@@ -12,9 +12,9 @@
 //!
 //! Each network maintains completely isolated trust models with no cross-network data leakage.
 
-use async_trait::async_trait;
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -22,16 +22,16 @@ use uuid::Uuid;
 
 // Re-export handlers
 pub mod anonymous;
-pub mod p2p;
 pub mod federated;
+pub mod p2p;
 pub mod public;
 
 #[cfg(test)]
 mod tests;
 
 pub use anonymous::AnonymousNetworkHandler;
-pub use p2p::P2PNetworkHandler;
 pub use federated::FederatedNetworkHandler;
+pub use p2p::P2PNetworkHandler;
 pub use public::PublicNetworkHandler;
 
 /// Network type determines trust model
@@ -285,15 +285,19 @@ impl StoqTransport {
     }
 
     /// Exchange certificates with peer (for P2P mode)
-    pub async fn exchange_certificate(&self, peer_addr: &str, _local_cert: &Certificate) -> Result<Certificate> {
+    pub async fn exchange_certificate(
+        &self,
+        peer_addr: &str,
+        _local_cert: &Certificate,
+    ) -> Result<Certificate> {
         // Placeholder implementation
         // In production, would use STOQ protocol to exchange certificates
         Ok(Certificate {
-            subject: format!("peer:{}", peer_addr),
-            issuer: format!("peer:{}", peer_addr),
+            subject: format!("peer:{peer_addr}"),
+            issuer: format!("peer:{peer_addr}"),
             public_key: vec![0; 32],
             signature: vec![0; 64],
-            fingerprint: format!("fingerprint:{}", peer_addr),
+            fingerprint: format!("fingerprint:{peer_addr}"),
             expires_at: 0,
             network_type: NetworkType::P2P,
             blockchain_registered: false,
@@ -342,7 +346,10 @@ pub fn generate_ephemeral_key() -> EphemeralKey {
 }
 
 /// Request federation membership from gateway
-pub async fn request_federation_membership(gateway_url: &str, _stoq: &Arc<StoqTransport>) -> Result<Certificate> {
+pub async fn request_federation_membership(
+    gateway_url: &str,
+    _stoq: &Arc<StoqTransport>,
+) -> Result<Certificate> {
     // Placeholder implementation
     // In production, would connect to federation gateway and request membership
     Ok(Certificate {
@@ -350,15 +357,20 @@ pub async fn request_federation_membership(gateway_url: &str, _stoq: &Arc<StoqTr
         issuer: gateway_url.to_string(),
         public_key: vec![0; 32],
         signature: vec![0; 64],
-        fingerprint: format!("federation:{}", gateway_url),
+        fingerprint: format!("federation:{gateway_url}"),
         expires_at: 0,
-        network_type: NetworkType::Federated { gateway_url: gateway_url.to_string() },
+        network_type: NetworkType::Federated {
+            gateway_url: gateway_url.to_string(),
+        },
         blockchain_registered: false,
     })
 }
 
 /// Request blockchain certificate from trust.hypermesh.online
-pub async fn request_blockchain_certificate(_stoq: &Arc<StoqTransport>, _proof: &ProofOfState) -> Result<Certificate> {
+pub async fn request_blockchain_certificate(
+    _stoq: &Arc<StoqTransport>,
+    _proof: &ProofOfState,
+) -> Result<Certificate> {
     // Placeholder implementation
     // In production, would submit proof to trust.hypermesh.online
     Ok(Certificate {
@@ -385,4 +397,3 @@ mod stoq {
     pub struct StoqTransport;
     pub struct _Connection;
 }
-

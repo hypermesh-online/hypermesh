@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime};
 
 use rcgen::{CertificateParams, Ia5String, KeyPair, SanType};
 
-use crate::errors::{TrustChainError, Result};
+use crate::errors::{Result, TrustChainError};
 
 /// Configuration for ephemeral certificate generation.
 pub struct EphemeralCertConfig {
@@ -73,7 +73,11 @@ impl EphemeralCertificateGenerator {
 
     /// Generate an ephemeral self-signed certificate.
     pub fn generate(&self) -> Result<EphemeralCertificate> {
-        let cn = format!("{}-{}", self.config.common_name_prefix, uuid::Uuid::new_v4());
+        let cn = format!(
+            "{}-{}",
+            self.config.common_name_prefix,
+            uuid::Uuid::new_v4()
+        );
         self.generate_inner(&cn, None, None)
     }
 
@@ -118,26 +122,23 @@ impl EphemeralCertificateGenerator {
 
         // If tunnel metadata is present, add a SAN so it is visible in the cert.
         if let (Some(tid), Some(hop)) = (&tunnel_id, hop_number) {
-            let tunnel_san = format!("{}-hop{}.tunnel.local", tid, hop);
+            let tunnel_san = format!("{tid}-hop{hop}.tunnel.local");
             let tunnel_ia5 = Ia5String::try_from(tunnel_san.as_str()).map_err(|e| {
                 TrustChainError::CertificateGenerationFailed {
                     reason: format!("invalid tunnel SAN: {e}"),
                 }
             })?;
-            params
-                .subject_alt_names
-                .push(SanType::DnsName(tunnel_ia5));
+            params.subject_alt_names.push(SanType::DnsName(tunnel_ia5));
         }
 
         params.not_before = now.into();
         params.not_after = expires_at.into();
 
         // Generate a fresh key pair and self-sign.
-        let key_pair = KeyPair::generate().map_err(|e| {
-            TrustChainError::CertificateGenerationFailed {
+        let key_pair =
+            KeyPair::generate().map_err(|e| TrustChainError::CertificateGenerationFailed {
                 reason: format!("key generation: {e}"),
-            }
-        })?;
+            })?;
 
         let cert = params.self_signed(&key_pair).map_err(|e| {
             TrustChainError::CertificateGenerationFailed {
@@ -181,8 +182,14 @@ mod tests {
         let cert = gen.generate().expect("test: generate ephemeral cert");
 
         assert!(!cert.cert_der.is_empty(), "cert DER should be non-empty");
-        assert!(!cert.private_key_der.is_empty(), "private key should be non-empty");
-        assert_ne!(cert.fingerprint, [0u8; 32], "fingerprint should be non-zero");
+        assert!(
+            !cert.private_key_der.is_empty(),
+            "private key should be non-empty"
+        );
+        assert_ne!(
+            cert.fingerprint, [0u8; 32],
+            "fingerprint should be non-zero"
+        );
         assert!(cert.tunnel_id.is_none());
         assert!(cert.hop_number.is_none());
 
@@ -212,7 +219,10 @@ mod tests {
         let a = gen.generate().expect("test: cert a");
         let b = gen.generate().expect("test: cert b");
 
-        assert_ne!(a.fingerprint, b.fingerprint, "two certs must have different fingerprints");
+        assert_ne!(
+            a.fingerprint, b.fingerprint,
+            "two certs must have different fingerprints"
+        );
     }
 
     #[test]

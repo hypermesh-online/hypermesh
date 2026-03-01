@@ -182,10 +182,7 @@ mod tests {
 
         assert_eq!(recipients.len(), 1);
         assert_eq!(recipients[0], opted);
-        assert_eq!(
-            mgr.get_status("content-001"),
-            Some(PushStatus::Pending)
-        );
+        assert_eq!(mgr.get_status("content-001"), Some(PushStatus::Pending));
     }
 
     #[test]
@@ -199,18 +196,11 @@ mod tests {
 
         mgr.mark_delivered("content-001")
             .expect("test: mark delivered");
-        assert_eq!(
-            mgr.get_status("content-001"),
-            Some(PushStatus::Delivered)
-        );
+        assert_eq!(mgr.get_status("content-001"), Some(PushStatus::Delivered));
 
         // Mark as failed after delivered (allowed -- status overwrite).
-        mgr.mark_failed("content-001")
-            .expect("test: mark failed");
-        assert_eq!(
-            mgr.get_status("content-001"),
-            Some(PushStatus::Failed)
-        );
+        mgr.mark_failed("content-001").expect("test: mark failed");
+        assert_eq!(mgr.get_status("content-001"), Some(PushStatus::Failed));
     }
 
     #[test]
@@ -218,18 +208,12 @@ mod tests {
         let mut mgr = ContentPushManager::new();
 
         // No one opted in.
-        let request = test_request(vec![
-            NodeId::from("node-x"),
-            NodeId::from("node-y"),
-        ]);
+        let request = test_request(vec![NodeId::from("node-x"), NodeId::from("node-y")]);
         let recipients = mgr.submit_push(request);
 
         assert!(recipients.is_empty());
         // When no recipients are eligible, status is Failed.
-        assert_eq!(
-            mgr.get_status("content-001"),
-            Some(PushStatus::Failed)
-        );
+        assert_eq!(mgr.get_status("content-001"), Some(PushStatus::Failed));
         assert_eq!(mgr.active_push_count(), 0);
     }
 }

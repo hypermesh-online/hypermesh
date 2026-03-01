@@ -6,19 +6,19 @@
 //!
 //! Measures validation latency, throughput, and resource usage.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration, Instant};
 use std::net::Ipv6Addr;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
 
-use tokio::sync::Semaphore;
 use anyhow::Result;
+use tokio::sync::Semaphore;
 use tracing::{info, warn};
 
 use trustchain::ca::CertificateRequest;
 use trustchain::consensus::{
+    hypermesh_client::{HyperMeshClientConfig, HyperMeshConsensusClient},
     ConsensusProof, ConsensusRequirements,
-    hypermesh_client::{HyperMeshConsensusClient, HyperMeshClientConfig},
 };
 
 /// Initialize tracing for performance tests
@@ -46,7 +46,7 @@ struct PerfStats {
 }
 
 impl PerfStats {
-    fn from_latencies(latencies: &mut Vec<u64>, duration: Duration) -> Self {
+    fn from_latencies(latencies: &mut [u64], duration: Duration) -> Self {
         latencies.sort_unstable();
 
         let total = latencies.len() as u64;
@@ -61,9 +61,18 @@ impl PerfStats {
             0
         };
 
-        let p50 = latencies.get(latencies.len() * 50 / 100).copied().unwrap_or(0);
-        let p95 = latencies.get(latencies.len() * 95 / 100).copied().unwrap_or(0);
-        let p99 = latencies.get(latencies.len() * 99 / 100).copied().unwrap_or(0);
+        let p50 = latencies
+            .get(latencies.len() * 50 / 100)
+            .copied()
+            .unwrap_or(0);
+        let p95 = latencies
+            .get(latencies.len() * 95 / 100)
+            .copied()
+            .unwrap_or(0);
+        let p99 = latencies
+            .get(latencies.len() * 99 / 100)
+            .copied()
+            .unwrap_or(0);
 
         let throughput = total as f64 / duration.as_secs_f64();
 
@@ -86,41 +95,83 @@ impl PerfStats {
         info!("\n╔═══════════════════════════════════════════════════════════════╗");
         info!("║ Performance Test: {:<44} ║", test_name);
         info!("╠═══════════════════════════════════════════════════════════════╣");
-        info!("║ Total Requests:        {:>10}                              ║", self.total_requests);
-        info!("║ Successful:            {:>10}                              ║", self.successful_requests);
-        info!("║ Failed:                {:>10}                              ║", self.failed_requests);
+        info!(
+            "║ Total Requests:        {:>10}                              ║",
+            self.total_requests
+        );
+        info!(
+            "║ Successful:            {:>10}                              ║",
+            self.successful_requests
+        );
+        info!(
+            "║ Failed:                {:>10}                              ║",
+            self.failed_requests
+        );
         info!("╠═══════════════════════════════════════════════════════════════╣");
         info!("║ Latency Statistics (microseconds):                           ║");
-        info!("║   Minimum:             {:>10} μs                            ║", self.min_latency_us);
-        info!("║   Maximum:             {:>10} μs                            ║", self.max_latency_us);
-        info!("║   Average:             {:>10} μs                            ║", self.avg_latency_us);
-        info!("║   Median (p50):        {:>10} μs                            ║", self.p50_latency_us);
-        info!("║   p95:                 {:>10} μs                            ║", self.p95_latency_us);
-        info!("║   p99:                 {:>10} μs                            ║", self.p99_latency_us);
+        info!(
+            "║   Minimum:             {:>10} μs                            ║",
+            self.min_latency_us
+        );
+        info!(
+            "║   Maximum:             {:>10} μs                            ║",
+            self.max_latency_us
+        );
+        info!(
+            "║   Average:             {:>10} μs                            ║",
+            self.avg_latency_us
+        );
+        info!(
+            "║   Median (p50):        {:>10} μs                            ║",
+            self.p50_latency_us
+        );
+        info!(
+            "║   p95:                 {:>10} μs                            ║",
+            self.p95_latency_us
+        );
+        info!(
+            "║   p99:                 {:>10} μs                            ║",
+            self.p99_latency_us
+        );
         info!("╠═══════════════════════════════════════════════════════════════╣");
-        info!("║ Throughput:            {:>10.2} req/sec                      ║", self.throughput_per_sec);
-        info!("║ Total Duration:        {:>10.2} seconds                      ║", self.total_duration_secs);
+        info!(
+            "║ Throughput:            {:>10.2} req/sec                      ║",
+            self.throughput_per_sec
+        );
+        info!(
+            "║ Total Duration:        {:>10.2} seconds                      ║",
+            self.total_duration_secs
+        );
         info!("╚═══════════════════════════════════════════════════════════════╝\n");
     }
 
+    #[allow(dead_code)]
     fn check_target(&self, target_latency_us: u64, target_throughput: f64) -> bool {
         let latency_ok = self.avg_latency_us < target_latency_us;
         let throughput_ok = self.throughput_per_sec > target_throughput;
 
         if !latency_ok {
-            warn!("⚠️  Latency target MISSED: {} μs > {} μs (target)",
-                  self.avg_latency_us, target_latency_us);
+            warn!(
+                "⚠️  Latency target MISSED: {} μs > {} μs (target)",
+                self.avg_latency_us, target_latency_us
+            );
         } else {
-            info!("✅ Latency target MET: {} μs < {} μs (target)",
-                  self.avg_latency_us, target_latency_us);
+            info!(
+                "✅ Latency target MET: {} μs < {} μs (target)",
+                self.avg_latency_us, target_latency_us
+            );
         }
 
         if !throughput_ok {
-            warn!("⚠️  Throughput target MISSED: {:.2} req/s < {:.2} req/s (target)",
-                  self.throughput_per_sec, target_throughput);
+            warn!(
+                "⚠️  Throughput target MISSED: {:.2} req/s < {:.2} req/s (target)",
+                self.throughput_per_sec, target_throughput
+            );
         } else {
-            info!("✅ Throughput target MET: {:.2} req/s > {:.2} req/s (target)",
-                  self.throughput_per_sec, target_throughput);
+            info!(
+                "✅ Throughput target MET: {:.2} req/s > {:.2} req/s (target)",
+                self.throughput_per_sec, target_throughput
+            );
         }
 
         latency_ok && throughput_ok
@@ -149,13 +200,16 @@ async fn bench_single_request_latency() -> Result<()> {
     let mut latencies = Vec::new();
     let iterations = 100;
 
-    info!("Running {} single request latency measurements...", iterations);
+    info!(
+        "Running {} single request latency measurements...",
+        iterations
+    );
 
     for i in 0..iterations {
         let cert_request = CertificateRequest {
-            common_name: format!("latency-test-{}.hypermesh.online", i),
+            common_name: format!("latency-test-{i}.hypermesh.online"),
             san_entries: vec![format!("latency-test-{}.hypermesh.online", i)],
-            node_id: format!("test_node_{:03}", i),
+            node_id: format!("test_node_{i:03}"),
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
@@ -173,7 +227,8 @@ async fn bench_single_request_latency() -> Result<()> {
         let latency = start.elapsed().as_micros() as u64;
 
         // Only count if it's a reasonable latency (not timeout)
-        if latency < 1_000_000 { // < 1 second
+        if latency < 1_000_000 {
+            // < 1 second
             latencies.push(latency);
         }
     }
@@ -220,9 +275,9 @@ async fn bench_sequential_throughput() -> Result<()> {
 
     for i in 0..iterations {
         let cert_request = CertificateRequest {
-            common_name: format!("throughput-test-{}.hypermesh.online", i),
+            common_name: format!("throughput-test-{i}.hypermesh.online"),
             san_entries: vec![format!("throughput-test-{}.hypermesh.online", i)],
-            node_id: format!("test_node_{:03}", i),
+            node_id: format!("test_node_{i:03}"),
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
@@ -236,7 +291,8 @@ async fn bench_sequential_throughput() -> Result<()> {
             .await;
 
         let latency = start.elapsed().as_micros() as u64;
-        if latency < 500_000 { // < 500ms
+        if latency < 500_000 {
+            // < 500ms
             latencies.push(latency);
         }
     }
@@ -294,9 +350,9 @@ async fn bench_concurrent_load() -> Result<()> {
                 let _permit = sem.acquire().await.unwrap();
 
                 let cert_request = CertificateRequest {
-                    common_name: format!("concurrent-{}-{}.hypermesh.online", concurrency, i),
+                    common_name: format!("concurrent-{concurrency}-{i}.hypermesh.online"),
                     san_entries: vec![format!("concurrent-{}-{}.hypermesh.online", concurrency, i)],
-                    node_id: format!("test_node_{:03}", i),
+                    node_id: format!("test_node_{i:03}"),
                     ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                     consensus_proof: ConsensusProof::new_for_testing(),
                     timestamp: SystemTime::now(),
@@ -310,7 +366,8 @@ async fn bench_concurrent_load() -> Result<()> {
                     .await;
 
                 let latency = start.elapsed().as_micros() as u64;
-                if latency < 500_000 { // < 500ms
+                if latency < 500_000 {
+                    // < 500ms
                     lats.lock().await.push(latency);
                 }
             });
@@ -328,12 +385,15 @@ async fn bench_concurrent_load() -> Result<()> {
         let mut lats = latencies.lock().await.clone();
 
         if lats.is_empty() {
-            info!("⚠️  No successful measurements at concurrency {}", concurrency);
+            info!(
+                "⚠️  No successful measurements at concurrency {}",
+                concurrency
+            );
             continue;
         }
 
         let stats = PerfStats::from_latencies(&mut lats, total_duration);
-        stats.print_summary(&format!("Concurrent Load ({})", concurrency));
+        stats.print_summary(&format!("Concurrent Load ({concurrency})"));
     }
 
     info!("Note: This test measures client overhead without server");
@@ -359,7 +419,10 @@ async fn bench_memory_usage() -> Result<()> {
 
     let counter = Arc::new(AtomicU64::new(0));
 
-    info!("Submitting {} requests with {} concurrency...", total_requests, concurrent_requests);
+    info!(
+        "Submitting {} requests with {} concurrency...",
+        total_requests, concurrent_requests
+    );
 
     let start = Instant::now();
     let mut handles = vec![];
@@ -373,9 +436,9 @@ async fn bench_memory_usage() -> Result<()> {
             let _permit = sem.acquire().await.unwrap();
 
             let cert_request = CertificateRequest {
-                common_name: format!("memory-test-{}.hypermesh.online", i),
+                common_name: format!("memory-test-{i}.hypermesh.online"),
                 san_entries: vec![format!("memory-test-{}.hypermesh.online", i)],
-                node_id: format!("test_node_{:03}", i),
+                node_id: format!("test_node_{i:03}"),
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
@@ -402,7 +465,10 @@ async fn bench_memory_usage() -> Result<()> {
     let completed = counter.load(Ordering::Relaxed);
 
     info!("Completed {} requests in {:?}", completed, duration);
-    info!("Throughput: {:.2} req/sec", completed as f64 / duration.as_secs_f64());
+    info!(
+        "Throughput: {:.2} req/sec",
+        completed as f64 / duration.as_secs_f64()
+    );
 
     info!("✅ Memory usage test completed");
     info!("Note: Use external tools (htop, valgrind) for detailed memory profiling");

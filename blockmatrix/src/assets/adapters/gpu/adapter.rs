@@ -4,17 +4,15 @@
 
 //! AssetAdapter trait implementation for GpuAssetAdapter.
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::SystemTime;
-use async_trait::async_trait;
 
 use crate::assets::core::{
-    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
-    AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyMode, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, GpuUsage,
-    AdapterHealth, AdapterCapabilities,
-    NetworkScope, AssetCategory, BaseSystemType, AssetData,
+    AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
+    AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
+    AssetType, BaseSystemType, GpuUsage, NetworkScope, PrivacyMode, ProxyAddress, ResourceLimits,
+    ResourceUsage,
 };
 
 use super::types::*;
@@ -25,10 +23,13 @@ impl AssetAdapter for GpuAssetAdapter {
         AssetType::Gpu
     }
 
-    async fn validate_consensus_proof(&self, proof: &crate::assets::core::ConsensusProof) -> AssetResult<bool> {
+    async fn validate_consensus_proof(
+        &self,
+        proof: &crate::assets::core::ConsensusProof,
+    ) -> AssetResult<bool> {
         // Check if this is a test proof
-        let is_test_proof = proof.stake_proof.stake_holder_id == "test_stake_holder" &&
-                           proof.space_proof.node_id == "test_node_001";
+        let is_test_proof = proof.stake_proof.stake_holder_id == "test_stake_holder"
+            && proof.space_proof.node_id == "test_node_001";
 
         if is_test_proof {
             return Ok(true);
@@ -44,7 +45,7 @@ impl AssetAdapter for GpuAssetAdapter {
 
         if !valid {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: "GPU consensus proof validation failed".to_string()
+                reason: "GPU consensus proof validation failed".to_string(),
             });
         }
 
@@ -61,24 +62,38 @@ impl AssetAdapter for GpuAssetAdapter {
             return Ok(false);
         }
 
-        let time_valid = proof.time_proof.time_verification_timestamp.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() > 0).unwrap_or(false) &&
-                        proof.time_proof.nonce > 0;
+        let time_valid = proof
+            .time_proof
+            .time_verification_timestamp
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() > 0)
+            .unwrap_or(false)
+            && proof.time_proof.nonce > 0;
 
         Ok(time_valid)
     }
 
-    async fn allocate_asset(&self, request: &AssetAllocationRequest) -> AssetResult<AssetAllocation> {
+    async fn allocate_asset(
+        &self,
+        request: &AssetAllocationRequest,
+    ) -> AssetResult<AssetAllocation> {
         // Validate consensus proof first
-        if !self.validate_consensus_proof(&request.consensus_proof).await? {
+        if !self
+            .validate_consensus_proof(&request.consensus_proof)
+            .await?
+        {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: "GPU allocation consensus validation failed".to_string()
+                reason: "GPU allocation consensus validation failed".to_string(),
             });
         }
 
         // Get GPU requirements
-        let gpu_req = request.requested_resources.gpu_usage.as_ref()
+        let gpu_req = request
+            .requested_resources
+            .gpu_usage
+            .as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
-                reason: "No GPU requirements specified".to_string()
+                reason: "No GPU requirements specified".to_string(),
             })?;
 
         // Create asset ID with real content-based hash
@@ -94,7 +109,8 @@ impl AssetAdapter for GpuAssetAdapter {
         );
 
         // Allocate GPU devices and memory
-        let (allocated_devices, allocated_memory) = self.allocate_gpu_devices(gpu_req, &asset_id).await?;
+        let (allocated_devices, allocated_memory) =
+            self.allocate_gpu_devices(gpu_req, &asset_id).await?;
 
         // Generate proxy address
         let proxy_address = Self::generate_proxy_address(&asset_id).await;
@@ -111,9 +127,12 @@ impl AssetAdapter for GpuAssetAdapter {
             asset_id: asset_id.clone(),
             allocated_devices: allocated_devices.clone(),
             allocated_memory_bytes: allocated_memory,
-            compute_capability: gpu_req.compute_capability.clone().unwrap_or_else(|| "8.0".to_string()),
+            compute_capability: gpu_req
+                .compute_capability
+                .clone()
+                .unwrap_or_else(|| "8.0".to_string()),
             enabled_features: gpu_req.required_features.clone(),
-            privacy_level: request.privacy_level.clone(),
+            privacy_level: request.privacy_level,
             isolation_enabled: true,
             compute_priority: 128,
             allocated_at: SystemTime::now(),
@@ -135,7 +154,8 @@ impl AssetAdapter for GpuAssetAdapter {
         }
 
         // Update usage statistics
-        self.update_usage_stats(GpuOperation::Allocate, gpu_req.units, allocated_memory).await;
+        self.update_usage_stats(GpuOperation::Allocate, gpu_req.units, allocated_memory)
+            .await;
 
         Ok(AssetAllocation {
             asset_id: asset_id.clone(),
@@ -158,14 +178,17 @@ impl AssetAdapter for GpuAssetAdapter {
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
-                performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
+                performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(
+                ),
             },
             allocation_config: crate::assets::core::privacy::AllocationConfig {
-                privacy_level: request.privacy_level.clone(),
-                resource_allocation: crate::assets::core::privacy::ResourceAllocationConfig::default(),
+                privacy_level: request.privacy_level,
+                resource_allocation:
+                    crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements: crate::assets::core::privacy::ConsensusRequirements::default(),
+                consensus_requirements:
+                    crate::assets::core::privacy::ConsensusRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -182,9 +205,10 @@ impl AssetAdapter for GpuAssetAdapter {
     async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         let allocation = {
             let mut allocations = self.allocations.write().await;
-            allocations.remove(asset_id)
+            allocations
+                .remove(asset_id)
                 .ok_or_else(|| AssetError::AssetNotFound {
-                    asset_id: asset_id.to_string()
+                    asset_id: asset_id.to_string(),
                 })?
         };
 
@@ -193,7 +217,8 @@ impl AssetAdapter for GpuAssetAdapter {
             let mut devices = self.gpu_devices.write().await;
             let mut device_allocations = self.device_allocations.write().await;
 
-            let memory_per_device = allocation.allocated_memory_bytes / allocation.allocated_devices.len() as u64;
+            let memory_per_device =
+                allocation.allocated_memory_bytes / allocation.allocated_devices.len() as u64;
 
             for device_id in &allocation.allocated_devices {
                 if let Some(device) = devices.get_mut(device_id) {
@@ -220,8 +245,9 @@ impl AssetAdapter for GpuAssetAdapter {
         self.update_usage_stats(
             GpuOperation::Deallocate,
             allocation.allocated_devices.len() as u32,
-            allocation.allocated_memory_bytes
-        ).await;
+            allocation.allocated_memory_bytes,
+        )
+        .await;
 
         tracing::info!(
             "Deallocated GPU asset: {} ({} devices, {} MB memory)",
@@ -234,9 +260,10 @@ impl AssetAdapter for GpuAssetAdapter {
 
     async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
-        let allocation = allocations.get(asset_id)
+        let allocation = allocations
+            .get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         Ok(AssetStatus {
@@ -244,7 +271,7 @@ impl AssetAdapter for GpuAssetAdapter {
             state: AssetState::InUse,
             allocated_at: allocation.allocated_at,
             last_accessed: allocation.last_accessed,
-            privacy_level: allocation.privacy_level.clone(),
+            privacy_level: allocation.privacy_level,
             proxy_address: None,
             resource_usage: self.get_resource_usage(asset_id).await?,
             consensus_proofs: Vec::new(),
@@ -253,32 +280,66 @@ impl AssetAdapter for GpuAssetAdapter {
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
             metadata: {
                 let mut metadata = HashMap::new();
-                metadata.insert("devices".to_string(), allocation.allocated_devices.len().to_string());
-                metadata.insert("allocated_devices".to_string(), format!("{:?}", allocation.allocated_devices));
-                metadata.insert("memory_bytes".to_string(), allocation.allocated_memory_bytes.to_string());
-                metadata.insert("compute_capability".to_string(), allocation.compute_capability.clone());
-                metadata.insert("utilization_percent".to_string(), allocation.current_utilization.to_string());
-                metadata.insert("memory_utilization_percent".to_string(), allocation.memory_utilization.to_string());
-                metadata.insert("isolation_enabled".to_string(), allocation.isolation_enabled.to_string());
+                metadata.insert(
+                    "devices".to_string(),
+                    allocation.allocated_devices.len().to_string(),
+                );
+                metadata.insert(
+                    "allocated_devices".to_string(),
+                    format!("{:?}", allocation.allocated_devices),
+                );
+                metadata.insert(
+                    "memory_bytes".to_string(),
+                    allocation.allocated_memory_bytes.to_string(),
+                );
+                metadata.insert(
+                    "compute_capability".to_string(),
+                    allocation.compute_capability.clone(),
+                );
+                metadata.insert(
+                    "utilization_percent".to_string(),
+                    allocation.current_utilization.to_string(),
+                );
+                metadata.insert(
+                    "memory_utilization_percent".to_string(),
+                    allocation.memory_utilization.to_string(),
+                );
+                metadata.insert(
+                    "isolation_enabled".to_string(),
+                    allocation.isolation_enabled.to_string(),
+                );
                 metadata
             },
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
+    async fn configure_privacy_level(
+        &self,
+        asset_id: &AssetRegistration,
+        privacy: PrivacyMode,
+    ) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
-        let allocation = allocations.get_mut(asset_id)
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let allocation =
+            allocations
+                .get_mut(asset_id)
+                .ok_or_else(|| AssetError::AssetNotFound {
+                    asset_id: asset_id.to_string(),
+                })?;
 
-        allocation.privacy_level = privacy.clone();
+        allocation.privacy_level = privacy;
 
-        tracing::info!("Updated privacy level for GPU asset {}: {:?}", asset_id, privacy);
+        tracing::info!(
+            "Updated privacy level for GPU asset {}: {:?}",
+            asset_id,
+            privacy
+        );
         Ok(())
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> AssetResult<ProxyAddress> {
         let proxy_address = Self::generate_proxy_address(asset_id).await;
 
         let proxy_mappings = self.proxy_mappings.read().await;
@@ -291,20 +352,25 @@ impl AssetAdapter for GpuAssetAdapter {
         Ok(proxy_address)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
+    async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
-        proxy_mappings.get(proxy_addr)
+        proxy_mappings
+            .get(proxy_addr)
             .cloned()
             .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                address: proxy_addr.clone()
+                address: proxy_addr.clone(),
             })
     }
 
     async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
-        let allocation = allocations.get(asset_id)
+        let allocation = allocations
+            .get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         let mut temperature = None;
@@ -336,7 +402,11 @@ impl AssetAdapter for GpuAssetAdapter {
         })
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(
+        &self,
+        asset_id: &AssetRegistration,
+        limits: ResourceLimits,
+    ) -> AssetResult<()> {
         if let Some(gpu_limit) = limits.gpu_limit {
             tracing::info!(
                 "Set GPU limits for asset {}: max devices {}, max memory {} MB, max utilization {}%",
@@ -353,21 +423,41 @@ impl AssetAdapter for GpuAssetAdapter {
         let stats = self.usage_stats.read().await;
         let devices = self.gpu_devices.read().await;
 
-        let available_devices = devices.values().filter(|device| matches!(device.status, GpuStatus::Available)).count();
+        let available_devices = devices
+            .values()
+            .filter(|device| matches!(device.status, GpuStatus::Available))
+            .count();
         let healthy = available_devices > 0 && stats.active_allocations < self.total_devices as u64;
 
         let total_memory = devices.values().map(|d| d.total_memory_bytes).sum::<u64>();
-        let available_memory = devices.values().map(|d| d.available_memory_bytes).sum::<u64>();
+        let available_memory = devices
+            .values()
+            .map(|d| d.available_memory_bytes)
+            .sum::<u64>();
 
         let mut performance_metrics = HashMap::new();
         performance_metrics.insert("total_devices".to_string(), self.total_devices as f64);
         performance_metrics.insert("available_devices".to_string(), available_devices as f64);
-        performance_metrics.insert("total_memory_gb".to_string(), (total_memory / (1024 * 1024 * 1024)) as f64);
-        performance_metrics.insert("available_memory_gb".to_string(), (available_memory / (1024 * 1024 * 1024)) as f64);
-        performance_metrics.insert("memory_utilization_percent".to_string(),
-            ((total_memory - available_memory) as f64 / total_memory as f64) * 100.0);
-        performance_metrics.insert("active_allocations".to_string(), stats.active_allocations as f64);
-        performance_metrics.insert("compute_operations".to_string(), stats.compute_operations as f64);
+        performance_metrics.insert(
+            "total_memory_gb".to_string(),
+            (total_memory / (1024 * 1024 * 1024)) as f64,
+        );
+        performance_metrics.insert(
+            "available_memory_gb".to_string(),
+            (available_memory / (1024 * 1024 * 1024)) as f64,
+        );
+        performance_metrics.insert(
+            "memory_utilization_percent".to_string(),
+            ((total_memory - available_memory) as f64 / total_memory as f64) * 100.0,
+        );
+        performance_metrics.insert(
+            "active_allocations".to_string(),
+            stats.active_allocations as f64,
+        );
+        performance_metrics.insert(
+            "compute_operations".to_string(),
+            stats.compute_operations as f64,
+        );
 
         Ok(AdapterHealth {
             healthy,

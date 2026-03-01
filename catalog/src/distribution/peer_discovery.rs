@@ -6,17 +6,17 @@
 //!
 //! Implements multiple discovery mechanisms for finding peers in the network
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
-use std::net::{SocketAddr, Ipv6Addr};
-use std::time::{Duration, SystemTime};
+use std::net::{Ipv6Addr, SocketAddr};
 use std::str::FromStr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 
 use super::{
-    stoq_transport::StoqTransportLayer,
     dht::{DhtNetwork, DhtNodeId},
+    stoq_transport::StoqTransportLayer,
 };
 
 /// Peer discovery service
@@ -141,10 +141,7 @@ struct MdnsDiscovery {
 
 impl PeerDiscovery {
     /// Create a new peer discovery service
-    pub async fn new(
-        transport: Arc<StoqTransportLayer>,
-        dht: Arc<DhtNetwork>,
-    ) -> Result<Self> {
+    pub async fn new(transport: Arc<StoqTransportLayer>, dht: Arc<DhtNetwork>) -> Result<Self> {
         let config = DiscoveryConfig::default();
         let known_peers = Arc::new(RwLock::new(PeerRegistry::new()));
 
@@ -157,8 +154,8 @@ impl PeerDiscovery {
 
         // Default bootstrap nodes
         let bootstrap_nodes = vec![
-            SocketAddr::from((Ipv6Addr::from_str("2001:db8::1").unwrap(), 8080)),
-            SocketAddr::from((Ipv6Addr::from_str("2001:db8::2").unwrap(), 8080)),
+            SocketAddr::from((Ipv6Addr::from_str("2001:db8::1").expect("hardcoded IPv6 address is valid"), 8080)),
+            SocketAddr::from((Ipv6Addr::from_str("2001:db8::2").expect("hardcoded IPv6 address is valid"), 8080)),
         ];
 
         let discovery = Self {
@@ -304,18 +301,16 @@ impl PeerDiscovery {
 
         for peer_id in connected_peers {
             // Request peer list from connected peer
-            match self.transport.send_request(
-                &peer_id,
-                super::stoq_transport::RequestType::GetPeers,
-            ).await {
-                Ok(super::stoq_transport::ResponseData::Peers(peers)) => {
-                    for new_peer_id in peers {
-                        // Note: We'd need to get full peer info here
-                        // For now, just track that we discovered it
-                        tracing::debug!("Discovered peer {} via exchange", new_peer_id);
-                    }
+            if let Ok(super::stoq_transport::ResponseData::Peers(peers)) = self
+                .transport
+                .send_request(&peer_id, super::stoq_transport::RequestType::GetPeers)
+                .await
+            {
+                for new_peer_id in peers {
+                    // Note: We'd need to get full peer info here
+                    // For now, just track that we discovered it
+                    tracing::debug!("Discovered peer {} via exchange", new_peer_id);
                 }
-                _ => {}
             }
         }
 
@@ -334,10 +329,11 @@ impl PeerDiscovery {
         // Check if we're at max peers
         if registry.peers.len() >= self.config.max_peers {
             // Only add if better quality than existing peers
-            let min_quality = registry.peers
+            let min_quality = registry
+                .peers
                 .values()
                 .map(|p| p.quality_score)
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .min_by(|a, b| a.partial_cmp(b).expect("quality scores should be valid for comparison"))
                 .unwrap_or(0.0);
 
             if peer_info.quality_score <= min_quality {
@@ -347,7 +343,8 @@ impl PeerDiscovery {
 
         // Add to registry
         for capability in &peer_info.capabilities {
-            registry.peers_by_capability
+            registry
+                .peers_by_capability
                 .entry(*capability)
                 .or_insert_with(HashSet::new)
                 .insert(peer_info.id.clone());
@@ -363,12 +360,13 @@ impl PeerDiscovery {
         let mut registry = self.known_peers.write().await;
 
         // Sort peers by quality score
-        let mut peers_by_quality: Vec<_> = registry.peers
+        let mut peers_by_quality: Vec<_> = registry
+            .peers
             .iter()
             .map(|(id, info)| (id.clone(), info.quality_score))
             .collect();
 
-        peers_by_quality.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        peers_by_quality.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("quality scores should be valid for comparison"));
 
         // Keep only the best peers
         let to_remove: Vec<_> = peers_by_quality
@@ -393,7 +391,8 @@ impl PeerDiscovery {
     /// Get peers with specific capability
     pub async fn get_peers_with_capability(&self, capability: PeerCapability) -> Vec<DhtNodeId> {
         let registry = self.known_peers.read().await;
-        registry.peers_by_capability
+        registry
+            .peers_by_capability
             .get(&capability)
             .map(|peers| peers.iter().cloned().collect())
             .unwrap_or_default()
@@ -459,7 +458,8 @@ impl PeerRegistry {
 
     fn clean_expired_peers(&mut self, ttl: Duration) {
         let now = SystemTime::now();
-        let expired: Vec<_> = self.peers
+        let expired: Vec<_> = self
+            .peers
             .iter()
             .filter_map(|(id, info)| {
                 if now.duration_since(info.last_seen).unwrap_or(Duration::MAX) > ttl {
@@ -532,9 +532,10 @@ mod tests {
 
         // Add peer
         for capability in &peer_info.capabilities {
-            registry.peers_by_capability
+            registry
+                .peers_by_capability
                 .entry(*capability)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(peer_id.clone());
         }
         registry.peers.insert(peer_id.clone(), peer_info);

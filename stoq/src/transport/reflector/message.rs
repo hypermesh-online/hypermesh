@@ -83,8 +83,7 @@ pub enum ReflectorMessage {
 impl ReflectorMessage {
     /// Serialize this message with a 4-byte LE length prefix.
     pub fn serialize_message(&self) -> Result<Vec<u8>> {
-        let payload = bincode::serialize(self)
-            .context("failed to serialize ReflectorMessage")?;
+        let payload = bincode::serialize(self).context("failed to serialize ReflectorMessage")?;
         let len = payload.len() as u32;
         let mut buf = Vec::with_capacity(4 + payload.len());
         buf.extend_from_slice(&len.to_le_bytes());

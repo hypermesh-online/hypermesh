@@ -7,9 +7,9 @@
 //! CRITICAL COMPONENT: Implements the core NAT-like memory addressing system
 //! that enables remote memory access via IPv6-like global addresses.
 
-pub mod types;
 pub mod routing;
 pub mod translation;
+pub mod types;
 
 // Re-export all public types
 pub use types::*;
@@ -35,7 +35,10 @@ mod tests {
         );
 
         assert_eq!(global_addr.service_port, 8080);
-        assert!(matches!(global_addr.address_type, GlobalAddressType::Memory));
+        assert!(matches!(
+            global_addr.address_type,
+            GlobalAddressType::Memory
+        ));
     }
 
     #[test]
@@ -84,21 +87,33 @@ mod tests {
             prefetch: true,
         };
 
-        let mapping = translator.create_translation(
-            global_addr.clone(),
-            1024 * 1024, // 1MB
-            permissions,
-        ).await.expect("test");
+        let mapping = translator
+            .create_translation(
+                global_addr.clone(),
+                1024 * 1024, // 1MB
+                permissions,
+            )
+            .await
+            .expect("test");
 
         assert_eq!(mapping.region_size, 1024 * 1024);
-        assert!(matches!(mapping.translation_state, TranslationState::Active));
+        assert!(matches!(
+            mapping.translation_state,
+            TranslationState::Active
+        ));
 
         // Test address translation
-        let local_addr = translator.translate_to_local(&global_addr).await.expect("test");
+        let local_addr = translator
+            .translate_to_local(&global_addr)
+            .await
+            .expect("test");
         assert_eq!(local_addr, mapping.local_address);
 
         // Test reverse translation
-        let reverse_global = translator.translate_to_global(local_addr).await.expect("test");
+        let reverse_global = translator
+            .translate_to_global(local_addr)
+            .await
+            .expect("test");
         assert_eq!(reverse_global.hash(), global_addr.hash());
     }
 
@@ -124,11 +139,14 @@ mod tests {
             prefetch: false,
         };
 
-        let mapping = translator.create_translation(
-            global_addr.clone(),
-            4096, // 4KB page
-            permissions,
-        ).await.expect("test");
+        let mapping = translator
+            .create_translation(
+                global_addr.clone(),
+                4096, // 4KB page
+                permissions,
+            )
+            .await
+            .expect("test");
 
         let local_ptr = mapping.local_address as *mut u8;
         #[allow(unsafe_code)]
@@ -145,7 +163,10 @@ mod tests {
             }
         }
 
-        translator.remove_translation(&global_addr).await.expect("test");
+        translator
+            .remove_translation(&global_addr)
+            .await
+            .expect("test");
 
         let stats = translator.get_stats().await.expect("test");
         assert_eq!(stats.active_translations, 0);
@@ -181,19 +202,25 @@ mod tests {
             require_consensus: false,
         };
 
-        let mapping = translator.create_translation_with_privacy(
-            global_addr.clone(),
-            8192, // 8KB
-            permissions,
-            privacy_config.clone(),
-        ).await.expect("test");
+        let mapping = translator
+            .create_translation_with_privacy(
+                global_addr.clone(),
+                8192, // 8KB
+                permissions,
+                privacy_config.clone(),
+            )
+            .await
+            .expect("test");
 
         assert!(mapping.privacy_config.is_some());
         let attached_privacy = mapping.privacy_config.expect("test");
         assert_eq!(attached_privacy.level, PrivacyMode::PRIVATE);
         assert_eq!(attached_privacy.max_concurrent_access, 5);
 
-        translator.remove_translation(&global_addr).await.expect("test");
+        translator
+            .remove_translation(&global_addr)
+            .await
+            .expect("test");
     }
 
     #[tokio::test]
@@ -227,14 +254,14 @@ mod tests {
             require_consensus: false,
         };
 
-        let result = translator.create_translation_with_privacy(
-            global_addr,
-            4096,
-            permissions,
-            invalid_privacy,
-        ).await;
+        let result = translator
+            .create_translation_with_privacy(global_addr, 4096, permissions, invalid_privacy)
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Private level should not have allowed networks or peers"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Private level should not have allowed networks or peers"));
     }
 }

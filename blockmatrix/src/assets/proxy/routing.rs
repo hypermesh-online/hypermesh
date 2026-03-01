@@ -7,15 +7,13 @@
 //! Implements intelligent routing for proxy traffic with load balancing,
 //! trust-based selection, and performance optimization.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{
-    AssetResult, AssetError, ProxyNodeInfo, PrivacyMode
-};
+use crate::assets::core::{AssetError, AssetResult, PrivacyMode, ProxyNodeInfo};
 
 /// Type alias for routing table
 pub type RouteTable = HashMap<String, Vec<ProxyRoute>>;
@@ -24,13 +22,13 @@ pub type RouteTable = HashMap<String, Vec<ProxyRoute>>;
 pub struct ProxyRouter {
     /// Routing table mapping destinations to routes
     routing_table: Arc<RwLock<HashMap<String, Vec<ProxyRoute>>>>,
-    
+
     /// Node registry for route calculation
     node_registry: Arc<RwLock<HashMap<String, ProxyNodeInfo>>>,
-    
+
     /// Route performance metrics
     route_metrics: Arc<RwLock<HashMap<String, RouteMetrics>>>,
-    
+
     /// Routing configuration
     config: RoutingConfig,
 }
@@ -40,28 +38,28 @@ pub struct ProxyRouter {
 pub struct ProxyRoute {
     /// Destination identifier
     pub destination: String,
-    
+
     /// Next hop proxy node
     pub next_hop: String,
-    
+
     /// Route cost/weight
     pub cost: u32,
-    
+
     /// Route type
     pub route_type: RouteType,
-    
+
     /// Whether this route requires authenticated nodes
     pub requires_authentication: bool,
-    
+
     /// Privacy level compatibility
     pub privacy_level: PrivacyMode,
-    
+
     /// Route capabilities
     pub capabilities: Vec<String>,
-    
+
     /// Route status
     pub status: RouteStatus,
-    
+
     /// Last updated timestamp
     pub last_updated: SystemTime,
 }
@@ -71,19 +69,19 @@ pub struct ProxyRoute {
 pub enum RouteType {
     /// Direct connection to destination
     Direct,
-    
+
     /// Single hop through proxy
     Proxy,
-    
+
     /// Multi-hop through proxy chain
     ProxyChain,
-    
+
     /// Load balanced across multiple proxies
     LoadBalanced,
-    
+
     /// Encrypted tunnel
     Tunnel,
-    
+
     /// High availability with failover
     HighAvailability,
 }
@@ -93,16 +91,16 @@ pub enum RouteType {
 pub enum RouteStatus {
     /// Route is active and available
     Active,
-    
+
     /// Route is temporarily unavailable
     Unavailable,
-    
+
     /// Route is degraded performance
     Degraded,
-    
+
     /// Route is under maintenance
     Maintenance,
-    
+
     /// Route has failed
     Failed,
 }
@@ -173,16 +171,16 @@ pub struct RoutingConfig {
 pub enum LoadBalanceAlgorithm {
     /// Round robin distribution
     RoundRobin,
-    
+
     /// Weight-based distribution
     Weighted,
-    
+
     /// Least connections
     LeastConnections,
-    
+
     /// Least latency
     LeastLatency,
-    
+
     /// Performance based
     PerformanceBased,
 }
@@ -205,19 +203,19 @@ impl Default for RoutingConfig {
 pub struct RouteRequest {
     /// Source node/address
     pub source: String,
-    
+
     /// Destination address
     pub destination: String,
-    
+
     /// Required capabilities
     pub required_capabilities: Vec<String>,
-    
+
     /// Privacy level requirements
     pub privacy_level: PrivacyMode,
-    
+
     /// Performance requirements
     pub performance_requirements: PerformanceRequirements,
-    
+
     /// Trust requirements
     pub trust_requirements: TrustRequirements,
 }
@@ -227,13 +225,13 @@ pub struct RouteRequest {
 pub struct PerformanceRequirements {
     /// Maximum acceptable latency in milliseconds
     pub max_latency_ms: f64,
-    
+
     /// Minimum required throughput in Mbps
     pub min_throughput_mbps: f64,
-    
+
     /// Minimum acceptable success rate
     pub min_success_rate: f64,
-    
+
     /// Maximum acceptable load
     pub max_load: f64,
 }
@@ -264,48 +262,55 @@ impl ProxyRouter {
             config: RoutingConfig::default(),
         })
     }
-    
+
     /// Add proxy node to routing registry
     pub async fn add_proxy_node(&self, node_info: &ProxyNodeInfo) -> AssetResult<()> {
         let mut registry = self.node_registry.write().await;
         let node_id_str = hex::encode(node_info.node_id);
         registry.insert(node_id_str, node_info.clone());
-        
+
         // Recalculate routes that might involve this node
         self.recalculate_routes().await?;
-        
-        tracing::info!("Added proxy node to routing registry: {:?}", node_info.node_id);
+
+        tracing::info!(
+            "Added proxy node to routing registry: {:?}",
+            node_info.node_id
+        );
         Ok(())
     }
-    
+
     /// Calculate best route for request
     pub async fn calculate_route(&self, request: &RouteRequest) -> AssetResult<ProxyRoute> {
         // Get available routes for destination
         let routes = {
             let table = self.routing_table.read().await;
-            table.get(&request.destination)
-                .cloned()
-                .unwrap_or_default()
+            table.get(&request.destination).cloned().unwrap_or_default()
         };
-        
+
         if routes.is_empty() {
             return Err(AssetError::AdapterError {
-                message: format!("No routes available for destination: {}", request.destination)
+                message: format!(
+                    "No routes available for destination: {}",
+                    request.destination
+                ),
             });
         }
-        
+
         // Filter routes based on requirements
         let suitable_routes = self.filter_routes(&routes, request).await?;
-        
+
         if suitable_routes.is_empty() {
             return Err(AssetError::AdapterError {
-                message: format!("No suitable routes for destination: {}", request.destination)
+                message: format!(
+                    "No suitable routes for destination: {}",
+                    request.destination
+                ),
             });
         }
-        
+
         // Select best route based on algorithm
         let best_route = self.select_best_route(&suitable_routes, request).await?;
-        
+
         tracing::debug!(
             "Selected route for {}: {} via {} (cost: {})",
             request.destination,
@@ -313,10 +318,10 @@ impl ProxyRouter {
             best_route.next_hop,
             best_route.cost
         );
-        
+
         Ok(best_route)
     }
-    
+
     /// Filter routes based on requirements
     async fn filter_routes(
         &self,
@@ -325,55 +330,60 @@ impl ProxyRouter {
     ) -> AssetResult<Vec<ProxyRoute>> {
         let metrics = self.route_metrics.read().await;
         let registry = self.node_registry.read().await;
-        
+
         let mut suitable_routes = Vec::new();
-        
+
         for route in routes {
             // Check route status
             if !matches!(route.status, RouteStatus::Active) {
                 continue;
             }
-            
+
             // Check authentication requirement
             if request.trust_requirements.require_authentication && !route.requires_authentication {
                 continue;
             }
-            
+
             // Check privacy level compatibility
             if !self.privacy_levels_compatible(&route.privacy_level, &request.privacy_level) {
                 continue;
             }
-            
+
             // Check capabilities
-            let has_required_caps = request.required_capabilities.iter()
+            let has_required_caps = request
+                .required_capabilities
+                .iter()
                 .all(|cap| route.capabilities.contains(cap));
             if !has_required_caps {
                 continue;
             }
-            
+
             // Check performance requirements
             if let Some(route_metrics) = metrics.get(&route.destination) {
-                if route_metrics.avg_latency_ms > request.performance_requirements.max_latency_ms ||
-                   route_metrics.throughput_mbps < request.performance_requirements.min_throughput_mbps ||
-                   route_metrics.success_rate < request.performance_requirements.min_success_rate ||
-                   route_metrics.current_load > request.performance_requirements.max_load {
+                if route_metrics.avg_latency_ms > request.performance_requirements.max_latency_ms
+                    || route_metrics.throughput_mbps
+                        < request.performance_requirements.min_throughput_mbps
+                    || route_metrics.success_rate
+                        < request.performance_requirements.min_success_rate
+                    || route_metrics.current_load > request.performance_requirements.max_load
+                {
                     continue;
                 }
             }
-            
+
             // Check node availability
             if let Some(node_info) = registry.get(&route.next_hop) {
                 if !node_info.is_authenticated {
                     continue;
                 }
             }
-            
+
             suitable_routes.push(route.clone());
         }
-        
+
         Ok(suitable_routes)
     }
-    
+
     /// Select best route based on configured algorithm
     async fn select_best_route(
         &self,
@@ -382,26 +392,25 @@ impl ProxyRouter {
     ) -> AssetResult<ProxyRoute> {
         let metrics = self.route_metrics.read().await;
         let registry = self.node_registry.read().await;
-        
+
         match self.config.load_balance_algorithm {
             LoadBalanceAlgorithm::PerformanceBased => {
                 self.select_performance_based_route(routes, &metrics).await
-            },
+            }
             LoadBalanceAlgorithm::LeastLatency => {
                 self.select_least_latency_route(routes, &metrics).await
-            },
+            }
             LoadBalanceAlgorithm::Weighted => {
-                self.select_weighted_route(routes, &metrics, &registry).await
-            },
+                self.select_weighted_route(routes, &metrics, &registry)
+                    .await
+            }
             LoadBalanceAlgorithm::LeastConnections => {
                 self.select_least_connections_route(routes, &metrics).await
-            },
-            LoadBalanceAlgorithm::RoundRobin => {
-                self.select_round_robin_route(routes).await
-            },
+            }
+            LoadBalanceAlgorithm::RoundRobin => self.select_round_robin_route(routes).await,
         }
     }
-    
+
     /// Select route based on performance metrics
     async fn select_performance_based_route(
         &self,
@@ -410,7 +419,7 @@ impl ProxyRouter {
     ) -> AssetResult<ProxyRoute> {
         let mut best_route = None;
         let mut best_score = 0.0;
-        
+
         for route in routes {
             if let Some(route_metrics) = metrics.get(&route.destination) {
                 // Calculate composite performance score
@@ -418,24 +427,25 @@ impl ProxyRouter {
                 let throughput_score = route_metrics.throughput_mbps / 1000.0; // Normalize to Gbps
                 let success_score = route_metrics.success_rate;
                 let load_score = 1.0 - route_metrics.current_load;
-                
-                let composite_score = (latency_score * 0.3 + 
-                                     throughput_score * 0.3 + 
-                                     success_score * 0.25 + 
-                                     load_score * 0.15).min(1.0);
-                
+
+                let composite_score = (latency_score * 0.3
+                    + throughput_score * 0.3
+                    + success_score * 0.25
+                    + load_score * 0.15)
+                    .min(1.0);
+
                 if composite_score > best_score {
                     best_score = composite_score;
                     best_route = Some(route.clone());
                 }
             }
         }
-        
+
         best_route.ok_or_else(|| AssetError::AdapterError {
-            message: "No route found with performance metrics".to_string()
+            message: "No route found with performance metrics".to_string(),
         })
     }
-    
+
     /// Select route with least latency
     async fn select_least_latency_route(
         &self,
@@ -444,7 +454,7 @@ impl ProxyRouter {
     ) -> AssetResult<ProxyRoute> {
         let mut best_route = None;
         let mut best_latency = f64::INFINITY;
-        
+
         for route in routes {
             if let Some(route_metrics) = metrics.get(&route.destination) {
                 if route_metrics.avg_latency_ms < best_latency {
@@ -453,12 +463,12 @@ impl ProxyRouter {
                 }
             }
         }
-        
+
         best_route.ok_or_else(|| AssetError::AdapterError {
-            message: "No route found with latency metrics".to_string()
+            message: "No route found with latency metrics".to_string(),
         })
     }
-    
+
     /// Select weighted route based on multiple factors
     async fn select_weighted_route(
         &self,
@@ -468,40 +478,40 @@ impl ProxyRouter {
     ) -> AssetResult<ProxyRoute> {
         let mut best_route = None;
         let mut best_weight = 0.0;
-        
+
         for route in routes {
             let mut weight = 0.0;
-            
+
             // Route cost (lower is better)
             weight += (100.0 - route.cost as f64) / 100.0 * 0.2;
-            
+
             // Authentication status (binary: 0.3 if authenticated, 0.0 if not)
             if let Some(node_info) = registry.get(&route.next_hop) {
                 if node_info.is_authenticated {
                     weight += 0.3;
                 }
             }
-            
+
             // Performance metrics
             if let Some(route_metrics) = metrics.get(&route.destination) {
                 let latency_factor = 1.0 / (1.0 + route_metrics.avg_latency_ms / 100.0);
                 let success_factor = route_metrics.success_rate;
                 let load_factor = 1.0 - route_metrics.current_load;
-                
+
                 weight += latency_factor * 0.2 + success_factor * 0.2 + load_factor * 0.1;
             }
-            
+
             if weight > best_weight {
                 best_weight = weight;
                 best_route = Some(route.clone());
             }
         }
-        
+
         best_route.ok_or_else(|| AssetError::AdapterError {
-            message: "No suitable weighted route found".to_string()
+            message: "No suitable weighted route found".to_string(),
         })
     }
-    
+
     /// Select route with least connections
     async fn select_least_connections_route(
         &self,
@@ -510,7 +520,7 @@ impl ProxyRouter {
     ) -> AssetResult<ProxyRoute> {
         let mut best_route = None;
         let mut best_load = f64::INFINITY;
-        
+
         for route in routes {
             if let Some(route_metrics) = metrics.get(&route.destination) {
                 if route_metrics.current_load < best_load {
@@ -519,31 +529,36 @@ impl ProxyRouter {
                 }
             }
         }
-        
+
         best_route.ok_or_else(|| AssetError::AdapterError {
-            message: "No route found with load metrics".to_string()
+            message: "No route found with load metrics".to_string(),
         })
     }
-    
+
     /// Select route using round robin algorithm
     async fn select_round_robin_route(&self, routes: &[ProxyRoute]) -> AssetResult<ProxyRoute> {
         // TODO: Implement stateful round robin tracking
         // For now, return first active route
-        routes.first()
+        routes
+            .first()
             .cloned()
             .ok_or_else(|| AssetError::AdapterError {
-                message: "No routes available for round robin".to_string()
+                message: "No routes available for round robin".to_string(),
             })
     }
-    
+
     /// Check if privacy levels are compatible
-    fn privacy_levels_compatible(&self, route_privacy: &PrivacyMode, request_privacy: &PrivacyMode) -> bool {
+    fn privacy_levels_compatible(
+        &self,
+        route_privacy: &PrivacyMode,
+        request_privacy: &PrivacyMode,
+    ) -> bool {
         // A route can serve a request if the route's privacy is at least as open.
         // Openness order: PRIVATE < ANONYMOUS < PUBLIC
         use crate::assets::core::privacy::privacy_priority;
         privacy_priority(route_privacy) >= privacy_priority(request_privacy)
     }
-    
+
     /// Recalculate all routes (called when network topology changes)
     async fn recalculate_routes(&self) -> AssetResult<()> {
         // TODO: Implement intelligent route recalculation
@@ -551,14 +566,18 @@ impl ProxyRouter {
         tracing::debug!("Recalculating proxy routes");
         Ok(())
     }
-    
+
     /// Update route metrics
-    pub async fn update_route_metrics(&self, destination: &str, metrics: RouteMetrics) -> AssetResult<()> {
+    pub async fn update_route_metrics(
+        &self,
+        destination: &str,
+        metrics: RouteMetrics,
+    ) -> AssetResult<()> {
         let mut route_metrics = self.route_metrics.write().await;
         route_metrics.insert(destination.to_string(), metrics);
         Ok(())
     }
-    
+
     /// Get route statistics
     pub async fn get_route_stats(&self) -> AssetResult<HashMap<String, RouteMetrics>> {
         let metrics = self.route_metrics.read().await;
@@ -582,12 +601,12 @@ impl std::fmt::Display for RouteType {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::{ProxyCapabilities};
-    
+    use crate::assets::core::ProxyCapabilities;
+
     async fn create_test_router() -> ProxyRouter {
-        ProxyRouter::new().await.unwrap()
+        ProxyRouter::new().await.expect("test: async operation")
     }
-    
+
     fn create_test_node_info(node_id: &str, authenticated: bool) -> ProxyNodeInfo {
         // Convert string to [u8; 8] for node_id
         let mut node_id_bytes = [0u8; 8];
@@ -609,28 +628,36 @@ mod tests {
             },
             is_authenticated: authenticated,
             last_heartbeat: SystemTime::now(),
-            certificate_fingerprint: format!("{}-cert", node_id),
+            certificate_fingerprint: format!("{node_id}-cert"),
         }
     }
-    
+
     #[tokio::test]
     async fn test_router_creation() {
         let router = create_test_router().await;
         assert!(router.routing_table.read().await.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_add_proxy_node() {
         let router = create_test_router().await;
         let node_info = create_test_node_info("test-node-1", true);
 
-        router.add_proxy_node(&node_info).await.unwrap();
+        router.add_proxy_node(&node_info).await.expect("test: async operation");
 
         let registry = router.node_registry.read().await;
-        assert!(registry.contains_key("test-node-1"));
-        assert!(registry["test-node-1"].is_authenticated);
+        // add_proxy_node stores with hex-encoded node_id bytes
+        let expected_key = hex::encode({
+            let mut bytes = [0u8; 8];
+            let src = b"test-node-1";
+            let len = src.len().min(8);
+            bytes[..len].copy_from_slice(&src[..len]);
+            bytes
+        });
+        assert!(registry.contains_key(&expected_key));
+        assert!(registry[&expected_key].is_authenticated);
     }
-    
+
     #[tokio::test]
     async fn test_route_privacy_compatibility() {
         let router = create_test_router().await;

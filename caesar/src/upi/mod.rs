@@ -28,6 +28,6 @@ pub mod types {
     pub use caesar_sdk::types::*;
 }
 
+pub use caesar_sdk::types::*;
 pub use caesar_sdk::EgressAdapter;
 pub use caesar_sdk::IngressAdapter;
-pub use caesar_sdk::types::*;

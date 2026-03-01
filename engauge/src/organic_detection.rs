@@ -323,7 +323,7 @@ mod tests {
                 organic_ratio,
             } => {
                 assert!(confidence > 0.0);
-                assert!(organic_ratio >= 0.0 && organic_ratio <= 1.0);
+                assert!((0.0..=1.0).contains(&organic_ratio));
             }
             other => panic!("expected Mixed, got: {other:?}"),
         }
@@ -331,8 +331,12 @@ mod tests {
 
     #[test]
     fn organic_ratio_values() {
-        assert!((TrafficClassification::Organic { confidence: 0.9 }.organic_ratio() - 1.0).abs() < 1e-9);
-        assert!((TrafficClassification::Speculative { confidence: 0.9 }.organic_ratio()).abs() < 1e-9);
+        assert!(
+            (TrafficClassification::Organic { confidence: 0.9 }.organic_ratio() - 1.0).abs() < 1e-9
+        );
+        assert!(
+            (TrafficClassification::Speculative { confidence: 0.9 }.organic_ratio()).abs() < 1e-9
+        );
         let mixed = TrafficClassification::Mixed {
             confidence: 0.5,
             organic_ratio: 0.6,
@@ -342,8 +346,13 @@ mod tests {
 
     #[test]
     fn confidence_accessor() {
-        assert!((TrafficClassification::Organic { confidence: 0.8 }.confidence() - 0.8).abs() < 1e-9);
-        assert!((TrafficClassification::Speculative { confidence: 0.7 }.confidence() - 0.7).abs() < 1e-9);
+        assert!(
+            (TrafficClassification::Organic { confidence: 0.8 }.confidence() - 0.8).abs() < 1e-9
+        );
+        assert!(
+            (TrafficClassification::Speculative { confidence: 0.7 }.confidence() - 0.7).abs()
+                < 1e-9
+        );
         let mixed = TrafficClassification::Mixed {
             confidence: 0.6,
             organic_ratio: 0.5,

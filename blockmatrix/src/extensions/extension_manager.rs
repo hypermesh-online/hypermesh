@@ -8,9 +8,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::assets::core::{AssetManager, AssetType};
+use super::traits::{AssetExtensionHandler, HyperMeshExtension};
 use super::types::*;
-use super::traits::{HyperMeshExtension, AssetExtensionHandler};
+use crate::assets::core::{AssetManager, AssetType};
 
 /// Extension manager for loading and managing extensions
 pub struct ExtensionManager {
@@ -38,7 +38,10 @@ impl ExtensionManager {
     }
 
     /// Load an extension
-    pub async fn load_extension(&self, mut extension: Box<dyn HyperMeshExtension>) -> ExtensionResult<()> {
+    pub async fn load_extension(
+        &self,
+        mut extension: Box<dyn HyperMeshExtension>,
+    ) -> ExtensionResult<()> {
         let metadata = extension.metadata();
         let extension_id = metadata.id.clone();
 
@@ -64,7 +67,11 @@ impl ExtensionManager {
         let config = ExtensionConfig {
             settings: serde_json::Value::Null,
             resource_limits: self.config.global_limits.clone(),
-            granted_capabilities: metadata.required_capabilities.intersection(&self.config.allowed_capabilities).cloned().collect(),
+            granted_capabilities: metadata
+                .required_capabilities
+                .intersection(&self.config.allowed_capabilities)
+                .cloned()
+                .collect(),
             privacy_level: crate::assets::core::PrivacyMode::PRIVATE,
             debug_mode: false,
         };
@@ -109,8 +116,11 @@ impl ExtensionManager {
     pub async fn unload_extension(&self, extension_id: &str) -> ExtensionResult<()> {
         let mut extension = {
             let mut extensions = self.extensions.write().await;
-            extensions.remove(extension_id)
-                .ok_or_else(|| ExtensionError::ExtensionNotFound { id: extension_id.to_string() })?
+            extensions
+                .remove(extension_id)
+                .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                    id: extension_id.to_string(),
+                })?
         };
 
         extension.shutdown().await?;
@@ -140,11 +150,12 @@ impl ExtensionManager {
 
         for dep in &metadata.dependencies {
             if !dep.optional {
-                let installed = registry.get(&dep.extension_id)
-                    .ok_or_else(|| ExtensionError::DependencyResolutionFailed {
+                let installed = registry.get(&dep.extension_id).ok_or_else(|| {
+                    ExtensionError::DependencyResolutionFailed {
                         extension: metadata.id.clone(),
                         dependency: dep.extension_id.clone(),
-                    })?;
+                    }
+                })?;
 
                 if !dep.version_requirement.matches(&installed.version) {
                     return Err(ExtensionError::VersionIncompatible {

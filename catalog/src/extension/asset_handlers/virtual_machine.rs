@@ -3,13 +3,10 @@
 // See the LICENSE file in the repository root for full license text.
 
 use super::{
-    async_trait, HashMap, Arc, RwLock,
-    AssetExtensionHandler, ExtensionResult, ExtensionError,
-    AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
-    AssetOperation, OperationResult, DeploymentResult, ExecutionResult,
-    ResourceUsageReport,
-    AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof,
+    async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
+    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetUpdate, ConsensusProof, DeploymentResult, ExecutionResult, ExtensionError,
+    ExtensionResult, HashMap, NetworkScope, OperationResult, ResourceUsageReport, RwLock,
 };
 
 /// Handler for Virtual Machine assets (Lua, WASM, etc.)
@@ -44,6 +41,12 @@ struct VMResources {
     pub storage_mb: u64,
 }
 
+impl Default for VirtualMachineHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VirtualMachineHandler {
     pub fn new() -> Self {
         Self {
@@ -75,12 +78,16 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         );
 
         // Extract VM configuration from metadata
-        let language = spec.metadata.get("language")
+        let language = spec
+            .metadata
+            .get("language")
             .and_then(|v| v.as_str())
             .unwrap_or("lua")
             .to_string();
 
-        let version = spec.metadata.get("version")
+        let version = spec
+            .metadata
+            .get("version")
             .and_then(|v| v.as_str())
             .unwrap_or("latest")
             .to_string();
@@ -105,12 +112,17 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(
+        &self,
+        id: &AssetRegistration,
+        update: AssetUpdate,
+    ) -> ExtensionResult<()> {
         let mut instances = self.instances.write().await;
 
-        let instance = instances.get_mut(id)
+        let instance = instances
+            .get_mut(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("VM instance not found: {}", id)
+                message: format!("VM instance not found: {id}"),
             })?;
 
         // Apply updates
@@ -125,9 +137,10 @@ impl AssetExtensionHandler for VirtualMachineHandler {
 
     async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut instances = self.instances.write().await;
-        instances.remove(id)
+        instances
+            .remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("VM instance not found: {}", id)
+                message: format!("VM instance not found: {id}"),
             })?;
 
         Ok(())
@@ -161,21 +174,28 @@ impl AssetExtensionHandler for VirtualMachineHandler {
     async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let instances = self.instances.read().await;
 
-        let instance = instances.get(id)
+        let instance = instances
+            .get(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("VM instance not found: {}", id)
+                message: format!("VM instance not found: {id}"),
             })?;
 
         let mut metadata_map = HashMap::new();
         metadata_map.insert("language".to_string(), serde_json::json!(instance.language));
         metadata_map.insert("version".to_string(), serde_json::json!(instance.version));
-        metadata_map.insert("status".to_string(), serde_json::json!(format!("{:?}", instance.status)));
+        metadata_map.insert(
+            "status".to_string(),
+            serde_json::json!(format!("{:?}", instance.status)),
+        );
 
         Ok(AssetMetadata {
             id: id.clone(),
             asset_type: AssetType::VirtualMachine,
             name: format!("{} VM", instance.language),
-            description: Some(format!("{} {} Virtual Machine", instance.language, instance.version)),
+            description: Some(format!(
+                "{} {} Virtual Machine",
+                instance.language, instance.version
+            )),
             created_at: std::time::SystemTime::now(),
             updated_at: std::time::SystemTime::now(),
             size_bytes: instance.resources.storage_mb * 1024 * 1024,
@@ -192,7 +212,11 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(
+        &self,
+        id: &AssetRegistration,
+        proof: ConsensusProof,
+    ) -> ExtensionResult<bool> {
         let instances = self.instances.read().await;
 
         // Check if instance exists
@@ -223,15 +247,20 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(true)
     }
 
-    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(
+        &self,
+        id: &AssetRegistration,
+        operation: AssetOperation,
+    ) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Execute(exec_spec) => {
                 // Execute code in VM
                 let instances = self.instances.read().await;
 
-                let instance = instances.get(id)
+                let instance = instances
+                    .get(id)
                     .ok_or_else(|| ExtensionError::RuntimeError {
-                        message: format!("VM instance not found: {}", id)
+                        message: format!("VM instance not found: {id}"),
                     })?;
 
                 // Simulate execution
@@ -253,16 +282,18 @@ impl AssetExtensionHandler for VirtualMachineHandler {
                 };
 
                 Ok(OperationResult::Executed(result))
-            },
+            }
 
             AssetOperation::Deploy(_deploy_spec) => {
                 // Deploy VM to environment
                 let mut instances = self.instances.write().await;
 
-                let instance = instances.get_mut(id)
-                    .ok_or_else(|| ExtensionError::RuntimeError {
-                        message: format!("VM instance not found: {}", id)
-                    })?;
+                let instance =
+                    instances
+                        .get_mut(id)
+                        .ok_or_else(|| ExtensionError::RuntimeError {
+                            message: format!("VM instance not found: {id}"),
+                        })?;
 
                 instance.status = VMStatus::Running;
 
@@ -274,11 +305,11 @@ impl AssetExtensionHandler for VirtualMachineHandler {
                 };
 
                 Ok(OperationResult::Deployed(result))
-            },
+            }
 
             _ => Err(ExtensionError::RuntimeError {
-                message: "Operation not supported for VM assets".to_string()
-            })
+                message: "Operation not supported for VM assets".to_string(),
+            }),
         }
     }
 }
@@ -306,7 +337,9 @@ mod tests {
             tags: vec!["test".to_string()],
         };
 
-        let asset_id = handler.create_asset(spec).await
+        let asset_id = handler
+            .create_asset(spec)
+            .await
             .expect("VM asset creation should succeed with valid spec");
         // Check that asset_id is valid (not empty)
         assert!(!asset_id.to_string().is_empty());

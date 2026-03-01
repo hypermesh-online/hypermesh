@@ -8,12 +8,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::assets::core::{AssetResult, PrivacyMode};
-use crate::assets::privacy::{
-    CaesarRewardConfig, ResourceAllocationConfig, PayoutFrequency,
-};
+use crate::assets::privacy::{CaesarRewardConfig, PayoutFrequency, ResourceAllocationConfig};
 
-use super::types::*;
 use super::config::*;
+use super::types::*;
 
 impl CaesarRewardCalculator {
     /// Create new reward calculator
@@ -35,21 +33,25 @@ impl CaesarRewardCalculator {
         user_preferences: &super::super::manager::CaesarRewardPreferences,
     ) -> AssetResult<CaesarRewardConfig> {
         // Base reward rate calculation
-        let base_rate = self.calculate_base_reward_rate(privacy_level, resource_config).await?;
+        let base_rate = self
+            .calculate_base_reward_rate(privacy_level, resource_config)
+            .await?;
 
         // Privacy multiplier
         let privacy_multiplier = self.calculate_privacy_multiplier(privacy_level).await?;
 
         // Utilization multiplier
-        let utilization_multiplier = self.calculate_utilization_multiplier(resource_config).await?;
+        let utilization_multiplier = self
+            .calculate_utilization_multiplier(resource_config)
+            .await?;
 
         // Performance bonuses
         let consensus_bonus = self.calculate_consensus_bonus().await?;
 
         // Apply dynamic adjustments
-        let final_rate = self.apply_dynamic_adjustments(
-            base_rate * privacy_multiplier * utilization_multiplier,
-        ).await?;
+        let final_rate = self
+            .apply_dynamic_adjustments(base_rate * privacy_multiplier * utilization_multiplier)
+            .await?;
 
         // Create reward configuration
         Ok(CaesarRewardConfig {
@@ -79,15 +81,20 @@ impl CaesarRewardCalculator {
         let base_reward = base_rate * hours;
 
         // Apply privacy multiplier
-        let privacy_multiplier = crate::assets::core::privacy::caesar_reward_multiplier(privacy_level);
+        let privacy_multiplier =
+            crate::assets::core::privacy::caesar_reward_multiplier(privacy_level);
         let privacy_adjusted_reward = base_reward * privacy_multiplier;
 
         // Apply utilization multipliers
-        let utilization_bonus = self.calculate_utilization_bonus(resource_utilization).await?;
+        let utilization_bonus = self
+            .calculate_utilization_bonus(resource_utilization)
+            .await?;
         let utilization_adjusted_reward = privacy_adjusted_reward * (1.0 + utilization_bonus);
 
         // Apply performance bonuses
-        let performance_bonus = self.calculate_performance_bonuses(performance_metrics).await?;
+        let performance_bonus = self
+            .calculate_performance_bonuses(performance_metrics)
+            .await?;
         let performance_adjusted_reward = utilization_adjusted_reward * (1.0 + performance_bonus);
 
         // Apply tier multipliers
@@ -129,19 +136,20 @@ impl CaesarRewardCalculator {
         let base = self.base_config.base_reward_rate;
 
         // Adjust based on resource allocation
-        let resource_factor = (
-            resource_config.cpu_percentage +
-            resource_config.gpu_percentage +
-            resource_config.memory_percentage +
-            resource_config.storage_percentage +
-            resource_config.network_percentage
-        ) / 5.0;
+        let resource_factor = (resource_config.cpu_percentage
+            + resource_config.gpu_percentage
+            + resource_config.memory_percentage
+            + resource_config.storage_percentage
+            + resource_config.network_percentage)
+            / 5.0;
 
         Ok(base * resource_factor)
     }
 
     async fn calculate_privacy_multiplier(&self, privacy_level: &PrivacyMode) -> AssetResult<f32> {
-        Ok(crate::assets::core::privacy::caesar_reward_multiplier(privacy_level))
+        Ok(crate::assets::core::privacy::caesar_reward_multiplier(
+            privacy_level,
+        ))
     }
 
     async fn calculate_utilization_multiplier(
@@ -185,8 +193,8 @@ impl CaesarRewardCalculator {
         &self,
         resource_utilization: &HashMap<String, f32>,
     ) -> AssetResult<f32> {
-        let avg_utilization = resource_utilization.values().sum::<f32>() /
-                             resource_utilization.len() as f32;
+        let avg_utilization =
+            resource_utilization.values().sum::<f32>() / resource_utilization.len() as f32;
 
         // Bonus for high utilization
         if avg_utilization > 0.8 {
@@ -205,7 +213,9 @@ impl CaesarRewardCalculator {
         let mut total_bonus = 0.0;
 
         for bonus_config in &self.performance_bonuses {
-            if let Some(metric_value) = performance_metrics.get(&format!("{:?}", bonus_config.metric)) {
+            if let Some(metric_value) =
+                performance_metrics.get(&format!("{:?}", bonus_config.metric))
+            {
                 for threshold in &bonus_config.thresholds {
                     if *metric_value >= threshold.threshold_value {
                         total_bonus += threshold.multiplier - 1.0; // Convert to bonus factor
@@ -299,54 +309,50 @@ impl CaesarRewardCalculator {
     }
 
     fn create_default_bonuses() -> Vec<PerformanceBonus> {
-        vec![
-            PerformanceBonus {
-                bonus_name: "High Uptime".to_string(),
-                metric: PerformanceMetric::Uptime,
-                thresholds: vec![
-                    BonusThreshold {
-                        threshold_value: 0.95,
-                        multiplier: 1.05,
-                        duration_requirement: Some(Duration::from_secs(24 * 60 * 60)),
-                    },
-                    BonusThreshold {
-                        threshold_value: 0.99,
-                        multiplier: 1.1,
-                        duration_requirement: Some(Duration::from_secs(7 * 24 * 60 * 60)),
-                    },
-                ],
-                max_multiplier: 1.2,
-                calculation_method: BonusCalculationMethod::Stepped,
-            },
-        ]
+        vec![PerformanceBonus {
+            bonus_name: "High Uptime".to_string(),
+            metric: PerformanceMetric::Uptime,
+            thresholds: vec![
+                BonusThreshold {
+                    threshold_value: 0.95,
+                    multiplier: 1.05,
+                    duration_requirement: Some(Duration::from_secs(24 * 60 * 60)),
+                },
+                BonusThreshold {
+                    threshold_value: 0.99,
+                    multiplier: 1.1,
+                    duration_requirement: Some(Duration::from_secs(7 * 24 * 60 * 60)),
+                },
+            ],
+            max_multiplier: 1.2,
+            calculation_method: BonusCalculationMethod::Stepped,
+        }]
     }
 
     fn create_default_penalties() -> Vec<PenaltyConfig> {
-        vec![
-            PenaltyConfig {
-                penalty_name: "Service Unavailability".to_string(),
-                violation_type: ViolationType::ServiceUnavailability,
-                severity_levels: vec![
-                    PenaltySeverityLevel {
-                        severity: "Minor".to_string(),
-                        penalty_multiplier: 0.9,
-                        penalty_duration: Duration::from_secs(60 * 60), // 1 hour
-                        restrictions: vec![],
-                    },
-                    PenaltySeverityLevel {
-                        severity: "Major".to_string(),
-                        penalty_multiplier: 0.5,
-                        penalty_duration: Duration::from_secs(24 * 60 * 60), // 1 day
-                        restrictions: vec!["reduced_allocation_limit".to_string()],
-                    },
-                ],
-                recovery_conditions: RecoveryConditions {
-                    time_based_recovery: true,
-                    performance_recovery: None,
-                    community_recovery: None,
-                    admin_recovery: false,
+        vec![PenaltyConfig {
+            penalty_name: "Service Unavailability".to_string(),
+            violation_type: ViolationType::ServiceUnavailability,
+            severity_levels: vec![
+                PenaltySeverityLevel {
+                    severity: "Minor".to_string(),
+                    penalty_multiplier: 0.9,
+                    penalty_duration: Duration::from_secs(60 * 60), // 1 hour
+                    restrictions: vec![],
                 },
+                PenaltySeverityLevel {
+                    severity: "Major".to_string(),
+                    penalty_multiplier: 0.5,
+                    penalty_duration: Duration::from_secs(24 * 60 * 60), // 1 day
+                    restrictions: vec!["reduced_allocation_limit".to_string()],
+                },
+            ],
+            recovery_conditions: RecoveryConditions {
+                time_based_recovery: true,
+                performance_recovery: None,
+                community_recovery: None,
+                admin_recovery: false,
             },
-        ]
+        }]
     }
 }

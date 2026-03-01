@@ -119,10 +119,7 @@ impl EpochTracker {
             report,
         };
 
-        let history = self
-            .histories
-            .entry(node_id.to_string())
-            .or_insert_with(VecDeque::new);
+        let history = self.histories.entry(node_id.to_string()).or_default();
 
         history.push_back(record);
 
@@ -179,11 +176,7 @@ impl EpochTracker {
     /// Decay factor: weight_i = decay^(n - 1 - i), where `decay = 0.9` and
     /// `i = 0` is the oldest epoch in the window. More recent epochs have
     /// weight closer to 1.0.
-    pub fn aggregate(
-        &self,
-        node_id: &str,
-        lookback: usize,
-    ) -> Option<AggregatedCapacity> {
+    pub fn aggregate(&self, node_id: &str, lookback: usize) -> Option<AggregatedCapacity> {
         let history = self.histories.get(node_id)?;
         if history.is_empty() {
             return None;
@@ -222,9 +215,7 @@ impl EpochTracker {
 
     /// Number of epochs recorded for a specific node (0 if unknown).
     pub fn epoch_count(&self, node_id: &str) -> usize {
-        self.histories
-            .get(node_id)
-            .map_or(0, |h| h.len())
+        self.histories.get(node_id).map_or(0, |h| h.len())
     }
 
     // -- internal helpers ---------------------------------------------------
@@ -232,7 +223,7 @@ impl EpochTracker {
     /// Extract the last `lookback` score values from a history deque.
     fn tail_scores(&self, history: &VecDeque<EpochRecord>, lookback: usize) -> Vec<f64> {
         let n = history.len();
-        let start = if lookback >= n { 0 } else { n - lookback };
+        let start = n.saturating_sub(lookback);
         history
             .iter()
             .skip(start)
@@ -256,11 +247,7 @@ fn std_deviation(values: &[f64], mean: f64) -> f64 {
     if values.len() < 2 {
         return 0.0;
     }
-    let variance = values
-        .iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f64>()
-        / values.len() as f64;
+    let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
     variance.sqrt()
 }
 
@@ -439,7 +426,10 @@ mod tests {
         // Default max_epochs is 30 -- insert 35 and verify pruning.
         let mut tracker = EpochTracker::default();
         for i in 0..35 {
-            tracker.record_epoch("default-test", report_with_fraction(0.5 + (i as f64) * 0.001));
+            tracker.record_epoch(
+                "default-test",
+                report_with_fraction(0.5 + (i as f64) * 0.001),
+            );
         }
         assert_eq!(tracker.epoch_count("default-test"), 30);
     }

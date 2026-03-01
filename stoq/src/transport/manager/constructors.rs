@@ -4,28 +4,28 @@
 
 //! STOQ Transport constructors and initialization
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use quinn::{self, TransportConfig as QuinnTransportConfig, VarInt};
-use std::net::{SocketAddr, Ipv6Addr};
+use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
-use crate::transport::certificates::CertificateManager;
+use crate::transport::adaptive::AdaptationManager;
 use crate::transport::certificate_strategy::NetworkType;
-use crate::transport::config::{TransportConfig, CongestionControl};
+use crate::transport::certificates::CertificateManager;
+use crate::transport::config::{CongestionControl, TransportConfig};
 use crate::transport::connection::MemoryPool;
+use crate::transport::ebpf::StoqEbpfTransport;
+use crate::transport::falcon::FalconTransport;
 use crate::transport::metrics::TransportMetrics;
 use crate::transport::stats::PerformanceStats;
-use crate::transport::falcon::FalconTransport;
-use crate::transport::adaptive::AdaptationManager;
-use crate::transport::ebpf::StoqEbpfTransport;
 
-use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};
-use crate::protocol::pos_fast_validator::{PosFastValidator, FastValidationConfig};
 use crate::extensions::DefaultStoqExtensions;
+use crate::protocol::pos_fast_validator::{FastValidationConfig, PosFastValidator};
+use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, StoqProtocolHandler};
 
 use super::{StoqTransport, CRYPTO_INIT};
 
@@ -45,9 +45,7 @@ fn resolve_ebpf_interface(config: &TransportConfig) -> String {
     }
 
     // Localhost and unspecified addresses use loopback
-    if config.bind_address == Ipv6Addr::LOCALHOST
-        || config.bind_address == Ipv6Addr::UNSPECIFIED
-    {
+    if config.bind_address == Ipv6Addr::LOCALHOST || config.bind_address == Ipv6Addr::UNSPECIFIED {
         return "lo".to_string();
     }
 
@@ -68,9 +66,14 @@ impl StoqTransport {
             }
         });
 
-        info!("Initializing STOQ transport on [{}]:{}", config.bind_address, config.port);
-        info!("Transport config: zero_copy={}, pool_size={}, max_streams={}",
-              config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams);
+        info!(
+            "Initializing STOQ transport on [{}]:{}",
+            config.bind_address, config.port
+        );
+        info!(
+            "Transport config: zero_copy={}, pool_size={}, max_streams={}",
+            config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams
+        );
 
         // Initialize certificate manager with IPv6-only production configuration
         let cert_config = if config.bind_address == Ipv6Addr::LOCALHOST {
@@ -89,7 +92,10 @@ impl StoqTransport {
     }
 
     /// Create a new STOQ transport for specific network type
-    pub async fn new_for_network(config: TransportConfig, network_type: NetworkType) -> Result<Self> {
+    pub async fn new_for_network(
+        config: TransportConfig,
+        network_type: NetworkType,
+    ) -> Result<Self> {
         // Initialize crypto provider once (globally)
         CRYPTO_INIT.call_once(|| {
             if let Err(e) = rustls::crypto::ring::default_provider().install_default() {
@@ -98,9 +104,14 @@ impl StoqTransport {
             }
         });
 
-        info!("Initializing STOQ transport for network type: {:?}", network_type);
-        info!("Transport config: zero_copy={}, pool_size={}, max_streams={}",
-              config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams);
+        info!(
+            "Initializing STOQ transport for network type: {:?}",
+            network_type
+        );
+        info!(
+            "Transport config: zero_copy={}, pool_size={}, max_streams={}",
+            config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams
+        );
 
         // Create network-aware certificate configuration
         let cert_config = crate::transport::certificates::CertificateConfig::with_network_type(
@@ -116,8 +127,10 @@ impl StoqTransport {
     }
 
     /// Internal: Create transport with provided certificate manager
-    async fn new_with_cert_manager(config: TransportConfig, cert_manager: Arc<CertificateManager>) -> Result<Self> {
-
+    async fn new_with_cert_manager(
+        config: TransportConfig,
+        cert_manager: Arc<CertificateManager>,
+    ) -> Result<Self> {
         // Configure QUIC transport for adaptive network tiers performance
         let mut server_transport_config = QuinnTransportConfig::default();
         server_transport_config.max_concurrent_bidi_streams(config.max_concurrent_streams.into());
@@ -126,7 +139,9 @@ impl StoqTransport {
 
         // QUIC performance optimizations
         server_transport_config.send_window(config.send_buffer_size as u64);
-        server_transport_config.receive_window(VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX));
+        server_transport_config.receive_window(
+            VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX),
+        );
         server_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
         server_transport_config.datagram_send_buffer_size(config.max_datagram_size);
 
@@ -136,7 +151,9 @@ impl StoqTransport {
         client_transport_config.max_concurrent_uni_streams(config.max_concurrent_streams.into());
         client_transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
         client_transport_config.send_window(config.send_buffer_size as u64);
-        client_transport_config.receive_window(VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX));
+        client_transport_config.receive_window(
+            VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX),
+        );
         client_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
         client_transport_config.datagram_send_buffer_size(config.max_datagram_size);
 
@@ -157,14 +174,14 @@ impl StoqTransport {
         // Create server configuration with TLS
         let rustls_server_config = cert_manager.server_crypto_config().await?;
         let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
-            quinn::crypto::rustls::QuicServerConfig::try_from(rustls_server_config)?
+            quinn::crypto::rustls::QuicServerConfig::try_from(rustls_server_config)?,
         ));
         server_config.transport_config(Arc::new(server_transport_config));
 
         // Create client configuration with TLS and cache it for performance
         let rustls_client_config = cert_manager.client_crypto_config().await?;
         let mut client_config = quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client_config)?
+            quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client_config)?,
         ));
         client_config.transport_config(Arc::new(client_transport_config));
 
@@ -179,7 +196,9 @@ impl StoqTransport {
 
         // Verify we're binding to IPv6
         if !socket_addr.is_ipv6() {
-            return Err(anyhow!("STOQ only supports IPv6 addresses, got: {}", socket_addr));
+            return Err(anyhow!(
+                "STOQ only supports IPv6 addresses, got: {socket_addr}"
+            ));
         }
 
         let socket = std::net::UdpSocket::bind(socket_addr)?;
@@ -195,7 +214,10 @@ impl StoqTransport {
 
             // IPv6-only flag
             if let Err(e) = socket2_sock.set_only_v6(true) {
-                warn!("Could not set IPv6-only socket option (continuing anyway): {}", e);
+                warn!(
+                    "Could not set IPv6-only socket option (continuing anyway): {}",
+                    e
+                );
             }
 
             // Socket optimizations
@@ -236,7 +258,10 @@ impl StoqTransport {
                 warn!("Failed to generate FALCON keypair: {}", e);
                 None
             } else {
-                info!("FALCON quantum-resistant cryptography enabled with {:?}", config.falcon_variant);
+                info!(
+                    "FALCON quantum-resistant cryptography enabled with {:?}",
+                    config.falcon_variant
+                );
                 Some(Arc::new(RwLock::new(falcon)))
             }
         } else {
@@ -257,7 +282,7 @@ impl StoqTransport {
         // Create handshake extension
         let handshake_extension = Arc::new(StoqHandshakeExtension::new(
             falcon_transport.clone(),
-            false, // Don't require FALCON (backwards compatibility)
+            false,                       // Don't require FALCON (backwards compatibility)
             config.enable_falcon_crypto, // Use hybrid mode if FALCON enabled
         ));
 
@@ -268,9 +293,9 @@ impl StoqTransport {
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
         // Create fast PoS pre-validator for line-rate filtering
-        let full_pos_validator = Arc::new(
-            crate::protocol::pos_validator::PosTokenValidator::new(Duration::from_secs(300)),
-        );
+        let full_pos_validator = Arc::new(crate::protocol::pos_validator::PosTokenValidator::new(
+            Duration::from_secs(300),
+        ));
         let pos_fast_validator = Arc::new(PosFastValidator::new(
             FastValidationConfig::default(),
             full_pos_validator,

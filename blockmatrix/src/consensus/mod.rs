@@ -10,21 +10,20 @@
 //! For the full consensus implementation, see trustchain::consensus module.
 
 // Submodule for nested import compatibility
+pub mod consensus_impl;
 pub mod proof;
 pub mod validation;
-pub mod consensus_impl;
 
 // Re-export all consensus types from TrustChain
 pub use trustchain::consensus::*;
 
 // Re-export our concrete implementation types
 pub use consensus_impl::{
-    AsyncConsensus, ConsensusResult, ConsensusState,
-    DefaultConsensus, ConsensusAdapter
+    AsyncConsensus, ConsensusAdapter, ConsensusResult, ConsensusState, DefaultConsensus,
 };
 
 // BlockMatrix-specific consensus types that extend TrustChain
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Access level for resources in the HyperMesh network
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -149,12 +148,18 @@ impl Default for ConsensusConfig {
 // Real validation service implementation using TrustChain's Proof of State
 pub mod validation_service {
     use super::*;
-    use crate::consensus::validation::{StateAuthenticator, DefaultStateAuthenticator};
+    use crate::consensus::validation::{DefaultStateAuthenticator, StateAuthenticator};
     use std::sync::Arc;
 
     pub struct ValidationService {
         validator: Arc<dyn StateAuthenticator>,
         requirements: ConsensusRequirements,
+    }
+
+    impl Default for ValidationService {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl ValidationService {
@@ -167,14 +172,18 @@ pub mod validation_service {
 
         pub fn with_requirements(requirements: ConsensusRequirements) -> Self {
             Self {
-                validator: Arc::new(DefaultStateAuthenticator::with_requirements(requirements.clone())),
+                validator: Arc::new(DefaultStateAuthenticator::with_requirements(
+                    requirements.clone(),
+                )),
                 requirements,
             }
         }
 
         pub fn for_production() -> Self {
             Self {
-                validator: Arc::new(DefaultStateAuthenticator::with_requirements(ConsensusRequirements::production())),
+                validator: Arc::new(DefaultStateAuthenticator::with_requirements(
+                    ConsensusRequirements::production(),
+                )),
                 requirements: ConsensusRequirements::production(),
             }
         }
@@ -191,7 +200,9 @@ pub mod validation_service {
             if proof.validate_with_requirements(&self.requirements) {
                 Ok(true)
             } else {
-                Err(ConsensusError::ValidationFailed("Consensus proof failed validation requirements".to_string()))
+                Err(ConsensusError::ValidationFailed(
+                    "Consensus proof failed validation requirements".to_string(),
+                ))
             }
         }
     }
@@ -199,28 +210,39 @@ pub mod validation_service {
     impl ValidationService {
         pub async fn validate_async(&self, proof: &ConsensusProof) -> Result<bool, ConsensusError> {
             // Convert proof to bytes for async validation
-            let proof_bytes = proof.to_bytes()
-                .map_err(|e| ConsensusError::Other(format!("Failed to serialize proof: {}", e)))?;
+            let proof_bytes = proof
+                .to_bytes()
+                .map_err(|e| ConsensusError::Other(format!("Failed to serialize proof: {e}")))?;
 
             // Use the async validator
             match self.validator.validate(&proof_bytes).await {
                 Ok(true) => Ok(true),
-                Ok(false) => Err(ConsensusError::ValidationFailed("Consensus proof validation failed".to_string())),
-                Err(e) => Err(ConsensusError::ValidationFailed(format!("Validation error: {}", e))),
+                Ok(false) => Err(ConsensusError::ValidationFailed(
+                    "Consensus proof validation failed".to_string(),
+                )),
+                Err(e) => Err(ConsensusError::ValidationFailed(format!(
+                    "Validation error: {e}"
+                ))),
             }
         }
     }
 }
 
 pub mod stoq_handlers {
+    use super::validation_service::{ConsensusValidationService, ValidationService};
     use super::*;
     use async_trait::async_trait;
-    use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError};
-    use std::sync::Arc;
     use serde_json::json;
-    use super::validation_service::{ConsensusValidationService, ValidationService};
+    use std::sync::Arc;
+    use stoq::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 
     pub struct StoqHandler;
+
+    impl Default for StoqHandler {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
     impl StoqHandler {
         pub fn new() -> Self {
@@ -245,7 +267,9 @@ pub mod stoq_handlers {
 
     impl ValidateCertificateHandler {
         pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
-            Self { _validation_service: validation_service }
+            Self {
+                _validation_service: validation_service,
+            }
         }
     }
 
@@ -257,7 +281,9 @@ pub mod stoq_handlers {
 
     impl ValidationStatusHandler {
         pub fn new(validation_service: Arc<dyn ConsensusValidationService>) -> Self {
-            Self { _validation_service: validation_service }
+            Self {
+                _validation_service: validation_service,
+            }
         }
     }
 
@@ -271,7 +297,7 @@ pub mod stoq_handlers {
         async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
             // Parse request and validate certificate
             let cert_data = String::from_utf8(req.payload.to_vec())
-                .map_err(|e| ApiError::InvalidRequest(format!("Invalid UTF-8: {}", e)))?;
+                .map_err(|e| ApiError::InvalidRequest(format!("Invalid UTF-8: {e}")))?;
 
             // TODO: Implement actual certificate validation logic
             let response = json!({
@@ -283,7 +309,7 @@ pub mod stoq_handlers {
 
             // Serialize response to bytes
             let payload = serde_json::to_vec(&response)
-                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
             Ok(ApiResponse {
                 request_id: req.id.clone(),
@@ -304,20 +330,26 @@ pub mod stoq_handlers {
 
         async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
             // Parse proof data from request - expect ConsensusProof JSON or bytes
-            let validation_result = if req.payload.starts_with(b"{") || req.payload.starts_with(b"[") {
+            let validation_result = if req.payload.starts_with(b"{")
+                || req.payload.starts_with(b"[")
+            {
                 // JSON format
                 let consensus_proof = serde_json::from_slice::<ConsensusProof>(&req.payload)
-                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof JSON: {}", e)))?;
+                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof JSON: {e}")))?;
 
                 // Validate using the service
-                self.validation_service.validate_async(&consensus_proof).await
+                self.validation_service
+                    .validate_async(&consensus_proof)
+                    .await
             } else {
                 // Binary format
                 let consensus_proof = ConsensusProof::from_bytes(&req.payload)
-                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof bytes: {}", e)))?;
+                    .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof bytes: {e}")))?;
 
                 // Validate using the service
-                self.validation_service.validate_async(&consensus_proof).await
+                self.validation_service
+                    .validate_async(&consensus_proof)
+                    .await
             };
 
             let response = match validation_result {
@@ -338,11 +370,11 @@ pub mod stoq_handlers {
                     "error": e.to_string(),
                     "timestamp": chrono::Utc::now(),
                     "message": "Validation error occurred"
-                })
+                }),
             };
 
             let payload = serde_json::to_vec(&response)
-                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
             Ok(ApiResponse {
                 request_id: req.id.clone(),
@@ -372,7 +404,7 @@ pub mod stoq_handlers {
             });
 
             let payload = serde_json::to_vec(&response)
-                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
             Ok(ApiResponse {
                 request_id: req.id.clone(),
@@ -400,7 +432,7 @@ pub mod stoq_handlers {
             });
 
             let payload = serde_json::to_vec(&response)
-                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+                .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
             Ok(ApiResponse {
                 request_id: req.id.clone(),
@@ -418,17 +450,17 @@ pub mod proof_of_state_integration {
 
     // Re-export all consensus types for compatibility
     pub use super::{
-        ConsensusProof,
-        SpaceProof,
-        StakeProof,
-        WorkProof,
-        TimeProof,
+        ConsensusProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState,
         WorkloadType,
-        WorkState,
-        Proof,
     };
 
     pub struct ProofOfStateIntegration;
+
+    impl Default for ProofOfStateIntegration {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
 
     impl ProofOfStateIntegration {
         pub fn new() -> Self {

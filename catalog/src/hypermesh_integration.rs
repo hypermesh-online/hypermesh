@@ -22,6 +22,7 @@ pub struct HyperMeshClient {
 }
 
 /// HyperMesh Asset Adapter for catalog assets
+#[derive(Default)]
 pub struct HyperMeshAssetAdapter {
     /// Asset type mappings to HyperMesh resources
     _asset_mappings: HashMap<String, HyperMeshResource>,
@@ -156,7 +157,10 @@ impl HyperMeshClient {
     /// Connect to HyperMesh network via TrustChain
     pub async fn connect(&mut self) -> Result<()> {
         // TODO: Implement TrustChain certificate-based connection
-        tracing::info!("Connecting to HyperMesh network at {}", self.network_address);
+        tracing::info!(
+            "Connecting to HyperMesh network at {}",
+            self.network_address
+        );
 
         // Validate TrustChain certificate
         if let Some(cert_path) = &self.trustchain_cert_path {
@@ -235,14 +239,6 @@ impl HyperMeshClient {
     }
 }
 
-impl Default for HyperMeshAssetAdapter {
-    fn default() -> Self {
-        Self {
-            _asset_mappings: HashMap::new(),
-        }
-    }
-}
-
 impl HyperMeshAssetAdapter {
     /// Create new asset adapter
     pub fn new() -> Self {
@@ -250,11 +246,7 @@ impl HyperMeshAssetAdapter {
     }
 
     /// Register asset mapping to HyperMesh resource
-    pub fn _register_asset_mapping(
-        &mut self,
-        asset_type: String,
-        resource: HyperMeshResource,
-    ) {
+    pub fn _register_asset_mapping(&mut self, asset_type: String, resource: HyperMeshResource) {
         self._asset_mappings.insert(asset_type, resource);
     }
 
@@ -284,16 +276,25 @@ impl HyperMeshAssetAdapter {
         // Check GPU requirement
         if asset_resources.gpu_required {
             resources.push(HyperMeshResource::Gpu {
-                memory_mb: 1024,  // Default GPU memory
+                memory_mb: 1024, // Default GPU memory
                 gpu_type: "CUDA".to_string(),
             });
         }
 
         // Parse memory limit (e.g., "1Gi" to MB)
         let memory_mb = if asset_resources.memory_limit.ends_with("Gi") {
-            asset_resources.memory_limit.trim_end_matches("Gi").parse::<u64>().unwrap_or(1) * 1024
+            asset_resources
+                .memory_limit
+                .trim_end_matches("Gi")
+                .parse::<u64>()
+                .unwrap_or(1)
+                * 1024
         } else if asset_resources.memory_limit.ends_with("Mi") {
-            asset_resources.memory_limit.trim_end_matches("Mi").parse::<u64>().unwrap_or(1024)
+            asset_resources
+                .memory_limit
+                .trim_end_matches("Mi")
+                .parse::<u64>()
+                .unwrap_or(1024)
         } else {
             1024 // Default 1GB
         };
@@ -306,9 +307,16 @@ impl HyperMeshAssetAdapter {
         // Parse storage requirement
         if let Some(storage_req) = &asset_resources.storage_required {
             let storage_mb = if storage_req.ends_with("Gi") {
-                storage_req.trim_end_matches("Gi").parse::<u64>().unwrap_or(1) * 1024
+                storage_req
+                    .trim_end_matches("Gi")
+                    .parse::<u64>()
+                    .unwrap_or(1)
+                    * 1024
             } else if storage_req.ends_with("Mi") {
-                storage_req.trim_end_matches("Mi").parse::<u64>().unwrap_or(1024)
+                storage_req
+                    .trim_end_matches("Mi")
+                    .parse::<u64>()
+                    .unwrap_or(1024)
             } else {
                 1024 // Default 1GB
             };
@@ -316,7 +324,7 @@ impl HyperMeshAssetAdapter {
             resources.push(HyperMeshResource::Storage {
                 size_mb: storage_mb,
                 storage_type: "SSD".to_string(),
-                persistent: true,  // Assume persistent for catalog assets
+                persistent: true, // Assume persistent for catalog assets
             });
         }
 

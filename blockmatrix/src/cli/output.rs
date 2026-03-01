@@ -28,9 +28,9 @@ pub enum CliOutput {
 impl fmt::Display for CliOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CliOutput::Text(text) => write!(f, "{}", text),
-            CliOutput::Table(table) => write!(f, "{}", table),
-            CliOutput::Json(json) => write!(f, "{}", json),
+            CliOutput::Text(text) => write!(f, "{text}"),
+            CliOutput::Table(table) => write!(f, "{table}"),
+            CliOutput::Json(json) => write!(f, "{json}"),
         }
     }
 }
@@ -165,13 +165,13 @@ mod tests {
     #[test]
     fn test_text_output_display() {
         let out = CliOutput::Text("hello world".into());
-        assert_eq!(format!("{}", out), "hello world");
+        assert_eq!(format!("{out}"), "hello world");
     }
 
     #[test]
     fn test_json_output_display() {
         let out = CliOutput::Json(r#"{"key":"value"}"#.into());
-        assert_eq!(format!("{}", out), r#"{"key":"value"}"#);
+        assert_eq!(format!("{out}"), r#"{"key":"value"}"#);
     }
 
     #[test]
@@ -184,7 +184,7 @@ mod tests {
             .add_row(vec!["beta".into(), "2".into()])
             .expect("test: add row");
 
-        let rendered = format!("{}", table);
+        let rendered = format!("{table}");
         assert!(rendered.contains("Name"));
         assert!(rendered.contains("Value"));
         assert!(rendered.contains("alpha"));
@@ -210,9 +210,7 @@ mod tests {
     fn test_table_row_count() {
         let mut table = CliTable::new(vec!["A".into()]);
         assert_eq!(table.row_count(), 0);
-        table
-            .add_row(vec!["x".into()])
-            .expect("test: add row");
+        table.add_row(vec!["x".into()]).expect("test: add row");
         assert_eq!(table.row_count(), 1);
     }
 
@@ -226,28 +224,26 @@ mod tests {
     #[test]
     fn test_empty_table_display() {
         let table = CliTable::new(vec![]);
-        let rendered = format!("{}", table);
+        let rendered = format!("{table}");
         assert!(rendered.is_empty());
     }
 
     #[test]
     fn test_cli_error_display() {
         let e = CliError::NotFound("node-42".into());
-        assert_eq!(format!("{}", e), "Not found: node-42");
+        assert_eq!(format!("{e}"), "Not found: node-42");
 
         let e2 = CliError::InvalidScope("foobar".into());
-        assert_eq!(format!("{}", e2), "Invalid scope: foobar");
+        assert_eq!(format!("{e2}"), "Invalid scope: foobar");
     }
 
     #[test]
     fn test_table_output_display() {
         let mut table = CliTable::new(vec!["Col".into()]);
-        table
-            .add_row(vec!["val".into()])
-            .expect("test: add row");
+        table.add_row(vec!["val".into()]).expect("test: add row");
 
         let out = CliOutput::Table(table);
-        let rendered = format!("{}", out);
+        let rendered = format!("{out}");
         assert!(rendered.contains("Col"));
         assert!(rendered.contains("val"));
     }

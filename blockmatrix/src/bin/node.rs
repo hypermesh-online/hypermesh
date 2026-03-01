@@ -17,7 +17,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use tracing::{info, warn, Level};
-use tracing_subscriber;
 
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -109,7 +108,10 @@ async fn main() -> Result<()> {
     let coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
 
     // Initialize node with unified bootstrap
-    info!("Initializing BlockMatrix node at ({}, {}, {})", coord.x, coord.y, coord.z);
+    info!(
+        "Initializing BlockMatrix node at ({}, {}, {})",
+        coord.x, coord.y, coord.z
+    );
     let bootstrap = NodeBootstrap::initialize(coord).await?;
 
     // Verify self-sufficiency
@@ -117,7 +119,10 @@ async fn main() -> Result<()> {
 
     info!("=== Node Bootstrap Complete ===");
     info!("Genesis Block: {}", bootstrap.genesis_block().hash);
-    info!("Certificate: {} (self-signed)", bootstrap.localhost_certificate().subject);
+    info!(
+        "Certificate: {} (self-signed)",
+        bootstrap.localhost_certificate().subject
+    );
     info!("Privacy Mode: {:?}", bootstrap.privacy_mode().await);
 
     // Get DNS records
@@ -142,17 +147,19 @@ async fn main() -> Result<()> {
                 info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
                 // Create STOQ config
-                let mut stoq_config = stoq::TransportConfig::default();
-                stoq_config.port = cli.stoq_port;
-                stoq_config.bind_address = std::net::Ipv6Addr::UNSPECIFIED;
+                let stoq_config = stoq::TransportConfig {
+                    port: cli.stoq_port,
+                    bind_address: std::net::Ipv6Addr::UNSPECIFIED,
+                    ..stoq::TransportConfig::default()
+                };
 
                 // Initialize STOQ
-                let transport = std::sync::Arc::new(
-                    stoq::StoqTransport::new(stoq_config).await?
-                );
+                let transport = std::sync::Arc::new(stoq::StoqTransport::new(stoq_config).await?);
 
                 // Parse bootstrap nodes
-                let bootstrap_nodes: Vec<std::net::SocketAddr> = cli.bootstrap.iter()
+                let bootstrap_nodes: Vec<std::net::SocketAddr> = cli
+                    .bootstrap
+                    .iter()
                     .filter_map(|addr| addr.parse().ok())
                     .collect();
 
@@ -161,12 +168,9 @@ async fn main() -> Result<()> {
                 }
 
                 // Create network manager
-                let network_manager = NetworkManager::new(
-                    coord.clone(),
-                    transport.clone(),
-                    privacy_mode,
-                    bootstrap_nodes,
-                ).await?;
+                let network_manager =
+                    NetworkManager::new(coord, transport.clone(), privacy_mode, bootstrap_nodes)
+                        .await?;
 
                 // Start discovery based on privacy mode
                 network_manager.start_discovery().await?;
@@ -180,7 +184,10 @@ async fn main() -> Result<()> {
                     }
                 });
 
-                info!("Network initialized, accepting connections on port {}", cli.stoq_port);
+                info!(
+                    "Network initialized, accepting connections on port {}",
+                    cli.stoq_port
+                );
 
                 // Periodically show connected nodes
                 let network_status = network_clone.clone();
@@ -193,7 +200,8 @@ async fn main() -> Result<()> {
                             info!("Connected nodes: {}", node_count);
                             let neighbors = network_status.find_matrix_neighbors(10.0).await;
                             for neighbor in neighbors.iter().take(3) {
-                                info!("  - Node {} at ({},{},{})",
+                                info!(
+                                    "  - Node {} at ({},{},{})",
                                     &neighbor.node_id[..8],
                                     neighbor.coordinate.x,
                                     neighbor.coordinate.y,
@@ -215,7 +223,10 @@ async fn main() -> Result<()> {
         Some(Commands::Status) => {
             info!("Node Status:");
             info!("  Genesis: {}", bootstrap.genesis_block().hash);
-            info!("  Blockchain height: {}", bootstrap.blockchain().get_height().await);
+            info!(
+                "  Blockchain height: {}",
+                bootstrap.blockchain().get_height().await
+            );
             info!("  Privacy mode: {:?}", bootstrap.privacy_mode().await);
             info!("  Self-sufficient: ✓");
         }

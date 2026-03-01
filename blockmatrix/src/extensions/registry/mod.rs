@@ -9,9 +9,8 @@
 pub mod types;
 
 pub use types::{
-    RegistryEntry, ExtensionEntryState, ExtensionLocation, HealthStatus,
-    HealthState, ExtensionMetrics, RegistryConfig, DependencyGraph,
-    RegistryListener, SearchCriteria,
+    DependencyGraph, ExtensionEntryState, ExtensionLocation, ExtensionMetrics, HealthState,
+    HealthStatus, RegistryConfig, RegistryEntry, RegistryListener, SearchCriteria,
 };
 
 use semver::{Version, VersionReq};
@@ -21,8 +20,8 @@ use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
 use super::{
-    AssetExtensionHandler, ExtensionCategory, ExtensionError, ExtensionMetadata,
-    ExtensionResult, ExtensionStatus, HyperMeshExtension,
+    AssetExtensionHandler, ExtensionCategory, ExtensionError, ExtensionMetadata, ExtensionResult,
+    ExtensionStatus, HyperMeshExtension,
 };
 
 use crate::assets::core::AssetType;
@@ -106,15 +105,15 @@ impl ExtensionRegistry {
             }
 
             if entries.contains_key(&extension_id) {
-                return Err(ExtensionError::ExtensionAlreadyLoaded {
-                    id: extension_id,
-                });
+                return Err(ExtensionError::ExtensionAlreadyLoaded { id: extension_id });
             }
         }
 
         // Check dependency cycle
         if self.config.auto_resolve_deps {
-            let deps: Vec<String> = metadata.dependencies.iter()
+            let deps: Vec<String> = metadata
+                .dependencies
+                .iter()
                 .map(|d| d.extension_id.clone())
                 .collect();
 
@@ -150,13 +149,16 @@ impl ExtensionRegistry {
 
         {
             let mut categories = self.categories.write().await;
-            categories.entry(metadata.category.clone())
+            categories
+                .entry(metadata.category.clone())
                 .or_default()
                 .insert(extension_id.clone());
         }
 
         if self.config.auto_resolve_deps {
-            let deps: Vec<String> = metadata.dependencies.iter()
+            let deps: Vec<String> = metadata
+                .dependencies
+                .iter()
                 .map(|d| d.extension_id.clone())
                 .collect();
 
@@ -178,10 +180,12 @@ impl ExtensionRegistry {
     ) -> ExtensionResult<()> {
         {
             let mut entries = self.entries.write().await;
-            let entry = entries.get_mut(extension_id)
-                .ok_or_else(|| ExtensionError::ExtensionNotFound {
-                    id: extension_id.to_string(),
-                })?;
+            let entry =
+                entries
+                    .get_mut(extension_id)
+                    .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                        id: extension_id.to_string(),
+                    })?;
 
             entry.state = ExtensionEntryState::Active;
             entry.updated_at = std::time::SystemTime::now();
@@ -214,7 +218,7 @@ impl ExtensionRegistry {
                 if !dependents.is_empty() {
                     return Err(ExtensionError::DependencyResolutionFailed {
                         extension: extension_id.to_string(),
-                        dependency: format!("Extension has active dependents: {:?}", dependents),
+                        dependency: format!("Extension has active dependents: {dependents:?}"),
                     });
                 }
             }
@@ -222,10 +226,12 @@ impl ExtensionRegistry {
 
         {
             let mut entries = self.entries.write().await;
-            let entry = entries.get_mut(extension_id)
-                .ok_or_else(|| ExtensionError::ExtensionNotFound {
-                    id: extension_id.to_string(),
-                })?;
+            let entry =
+                entries
+                    .get_mut(extension_id)
+                    .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                        id: extension_id.to_string(),
+                    })?;
 
             entry.state = ExtensionEntryState::Unloading;
             entry.updated_at = std::time::SystemTime::now();
@@ -257,10 +263,12 @@ impl ExtensionRegistry {
 
         {
             let mut entries = self.entries.write().await;
-            let entry = entries.remove(extension_id)
-                .ok_or_else(|| ExtensionError::ExtensionNotFound {
-                    id: extension_id.to_string(),
-                })?;
+            let entry =
+                entries
+                    .remove(extension_id)
+                    .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                        id: extension_id.to_string(),
+                    })?;
 
             let mut categories = self.categories.write().await;
             if let Some(cat_set) = categories.get_mut(&entry.metadata.category) {
@@ -290,7 +298,10 @@ impl ExtensionRegistry {
     }
 
     /// Get asset handler for type
-    pub async fn get_handler(&self, asset_type: &AssetType) -> Option<Arc<dyn AssetExtensionHandler>> {
+    pub async fn get_handler(
+        &self,
+        asset_type: &AssetType,
+    ) -> Option<Arc<dyn AssetExtensionHandler>> {
         let handlers = self.handlers.read().await;
         handlers.get(asset_type).cloned()
     }
@@ -304,7 +315,8 @@ impl ExtensionRegistry {
     /// List extensions by category
     pub async fn list_by_category(&self, category: &ExtensionCategory) -> Vec<String> {
         let categories = self.categories.read().await;
-        categories.get(category)
+        categories
+            .get(category)
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default()
     }
@@ -318,7 +330,8 @@ impl ExtensionRegistry {
     /// Check if extension is active
     pub async fn is_active(&self, extension_id: &str) -> bool {
         let entries = self.entries.read().await;
-        entries.get(extension_id)
+        entries
+            .get(extension_id)
             .map(|e| e.state == ExtensionEntryState::Active)
             .unwrap_or(false)
     }
@@ -368,7 +381,8 @@ impl ExtensionRegistry {
 
             let extension_ids: Vec<String> = {
                 let entries = self.entries.read().await;
-                entries.iter()
+                entries
+                    .iter()
                     .filter(|(_, e)| e.state == ExtensionEntryState::Active)
                     .map(|(id, _)| id.clone())
                     .collect()
@@ -377,14 +391,23 @@ impl ExtensionRegistry {
             for id in extension_ids {
                 if let Some(extension) = self.get_extension(&id).await {
                     match extension.status().await {
-                        ExtensionStatus { health: super::ExtensionHealth::Healthy, .. } => {
+                        ExtensionStatus {
+                            health: super::ExtensionHealth::Healthy,
+                            ..
+                        } => {
                             self.update_health(&id, HealthState::Healthy).await;
                         }
-                        ExtensionStatus { health: super::ExtensionHealth::Degraded(msg), .. } => {
+                        ExtensionStatus {
+                            health: super::ExtensionHealth::Degraded(msg),
+                            ..
+                        } => {
                             self.update_health(&id, HealthState::Degraded).await;
                             warn!("Extension {} degraded: {}", id, msg);
                         }
-                        ExtensionStatus { health: super::ExtensionHealth::Unhealthy(msg), .. } => {
+                        ExtensionStatus {
+                            health: super::ExtensionHealth::Unhealthy(msg),
+                            ..
+                        } => {
                             self.update_health(&id, HealthState::Unhealthy).await;
                             error!("Extension {} unhealthy: {}", id, msg);
                         }
@@ -440,7 +463,8 @@ impl ExtensionRegistry {
     pub async fn search_extensions(&self, criteria: SearchCriteria) -> Vec<RegistryEntry> {
         let entries = self.entries.read().await;
 
-        entries.values()
+        entries
+            .values()
             .filter(|entry| {
                 if let Some(ref cat) = criteria.category {
                     if entry.metadata.category != *cat {
@@ -485,13 +509,14 @@ impl ExtensionRegistry {
         hypermesh_version: &Version,
     ) -> ExtensionResult<()> {
         let entries = self.entries.read().await;
-        let entry = entries.get(extension_id)
+        let entry = entries
+            .get(extension_id)
             .ok_or_else(|| ExtensionError::ExtensionNotFound {
                 id: extension_id.to_string(),
             })?;
 
         if !VersionReq::parse(&format!("^{}", entry.metadata.hypermesh_version))
-            .unwrap()
+            .expect("version requirement format should be valid")
             .matches(hypermesh_version)
         {
             return Err(ExtensionError::VersionIncompatible {
@@ -503,11 +528,12 @@ impl ExtensionRegistry {
 
         for dep in &entry.metadata.dependencies {
             if !dep.optional {
-                let dep_entry = entries.get(&dep.extension_id)
-                    .ok_or_else(|| ExtensionError::DependencyResolutionFailed {
+                let dep_entry = entries.get(&dep.extension_id).ok_or_else(|| {
+                    ExtensionError::DependencyResolutionFailed {
                         extension: extension_id.to_string(),
                         dependency: dep.extension_id.clone(),
-                    })?;
+                    }
+                })?;
 
                 if !dep.version_requirement.matches(&dep_entry.metadata.version) {
                     return Err(ExtensionError::VersionIncompatible {
@@ -533,7 +559,10 @@ mod tests {
 
         graph.add_extension("ext1".to_string(), vec![]);
         graph.add_extension("ext2".to_string(), vec!["ext1".to_string()]);
-        graph.add_extension("ext3".to_string(), vec!["ext1".to_string(), "ext2".to_string()]);
+        graph.add_extension(
+            "ext3".to_string(),
+            vec!["ext1".to_string(), "ext2".to_string()],
+        );
 
         let order = graph.get_load_order();
         assert_eq!(order[0], "ext1");
@@ -551,13 +580,13 @@ mod tests {
         let metadata = ExtensionMetadata {
             id: "test-ext".to_string(),
             name: "Test Extension".to_string(),
-            version: Version::parse("1.0.0").unwrap(),
+            version: Version::parse("1.0.0").expect("test: expected success"),
             description: "Test".to_string(),
             author: "Test".to_string(),
             license: "MIT".to_string(),
             homepage: None,
             category: ExtensionCategory::AssetLibrary,
-            hypermesh_version: Version::parse("1.0.0").unwrap(),
+            hypermesh_version: Version::parse("1.0.0").expect("test: expected success"),
             dependencies: vec![],
             required_capabilities: HashSet::new(),
             provided_assets: vec![],
@@ -571,9 +600,12 @@ mod tests {
             distribution_hash: None,
         };
 
-        registry.register_extension(metadata.clone(), location).await.unwrap();
+        registry
+            .register_extension(metadata.clone(), location)
+            .await
+            .expect("test: expected success");
 
-        let retrieved = registry.get_metadata("test-ext").await.unwrap();
+        let retrieved = registry.get_metadata("test-ext").await.expect("test: async operation");
         assert_eq!(retrieved.id, "test-ext");
 
         let list = registry.list_extensions().await;

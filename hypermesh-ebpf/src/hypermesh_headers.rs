@@ -7,8 +7,8 @@
 //! Defines HyperMesh-specific extension headers that are carried in STOQ packets.
 //! STOQ treats these as opaque byte blobs; HyperMesh interprets their semantics.
 
-use serde::{Serialize, Deserialize};
-use hypermesh_lib::{PrivacyMode, AccessScope};
+use hypermesh_lib::{AccessScope, PrivacyMode};
+use serde::{Deserialize, Serialize};
 
 /// Extension type constants (HyperMesh namespace: 0x1000-0x1FFF)
 pub const EXT_PROOF_OF_STATE: u16 = 0x1000;
@@ -65,14 +65,19 @@ impl ProofOfStateHeader {
         let when = u64::from_be_bytes(bytes[64..72].try_into().ok()?);
         where_.copy_from_slice(&bytes[72..88]);
 
-        Some(Self { who, what, when, where_ })
+        Some(Self {
+            who,
+            what,
+            when,
+            where_,
+        })
     }
 
     /// Validate proof timestamps (basic sanity check)
     pub fn validate_timestamps(&self) -> bool {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time should be after UNIX epoch")
             .as_micros() as u64;
 
         // Allow 5-minute clock skew
@@ -137,7 +142,12 @@ impl AssetHashHeader {
         let shard_count = u32::from_be_bytes(bytes[64..68].try_into().ok()?);
         let shard_index = u32::from_be_bytes(bytes[68..72].try_into().ok()?);
 
-        Some(Self { asset_id, hash, shard_count, shard_index })
+        Some(Self {
+            asset_id,
+            hash,
+            shard_count,
+            shard_index,
+        })
     }
 
     /// Validate shard indices
@@ -242,14 +252,21 @@ impl MatrixRoutingHeader {
             }
         }
 
-        Some(Self { source, destination, path })
+        Some(Self {
+            source,
+            destination,
+            path,
+        })
     }
 
     /// Validate routing path (no loops, within matrix bounds)
     pub fn validate_path(&self, matrix_size: u16) -> bool {
         // Check source and destination are within bounds
-        if self.source.x >= matrix_size || self.source.y >= matrix_size ||
-           self.destination.x >= matrix_size || self.destination.y >= matrix_size {
+        if self.source.x >= matrix_size
+            || self.source.y >= matrix_size
+            || self.destination.x >= matrix_size
+            || self.destination.y >= matrix_size
+        {
             return false;
         }
 
@@ -278,7 +295,10 @@ impl MatrixRoutingHeader {
 pub fn privacy_mode_from_u8(value: u8) -> Option<PrivacyMode> {
     match value {
         0 => Some(PrivacyMode::ANONYMOUS),
-        1 => Some(PrivacyMode { scope: AccessScope::Bounded, tracked: false }),
+        1 => Some(PrivacyMode {
+            scope: AccessScope::Bounded,
+            tracked: false,
+        }),
         2 => Some(PrivacyMode::PRIVATE),
         3 => Some(PrivacyMode::PUBLIC),
         _ => None,
@@ -339,7 +359,7 @@ mod tests {
         let bytes = proof.to_bytes();
         assert_eq!(bytes.len(), ProofOfStateHeader::SIZE);
 
-        let decoded = ProofOfStateHeader::from_bytes(&bytes).unwrap();
+        let decoded = ProofOfStateHeader::from_bytes(&bytes).expect("test: expected success");
         assert_eq!(decoded.who, proof.who);
         assert_eq!(decoded.what, proof.what);
         assert_eq!(decoded.when, proof.when);

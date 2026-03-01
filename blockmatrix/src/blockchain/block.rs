@@ -68,7 +68,7 @@ impl Block {
             assets: assets.clone(),
             previous_hash: previous_hash.clone(),
             hash: String::new(),
-            node_coordinate: node_coordinate.clone(),
+            node_coordinate,
             nonce,
             shard_commitment: None,
         };
@@ -82,7 +82,7 @@ impl Block {
     /// Create the genesis block for a node
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
         // Create a genesis AssetRegistration for this node
-        let genesis_asset = AssetRegistration::genesis(node_coordinate.clone());
+        let genesis_asset = AssetRegistration::genesis(node_coordinate);
 
         Block::new(
             0,
@@ -116,7 +116,7 @@ impl Block {
         }
 
         let hash = hasher.finalize();
-        format!("{}", hash)
+        format!("{hash}")
     }
 
     /// Verify the block's hash is correct
@@ -159,8 +159,9 @@ impl Block {
 
     /// Check if this is a genesis block
     pub fn is_genesis(&self) -> bool {
-        self.index == 0 &&
-        self.previous_hash == "0000000000000000000000000000000000000000000000000000000000000000"
+        self.index == 0
+            && self.previous_hash
+                == "0000000000000000000000000000000000000000000000000000000000000000"
     }
 }
 
@@ -175,7 +176,7 @@ impl fmt::Display for Block {
             self.node_coordinate.y,
             self.node_coordinate.z,
             &self.hash[..8],
-            &self.hash[self.hash.len()-8..]
+            &self.hash[self.hash.len() - 8..]
         )
     }
 }
@@ -187,7 +188,7 @@ mod tests {
     #[test]
     fn test_genesis_block_creation() {
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
-        let genesis = Block::genesis(coord.clone());
+        let genesis = Block::genesis(coord);
 
         assert_eq!(genesis.index, 0);
         assert!(genesis.is_genesis());
@@ -198,10 +199,10 @@ mod tests {
     #[test]
     fn test_block_creation() {
         let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coord");
-        let asset = AssetRegistration::genesis(coord.clone());
+        let asset = AssetRegistration::genesis(coord);
         let prev_hash = "abc123".to_string();
 
-        let block = Block::new(1, vec![asset.clone()], prev_hash.clone(), coord.clone());
+        let block = Block::new(1, vec![asset.clone()], prev_hash.clone(), coord);
 
         assert_eq!(block.index, 1);
         assert_eq!(block.assets.len(), 1);
@@ -215,18 +216,14 @@ mod tests {
     #[test]
     fn test_hash_verification() {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
-        let asset = AssetRegistration::genesis(coord.clone());
-        let mut block = Block::new(
-            1,
-            vec![asset.clone()],
-            "prev".to_string(),
-            coord.clone(),
-        );
+        let asset = AssetRegistration::genesis(coord);
+        let mut block = Block::new(1, vec![asset.clone()], "prev".to_string(), coord);
 
         assert!(block.verify_hash());
 
         // Tamper with assets
-        let tampered_asset = AssetRegistration::genesis(MatrixCoordinate::new(1, 1, 1).expect("test: valid coord"));
+        let tampered_asset =
+            AssetRegistration::genesis(MatrixCoordinate::new(1, 1, 1).expect("test: valid coord"));
         block.assets = vec![tampered_asset];
         assert!(!block.verify_hash());
 
@@ -240,7 +237,7 @@ mod tests {
         let coord1 = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
         let coord2 = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
 
-        let block = Block::genesis(coord1.clone());
+        let block = Block::genesis(coord1);
 
         assert!(block.belongs_to_node(&coord1));
         assert!(!block.belongs_to_node(&coord2));
@@ -251,19 +248,18 @@ mod tests {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
         // Create multiple assets to test size calculation
         let assets: Vec<AssetRegistration> = (0..10)
-            .map(|i| AssetRegistration::genesis(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
+            .map(|i| {
+                AssetRegistration::genesis(
+                    MatrixCoordinate::new(i, i, i).expect("test: valid coord"),
+                )
+            })
             .collect();
 
-        let block = Block::new(
-            100,
-            assets,
-            "x".repeat(64),
-            coord,
-        );
+        let block = Block::new(100, assets, "x".repeat(64), coord);
 
         let size = block.size();
         assert!(size >= 320); // At least 10 assets * 32 bytes
-        assert!(size < 1024);  // But not too much overhead
+        assert!(size < 1024); // But not too much overhead
     }
 
     #[test]
@@ -271,7 +267,7 @@ mod tests {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
         let block = Block::genesis(coord);
 
-        let display = format!("{}", block);
+        let display = format!("{block}");
         assert!(display.contains("Block #0"));
         assert!(display.contains("Node: (10,20,30)"));
     }
@@ -279,11 +275,11 @@ mod tests {
     #[test]
     fn test_deterministic_hash() {
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
-        let asset = AssetRegistration::genesis(coord.clone());
+        let asset = AssetRegistration::genesis(coord);
 
         // Create two blocks with same asset but let nonce be random
-        let block1 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord.clone());
-        let block2 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord.clone());
+        let block1 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord);
+        let block2 = Block::new(1, vec![asset.clone()], "prev".to_string(), coord);
 
         // Hashes should be different due to different nonce/timestamp
         assert_ne!(block1.hash, block2.hash);
@@ -314,7 +310,7 @@ mod tests {
     #[test]
     fn test_genesis_block_properties() {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
-        let genesis = Block::genesis(coord.clone());
+        let genesis = Block::genesis(coord);
 
         // Genesis block should have specific properties
         assert_eq!(genesis.index, 0);
@@ -323,7 +319,7 @@ mod tests {
             genesis.previous_hash,
             "0000000000000000000000000000000000000000000000000000000000000000"
         );
-        assert!(genesis.assets.len() > 0); // Has genesis asset
+        assert!(!genesis.assets.is_empty()); // Has genesis asset
         assert_eq!(genesis.asset_count(), 1); // Exactly one genesis asset
         assert!(genesis.verify_hash());
     }
@@ -331,17 +327,22 @@ mod tests {
     #[test]
     fn test_block_must_have_assets() {
         let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
-        let result = std::panic::catch_unwind(|| {
-            Block::new(1, vec![], "prev".to_string(), coord)
-        });
-        assert!(result.is_err(), "Block creation with empty assets should panic");
+        let result = std::panic::catch_unwind(|| Block::new(1, vec![], "prev".to_string(), coord));
+        assert!(
+            result.is_err(),
+            "Block creation with empty assets should panic"
+        );
     }
 
     #[test]
     fn test_asset_helpers() {
         let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
         let assets: Vec<AssetRegistration> = (0..5)
-            .map(|i| AssetRegistration::genesis(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
+            .map(|i| {
+                AssetRegistration::genesis(
+                    MatrixCoordinate::new(i, i, i).expect("test: valid coord"),
+                )
+            })
             .collect();
 
         let block = Block::new(1, assets.clone(), "prev".to_string(), coord);

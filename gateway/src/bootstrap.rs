@@ -91,11 +91,7 @@ impl BootstrapHandler {
         let resp = BootstrapResponse {
             stoq_endpoint: self.stoq_endpoint.clone(),
             bootstrap_token: token,
-            supported_privacy_modes: vec![
-                "anonymous".into(),
-                "private".into(),
-                "public".into(),
-            ],
+            supported_privacy_modes: vec!["anonymous".into(), "private".into(), "public".into()],
             expires_at: expires_at.to_rfc3339(),
         };
 
@@ -105,8 +101,8 @@ impl BootstrapHandler {
             "Bootstrap response issued"
         );
 
-        let body = serde_json::to_vec(&resp)
-            .expect("BootstrapResponse serialization should not fail");
+        let body =
+            serde_json::to_vec(&resp).expect("BootstrapResponse serialization should not fail");
 
         Response::builder()
             .status(StatusCode::OK)
@@ -182,8 +178,12 @@ mod tests {
         assert_eq!(body.stoq_endpoint, "[::]:8444");
         assert!(!body.bootstrap_token.is_empty());
         assert_eq!(body.supported_privacy_modes.len(), 3);
-        assert!(body.supported_privacy_modes.contains(&"anonymous".to_string()));
-        assert!(body.supported_privacy_modes.contains(&"private".to_string()));
+        assert!(body
+            .supported_privacy_modes
+            .contains(&"anonymous".to_string()));
+        assert!(body
+            .supported_privacy_modes
+            .contains(&"private".to_string()));
         assert!(body.supported_privacy_modes.contains(&"public".to_string()));
         assert!(!body.expires_at.is_empty());
     }
@@ -270,15 +270,11 @@ mod tests {
         };
 
         let json = serde_json::to_string(&resp).expect("test: serialize");
-        let parsed: BootstrapResponse =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let parsed: BootstrapResponse = serde_json::from_str(&json).expect("test: deserialize");
 
         assert_eq!(parsed.stoq_endpoint, resp.stoq_endpoint);
         assert_eq!(parsed.bootstrap_token, resp.bootstrap_token);
-        assert_eq!(
-            parsed.supported_privacy_modes,
-            resp.supported_privacy_modes
-        );
+        assert_eq!(parsed.supported_privacy_modes, resp.supported_privacy_modes);
         assert_eq!(parsed.expires_at, resp.expires_at);
     }
 }

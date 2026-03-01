@@ -14,7 +14,7 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// Network-specific isolation configuration
 #[derive(Debug, Clone)]
@@ -46,7 +46,7 @@ impl PacketFilter {
     /// Create new packet filter for network
     fn new(network_id: NetworkId) -> Self {
         let mut allowed_destinations = HashSet::new();
-        allowed_destinations.insert(network_id.clone());
+        allowed_destinations.insert(network_id);
 
         PacketFilter {
             network_id,
@@ -77,7 +77,10 @@ impl PacketFilter {
         }
 
         // Check allowed destinations
-        if !self.allowed_destinations.contains(&packet.destination_network) {
+        if !self
+            .allowed_destinations
+            .contains(&packet.destination_network)
+        {
             return Err(anyhow!(
                 "Destination network {} not in allowed list",
                 packet.destination_network
@@ -142,7 +145,10 @@ impl DefaultIsolationManager {
         // Update statistics
         stats.violations_detected += 1;
         let violation_type_str = violation.violation_type.to_string();
-        *stats.violations_by_type.entry(violation_type_str).or_insert(0) += 1;
+        *stats
+            .violations_by_type
+            .entry(violation_type_str)
+            .or_insert(0) += 1;
 
         // Add to violation log
         violations.push(violation.clone());
@@ -155,9 +161,7 @@ impl DefaultIsolationManager {
 
         warn!(
             "Isolation violation: {} from {} to {}",
-            violation.violation_type,
-            violation.source_network,
-            violation.destination_network
+            violation.violation_type, violation.source_network, violation.destination_network
         );
     }
 
@@ -174,7 +178,7 @@ impl DefaultIsolationManager {
     async fn validate_network_exists(&self, network_id: &NetworkId) -> Result<()> {
         let configs = self.network_configs.read().await;
         if !configs.contains_key(network_id) {
-            return Err(anyhow!("Network {} not configured", network_id));
+            return Err(anyhow!("Network {network_id} not configured"));
         }
         Ok(())
     }
@@ -187,38 +191,52 @@ impl IsolationManager for DefaultIsolationManager {
         network_id: NetworkId,
         network_type: NetworkType,
     ) -> Result<()> {
-        debug!("Configuring isolation for network {} ({})", network_id, network_type.name());
+        debug!(
+            "Configuring isolation for network {} ({})",
+            network_id,
+            network_type.name()
+        );
 
         // Check if network already configured
         {
             let configs = self.network_configs.read().await;
             if configs.contains_key(&network_id) {
-                return Err(anyhow!("Network {} already configured", network_id));
+                return Err(anyhow!("Network {network_id} already configured"));
             }
         }
 
         // Create isolated connection pool
-        let connection_pool = Arc::new(ConnectionPool::new(network_id.clone()));
+        let connection_pool = Arc::new(ConnectionPool::new(network_id));
 
         // Create network configuration
         let config = NetworkIsolationConfig {
-            _network_id: network_id.clone(),
+            _network_id: network_id,
             _network_type: network_type.clone(),
             _connection_pool: connection_pool.clone(),
-            packet_filter: PacketFilter::new(network_id.clone()),
+            packet_filter: PacketFilter::new(network_id),
             _created_at: Utc::now(),
         };
 
         // Store configuration
-        self.network_configs.write().await.insert(network_id.clone(), config.clone());
+        self.network_configs
+            .write()
+            .await
+            .insert(network_id, config.clone());
 
         // Store connection pool
-        self.connection_pools.write().await.insert(network_id.clone(), connection_pool);
+        self.connection_pools
+            .write()
+            .await
+            .insert(network_id, connection_pool);
 
         // Update stats
         self.stats.write().await.active_networks += 1;
 
-        info!("Configured isolation for network {} (type: {})", network_id, network_type.name());
+        info!(
+            "Configured isolation for network {} (type: {})",
+            network_id,
+            network_type.name()
+        );
         Ok(())
     }
 
@@ -248,22 +266,21 @@ impl IsolationManager for DefaultIsolationManager {
     }
 
     async fn validate_packet(&self, packet: &Packet) -> Result<()> {
-        debug!("Validating packet {} from {} to {}",
-               packet.id, packet.source_network, packet.destination_network);
+        debug!(
+            "Validating packet {} from {} to {}",
+            packet.id, packet.source_network, packet.destination_network
+        );
 
         // Check if packet crosses network boundary
         if packet.crosses_boundary() {
             // VIOLATION: Packet attempting to cross network boundary
             let violation = IsolationViolation {
                 violation_type: ViolationType::CrossNetworkPacket,
-                source_network: packet.source_network.clone(),
-                destination_network: packet.destination_network.clone(),
+                source_network: packet.source_network,
+                destination_network: packet.destination_network,
                 timestamp: Utc::now(),
                 packet_id: Some(packet.id.clone()),
-                details: format!(
-                    "Packet {} attempted to cross network boundary",
-                    packet.id
-                ),
+                details: format!("Packet {} attempted to cross network boundary", packet.id),
             };
 
             self.record_violation(violation).await;
@@ -294,7 +311,10 @@ impl IsolationManager for DefaultIsolationManager {
         }
 
         // Track packet origin
-        self.packet_origins.write().await.insert(packet.id.clone(), packet.source_network.clone());
+        self.packet_origins
+            .write()
+            .await
+            .insert(packet.id.clone(), packet.source_network);
 
         self.update_packet_stats(true).await;
         debug!("Packet {} validated successfully", packet.id);
@@ -302,10 +322,12 @@ impl IsolationManager for DefaultIsolationManager {
     }
 
     async fn get_connection_pool(&self, network_id: NetworkId) -> Result<Arc<ConnectionPool>> {
-        self.connection_pools.read().await
+        self.connection_pools
+            .read()
+            .await
             .get(&network_id)
             .cloned()
-            .ok_or_else(|| anyhow!("No connection pool for network: {}", network_id))
+            .ok_or_else(|| anyhow!("No connection pool for network: {network_id}"))
     }
 
     async fn check_violations(&self) -> Vec<IsolationViolation> {

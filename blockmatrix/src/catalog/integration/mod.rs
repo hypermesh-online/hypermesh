@@ -11,20 +11,17 @@
 pub mod hypermesh_bridge;
 
 pub use hypermesh_bridge::{
-    CatalogHyperMeshBridge, CatalogDeploymentSpec, CatalogDeploymentResult,
-    CatalogAssetType, DeploymentStrategy, BridgeConfiguration,
-    VMDeploymentConfig, ContainerDeploymentConfig, DeploymentInfo,
+    BridgeConfiguration, CatalogAssetType, CatalogDeploymentResult, CatalogDeploymentSpec,
+    CatalogHyperMeshBridge, ContainerDeploymentConfig, DeploymentInfo, DeploymentStrategy,
+    VMDeploymentConfig,
 };
 
 /// Integration utilities and helpers
 pub mod utils {
     use super::*;
-    
-    
+
     /// Convert Catalog asset to appropriate deployment strategy
-    pub fn recommend_deployment_strategy(
-        asset: &CatalogAssetType,
-    ) -> DeploymentStrategy {
+    pub fn recommend_deployment_strategy(asset: &CatalogAssetType) -> DeploymentStrategy {
         match asset {
             CatalogAssetType::PythonApp { .. } => {
                 DeploymentStrategy::VMExecution {
@@ -37,18 +34,16 @@ pub mod utils {
                         environment_variables: std::collections::HashMap::new(),
                     },
                 }
-            },
-            CatalogAssetType::ContainerImage { .. } => {
-                DeploymentStrategy::Container {
-                    container_config: ContainerDeploymentConfig {
-                        base_image: "ubuntu:20.04".to_string(),
-                        ports: vec![],
-                        volumes: vec![],
-                        environment_variables: std::collections::HashMap::new(),
-                        command: vec![],
-                        args: vec![],
-                    },
-                }
+            }
+            CatalogAssetType::ContainerImage { .. } => DeploymentStrategy::Container {
+                container_config: ContainerDeploymentConfig {
+                    base_image: "ubuntu:20.04".to_string(),
+                    ports: vec![],
+                    volumes: vec![],
+                    environment_variables: std::collections::HashMap::new(),
+                    command: vec![],
+                    args: vec![],
+                },
             },
             CatalogAssetType::DataPipeline { .. } => {
                 DeploymentStrategy::Hybrid {
@@ -69,22 +64,20 @@ pub mod utils {
                         args: vec![],
                     },
                 }
-            },
-            _ => {
-                DeploymentStrategy::VMExecution {
-                    vm_config: VMDeploymentConfig {
-                        language_runtime: "python".to_string(),
-                        execution_timeout: std::time::Duration::from_secs(1800),
-                        memory_limit: 1024 * 1024 * 1024,
-                        cpu_limit: 2,
-                        enable_gpu: false,
-                        environment_variables: std::collections::HashMap::new(),
-                    },
-                }
             }
+            _ => DeploymentStrategy::VMExecution {
+                vm_config: VMDeploymentConfig {
+                    language_runtime: "python".to_string(),
+                    execution_timeout: std::time::Duration::from_secs(1800),
+                    memory_limit: 1024 * 1024 * 1024,
+                    cpu_limit: 2,
+                    enable_gpu: false,
+                    environment_variables: std::collections::HashMap::new(),
+                },
+            },
         }
     }
-    
+
     /// Estimate resource requirements for Catalog asset
     pub fn estimate_resource_requirements(
         asset: &CatalogAssetType,
@@ -96,11 +89,15 @@ pub mod utils {
                     cpu_cores: Some((1.0 * complexity_factor) as u32),
                     memory_mb: Some((512.0 * complexity_factor) as u64),
                     storage_gb: Some(1),
-                    gpu_count: if code.contains("torch") || code.contains("tensorflow") { Some(1) } else { None },
+                    gpu_count: if code.contains("torch") || code.contains("tensorflow") {
+                        Some(1)
+                    } else {
+                        None
+                    },
                     network_bandwidth_mbps: Some(5),
                     custom_resources: std::collections::HashMap::new(),
                 }
-            },
+            }
             CatalogAssetType::ContainerImage { .. } => {
                 hypermesh_bridge::CatalogResourceRequirements {
                     cpu_cores: Some(2),
@@ -110,7 +107,7 @@ pub mod utils {
                     network_bandwidth_mbps: Some(10),
                     custom_resources: std::collections::HashMap::new(),
                 }
-            },
+            }
             CatalogAssetType::DataPipeline { stages, .. } => {
                 // Scale based on pipeline complexity
                 let stage_count = stages.len() as f64;
@@ -122,7 +119,7 @@ pub mod utils {
                     network_bandwidth_mbps: Some((50.0 * stage_count.sqrt()) as u64),
                     custom_resources: std::collections::HashMap::new(),
                 }
-            },
+            }
             _ => {
                 // Default conservative estimates
                 hypermesh_bridge::CatalogResourceRequirements {
@@ -136,34 +133,38 @@ pub mod utils {
             }
         }
     }
-    
+
     /// Estimate code complexity factor (1.0 = simple, 5.0 = very complex)
     pub fn estimate_code_complexity(code: &str) -> f64 {
         let mut complexity = 1.0;
-        
+
         // Count complexity indicators
         let lines = code.lines().count();
         complexity += (lines as f64 / 100.0).min(2.0); // Max +2.0 for lines
-        
+
         // Count loops and conditionals
         let loops = code.matches("for ").count() + code.matches("while ").count();
         complexity += (loops as f64 * 0.2).min(1.0); // Max +1.0 for loops
-        
+
         // Count function definitions
         let functions = code.matches("function ").count() + code.matches("def ").count();
         complexity += (functions as f64 * 0.1).min(0.5); // Max +0.5 for functions
-        
+
         // Check for parallel/concurrent code
         if code.contains("parallel") || code.contains("concurrent") || code.contains("async") {
             complexity += 1.0;
         }
-        
+
         // Check for heavy computational libraries
-        if code.contains("numpy") || code.contains("scipy") || code.contains("pandas") ||
-           code.contains("LinearAlgebra") || code.contains("Statistics") {
+        if code.contains("numpy")
+            || code.contains("scipy")
+            || code.contains("pandas")
+            || code.contains("LinearAlgebra")
+            || code.contains("Statistics")
+        {
             complexity += 0.5;
         }
-        
+
         complexity.min(5.0) // Cap at 5.0
     }
 }
@@ -172,11 +173,10 @@ pub mod utils {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_deployment_strategy_recommendation() {
-    }
-    
+    fn test_deployment_strategy_recommendation() {}
+
     #[test]
     fn test_resource_estimation() {
         let python_app = CatalogAssetType::PythonApp {
@@ -184,13 +184,13 @@ mod tests {
             requirements_txt: "torch>=1.0".to_string(),
             entry_point: "main.py".to_string(),
         };
-        
+
         let requirements = utils::estimate_resource_requirements(&python_app);
         assert!(requirements.gpu_count.is_some()); // Should detect GPU need from torch
         assert!(requirements.cpu_cores.is_some());
         assert!(requirements.memory_mb.is_some());
     }
-    
+
     #[test]
     fn test_code_complexity_estimation() {
         let simple_code = "print('hello')";
@@ -205,10 +205,10 @@ mod tests {
                             result = np.parallel.compute()
                 return result
         "#;
-        
+
         let simple_complexity = utils::estimate_code_complexity(simple_code);
         let complex_complexity = utils::estimate_code_complexity(complex_code);
-        
+
         assert!(complex_complexity > simple_complexity);
         assert!(simple_complexity >= 1.0);
         assert!(complex_complexity <= 5.0);

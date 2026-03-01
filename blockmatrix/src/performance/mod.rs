@@ -275,7 +275,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_production_readiness_validation() {
-        let report = validate_production_readiness().await.unwrap();
+        let report = validate_production_readiness().await.expect("test: async operation");
         
         assert!(report.performance_ready);
         assert!(report.monitoring_ready);
@@ -286,13 +286,13 @@ mod tests {
     
     #[tokio::test]
     async fn test_performance_targets_validation() {
-        let valid = validate_performance_targets().await.unwrap();
+        let valid = validate_performance_targets().await.expect("test: async operation");
         assert!(valid);
     }
     
     #[tokio::test]
     async fn test_monitoring_deployment_validation() {
-        let valid = validate_monitoring_deployment().await.unwrap();
+        let valid = validate_monitoring_deployment().await.expect("test: async operation");
         assert!(valid);
     }
     

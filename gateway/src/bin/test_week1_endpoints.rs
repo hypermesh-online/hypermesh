@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 fn main() -> Result<()> {
@@ -23,15 +23,60 @@ fn main() -> Result<()> {
     // List of implemented endpoints
     let endpoints = vec![
         ("1", "Gateway Health", "/health", "Gateway (8443)"),
-        ("2", "HyperMesh System Status", "/api/v1/hypermesh/system/status", "BlockMatrix (8446)"),
-        ("3", "HyperMesh Assets", "/api/v1/hypermesh/assets", "BlockMatrix (8446)"),
-        ("4", "HyperMesh Allocations", "/api/v1/hypermesh/allocations", "BlockMatrix (8446)"),
-        ("5", "STOQ System Health", "/api/v1/stoq/system/health", "BlockMatrix (8446)"),
-        ("6", "STOQ Connections", "/api/v1/stoq/connections", "BlockMatrix (8446)"),
-        ("7", "HyperMesh Nodes Health", "/api/v1/hypermesh/nodes/health", "BlockMatrix (8446)"),
-        ("8", "STOQ Performance Metrics", "/api/v1/stoq/metrics/performance", "BlockMatrix (8446)"),
-        ("9", "Byzantine Detections", "/api/v1/hypermesh/byzantine/detections", "BlockMatrix (8446)"),
-        ("10", "TrustChain Auth Certificate", "/api/v1/trustchain/auth/certificate", "TrustChain (50053)"),
+        (
+            "2",
+            "HyperMesh System Status",
+            "/api/v1/hypermesh/system/status",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "3",
+            "HyperMesh Assets",
+            "/api/v1/hypermesh/assets",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "4",
+            "HyperMesh Allocations",
+            "/api/v1/hypermesh/allocations",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "5",
+            "STOQ System Health",
+            "/api/v1/stoq/system/health",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "6",
+            "STOQ Connections",
+            "/api/v1/stoq/connections",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "7",
+            "HyperMesh Nodes Health",
+            "/api/v1/hypermesh/nodes/health",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "8",
+            "STOQ Performance Metrics",
+            "/api/v1/stoq/metrics/performance",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "9",
+            "Byzantine Detections",
+            "/api/v1/hypermesh/byzantine/detections",
+            "BlockMatrix (8446)",
+        ),
+        (
+            "10",
+            "TrustChain Auth Certificate",
+            "/api/v1/trustchain/auth/certificate",
+            "TrustChain (50053)",
+        ),
     ];
 
     info!("Implemented Endpoints:");

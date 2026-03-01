@@ -178,10 +178,7 @@ impl ScopeRouter {
                 };
             }
             self.stats.gateway_routes.fetch_add(1, Ordering::Relaxed);
-            debug!(
-                "cross-scope via gateway {} -> {:?}",
-                gw.node_id, to_scope
-            );
+            debug!("cross-scope via gateway {} -> {:?}", gw.node_id, to_scope);
             return RouteDecision::ViaGateway {
                 gateway: gw,
                 target_scope: to_scope,
@@ -199,7 +196,7 @@ impl ScopeRouter {
 
         self.stats.denied_routes.fetch_add(1, Ordering::Relaxed);
         RouteDecision::Denied {
-            reason: format!("no route from {:?} to {:?}", from_scope, to_scope),
+            reason: format!("no route from {from_scope:?} to {to_scope:?}"),
         }
     }
 
@@ -210,8 +207,7 @@ impl ScopeRouter {
             "registered gateway {} at {} (scopes: {:?})",
             node.node_id, node.addr, node.supported_scopes
         );
-        self.registered_gateways
-            .insert(node.node_id.clone(), node);
+        self.registered_gateways.insert(node.node_id.clone(), node);
     }
 
     /// Remove a gateway node by ID. Returns `true` if it existed.
@@ -224,11 +220,7 @@ impl ScopeRouter {
     }
 
     /// Register (or update) a federation's trust level for routing decisions.
-    pub fn register_federation(
-        &self,
-        federation_id: String,
-        trust_level: GatewayTrustLevel,
-    ) {
+    pub fn register_federation(&self, federation_id: String, trust_level: GatewayTrustLevel) {
         debug!(
             "registered federation {} with trust {:?}",
             federation_id, trust_level
@@ -263,10 +255,7 @@ impl ScopeRouter {
         let mut best: Option<(f64, GatewayNode)> = None;
         for entry in self.registered_gateways.iter() {
             let gw = entry.value();
-            let supports = gw
-                .supported_scopes
-                .iter()
-                .any(|s| scopes.contains(s));
+            let supports = gw.supported_scopes.iter().any(|s| scopes.contains(s));
             if !supports {
                 continue;
             }
@@ -274,7 +263,7 @@ impl ScopeRouter {
                 continue;
             }
             let dist = euclidean_distance_to_origin(&gw.position);
-            if best.as_ref().map_or(true, |(d, _)| dist < *d) {
+            if best.as_ref().is_none_or(|(d, _)| dist < *d) {
                 best = Some((dist, gw.clone()));
             }
         }
@@ -287,10 +276,7 @@ impl ScopeRouter {
     }
 
     /// Look for a trusted federation that could handle the target scope.
-    fn find_federation_for_scope(
-        &self,
-        _scope: BlockchainScope,
-    ) -> Option<String> {
+    fn find_federation_for_scope(&self, _scope: BlockchainScope) -> Option<String> {
         // Return the first non-untrusted federation.
         for entry in self.federation_trust.iter() {
             if *entry.value() != GatewayTrustLevel::Untrusted {
@@ -352,7 +338,12 @@ mod tests {
         );
         match decision {
             RouteDecision::Direct { target } => {
-                assert_eq!(target, "[::1]:9000".parse::<SocketAddr>().expect("test: valid addr"));
+                assert_eq!(
+                    target,
+                    "[::1]:9000"
+                        .parse::<SocketAddr>()
+                        .expect("test: valid addr")
+                );
             }
             other => unreachable!("expected Direct, got {:?}", other),
         }
@@ -369,7 +360,7 @@ mod tests {
         );
         match decision {
             RouteDecision::Denied { reason } => {
-                assert!(reason.contains("no target"), "reason: {}", reason);
+                assert!(reason.contains("no target"), "reason: {reason}");
             }
             other => unreachable!("expected Denied, got {:?}", other),
         }
@@ -394,7 +385,7 @@ mod tests {
         );
         match decision {
             RouteDecision::Denied { reason } => {
-                assert!(reason.contains("anonymous"), "reason: {}", reason);
+                assert!(reason.contains("anonymous"), "reason: {reason}");
             }
             other => unreachable!("expected Denied, got {:?}", other),
         }
@@ -450,8 +441,7 @@ mod tests {
             RouteDecision::Denied { reason } => {
                 assert!(
                     reason.contains("no route"),
-                    "expected no-route deny, got: {}",
-                    reason
+                    "expected no-route deny, got: {reason}"
                 );
             }
             other => unreachable!("expected Denied, got {:?}", other),
@@ -549,7 +539,12 @@ mod tests {
         );
         match decision {
             RouteDecision::Direct { target } => {
-                assert_eq!(target, "[::1]:9011".parse::<SocketAddr>().expect("test: valid addr"));
+                assert_eq!(
+                    target,
+                    "[::1]:9011"
+                        .parse::<SocketAddr>()
+                        .expect("test: valid addr")
+                );
             }
             other => unreachable!("expected Direct to near gateway, got {:?}", other),
         }
@@ -627,7 +622,12 @@ mod tests {
         );
         match decision {
             RouteDecision::Direct { target } => {
-                assert_eq!(target, "[::1]:9999".parse::<SocketAddr>().expect("test: valid addr"));
+                assert_eq!(
+                    target,
+                    "[::1]:9999"
+                        .parse::<SocketAddr>()
+                        .expect("test: valid addr")
+                );
             }
             other => unreachable!("expected Direct with updated addr, got {:?}", other),
         }

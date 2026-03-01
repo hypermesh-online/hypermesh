@@ -4,14 +4,14 @@
 
 //! Platform coordination and lifecycle management
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::sync::{RwLock, Notify};
-use tracing::{info, error, instrument};
-use serde::{Serialize, Deserialize};
+use tokio::sync::{Notify, RwLock};
+use tracing::{error, info, instrument};
 
-use crate::{IntegrationResult, IntegrationError};
+use crate::{IntegrationError, IntegrationResult};
 
 /// Integration coordinator (alias for PlatformCoordinator)
 pub type IntegrationCoordinator = PlatformCoordinator;
@@ -117,15 +117,18 @@ impl PlatformCoordinator {
             notifications: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// Initialize coordination phases
     #[instrument(skip(self))]
-    pub async fn initialize_phases(&self, phase_definitions: Vec<PhaseDefinition>) -> IntegrationResult<()> {
+    pub async fn initialize_phases(
+        &self,
+        phase_definitions: Vec<PhaseDefinition>,
+    ) -> IntegrationResult<()> {
         info!("Initializing coordination phases");
-        
+
         let mut phases = self.phases.write().await;
         let mut notifications = self.notifications.write().await;
-        
+
         for def in phase_definitions {
             let phase_state = PhaseState {
                 name: def.name.clone(),
@@ -136,23 +139,23 @@ impl PlatformCoordinator {
                 progress: 0.0,
                 error: None,
             };
-            
+
             phases.insert(def.name.clone(), phase_state);
             notifications.insert(def.name.clone(), Arc::new(Notify::new()));
         }
-        
+
         info!("Initialized {} coordination phases", phases.len());
         Ok(())
     }
-    
+
     /// Start a coordination phase
     #[instrument(skip(self))]
     pub async fn start_phase(&self, phase_name: &str) -> IntegrationResult<()> {
         info!("Starting coordination phase: {}", phase_name);
-        
+
         let mut phases = self.phases.write().await;
         let mut coord_state = self.coordination_state.write().await;
-        
+
         // Check if phase exists and get dependencies
         let phase_deps = if let Some(phase) = phases.get(phase_name) {
             phase.dependencies.clone()
@@ -169,7 +172,7 @@ impl PlatformCoordinator {
                 if dep_phase.status != PhaseStatus::Completed {
                     return Err(IntegrationError::Lifecycle {
                         phase: phase_name.to_string(),
-                        message: format!("Dependency '{}' not completed", dep),
+                        message: format!("Dependency '{dep}' not completed"),
                     });
                 }
             }
@@ -183,28 +186,30 @@ impl PlatformCoordinator {
 
             info!("Phase '{}' started successfully", phase_name);
         }
-        
+
         Ok(())
     }
-    
+
     /// Complete a coordination phase
     #[instrument(skip(self))]
     pub async fn complete_phase(&self, phase_name: &str) -> IntegrationResult<()> {
         info!("Completing coordination phase: {}", phase_name);
-        
+
         let mut phases = self.phases.write().await;
         let mut coord_state = self.coordination_state.write().await;
         let notifications = self.notifications.read().await;
-        
+
         if let Some(phase) = phases.get_mut(phase_name) {
             let start_time = phase.start_time.unwrap_or(SystemTime::now());
             let end_time = SystemTime::now();
-            let duration = end_time.duration_since(start_time).unwrap_or(Duration::from_secs(0));
-            
+            let duration = end_time
+                .duration_since(start_time)
+                .unwrap_or(Duration::from_secs(0));
+
             phase.status = PhaseStatus::Completed;
             phase.end_time = Some(end_time);
             phase.progress = 1.0;
-            
+
             // Record phase execution
             coord_state.phase_history.push(PhaseExecution {
                 phase: phase_name.to_string(),
@@ -213,46 +218,54 @@ impl PlatformCoordinator {
                 success: true,
                 error_message: None,
             });
-            
+
             // Clear current phase if this was it
             if coord_state.current_phase.as_ref() == Some(&phase_name.to_string()) {
                 coord_state.current_phase = None;
             }
-            
+
             // Notify waiters
             if let Some(notify) = notifications.get(phase_name) {
                 notify.notify_waiters();
             }
-            
-            info!("Phase '{}' completed successfully in {:?}", phase_name, duration);
+
+            info!(
+                "Phase '{}' completed successfully in {:?}",
+                phase_name, duration
+            );
         } else {
             return Err(IntegrationError::Lifecycle {
                 phase: phase_name.to_string(),
                 message: "Phase not found".to_string(),
             });
         }
-        
+
         Ok(())
     }
-    
+
     /// Fail a coordination phase
     #[instrument(skip(self))]
     pub async fn fail_phase(&self, phase_name: &str, error_message: &str) -> IntegrationResult<()> {
-        error!("Failing coordination phase: {} - {}", phase_name, error_message);
-        
+        error!(
+            "Failing coordination phase: {} - {}",
+            phase_name, error_message
+        );
+
         let mut phases = self.phases.write().await;
         let mut coord_state = self.coordination_state.write().await;
         let notifications = self.notifications.read().await;
-        
+
         if let Some(phase) = phases.get_mut(phase_name) {
             let start_time = phase.start_time.unwrap_or(SystemTime::now());
             let end_time = SystemTime::now();
-            let duration = end_time.duration_since(start_time).unwrap_or(Duration::from_secs(0));
-            
+            let duration = end_time
+                .duration_since(start_time)
+                .unwrap_or(Duration::from_secs(0));
+
             phase.status = PhaseStatus::Failed;
             phase.end_time = Some(end_time);
             phase.error = Some(error_message.to_string());
-            
+
             // Record phase execution
             coord_state.phase_history.push(PhaseExecution {
                 phase: phase_name.to_string(),
@@ -261,54 +274,62 @@ impl PlatformCoordinator {
                 success: false,
                 error_message: Some(error_message.to_string()),
             });
-            
+
             // Set platform to error state
             coord_state.platform_state = PlatformState::Error {
-                message: format!("Phase '{}' failed: {}", phase_name, error_message),
+                message: format!("Phase '{phase_name}' failed: {error_message}"),
             };
-            
+
             // Clear current phase
             coord_state.current_phase = None;
-            
+
             // Notify waiters
             if let Some(notify) = notifications.get(phase_name) {
                 notify.notify_waiters();
             }
-            
-            error!("Phase '{}' failed after {:?}: {}", phase_name, duration, error_message);
+
+            error!(
+                "Phase '{}' failed after {:?}: {}",
+                phase_name, duration, error_message
+            );
         }
-        
+
         Ok(())
     }
-    
+
     /// Update phase progress
     #[instrument(skip(self))]
     pub async fn update_progress(&self, phase_name: &str, progress: f64) -> IntegrationResult<()> {
         let mut phases = self.phases.write().await;
-        
+
         if let Some(phase) = phases.get_mut(phase_name) {
             phase.progress = progress.clamp(0.0, 1.0);
         }
-        
+
         Ok(())
     }
-    
+
     /// Wait for a phase to complete
     #[instrument(skip(self))]
-    pub async fn wait_for_phase(&self, phase_name: &str, timeout: Duration) -> IntegrationResult<()> {
+    pub async fn wait_for_phase(
+        &self,
+        phase_name: &str,
+        timeout: Duration,
+    ) -> IntegrationResult<()> {
         let notifications = self.notifications.read().await;
-        
+
         if let Some(notify) = notifications.get(phase_name) {
             let notify_clone = notify.clone();
             drop(notifications);
-            
+
             // Wait for notification with timeout
-            tokio::time::timeout(timeout, notify_clone.notified()).await
+            tokio::time::timeout(timeout, notify_clone.notified())
+                .await
                 .map_err(|_| IntegrationError::Lifecycle {
                     phase: phase_name.to_string(),
                     message: "Phase wait timeout".to_string(),
                 })?;
-            
+
             // Check if phase actually completed successfully
             let phases = self.phases.read().await;
             if let Some(phase) = phases.get(phase_name) {
@@ -316,7 +337,10 @@ impl PlatformCoordinator {
                     PhaseStatus::Completed => Ok(()),
                     PhaseStatus::Failed => Err(IntegrationError::Lifecycle {
                         phase: phase_name.to_string(),
-                        message: phase.error.clone().unwrap_or_else(|| "Phase failed".to_string()),
+                        message: phase
+                            .error
+                            .clone()
+                            .unwrap_or_else(|| "Phase failed".to_string()),
                     }),
                     _ => Err(IntegrationError::Lifecycle {
                         phase: phase_name.to_string(),
@@ -336,23 +360,23 @@ impl PlatformCoordinator {
             })
         }
     }
-    
+
     /// Get current coordination state
     pub async fn get_state(&self) -> CoordinationState {
         self.coordination_state.read().await.clone()
     }
-    
+
     /// Get all phase states
     pub async fn get_phases(&self) -> HashMap<String, PhaseState> {
         self.phases.read().await.clone()
     }
-    
+
     /// Set platform state
     pub async fn set_platform_state(&self, state: PlatformState) {
         let mut coord_state = self.coordination_state.write().await;
         coord_state.platform_state = state;
     }
-    
+
     /// Get platform uptime
     pub async fn get_uptime(&self) -> Duration {
         let coord_state = self.coordination_state.read().await;
@@ -382,13 +406,13 @@ impl PhaseDefinition {
             expected_duration: None,
         }
     }
-    
+
     /// Add dependencies
     pub fn with_dependencies(mut self, dependencies: Vec<String>) -> Self {
         self.dependencies = dependencies;
         self
     }
-    
+
     /// Set expected duration
     pub fn with_expected_duration(mut self, duration: Duration) -> Self {
         self.expected_duration = Some(duration);

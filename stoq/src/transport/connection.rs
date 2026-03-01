@@ -4,12 +4,12 @@
 
 //! STOQ Connection Management
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use parking_lot::Mutex;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::net::Ipv6Addr;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use super::metrics::TransportMetrics;
 
@@ -164,7 +164,7 @@ impl Connection {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_else(|_| std::time::Duration::from_secs(0))
-                    .as_secs()
+                    .as_secs(),
             ),
             idle_timeout,
         }
@@ -178,15 +178,19 @@ impl Connection {
     /// Accept a bidirectional stream
     pub async fn accept_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
         self.update_activity();
-        self.inner.accept_bi().await
-            .map_err(|e| anyhow!("Failed to accept bidirectional stream: {}", e))
+        self.inner
+            .accept_bi()
+            .await
+            .map_err(|e| anyhow!("Failed to accept bidirectional stream: {e}"))
     }
 
     /// Open a bidirectional stream
     pub async fn open_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
         self.update_activity();
-        self.inner.open_bi().await
-            .map_err(|e| anyhow!("Failed to open bidirectional stream: {}", e))
+        self.inner
+            .open_bi()
+            .await
+            .map_err(|e| anyhow!("Failed to open bidirectional stream: {e}"))
     }
 
     /// Get the remote endpoint
@@ -273,14 +277,23 @@ pub struct Stream {
 }
 
 impl Stream {
-    pub(crate) fn new(send: quinn::SendStream, recv: quinn::RecvStream, metrics: Arc<TransportMetrics>) -> Self {
-        Self { send, recv, metrics }
+    pub(crate) fn new(
+        send: quinn::SendStream,
+        recv: quinn::RecvStream,
+        metrics: Arc<TransportMetrics>,
+    ) -> Self {
+        Self {
+            send,
+            recv,
+            metrics,
+        }
     }
 
     /// Send data over the stream with zero-copy optimization
     pub async fn send(&mut self, data: &[u8]) -> Result<()> {
         // Use zero-copy when possible
-        if data.len() <= 1024 * 1024 { // 1MB threshold for zero-copy
+        if data.len() <= 1024 * 1024 {
+            // 1MB threshold for zero-copy
             let bytes = Bytes::copy_from_slice(data);
             self.send.write_all(&bytes).await?;
         } else {

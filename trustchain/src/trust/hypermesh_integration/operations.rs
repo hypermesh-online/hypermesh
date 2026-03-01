@@ -4,15 +4,15 @@
 
 //! HyperMesh Trust Integration operations and implementations
 
+use dashmap::DashMap;
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use dashmap::DashMap;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
-use crate::errors::Result as TrustChainResult;
-use crate::consensus::FourProofValidator;
 use super::types::*;
+use crate::consensus::FourProofValidator;
+use crate::errors::Result as TrustChainResult;
 
 /// HyperMesh trust validator with Byzantine fault detection
 pub struct HyperMeshTrustValidator {
@@ -79,20 +79,22 @@ impl HyperMeshTrustValidator {
         debug!("Authenticating asset: {:?}", asset_id);
 
         let _asset_metadata = self.asset_client.get_asset_metadata(asset_id).await?;
-        let status = self.authenticator.authenticate(
-            &EntityId::Asset(asset_id.clone()),
-        ).await?;
+        let status = self
+            .authenticator
+            .authenticate(&EntityId::Asset(asset_id.clone()))
+            .await?;
 
         if !status.authenticated {
             warn!("Asset {} FAILED authentication", asset_id.uuid);
         }
 
         let validation_time = start_time.elapsed().as_millis() as u32;
-        self.metrics.auth_checks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.average_validation_time_ms.store(
-            validation_time,
-            std::sync::atomic::Ordering::Relaxed,
-        );
+        self.metrics
+            .auth_checks
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .average_validation_time_ms
+            .store(validation_time, std::sync::atomic::Ordering::Relaxed);
 
         debug!(
             "Asset authentication: {} ({}ms)",
@@ -130,9 +132,7 @@ impl HyperMeshTrustValidator {
                 "Byzantine behavior detected: {:?} confidence: {:.3}",
                 report.fault_type, report.confidence
             );
-            if report.confidence
-                >= self.config.alert_thresholds.byzantine_confidence
-            {
+            if report.confidence >= self.config.alert_thresholds.byzantine_confidence {
                 self.byzantine_detector.send_alert(&report).await?;
                 self.metrics
                     .alert_count
@@ -153,10 +153,7 @@ impl HyperMeshTrustValidator {
     }
 
     /// Establish proxy connection
-    pub async fn establish_proxy(
-        &self,
-        target: &Ipv6Addr,
-    ) -> TrustChainResult<ProxyConnection> {
+    pub async fn establish_proxy(&self, target: &Ipv6Addr) -> TrustChainResult<ProxyConnection> {
         info!("Establishing proxy to: {}", target);
         let proxy_candidates = self.proxy_manager.find_proxy_candidates(target).await?;
         let selected_proxy = self
@@ -221,9 +218,7 @@ impl HyperMeshAssetClient {
 }
 
 impl ByzantineDetector {
-    pub(crate) async fn new(
-        _config: &TrustValidatorConfig,
-    ) -> TrustChainResult<Self> {
+    pub(crate) async fn new(_config: &TrustValidatorConfig) -> TrustChainResult<Self> {
         Ok(Self {
             _node_behaviors: Arc::new(DashMap::new()),
             _patterns: Arc::new(ByzantinePatterns {}),
@@ -246,10 +241,7 @@ impl ByzantineDetector {
         })
     }
 
-    pub(crate) async fn send_alert(
-        &self,
-        _report: &ByzantineReport,
-    ) -> TrustChainResult<()> {
+    pub(crate) async fn send_alert(&self, _report: &ByzantineReport) -> TrustChainResult<()> {
         Ok(())
     }
 }
@@ -303,9 +295,7 @@ impl RemoteProxyManager {
 }
 
 impl BinaryAuthEngine {
-    pub(crate) async fn new(
-        _config: &TrustValidatorConfig,
-    ) -> TrustChainResult<Self> {
+    pub(crate) async fn new(_config: &TrustValidatorConfig) -> TrustChainResult<Self> {
         Ok(Self {
             _consensus_validator: Arc::new(FourProofValidator::new()),
         })

@@ -5,9 +5,9 @@
 // STOQ Phase 5: Comprehensive Integration Testing Suite
 // End-to-end validation of complete system functionality
 
-use stoq::transport::{StoqTransport, TransportConfig, NetworkTier, Endpoint};
 use std::net::Ipv6Addr;
 use std::sync::Arc;
+use stoq::transport::{Endpoint, NetworkTier, StoqTransport, TransportConfig};
 use tokio::sync::Barrier;
 
 mod connection_tests {
@@ -16,8 +16,10 @@ mod connection_tests {
     #[tokio::test]
     async fn test_end_to_end_connection() {
         // Setup server
-        let mut server_config = TransportConfig::default();
-        server_config.port = 0; // Let OS assign port
+        let server_config = TransportConfig {
+            port: 0, // Let OS assign port
+            ..Default::default()
+        };
         let server = Arc::new(StoqTransport::new(server_config).await.unwrap());
         let actual_addr = server.local_addr().unwrap();
 
@@ -57,8 +59,10 @@ mod connection_tests {
         const NUM_CONNECTIONS: usize = 10; // Reduced for faster testing
 
         // Setup server
-        let mut server_config = TransportConfig::default();
-        server_config.port = 0;
+        let server_config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         let server = Arc::new(StoqTransport::new(server_config).await.unwrap());
         let server_addr = server.local_addr().unwrap();
 
@@ -81,8 +85,7 @@ mod connection_tests {
 
                     // Read client ID
                     let data = stream.receive().await.unwrap();
-                    let client_id: usize = String::from_utf8_lossy(&data)
-                        .parse().unwrap();
+                    let client_id: usize = String::from_utf8_lossy(&data).parse().unwrap();
 
                     assert_eq!(client_id, i);
 
@@ -90,7 +93,7 @@ mod connection_tests {
                     barrier_clone.wait().await;
 
                     // Echo response
-                    let response = format!("ACK: {}", client_id);
+                    let response = format!("ACK: {client_id}");
                     stream.send(response.as_bytes()).await.unwrap();
                 });
 
@@ -124,7 +127,7 @@ mod connection_tests {
 
                 // Read response
                 let data = stream.receive().await.unwrap();
-                let expected = format!("ACK: {}", i);
+                let expected = format!("ACK: {i}");
                 assert_eq!(&data[..], expected.as_bytes());
             });
 
@@ -146,8 +149,10 @@ mod stream_management_tests {
     #[tokio::test]
     async fn test_bidirectional_streams() {
         // Setup transports
-        let mut server_config = TransportConfig::default();
-        server_config.port = 0;
+        let server_config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         let server = Arc::new(StoqTransport::new(server_config).await.unwrap());
         let server_addr = server.local_addr().unwrap();
 
@@ -163,9 +168,9 @@ mod stream_management_tests {
             for i in 0..5 {
                 let mut stream = conn.accept_stream().await.unwrap();
                 let data = stream.receive().await.unwrap();
-                assert_eq!(data, format!("Stream {}", i).as_bytes());
+                assert_eq!(data, format!("Stream {i}").as_bytes());
 
-                stream.send(format!("Reply {}", i).as_bytes()).await.unwrap();
+                stream.send(format!("Reply {i}").as_bytes()).await.unwrap();
             }
         });
 
@@ -175,10 +180,10 @@ mod stream_management_tests {
 
         for i in 0..5 {
             let mut stream = conn.open_stream().await.unwrap();
-            stream.send(format!("Stream {}", i).as_bytes()).await.unwrap();
+            stream.send(format!("Stream {i}").as_bytes()).await.unwrap();
 
             let reply = stream.receive().await.unwrap();
-            assert_eq!(reply, format!("Reply {}", i).as_bytes());
+            assert_eq!(reply, format!("Reply {i}").as_bytes());
         }
 
         server_handle.await.unwrap();
@@ -190,9 +195,11 @@ mod transport_features_tests {
 
     #[tokio::test]
     async fn test_zero_copy_operations() {
-        let mut config = TransportConfig::default();
-        config.enable_zero_copy = true;
-        config.port = 0;
+        let config = TransportConfig {
+            enable_zero_copy: true,
+            port: 0,
+            ..Default::default()
+        };
 
         let transport = Arc::new(StoqTransport::new(config).await.unwrap());
         let stats = transport.stats();
@@ -204,13 +211,17 @@ mod transport_features_tests {
 
     #[tokio::test]
     async fn test_connection_pooling() {
-        let mut server_config = TransportConfig::default();
-        server_config.port = 0;
+        let server_config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         let server = Arc::new(StoqTransport::new(server_config).await.unwrap());
         let server_addr = server.local_addr().unwrap();
 
-        let mut client_config = TransportConfig::default();
-        client_config.connection_pool_size = 5;
+        let client_config = TransportConfig {
+            connection_pool_size: 5,
+            ..Default::default()
+        };
         let client = Arc::new(StoqTransport::new(client_config).await.unwrap());
 
         // Server accept connections
@@ -241,8 +252,10 @@ mod performance_tier_tests {
 
     #[tokio::test]
     async fn test_tier_adaptation() {
-        let mut config = TransportConfig::default();
-        config.port = 0;
+        let mut config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
 
         // Start with slow tier
         config.adapt_for_network_tier(&NetworkTier::Slow { mbps: 10.0 });
@@ -257,8 +270,10 @@ mod performance_tier_tests {
 
     #[tokio::test]
     async fn test_datacenter_tier_performance() {
-        let mut config = TransportConfig::default();
-        config.port = 0;
+        let mut config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
 
         // Configure for datacenter tier
         config.adapt_for_network_tier(&NetworkTier::DataCenter { gbps: 100.0 });
@@ -277,9 +292,13 @@ mod performance_tier_tests {
 mod integration_test_utils {
     use super::*;
 
-    pub async fn create_test_transport_pair() -> (Arc<StoqTransport>, Arc<StoqTransport>, Endpoint) {
-        let mut server_config = TransportConfig::default();
-        server_config.port = 0;
+    #[allow(dead_code)]
+    pub async fn create_test_transport_pair() -> (Arc<StoqTransport>, Arc<StoqTransport>, Endpoint)
+    {
+        let server_config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         let server = Arc::new(StoqTransport::new(server_config).await.unwrap());
         let server_addr = server.local_addr().unwrap();
 

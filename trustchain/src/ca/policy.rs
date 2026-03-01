@@ -3,13 +3,13 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Certificate Policy Engine
-//! 
+//!
 //! Policy validation for certificate requests.
 
 use anyhow::Result;
 
-use crate::consensus::ConsensusRequirements;
 use super::CertificateRequest;
+use crate::consensus::ConsensusRequirements;
 
 /// Policy engine for certificate validation
 #[derive(Clone)]
@@ -33,7 +33,10 @@ impl PolicyEngine {
         }
 
         // Validate consensus proof meets requirements
-        if !request.consensus_proof.validate_with_requirements(&self.consensus_requirements) {
+        if !request
+            .consensus_proof
+            .validate_with_requirements(&self.consensus_requirements)
+        {
             return Ok(false);
         }
 

@@ -4,41 +4,55 @@
 
 //! eBPF throughput benchmarks for STOQ transport
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::net::Ipv6Addr;
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 use tokio::runtime::Runtime;
 
 fn setup_transport_with_ebpf(rt: &Runtime) -> StoqTransport {
     rt.block_on(async {
         // Initialize crypto
-        if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+        if rustls::crypto::ring::default_provider()
+            .install_default()
+            .is_err()
+        {
             // Already installed
         }
 
-        let mut config = TransportConfig::default();
-        config.enable_zero_copy = true;
-        config.enable_memory_pool = true;
-        config.frame_batch_size = 64;
-        config.memory_pool_size = 2048;
+        let config = TransportConfig {
+            enable_zero_copy: true,
+            enable_memory_pool: true,
+            frame_batch_size: 64,
+            memory_pool_size: 2048,
+            ..Default::default()
+        };
 
-        StoqTransport::new(config).await.expect("Failed to create transport")
+        StoqTransport::new(config)
+            .await
+            .expect("Failed to create transport")
     })
 }
 
 fn setup_transport_without_ebpf(rt: &Runtime) -> StoqTransport {
     rt.block_on(async {
         // Initialize crypto
-        if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+        if rustls::crypto::ring::default_provider()
+            .install_default()
+            .is_err()
+        {
             // Already installed
         }
 
-        let mut config = TransportConfig::default();
-        config.enable_zero_copy = false;  // Disable zero-copy to simulate no eBPF
-        config.enable_memory_pool = false;
-        config.frame_batch_size = 1;
+        let config = TransportConfig {
+            enable_zero_copy: false, // Disable zero-copy to simulate no eBPF
+            enable_memory_pool: false,
+            frame_batch_size: 1,
+            ..Default::default()
+        };
 
-        StoqTransport::new(config).await.expect("Failed to create transport")
+        StoqTransport::new(config)
+            .await
+            .expect("Failed to create transport")
     })
 }
 
@@ -53,41 +67,33 @@ fn benchmark_send_throughput(c: &mut Criterion) {
 
         // Benchmark with eBPF optimizations
         group.throughput(Throughput::Bytes(*size as u64));
-        group.bench_with_input(
-            BenchmarkId::new("with_ebpf", size),
-            size,
-            |b, _size| {
-                let transport = setup_transport_with_ebpf(&rt);
-                let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9294);
+        group.bench_with_input(BenchmarkId::new("with_ebpf", size), size, |b, _size| {
+            let transport = setup_transport_with_ebpf(&rt);
+            let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9294);
 
-                b.iter(|| {
-                    rt.block_on(async {
-                        // Create mock connection for benchmarking
-                        if let Ok(conn) = transport.connect(&endpoint).await {
-                            let _ = transport.send(&conn, black_box(&data)).await;
-                        }
-                    })
-                });
-            },
-        );
+            b.iter(|| {
+                rt.block_on(async {
+                    // Create mock connection for benchmarking
+                    if let Ok(conn) = transport.connect(&endpoint).await {
+                        let _ = transport.send(&conn, black_box(&data)).await;
+                    }
+                })
+            });
+        });
 
         // Benchmark without eBPF optimizations
-        group.bench_with_input(
-            BenchmarkId::new("without_ebpf", size),
-            size,
-            |b, _size| {
-                let transport = setup_transport_without_ebpf(&rt);
-                let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9295);
+        group.bench_with_input(BenchmarkId::new("without_ebpf", size), size, |b, _size| {
+            let transport = setup_transport_without_ebpf(&rt);
+            let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9295);
 
-                b.iter(|| {
-                    rt.block_on(async {
-                        if let Ok(conn) = transport.connect(&endpoint).await {
-                            let _ = transport.send(&conn, black_box(&data)).await;
-                        }
-                    })
-                });
-            },
-        );
+            b.iter(|| {
+                rt.block_on(async {
+                    if let Ok(conn) = transport.connect(&endpoint).await {
+                        let _ = transport.send(&conn, black_box(&data)).await;
+                    }
+                })
+            });
+        });
     }
 
     group.finish();

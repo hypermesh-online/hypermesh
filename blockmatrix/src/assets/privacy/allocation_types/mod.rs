@@ -7,17 +7,17 @@
 //! Implements the four allocation types from Proof of State with enhanced
 //! constraints and transition validation.
 
-pub mod security;
 pub mod performance;
+pub mod security;
 pub mod transitions;
 
-pub use security::*;
 pub use performance::*;
+pub use security::*;
 pub use transitions::*;
 
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use crate::assets::core::PrivacyMode;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Privacy allocation types from Proof of State patterns
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,9 +37,13 @@ impl PrivacyAllocationType {
     pub fn description(&self) -> &'static str {
         match self {
             PrivacyAllocationType::Private => "Internal use only, no external access or sharing",
-            PrivacyAllocationType::Public => "Cross-network accessible with full discovery capabilities",
+            PrivacyAllocationType::Public => {
+                "Cross-network accessible with full discovery capabilities"
+            }
             PrivacyAllocationType::Anonymous => "Privacy-first sharing with no identity tracking",
-            PrivacyAllocationType::Verified => "Maximum security with full consensus proof validation",
+            PrivacyAllocationType::Verified => {
+                "Maximum security with full consensus proof validation"
+            }
         }
     }
 
@@ -60,9 +64,9 @@ impl PrivacyAllocationType {
 
     /// Check if allocation type supports public discovery
     pub fn supports_public_discovery(&self) -> bool {
-        matches!(self,
-            PrivacyAllocationType::Public |
-            PrivacyAllocationType::Verified
+        matches!(
+            self,
+            PrivacyAllocationType::Public | PrivacyAllocationType::Verified
         )
     }
 
@@ -97,7 +101,7 @@ impl PrivacyAllocationType {
             PrivacyAllocationType::Private => 0.0, // No rewards for private allocation
             PrivacyAllocationType::Public => 0.75,
             PrivacyAllocationType::Anonymous => 0.5, // Lower rewards for anonymous
-            PrivacyAllocationType::Verified => 1.0, // Maximum rewards
+            PrivacyAllocationType::Verified => 1.0,  // Maximum rewards
         }
     }
 
@@ -127,10 +131,9 @@ impl PrivacyAllocationType {
     /// Get required capabilities for this allocation type
     pub fn required_capabilities(&self) -> Vec<String> {
         match self {
-            PrivacyAllocationType::Private => vec![
-                "local_access".to_string(),
-                "memory_isolation".to_string(),
-            ],
+            PrivacyAllocationType::Private => {
+                vec!["local_access".to_string(), "memory_isolation".to_string()]
+            }
             PrivacyAllocationType::Public => vec![
                 "remote_access".to_string(),
                 "public_discovery".to_string(),

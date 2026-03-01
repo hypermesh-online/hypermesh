@@ -7,18 +7,18 @@
 //! Handles package lifecycle operations including installation, updates, and removal.
 //! MIGRATION: Now integrates with CatalogRegistry for type storage/retrieval.
 
-use super::types::*;
 use super::asset_library::AssetLibrary;
 use super::resolver::DependencyResolver;
-use super::{LibraryInterface, DependencyResolution};
+use super::types::*;
+use super::{DependencyResolution, LibraryInterface};
 
-use anyhow::{Result, bail};
-use std::sync::Arc;
+use anyhow::{bail, Result};
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Import Asset Registry
-use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 use hypermesh_lib::PrivacyMode;
 
 /// Package operation results
@@ -164,7 +164,9 @@ impl AssetPackageManager {
         {
             let locks = self.install_locks.read().await;
             if locks.contains(package_id) {
-                result.errors.push(format!("Package {} is already being installed", package_id));
+                result
+                    .errors
+                    .push(format!("Package {package_id} is already being installed"));
                 return Ok(result);
             }
         }
@@ -185,7 +187,9 @@ impl AssetPackageManager {
         let package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
             None => {
-                result.errors.push(format!("Package {} not found", package_id));
+                result
+                    .errors
+                    .push(format!("Package {package_id} not found"));
                 return Ok(result);
             }
         };
@@ -206,7 +210,9 @@ impl AssetPackageManager {
         let mut packages_to_install = vec![(Arc::from(package_id), package)];
 
         if self.config.auto_install_deps {
-            let dep_resolution = self.resolve_all_dependencies(&packages_to_install[0].1).await?;
+            let dep_resolution = self
+                .resolve_all_dependencies(&packages_to_install[0].1)
+                .await?;
 
             if !dep_resolution.success {
                 result.errors.push(format!(
@@ -231,22 +237,25 @@ impl AssetPackageManager {
         for (pkg_id, pkg) in packages_to_install {
             // Check if already installed
             if installed_packages.contains_key(&pkg_id) {
-                result.warnings.push(format!("Package {} is already installed", pkg_id));
+                result
+                    .warnings
+                    .push(format!("Package {pkg_id} is already installed"));
                 continue;
             }
 
             // Create installation record
             let installed = InstalledPackage {
                 id: Arc::clone(&pkg_id),
-                version: pkg.metadata.as_ref()
+                version: pkg
+                    .metadata
+                    .as_ref()
                     .map(|m| Arc::clone(&m.version))
                     .unwrap_or_else(|| Arc::from(pkg.version.as_str())),
                 installed_at: chrono::Utc::now().timestamp(),
-                dependencies: pkg.spec.as_ref()
-                    .map(|s| s.dependencies
-                        .iter()
-                        .map(|d| Arc::clone(&d.name))
-                        .collect())
+                dependencies: pkg
+                    .spec
+                    .as_ref()
+                    .map(|s| s.dependencies.iter().map(|d| Arc::clone(&d.name)).collect())
                     .unwrap_or_else(Vec::new),
                 dependents: HashSet::new(),
                 source: if pkg_id.as_ref() == package_id {
@@ -290,7 +299,9 @@ impl AssetPackageManager {
         let package_info = match installed.get(package_id) {
             Some(info) => info.clone(),
             None => {
-                result.errors.push(format!("Package {} is not installed", package_id));
+                result
+                    .errors
+                    .push(format!("Package {package_id} is not installed"));
                 return Ok(result);
             }
         };
@@ -349,7 +360,9 @@ impl AssetPackageManager {
             match installed.get(package_id) {
                 Some(info) => info.version.to_string(),
                 None => {
-                    result.errors.push(format!("Package {} is not installed", package_id));
+                    result
+                        .errors
+                        .push(format!("Package {package_id} is not installed"));
                     return Ok(result);
                 }
             }
@@ -359,16 +372,23 @@ impl AssetPackageManager {
         let latest_package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
             None => {
-                result.errors.push(format!("Package {} not found in library", package_id));
+                result
+                    .errors
+                    .push(format!("Package {package_id} not found in library"));
                 return Ok(result);
             }
         };
 
         // Check if update is needed
-        if latest_package.metadata.as_ref().map(|m| m.version.as_ref()).unwrap_or("") == current_version {
+        if latest_package
+            .metadata
+            .as_ref()
+            .map(|m| m.version.as_ref())
+            .unwrap_or("")
+            == current_version
+        {
             result.warnings.push(format!(
-                "Package {} is already at latest version {}",
-                package_id, current_version
+                "Package {package_id} is already at latest version {current_version}"
             ));
             result.success = true;
             return Ok(result);
@@ -395,7 +415,11 @@ impl AssetPackageManager {
                 "Updated {} from {} to {}",
                 package_id,
                 current_version,
-                latest_package.metadata.as_ref().map(|m| m.version.as_ref()).unwrap_or("<unknown>")
+                latest_package
+                    .metadata
+                    .as_ref()
+                    .map(|m| m.version.as_ref())
+                    .unwrap_or("<unknown>")
             ));
         }
 
@@ -428,7 +452,7 @@ impl AssetPackageManager {
     pub async fn check_dependencies(&self, package_id: &str) -> Result<DependencyCheckResult> {
         let package = match self.library.get_package(package_id).await {
             Some(pkg) => pkg,
-            None => bail!("Package {} not found", package_id),
+            None => bail!("Package {package_id} not found"),
         };
 
         let resolution = self.library.resolve_dependencies(&package).await?;
@@ -437,7 +461,8 @@ impl AssetPackageManager {
             package_id: package_id.to_string(),
             total_dependencies: resolution.resolved.len(),
             missing: resolution.missing,
-            conflicts: resolution.conflicts
+            conflicts: resolution
+                .conflicts
                 .into_iter()
                 .map(|c| DependencyConflictInfo {
                     name: c.name,
@@ -450,24 +475,27 @@ impl AssetPackageManager {
     }
 
     /// Find orphaned dependencies (not required by any package)
-    fn find_orphaned_dependencies(&self, installed: &HashMap<Arc<str>, InstalledPackage>) -> Vec<String> {
+    fn find_orphaned_dependencies(
+        &self,
+        installed: &HashMap<Arc<str>, InstalledPackage>,
+    ) -> Vec<String> {
         installed
             .values()
             .filter(|pkg| {
-                pkg.dependents.is_empty() &&
-                matches!(pkg.source, InstallSource::Dependency)
+                pkg.dependents.is_empty() && matches!(pkg.source, InstallSource::Dependency)
             })
             .map(|pkg| pkg.id.to_string())
             .collect()
     }
 
     /// Resolve all dependencies recursively
-    async fn resolve_all_dependencies(&self, package: &LibraryAssetPackage) -> Result<DependencyResolution> {
-        self.resolver.resolve_full(
-            package,
-            &*self.library,
-            self.config.max_dependency_depth,
-        ).await
+    async fn resolve_all_dependencies(
+        &self,
+        package: &LibraryAssetPackage,
+    ) -> Result<DependencyResolution> {
+        self.resolver
+            .resolve_full(package, &*self.library, self.config.max_dependency_depth)
+            .await
     }
 
     /// Clean orphaned packages
@@ -557,7 +585,7 @@ mod tests {
         let library = Arc::new(AssetLibrary::new());
         let manager = AssetPackageManager::new(library, PackageManagerConfig::default());
 
-        let installed = manager.list_installed().await.unwrap();
+        let installed = manager.list_installed().await.expect("test: async operation");
         assert_eq!(installed.len(), 0);
     }
 
@@ -567,26 +595,27 @@ mod tests {
 
         // Add a test package to the library
         let package = create_test_package("test-pkg");
-        library.add_package(package).await.unwrap();
+        library.add_package(package).await.expect("test: async operation");
 
-        let manager = AssetPackageManager::new(Arc::clone(&library), PackageManagerConfig::default());
+        let manager =
+            AssetPackageManager::new(Arc::clone(&library), PackageManagerConfig::default());
 
         // Install package
-        let result = manager.install_package("test-pkg").await.unwrap();
+        let result = manager.install_package("test-pkg").await.expect("test: async operation");
         assert!(result.success);
         assert_eq!(result.packages_affected.len(), 1);
 
         // Check it's installed
-        let installed = manager.list_installed().await.unwrap();
+        let installed = manager.list_installed().await.expect("test: async operation");
         assert_eq!(installed.len(), 1);
         assert_eq!(installed[0].id, "test-pkg");
 
         // Uninstall package
-        let result = manager.uninstall_package("test-pkg").await.unwrap();
+        let result = manager.uninstall_package("test-pkg").await.expect("test: async operation");
         assert!(result.success);
 
         // Check it's gone
-        let installed = manager.list_installed().await.unwrap();
+        let installed = manager.list_installed().await.expect("test: async operation");
         assert_eq!(installed.len(), 0);
     }
 
@@ -612,7 +641,11 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                runtime: RuntimeRequirements { runtime_type: "lua".to_string(), version: "5.4".to_string(), dependencies: vec![] },
+                runtime: RuntimeRequirements {
+                    runtime_type: "lua".to_string(),
+                    version: "5.4".to_string(),
+                    dependencies: vec![],
+                },
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

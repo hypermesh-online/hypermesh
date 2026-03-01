@@ -10,18 +10,18 @@
 //!   not a different strategy — P2P, Federated, and Public all use the same
 //!   TrustChain mechanism, just pointed at different CA instances)
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
 use rustls::pki_types::PrivateKeyDer;
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 // sha2 used by test helpers
+use serde::{Deserialize, Serialize};
 #[cfg(test)]
-use sha2::{Sha256, Digest};
-use serde::{Serialize, Deserialize};
+use sha2::{Digest, Sha256};
 
 use super::certificates::{StoqNodeCertificate, TrustChainClient};
 
@@ -60,10 +60,21 @@ pub struct AnonymousCertificateStrategy {
     hop_number: u32,
 }
 
+impl Default for AnonymousCertificateStrategy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnonymousCertificateStrategy {
     pub fn new() -> Self {
-        info!("Initializing Anonymous certificate strategy: ephemeral per-connection certs, no CA/CT");
-        Self { tunnel_id: None, hop_number: 0 }
+        info!(
+            "Initializing Anonymous certificate strategy: ephemeral per-connection certs, no CA/CT"
+        );
+        Self {
+            tunnel_id: None,
+            hop_number: 0,
+        }
     }
 
     /// Create a tunnel-aware anonymous strategy. The tunnel ID and hop number
@@ -74,7 +85,10 @@ impl AnonymousCertificateStrategy {
             "Initializing Anonymous certificate strategy for tunnel {} hop {}",
             tunnel_id, hop_number
         );
-        Self { tunnel_id: Some(tunnel_id), hop_number }
+        Self {
+            tunnel_id: Some(tunnel_id),
+            hop_number,
+        }
     }
 
     /// Generate a fresh ephemeral self-signed certificate.
@@ -87,16 +101,17 @@ impl AnonymousCertificateStrategy {
         let cert_key = rcgen::generate_simple_self_signed(vec![cn])?;
         let cert_der = cert_key.cert.der().clone();
         let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
-            .map_err(|e| anyhow!("Failed to serialize ephemeral private key: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize ephemeral private key: {e}"))?;
 
         let fingerprint: [u8; 32] = blake3::hash(cert_der.as_ref()).into();
 
         let now = SystemTime::now();
         let expires_at = now + Duration::from_secs(86400); // 24 hours
 
-        let metadata = self.tunnel_id.as_ref().map(|tid| {
-            format!("EPHEMERAL:ANONYMOUS:{}:hop{}", tid, self.hop_number).into_bytes()
-        });
+        let metadata = self
+            .tunnel_id
+            .as_ref()
+            .map(|tid| format!("EPHEMERAL:ANONYMOUS:{}:hop{}", tid, self.hop_number).into_bytes());
 
         Ok(StoqNodeCertificate {
             node_id: format!("ephemeral-{}", hex::encode(&fingerprint[..8])),
@@ -177,10 +192,8 @@ impl AuthenticatedCertificateStrategy {
             label, trustchain_endpoint
         );
 
-        let trustchain_client = Arc::new(TrustChainClient::new(
-            trustchain_endpoint.clone(),
-            node_id,
-        ));
+        let trustchain_client =
+            Arc::new(TrustChainClient::new(trustchain_endpoint.clone(), node_id));
 
         Self {
             trustchain_endpoint,
@@ -199,16 +212,23 @@ impl AuthenticatedCertificateStrategy {
             self.label, self.trustchain_endpoint
         );
 
-        let metadata = format!("TRUSTCHAIN:{}:{}", self.label.to_uppercase(), self.trustchain_endpoint)
-            .into_bytes();
+        let metadata = format!(
+            "TRUSTCHAIN:{}:{}",
+            self.label.to_uppercase(),
+            self.trustchain_endpoint
+        )
+        .into_bytes();
 
-        let cert = self.trustchain_client.request_certificate(
-            &self.common_name,
-            &self.ipv6_addresses,
-            Some(&metadata),
-        ).await?;
+        let cert = self
+            .trustchain_client
+            .request_certificate(&self.common_name, &self.ipv6_addresses, Some(&metadata))
+            .await?;
 
-        info!("{} certificate obtained: {}", self.label, cert.fingerprint());
+        info!(
+            "{} certificate obtained: {}",
+            self.label,
+            cert.fingerprint()
+        );
         Ok(cert)
     }
 }
@@ -218,7 +238,7 @@ impl CertificateStrategy for AuthenticatedCertificateStrategy {
     async fn get_certificate(&self) -> Result<Option<StoqNodeCertificate>> {
         let mut cert_guard = self.current_cert.write().await;
 
-        if cert_guard.is_none() || cert_guard.as_ref().map_or(true, |c| c.needs_renewal()) {
+        if cert_guard.is_none() || cert_guard.as_ref().is_none_or(|c| c.needs_renewal()) {
             debug!("Requesting new {} certificate", self.label);
             let cert = self.request_certificate().await?;
             *cert_guard = Some(cert.clone());
@@ -231,7 +251,8 @@ impl CertificateStrategy for AuthenticatedCertificateStrategy {
     async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool> {
         debug!("Validating certificate via {} TrustChain CA", self.label);
 
-        let is_valid = self.trustchain_client
+        let is_valid = self
+            .trustchain_client
             .validate_certificate(cert.certificate.as_ref())
             .await?;
 
@@ -295,36 +316,30 @@ impl NetworkType {
         ipv6_addresses: Vec<Ipv6Addr>,
     ) -> Result<Arc<dyn CertificateStrategy>> {
         match self {
-            NetworkType::Anonymous => {
-                Ok(Arc::new(AnonymousCertificateStrategy::new()))
-            }
-            NetworkType::P2P => {
-                Ok(Arc::new(AuthenticatedCertificateStrategy::new(
-                    "local://trustchain".to_string(),
-                    node_id,
-                    common_name,
-                    ipv6_addresses,
-                    "Private".to_string(),
-                )))
-            }
+            NetworkType::Anonymous => Ok(Arc::new(AnonymousCertificateStrategy::new())),
+            NetworkType::P2P => Ok(Arc::new(AuthenticatedCertificateStrategy::new(
+                "local://trustchain".to_string(),
+                node_id,
+                common_name,
+                ipv6_addresses,
+                "Private".to_string(),
+            ))),
             NetworkType::Federated { gateway_url } => {
                 Ok(Arc::new(AuthenticatedCertificateStrategy::new(
-                    format!("quic://{}", gateway_url),
+                    format!("quic://{gateway_url}"),
                     node_id,
                     common_name,
                     ipv6_addresses,
                     "Federated".to_string(),
                 )))
             }
-            NetworkType::Public => {
-                Ok(Arc::new(AuthenticatedCertificateStrategy::new(
-                    "quic://trust.hypermesh.online".to_string(),
-                    node_id,
-                    common_name,
-                    ipv6_addresses,
-                    "Public".to_string(),
-                )))
-            }
+            NetworkType::Public => Ok(Arc::new(AuthenticatedCertificateStrategy::new(
+                "quic://trust.hypermesh.online".to_string(),
+                node_id,
+                common_name,
+                ipv6_addresses,
+                "Public".to_string(),
+            ))),
         }
     }
 }
@@ -344,7 +359,10 @@ mod tests {
         assert!(cert.node_id.starts_with("ephemeral-"));
 
         // Each call produces a unique cert
-        let cert2 = strategy.get_certificate().await?.expect("test: second cert");
+        let cert2 = strategy
+            .get_certificate()
+            .await?
+            .expect("test: second cert");
         assert_ne!(cert.fingerprint_sha256, cert2.fingerprint_sha256);
 
         // Anonymous should accept all certificates
@@ -368,7 +386,10 @@ mod tests {
 
         // Tunnel metadata should be embedded
         assert!(cert.node_id.starts_with("ephemeral-"));
-        let meta = cert.metadata.as_ref().expect("tunnel cert should have metadata");
+        let meta = cert
+            .metadata
+            .as_ref()
+            .expect("tunnel cert should have metadata");
         let meta_str = String::from_utf8_lossy(meta);
         assert!(meta_str.contains("tun-abc"));
         assert!(meta_str.contains("hop2"));
@@ -383,27 +404,22 @@ mod tests {
         let addrs = vec![Ipv6Addr::LOCALHOST];
 
         // All three non-anonymous types create AuthenticatedCertificateStrategy
-        let private = NetworkType::P2P.create_strategy(
-            node_id.clone(), cn.clone(), addrs.clone(),
-        )?;
+        let private =
+            NetworkType::P2P.create_strategy(node_id.clone(), cn.clone(), addrs.clone())?;
         assert_eq!(private.strategy_name(), "Private");
 
         let federated = NetworkType::Federated {
             gateway_url: "gw.test.internal".to_string(),
-        }.create_strategy(
-            node_id.clone(), cn.clone(), addrs.clone(),
-        )?;
+        }
+        .create_strategy(node_id.clone(), cn.clone(), addrs.clone())?;
         assert_eq!(federated.strategy_name(), "Federated");
 
-        let public = NetworkType::Public.create_strategy(
-            node_id.clone(), cn.clone(), addrs.clone(),
-        )?;
+        let public =
+            NetworkType::Public.create_strategy(node_id.clone(), cn.clone(), addrs.clone())?;
         assert_eq!(public.strategy_name(), "Public");
 
         // Anonymous is distinct
-        let anon = NetworkType::Anonymous.create_strategy(
-            node_id, cn, addrs,
-        )?;
+        let anon = NetworkType::Anonymous.create_strategy(node_id, cn, addrs)?;
         assert_eq!(anon.strategy_name(), "Anonymous");
 
         Ok(())

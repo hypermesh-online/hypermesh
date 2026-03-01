@@ -6,25 +6,27 @@
 //!
 //! Handles shard placement calculations based on Block-MATRIX topology
 
-use crate::assets::core::ProxyAddress;
 use crate::assets::core::AssetRegistration;
+use crate::assets::core::ProxyAddress;
 
 /// Generate proxy address for storage access
 pub async fn generate_proxy_address(asset_id: &AssetRegistration) -> ProxyAddress {
     let mut node_id = [0u8; 8];
     node_id.copy_from_slice(&asset_id.content_hash[..8]);
     ProxyAddress::new(
-        [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
-         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
+        [
+            0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x01,
+        ],
         node_id,
-        8080
+        8080,
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
+    use crate::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 
     #[tokio::test]
     async fn test_generate_proxy_address() {

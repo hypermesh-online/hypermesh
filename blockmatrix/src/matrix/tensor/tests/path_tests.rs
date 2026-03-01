@@ -4,23 +4,22 @@
 
 //! Comprehensive tests for path finding algorithms
 
-use crate::matrix::tensor::path_finding::*;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::matrix::tensor::path_finding::*;
 
 fn grid_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
     let mut neighbors = Vec::new();
     let offsets = [
-        (-1, 0, 0), (1, 0, 0),
-        (0, -1, 0), (0, 1, 0),
-        (0, 0, -1), (0, 0, 1),
+        (-1, 0, 0),
+        (1, 0, 0),
+        (0, -1, 0),
+        (0, 1, 0),
+        (0, 0, -1),
+        (0, 0, 1),
     ];
 
     for (dx, dy, dz) in offsets.iter() {
-        if let Ok(neighbor) = MatrixCoordinate::new(
-            coord.x + dx,
-            coord.y + dy,
-            coord.z + dz,
-        ) {
+        if let Ok(neighbor) = MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz) {
             neighbors.push(neighbor);
         }
     }
@@ -38,11 +37,9 @@ fn diagonal_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
                     continue;
                 }
 
-                if let Ok(neighbor) = MatrixCoordinate::new(
-                    coord.x + dx,
-                    coord.y + dy,
-                    coord.z + dz,
-                ) {
+                if let Ok(neighbor) =
+                    MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz)
+                {
                     neighbors.push(neighbor);
                 }
             }
@@ -55,30 +52,30 @@ fn diagonal_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
 #[test]
 fn test_pathfinder_straight_line() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(5, 0, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert_eq!(path.len(), 6);
     assert_eq!(path[0], start);
     assert_eq!(path[5], goal);
 
     // Check path is straight
-    for i in 0..path.len() {
-        assert_eq!(path[i].y, 0);
-        assert_eq!(path[i].z, 0);
-        assert_eq!(path[i].x, i as i64);
+    for (i, point) in path.iter().enumerate() {
+        assert_eq!(point.y, 0);
+        assert_eq!(point.z, 0);
+        assert_eq!(point.x, i as i64);
     }
 }
 
 #[test]
 fn test_pathfinder_diagonal_movement() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(3, 3, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(3, 3, 0).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 7); // Minimum Manhattan distance
     assert_eq!(path[0], start);
@@ -88,10 +85,10 @@ fn test_pathfinder_diagonal_movement() {
 #[test]
 fn test_pathfinder_3d_movement() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(2, 2, 2).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 7); // Minimum Manhattan distance
     assert_eq!(path[0], start);
@@ -101,8 +98,8 @@ fn test_pathfinder_3d_movement() {
 #[test]
 fn test_pathfinder_no_path() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(100, 100, 100).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(100, 100, 100).expect("test: valid coordinate");
 
     // No neighbors = no path possible
     let result = finder.find_path(&start, &goal, |_| vec![]);
@@ -119,9 +116,9 @@ fn test_pathfinder_no_path() {
 #[test]
 fn test_pathfinder_same_start_and_goal() {
     let finder = PathFinder::new();
-    let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
+    let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
 
-    let path = finder.find_path(&coord, &coord, grid_neighbors).unwrap();
+    let path = finder.find_path(&coord, &coord, grid_neighbors).expect("test: query operation");
 
     assert_eq!(path.len(), 1);
     assert_eq!(path[0], coord);
@@ -130,10 +127,10 @@ fn test_pathfinder_same_start_and_goal() {
 #[test]
 fn test_pathfinder_manhattan_heuristic() {
     let finder = PathFinder::manhattan();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(4, 4, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(4, 4, 0).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 9); // Manhattan distance is 8
     assert_eq!(path[0], start);
@@ -145,10 +142,10 @@ fn test_pathfinder_custom_heuristic() {
     // Use Chebyshev distance as heuristic
     let finder = PathFinder::with_heuristic(|a, b| a.chebyshev_distance(b) as f64);
 
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(3, 3, 3).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(3, 3, 3).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, diagonal_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, diagonal_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 4); // Chebyshev distance is 3
     assert_eq!(path[0], start);
@@ -160,8 +157,8 @@ fn test_pathfinder_timeout() {
     let mut finder = PathFinder::new();
     finder.set_max_iterations(5); // Very low limit
 
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(100, 100, 100).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(100, 100, 100).expect("test: valid coordinate");
 
     let result = finder.find_path(&start, &goal, grid_neighbors);
 
@@ -176,10 +173,12 @@ fn test_pathfinder_timeout() {
 #[test]
 fn test_k_shortest_paths_single() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(3, 0, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate");
 
-    let paths = finder.find_k_shortest_paths(&start, &goal, 1, grid_neighbors).unwrap();
+    let paths = finder
+        .find_k_shortest_paths(&start, &goal, 1, grid_neighbors)
+        .expect("test: expected success");
 
     assert_eq!(paths.len(), 1);
     assert_eq!(paths[0][0], start);
@@ -189,10 +188,12 @@ fn test_k_shortest_paths_single() {
 #[test]
 fn test_k_shortest_paths_multiple() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(2, 2, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(2, 2, 0).expect("test: valid coordinate");
 
-    let paths = finder.find_k_shortest_paths(&start, &goal, 3, grid_neighbors).unwrap();
+    let paths = finder
+        .find_k_shortest_paths(&start, &goal, 3, grid_neighbors)
+        .expect("test: expected success");
 
     assert!(!paths.is_empty());
 
@@ -211,10 +212,12 @@ fn test_k_shortest_paths_multiple() {
 #[test]
 fn test_k_shortest_paths_zero_k() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(3, 0, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate");
 
-    let paths = finder.find_k_shortest_paths(&start, &goal, 0, grid_neighbors).unwrap();
+    let paths = finder
+        .find_k_shortest_paths(&start, &goal, 0, grid_neighbors)
+        .expect("test: expected success");
 
     assert_eq!(paths.len(), 0);
 }
@@ -222,10 +225,10 @@ fn test_k_shortest_paths_zero_k() {
 #[test]
 fn test_calculate_path_cost_straight() {
     let path = vec![
-        MatrixCoordinate::new(0, 0, 0).unwrap(),
-        MatrixCoordinate::new(1, 0, 0).unwrap(),
-        MatrixCoordinate::new(2, 0, 0).unwrap(),
-        MatrixCoordinate::new(3, 0, 0).unwrap(),
+        MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate"),
     ];
 
     let cost = calculate_path_cost(&path);
@@ -235,9 +238,9 @@ fn test_calculate_path_cost_straight() {
 #[test]
 fn test_calculate_path_cost_diagonal() {
     let path = vec![
-        MatrixCoordinate::new(0, 0, 0).unwrap(),
-        MatrixCoordinate::new(1, 1, 0).unwrap(),
-        MatrixCoordinate::new(2, 2, 0).unwrap(),
+        MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(2, 2, 0).expect("test: valid coordinate"),
     ];
 
     let cost = calculate_path_cost(&path);
@@ -254,7 +257,7 @@ fn test_calculate_path_cost_empty() {
 
 #[test]
 fn test_calculate_path_cost_single() {
-    let path = vec![MatrixCoordinate::new(5, 5, 5).unwrap()];
+    let path = vec![MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate")];
     let cost = calculate_path_cost(&path);
     assert_eq!(cost, 0.0);
 }
@@ -262,20 +265,20 @@ fn test_calculate_path_cost_single() {
 #[test]
 fn test_optimize_path_straight() {
     let path = vec![
-        MatrixCoordinate::new(0, 0, 0).unwrap(),
-        MatrixCoordinate::new(1, 0, 0).unwrap(),
-        MatrixCoordinate::new(2, 0, 0).unwrap(),
-        MatrixCoordinate::new(3, 0, 0).unwrap(),
+        MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate"),
     ];
 
     let optimized = optimize_path(path.clone());
 
     // Should optimize to just start and end
     assert!(optimized.len() <= path.len());
-    assert_eq!(optimized[0], MatrixCoordinate::new(0, 0, 0).unwrap());
+    assert_eq!(optimized[0], MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
     assert_eq!(
         optimized[optimized.len() - 1],
-        MatrixCoordinate::new(3, 0, 0).unwrap()
+        MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate")
     );
 }
 
@@ -289,8 +292,8 @@ fn test_optimize_path_empty() {
 #[test]
 fn test_optimize_path_two_nodes() {
     let path = vec![
-        MatrixCoordinate::new(0, 0, 0).unwrap(),
-        MatrixCoordinate::new(10, 0, 0).unwrap(),
+        MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
     ];
 
     let optimized = optimize_path(path.clone());
@@ -299,10 +302,10 @@ fn test_optimize_path_two_nodes() {
 
 #[test]
 fn test_bidirectional_search() {
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(5, 0, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate");
 
-    let path = bidirectional_search(&start, &goal, grid_neighbors).unwrap();
+    let path = bidirectional_search(&start, &goal, grid_neighbors).expect("test: expected success");
 
     assert_eq!(path[0], start);
     assert_eq!(path[path.len() - 1], goal);
@@ -313,10 +316,10 @@ fn test_bidirectional_search() {
 #[test]
 fn test_pathfinder_large_grid() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(20, 20, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(20, 20, 0).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 41); // Minimum Manhattan distance
     assert_eq!(path[0], start);
@@ -326,10 +329,10 @@ fn test_pathfinder_large_grid() {
 #[test]
 fn test_pathfinder_negative_coordinates() {
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(-5, -5, -5).unwrap();
-    let goal = MatrixCoordinate::new(5, 5, 5).unwrap();
+    let start = MatrixCoordinate::new(-5, -5, -5).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, grid_neighbors).unwrap();
+    let path = finder.find_path(&start, &goal, grid_neighbors).expect("test: query operation");
 
     assert!(path.len() >= 31); // Manhattan distance is 30
     assert_eq!(path[0], start);
@@ -352,10 +355,12 @@ fn test_pathfinder_with_obstacles() {
     };
 
     let finder = PathFinder::new();
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(3, 3, 0).unwrap();
+    let start = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let goal = MatrixCoordinate::new(3, 3, 0).expect("test: valid coordinate");
 
-    let path = finder.find_path(&start, &goal, neighbors_with_obstacle).unwrap();
+    let path = finder
+        .find_path(&start, &goal, neighbors_with_obstacle)
+        .expect("test: expected success");
 
     // Path should avoid the obstacles
     assert!(path.len() >= 7);

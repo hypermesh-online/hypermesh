@@ -32,8 +32,8 @@ impl Library {
 struct Symbol<T>(std::marker::PhantomData<T>);
 
 use super::{
-    ExtensionCapability, ExtensionError, ExtensionMetadata,
-    ExtensionResult, HyperMeshExtension, ResourceLimits,
+    ExtensionCapability, ExtensionError, ExtensionMetadata, ExtensionResult, HyperMeshExtension,
+    ResourceLimits,
 };
 
 /// Type alias for extension constructor function
@@ -143,7 +143,7 @@ impl ExtensionLoader {
     pub fn new(config: LoaderConfig) -> Self {
         let verifier = if config.verify_signatures {
             Some(Arc::new(SecurityVerifier::new(
-                config.trustchain_cert_path.clone()
+                config.trustchain_cert_path.clone(),
             )))
         } else {
             None
@@ -216,7 +216,12 @@ impl ExtensionLoader {
             path: path.to_path_buf(),
             method: method.clone(),
             metadata: manifest.metadata.clone(),
-            capabilities: manifest.metadata.required_capabilities.iter().cloned().collect(),
+            capabilities: manifest
+                .metadata
+                .required_capabilities
+                .iter()
+                .cloned()
+                .collect(),
             limits: self.config.default_limits.clone(),
         };
 
@@ -255,22 +260,20 @@ impl ExtensionLoader {
 
         if !lib_path.exists() {
             return Err(ExtensionError::Internal(anyhow::anyhow!(
-                "Extension library not found: {:?}", lib_path
+                "Extension library not found: {lib_path:?}"
             )));
         }
 
         // Load the library
         let library = Library::new(&lib_path).map_err(|e| {
-            ExtensionError::Internal(anyhow::anyhow!(
-                "Failed to load library {:?}: {}", lib_path, e
-            ))
+            ExtensionError::Internal(anyhow::anyhow!("Failed to load library {lib_path:?}: {e}"))
         })?;
 
         // Get the constructor function
         let _constructor: Symbol<ExtensionConstructor> = unsafe {
             library.get(b"hypermesh_extension_create\0").map_err(|e| {
                 ExtensionError::Internal(anyhow::anyhow!(
-                    "Failed to find extension constructor: {}", e
+                    "Failed to find extension constructor: {e}"
                 ))
             })?
         };
@@ -278,9 +281,10 @@ impl ExtensionLoader {
         // Create the extension instance
         // TODO: This is stub code - libloading dependency needed for actual implementation
         // For now, return error since we can't actually load extensions
-        return Err(ExtensionError::InitializationFailed {
-            reason: "Extension loading not yet implemented (libloading dependency needed)".to_string(),
-        });
+        Err(ExtensionError::InitializationFailed {
+            reason: "Extension loading not yet implemented (libloading dependency needed)"
+                .to_string(),
+        })
 
         // The code below would work once libloading is available:
         /*
@@ -339,11 +343,11 @@ impl ExtensionLoader {
     pub async fn unload_extension(&self, extension_id: &str) -> ExtensionResult<()> {
         let loaded_ext = {
             let mut loaded = self.loaded.write().await;
-            loaded.remove(extension_id).ok_or_else(|| {
-                ExtensionError::ExtensionNotFound {
+            loaded
+                .remove(extension_id)
+                .ok_or_else(|| ExtensionError::ExtensionNotFound {
                     id: extension_id.to_string(),
-                }
-            })?
+                })?
         };
 
         // Shutdown the extension
@@ -355,7 +359,10 @@ impl ExtensionLoader {
     }
 
     /// Get loaded extension
-    pub async fn get_extension(&self, extension_id: &str) -> Option<Arc<RwLock<dyn HyperMeshExtension>>> {
+    pub async fn get_extension(
+        &self,
+        extension_id: &str,
+    ) -> Option<Arc<RwLock<dyn HyperMeshExtension>>> {
         let loaded = self.loaded.read().await;
         loaded.get(extension_id).map(|le| Arc::clone(&le.extension))
     }
@@ -363,7 +370,10 @@ impl ExtensionLoader {
     /// List loaded extensions
     pub async fn list_loaded(&self) -> Vec<ExtensionMetadata> {
         let loaded = self.loaded.read().await;
-        loaded.values().map(|le| le.context.metadata.clone()).collect()
+        loaded
+            .values()
+            .map(|le| le.context.metadata.clone())
+            .collect()
     }
 
     /// Scan directory for extensions
@@ -371,14 +381,12 @@ impl ExtensionLoader {
         let mut manifests = Vec::new();
 
         let entries = tokio::fs::read_dir(dir).await.map_err(|e| {
-            ExtensionError::Internal(anyhow::anyhow!(
-                "Failed to read directory {:?}: {}", dir, e
-            ))
+            ExtensionError::Internal(anyhow::anyhow!("Failed to read directory {dir:?}: {e}"))
         })?;
 
         let mut entries = entries;
         while let Some(entry) = entries.next_entry().await.map_err(|e| {
-            ExtensionError::Internal(anyhow::anyhow!("Failed to read directory entry: {}", e))
+            ExtensionError::Internal(anyhow::anyhow!("Failed to read directory entry: {e}"))
         })? {
             let path = entry.path();
 
@@ -416,15 +424,17 @@ impl ExtensionLoader {
             path.with_extension("toml")
         };
 
-        let content = tokio::fs::read_to_string(&manifest_path).await.map_err(|e| {
-            ExtensionError::Internal(anyhow::anyhow!(
-                "Failed to read manifest {:?}: {}", manifest_path, e
-            ))
-        })?;
+        let content = tokio::fs::read_to_string(&manifest_path)
+            .await
+            .map_err(|e| {
+                ExtensionError::Internal(anyhow::anyhow!(
+                    "Failed to read manifest {manifest_path:?}: {e}"
+                ))
+            })?;
 
         let manifest: ExtensionManifest = toml::from_str(&content).map_err(|e| {
             ExtensionError::Internal(anyhow::anyhow!(
-                "Failed to parse manifest {:?}: {}", manifest_path, e
+                "Failed to parse manifest {manifest_path:?}: {e}"
             ))
         })?;
 
@@ -460,7 +470,7 @@ impl ExtensionLoader {
                 }
             }
             _ => Err(ExtensionError::Internal(anyhow::anyhow!(
-                "Unknown extension type: {}", ext
+                "Unknown extension type: {ext}"
             ))),
         }
     }
@@ -470,7 +480,8 @@ impl ExtensionLoader {
         // Get the current extension's path
         let path = {
             let loaded = self.loaded.read().await;
-            loaded.get(extension_id)
+            loaded
+                .get(extension_id)
                 .map(|le| le.context.path.clone())
                 .ok_or_else(|| ExtensionError::ExtensionNotFound {
                     id: extension_id.to_string(),
@@ -565,7 +576,9 @@ pub struct SecurityVerifier {
 impl SecurityVerifier {
     /// Create new security verifier
     pub fn new(cert_path: Option<PathBuf>) -> Self {
-        Self { _cert_path: cert_path }
+        Self {
+            _cert_path: cert_path,
+        }
     }
 
     /// Verify extension signature
@@ -580,7 +593,7 @@ impl SecurityVerifier {
                 let sig_path = if path.is_dir() {
                     path.join(sig_file)
                 } else {
-                    path.parent().unwrap().join(sig_file)
+                    path.parent().expect("file path should have a parent directory").join(sig_file)
                 };
 
                 if !sig_path.exists() {
@@ -596,7 +609,10 @@ impl SecurityVerifier {
                 // 3. Verifying the signature matches the extension binary
                 // 4. Checking certificate validity and trust chain
 
-                debug!("Signature verification successful for {}", manifest.metadata.id);
+                debug!(
+                    "Signature verification successful for {}",
+                    manifest.metadata.id
+                );
             }
         }
 
@@ -648,19 +664,28 @@ impl ExtensionSandbox {
 
         if usage.cpu_percent > self.limits.max_cpu_percent {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("CPU: {:.1}% > {:.1}%", usage.cpu_percent, self.limits.max_cpu_percent),
+                resource: format!(
+                    "CPU: {:.1}% > {:.1}%",
+                    usage.cpu_percent, self.limits.max_cpu_percent
+                ),
             });
         }
 
         if usage.memory_bytes > self.limits.max_memory_bytes {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("Memory: {} > {}", usage.memory_bytes, self.limits.max_memory_bytes),
+                resource: format!(
+                    "Memory: {} > {}",
+                    usage.memory_bytes, self.limits.max_memory_bytes
+                ),
             });
         }
 
         if usage.operations >= self.limits.max_concurrent_operations {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("Operations: {} >= {}", usage.operations, self.limits.max_concurrent_operations),
+                resource: format!(
+                    "Operations: {} >= {}",
+                    usage.operations, self.limits.max_concurrent_operations
+                ),
             });
         }
 
@@ -703,13 +728,13 @@ mod tests {
 
         let so_path = PathBuf::from("extension.so");
         assert_eq!(
-            loader.determine_loading_method(&so_path).unwrap(),
+            loader.determine_loading_method(&so_path).expect("test: expected success"),
             LoadingMethod::SharedLibrary
         );
 
         let wasm_path = PathBuf::from("extension.wasm");
         assert_eq!(
-            loader.determine_loading_method(&wasm_path).unwrap(),
+            loader.determine_loading_method(&wasm_path).expect("test: expected success"),
             LoadingMethod::WebAssembly
         );
     }
@@ -731,7 +756,7 @@ mod tests {
 
         // Test operation limit
         for _ in 0..5 {
-            sandbox.start_operation().await.unwrap();
+            sandbox.start_operation().await.expect("test: async operation");
         }
 
         // Should fail when at limit

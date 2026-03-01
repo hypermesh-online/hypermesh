@@ -7,17 +7,16 @@ use http::{Request, Response, StatusCode};
 use serde::Serialize;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
-use tracing::{info, error, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use trustchain::ca::certificate_store::CertificateStore;
 use trustchain::ca::{CAConfig, TrustChainCA};
 use trustchain::http3::handlers::{
-    self, HttpHandlerContext,
-    IssueCertificateRequest, ValidateCertificateRequest, RevokeCertificateRequest,
-    DnsResolveRequest as HandlerDnsResolveRequest,
+    self, DnsResolveRequest as HandlerDnsResolveRequest, HttpHandlerContext,
+    IssueCertificateRequest, RevokeCertificateRequest, ValidateCertificateRequest,
 };
-use trustchain::http3::{ApiResponse, Router, Http3StoqServer};
+use trustchain::http3::{ApiResponse, Http3StoqServer, Router};
 use trustchain::security::{SecurityConfig, SecurityMonitor};
 
 /// Build a JSON success response wrapping `data` in `ApiResponse`.
@@ -46,11 +45,7 @@ fn build_json_response<T: Serialize>(data: T, request_id: String) -> Response<Ve
 
 /// Build a JSON error response using the `ApiResponse` format.
 fn build_error_response(code: &str, message: String, request_id: String) -> Response<Vec<u8>> {
-    let api_resp: ApiResponse<()> = ApiResponse::error(
-        code.to_string(),
-        message,
-        request_id,
-    );
+    let api_resp: ApiResponse<()> = ApiResponse::error(code.to_string(), message, request_id);
     match serde_json::to_vec(&api_resp) {
         Ok(body) => Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -74,6 +69,7 @@ fn build_error_response(code: &str, message: String, request_id: String) -> Resp
 }
 
 /// Parse a JSON request body, returning an error response on failure.
+#[allow(clippy::result_large_err)]
 fn parse_request_body<T: serde::de::DeserializeOwned>(
     req: &Request<Vec<u8>>,
     request_id: &str,
@@ -81,7 +77,7 @@ fn parse_request_body<T: serde::de::DeserializeOwned>(
     serde_json::from_slice(req.body()).map_err(|e| {
         build_error_response(
             "BAD_REQUEST",
-            format!("Invalid request body: {}", e),
+            format!("Invalid request body: {e}"),
             request_id.to_string(),
         )
     })
@@ -89,11 +85,7 @@ fn parse_request_body<T: serde::de::DeserializeOwned>(
 
 /// Extract the last path segment from a URI (for /{id} style routes).
 fn extract_path_id(req: &Request<Vec<u8>>) -> &str {
-    req.uri()
-        .path()
-        .split('/')
-        .last()
-        .unwrap_or("unknown")
+    req.uri().path().split('/').next_back().unwrap_or("unknown")
 }
 
 #[tokio::main]
@@ -141,17 +133,16 @@ async fn main() -> Result<()> {
 fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
     // Health endpoint
     let ctx_health = Arc::clone(&ctx);
-    let router = Router::new()
-        .get("/api/v1/trustchain/health", move |_req| {
-            let ctx = Arc::clone(&ctx_health);
-            async move {
-                let rid = uuid::Uuid::new_v4().to_string();
-                match handlers::handle_health(&ctx).await {
-                    Ok(resp) => build_json_response(resp, rid),
-                    Err(e) => build_error_response("HEALTH_ERROR", e.to_string(), rid),
-                }
+    let router = Router::new().get("/api/v1/trustchain/health", move |_req| {
+        let ctx = Arc::clone(&ctx_health);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            match handlers::handle_health(&ctx).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("HEALTH_ERROR", e.to_string(), rid),
             }
-        });
+        }
+    });
 
     // Status endpoint (no real handler — keep as stub)
     let router = router.get("/api/v1/trustchain/status", |_req| async move {
@@ -236,7 +227,11 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
             let serial = extract_path_id(&req).to_string();
             match handlers::handle_get_certificate(&ctx, &serial).await {
                 Ok(Some(cert)) => build_json_response(cert, rid),
-                Ok(None) => build_error_response("NOT_FOUND", format!("Certificate {} not found", serial), rid),
+                Ok(None) => build_error_response(
+                    "NOT_FOUND",
+                    format!("Certificate {serial} not found"),
+                    rid,
+                ),
                 Err(e) => build_error_response("GET_CERT_ERROR", e.to_string(), rid),
             }
         }
@@ -303,15 +298,18 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
     });
 
     // DNS record lookup (stub)
-    let router = router.get("/api/v1/trustchain/dns/record/{domain}", |_req| async move {
-        // TODO: Implement handle_dns_record_lookup() in handlers.rs — needs
-        // per-domain record enumeration from DnsResolver via STOQ transport.
-        build_error_response(
-            "NOT_IMPLEMENTED",
-            "DNS record lookup requires STOQ transport integration (not yet wired)".to_string(),
-            uuid::Uuid::new_v4().to_string(),
-        )
-    });
+    let router = router.get(
+        "/api/v1/trustchain/dns/record/{domain}",
+        |_req| async move {
+            // TODO: Implement handle_dns_record_lookup() in handlers.rs — needs
+            // per-domain record enumeration from DnsResolver via STOQ transport.
+            build_error_response(
+                "NOT_IMPLEMENTED",
+                "DNS record lookup requires STOQ transport integration (not yet wired)".to_string(),
+                uuid::Uuid::new_v4().to_string(),
+            )
+        },
+    );
 
     // Consensus status (stub)
     let router = router.get("/api/v1/trustchain/consensus/status", |_req| async move {
@@ -333,24 +331,30 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
         // SecurityMonitor::validate_certificate_operation().
         build_error_response(
             "NOT_IMPLEMENTED",
-            "Consensus validation endpoint requires proof deserialization (not yet wired)".to_string(),
+            "Consensus validation endpoint requires proof deserialization (not yet wired)"
+                .to_string(),
             uuid::Uuid::new_v4().to_string(),
         )
     });
 
     // Consensus proofs by asset ID (stub)
-    let router = router.get("/api/v1/trustchain/consensus/proofs/{asset_id}", |_req| async move {
-        // TODO: Implement handle_consensus_proofs() in handlers.rs — needs
-        // per-asset proof retrieval from blockchain/consensus layer.
-        build_error_response(
-            "NOT_IMPLEMENTED",
-            "Consensus proof retrieval requires blockchain integration (not yet wired)".to_string(),
-            uuid::Uuid::new_v4().to_string(),
-        )
-    });
+    let router = router.get(
+        "/api/v1/trustchain/consensus/proofs/{asset_id}",
+        |_req| async move {
+            // TODO: Implement handle_consensus_proofs() in handlers.rs — needs
+            // per-asset proof retrieval from blockchain/consensus layer.
+            build_error_response(
+                "NOT_IMPLEMENTED",
+                "Consensus proof retrieval requires blockchain integration (not yet wired)"
+                    .to_string(),
+                uuid::Uuid::new_v4().to_string(),
+            )
+        },
+    );
 
     // Auth certificate (stub)
-    let router = router.post("/api/v1/trustchain/auth/certificate", |_req| async move {
+
+    router.post("/api/v1/trustchain/auth/certificate", |_req| async move {
         // TODO: Implement handle_auth_certificate() in handlers.rs — needs
         // certificate-based authentication flow: validate cert against CA,
         // generate session token, assign permissions based on cert attributes.
@@ -359,7 +363,5 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
             "Certificate authentication requires session management (not yet wired)".to_string(),
             uuid::Uuid::new_v4().to_string(),
         )
-    });
-
-    router
+    })
 }

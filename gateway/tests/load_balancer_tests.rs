@@ -91,7 +91,10 @@ fn least_connections_selects_least_loaded() {
 
     // next should have been selected because it had min connections
     // (before selection incremented it)
-    let next_state = backends.iter().find(|b| b.addr == next).expect("test: found");
+    let next_state = backends
+        .iter()
+        .find(|b| b.addr == next)
+        .expect("test: found");
     // It was incremented by select, so it should be min_conns + 1 or equal
     assert!(
         next_state.active_connections <= min_conns + 1,
@@ -227,7 +230,10 @@ fn strategy_accessor() {
 
 #[test]
 fn default_strategy_is_round_robin() {
-    assert_eq!(LoadBalanceStrategy::default(), LoadBalanceStrategy::RoundRobin);
+    assert_eq!(
+        LoadBalanceStrategy::default(),
+        LoadBalanceStrategy::RoundRobin
+    );
 }
 
 #[test]

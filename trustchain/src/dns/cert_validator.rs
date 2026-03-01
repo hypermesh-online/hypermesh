@@ -3,16 +3,16 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Certificate DNS Validation
-//! 
+//!
 //! Validates domain certificates through DNS and CT integration.
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use tracing::{debug, warn, error};
+use tracing::{debug, error, warn};
 
-use crate::errors::{DnsError, TrustChainError, Result as TrustChainResult};
+use crate::errors::{DnsError, Result as TrustChainResult, TrustChainError};
 
 /// Certificate validator for DNS domains
 pub struct CertificateValidator {
@@ -35,25 +35,13 @@ pub struct ValidationResult {
 }
 
 /// Validation statistics
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ValidationStats {
     pub validations_performed: u64,
     pub validations_passed: u64,
     pub validations_failed: u64,
     pub cache_hits: u64,
     pub last_validation: Option<SystemTime>,
-}
-
-impl Default for ValidationStats {
-    fn default() -> Self {
-        Self {
-            validations_performed: 0,
-            validations_passed: 0,
-            validations_failed: 0,
-            cache_hits: 0,
-            last_validation: None,
-        }
-    }
 }
 
 impl CertificateValidator {
@@ -94,7 +82,8 @@ impl CertificateValidator {
                         debug!("Certificate validation cache hit: {} (invalid)", domain);
                         return Err(DnsError::CertificateValidationFailed {
                             domain: domain.to_string(),
-                        }.into());
+                        }
+                        .into());
                     }
                 }
             }
@@ -125,10 +114,14 @@ impl CertificateValidator {
             debug!("Certificate validation successful: {}", domain);
             Ok(())
         } else {
-            warn!("Certificate validation failed: {} - {:?}", domain, validation_result.reason);
+            warn!(
+                "Certificate validation failed: {} - {:?}",
+                domain, validation_result.reason
+            );
             Err(DnsError::CertificateValidationFailed {
                 domain: domain.to_string(),
-            }.into())
+            }
+            .into())
         }
     }
 
@@ -185,12 +178,13 @@ impl CertificateValidator {
 
     async fn simple_domain_validation(&self, domain: &str) -> bool {
         // Simple validation - in production this would be more sophisticated
-        
+
         // Accept localhost and test domains
-        if domain == "localhost" || 
-           domain.ends_with(".localhost") ||
-           domain.ends_with(".test") ||
-           domain.ends_with(".example.com") {
+        if domain == "localhost"
+            || domain.ends_with(".localhost")
+            || domain.ends_with(".test")
+            || domain.ends_with(".example.com")
+        {
             return true;
         }
 
@@ -202,7 +196,10 @@ impl CertificateValidator {
 
         // For other domains, we would perform actual certificate validation
         // For now, we'll mark them as invalid to avoid false positives
-        warn!("Certificate validation not implemented for domain: {}", domain);
+        warn!(
+            "Certificate validation not implemented for domain: {}",
+            domain
+        );
         false
     }
 }
@@ -244,11 +241,8 @@ impl ConfigurableCertificateValidator {
     /// Create new configurable certificate validator
     pub async fn new(config: ValidationConfig) -> TrustChainResult<Self> {
         let validator = CertificateValidator::new(config.enabled).await?;
-        
-        Ok(Self {
-            validator,
-            config,
-        })
+
+        Ok(Self { validator, config })
     }
 
     /// Validate domain certificate with configuration
@@ -267,16 +261,22 @@ impl ConfigurableCertificateValidator {
                 Err(e) => {
                     last_error = Some(e);
                     attempts += 1;
-                    
+
                     if attempts < self.config.retry_attempts {
-                        debug!("Certificate validation failed for {}, retrying... (attempt {})", domain, attempts);
+                        debug!(
+                            "Certificate validation failed for {}, retrying... (attempt {})",
+                            domain, attempts
+                        );
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     }
                 }
             }
         }
 
-        error!("Certificate validation failed for {} after {} attempts", domain, attempts);
+        error!(
+            "Certificate validation failed for {} after {} attempts",
+            domain, attempts
+        );
         Err(last_error.unwrap_or_else(|| {
             TrustChainError::DnsResolver(DnsError::CertificateValidationFailed {
                 domain: domain.to_string(),
@@ -301,7 +301,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_validator_creation() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
         let stats = validator.get_stats().await;
         assert_eq!(stats.validations_performed, 0);
@@ -309,7 +310,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_validator() {
-        let validator = CertificateValidator::new(false).await
+        let validator = CertificateValidator::new(false)
+            .await
             .expect("Failed to create disabled validator");
 
         // Validation should always succeed when disabled
@@ -322,7 +324,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_localhost_validation() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
 
         // Localhost should be valid
@@ -336,14 +339,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_trustchain_domain_validation() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
 
         // TrustChain domains should be valid
         let domains = ["hypermesh", "caesar", "trust", "assets"];
         for domain in &domains {
             let result = validator.validate_domain_certificate(domain).await;
-            assert!(result.is_ok(), "Domain {} should be valid", domain);
+            assert!(result.is_ok(), "Domain {domain} should be valid");
         }
 
         let stats = validator.get_stats().await;
@@ -353,15 +357,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_caching() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
 
         // First validation
-        validator.validate_domain_certificate("localhost").await
+        validator
+            .validate_domain_certificate("localhost")
+            .await
             .expect("First validation failed");
 
         // Second validation should hit cache
-        validator.validate_domain_certificate("localhost").await
+        validator
+            .validate_domain_certificate("localhost")
+            .await
             .expect("Second validation failed");
 
         let stats = validator.get_stats().await;
@@ -371,19 +380,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_clearing() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
 
         // Perform validation to populate cache
-        validator.validate_domain_certificate("localhost").await
+        validator
+            .validate_domain_certificate("localhost")
+            .await
             .expect("Initial validation failed");
 
         // Clear cache
-        validator.clear_cache().await
+        validator
+            .clear_cache()
+            .await
             .expect("Failed to clear cache");
 
         // Next validation should not hit cache
-        validator.validate_domain_certificate("localhost").await
+        validator
+            .validate_domain_certificate("localhost")
+            .await
             .expect("Post-clear validation failed");
 
         let stats = validator.get_stats().await;
@@ -399,7 +415,8 @@ mod tests {
             ..Default::default()
         };
 
-        let validator = ConfigurableCertificateValidator::new(config).await
+        let validator = ConfigurableCertificateValidator::new(config)
+            .await
             .expect("Failed to create configurable validator");
 
         // Test validation
@@ -409,11 +426,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_unknown_domain_validation() {
-        let validator = CertificateValidator::new(true).await
+        let validator = CertificateValidator::new(true)
+            .await
             .expect("Failed to create certificate validator");
 
         // Unknown domain should fail validation (not implemented)
-        let result = validator.validate_domain_certificate("unknown.example.org").await;
+        let result = validator
+            .validate_domain_certificate("unknown.example.org")
+            .await;
         assert!(result.is_err());
 
         let stats = validator.get_stats().await;

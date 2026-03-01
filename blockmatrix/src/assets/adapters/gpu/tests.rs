@@ -6,11 +6,10 @@
 
 use super::*;
 use crate::assets::core::{
-    AssetAdapter, AssetType, AssetAllocationRequest, PrivacyMode,
-    GpuRequirements, ConsensusProof,
+    AssetAdapter, AssetAllocationRequest, AssetType, ConsensusProof, GpuRequirements, PrivacyMode,
 };
-use std::time::Duration;
 use std::collections::HashMap;
+use std::time::Duration;
 
 fn _create_test_gpu_request() -> AssetAllocationRequest {
     AssetAllocationRequest {
@@ -51,8 +50,14 @@ async fn test_gpu_allocation() {
     // Basic verification that the test proof has valid values for GPU validation:
     // - stake_amount >= 200
     // - computational_power >= 20
-    assert!(test_proof.stake_proof.stake_amount >= 200, "Stake amount should be >= 200");
-    assert!(test_proof.work_proof.computational_power >= 20, "Computational power should be >= 20");
+    assert!(
+        test_proof.stake_proof.stake_amount >= 200,
+        "Stake amount should be >= 200"
+    );
+    assert!(
+        test_proof.work_proof.computational_power >= 20,
+        "Computational power should be >= 20"
+    );
 
     // The actual adapter allocation test is disabled due to GPU hardware detection
     // issues on systems without GPUs. This needs hardware-specific testing.
@@ -75,6 +80,10 @@ async fn test_gpu_capabilities() {
 
     assert_eq!(capabilities.asset_type, AssetType::Gpu);
     assert!(capabilities.supports_proxy_addressing);
-    assert!(capabilities.features.contains(&"nova_vulkan_support".to_string()));
-    assert!(capabilities.features.contains(&"consensus_acceleration".to_string()));
+    assert!(capabilities
+        .features
+        .contains(&"nova_vulkan_support".to_string()));
+    assert!(capabilities
+        .features
+        .contains(&"consensus_acceleration".to_string()));
 }

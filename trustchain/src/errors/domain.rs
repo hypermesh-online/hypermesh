@@ -4,8 +4,8 @@
 
 //! Domain-specific error types for TrustChain subsystems
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize, Deserialize};
 
 /// Certificate Authority specific errors
 #[derive(Debug, Error, Serialize, Deserialize)]

@@ -10,9 +10,9 @@
 //! This module provides binary pass/fail authentication based on Byzantine
 //! detection data. No trust scores, no reputation floats, no time-decay.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
@@ -34,6 +34,12 @@ pub struct AuthenticationResult {
 pub struct BinaryAuthenticator {
     /// Nodes that have been revoked (node_id -> reason)
     revoked: RwLock<HashMap<String, String>>,
+}
+
+impl Default for BinaryAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BinaryAuthenticator {
@@ -69,7 +75,7 @@ impl BinaryAuthenticator {
         node_id: &str,
         violation: &ByzantineViolation,
     ) -> TrustChainResult<AuthenticationResult> {
-        let reason = format!("Revoked due to Byzantine violation: {:?}", violation);
+        let reason = format!("Revoked due to Byzantine violation: {violation:?}");
         {
             let mut revoked = self.revoked.write().await;
             revoked.insert(node_id.to_string(), reason.clone());
@@ -208,9 +214,9 @@ mod tests {
         ];
 
         for (i, v) in violations.iter().enumerate() {
-            let node = format!("node-{}", i);
+            let node = format!("node-{i}");
             let result = auth.revoke(&node, v).await.expect("test");
-            assert!(!result.authenticated, "Violation {:?} should revoke", v);
+            assert!(!result.authenticated, "Violation {v:?} should revoke");
         }
         assert_eq!(auth.revoked_count().await, 5);
     }

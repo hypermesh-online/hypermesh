@@ -17,12 +17,12 @@ pub mod catalog_registry;
 
 // Re-export main types
 pub use asset_type::{
-    AssetTypeDefinition, TypeMetadata, ValidationRule, ValidationRuleType, TypeValidationResult,
+    AssetTypeDefinition, TypeMetadata, TypeValidationResult, ValidationRule, ValidationRuleType,
 };
 
 pub use catalog_registry::{
-    CatalogRegistry, TrustPolicy, RegistryConfig, SearchQuery, SearchResult, SearchResults,
-    RegistryStatistics, SortCriteria, DateRange,
+    CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics, SearchQuery, SearchResult,
+    SearchResults, SortCriteria, TrustPolicy,
 };
 
 // Legacy compatibility exports (DEPRECATED - use new types above)
@@ -85,7 +85,10 @@ pub trait AssetDiscovery {
     async fn list_assets(&self, filters: &AssetFilters) -> Result<Vec<AssetIndexEntry>>;
 
     /// Get asset recommendations
-    async fn get_recommendations(&self, context: &RecommendationContext) -> Result<Vec<AssetIndexEntry>>;
+    async fn get_recommendations(
+        &self,
+        context: &RecommendationContext,
+    ) -> Result<Vec<AssetIndexEntry>>;
 }
 
 // Legacy compatibility types (DEPRECATED - for migration only)

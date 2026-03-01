@@ -9,17 +9,17 @@
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod windows_performance_tests {
+    use anyhow::Result;
     use blockmatrix::os_integration::{create_os_abstraction, types::*};
-    use std::thread;
-    use std::time::{Duration, Instant};
     use std::fs::{self, File};
     use std::io::Write;
-    use anyhow::Result;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     // Helper to verify Windows version
     fn is_windows_10_or_later() -> bool {
-        use winapi::um::sysinfoapi::{GetVersionExW, OSVERSIONINFOEXW};
         use std::mem::zeroed;
+        use winapi::um::sysinfoapi::{GetVersionExW, OSVERSIONINFOEXW};
 
         unsafe {
             let mut version_info: OSVERSIONINFOEXW = zeroed();
@@ -44,7 +44,8 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // First sample - establish baseline
-        let usage1 = os.get_resource_usage()
+        let usage1 = os
+            .get_resource_usage()
             .expect("Failed to get first resource usage");
 
         // Generate some CPU load
@@ -60,11 +61,15 @@ mod windows_performance_tests {
         std::hint::black_box(sum);
 
         // Second sample - should show CPU usage
-        let usage2 = os.get_resource_usage()
+        let usage2 = os
+            .get_resource_usage()
             .expect("Failed to get second resource usage");
 
         // Verify we got non-zero CPU delta
-        assert!(usage2.cpu_percent > 0.0, "CPU usage should be > 0% after load");
+        assert!(
+            usage2.cpu_percent > 0.0,
+            "CPU usage should be > 0% after load"
+        );
         assert!(usage2.cpu_percent <= 100.0, "CPU usage should be <= 100%");
 
         // CPU time should have increased
@@ -75,8 +80,10 @@ mod windows_performance_tests {
             usage2.total_cpu_time_ms
         );
 
-        println!("CPU usage: {:.2}%, total time: {}ms",
-            usage2.cpu_percent, usage2.total_cpu_time_ms);
+        println!(
+            "CPU usage: {:.2}%, total time: {}ms",
+            usage2.cpu_percent, usage2.total_cpu_time_ms
+        );
     }
 
     #[test]
@@ -89,12 +96,13 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // Baseline network counters
-        let usage1 = os.get_resource_usage()
+        let usage1 = os
+            .get_resource_usage()
             .expect("Failed to get baseline network usage");
 
         // Generate network activity
-        use std::net::TcpStream;
         use std::io::Read;
+        use std::net::TcpStream;
 
         // Try to connect to a well-known service
         if let Ok(mut stream) = TcpStream::connect("1.1.1.1:443") {
@@ -107,15 +115,22 @@ mod windows_performance_tests {
         thread::sleep(Duration::from_millis(500));
 
         // Get updated counters
-        let usage2 = os.get_resource_usage()
+        let usage2 = os
+            .get_resource_usage()
             .expect("Failed to get updated network usage");
 
         // Should have some network I/O
-        let bytes_sent_delta = usage2.network_bytes_sent.saturating_sub(usage1.network_bytes_sent);
-        let bytes_recv_delta = usage2.network_bytes_received.saturating_sub(usage1.network_bytes_received);
+        let bytes_sent_delta = usage2
+            .network_bytes_sent
+            .saturating_sub(usage1.network_bytes_sent);
+        let bytes_recv_delta = usage2
+            .network_bytes_received
+            .saturating_sub(usage1.network_bytes_received);
 
-        println!("Network I/O: sent {} bytes, received {} bytes",
-            bytes_sent_delta, bytes_recv_delta);
+        println!(
+            "Network I/O: sent {} bytes, received {} bytes",
+            bytes_sent_delta, bytes_recv_delta
+        );
 
         // At minimum we sent the HTTP request
         assert!(
@@ -134,7 +149,8 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // Baseline disk counters
-        let usage1 = os.get_resource_usage()
+        let usage1 = os
+            .get_resource_usage()
             .expect("Failed to get baseline disk usage");
 
         // Generate disk I/O
@@ -143,8 +159,7 @@ mod windows_performance_tests {
 
         // Write 10MB of data
         {
-            let mut file = File::create(&test_file)
-                .expect("Failed to create test file");
+            let mut file = File::create(&test_file).expect("Failed to create test file");
 
             let data = vec![0xAB; 1024 * 1024]; // 1MB buffer
             for _ in 0..10 {
@@ -157,14 +172,17 @@ mod windows_performance_tests {
         thread::sleep(Duration::from_millis(500));
 
         // Get updated counters
-        let usage2 = os.get_resource_usage()
+        let usage2 = os
+            .get_resource_usage()
             .expect("Failed to get updated disk usage");
 
         // Clean up
         let _ = fs::remove_file(test_file);
 
         // Should show disk writes
-        let disk_write_delta = usage2.disk_bytes_written.saturating_sub(usage1.disk_bytes_written);
+        let disk_write_delta = usage2
+            .disk_bytes_written
+            .saturating_sub(usage1.disk_bytes_written);
 
         println!("Disk I/O: wrote {} bytes", disk_write_delta);
 
@@ -186,14 +204,14 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // Get baseline memory
-        let mem_info1 = os.detect_memory()
-            .expect("Failed to get memory info");
+        let mem_info1 = os.detect_memory().expect("Failed to get memory info");
 
         // Allocate significant memory
         let big_vec: Vec<u8> = vec![0xFF; 100 * 1024 * 1024]; // 100MB
 
         // Get updated memory
-        let mem_info2 = os.detect_memory()
+        let mem_info2 = os
+            .detect_memory()
             .expect("Failed to get updated memory info");
 
         // Available memory should have decreased
@@ -238,14 +256,14 @@ mod windows_performance_tests {
 
         // Check intervals between samples
         for i in 1..timestamps.len() {
-            let interval = timestamps[i].duration_since(timestamps[i-1]);
+            let interval = timestamps[i].duration_since(timestamps[i - 1]);
 
             // Allow 20ms variance for Windows scheduler
             assert!(
-                interval >= Duration::from_millis(80) &&
-                interval <= Duration::from_millis(120),
+                interval >= Duration::from_millis(80) && interval <= Duration::from_millis(120),
                 "Interval {} was {:?}, expected ~100ms",
-                i, interval
+                i,
+                interval
             );
         }
 
@@ -262,16 +280,22 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // First sample - no previous data
-        let usage = os.get_resource_usage()
+        let usage = os
+            .get_resource_usage()
             .expect("First sample should succeed");
 
         // CPU percent might be 0 on first sample (no delta)
-        assert!(usage.cpu_percent >= 0.0 && usage.cpu_percent <= 100.0,
-            "CPU percent should be valid even on first sample");
+        assert!(
+            usage.cpu_percent >= 0.0 && usage.cpu_percent <= 100.0,
+            "CPU percent should be valid even on first sample"
+        );
 
         // But absolute values should be available
         assert!(usage.memory_used_mb > 0, "Memory usage should be available");
-        assert!(usage.total_memory_mb > 0, "Total memory should be available");
+        assert!(
+            usage.total_memory_mb > 0,
+            "Total memory should be available"
+        );
 
         println!("First sample handled gracefully");
     }
@@ -286,7 +310,8 @@ mod windows_performance_tests {
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
 
         // Should be able to query different counter categories
-        let usage = os.get_resource_usage()
+        let usage = os
+            .get_resource_usage()
             .expect("Failed to get resource usage");
 
         // Verify we get data from multiple categories
@@ -316,7 +341,8 @@ mod windows_performance_tests {
 
         // Sample at ~100Hz for 1 second
         while start.elapsed() < Duration::from_secs(1) {
-            let _ = os.get_resource_usage()
+            let _ = os
+                .get_resource_usage()
                 .expect("High frequency sampling should not fail");
             sample_count += 1;
             thread::sleep(Duration::from_millis(10)); // ~100Hz
@@ -325,8 +351,11 @@ mod windows_performance_tests {
         println!("Completed {} samples in 1 second", sample_count);
 
         // Should achieve at least 80 samples (allowing for overhead)
-        assert!(sample_count >= 80,
-            "Expected at least 80 samples, got {}", sample_count);
+        assert!(
+            sample_count >= 80,
+            "Expected at least 80 samples, got {}",
+            sample_count
+        );
     }
 
     #[test]
@@ -342,14 +371,17 @@ mod windows_performance_tests {
         let mut last_bytes_sent = 0u64;
 
         for i in 0..100 {
-            let usage = os.get_resource_usage()
+            let usage = os
+                .get_resource_usage()
                 .expect("Failed to get resource usage");
 
             // Network bytes should never decrease (handle counter overflow)
             assert!(
                 usage.network_bytes_sent >= last_bytes_sent,
                 "Network counter went backwards at iteration {}: {} -> {}",
-                i, last_bytes_sent, usage.network_bytes_sent
+                i,
+                last_bytes_sent,
+                usage.network_bytes_sent
             );
 
             last_bytes_sent = usage.network_bytes_sent;

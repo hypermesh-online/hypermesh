@@ -6,10 +6,10 @@
 //!
 //! Packet validation methods are in `validation.rs`.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 use crate::capabilities::NicCapabilities;
 use crate::policy_maps::PolicyManager;
@@ -116,18 +116,15 @@ impl XdpManager {
     /// - NIC supports offload: proceed with HW_MODE
     /// - NIC does not support offload + `Required`: return error
     /// - NIC does not support offload + `Opportunistic`/`Disabled`: fall back to Native
-    pub fn attach_with_mode(
-        &mut self,
-        interface: &str,
-        mode: XdpAttachMode,
-    ) -> Result<()> {
+    pub fn attach_with_mode(&mut self, interface: &str, mode: XdpAttachMode) -> Result<()> {
         let effective_mode = match mode {
             XdpAttachMode::Offload => {
                 let nic = NicCapabilities::detect(interface);
                 if nic.supports_xdp_offload {
                     tracing::info!(
                         "NIC {} (driver: {}) supports XDP offload",
-                        interface, nic.driver_name
+                        interface,
+                        nic.driver_name
                     );
                     XdpAttachMode::Offload
                 } else {
@@ -173,18 +170,18 @@ impl XdpManager {
         tracing::info!(
             "XDP manager attached to {} ({} mode)",
             interface,
-            if self.available { "kernel" } else { "userspace" }
+            if self.available {
+                "kernel"
+            } else {
+                "userspace"
+            }
         );
 
         Ok(())
     }
 
     #[cfg(feature = "kernel-attach")]
-    fn try_kernel_attach(
-        &mut self,
-        interface: &str,
-        mode: XdpAttachMode,
-    ) -> Result<()> {
+    fn try_kernel_attach(&mut self, interface: &str, mode: XdpAttachMode) -> Result<()> {
         use aya::programs::{Xdp, XdpFlags};
 
         let bpf_paths = [
@@ -206,7 +203,8 @@ impl XdpManager {
                     };
 
                     if let Some(program) = bpf.program_mut(prog_name) {
-                        let xdp: &mut Xdp = program.try_into()
+                        let xdp: &mut Xdp = program
+                            .try_into()
                             .map_err(|e| anyhow!("Not an XDP program: {}", e))?;
                         xdp.load()
                             .map_err(|e| anyhow!("Failed to load XDP: {}", e))?;
@@ -220,7 +218,9 @@ impl XdpManager {
                         self.bpf = Some(bpf);
                         tracing::info!(
                             "XDP program '{}' attached to {} from {:?}",
-                            prog_name, interface, path
+                            prog_name,
+                            interface,
+                            path
                         );
                     } else {
                         tracing::warn!(
@@ -232,7 +232,8 @@ impl XdpManager {
                 Err(e) => {
                     tracing::warn!(
                         "Failed to load eBPF from {:?}: {}. Userspace fallback.",
-                        path, e
+                        path,
+                        e
                     );
                 }
             }
@@ -295,7 +296,8 @@ impl XdpManager {
                 if let Some(map) = bpf.map_mut("filter_map") {
                     match BpfHashMap::<_, [u8; 32], u32>::try_from(map) {
                         Ok(mut filter_map) => {
-                            filter_map.insert(&key, &action_val, 0)
+                            filter_map
+                                .insert(&key, &action_val, 0)
                                 .map_err(|e| anyhow!("Failed to update filter map: {}", e))?;
                             tracing::debug!("Updated XDP filter rule");
                         }
@@ -357,16 +359,11 @@ impl XdpManager {
                         let policies = self.policy_manager.get_all_policies();
                         for (conn_id, policy) in &policies {
                             let bytes = policy_to_bytes(policy);
-                            bpf_map.insert(conn_id, &bytes, 0)
-                                .map_err(|e| anyhow!(
-                                    "Failed to insert policy for conn {}: {}",
-                                    conn_id, e
-                                ))?;
+                            bpf_map.insert(conn_id, &bytes, 0).map_err(|e| {
+                                anyhow!("Failed to insert policy for conn {}: {}", conn_id, e)
+                            })?;
                         }
-                        tracing::debug!(
-                            "Synced {} policies to kernel BPF map",
-                            policies.len()
-                        );
+                        tracing::debug!("Synced {} policies to kernel BPF map", policies.len());
                     }
                     Err(e) => {
                         tracing::warn!("Failed to access policy_map: {}", e);
@@ -417,10 +414,9 @@ impl XdpManager {
                     match Array::<_, [u8; 24]>::try_from(map) {
                         Ok(mut array) => {
                             let bytes = config.to_bytes();
-                            array.set(0, &bytes, 0)
-                                .map_err(|e| anyhow!(
-                                    "Failed to write pos_config_map: {}", e
-                                ))?;
+                            array
+                                .set(0, &bytes, 0)
+                                .map_err(|e| anyhow!("Failed to write pos_config_map: {}", e))?;
                             tracing::info!(
                                 "Kernel PoS config synced: difficulty={}, ttl={}ns, enabled={}",
                                 config.min_difficulty,

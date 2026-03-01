@@ -8,11 +8,11 @@
 //! privacy tier enforcement, and shard addressing.
 
 use anyhow::Result;
-use std::time::{Duration, SystemTime};
 use hypermesh_lib::PrivacyMode;
+use std::time::{Duration, SystemTime};
 use stoq::protocol::{
-    StoqPosIntegration, MatrixPosition, MatrixPositionExt, PosToken,
-    ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
+    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake, ProofOfTime,
+    ProofOfWork, StoqPosIntegration,
 };
 use stoq::transport::certificate_strategy::NetworkType;
 
@@ -52,11 +52,9 @@ async fn test_anonymous_network_validation() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Anonymous network should succeed without PoS token
-    let result = integration.validate_connection(
-        "conn_anon_1".to_string(),
-        &NetworkType::Anonymous,
-        None,
-    ).await?;
+    let result = integration
+        .validate_connection("conn_anon_1".to_string(), &NetworkType::Anonymous, None)
+        .await?;
 
     assert!(result, "Anonymous connection should succeed");
 
@@ -72,11 +70,9 @@ async fn test_p2p_network_validation() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // P2P network should succeed without PoS token (certificate-based)
-    let result = integration.validate_connection(
-        "conn_p2p_1".to_string(),
-        &NetworkType::P2P,
-        None,
-    ).await?;
+    let result = integration
+        .validate_connection("conn_p2p_1".to_string(), &NetworkType::P2P, None)
+        .await?;
 
     assert!(result, "P2P connection should succeed");
 
@@ -93,13 +89,15 @@ async fn test_federated_network_validation() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Federated network should succeed without PoS token (federation-based)
-    let result = integration.validate_connection(
-        "conn_fed_1".to_string(),
-        &NetworkType::Federated {
-            gateway_url: "gateway.test.internal".to_string(),
-        },
-        None,
-    ).await?;
+    let result = integration
+        .validate_connection(
+            "conn_fed_1".to_string(),
+            &NetworkType::Federated {
+                gateway_url: "gateway.test.internal".to_string(),
+            },
+            None,
+        )
+        .await?;
 
     assert!(result, "Federated connection should succeed");
 
@@ -117,11 +115,9 @@ async fn test_public_network_with_pos_validation() -> Result<()> {
     let token = create_test_pos_token();
 
     // Public network should succeed with valid PoS token
-    let result = integration.validate_connection(
-        "conn_pub_1".to_string(),
-        &NetworkType::Public,
-        Some(&token),
-    ).await?;
+    let result = integration
+        .validate_connection("conn_pub_1".to_string(), &NetworkType::Public, Some(&token))
+        .await?;
 
     assert!(result, "Public connection with PoS token should succeed");
 
@@ -139,13 +135,14 @@ async fn test_public_network_without_pos_fails() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Public network should fail without PoS token
-    let result = integration.validate_connection(
-        "conn_pub_2".to_string(),
-        &NetworkType::Public,
-        None,
-    ).await;
+    let result = integration
+        .validate_connection("conn_pub_2".to_string(), &NetworkType::Public, None)
+        .await;
 
-    assert!(result.is_err(), "Public connection without PoS token should fail");
+    assert!(
+        result.is_err(),
+        "Public connection without PoS token should fail"
+    );
 
     Ok(())
 }
@@ -155,11 +152,13 @@ async fn test_asset_hash_verification_success() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Register a connection first
-    integration.validate_connection(
-        "conn1".to_string(),
-        &NetworkType::Public,
-        Some(&create_test_pos_token()),
-    ).await?;
+    integration
+        .validate_connection(
+            "conn1".to_string(),
+            &NetworkType::Public,
+            Some(&create_test_pos_token()),
+        )
+        .await?;
 
     let asset_data = b"test asset data for verification";
 
@@ -167,12 +166,8 @@ async fn test_asset_hash_verification_success() -> Result<()> {
     let correct_hash: [u8; 32] = *blake3::hash(asset_data).as_bytes();
 
     // Validate with correct hash
-    let result = integration.validate_asset_hash(
-        "conn1",
-        b"asset_123",
-        &correct_hash,
-        asset_data,
-    )?;
+    let result =
+        integration.validate_asset_hash("conn1", b"asset_123", &correct_hash, asset_data)?;
 
     assert!(result, "Asset hash validation should succeed");
 
@@ -188,22 +183,19 @@ async fn test_asset_hash_verification_failure() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Register a connection
-    integration.validate_connection(
-        "conn2".to_string(),
-        &NetworkType::Public,
-        Some(&create_test_pos_token()),
-    ).await?;
+    integration
+        .validate_connection(
+            "conn2".to_string(),
+            &NetworkType::Public,
+            Some(&create_test_pos_token()),
+        )
+        .await?;
 
     let asset_data = b"test asset data";
     let wrong_hash = [0u8; 32]; // Wrong hash
 
     // Validate with wrong hash
-    let result = integration.validate_asset_hash(
-        "conn2",
-        b"asset_456",
-        &wrong_hash,
-        asset_data,
-    )?;
+    let result = integration.validate_asset_hash("conn2", b"asset_456", &wrong_hash, asset_data)?;
 
     assert!(!result, "Asset hash validation should fail with wrong hash");
 
@@ -260,12 +252,8 @@ async fn test_shard_position_calculation() -> Result<()> {
     let min_distance = 10.0;
     let max_distance = 100.0;
 
-    let positions = integration.calculate_shard_positions(
-        num_shards,
-        origin,
-        min_distance,
-        max_distance,
-    );
+    let positions =
+        integration.calculate_shard_positions(num_shards, origin, min_distance, max_distance);
 
     assert_eq!(positions.len(), num_shards);
 
@@ -294,11 +282,9 @@ async fn test_privacy_tier_enforcement_anonymous() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Create anonymous connection
-    integration.validate_connection(
-        "anon_conn".to_string(),
-        &NetworkType::Anonymous,
-        None,
-    ).await?;
+    integration
+        .validate_connection("anon_conn".to_string(), &NetworkType::Anonymous, None)
+        .await?;
 
     // Anonymous should reject logging operations
     let result = integration.enforce_privacy_tier("anon_conn", "log_data");
@@ -328,31 +314,27 @@ async fn test_all_network_types_integration() -> Result<()> {
     let token = create_test_pos_token();
 
     // Connect to all 4 network types
-    integration.validate_connection(
-        "conn_anon".to_string(),
-        &NetworkType::Anonymous,
-        None,
-    ).await?;
+    integration
+        .validate_connection("conn_anon".to_string(), &NetworkType::Anonymous, None)
+        .await?;
 
-    integration.validate_connection(
-        "conn_p2p".to_string(),
-        &NetworkType::P2P,
-        None,
-    ).await?;
+    integration
+        .validate_connection("conn_p2p".to_string(), &NetworkType::P2P, None)
+        .await?;
 
-    integration.validate_connection(
-        "conn_fed".to_string(),
-        &NetworkType::Federated {
-            gateway_url: "gateway.test".to_string(),
-        },
-        None,
-    ).await?;
+    integration
+        .validate_connection(
+            "conn_fed".to_string(),
+            &NetworkType::Federated {
+                gateway_url: "gateway.test".to_string(),
+            },
+            None,
+        )
+        .await?;
 
-    integration.validate_connection(
-        "conn_pub".to_string(),
-        &NetworkType::Public,
-        Some(&token),
-    ).await?;
+    integration
+        .validate_connection("conn_pub".to_string(), &NetworkType::Public, Some(&token))
+        .await?;
 
     // Verify all connections are tracked
     // P2P and Federated both map to PRIVATE, so private_connections = 2
@@ -370,23 +352,21 @@ async fn test_connection_statistics() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
     // Create multiple connections
-    integration.validate_connection(
-        "c1".to_string(),
-        &NetworkType::Anonymous,
-        None,
-    ).await?;
+    integration
+        .validate_connection("c1".to_string(), &NetworkType::Anonymous, None)
+        .await?;
 
-    integration.validate_connection(
-        "c2".to_string(),
-        &NetworkType::P2P,
-        None,
-    ).await?;
+    integration
+        .validate_connection("c2".to_string(), &NetworkType::P2P, None)
+        .await?;
 
-    integration.validate_connection(
-        "c3".to_string(),
-        &NetworkType::Public,
-        Some(&create_test_pos_token()),
-    ).await?;
+    integration
+        .validate_connection(
+            "c3".to_string(),
+            &NetworkType::Public,
+            Some(&create_test_pos_token()),
+        )
+        .await?;
 
     // Get connection stats
     let c1_stats = integration.get_connection_stats("c1");
@@ -467,9 +447,7 @@ async fn test_privacy_mode_validation_requirements() -> Result<()> {
 async fn test_concurrent_connections() -> Result<()> {
     use tokio::task::JoinSet;
 
-    let integration = std::sync::Arc::new(
-        StoqPosIntegration::new(Duration::from_secs(300))
-    );
+    let integration = std::sync::Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
 
     let mut tasks = JoinSet::new();
 
@@ -494,11 +472,9 @@ async fn test_concurrent_connections() -> Result<()> {
                 None
             };
 
-            integration.validate_connection(
-                format!("conn_{}", i),
-                &network_type,
-                pos_token.as_ref(),
-            ).await
+            integration
+                .validate_connection(format!("conn_{i}"), &network_type, pos_token.as_ref())
+                .await
         });
     }
 

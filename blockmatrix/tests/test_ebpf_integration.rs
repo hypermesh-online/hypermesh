@@ -15,20 +15,17 @@
 #[cfg(target_os = "linux")]
 #[cfg(test)]
 mod ebpf_integration_tests {
+    use anyhow::Result;
     use blockmatrix::os_integration::{create_os_abstraction, types::*};
-    use std::thread;
-    use std::time::{Duration, Instant};
     use std::fs;
     use std::process::Command;
-    use anyhow::Result;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     // Helper to check if we have required privileges
     fn has_ebpf_privileges() -> bool {
         // Check for CAP_BPF capability or root
-        let output = Command::new("capsh")
-            .args(&["--print"])
-            .output()
-            .ok();
+        let output = Command::new("capsh").args(&["--print"]).output().ok();
 
         if let Some(output) = output {
             let caps = String::from_utf8_lossy(&output.stdout);
@@ -60,13 +57,18 @@ mod ebpf_integration_tests {
         let xdp_program = include_bytes!("../ebpf/xdp_counter.o");
 
         // Load the program
-        let handle = os.load_ebpf_program(xdp_program)
+        let handle = os
+            .load_ebpf_program(xdp_program)
             .expect("test: load XDP program");
 
         // Attach to loopback interface (EbpfAttachType::Xdp is a unit variant;
         // the implementation selects the interface internally)
         let attach_result = os.attach_ebpf_monitor(handle, EbpfAttachType::Xdp);
-        assert!(attach_result.is_ok(), "Failed to attach XDP program: {:?}", attach_result);
+        assert!(
+            attach_result.is_ok(),
+            "Failed to attach XDP program: {:?}",
+            attach_result
+        );
 
         // Generate some network traffic on loopback
         Command::new("ping")
@@ -77,7 +79,8 @@ mod ebpf_integration_tests {
         thread::sleep(Duration::from_secs(1));
 
         // Read packet counters from eBPF map
-        let metrics = os.read_ebpf_metrics(handle)
+        let metrics = os
+            .read_ebpf_metrics(handle)
             .expect("test: read eBPF metrics");
 
         // Verify metrics are populated (values map keyed by metric name)
@@ -108,15 +111,23 @@ mod ebpf_integration_tests {
         let kprobe_program = include_bytes!("../ebpf/kprobe_open.o");
 
         // Load the program
-        let handle = os.load_ebpf_program(kprobe_program)
+        let handle = os
+            .load_ebpf_program(kprobe_program)
             .expect("test: load kprobe program");
 
         // Attach to sys_open
-        let attach_result = os.attach_ebpf_monitor(handle, EbpfAttachType::Kprobe {
-            function: "__x64_sys_open".to_string()
-        });
+        let attach_result = os.attach_ebpf_monitor(
+            handle,
+            EbpfAttachType::Kprobe {
+                function: "__x64_sys_open".to_string(),
+            },
+        );
 
-        assert!(attach_result.is_ok(), "Failed to attach kprobe: {:?}", attach_result);
+        assert!(
+            attach_result.is_ok(),
+            "Failed to attach kprobe: {:?}",
+            attach_result
+        );
 
         // Trigger some open() syscalls
         for _i in 0..10 {
@@ -125,11 +136,16 @@ mod ebpf_integration_tests {
         }
 
         // Read syscall counters from eBPF map
-        let metrics = os.read_ebpf_metrics(handle)
+        let metrics = os
+            .read_ebpf_metrics(handle)
             .expect("test: read kprobe metrics");
 
         let syscall_count = metrics.values.get("syscall_count").copied().unwrap_or(0);
-        assert!(syscall_count >= 10, "Expected at least 10 syscalls, got {}", syscall_count);
+        assert!(
+            syscall_count >= 10,
+            "Expected at least 10 syscalls, got {}",
+            syscall_count
+        );
 
         // Cleanup
         os.unload_ebpf_program(handle).expect("test: unload kprobe");
@@ -154,18 +170,24 @@ mod ebpf_integration_tests {
         let kprobe_program = include_bytes!("../ebpf/kprobe_open.o");
 
         // Load multiple programs
-        let xdp_handle = os.load_ebpf_program(xdp_program)
+        let xdp_handle = os
+            .load_ebpf_program(xdp_program)
             .expect("test: load XDP program");
-        let kprobe_handle = os.load_ebpf_program(kprobe_program)
+        let kprobe_handle = os
+            .load_ebpf_program(kprobe_program)
             .expect("test: load kprobe program");
 
         // Attach both
         os.attach_ebpf_monitor(xdp_handle, EbpfAttachType::Xdp)
             .expect("test: attach XDP");
 
-        os.attach_ebpf_monitor(kprobe_handle, EbpfAttachType::Kprobe {
-            function: "__x64_sys_open".to_string()
-        }).expect("test: attach kprobe");
+        os.attach_ebpf_monitor(
+            kprobe_handle,
+            EbpfAttachType::Kprobe {
+                function: "__x64_sys_open".to_string(),
+            },
+        )
+        .expect("test: attach kprobe");
 
         // Generate mixed activity
         thread::spawn(|| {
@@ -182,20 +204,28 @@ mod ebpf_integration_tests {
         thread::sleep(Duration::from_secs(1));
 
         // Read metrics from both via eBPF map values
-        let xdp_metrics = os.read_ebpf_metrics(xdp_handle)
+        let xdp_metrics = os
+            .read_ebpf_metrics(xdp_handle)
             .expect("test: read XDP metrics");
-        let kprobe_metrics = os.read_ebpf_metrics(kprobe_handle)
+        let kprobe_metrics = os
+            .read_ebpf_metrics(kprobe_handle)
             .expect("test: read kprobe metrics");
 
         let packet_count = xdp_metrics.values.get("packet_count").copied().unwrap_or(0);
-        let syscall_count = kprobe_metrics.values.get("syscall_count").copied().unwrap_or(0);
+        let syscall_count = kprobe_metrics
+            .values
+            .get("syscall_count")
+            .copied()
+            .unwrap_or(0);
 
         assert!(packet_count > 0, "XDP didn't capture packets");
         assert!(syscall_count > 0, "Kprobe didn't capture syscalls");
 
         // Cleanup both
-        os.unload_ebpf_program(xdp_handle).expect("test: unload XDP");
-        os.unload_ebpf_program(kprobe_handle).expect("test: unload kprobe");
+        os.unload_ebpf_program(xdp_handle)
+            .expect("test: unload XDP");
+        os.unload_ebpf_program(kprobe_handle)
+            .expect("test: unload kprobe");
     }
 
     #[test]
@@ -216,32 +246,46 @@ mod ebpf_integration_tests {
         // Program with hash map for per-CPU stats
         let map_program = include_bytes!("../ebpf/percpu_stats.o");
 
-        let handle = os.load_ebpf_program(map_program)
+        let handle = os
+            .load_ebpf_program(map_program)
             .expect("test: load program with maps");
 
         // Initial read should have empty values
-        let initial_metrics = os.read_ebpf_metrics(handle)
+        let initial_metrics = os
+            .read_ebpf_metrics(handle)
             .expect("test: read initial metrics");
 
-        assert!(initial_metrics.values.is_empty(), "Expected empty initial values");
+        assert!(
+            initial_metrics.values.is_empty(),
+            "Expected empty initial values"
+        );
 
         // Attach to trigger updates
-        os.attach_ebpf_monitor(handle, EbpfAttachType::Tracepoint {
-            category: "sched".to_string(),
-            name: "sched_switch".to_string()
-        }).expect("test: attach to tracepoint");
+        os.attach_ebpf_monitor(
+            handle,
+            EbpfAttachType::Tracepoint {
+                category: "sched".to_string(),
+                name: "sched_switch".to_string(),
+            },
+        )
+        .expect("test: attach to tracepoint");
 
         // Let it collect some data
         thread::sleep(Duration::from_millis(500));
 
         // Read updated metrics
-        let updated_metrics = os.read_ebpf_metrics(handle)
+        let updated_metrics = os
+            .read_ebpf_metrics(handle)
             .expect("test: read updated metrics");
 
         // Should have per-CPU data now in the values map
-        assert!(!updated_metrics.values.is_empty(), "No per-CPU stats collected");
+        assert!(
+            !updated_metrics.values.is_empty(),
+            "No per-CPU stats collected"
+        );
 
-        os.unload_ebpf_program(handle).expect("test: unload program");
+        os.unload_ebpf_program(handle)
+            .expect("test: unload program");
     }
 
     #[test]
@@ -260,7 +304,10 @@ mod ebpf_integration_tests {
         let load_result = os.load_ebpf_program(&dummy_program);
 
         // Should fail gracefully, not panic
-        assert!(load_result.is_err(), "Expected error when loading without privileges");
+        assert!(
+            load_result.is_err(),
+            "Expected error when loading without privileges"
+        );
 
         if let Err(e) = load_result {
             let error_msg = format!("{}", e);
@@ -324,7 +371,8 @@ mod ebpf_integration_tests {
         }
 
         let xdp_program = include_bytes!("../ebpf/xdp_counter.o");
-        let handle = os.load_ebpf_program(xdp_program)
+        let handle = os
+            .load_ebpf_program(xdp_program)
             .expect("test: load XDP program");
 
         // XDP is a unit variant; interface selection is internal.
@@ -359,7 +407,8 @@ mod ebpf_integration_tests {
 
         // Rapid load/unload cycles
         for i in 0..100 {
-            let handle = os.load_ebpf_program(xdp_program)
+            let handle = os
+                .load_ebpf_program(xdp_program)
                 .expect(&format!("test: load program iteration {}", i));
 
             // Optional: attach and detach every 10th iteration

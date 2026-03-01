@@ -12,30 +12,27 @@
 //! - Resource monitoring
 //! - Health checks
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetAdapter, AssetRegistration, AssetType, AssetResult, AssetError,
-    AssetAllocationRequest, AssetStatus, AssetState,
-    PrivacyMode, AssetAllocation, ProxyAddress,
-    ResourceUsage, ResourceLimits, StorageUsage,
-    AdapterHealth, AdapterCapabilities, ConsensusProof,
-    NetworkScope, AssetCategory, BaseSystemType, AssetData,
+    AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
+    AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
+    AssetType, BaseSystemType, ConsensusProof, NetworkScope, PrivacyMode, ProxyAddress,
+    ResourceLimits, ResourceUsage, StorageUsage,
 };
 
 use super::allocation::{
-    StorageAllocation, StoragePool, StorageUsageStats, StorageOperation,
-    allocate_storage_from_devices, deallocate_storage_from_devices,
-    update_usage_stats, initialize_default_pool,
+    allocate_storage_from_devices, deallocate_storage_from_devices, initialize_default_pool,
+    update_usage_stats, StorageAllocation, StorageOperation, StoragePool, StorageUsageStats,
 };
-use super::devices::{StorageDevice, StorageStatus, detect_storage_configuration, get_io_stats};
-use super::sharding::ShardingConfig;
-use super::encryption::create_kyber_encryption_key;
+use super::devices::{detect_storage_configuration, get_io_stats, StorageDevice, StorageStatus};
 use super::distribution::generate_proxy_address;
+use super::encryption::create_kyber_encryption_key;
+use super::sharding::ShardingConfig;
 
 /// Storage Asset Adapter implementation
 pub struct StorageAssetAdapter {
@@ -92,7 +89,7 @@ impl AssetAdapter for StorageAssetAdapter {
 
         if !valid {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: "Storage consensus proof validation failed".to_string()
+                reason: "Storage consensus proof validation failed".to_string(),
             });
         }
 
@@ -108,33 +105,49 @@ impl AssetAdapter for StorageAssetAdapter {
         }
 
         // PoStake: Validate storage access stake
-        if proof.stake_proof.stake_amount < 75 { // Moderate minimum for storage
+        if proof.stake_proof.stake_amount < 75 {
+            // Moderate minimum for storage
             return Ok(false);
         }
 
         // PoWork: Validate computational work for storage management
-        if proof.work_proof.computational_power < 14 { // Medium difficulty for storage
+        if proof.work_proof.computational_power < 14 {
+            // Medium difficulty for storage
             return Ok(false);
         }
 
         // PoTime: Validate temporal ordering for storage operations
-        let time_valid = proof.time_proof.time_verification_timestamp.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() > 0).unwrap_or(false);
+        let time_valid = proof
+            .time_proof
+            .time_verification_timestamp
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() > 0)
+            .unwrap_or(false);
 
         Ok(time_valid)
     }
 
-    async fn allocate_asset(&self, request: &AssetAllocationRequest) -> AssetResult<AssetAllocation> {
+    async fn allocate_asset(
+        &self,
+        request: &AssetAllocationRequest,
+    ) -> AssetResult<AssetAllocation> {
         // Validate consensus proof first
-        if !self.validate_consensus_proof(&request.consensus_proof).await? {
+        if !self
+            .validate_consensus_proof(&request.consensus_proof)
+            .await?
+        {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: "Storage allocation consensus validation failed".to_string()
+                reason: "Storage allocation consensus validation failed".to_string(),
             });
         }
 
         // Get storage requirements
-        let storage_req = request.requested_resources.storage_usage.as_ref()
+        let storage_req = request
+            .requested_resources
+            .storage_usage
+            .as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
-                reason: "No storage requirements specified".to_string()
+                reason: "No storage requirements specified".to_string(),
             })?;
 
         // Check available capacity
@@ -168,7 +181,8 @@ impl AssetAdapter for StorageAssetAdapter {
             &asset_id,
             &self.storage_devices,
             &self.device_allocations,
-        ).await?;
+        )
+        .await?;
 
         // Generate proxy address
         let proxy_address = generate_proxy_address(&asset_id).await;
@@ -181,7 +195,8 @@ impl AssetAdapter for StorageAssetAdapter {
         };
 
         // Configure sharding
-        let sharding_config = ShardingConfig::configure(storage_req.size_bytes, allocated_devices.len() as u32);
+        let sharding_config =
+            ShardingConfig::configure(storage_req.size_bytes, allocated_devices.len() as u32);
 
         // Create storage allocation record
         let allocation = StorageAllocation {
@@ -189,7 +204,7 @@ impl AssetAdapter for StorageAssetAdapter {
             allocated_devices: allocated_devices.clone(),
             allocated_size_bytes: allocated_size,
             storage_type: storage_req.storage_type.clone(),
-            privacy_level: request.privacy_level.clone(),
+            privacy_level: request.privacy_level,
             replication_factor: storage_req.durability_replicas,
             encryption_enabled: encryption_key_id.is_some(),
             encryption_key_id,
@@ -219,7 +234,12 @@ impl AssetAdapter for StorageAssetAdapter {
         }
 
         // Update usage statistics
-        update_usage_stats(&self.usage_stats, StorageOperation::Allocate, allocated_size).await;
+        update_usage_stats(
+            &self.usage_stats,
+            StorageOperation::Allocate,
+            allocated_size,
+        )
+        .await;
 
         Ok(AssetAllocation {
             asset_id: asset_id.clone(),
@@ -242,14 +262,17 @@ impl AssetAdapter for StorageAssetAdapter {
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
-                performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
+                performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(
+                ),
             },
             allocation_config: crate::assets::core::privacy::AllocationConfig {
-                privacy_level: request.privacy_level.clone(),
-                resource_allocation: crate::assets::core::privacy::ResourceAllocationConfig::default(),
+                privacy_level: request.privacy_level,
+                resource_allocation:
+                    crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements: crate::assets::core::privacy::ConsensusRequirements::default(),
+                consensus_requirements:
+                    crate::assets::core::privacy::ConsensusRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -267,14 +290,20 @@ impl AssetAdapter for StorageAssetAdapter {
         // Get allocation record
         let allocation = {
             let mut allocations = self.allocations.write().await;
-            allocations.remove(asset_id)
+            allocations
+                .remove(asset_id)
                 .ok_or_else(|| AssetError::AssetNotFound {
-                    asset_id: asset_id.to_string()
+                    asset_id: asset_id.to_string(),
                 })?
         };
 
         // Free storage devices
-        deallocate_storage_from_devices(&allocation, &self.storage_devices, &self.device_allocations).await?;
+        deallocate_storage_from_devices(
+            &allocation,
+            &self.storage_devices,
+            &self.device_allocations,
+        )
+        .await?;
 
         // Remove proxy mapping
         {
@@ -289,7 +318,12 @@ impl AssetAdapter for StorageAssetAdapter {
         }
 
         // Update usage statistics
-        update_usage_stats(&self.usage_stats, StorageOperation::Deallocate, allocation.allocated_size_bytes).await;
+        update_usage_stats(
+            &self.usage_stats,
+            StorageOperation::Deallocate,
+            allocation.allocated_size_bytes,
+        )
+        .await;
 
         tracing::info!(
             "Deallocated storage asset: {} ({} devices, {} bytes)",
@@ -302,9 +336,10 @@ impl AssetAdapter for StorageAssetAdapter {
 
     async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus> {
         let allocations = self.allocations.read().await;
-        let allocation = allocations.get(asset_id)
+        let allocation = allocations
+            .get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         Ok(AssetStatus {
@@ -312,7 +347,7 @@ impl AssetAdapter for StorageAssetAdapter {
             state: AssetState::InUse,
             allocated_at: allocation.allocated_at,
             last_accessed: allocation.last_accessed,
-            privacy_level: allocation.privacy_level.clone(),
+            privacy_level: allocation.privacy_level,
             proxy_address: None, // Will be filled by proxy resolver
             resource_usage: self.get_resource_usage(asset_id).await?,
             consensus_proofs: Vec::new(),
@@ -321,27 +356,57 @@ impl AssetAdapter for StorageAssetAdapter {
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
             metadata: {
                 let mut metadata = HashMap::new();
-                metadata.insert("allocated_size_bytes".to_string(), allocation.allocated_size_bytes.to_string());
-                metadata.insert("storage_type".to_string(), format!("{:?}", allocation.storage_type));
-                metadata.insert("devices".to_string(), allocation.allocated_devices.len().to_string());
-                metadata.insert("replication_factor".to_string(), allocation.replication_factor.to_string());
-                metadata.insert("encryption_enabled".to_string(), allocation.encryption_enabled.to_string());
-                metadata.insert("current_iops".to_string(), allocation.current_iops.to_string());
-                metadata.insert("current_throughput_mbps".to_string(), allocation.current_throughput_mbps.to_string());
-                metadata.insert("shard_count".to_string(), allocation.sharding_config.shard_count.to_string());
+                metadata.insert(
+                    "allocated_size_bytes".to_string(),
+                    allocation.allocated_size_bytes.to_string(),
+                );
+                metadata.insert(
+                    "storage_type".to_string(),
+                    format!("{:?}", allocation.storage_type),
+                );
+                metadata.insert(
+                    "devices".to_string(),
+                    allocation.allocated_devices.len().to_string(),
+                );
+                metadata.insert(
+                    "replication_factor".to_string(),
+                    allocation.replication_factor.to_string(),
+                );
+                metadata.insert(
+                    "encryption_enabled".to_string(),
+                    allocation.encryption_enabled.to_string(),
+                );
+                metadata.insert(
+                    "current_iops".to_string(),
+                    allocation.current_iops.to_string(),
+                );
+                metadata.insert(
+                    "current_throughput_mbps".to_string(),
+                    allocation.current_throughput_mbps.to_string(),
+                );
+                metadata.insert(
+                    "shard_count".to_string(),
+                    allocation.sharding_config.shard_count.to_string(),
+                );
                 metadata
             },
         })
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()> {
+    async fn configure_privacy_level(
+        &self,
+        asset_id: &AssetRegistration,
+        privacy: PrivacyMode,
+    ) -> AssetResult<()> {
         let mut allocations = self.allocations.write().await;
-        let allocation = allocations.get_mut(asset_id)
-            .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
-            })?;
+        let allocation =
+            allocations
+                .get_mut(asset_id)
+                .ok_or_else(|| AssetError::AssetNotFound {
+                    asset_id: asset_id.to_string(),
+                })?;
 
-        allocation.privacy_level = privacy.clone();
+        allocation.privacy_level = privacy;
 
         // Update encryption based on privacy level
         if privacy == PrivacyMode::PRIVATE && allocation.encryption_key_id.is_none() {
@@ -349,11 +414,18 @@ impl AssetAdapter for StorageAssetAdapter {
             allocation.encryption_enabled = true;
         }
 
-        tracing::info!("Updated privacy level for storage asset {}: {:?}", asset_id, privacy);
+        tracing::info!(
+            "Updated privacy level for storage asset {}: {:?}",
+            asset_id,
+            privacy
+        );
         Ok(())
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> AssetResult<ProxyAddress> {
         let proxy_address = generate_proxy_address(asset_id).await;
 
         // Find existing proxy address
@@ -367,24 +439,30 @@ impl AssetAdapter for StorageAssetAdapter {
         Ok(proxy_address)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
+    async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration> {
         let proxy_mappings = self.proxy_mappings.read().await;
-        proxy_mappings.get(proxy_addr)
+        proxy_mappings
+            .get(proxy_addr)
             .cloned()
             .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                address: proxy_addr.clone()
+                address: proxy_addr.clone(),
             })
     }
 
     async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
         let allocations = self.allocations.read().await;
-        let allocation = allocations.get(asset_id)
+        let allocation = allocations
+            .get(asset_id)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         // Get real I/O statistics from /proc/diskstats
-        let (read_iops, write_iops, read_mbps, write_mbps) = get_io_stats(&allocation.allocated_devices);
+        let (read_iops, write_iops, read_mbps, write_mbps) =
+            get_io_stats(&allocation.allocated_devices);
 
         let storage_usage = StorageUsage {
             used_bytes: allocation.allocated_size_bytes,
@@ -405,7 +483,11 @@ impl AssetAdapter for StorageAssetAdapter {
         })
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(
+        &self,
+        asset_id: &AssetRegistration,
+        limits: ResourceLimits,
+    ) -> AssetResult<()> {
         if let Some(storage_limit) = limits.storage_limit {
             tracing::info!(
                 "Set storage limits for asset {}: max {} bytes, max {} IOPS, max {} MB/s",
@@ -423,32 +505,56 @@ impl AssetAdapter for StorageAssetAdapter {
         let devices = self.storage_devices.read().await;
         let available = *self.available_capacity.read().await;
 
-        let failed_devices = devices.values().filter(|device| matches!(device.status, StorageStatus::Failed)).count();
-        let degraded_devices = devices.values().filter(|device| matches!(device.status, StorageStatus::Degraded)).count();
+        let failed_devices = devices
+            .values()
+            .filter(|device| matches!(device.status, StorageStatus::Failed))
+            .count();
+        let degraded_devices = devices
+            .values()
+            .filter(|device| matches!(device.status, StorageStatus::Degraded))
+            .count();
         let healthy = failed_devices == 0 && degraded_devices < 2 && available > 0;
 
-        let average_health = devices.values()
+        let average_health = devices
+            .values()
             .map(|d| d.health_metrics.health_percentage as f64)
-            .sum::<f64>() / devices.len() as f64;
+            .sum::<f64>()
+            / devices.len() as f64;
 
         let mut performance_metrics = HashMap::new();
-        performance_metrics.insert("total_capacity_gb".to_string(), (self.total_capacity / (1024 * 1024 * 1024)) as f64);
-        performance_metrics.insert("available_capacity_gb".to_string(), (available / (1024 * 1024 * 1024)) as f64);
-        performance_metrics.insert("capacity_utilization_percent".to_string(),
-            ((self.total_capacity - available) as f64 / self.total_capacity as f64) * 100.0);
-        performance_metrics.insert("active_allocations".to_string(), stats.active_allocations as f64);
+        performance_metrics.insert(
+            "total_capacity_gb".to_string(),
+            (self.total_capacity / (1024 * 1024 * 1024)) as f64,
+        );
+        performance_metrics.insert(
+            "available_capacity_gb".to_string(),
+            (available / (1024 * 1024 * 1024)) as f64,
+        );
+        performance_metrics.insert(
+            "capacity_utilization_percent".to_string(),
+            ((self.total_capacity - available) as f64 / self.total_capacity as f64) * 100.0,
+        );
+        performance_metrics.insert(
+            "active_allocations".to_string(),
+            stats.active_allocations as f64,
+        );
         performance_metrics.insert("total_devices".to_string(), devices.len() as f64);
         performance_metrics.insert("failed_devices".to_string(), failed_devices as f64);
         performance_metrics.insert("degraded_devices".to_string(), degraded_devices as f64);
         performance_metrics.insert("average_health_percent".to_string(), average_health);
-        performance_metrics.insert("dedup_savings_gb".to_string(), (stats.dedup_savings_bytes / (1024 * 1024 * 1024)) as f64);
+        performance_metrics.insert(
+            "dedup_savings_gb".to_string(),
+            (stats.dedup_savings_bytes / (1024 * 1024 * 1024)) as f64,
+        );
 
         Ok(AdapterHealth {
             healthy,
             message: if healthy {
                 "Storage adapter operating normally".to_string()
             } else {
-                format!("Storage adapter issues: {} failed, {} degraded devices", failed_devices, degraded_devices)
+                format!(
+                    "Storage adapter issues: {failed_devices} failed, {degraded_devices} degraded devices"
+                )
             },
             last_check: SystemTime::now(),
             performance_metrics,

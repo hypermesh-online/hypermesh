@@ -17,13 +17,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Import HyperMesh extension types
+use blockmatrix::assets::core::AssetType;
 use blockmatrix::extensions::{
-    AssetExtensionHandler, ExtensionCapability, ExtensionCategory,
-    ExtensionConfig, ExtensionError, ExtensionMetadata, ExtensionRequest,
-    ExtensionResponse, ExtensionResult, ExtensionStateData,
+    AssetExtensionHandler, ExtensionCapability, ExtensionCategory, ExtensionConfig, ExtensionError,
+    ExtensionMetadata, ExtensionRequest, ExtensionResponse, ExtensionResult, ExtensionStateData,
     ExtensionStatus, HyperMeshExtension, ResourceLimits, ValidationReport,
 };
-use blockmatrix::assets::core::AssetType;
 
 use crate::extension::{CatalogExtension, CatalogExtensionConfig};
 
@@ -51,8 +50,10 @@ pub struct CatalogPlugin {
 impl CatalogPlugin {
     /// Create new catalog plugin instance
     pub fn new() -> Self {
-        let mut config = CatalogExtensionConfig::default();
-        config.cache_size = 1000; // Use reasonable cache size (1000 entries)
+        let config = CatalogExtensionConfig {
+            cache_size: 1000, // Use reasonable cache size (1000 entries)
+            ..Default::default()
+        };
         Self {
             inner: Arc::new(RwLock::new(CatalogExtension::new(config))),
             config: ExtensionConfig {
@@ -72,8 +73,8 @@ impl CatalogPlugin {
 impl HyperMeshExtension for CatalogPlugin {
     fn metadata(&self) -> ExtensionMetadata {
         // Parse hardcoded versions (validation happens at runtime)
-        let version = semver::Version::parse(PLUGIN_VERSION)
-            .expect("PLUGIN_VERSION must be valid semver");
+        let version =
+            semver::Version::parse(PLUGIN_VERSION).expect("PLUGIN_VERSION must be valid semver");
         let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
             .expect("REQUIRED_HYPERMESH_VERSION must be valid semver");
 
@@ -132,16 +133,19 @@ impl HyperMeshExtension for CatalogPlugin {
         // Extract catalog-specific configuration
         let _catalog_config = if let Some(settings) = self.config.settings.as_object() {
             CatalogExtensionConfig {
-                library_path: settings.get("storage_path")
+                library_path: settings
+                    .get("storage_path")
                     .and_then(|v| v.as_str())
                     .map(|s| s.into())
                     .unwrap_or_else(|| "./catalog_storage".into()),
-                cache_size: settings.get("cache_size")
+                cache_size: settings
+                    .get("cache_size")
                     .and_then(|v| v.as_u64())
                     .map(|mb| mb * 1024 * 1024)
                     .unwrap_or(1024 * 1024 * 1024),
                 max_package_size: 10 * 1024 * 1024 * 1024, // 10GB
-                enable_p2p: settings.get("p2p_enabled")
+                enable_p2p: settings
+                    .get("p2p_enabled")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true),
                 consensus_validation: true,
@@ -163,7 +167,7 @@ impl HyperMeshExtension for CatalogPlugin {
         let mut inner = self.inner.write().await;
         inner.initialize(self.config.clone()).await.map_err(|e| {
             ExtensionError::InitializationFailed {
-                reason: format!("Catalog initialization failed: {}", e),
+                reason: format!("Catalog initialization failed: {e}"),
             }
         })?;
 
@@ -171,18 +175,26 @@ impl HyperMeshExtension for CatalogPlugin {
         Ok(())
     }
 
-    async fn register_assets(&self) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>> {
+    async fn register_assets(
+        &self,
+    ) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>> {
         // Return asset handlers through the HyperMeshExtension trait
         let inner = self.inner.read().await;
         inner.register_assets().await
     }
 
-    async fn extend_manager(&self, asset_manager: Arc<blockmatrix::assets::core::AssetManager>) -> ExtensionResult<()> {
+    async fn extend_manager(
+        &self,
+        asset_manager: Arc<blockmatrix::assets::core::AssetManager>,
+    ) -> ExtensionResult<()> {
         let inner = self.inner.write().await;
         inner.extend_manager(asset_manager).await
     }
 
-    async fn handle_request(&self, request: ExtensionRequest) -> ExtensionResult<ExtensionResponse> {
+    async fn handle_request(
+        &self,
+        request: ExtensionRequest,
+    ) -> ExtensionResult<ExtensionResponse> {
         let inner = self.inner.read().await;
 
         // Delegate request handling to inner extension
@@ -248,8 +260,8 @@ pub unsafe extern "C" fn hypermesh_extension_destroy(ptr: *mut c_void) {
 #[no_mangle]
 pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
     // Parse hardcoded versions - validated at compile time by metadata() function
-    let version = semver::Version::parse(PLUGIN_VERSION)
-        .expect("PLUGIN_VERSION validated at compile time");
+    let version =
+        semver::Version::parse(PLUGIN_VERSION).expect("PLUGIN_VERSION validated at compile time");
     let hypermesh_version = semver::Version::parse(REQUIRED_HYPERMESH_VERSION)
         .expect("REQUIRED_HYPERMESH_VERSION validated at compile time");
 
@@ -297,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_plugin_metadata() {
-        let metadata_ptr = unsafe { hypermesh_extension_metadata() };
+        let metadata_ptr = hypermesh_extension_metadata();
         assert!(!metadata_ptr.is_null());
     }
 
@@ -324,14 +336,19 @@ mod tests {
         assert!(plugin.initialize(config).await.is_ok());
 
         // Validate
-        let validation = plugin.validate().await
+        let validation = plugin
+            .validate()
+            .await
             .expect("Plugin validation should succeed after initialization");
         assert!(validation.valid || !validation.warnings.is_empty());
 
         // Get status
         let status = plugin.status().await;
         use blockmatrix::extensions::ExtensionState;
-        assert!(matches!(status.state, ExtensionState::Running | ExtensionState::Error(_)));
+        assert!(matches!(
+            status.state,
+            ExtensionState::Running | ExtensionState::Error(_)
+        ));
 
         // Shutdown
         assert!(plugin.shutdown().await.is_ok());

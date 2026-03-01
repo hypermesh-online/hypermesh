@@ -74,7 +74,10 @@ async fn test_library_operations() {
     let extension = loader.get_extension(&extension_id).await.unwrap();
 
     extension.register_assets().await.unwrap();
-    extension.extend_manager(asset_manager.clone()).await.unwrap();
+    extension
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Create library
     let create_lib = ExtensionRequest {

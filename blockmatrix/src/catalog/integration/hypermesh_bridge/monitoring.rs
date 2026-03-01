@@ -4,9 +4,9 @@
 
 //! Monitoring and observability type definitions for catalog deployments
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Serialize, Deserialize};
 
 /// Monitoring configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,9 +102,19 @@ pub struct AlertRule {
 /// Alert conditions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlertCondition {
-    MetricThreshold { metric: String, threshold: f64, operator: ComparisonOperator },
-    ErrorRate { threshold: f64, window: Duration },
-    ResourceUsage { resource: String, threshold: f64 },
+    MetricThreshold {
+        metric: String,
+        threshold: f64,
+        operator: ComparisonOperator,
+    },
+    ErrorRate {
+        threshold: f64,
+        window: Duration,
+    },
+    ResourceUsage {
+        resource: String,
+        threshold: f64,
+    },
     Custom(String, serde_json::Value),
 }
 
@@ -131,8 +141,18 @@ pub enum AlertSeverity {
 /// Notification channels
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NotificationChannel {
-    Email { addresses: Vec<String> },
-    Slack { webhook_url: String, channel: String },
-    Webhook { url: String, headers: HashMap<String, String> },
-    SMS { phone_numbers: Vec<String> },
+    Email {
+        addresses: Vec<String>,
+    },
+    Slack {
+        webhook_url: String,
+        channel: String,
+    },
+    Webhook {
+        url: String,
+        headers: HashMap<String, String>,
+    },
+    SMS {
+        phone_numbers: Vec<String>,
+    },
 }

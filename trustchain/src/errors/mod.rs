@@ -325,7 +325,10 @@ mod tests {
         assert!(response.details.is_some());
 
         let details = response.details.expect("test");
-        assert_eq!(details["security_failure_reason"], "Four-proof consensus validation failed");
+        assert_eq!(
+            details["security_failure_reason"],
+            "Four-proof consensus validation failed"
+        );
     }
 
     #[test]
@@ -339,7 +342,10 @@ mod tests {
         let deserialized: CAError = serde_json::from_str(&json).expect("test");
 
         match deserialized {
-            CAError::CertificateRevoked { serial_number, reason } => {
+            CAError::CertificateRevoked {
+                serial_number,
+                reason,
+            } => {
                 assert_eq!(serial_number, "123456");
                 assert_eq!(reason, "Private key compromised");
             }

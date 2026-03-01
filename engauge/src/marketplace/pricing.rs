@@ -92,10 +92,10 @@ impl Default for PricingEngine {
 /// Higher tiers (institutional/sovereign) get volume discounts.
 fn tier_multiplier(tier: MarketTier) -> Decimal {
     match tier {
-        MarketTier::L0 => Decimal::ONE,                  // 1.0
-        MarketTier::L1 => Decimal::new(8, 1),            // 0.8
-        MarketTier::L2 => Decimal::new(5, 1),            // 0.5
-        MarketTier::L3 => Decimal::new(2, 1),            // 0.2
+        MarketTier::L0 => Decimal::ONE,       // 1.0
+        MarketTier::L1 => Decimal::new(8, 1), // 0.8
+        MarketTier::L2 => Decimal::new(5, 1), // 0.5
+        MarketTier::L3 => Decimal::new(2, 1), // 0.2
     }
 }
 
@@ -125,7 +125,10 @@ mod tests {
         let l3_price = engine.calculate_price(LeaseableResource::Gpu, 100, MarketTier::L3);
 
         // L0 price should be greater than L3 price (L3 has 0.2 multiplier).
-        assert!(l0_price.0 > l3_price.0, "L0={} should > L3={}", l0_price, l3_price);
+        assert!(
+            l0_price.0 > l3_price.0,
+            "L0={l0_price} should > L3={l3_price}"
+        );
 
         // L3 should be 20% of L0.
         let expected_l3 = l0_price.0 * Decimal::new(2, 1);

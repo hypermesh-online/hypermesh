@@ -622,7 +622,7 @@ mod tests {
                 kms_key_id: None,
                 enable_bucket_key: true,
             },
-            upload_processor: Arc::new(UploadProcessor::new().await.unwrap()),
+            upload_processor: Arc::new(UploadProcessor::new().await.expect("test: async operation")),
         };
 
         let test_entry = CTEntry {
@@ -638,10 +638,10 @@ mod tests {
             signature: vec![0u8; 64],
         };
 
-        let serialized = storage.serialize_and_compress_entry(&test_entry).await.unwrap();
+        let serialized = storage.serialize_and_compress_entry(&test_entry).await.expect("test: async operation");
         assert!(!serialized.is_empty());
 
-        let deserialized = storage.deserialize_entry(&serialized).await.unwrap();
+        let deserialized = storage.deserialize_entry(&serialized).await.expect("test: async operation");
         assert_eq!(deserialized.entry_id, test_entry.entry_id);
     }
 }

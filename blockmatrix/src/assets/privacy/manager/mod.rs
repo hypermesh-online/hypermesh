@@ -7,7 +7,7 @@
 //! Manages user privacy preferences, resource allocation controls,
 //! and integration with consensus system and proxy management.
 
-mod types;
 mod operations;
+mod types;
 
 pub use types::*;

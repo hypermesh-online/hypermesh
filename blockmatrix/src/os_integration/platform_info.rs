@@ -69,10 +69,7 @@ impl PlatformInfo {
             .map(|c| c.cores)
             .unwrap_or_else(|_| num_cpus::get());
 
-        let total_memory_bytes = os
-            .detect_memory()
-            .map(|m| m.total_bytes)
-            .unwrap_or(0);
+        let total_memory_bytes = os.detect_memory().map(|m| m.total_bytes).unwrap_or(0);
 
         let ebpf_supported = os.is_ebpf_supported();
 
@@ -100,7 +97,15 @@ impl fmt::Display for PlatformInfo {
         writeln!(f, "Hostname: {}", self.hostname)?;
         writeln!(f, "CPUs:     {}", self.cpu_count)?;
         writeln!(f, "Memory:   {}", self.memory_display())?;
-        write!(f, "eBPF:     {}", if self.ebpf_supported { "supported" } else { "not supported" })
+        write!(
+            f,
+            "eBPF:     {}",
+            if self.ebpf_supported {
+                "supported"
+            } else {
+                "not supported"
+            }
+        )
     }
 }
 
@@ -166,7 +171,7 @@ fn format_bytes(bytes: u64) -> String {
     } else if bytes >= KB {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
@@ -182,7 +187,10 @@ mod tests {
         assert!(!info.arch.is_empty(), "arch should not be empty");
         assert!(info.cpu_count > 0, "should detect at least one CPU");
         #[cfg(target_os = "linux")]
-        assert!(info.total_memory_bytes > 0, "should detect non-zero memory on Linux");
+        assert!(
+            info.total_memory_bytes > 0,
+            "should detect non-zero memory on Linux"
+        );
     }
 
     #[test]

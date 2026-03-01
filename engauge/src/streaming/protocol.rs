@@ -234,8 +234,7 @@ mod tests {
     fn encode_decode_capacity_roundtrip() {
         let frame = capacity_frame();
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode capacity frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode capacity frame");
         assert_eq!(decoded.source_node, test_node());
         assert_eq!(decoded.sequence, 1);
         match &decoded.payload {
@@ -251,8 +250,7 @@ mod tests {
     fn encode_decode_congestion_roundtrip() {
         let frame = congestion_frame();
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode congestion frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode congestion frame");
         assert_eq!(decoded.sequence, 2);
         match &decoded.payload {
             MetricsPayload::Congestion(c) => {
@@ -267,8 +265,7 @@ mod tests {
     fn encode_decode_routing_roundtrip() {
         let frame = routing_frame();
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode routing frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode routing frame");
         assert_eq!(decoded.sequence, 3);
         match &decoded.payload {
             MetricsPayload::Routing(r) => {
@@ -283,8 +280,7 @@ mod tests {
     fn encode_decode_economic_roundtrip() {
         let frame = economic_frame();
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode economic frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode economic frame");
         assert_eq!(decoded.sequence, 4);
         match &decoded.payload {
             MetricsPayload::Economic(e) => {
@@ -315,8 +311,7 @@ mod tests {
     fn encode_decode_verification_roundtrip() {
         let frame = verification_frame();
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode verification frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode verification frame");
         assert_eq!(decoded.sequence, 5);
         match &decoded.payload {
             MetricsPayload::Verification(v) => {
@@ -349,7 +344,11 @@ mod tests {
 
     #[test]
     fn frame_with_each_privacy_mode_serializes() {
-        for mode in &[PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
+        for mode in &[
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PRIVATE,
+            PrivacyMode::PUBLIC,
+        ] {
             let frame = MetricsFrame {
                 source_node: test_node(),
                 timestamp_us: 100,
@@ -364,8 +363,8 @@ mod tests {
                 sequence: 0,
             };
             let bytes = frame.encode().expect("test: encode frame");
-            let decoded = MetricsFrame::decode(&bytes)
-                .expect("test: decode frame with privacy mode");
+            let decoded =
+                MetricsFrame::decode(&bytes).expect("test: decode frame with privacy mode");
             assert_eq!(decoded.privacy_mode, *mode);
         }
     }
@@ -386,8 +385,7 @@ mod tests {
             sequence: 0,
         };
         let bytes = frame.encode().expect("test: encode frame");
-        let decoded = MetricsFrame::decode(&bytes)
-            .expect("test: decode zero-value frame");
+        let decoded = MetricsFrame::decode(&bytes).expect("test: decode zero-value frame");
         assert_eq!(decoded.timestamp_us, 0);
         assert_eq!(decoded.sequence, 0);
         match &decoded.payload {

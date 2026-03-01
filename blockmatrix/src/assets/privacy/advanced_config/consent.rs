@@ -6,27 +6,27 @@
 //!
 //! Configuration for user consent collection, management, and verification.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetResult, AssetError};
+use crate::assets::core::{AssetError, AssetResult};
 
 /// Consent management settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConsentManagementSettings {
     /// Consent model
     pub consent_model: ConsentModel,
-    
+
     /// Granular consent settings
     pub granular_consent: GranularConsentSettings,
-    
+
     /// Consent withdrawal settings
     pub withdrawal_settings: ConsentWithdrawalSettings,
-    
+
     /// Consent verification settings
     pub verification_settings: ConsentVerificationSettings,
-    
+
     /// Consent audit trail settings
     pub audit_trail: ConsentAuditTrailSettings,
 }
@@ -46,13 +46,13 @@ pub enum ConsentModel {
 pub struct GranularConsentSettings {
     /// Enable granular consent
     pub enabled: bool,
-    
+
     /// Consent categories
     pub categories: Vec<ConsentCategory>,
-    
+
     /// Category dependencies
     pub dependencies: HashMap<String, Vec<String>>,
-    
+
     /// Default consent states
     pub default_states: HashMap<String, ConsentState>,
 }
@@ -62,19 +62,19 @@ pub struct GranularConsentSettings {
 pub struct ConsentCategory {
     /// Category identifier
     pub id: String,
-    
+
     /// Category name
     pub name: String,
-    
+
     /// Category description
     pub description: String,
-    
+
     /// Required vs optional
     pub required: bool,
-    
+
     /// Default state
     pub default_state: ConsentState,
-    
+
     /// Sub-categories
     pub sub_categories: Vec<ConsentCategory>,
 }
@@ -94,13 +94,13 @@ pub enum ConsentState {
 pub struct ConsentWithdrawalSettings {
     /// Withdrawal methods
     pub withdrawal_methods: Vec<WithdrawalMethod>,
-    
+
     /// Confirmation settings
     pub confirmation_settings: WithdrawalConfirmationSettings,
-    
+
     /// Grace period settings
     pub grace_period_settings: WithdrawalGracePeriodSettings,
-    
+
     /// Processing time limits
     pub processing_time_limits: HashMap<String, Duration>,
 }
@@ -120,13 +120,13 @@ pub enum WithdrawalMethod {
 pub struct WithdrawalConfirmationSettings {
     /// Require confirmation
     pub require_confirmation: bool,
-    
+
     /// Confirmation methods
     pub confirmation_methods: Vec<String>,
-    
+
     /// Confirmation timeout
     pub confirmation_timeout: Duration,
-    
+
     /// Multiple confirmations required
     pub multiple_confirmations: bool,
 }
@@ -136,13 +136,13 @@ pub struct WithdrawalConfirmationSettings {
 pub struct WithdrawalGracePeriodSettings {
     /// Grace period duration
     pub duration: Duration,
-    
+
     /// Grace period notifications
     pub notifications: Vec<GracePeriodNotification>,
-    
+
     /// Allow cancellation during grace period
     pub allow_cancellation: bool,
-    
+
     /// Automatic processing after grace period
     pub automatic_processing: bool,
 }
@@ -152,13 +152,13 @@ pub struct WithdrawalGracePeriodSettings {
 pub struct GracePeriodNotification {
     /// Notification timing
     pub timing: NotificationTiming,
-    
+
     /// Notification content
     pub content: String,
-    
+
     /// Notification methods
     pub methods: Vec<String>,
-    
+
     /// Require acknowledgment
     pub require_acknowledgment: bool,
 }
@@ -178,29 +178,29 @@ pub enum NotificationTiming {
 pub struct ConsentVerificationSettings {
     /// Verification requirements
     pub requirements: ConsentVerificationRequirements,
-    
+
     /// Re-verification settings
     pub reverification: ConsentReverificationSettings,
-    
+
     /// Verification methods
     pub verification_methods: Vec<String>,
-    
+
     /// Verification frequency
     pub verification_frequency: Duration,
 }
 
 /// Consent verification requirements
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ConsentVerificationRequirements {
     /// Identity verification required
     pub identity_verification: bool,
-    
+
     /// Age verification required
     pub age_verification: bool,
-    
+
     /// Capacity verification required
     pub capacity_verification: bool,
-    
+
     /// Documentation requirements
     pub documentation_requirements: Vec<String>,
 }
@@ -210,13 +210,13 @@ pub struct ConsentVerificationRequirements {
 pub struct ConsentReverificationSettings {
     /// Enable re-verification
     pub enabled: bool,
-    
+
     /// Re-verification triggers
     pub triggers: Vec<ReverificationTrigger>,
-    
+
     /// Re-verification frequency
     pub frequency: Duration,
-    
+
     /// Grace period for re-verification
     pub grace_period: Duration,
 }
@@ -236,16 +236,16 @@ pub enum ReverificationTrigger {
 pub struct ConsentAuditTrailSettings {
     /// Enable audit trail
     pub enabled: bool,
-    
+
     /// Audit events to track
     pub tracked_events: Vec<ConsentAuditEvent>,
-    
+
     /// Audit retention period
     pub retention_period: Duration,
-    
+
     /// Audit security settings
     pub security_settings: HashMap<String, String>,
-    
+
     /// Real-time audit alerts
     pub realtime_alerts: bool,
 }
@@ -274,13 +274,15 @@ impl ConsentManagementSettings {
 impl GranularConsentSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.categories.is_empty() {
-            return Err(AssetError::ValidationError { message: "Granular consent enabled but no categories specified".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Granular consent enabled but no categories specified".to_string(),
+            });
         }
-        
+
         for category in &self.categories {
             category.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -288,17 +290,21 @@ impl GranularConsentSettings {
 impl ConsentCategory {
     pub fn validate(&self) -> AssetResult<()> {
         if self.id.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Consent category ID cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Consent category ID cannot be empty".to_string(),
+            });
         }
-        
+
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Consent category name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Consent category name cannot be empty".to_string(),
+            });
         }
-        
+
         for sub_category in &self.sub_categories {
             sub_category.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -306,7 +312,9 @@ impl ConsentCategory {
 impl ConsentWithdrawalSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.withdrawal_methods.is_empty() {
-            return Err(AssetError::ValidationError { message: "At least one withdrawal method must be specified".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "At least one withdrawal method must be specified".to_string(),
+            });
         }
         Ok(())
     }
@@ -315,7 +323,9 @@ impl ConsentWithdrawalSettings {
 impl ConsentVerificationSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.verification_frequency.as_secs() == 0 {
-            return Err(AssetError::ValidationError { message: "Verification frequency cannot be zero".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Verification frequency cannot be zero".to_string(),
+            });
         }
         Ok(())
     }
@@ -384,17 +394,6 @@ impl Default for ConsentVerificationSettings {
             reverification: ConsentReverificationSettings::default(),
             verification_methods: vec!["identity_check".to_string()],
             verification_frequency: Duration::from_secs(365 * 24 * 3600), // 1 year
-        }
-    }
-}
-
-impl Default for ConsentVerificationRequirements {
-    fn default() -> Self {
-        Self {
-            identity_verification: false,
-            age_verification: false,
-            capacity_verification: false,
-            documentation_requirements: Vec::new(),
         }
     }
 }

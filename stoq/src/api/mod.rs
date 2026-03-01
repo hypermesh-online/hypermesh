@@ -7,21 +7,21 @@
 //! Provides RPC-style API framework over STOQ protocol for inter-component communication.
 //! Replaces HTTP REST APIs with STOQ-native request/response messaging.
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize, de::DeserializeOwned};
-use anyhow::{Result, anyhow};
-use std::sync::Arc;
-use std::collections::HashMap;
-use parking_lot::RwLock;
 use bytes::Bytes;
-use tracing::{info, debug, warn, error, instrument};
+use parking_lot::RwLock;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tracing::{debug, error, info, instrument, warn};
 
-use crate::transport::{StoqTransport, Connection, Endpoint};
+use crate::transport::{Connection, Endpoint, StoqTransport};
 
 pub mod service_discovery;
 
 // Re-exports for backward compatibility
-pub use service_discovery::{ServiceType, ServiceEndpoint, ServiceDiscovery, ServiceMetadata};
+pub use service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata, ServiceType};
 
 /// API request over STOQ protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,11 +71,11 @@ pub enum ApiError {
 impl std::fmt::Display for ApiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApiError::NotFound(s) => write!(f, "Not found: {}", s),
-            ApiError::InvalidRequest(s) => write!(f, "Invalid request: {}", s),
-            ApiError::HandlerError(s) => write!(f, "Handler error: {}", s),
-            ApiError::SerializationError(s) => write!(f, "Serialization error: {}", s),
-            ApiError::TransportError(s) => write!(f, "Transport error: {}", s),
+            ApiError::NotFound(s) => write!(f, "Not found: {s}"),
+            ApiError::InvalidRequest(s) => write!(f, "Invalid request: {s}"),
+            ApiError::HandlerError(s) => write!(f, "Handler error: {s}"),
+            ApiError::SerializationError(s) => write!(f, "Serialization error: {s}"),
+            ApiError::TransportError(s) => write!(f, "Transport error: {s}"),
         }
     }
 }
@@ -189,7 +189,7 @@ impl StoqApiServer {
                         request_id: String::new(),
                         success: false,
                         payload: Bytes::new(),
-                        error: Some(format!("Invalid request format: {}", e)),
+                        error: Some(format!("Invalid request format: {e}")),
                         metadata: HashMap::new(),
                     };
                     let _ = Self::send_response(&mut send, error_response).await;
@@ -197,34 +197,33 @@ impl StoqApiServer {
                 }
             };
 
-            debug!("Received API request: {} {}", request.service, request.method);
+            debug!(
+                "Received API request: {} {}",
+                request.service, request.method
+            );
 
             // Route to handler (scope the RwLock guard to avoid Send issues)
             let handler_path = format!("{}/{}", request.service, request.method);
             let handler = handlers.read().get(&handler_path).cloned();
 
             let response = match handler {
-                Some(h) => {
-                    match h.handle(request.clone()).await {
-                        Ok(resp) => resp,
-                        Err(e) => ApiResponse {
-                            request_id: request.id.clone(),
-                            success: false,
-                            payload: Bytes::new(),
-                            error: Some(e.to_string()),
-                            metadata: HashMap::new(),
-                        }
-                    }
-                }
-                None => {
-                    ApiResponse {
+                Some(h) => match h.handle(request.clone()).await {
+                    Ok(resp) => resp,
+                    Err(e) => ApiResponse {
                         request_id: request.id.clone(),
                         success: false,
                         payload: Bytes::new(),
-                        error: Some(format!("Handler not found: {}", handler_path)),
+                        error: Some(e.to_string()),
                         metadata: HashMap::new(),
-                    }
-                }
+                    },
+                },
+                None => ApiResponse {
+                    request_id: request.id.clone(),
+                    success: false,
+                    payload: Bytes::new(),
+                    error: Some(format!("Handler not found: {handler_path}")),
+                    metadata: HashMap::new(),
+                },
             };
 
             // Send response
@@ -238,12 +237,9 @@ impl StoqApiServer {
     }
 
     /// Send API response over stream
-    async fn send_response(
-        send: &mut quinn::SendStream,
-        response: ApiResponse,
-    ) -> Result<()> {
+    async fn send_response(send: &mut quinn::SendStream, response: ApiResponse) -> Result<()> {
         let response_data = bincode::serialize(&response)
-            .map_err(|e| anyhow!("Failed to serialize response: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize response: {e}"))?;
 
         send.write_all(&response_data).await?;
         send.finish()?;
@@ -272,7 +268,7 @@ impl StoqApiClient {
     pub fn new(transport: Arc<StoqTransport>) -> Self {
         // Create service discovery with 5-minute cache TTL
         let service_discovery = Arc::new(service_discovery::ServiceDiscovery::new(
-            std::time::Duration::from_secs(300)
+            std::time::Duration::from_secs(300),
         ));
 
         Self {
@@ -296,19 +292,14 @@ impl StoqApiClient {
 
     /// Make an API call
     #[instrument(skip(self, payload))]
-    pub async fn call<T, R>(
-        &self,
-        service: &str,
-        method: &str,
-        payload: &T,
-    ) -> Result<R, ApiError>
+    pub async fn call<T, R>(&self, service: &str, method: &str, payload: &T) -> Result<R, ApiError>
     where
         T: Serialize,
         R: DeserializeOwned,
     {
         // Serialize payload
-        let payload_bytes = serde_json::to_vec(payload)
-            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+        let payload_bytes =
+            serde_json::to_vec(payload).map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
         // Create request
         let request = ApiRequest {
@@ -320,24 +311,31 @@ impl StoqApiClient {
         };
 
         // Get or create connection to service
-        let connection = self.get_connection(service).await
+        let connection = self
+            .get_connection(service)
+            .await
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
 
         // Open bidirectional stream
-        let (mut send, mut recv) = connection.open_bi().await
+        let (mut send, mut recv) = connection
+            .open_bi()
+            .await
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
 
         // Send request
         let request_data = bincode::serialize(&request)
             .map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
-        send.write_all(&request_data).await
+        send.write_all(&request_data)
+            .await
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
         send.finish()
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
 
         // Receive response
-        let response_data = recv.read_to_end(10 * 1024 * 1024).await
+        let response_data = recv
+            .read_to_end(10 * 1024 * 1024)
+            .await
             .map_err(|e| ApiError::TransportError(e.to_string()))?;
 
         let response: ApiResponse = bincode::deserialize(&response_data)
@@ -346,7 +344,9 @@ impl StoqApiClient {
         // Check success
         if !response.success {
             return Err(ApiError::HandlerError(
-                response.error.unwrap_or_else(|| "Unknown error".to_string())
+                response
+                    .error
+                    .unwrap_or_else(|| "Unknown error".to_string()),
             ));
         }
 
@@ -371,7 +371,9 @@ impl StoqApiClient {
 
         // Store Arc in cache, return cloned Connection
         let conn_clone = (*connection).clone();
-        self.connections.write().insert(service.to_string(), conn_clone.clone());
+        self.connections
+            .write()
+            .insert(service.to_string(), conn_clone.clone());
 
         Ok(conn_clone)
     }
@@ -382,8 +384,10 @@ impl StoqApiClient {
         let service_endpoint = self.service_discovery.resolve(service)?;
 
         // Log the discovery operation
-        debug!("Resolved service '{}' to [{}]:{} via service discovery",
-            service, service_endpoint.address, service_endpoint.port);
+        debug!(
+            "Resolved service '{}' to [{}]:{} via service discovery",
+            service, service_endpoint.address, service_endpoint.port
+        );
 
         // Convert ServiceEndpoint to transport Endpoint
         Ok(Endpoint {
@@ -396,7 +400,6 @@ impl StoqApiClient {
 
 #[cfg(test)]
 mod tests {
-    
 
     // TODO: Add STOQ API integration tests
 }

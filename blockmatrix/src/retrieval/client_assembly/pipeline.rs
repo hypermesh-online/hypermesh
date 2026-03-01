@@ -8,16 +8,15 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use crate::assets::pipeline::{
-    Compressor, CompressionConfig, CompressionAlgorithm,
-    Encryptor, EncryptionConfig,
-    Sharder, ShardingConfig,
-    sharding::{Shard, ShardMetadata},
-    encryption::{KyberEncryptionResult, EncryptedData},
+    encryption::{EncryptedData, KyberEncryptionResult},
     orchestrator::DecryptionKey,
+    sharding::{Shard, ShardMetadata},
+    CompressionAlgorithm, CompressionConfig, Compressor, EncryptionConfig, Encryptor, Sharder,
+    ShardingConfig,
 };
 
+use super::super::{RetrievalMetadata, RetrievalPlan};
 use super::{ClientAssembler, FetchedShard};
-use super::super::{RetrievalPlan, RetrievalMetadata};
 
 impl ClientAssembler {
     /// Reconstruct file from fetched shards (basic concatenation).
@@ -27,7 +26,8 @@ impl ClientAssembler {
     /// reconstruction (Reed-Solomon -> decrypt -> decompress).
     pub async fn reconstruct(&self) -> Result<Vec<u8>> {
         let plan = self.plan.read().await;
-        let plan = plan.as_ref()
+        let plan = plan
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
 
         let fetched = self.fetched_shards.read().await;
@@ -61,7 +61,8 @@ impl ClientAssembler {
         decryption_key: &DecryptionKey,
     ) -> Result<Vec<u8>> {
         let plan = self.plan.read().await;
-        let plan = plan.as_ref()
+        let plan = plan
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
 
         let fetched = self.fetched_shards.read().await;
@@ -76,19 +77,9 @@ impl ClientAssembler {
 
         let pipeline_shards = self.build_pipeline_shards(&fetched, plan);
 
-        let encrypted_blob = Self::reconstruct_shards(
-            &pipeline_shards,
-            &plan.metadata,
-        )?;
-        let compressed_data = Self::decrypt_blob(
-            &encrypted_blob,
-            decryption_key,
-            &plan.metadata,
-        )?;
-        let original_data = Self::decompress_data(
-            &compressed_data,
-            &plan.metadata,
-        )?;
+        let encrypted_blob = Self::reconstruct_shards(&pipeline_shards, &plan.metadata)?;
+        let compressed_data = Self::decrypt_blob(&encrypted_blob, decryption_key, &plan.metadata)?;
+        let original_data = Self::decompress_data(&compressed_data, &plan.metadata)?;
 
         Ok(original_data)
     }
@@ -132,20 +123,18 @@ impl ClientAssembler {
     }
 
     /// Stage 1: Reed-Solomon reconstruct encrypted blob from shards.
-    fn reconstruct_shards(
-        shards: &[Shard],
-        metadata: &RetrievalMetadata,
-    ) -> Result<Vec<u8>> {
+    fn reconstruct_shards(shards: &[Shard], metadata: &RetrievalMetadata) -> Result<Vec<u8>> {
         let config = ShardingConfig {
             data_shards: metadata.erasure_coding.0,
             parity_shards: metadata.erasure_coding.1,
             ..Default::default()
         };
-        let sharder = Sharder::new(config)
-            .map_err(|e| anyhow::anyhow!("Sharder init failed: {}", e))?;
+        let sharder =
+            Sharder::new(config).map_err(|e| anyhow::anyhow!("Sharder init failed: {e}"))?;
 
-        sharder.reconstruct(shards)
-            .map_err(|e| anyhow::anyhow!("Shard reconstruction failed: {}", e))
+        sharder
+            .reconstruct(shards)
+            .map_err(|e| anyhow::anyhow!("Shard reconstruction failed: {e}"))
     }
 
     /// Stage 2: Decrypt blob using decryption key.
@@ -173,8 +162,9 @@ impl ClientAssembler {
                     nonce: nonce.clone(),
                     original_size: *original_size,
                 };
-                encryptor.decrypt(&kyber_result, secret_key)
-                    .map_err(|e| anyhow::anyhow!("Kyber decryption failed: {}", e))
+                encryptor
+                    .decrypt(&kyber_result, secret_key)
+                    .map_err(|e| anyhow::anyhow!("Kyber decryption failed: {e}"))
             }
             DecryptionKey::Aes(key) => {
                 let encrypted = EncryptedData {
@@ -182,17 +172,15 @@ impl ClientAssembler {
                     nonce: key.nonce.clone(),
                     original_size: 0,
                 };
-                encryptor.decrypt_aes(&encrypted, key)
-                    .map_err(|e| anyhow::anyhow!("AES decryption failed: {}", e))
+                encryptor
+                    .decrypt_aes(&encrypted, key)
+                    .map_err(|e| anyhow::anyhow!("AES decryption failed: {e}"))
             }
         }
     }
 
     /// Stage 3: Decompress data.
-    fn decompress_data(
-        compressed_data: &[u8],
-        metadata: &RetrievalMetadata,
-    ) -> Result<Vec<u8>> {
+    fn decompress_data(compressed_data: &[u8], metadata: &RetrievalMetadata) -> Result<Vec<u8>> {
         if metadata.compression.is_empty() || metadata.compression == "none" {
             return Ok(compressed_data.to_vec());
         }
@@ -207,7 +195,8 @@ impl ClientAssembler {
             ..Default::default()
         });
 
-        compressor.decompress(compressed_data)
-            .map_err(|e| anyhow::anyhow!("Decompression failed: {}", e))
+        compressor
+            .decompress(compressed_data)
+            .map_err(|e| anyhow::anyhow!("Decompression failed: {e}"))
     }
 }

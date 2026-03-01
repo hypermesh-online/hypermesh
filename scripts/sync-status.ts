@@ -233,7 +233,7 @@ function countRsTests(srcDir: string): number {
   }
   try {
     const output = execSync(
-      `grep -r "#\\[test\\]" "${srcDir}" 2>/dev/null | wc -l`,
+      `grep -rE "#\\[(tokio::)?test\\]" "${srcDir}" 2>/dev/null | wc -l`,
       { encoding: "utf-8" }
     );
     return parseInt(output.trim(), 10) || 0;
@@ -311,11 +311,22 @@ function collectCrateStats(crateDir: string, crateId: string): CrateStats {
     };
   }
 
+  // For Rust crates, also count tests in tests/ and benches/ directories
+  let testCount = countRsTests(project.srcDir);
+  const testsDir = join(crateDir, "tests");
+  const benchesDir = join(crateDir, "benches");
+  if (existsSync(testsDir)) {
+    testCount += countRsTests(testsDir);
+  }
+  if (existsSync(benchesDir)) {
+    testCount += countRsTests(benchesDir);
+  }
+
   return {
     id: crateId,
     files: countRsFiles(project.srcDir),
     linesOfCode: countRsLinesOfCode(project.srcDir),
-    testCount: countRsTests(project.srcDir),
+    testCount,
   };
 }
 

@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use tracing::{debug, warn};
@@ -187,7 +187,7 @@ impl PosFastValidator {
             }
             FastValidationResult::Rejected(reason) => {
                 warn!("Fast validator rejected: {}", reason);
-                Err(anyhow!("Fast validation rejected: {}", reason))
+                Err(anyhow!("Fast validation rejected: {reason}"))
             }
             FastValidationResult::PassToFull => {
                 let result = self.validate_for_tier(token, privacy_mode)?;
@@ -256,7 +256,8 @@ impl PosFastValidator {
 
     /// Insert a validation result into the fast cache.
     pub fn cache_result(&self, token_hash: [u8; 32], valid: bool) {
-        self.fast_cache.insert(token_hash, (valid, SystemTime::now()));
+        self.fast_cache
+            .insert(token_hash, (valid, SystemTime::now()));
     }
 
     /// Remove expired entries from the fast cache.
@@ -359,7 +360,7 @@ impl PosFastValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
+    use crate::protocol::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork};
 
     /// Helper: create a valid test token that passes all fast checks.
     fn create_valid_token() -> PosToken {
@@ -447,8 +448,10 @@ mod tests {
 
     #[test]
     fn test_fast_check_size_limit() {
-        let mut config = FastValidationConfig::default();
-        config.max_token_size_bytes = 50; // Unrealistically small
+        let config = FastValidationConfig {
+            max_token_size_bytes: 50, // Unrealistically small
+            ..Default::default()
+        };
         let full = Arc::new(PosTokenValidator::new(Duration::from_secs(300)));
         let v = PosFastValidator::new(config, full);
 
@@ -474,8 +477,10 @@ mod tests {
 
     #[test]
     fn test_rate_limiting() {
-        let mut config = FastValidationConfig::default();
-        config.rate_limit_per_sec = 5;
+        let config = FastValidationConfig {
+            rate_limit_per_sec: 5,
+            ..Default::default()
+        };
         let full = Arc::new(PosTokenValidator::new(Duration::from_secs(300)));
         let v = PosFastValidator::new(config, full);
 
@@ -487,8 +492,7 @@ mod tests {
             let result = v.fast_validate(&t);
             assert!(
                 !matches!(result, FastValidationResult::Rejected(ref r) if r.contains("Rate")),
-                "Validation {} should not be rate-limited",
-                i
+                "Validation {i} should not be rate-limited"
             );
         }
         // 6th should be rate-limited
@@ -525,8 +529,10 @@ mod tests {
 
     #[test]
     fn test_cache_expiry() {
-        let mut config = FastValidationConfig::default();
-        config.fast_cache_ttl_secs = 0; // Immediate expiry
+        let config = FastValidationConfig {
+            fast_cache_ttl_secs: 0, // Immediate expiry
+            ..Default::default()
+        };
         let full = Arc::new(PosTokenValidator::new(Duration::from_secs(300)));
         let v = PosFastValidator::new(config, full);
 
@@ -552,7 +558,8 @@ mod tests {
         let v = make_validator();
         let token = create_valid_token();
 
-        let result = v.validate(&token, &PrivacyMode::ANONYMOUS)
+        let result = v
+            .validate(&token, &PrivacyMode::ANONYMOUS)
             .expect("test: anonymous validation should succeed");
 
         assert!(result.is_valid, "Anonymous mode should skip validation");
@@ -564,7 +571,8 @@ mod tests {
         let v = make_validator();
         let token = create_valid_token();
 
-        let result = v.validate(&token, &PrivacyMode::PRIVATE)
+        let result = v
+            .validate(&token, &PrivacyMode::PRIVATE)
             .expect("test: private validation should succeed");
 
         // Valid token should pass private subset checks
@@ -577,7 +585,8 @@ mod tests {
         // but stake 0 should fail at fast_validate before reaching tier check
         // Actually for the full validate path, stake 0 is also caught at fast stage.
         // Let's test validate_for_tier directly for subset check:
-        let result2 = v.validate_for_tier(&bad_token, &PrivacyMode::PRIVATE)
+        let result2 = v
+            .validate_for_tier(&bad_token, &PrivacyMode::PRIVATE)
             .expect("test: private subset should return result");
         assert!(!result2.is_valid, "Zero-stake should fail private checks");
         assert!(result2.errors.iter().any(|e| e.contains("zero")));
@@ -588,19 +597,27 @@ mod tests {
         let v = make_validator();
         let token = create_valid_token();
 
-        let result = v.validate(&token, &PrivacyMode::PUBLIC)
+        let result = v
+            .validate(&token, &PrivacyMode::PUBLIC)
             .expect("test: public validation should succeed");
 
         // Valid token with all proofs should pass full validation
-        assert!(result.is_valid, "Valid token should pass full public validation");
+        assert!(
+            result.is_valid,
+            "Valid token should pass full public validation"
+        );
 
         // Test with expired token (should fail full validation)
         // Use a different ID so the full validator's cache doesn't mask the failure.
         let mut expired = create_valid_token();
         expired.id = vec![99, 98, 97, 96];
         expired.expires_at = SystemTime::now() - Duration::from_secs(60);
-        let result2 = v.validate_for_tier(&expired, &PrivacyMode::PUBLIC)
+        let result2 = v
+            .validate_for_tier(&expired, &PrivacyMode::PUBLIC)
             .expect("test: public expired should return result");
-        assert!(!result2.is_valid, "Expired token should fail public validation");
+        assert!(
+            !result2.is_valid,
+            "Expired token should fail public validation"
+        );
     }
 }

@@ -9,15 +9,15 @@
 //! This module coordinates with TrustChain for network identity and credentials,
 //! while BlockMatrix handles asset routing across networks.
 
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use async_trait::async_trait;
 
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 use super::PeerIdentity;
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult};
 
 /// Canonical NetworkId from hypermesh-lib (newtype over [u8; 16]).
 pub use hypermesh_lib::NetworkId;
@@ -253,14 +253,17 @@ impl MultiNetworkMembership {
         // Get network info
         let network_info = {
             let discovered = self.discovered_networks.read().await;
-            discovered.get(&network_id).cloned()
+            discovered
+                .get(&network_id)
+                .cloned()
                 .ok_or_else(|| AssetError::NetworkError {
                     message: "Network not found".to_string(),
                 })?
         };
 
         // Request credentials from TrustChain
-        let credentials = self.trustchain_client
+        let credentials = self
+            .trustchain_client
             .request_credentials(network_id)
             .await?;
 
@@ -299,7 +302,9 @@ impl MultiNetworkMembership {
             membership.last_active = SystemTime::now();
 
             // Revoke credentials via TrustChain
-            self.trustchain_client.revoke_credentials(network_id).await?;
+            self.trustchain_client
+                .revoke_credentials(network_id)
+                .await?;
 
             tracing::info!("Left network {}", network_id);
             Ok(())
@@ -313,7 +318,8 @@ impl MultiNetworkMembership {
     /// Get active memberships
     pub async fn active_memberships(&self) -> Vec<NetworkMembership> {
         let memberships = self.memberships.read().await;
-        memberships.values()
+        memberships
+            .values()
             .filter(|m| m.status == MembershipStatus::Active)
             .cloned()
             .collect()
@@ -345,7 +351,8 @@ impl MultiNetworkMembership {
     ) -> bool {
         let memberships = self.memberships.read().await;
 
-        memberships.get(&network_id)
+        memberships
+            .get(&network_id)
             .map(|m| m.visible_assets.contains(asset_id))
             .unwrap_or(false)
     }
@@ -354,7 +361,8 @@ impl MultiNetworkMembership {
     pub async fn networks_for_asset(&self, asset_id: &AssetRegistration) -> Vec<NetworkId> {
         let memberships = self.memberships.read().await;
 
-        memberships.iter()
+        memberships
+            .iter()
             .filter(|(_, m)| m.visible_assets.contains(asset_id))
             .map(|(id, _)| *id)
             .collect()
@@ -364,14 +372,17 @@ impl MultiNetworkMembership {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use crate::test_utils::test_asset_id;
+    use std::time::Duration;
 
     struct MockTrustChainClient;
 
     #[async_trait]
     impl TrustChainClient for MockTrustChainClient {
-        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
+        async fn request_credentials(
+            &self,
+            _network_id: NetworkId,
+        ) -> AssetResult<NetworkCredentials> {
             Ok(NetworkCredentials {
                 certificate: vec![1, 2, 3],
                 public_key: vec![4, 5, 6],
@@ -390,24 +401,22 @@ mod tests {
         }
 
         async fn discover_networks(&self) -> AssetResult<Vec<NetworkDiscovery>> {
-            Ok(vec![
-                NetworkDiscovery {
-                    network_id: NetworkId([1u8; 16]),
-                    name: "Bank Customer Portal".to_string(),
-                    description: "Public banking services".to_string(),
-                    entry_points: vec![],
-                    requirements: JoinRequirements {
-                        invitation_required: false,
-                        min_reputation: None,
-                        required_proofs: HashSet::new(),
-                        geo_restrictions: None,
-                        approval_process: ApprovalProcess::Automatic,
-                    },
-                    privacy_tier: PrivacyMode::PUBLIC,
-                    member_count: 1000,
-                    is_public: true,
+            Ok(vec![NetworkDiscovery {
+                network_id: NetworkId([1u8; 16]),
+                name: "Bank Customer Portal".to_string(),
+                description: "Public banking services".to_string(),
+                entry_points: vec![],
+                requirements: JoinRequirements {
+                    invitation_required: false,
+                    min_reputation: None,
+                    required_proofs: HashSet::new(),
+                    geo_restrictions: None,
+                    approval_process: ApprovalProcess::Automatic,
                 },
-            ])
+                privacy_tier: PrivacyMode::PUBLIC,
+                member_count: 1000,
+                is_public: true,
+            }])
         }
     }
 
@@ -423,7 +432,10 @@ mod tests {
         let client = Arc::new(MockTrustChainClient);
         let membership = MultiNetworkMembership::new(node_id, client);
 
-        let networks = membership.discover_networks().await.expect("test: discover");
+        let networks = membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
         assert_eq!(networks.len(), 1);
         assert_eq!(networks[0].name, "Bank Customer Portal");
     }
@@ -441,14 +453,23 @@ mod tests {
         let membership = MultiNetworkMembership::new(node_id, client);
 
         // Discover networks first
-        let networks = membership.discover_networks().await.expect("test: discover");
+        let networks = membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
         let network_id = networks[0].network_id;
 
         // Join network
-        membership.join_network(network_id, PrivacyMode::PUBLIC).await.expect("test: join");
+        membership
+            .join_network(network_id, PrivacyMode::PUBLIC)
+            .await
+            .expect("test: join");
 
         // Leave network
-        membership.leave_network(network_id).await.expect("test: leave");
+        membership
+            .leave_network(network_id)
+            .await
+            .expect("test: leave");
     }
 
     #[tokio::test]
@@ -464,14 +485,23 @@ mod tests {
         let membership = MultiNetworkMembership::new(node_id, client);
 
         // Discover and join network
-        let networks = membership.discover_networks().await.expect("test: discover");
+        let networks = membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
         let network_id = networks[0].network_id;
-        membership.join_network(network_id, PrivacyMode::PUBLIC).await.expect("test: join");
+        membership
+            .join_network(network_id, PrivacyMode::PUBLIC)
+            .await
+            .expect("test: join");
 
         // Add asset to network
         use crate::assets::core::AssetType;
         let asset_id = test_asset_id(AssetType::Cpu);
-        membership.add_asset_to_network(network_id, asset_id.clone()).await.expect("test: add asset");
+        membership
+            .add_asset_to_network(network_id, asset_id.clone())
+            .await
+            .expect("test: add asset");
 
         // Check visibility
         assert!(membership.is_asset_visible(network_id, &asset_id).await);

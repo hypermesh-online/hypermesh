@@ -11,20 +11,20 @@
 //! This is THE single XDP manager for the entire HyperMesh stack.
 //! STOQ and blockmatrix are consumers via the `HyperMeshEbpf` orchestrator.
 
-mod types;
 mod manager;
+mod types;
 mod validation;
 
-pub use types::*;
 pub use manager::*;
+pub use types::*;
 #[cfg(any(feature = "kernel-attach", test))]
 pub(crate) use validation::policy_to_bytes;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::policy_maps::{PolicyManager, ValidationPolicy};
     use crate::hypermesh_headers::*;
+    use crate::policy_maps::{PolicyManager, ValidationPolicy};
     use crate::validation::ALG_FALCON_1024;
 
     /// Build a valid `who` field: FALCON-1024 algorithm indicator + 8 non-zero prefix bytes.
@@ -463,7 +463,10 @@ mod tests {
         let mut mgr = XdpManager::new(pm).expect("test: create xdp manager");
 
         let result = mgr.attach_with_mode("lo", XdpAttachMode::Offload);
-        assert!(result.is_ok(), "test: offload on lo should fall back, not error");
+        assert!(
+            result.is_ok(),
+            "test: offload on lo should fall back, not error"
+        );
 
         // Verify attachment was tracked
         let attached = mgr.attached.read();
@@ -483,8 +486,7 @@ mod tests {
         let err_msg = result.expect_err("test: should be error").to_string();
         assert!(
             err_msg.contains("does not support XDP offload"),
-            "test: error should mention offload unsupported, got: {}",
-            err_msg
+            "test: error should mention offload unsupported, got: {err_msg}"
         );
     }
 
@@ -496,7 +498,10 @@ mod tests {
 
         // loopback does not support offload - should succeed with fallback
         let result = mgr.attach_with_mode("lo", XdpAttachMode::Offload);
-        assert!(result.is_ok(), "test: opportunistic offload on lo should fall back");
+        assert!(
+            result.is_ok(),
+            "test: opportunistic offload on lo should fall back"
+        );
     }
 
     #[test]
@@ -512,7 +517,10 @@ mod tests {
         let _ = mgr.detach("lo");
 
         let result = mgr.attach_with_mode("lo", XdpAttachMode::Generic);
-        assert!(result.is_ok(), "test: generic mode should not check offload");
+        assert!(
+            result.is_ok(),
+            "test: generic mode should not check offload"
+        );
     }
 
     // -------------------------------------------------------------------
@@ -556,14 +564,12 @@ mod tests {
         assert_eq!(difficulty, 16);
 
         let skew = u64::from_le_bytes([
-            bytes[4], bytes[5], bytes[6], bytes[7],
-            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11],
         ]);
         assert_eq!(skew, 300_000_000_000);
 
         let ttl = u64::from_le_bytes([
-            bytes[12], bytes[13], bytes[14], bytes[15],
-            bytes[16], bytes[17], bytes[18], bytes[19],
+            bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17], bytes[18], bytes[19],
         ]);
         assert_eq!(ttl, 3_600_000_000_000);
 

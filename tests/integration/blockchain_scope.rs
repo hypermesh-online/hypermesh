@@ -26,10 +26,10 @@ fn only_device_and_network() {
 #[test]
 fn serde_round_trip() {
     for scope in [BlockchainScope::Device, BlockchainScope::Network] {
-        let json = serde_json::to_string(&scope)
-            .unwrap_or_else(|e| panic!("serialize {:?}: {}", scope, e));
-        let back: BlockchainScope = serde_json::from_str(&json)
-            .unwrap_or_else(|e| panic!("deserialize {:?}: {}", scope, e));
+        let json =
+            serde_json::to_string(&scope).unwrap_or_else(|e| panic!("serialize {scope:?}: {e}"));
+        let back: BlockchainScope =
+            serde_json::from_str(&json).unwrap_or_else(|e| panic!("deserialize {scope:?}: {e}"));
         assert_eq!(scope, back);
     }
 }
@@ -39,7 +39,11 @@ fn scope_independent_from_privacy_mode() {
     // BlockchainScope and PrivacyMode are independent dimensions.
     // Any combination is valid.
     let scopes = [BlockchainScope::Device, BlockchainScope::Network];
-    let modes = [PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC];
+    let modes = [
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
+    ];
 
     // 2 scopes x 3 modes = 6 valid combinations
     let mut count = 0;

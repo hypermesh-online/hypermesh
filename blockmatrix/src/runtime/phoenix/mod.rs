@@ -430,17 +430,17 @@ mod tests {
     #[test]
     fn test_parse_endpoint() {
         // IPv6 with port
-        let (ip, port) = parse_endpoint("[::1]:9292").unwrap();
+        let (ip, port) = parse_endpoint("[::1]:9292").expect("test: expected success");
         assert_eq!(ip, Ipv6Addr::LOCALHOST);
         assert_eq!(port, 9292);
 
         // Hostname with port (resolves to localhost for now)
-        let (ip, port) = parse_endpoint("example.com:8080").unwrap();
+        let (ip, port) = parse_endpoint("example.com:8080").expect("test: expected success");
         assert_eq!(ip, Ipv6Addr::LOCALHOST);
         assert_eq!(port, 8080);
 
         // No port (uses default)
-        let (ip, port) = parse_endpoint("::1").unwrap();
+        let (ip, port) = parse_endpoint("::1").expect("test: expected success");
         assert_eq!(ip, Ipv6Addr::LOCALHOST);
         assert_eq!(port, crate::DEFAULT_PORT);
     }

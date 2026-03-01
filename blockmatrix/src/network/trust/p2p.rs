@@ -7,17 +7,16 @@
 //! Core Principle: Direct peer trust exchange without intermediary CA.
 //! Similar to SSH known_hosts model - users manually approve peer certificates.
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
-    StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate, PeerId,
-    new_random_network_id,
+    new_random_network_id, AssetRequest, AssetResponse, Certificate, NetworkConfig,
+    NetworkConnection, NetworkHandler, NetworkType, PeerId, PeerInfo, StoqTransport,
 };
 
 /// P2P network handler - direct peer-to-peer with self-signed certificates
@@ -66,8 +65,8 @@ impl P2PNetworkHandler {
 
     /// Generate self-signed certificate for P2P
     fn generate_self_signed_cert() -> Certificate {
-        use std::time::{SystemTime, UNIX_EPOCH};
         use rand::Rng;
+        use std::time::{SystemTime, UNIX_EPOCH};
 
         let node_id = format!("p2p-node-{}", uuid::Uuid::new_v4());
         let now = SystemTime::now()
@@ -87,7 +86,7 @@ impl P2PNetworkHandler {
             issuer: node_id.clone(), // Self-signed
             public_key,
             signature,
-            fingerprint: format!("fingerprint:{}", node_id),
+            fingerprint: format!("fingerprint:{node_id}"),
             expires_at: now + 365 * 24 * 3600, // 1 year
             network_type: NetworkType::P2P,
             blockchain_registered: false,
@@ -99,16 +98,25 @@ impl P2PNetworkHandler {
         info!("Connecting to P2P peer: {}", peer_addr);
 
         // Exchange certificates with peer
-        let peer_cert = stoq.exchange_certificate(peer_addr, &self.self_signed_cert).await?;
+        let peer_cert = stoq
+            .exchange_certificate(peer_addr, &self.self_signed_cert)
+            .await?;
         let peer_id = PeerId::from_cert(&peer_cert);
 
-        debug!("Received certificate from peer {}: {:?}", peer_id, peer_cert.fingerprint);
+        debug!(
+            "Received certificate from peer {}: {:?}",
+            peer_id, peer_cert.fingerprint
+        );
 
         // Add to pending peers for manual approval
-        self.pending_peers.write().await.insert(peer_id.clone(), peer_cert.clone());
+        self.pending_peers
+            .write()
+            .await
+            .insert(peer_id.clone(), peer_cert.clone());
 
         // For now, auto-accept (TODO: implement UI for manual approval)
-        self.approve_peer(peer_id.clone(), "Auto-approved for testing").await?;
+        self.approve_peer(peer_id.clone(), "Auto-approved for testing")
+            .await?;
 
         Ok(())
     }
@@ -118,11 +126,17 @@ impl P2PNetworkHandler {
         info!("Approving P2P peer: {}", peer_id);
 
         // Move from pending to trusted
-        let cert = self.pending_peers.write().await
+        let cert = self
+            .pending_peers
+            .write()
+            .await
             .remove(&peer_id)
-            .ok_or_else(|| anyhow!("Peer {} not found in pending list", peer_id))?;
+            .ok_or_else(|| anyhow!("Peer {peer_id} not found in pending list"))?;
 
-        self.trusted_peers.write().await.insert(peer_id.clone(), cert);
+        self.trusted_peers
+            .write()
+            .await
+            .insert(peer_id.clone(), cert);
 
         // Log trust decision
         self.trust_decisions.write().await.push(TrustDecision {
@@ -163,7 +177,9 @@ impl P2PNetworkHandler {
 
     /// Get list of pending peers awaiting approval
     pub async fn get_pending_peers(&self) -> Vec<(PeerId, Certificate)> {
-        self.pending_peers.read().await
+        self.pending_peers
+            .read()
+            .await
             .iter()
             .map(|(id, cert)| (id.clone(), cert.clone()))
             .collect()
@@ -171,7 +187,9 @@ impl P2PNetworkHandler {
 
     /// Get list of trusted peers
     pub async fn get_trusted_peers(&self) -> Vec<(PeerId, Certificate)> {
-        self.trusted_peers.read().await
+        self.trusted_peers
+            .read()
+            .await
             .iter()
             .map(|(id, cert)| (id.clone(), cert.clone()))
             .collect()
@@ -205,8 +223,10 @@ impl NetworkHandler for P2PNetworkHandler {
         let connection_ref = connection.clone();
         *self.connection.write().await = Some(connection_ref);
 
-        info!("P2P network bootstrapped with {} trusted peers",
-            self.trusted_peers.read().await.len());
+        info!(
+            "P2P network bootstrapped with {} trusted peers",
+            self.trusted_peers.read().await.len()
+        );
         Ok(connection)
     }
 
@@ -251,7 +271,10 @@ impl NetworkHandler for P2PNetworkHandler {
         if let Some(cert) = &peer.certificate {
             if cert.is_self_signed() {
                 drop(pending); // Release read lock
-                self.pending_peers.write().await.insert(peer.peer_id.clone(), cert.clone());
+                self.pending_peers
+                    .write()
+                    .await
+                    .insert(peer.peer_id.clone(), cert.clone());
                 info!("Added peer {} to pending approval list", peer.peer_id);
             }
         }
@@ -271,11 +294,7 @@ impl NetworkHandler for P2PNetworkHandler {
 
         let response = AssetResponse {
             asset_id: request.asset_id.clone(),
-            data: if authorized {
-                None // Would fetch actual data
-            } else {
-                None
-            },
+            data: None, // Would fetch actual data when authorized
             authorized,
             metadata: {
                 let mut meta = std::collections::HashMap::new();
@@ -283,8 +302,10 @@ impl NetworkHandler for P2PNetworkHandler {
                 if let Some(peer_id) = &request.peer_id {
                     meta.insert("peer".to_string(), peer_id.to_string());
                 }
-                meta.insert("trusted_peers".to_string(),
-                    self.trusted_peers.read().await.len().to_string());
+                meta.insert(
+                    "trusted_peers".to_string(),
+                    self.trusted_peers.read().await.len().to_string(),
+                );
                 meta
             },
         };
@@ -340,10 +361,10 @@ mod tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
         assert_eq!(connection.network_type, NetworkType::P2P);
         assert!(connection.certificate.is_some());
-        assert!(connection.certificate.unwrap().is_self_signed());
+        assert!(connection.certificate.expect("test: certificate operation").is_self_signed());
     }
 
     #[tokio::test]
@@ -355,12 +376,19 @@ mod tests {
         let peer_id = PeerId::from_cert(&peer_cert);
 
         // Add to pending
-        handler.pending_peers.write().await.insert(peer_id.clone(), peer_cert);
+        handler
+            .pending_peers
+            .write()
+            .await
+            .insert(peer_id.clone(), peer_cert);
         assert_eq!(handler.get_pending_peers().await.len(), 1);
         assert_eq!(handler.get_trusted_peers().await.len(), 0);
 
         // Approve peer
-        handler.approve_peer(peer_id.clone(), "Test approval").await.unwrap();
+        handler
+            .approve_peer(peer_id.clone(), "Test approval")
+            .await
+            .expect("test: expected success");
         assert_eq!(handler.get_pending_peers().await.len(), 0);
         assert_eq!(handler.get_trusted_peers().await.len(), 1);
     }
@@ -372,7 +400,11 @@ mod tests {
         // Create and approve a test peer
         let peer_cert = P2PNetworkHandler::generate_self_signed_cert();
         let peer_id = PeerId::from_cert(&peer_cert);
-        handler.trusted_peers.write().await.insert(peer_id.clone(), peer_cert.clone());
+        handler
+            .trusted_peers
+            .write()
+            .await
+            .insert(peer_id.clone(), peer_cert.clone());
 
         // Trusted peer should validate
         let peer = PeerInfo {
@@ -381,7 +413,7 @@ mod tests {
             certificate: Some(peer_cert),
             network_type: NetworkType::P2P,
         };
-        assert!(handler.validate_peer(&peer).await.unwrap());
+        assert!(handler.validate_peer(&peer).await.expect("test: async operation"));
 
         // Unknown peer should not validate
         let unknown_peer = PeerInfo {
@@ -390,6 +422,6 @@ mod tests {
             certificate: None,
             network_type: NetworkType::P2P,
         };
-        assert!(!handler.validate_peer(&unknown_peer).await.unwrap());
+        assert!(!handler.validate_peer(&unknown_peer).await.expect("test: async operation"));
     }
 }

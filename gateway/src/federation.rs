@@ -149,7 +149,7 @@ impl FederationBridge {
             self.stats.messages_rejected.fetch_add(1, Ordering::Relaxed);
             warn!("forwarding denied to federation '{}'", federation_id);
             return Err(GatewayError::AuthFailed {
-                reason: format!("forwarding to federation '{}' denied", federation_id),
+                reason: format!("forwarding to federation '{federation_id}' denied"),
             });
         }
         if let Some(mut peer) = self.peers.get_mut(federation_id) {
@@ -170,11 +170,7 @@ impl FederationBridge {
     /// Update the trust level for an existing peer.
     ///
     /// Returns `true` if the peer was found and updated, `false` otherwise.
-    pub fn update_trust_level(
-        &self,
-        federation_id: &str,
-        level: GatewayTrustLevel,
-    ) -> bool {
+    pub fn update_trust_level(&self, federation_id: &str, level: GatewayTrustLevel) -> bool {
         if let Some(mut peer) = self.peers.get_mut(federation_id) {
             debug!(
                 "trust level updated for '{}': {:?} -> {:?}",
@@ -244,11 +240,8 @@ mod tests {
     #[test]
     fn join_untrusted_rejected() {
         let bridge = FederationBridge::new("local".into(), 10);
-        let result = bridge.join_federation(make_peer(
-            "bad",
-            "Bad Net",
-            GatewayTrustLevel::Untrusted,
-        ));
+        let result =
+            bridge.join_federation(make_peer("bad", "Bad Net", GatewayTrustLevel::Untrusted));
         assert!(result.is_err());
         assert_eq!(bridge.list_peers().len(), 0);
     }
@@ -262,8 +255,7 @@ mod tests {
         bridge
             .join_federation(make_peer("b", "B", GatewayTrustLevel::Full))
             .expect("test: join b");
-        let result =
-            bridge.join_federation(make_peer("c", "C", GatewayTrustLevel::Full));
+        let result = bridge.join_federation(make_peer("c", "C", GatewayTrustLevel::Full));
         assert!(result.is_err());
     }
 

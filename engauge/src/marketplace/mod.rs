@@ -12,14 +12,14 @@
 //! - [`pricing`] -- Governor-adjusted pricing engine.
 //! - [`content_push`] -- Paid content distribution with explicit opt-in.
 
-pub mod resource_pool;
+pub mod content_push;
 pub mod lease_contract;
 pub mod lease_manager;
 pub mod pricing;
-pub mod content_push;
+pub mod resource_pool;
 
-pub use resource_pool::{ResourcePool, AllocationConfig, LeaseableResource, PoolError};
-pub use lease_contract::{LeaseContract, LeaseState, LeaseError};
+pub use content_push::{ContentPushManager, ContentPushRequest, PushError, PushStatus};
+pub use lease_contract::{LeaseContract, LeaseError, LeaseState};
 pub use lease_manager::{LeaseManager, ManagerError};
 pub use pricing::PricingEngine;
-pub use content_push::{ContentPushManager, ContentPushRequest, PushStatus, PushError};
+pub use resource_pool::{AllocationConfig, LeaseableResource, PoolError, ResourcePool};

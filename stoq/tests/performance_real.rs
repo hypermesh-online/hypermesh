@@ -6,15 +6,17 @@
 //!
 //! This test measures ACTUAL throughput, not theoretical calculations
 
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint, Connection};
 use std::net::Ipv6Addr;
 use std::time::{Duration, Instant};
-use tokio;
+use stoq::transport::{Connection, Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_real_throughput() {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore error
     }
 
@@ -25,7 +27,7 @@ async fn test_real_throughput() {
         bind_address: Ipv6Addr::LOCALHOST,
         port: 19292,
         max_concurrent_streams: 1000,
-        send_buffer_size: 64 * 1024 * 1024, // 64MB
+        send_buffer_size: 64 * 1024 * 1024,    // 64MB
         receive_buffer_size: 64 * 1024 * 1024, // 64MB
         enable_zero_copy: true,
         enable_memory_pool: true,
@@ -77,7 +79,10 @@ async fn test_real_throughput() {
     ];
 
     println!("Testing throughput with different data sizes:\n");
-    println!("{:<10} {:<15} {:<15} {:<15}", "Size", "Time (ms)", "Throughput", "Gbps");
+    println!(
+        "{:<10} {:<15} {:<15} {:<15}",
+        "Size", "Time (ms)", "Throughput", "Gbps"
+    );
     println!("{}", "-".repeat(60));
 
     for (size, label) in test_sizes {
@@ -119,7 +124,7 @@ async fn test_real_throughput() {
 
     // Test connection pooling
     let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 19292);
-    let test_data = vec![0xCD; 1024 * 1024]; // 1MB
+    let _test_data = vec![0xCD; 1024 * 1024]; // 1MB
 
     // First connection (cold)
     let start = Instant::now();
@@ -136,7 +141,10 @@ async fn test_real_throughput() {
 
     println!("Cold connection: {:.2} ms", cold_connect_time.as_millis());
     println!("Pooled connection: {:.2} ms", warm_connect_time.as_millis());
-    println!("Speedup: {:.1}x", cold_connect_time.as_secs_f64() / warm_connect_time.as_secs_f64());
+    println!(
+        "Speedup: {:.1}x",
+        cold_connect_time.as_secs_f64() / warm_connect_time.as_secs_f64()
+    );
 
     conn2.close();
 
@@ -170,18 +178,18 @@ async fn test_real_throughput() {
     let total_bytes = concurrent_count * stream_data_size;
     let gbps = (total_bytes as f64 * 8.0) / (duration.as_secs_f64() * 1_000_000_000.0);
 
-    println!("Concurrent streams: {}", concurrent_count);
+    println!("Concurrent streams: {concurrent_count}");
     println!("Total data: {} MB", total_bytes / (1024 * 1024));
     println!("Time: {:.2} ms", duration.as_millis());
-    println!("Throughput: {:.3} Gbps", gbps);
+    println!("Throughput: {gbps:.3} Gbps");
 
     println!("\n=== Performance Statistics ===\n");
 
     let (peak_gbps, zero_copy_ops, pool_hits, frame_batches) = client.performance_stats();
-    println!("Peak throughput: {:.3} Gbps", peak_gbps);
-    println!("Zero-copy operations: {}", zero_copy_ops);
-    println!("Memory pool hits: {}", pool_hits);
-    println!("Frame batches sent: {}", frame_batches);
+    println!("Peak throughput: {peak_gbps:.3} Gbps");
+    println!("Zero-copy operations: {zero_copy_ops}");
+    println!("Memory pool hits: {pool_hits}");
+    println!("Frame batches sent: {frame_batches}");
 
     // Cleanup
     client.shutdown().await;
@@ -200,14 +208,17 @@ async fn handle_connection(conn: std::sync::Arc<Connection>) {
 #[tokio::test]
 async fn test_adaptive_tier_detection() {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore error
     }
 
     println!("\n=== Testing Adaptive Network Tier Detection ===\n");
 
     let config = TransportConfig::default();
-    let transport = StoqTransport::new(config).await.unwrap();
+    let _transport = StoqTransport::new(config).await.unwrap();
 
     // Simulate different network conditions
     let test_throughputs = vec![
@@ -219,7 +230,7 @@ async fn test_adaptive_tier_detection() {
 
     for (bps, tier_name) in test_throughputs {
         let detected_tier = detect_network_tier(bps);
-        println!("{}: Detected as Tier {}", tier_name, detected_tier);
+        println!("{tier_name}: Detected as Tier {detected_tier}");
     }
 }
 
@@ -229,6 +240,6 @@ fn detect_network_tier(bits_per_second: u64) -> u8 {
         bps if bps >= 10_000_000_000 => 3, // 10+ Gbps
         bps if bps >= 1_000_000_000 => 2,  // 1+ Gbps
         bps if bps >= 100_000_000 => 1,    // 100+ Mbps
-        _ => 0, // Below 100 Mbps
+        _ => 0,                            // Below 100 Mbps
     }
 }

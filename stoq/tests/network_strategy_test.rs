@@ -5,43 +5,44 @@
 //! Integration tests for network-aware certificate strategies
 
 use anyhow::Result;
-use stoq::transport::{
-    TransportConfig, StoqTransport, NetworkType,
-    CertificateStrategy, AnonymousCertificateStrategy,
-    AuthenticatedCertificateStrategy, CertificateManager,
-};
 use std::net::Ipv6Addr;
 use std::sync::Arc;
+use stoq::transport::{
+    AnonymousCertificateStrategy, AuthenticatedCertificateStrategy, CertificateManager,
+    CertificateStrategy, NetworkType, StoqTransport, TransportConfig,
+};
 
 #[tokio::test]
 async fn test_anonymous_network_transport() -> Result<()> {
-    let mut config = TransportConfig::default();
-    config.port = 0; // Let OS assign port
-    config.bind_address = Ipv6Addr::LOCALHOST;
+    let config = TransportConfig {
+        port: 0, // Let OS assign port
+        bind_address: Ipv6Addr::LOCALHOST,
+        ..Default::default()
+    };
 
     // Create transport for anonymous network
-    let transport = StoqTransport::new_for_network(
-        config,
-        NetworkType::Anonymous,
-    ).await?;
+    let transport = StoqTransport::new_for_network(config, NetworkType::Anonymous).await?;
 
     // Anonymous network should work without certificates
-    assert!(transport.cert_manager.get_certificate_fingerprint().await.is_ok());
+    assert!(transport
+        .cert_manager
+        .get_certificate_fingerprint()
+        .await
+        .is_ok());
 
     Ok(())
 }
 
 #[tokio::test]
 async fn test_p2p_network_transport() -> Result<()> {
-    let mut config = TransportConfig::default();
-    config.port = 0; // Let OS assign port
-    config.bind_address = Ipv6Addr::LOCALHOST;
+    let config = TransportConfig {
+        port: 0, // Let OS assign port
+        bind_address: Ipv6Addr::LOCALHOST,
+        ..Default::default()
+    };
 
     // Create transport for P2P network
-    let transport = StoqTransport::new_for_network(
-        config,
-        NetworkType::P2P,
-    ).await?;
+    let transport = StoqTransport::new_for_network(config, NetworkType::P2P).await?;
 
     // P2P network should have self-signed certificate
     let fingerprint = transport.cert_manager.get_certificate_fingerprint().await?;
@@ -53,9 +54,11 @@ async fn test_p2p_network_transport() -> Result<()> {
 
 #[tokio::test]
 async fn test_federated_network_transport() -> Result<()> {
-    let mut config = TransportConfig::default();
-    config.port = 0; // Let OS assign port
-    config.bind_address = Ipv6Addr::LOCALHOST;
+    let config = TransportConfig {
+        port: 0, // Let OS assign port
+        bind_address: Ipv6Addr::LOCALHOST,
+        ..Default::default()
+    };
 
     // Create transport for federated network
     // Note: This will fail to connect to the gateway but should initialize correctly
@@ -64,7 +67,8 @@ async fn test_federated_network_transport() -> Result<()> {
         NetworkType::Federated {
             gateway_url: "gateway.test.internal:8443".to_string(),
         },
-    ).await;
+    )
+    .await;
 
     // We expect this to succeed in creating the transport
     // even if it can't connect to the federation gateway
@@ -81,26 +85,31 @@ async fn test_strategy_selection() -> Result<()> {
 
     // Anonymous creates AnonymousCertificateStrategy
     let anon = NetworkType::Anonymous.create_strategy(
-        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+        node_id.clone(),
+        common_name.clone(),
+        ipv6_addresses.clone(),
     )?;
     assert_eq!(anon.strategy_name(), "Anonymous");
 
     // P2P/Federated/Public all create AuthenticatedCertificateStrategy
     // with different labels
     let private = NetworkType::P2P.create_strategy(
-        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+        node_id.clone(),
+        common_name.clone(),
+        ipv6_addresses.clone(),
     )?;
     assert_eq!(private.strategy_name(), "Private");
 
     let federated = NetworkType::Federated {
-        gateway_url: "gateway.test.internal".to_string()
-    }.create_strategy(
-        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
-    )?;
+        gateway_url: "gateway.test.internal".to_string(),
+    }
+    .create_strategy(node_id.clone(), common_name.clone(), ipv6_addresses.clone())?;
     assert_eq!(federated.strategy_name(), "Federated");
 
     let public = NetworkType::Public.create_strategy(
-        node_id.clone(), common_name.clone(), ipv6_addresses.clone(),
+        node_id.clone(),
+        common_name.clone(),
+        ipv6_addresses.clone(),
     )?;
     assert_eq!(public.strategy_name(), "Public");
 
@@ -162,8 +171,10 @@ async fn test_certificate_manager_with_strategy() -> Result<()> {
 
 #[tokio::test]
 async fn test_backward_compatibility() -> Result<()> {
-    let mut config = TransportConfig::default();
-    config.port = 0; // Let OS assign port
+    let config = TransportConfig {
+        port: 0, // Let OS assign port
+        ..Default::default()
+    };
 
     // Old API should still work (defaults to localhost testing)
     let transport = StoqTransport::new(config).await?;

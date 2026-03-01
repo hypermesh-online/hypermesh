@@ -24,27 +24,29 @@
 #![deny(unsafe_code)]
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // Pipeline stages
 pub mod compression;
-pub mod encryption;
-pub mod sharding;
 pub mod distribution;
+pub mod encryption;
 pub mod orchestrator;
+pub mod sharding;
 
 // Re-exports
-pub use compression::{Compressor, CompressionConfig, CompressionAlgorithm, CompressionStats};
-pub use encryption::{
-    Encryptor, EncryptionConfig, EncryptionStats, EncryptedData,
-    KyberKeyPair, KyberEncryptionResult, AesKey,
-};
-pub use sharding::{Sharder, ShardingConfig, Shard, ShardMetadata, ShardingStats};
+pub use compression::{CompressionAlgorithm, CompressionConfig, CompressionStats, Compressor};
 pub use distribution::{
-    MatrixDistributor, DistributionConfig, DistributedAsset, ShardPlacement,
-    MatrixConstraints, DistributionStats,
+    DistributedAsset, DistributionConfig, DistributionStats, MatrixConstraints, MatrixDistributor,
+    ShardPlacement,
 };
-pub use orchestrator::{AssetPipeline, DecryptionKey, PipelineConfig, PipelineStats, ProcessedAsset};
+pub use encryption::{
+    AesKey, EncryptedData, EncryptionConfig, EncryptionStats, Encryptor, KyberEncryptionResult,
+    KyberKeyPair,
+};
+pub use orchestrator::{
+    AssetPipeline, DecryptionKey, PipelineConfig, PipelineStats, ProcessedAsset,
+};
+pub use sharding::{Shard, ShardMetadata, Sharder, ShardingConfig, ShardingStats};
 
 /// Raw asset data to be processed
 #[derive(Clone, Debug)]

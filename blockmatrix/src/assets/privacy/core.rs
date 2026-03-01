@@ -6,16 +6,15 @@
 //!
 //! Base privacy settings and fundamental types.
 
-use std::time::Duration;
-use serde::{Deserialize, Serialize};
 use crate::assets::core::PrivacyMode;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use super::PrivacyAllocationType;
 
 // Import from retention module (these were stub definitions here)
 use super::retention::{
-    AutoDeletionSettings as RetentionAutoDelete,
-    ArchivePreferences as RetentionArchive,
+    ArchivePreferences as RetentionArchive, AutoDeletionSettings as RetentionAutoDelete,
 };
 
 /// Complete user privacy configuration
@@ -23,28 +22,28 @@ use super::retention::{
 pub struct UserPrivacyConfig {
     /// User identifier
     pub user_id: String,
-    
+
     /// Configuration version
     pub config_version: String,
-    
+
     /// Main privacy settings
     pub privacy_settings: PrivacySettings,
-    
+
     /// Resource-specific privacy settings
     pub resource_settings: ResourcePrivacySettings,
-    
+
     /// Privacy constraints and limits
     pub constraints: PrivacyConstraints,
-    
+
     /// Validation rules
     pub validation_rules: PrivacyValidationRules,
-    
+
     /// Configuration templates
     pub templates: Vec<PrivacyTemplate>,
-    
+
     /// Quick settings presets
     pub presets: Vec<PrivacyPreset>,
-    
+
     /// Advanced configuration options
     pub advanced_options: AdvancedPrivacyOptions,
 }
@@ -54,19 +53,19 @@ pub struct UserPrivacyConfig {
 pub struct PrivacySettings {
     /// Default privacy level
     pub default_privacy_level: PrivacyMode,
-    
+
     /// Default allocation type
     pub default_allocation_type: PrivacyAllocationType,
-    
+
     /// Privacy preference (user's desired privacy/functionality balance)
     pub privacy_preference: PrivacyPreference,
-    
+
     /// Data minimization settings
     pub data_minimization: DataMinimizationSettings,
-    
+
     /// Consent management
     pub consent_management: ConsentManagementSettings,
-    
+
     /// Privacy dashboard preferences
     pub dashboard_preferences: DashboardPreferences,
 }
@@ -89,13 +88,13 @@ pub enum PrivacyPreference {
 pub struct DataMinimizationSettings {
     /// Enable automatic data minimization
     pub enabled: bool,
-    
+
     /// Data retention preferences
     pub retention_preferences: RetentionPreferences,
-    
+
     /// Data sharing minimization
     pub sharing_minimization: SharingMinimizationSettings,
-    
+
     /// Anonymization preferences
     pub anonymization_preferences: AnonymizationPreferences,
 }

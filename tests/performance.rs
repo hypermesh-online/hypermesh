@@ -47,19 +47,15 @@ pub async fn benchmark_stoq_throughput() -> HashMap<String, f64> {
 
     for (size_name, size) in packet_sizes {
         let throughput = test_stoq_packet_throughput(size).await;
-        metrics.insert(format!("stoq_throughput_{}_mbps", size_name), throughput);
+        metrics.insert(format!("stoq_throughput_{size_name}_mbps"), throughput);
     }
 
     // Test adaptive tier detection
-    let tiers = vec![
-        ("100mbps", 100.0),
-        ("1gbps", 1000.0),
-        ("2.5gbps", 2500.0),
-    ];
+    let tiers = vec![("100mbps", 100.0), ("1gbps", 1000.0), ("2.5gbps", 2500.0)];
 
     for (tier_name, expected_speed) in tiers {
         let detected = test_stoq_tier_detection(expected_speed).await;
-        metrics.insert(format!("stoq_tier_{}_detected", tier_name), detected);
+        metrics.insert(format!("stoq_tier_{tier_name}_detected"), detected);
     }
 
     // Test zero-copy optimization
@@ -81,7 +77,7 @@ pub async fn benchmark_trustchain_operations() -> HashMap<String, f64> {
     ];
 
     for (op, latency) in cert_ops {
-        metrics.insert(format!("trustchain_{}_ms", op), latency);
+        metrics.insert(format!("trustchain_{op}_ms"), latency);
     }
 
     // DNS operations
@@ -92,7 +88,7 @@ pub async fn benchmark_trustchain_operations() -> HashMap<String, f64> {
     ];
 
     for (op, latency) in dns_ops {
-        metrics.insert(format!("dns_{}_ms", op), latency);
+        metrics.insert(format!("dns_{op}_ms"), latency);
     }
 
     metrics
@@ -111,7 +107,7 @@ pub async fn benchmark_asset_operations() -> HashMap<String, f64> {
     ];
 
     for (op, latency) in asset_ops {
-        metrics.insert(format!("asset_{}_ms", op), latency);
+        metrics.insert(format!("asset_{op}_ms"), latency);
     }
 
     // Test different asset types
@@ -123,7 +119,7 @@ pub async fn benchmark_asset_operations() -> HashMap<String, f64> {
     ];
 
     for (asset_type, throughput) in asset_types {
-        metrics.insert(format!("{}_asset_ops_per_sec", asset_type), throughput);
+        metrics.insert(format!("{asset_type}_asset_ops_per_sec"), throughput);
     }
 
     metrics
@@ -142,7 +138,7 @@ pub async fn benchmark_consensus_latency() -> HashMap<String, f64> {
     ];
 
     for (proof_type, latency) in proofs {
-        metrics.insert(format!("consensus_{}_ms", proof_type), latency);
+        metrics.insert(format!("consensus_{proof_type}_ms"), latency);
     }
 
     // Combined consensus
@@ -170,7 +166,7 @@ pub async fn benchmark_memory_usage() -> HashMap<String, f64> {
     ];
 
     for (component, memory_mb) in components {
-        metrics.insert(format!("{}_memory_mb", component), memory_mb);
+        metrics.insert(format!("{component}_memory_mb"), memory_mb);
     }
 
     // Test memory under load
@@ -189,10 +185,12 @@ pub fn validate_metrics(metrics: &HashMap<String, f64>) -> bool {
     if let Some(throughput) = metrics.get("stoq_throughput_large_mbps") {
         let required = targets.stoq_throughput_gbps * 1000.0;
         if *throughput < required {
-            eprintln!("FAILED: STOQ throughput {:.2} Mbps < {:.2} Mbps (required)", throughput, required);
+            eprintln!(
+                "FAILED: STOQ throughput {throughput:.2} Mbps < {required:.2} Mbps (required)"
+            );
             passed = false;
         } else {
-            eprintln!("PASSED: STOQ throughput {:.2} Mbps >= {:.2} Mbps", throughput, required);
+            eprintln!("PASSED: STOQ throughput {throughput:.2} Mbps >= {required:.2} Mbps");
         }
     } else {
         eprintln!("FAILED: Missing stoq_throughput_large_mbps metric");
@@ -202,20 +200,32 @@ pub fn validate_metrics(metrics: &HashMap<String, f64>) -> bool {
     // Check TrustChain operations
     if let Some(ops_ms) = metrics.get("trustchain_validate_ms") {
         if *ops_ms > targets.trustchain_ops_ms {
-            eprintln!("FAILED: TrustChain validation {:.2} ms > {:.2} ms (target)", ops_ms, targets.trustchain_ops_ms);
+            eprintln!(
+                "FAILED: TrustChain validation {:.2} ms > {:.2} ms (target)",
+                ops_ms, targets.trustchain_ops_ms
+            );
             passed = false;
         } else {
-            eprintln!("PASSED: TrustChain validation {:.2} ms <= {:.2} ms", ops_ms, targets.trustchain_ops_ms);
+            eprintln!(
+                "PASSED: TrustChain validation {:.2} ms <= {:.2} ms",
+                ops_ms, targets.trustchain_ops_ms
+            );
         }
     }
 
     // Check consensus latency
     if let Some(latency) = metrics.get("consensus_combined_ms") {
         if *latency > targets.consensus_latency_ms {
-            eprintln!("FAILED: Consensus latency {:.2} ms > {:.2} ms (target)", latency, targets.consensus_latency_ms);
+            eprintln!(
+                "FAILED: Consensus latency {:.2} ms > {:.2} ms (target)",
+                latency, targets.consensus_latency_ms
+            );
             passed = false;
         } else {
-            eprintln!("PASSED: Consensus latency {:.2} ms <= {:.2} ms", latency, targets.consensus_latency_ms);
+            eprintln!(
+                "PASSED: Consensus latency {:.2} ms <= {:.2} ms",
+                latency, targets.consensus_latency_ms
+            );
         }
     }
 
@@ -223,16 +233,16 @@ pub fn validate_metrics(metrics: &HashMap<String, f64>) -> bool {
     if let Some(memory) = metrics.get("peak_memory_mb") {
         let max_allowed = targets.memory_usage_mb * 5.0;
         if *memory > max_allowed {
-            eprintln!("FAILED: Peak memory {:.2} MB > {:.2} MB (target)", memory, max_allowed);
+            eprintln!("FAILED: Peak memory {memory:.2} MB > {max_allowed:.2} MB (target)");
             passed = false;
         } else {
-            eprintln!("PASSED: Peak memory {:.2} MB <= {:.2} MB", memory, max_allowed);
+            eprintln!("PASSED: Peak memory {memory:.2} MB <= {max_allowed:.2} MB");
         }
     }
 
     eprintln!("\nAll metrics collected:");
     for (key, value) in metrics.iter() {
-        eprintln!("  {}: {:.2}", key, value);
+        eprintln!("  {key}: {value:.2}");
     }
 
     passed
@@ -250,8 +260,7 @@ pub fn check_regression(metrics: &HashMap<String, f64>) -> Vec<String> {
             let regression = (value - baseline_value) / baseline_value * 100.0;
             if regression > 10.0 {
                 warnings.push(format!(
-                    "{} regressed by {:.1}% (baseline: {:.2}, current: {:.2})",
-                    key, regression, baseline_value, value
+                    "{key} regressed by {regression:.1}% (baseline: {baseline_value:.2}, current: {value:.2})"
                 ));
             }
         }
@@ -268,11 +277,11 @@ async fn test_stoq_packet_throughput(packet_size: usize) -> f64 {
     // See stoq/tests/performance_real.rs for actual benchmarks
 
     match packet_size {
-        64 => 800.0,        // Small packets: ~800 Mbps (overhead dominates)
-        1024 => 2500.0,     // Medium packets: ~2.5 Gbps
-        8192 => 8000.0,     // Large packets: ~8 Gbps (optimal)
-        65536 => 12000.0,   // Jumbo packets: ~12 Gbps (zero-copy optimized)
-        _ => 3000.0,        // Default: 3 Gbps baseline
+        64 => 800.0,      // Small packets: ~800 Mbps (overhead dominates)
+        1024 => 2500.0,   // Medium packets: ~2.5 Gbps
+        8192 => 8000.0,   // Large packets: ~8 Gbps (optimal)
+        65536 => 12000.0, // Jumbo packets: ~12 Gbps (zero-copy optimized)
+        _ => 3000.0,      // Default: 3 Gbps baseline
     }
 }
 

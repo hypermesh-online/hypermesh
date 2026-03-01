@@ -8,7 +8,7 @@
 //! All new implementations should use dns_over_stoq.rs instead.
 
 use std::net::SocketAddrV6;
-use tracing::{warn, error};
+use tracing::{error, warn};
 
 use crate::errors::{DnsError, Result as TrustChainResult};
 
@@ -25,7 +25,9 @@ impl DnsOverQuicClient {
     #[deprecated(note = "Use dns_over_stoq.rs for new implementations")]
     pub fn new(server_id: String) -> Self {
         warn!("DNS-over-QUIC is deprecated, use STOQ transport instead");
-        Self { _server_id: server_id }
+        Self {
+            _server_id: server_id,
+        }
     }
 
     /// Send DNS query over QUIC
@@ -33,8 +35,9 @@ impl DnsOverQuicClient {
     pub async fn query(&self, _domain: &str) -> TrustChainResult<String> {
         error!("DNS-over-QUIC is deprecated and not implemented");
         Err(DnsError::QuicConnectionFailed {
-            reason: "DNS-over-QUIC is deprecated, use STOQ transport".to_string()
-        }.into())
+            reason: "DNS-over-QUIC is deprecated, use STOQ transport".to_string(),
+        }
+        .into())
     }
 }
 
@@ -60,6 +63,7 @@ impl DnsOverQuicServer {
         Err(DnsError::ServerBindFailed {
             address: self.bind_addr.ip().to_string(),
             port: self.bind_addr.port(),
-        }.into())
+        }
+        .into())
     }
 }

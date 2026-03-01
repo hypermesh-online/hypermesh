@@ -7,12 +7,12 @@
 //! **STOQ Protocol Only** - HTTP version REMOVED
 //! All TrustChain services now communicate via STOQ (QUIC transport).
 
-use std::time::SystemTime;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
-use serde::{Serialize, Deserialize};
+use std::time::SystemTime;
 
-use crate::consensus::ConsensusProof;
 use crate::ca::IssuedCertificate;
+use crate::consensus::ConsensusProof;
 use crate::ct::SignedCertificateTimestamp;
 use crate::dns::DnsResponse;
 
@@ -190,7 +190,7 @@ mod tests {
             },
         };
 
-        let json = serde_json::to_string(&response).unwrap();
+        let json = serde_json::to_string(&response).expect("test: serialization");
         assert!(json.contains("healthy"));
         assert!(json.contains("services"));
     }
@@ -202,15 +202,18 @@ mod tests {
         // Test deserialization with simplified approach
         let request = CertificateIssueRequest {
             common_name: "test.example.com".to_string(),
-            san_entries: vec!["test.example.com".to_string(), "alt.example.com".to_string()],
+            san_entries: vec![
+                "test.example.com".to_string(),
+                "alt.example.com".to_string(),
+            ],
             node_id: "node123".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::default_for_testing(),
         };
 
         // Test serialization/deserialization roundtrip
-        let json = serde_json::to_string(&request).unwrap();
-        let deserialized: CertificateIssueRequest = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&request).expect("test: serialization");
+        let deserialized: CertificateIssueRequest = serde_json::from_str(&json).expect("test: deserialization");
 
         assert_eq!(request.common_name, deserialized.common_name);
         assert_eq!(request.san_entries.len(), deserialized.san_entries.len());

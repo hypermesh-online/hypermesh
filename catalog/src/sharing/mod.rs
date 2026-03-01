@@ -8,25 +8,25 @@
 //! across the HyperMesh network for fully decentralized asset distribution.
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 
-pub mod synchronization;
-pub mod mirroring;
 pub mod discovery;
+pub mod mirroring;
 pub mod protocols;
+pub mod synchronization;
 pub mod topology;
 
-pub use synchronization::{SyncManager, SyncStrategy, SyncState};
+pub use discovery::{AssetIndex, DiscoveryService, SearchCapabilities};
 pub use mirroring::{MirrorManager, MirrorStrategy, ReplicationConfig};
-pub use discovery::{DiscoveryService, AssetIndex, SearchCapabilities};
-pub use protocols::{SharingProtocol, SharePermission, BandwidthAllocation};
+pub use protocols::{BandwidthAllocation, SharePermission, SharingProtocol};
+pub use synchronization::{SyncManager, SyncState, SyncStrategy};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
-use crate::{AssetRegistration, AssetPackage, AssetMetadata};
+use crate::{AssetMetadata, AssetPackage, AssetRegistration};
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +62,7 @@ impl Default for SharingConfig {
         Self {
             node_id: uuid::Uuid::new_v4().to_string(),
             max_mirror_storage: 10 * 1024 * 1024 * 1024, // 10GB
-            max_bandwidth: 10 * 1024 * 1024, // 10MB/s
+            max_bandwidth: 10 * 1024 * 1024,             // 10MB/s
             replication_factor: 3,
             sync_interval: Duration::from_secs(300), // 5 minutes
             discovery_cache_ttl: Duration::from_secs(3600), // 1 hour
@@ -166,9 +166,15 @@ pub enum SharingEvent {
     /// Peer left network
     PeerLeft { node_id: String },
     /// Package shared
-    PackageShared { asset_id: AssetRegistration, recipient: String },
+    PackageShared {
+        asset_id: AssetRegistration,
+        recipient: String,
+    },
     /// Package mirrored
-    PackageMirrored { asset_id: AssetRegistration, mirror_node: String },
+    PackageMirrored {
+        asset_id: AssetRegistration,
+        mirror_node: String,
+    },
     /// Synchronization completed
     SyncCompleted { peer: String, packages_synced: u32 },
     /// Synchronization failed
@@ -176,7 +182,10 @@ pub enum SharingEvent {
     /// Discovery cache updated
     DiscoveryUpdated { packages_indexed: u32 },
     /// Network topology changed
-    TopologyChanged { nodes_added: u32, nodes_removed: u32 },
+    TopologyChanged {
+        nodes_added: u32,
+        nodes_removed: u32,
+    },
 }
 
 /// Main decentralized sharing manager
@@ -190,6 +199,7 @@ pub struct SharingManager {
     peers: Arc<RwLock<HashMap<String, PeerInfo>>>,
     package_availability: Arc<RwLock<HashMap<String, PackageAvailability>>>,
     stats: Arc<RwLock<SharingStats>>,
+    #[allow(clippy::type_complexity)]
     event_listeners: Arc<RwLock<Vec<Box<dyn Fn(SharingEvent) + Send + Sync>>>>,
 }
 
@@ -202,30 +212,30 @@ impl SharingManager {
         let config = Arc::new(config.clone());
 
         // Initialize components
-        let sync_manager = Arc::new(SyncManager::new(
-            config.node_id.clone(),
-            config.sync_interval,
-            registry.clone(),
-        ).await?);
+        let sync_manager = Arc::new(
+            SyncManager::new(
+                config.node_id.clone(),
+                config.sync_interval,
+                registry.clone(),
+            )
+            .await?,
+        );
 
-        let mirror_manager = Arc::new(MirrorManager::new(
-            config.max_mirror_storage,
-            config.replication_factor,
-            registry.clone(),
-        ).await?);
+        let mirror_manager = Arc::new(
+            MirrorManager::new(
+                config.max_mirror_storage,
+                config.replication_factor,
+                registry.clone(),
+            )
+            .await?,
+        );
 
-        let discovery_service = Arc::new(DiscoveryService::new(
-            config.discovery_cache_ttl,
-        ).await?);
+        let discovery_service = Arc::new(DiscoveryService::new(config.discovery_cache_ttl).await?);
 
-        let sharing_protocol = Arc::new(SharingProtocol::new(
-            config.max_bandwidth,
-            config.fair_use_limit,
-        ).await?);
+        let sharing_protocol =
+            Arc::new(SharingProtocol::new(config.max_bandwidth, config.fair_use_limit).await?);
 
-        let network_topology = Arc::new(RwLock::new(
-            NetworkTopology::new(config.node_id.clone())
-        ));
+        let network_topology = Arc::new(RwLock::new(NetworkTopology::new(config.node_id.clone())));
 
         Ok(Self {
             config,
@@ -259,7 +269,8 @@ impl SharingManager {
         self.emit_event(SharingEvent::PeerJoined {
             node_id: node_id.clone(),
             address: address.to_string(),
-        }).await;
+        })
+        .await;
 
         // Initiate sync with new peer
         self.sync_with_peer(&node_id).await?;
@@ -283,7 +294,8 @@ impl SharingManager {
         // Notify listeners
         self.emit_event(SharingEvent::PeerLeft {
             node_id: node_id.to_string(),
-        }).await;
+        })
+        .await;
 
         Ok(())
     }
@@ -307,21 +319,20 @@ impl SharingManager {
                 blockmatrix::assets::core::ApplicationDomain {
                     domain_name: "catalog".to_string(),
                     domain_hash: [0u8; 32],
-                }
+                },
             ),
         );
 
         // Register with discovery service
-        self.discovery_service.register_package(
-            &asset_id,
-            &package.spec.metadata,
-            permission.clone(),
-        ).await?;
+        self.discovery_service
+            .register_package(&asset_id, &package.spec.metadata, permission.clone())
+            .await?;
 
         // Update availability (use package_hash as string key)
         let mut availability = self.package_availability.write().await;
-        availability.entry(package.package_hash.clone()).or_insert_with(|| {
-            PackageAvailability {
+        availability
+            .entry(package.package_hash.clone())
+            .or_insert_with(|| PackageAvailability {
                 asset_id: package.package_hash.clone(),
                 available_nodes: vec![self.config.node_id.clone()],
                 replication_count: 1,
@@ -329,11 +340,11 @@ impl SharingManager {
                 last_updated: SystemTime::now(),
                 popularity: 0.0,
                 avg_download_speed: 0,
-            }
-        });
+            });
 
         // Notify peers about new package
-        self.broadcast_package_availability(&package.package_hash).await?;
+        self.broadcast_package_availability(&package.package_hash)
+            .await?;
 
         // Update stats
         let mut stats = self.stats.write().await;
@@ -345,14 +356,15 @@ impl SharingManager {
     /// Synchronize with specific peer
     pub async fn sync_with_peer(&self, node_id: &str) -> Result<()> {
         let peers = self.peers.read().await;
-        let peer = peers.get(node_id)
+        let peer = peers
+            .get(node_id)
             .ok_or_else(|| anyhow::anyhow!("Peer not found"))?;
 
         // Perform synchronization
-        let sync_result = self.sync_manager.sync_with_peer(
-            peer,
-            ConflictResolution::ConsensusWins,
-        ).await;
+        let sync_result = self
+            .sync_manager
+            .sync_with_peer(peer, ConflictResolution::ConsensusWins)
+            .await;
 
         match sync_result {
             Ok(packages_synced) => {
@@ -364,7 +376,8 @@ impl SharingManager {
                 self.emit_event(SharingEvent::SyncCompleted {
                     peer: node_id.to_string(),
                     packages_synced,
-                }).await;
+                })
+                .await;
             }
             Err(e) => {
                 // Update stats
@@ -375,7 +388,8 @@ impl SharingManager {
                 self.emit_event(SharingEvent::SyncFailed {
                     peer: node_id.to_string(),
                     error: e.to_string(),
-                }).await;
+                })
+                .await;
 
                 return Err(e);
             }
@@ -391,7 +405,8 @@ impl SharingManager {
         }
 
         // Get popular packages from discovery
-        let popular_packages = self.discovery_service
+        let popular_packages = self
+            .discovery_service
             .get_popular_packages(self.config.auto_mirror_threshold)
             .await?;
 
@@ -401,17 +416,20 @@ impl SharingManager {
             // Check if we should mirror this package
             if self.should_mirror_package(&asset_id, &metadata).await? {
                 // Mirror the package
-                if let Ok(_) = self.mirror_manager.mirror_package(
-                    &asset_id,
-                    &metadata,
-                ).await {
+                if self
+                    .mirror_manager
+                    .mirror_package(&asset_id, &metadata)
+                    .await
+                    .is_ok()
+                {
                     mirrored_count += 1;
 
                     // Notify listeners
                     self.emit_event(SharingEvent::PackageMirrored {
                         asset_id,
                         mirror_node: self.config.node_id.clone(),
-                    }).await;
+                    })
+                    .await;
                 }
             }
         }
@@ -424,16 +442,19 @@ impl SharingManager {
     }
 
     /// Search for packages across the network
-    pub async fn search_packages(&self, query: &str) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    pub async fn search_packages(
+        &self,
+        query: &str,
+    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         // Search local and cached packages first
         let local_results = self.discovery_service.search_local(query).await?;
 
         // If not enough results, search network
         if local_results.len() < 10 {
-            let network_results = self.discovery_service.search_network(
-                query,
-                &*self.peers.read().await,
-            ).await?;
+            let network_results = self
+                .discovery_service
+                .search_network(query, &*self.peers.read().await)
+                .await?;
 
             // Merge and deduplicate results
             let mut all_results = local_results;
@@ -464,10 +485,10 @@ impl SharingManager {
             let best_node = self.select_best_node(&info.available_nodes).await?;
 
             // Download from selected node
-            let package = self.sharing_protocol.download_package(
-                &asset_id_str,
-                &best_node,
-            ).await?;
+            let package = self
+                .sharing_protocol
+                .download_package(&asset_id_str, &best_node)
+                .await?;
 
             // Update stats
             let mut stats = self.stats.write().await;
@@ -558,7 +579,8 @@ impl SharingManager {
                 score += peer.trust_weight * 0.3;
 
                 // Factor 2: Bandwidth capacity
-                let bandwidth_score = (peer.bandwidth_capacity as f64 / (10 * 1024 * 1024) as f64).min(1.0);
+                let bandwidth_score =
+                    (peer.bandwidth_capacity as f64 / (10 * 1024 * 1024) as f64).min(1.0);
                 score += bandwidth_score * 0.3;
 
                 // Factor 3: Network distance
@@ -567,7 +589,8 @@ impl SharingManager {
 
                 // Factor 4: Geographic proximity
                 if let (Some(our_loc), Some(peer_loc)) =
-                    (&self.config.geographic_location, &peer.location) {
+                    (&self.config.geographic_location, &peer.location)
+                {
                     let geo_score = 1.0 / (1.0 + our_loc.distance_to(peer_loc));
                     score += geo_score * 0.2;
                 }
@@ -587,10 +610,9 @@ impl SharingManager {
 
         for (node_id, _) in peers.iter() {
             // Notify each peer about the new package
-            self.sharing_protocol.notify_availability(
-                node_id,
-                asset_id,
-            ).await?;
+            self.sharing_protocol
+                .notify_availability(node_id, asset_id)
+                .await?;
         }
 
         Ok(())
@@ -636,7 +658,7 @@ mod tests {
         ));
 
         let config = SharingConfig::default();
-        let manager = SharingManager::new(config, registry).await.unwrap();
+        let _manager = SharingManager::new(config, registry).await.expect("test: async operation");
 
         // Test connecting to a peer (would need mock in real test)
         // let node_id = manager.connect_peer("peer.hypermesh.online").await;

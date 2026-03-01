@@ -79,11 +79,8 @@ impl Cluster {
         let sum_z: i64 = self.members.iter().map(|m| m.z).sum();
         let count = self.members.len() as i64;
 
-        self.centroid = MatrixCoordinate::new(
-            sum_x / count,
-            sum_y / count,
-            sum_z / count,
-        ).unwrap_or_else(|_| MatrixCoordinate::origin());
+        self.centroid = MatrixCoordinate::new(sum_x / count, sum_y / count, sum_z / count)
+            .unwrap_or_else(|_| MatrixCoordinate::origin());
     }
 
     /// Get the size of the cluster
@@ -102,7 +99,9 @@ impl Cluster {
             return 0.0;
         }
 
-        let sum: f64 = self.members.iter()
+        let sum: f64 = self
+            .members
+            .iter()
             .map(|m| self.centroid.euclidean_distance(m))
             .sum();
 
@@ -157,7 +156,7 @@ impl GeographicClustering {
         for _iteration in 0..max_iterations {
             // Create empty clusters
             let mut new_clusters: Vec<Cluster> = (0..k)
-                .map(|i| Cluster::new(format!("kmeans_{}", i)))
+                .map(|i| Cluster::new(format!("kmeans_{i}")))
                 .collect();
 
             // Assign nodes to nearest centroid
@@ -196,7 +195,11 @@ impl GeographicClustering {
     }
 
     /// Initialize K-means centroids using K-means++ algorithm
-    fn initialize_kmeans_centroids(&self, nodes: &[MatrixCoordinate], k: usize) -> Vec<MatrixCoordinate> {
+    fn initialize_kmeans_centroids(
+        &self,
+        nodes: &[MatrixCoordinate],
+        k: usize,
+    ) -> Vec<MatrixCoordinate> {
         let mut centroids = Vec::with_capacity(k);
 
         // First centroid: random node
@@ -208,7 +211,8 @@ impl GeographicClustering {
             let mut best_node = nodes[0];
 
             for node in nodes {
-                let min_dist = centroids.iter()
+                let min_dist = centroids
+                    .iter()
                     .map(|c| c.euclidean_distance(node))
                     .fold(f64::MAX, f64::min);
 
@@ -225,7 +229,11 @@ impl GeographicClustering {
     }
 
     /// Find the nearest centroid to a node
-    fn find_nearest_centroid(&self, node: &MatrixCoordinate, centroids: &[MatrixCoordinate]) -> usize {
+    fn find_nearest_centroid(
+        &self,
+        node: &MatrixCoordinate,
+        centroids: &[MatrixCoordinate],
+    ) -> usize {
         let mut min_dist = f64::MAX;
         let mut nearest_idx = 0;
 
@@ -265,7 +273,7 @@ impl GeographicClustering {
 
             if neighbors.len() >= min_points {
                 // Start a new cluster
-                let mut cluster = Cluster::new(format!("dbscan_{}", cluster_id));
+                let mut cluster = Cluster::new(format!("dbscan_{cluster_id}"));
                 cluster_id += 1;
 
                 // Expand cluster
@@ -288,12 +296,18 @@ impl GeographicClustering {
         }
     }
 
-    /// Find neighbors within epsilon distance
-    fn find_neighbors(&self, node: &MatrixCoordinate, nodes: &[MatrixCoordinate], eps: f64) -> Vec<MatrixCoordinate> {
-        nodes.iter()
+    /// Find neighbors within epsilon distance (includes the point itself per standard DBSCAN)
+    fn find_neighbors(
+        &self,
+        node: &MatrixCoordinate,
+        nodes: &[MatrixCoordinate],
+        eps: f64,
+    ) -> Vec<MatrixCoordinate> {
+        nodes
+            .iter()
             .filter(|n| {
                 let dist = node.euclidean_distance(n);
-                dist <= eps && **n != *node
+                dist <= eps
             })
             .cloned()
             .collect()
@@ -352,8 +366,12 @@ impl GeographicClustering {
             cluster.zone_id = Some(zone.id.clone());
 
             // Add metadata
-            cluster.metadata.insert("zone_name".to_string(), zone.name.clone());
-            cluster.metadata.insert("zone_level".to_string(), format!("{:?}", zone.level));
+            cluster
+                .metadata
+                .insert("zone_name".to_string(), zone.name.clone());
+            cluster
+                .metadata
+                .insert("zone_level".to_string(), format!("{:?}", zone.level));
 
             self.clusters.insert(cluster.id.clone(), cluster);
         }
@@ -422,7 +440,9 @@ impl GeographicClustering {
 
         for i in 0..clusters.len() {
             for j in (i + 1)..clusters.len() {
-                let dist = clusters[i].centroid.euclidean_distance(&clusters[j].centroid);
+                let dist = clusters[i]
+                    .centroid
+                    .euclidean_distance(&clusters[j].centroid);
                 total_separation += dist;
                 count += 1;
             }
@@ -450,7 +470,9 @@ impl GeographicClustering {
                 if i != j {
                     let cohesion_i = clusters[i].cohesion();
                     let cohesion_j = clusters[j].cohesion();
-                    let separation = clusters[i].centroid.euclidean_distance(&clusters[j].centroid);
+                    let separation = clusters[i]
+                        .centroid
+                        .euclidean_distance(&clusters[j].centroid);
 
                     if separation > 0.0 {
                         let ratio = (cohesion_i + cohesion_j) / separation;
@@ -496,7 +518,9 @@ impl GeographicClustering {
                 return 0.0;
             }
 
-            let sum: f64 = cluster.members.iter()
+            let sum: f64 = cluster
+                .members
+                .iter()
                 .filter(|m| *m != node)
                 .map(|m| node.euclidean_distance(m))
                 .sum();
@@ -513,7 +537,9 @@ impl GeographicClustering {
 
         for (other_id, other_cluster) in &self.clusters {
             if other_id != cluster_id && !other_cluster.is_empty() {
-                let sum: f64 = other_cluster.members.iter()
+                let sum: f64 = other_cluster
+                    .members
+                    .iter()
                     .map(|m| node.euclidean_distance(m))
                     .sum();
                 let avg = sum / other_cluster.members.len() as f64;
@@ -535,7 +561,8 @@ impl GeographicClustering {
 
     /// Get cluster for a specific node
     pub fn get_node_cluster(&self, node: &MatrixCoordinate) -> Option<&Cluster> {
-        self.node_clusters.get(node)
+        self.node_clusters
+            .get(node)
             .and_then(|id| self.clusters.get(id))
     }
 
@@ -548,7 +575,9 @@ impl GeographicClustering {
         });
 
         // Add to cluster or create new one
-        let cluster = self.clusters.entry(cluster_id.clone())
+        let cluster = self
+            .clusters
+            .entry(cluster_id.clone())
             .or_insert_with(|| Cluster::new(cluster_id.clone()));
         cluster.add_member(node);
         self.node_clusters.insert(node, cluster_id);
@@ -599,25 +628,25 @@ impl Default for GeographicClustering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::matrix::geospatial::hierarchy::{GeographicLevel, GeographicBounds};
+    use crate::matrix::geospatial::hierarchy::{GeographicBounds, GeographicLevel};
 
     fn create_test_nodes() -> Vec<MatrixCoordinate> {
         vec![
             // Cluster 1 (around origin)
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(1, 1, 0).unwrap(),
-            MatrixCoordinate::new(-1, 1, 0).unwrap(),
-            MatrixCoordinate::new(1, -1, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(-1, 1, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(1, -1, 0).expect("test: valid coordinate"),
             // Cluster 2 (around 10,10)
-            MatrixCoordinate::new(10, 10, 0).unwrap(),
-            MatrixCoordinate::new(11, 10, 0).unwrap(),
-            MatrixCoordinate::new(10, 11, 0).unwrap(),
-            MatrixCoordinate::new(9, 10, 0).unwrap(),
+            MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(11, 10, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(10, 11, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(9, 10, 0).expect("test: valid coordinate"),
             // Cluster 3 (around -10,-10)
-            MatrixCoordinate::new(-10, -10, 0).unwrap(),
-            MatrixCoordinate::new(-11, -10, 0).unwrap(),
-            MatrixCoordinate::new(-10, -11, 0).unwrap(),
-            MatrixCoordinate::new(-9, -10, 0).unwrap(),
+            MatrixCoordinate::new(-10, -10, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(-11, -10, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(-10, -11, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(-9, -10, 0).expect("test: valid coordinate"),
         ]
     }
 
@@ -626,9 +655,9 @@ mod tests {
         let mut cluster = Cluster::new("test".to_string());
 
         // Add members
-        cluster.add_member(MatrixCoordinate::new(0, 0, 0).unwrap());
-        cluster.add_member(MatrixCoordinate::new(2, 0, 0).unwrap());
-        cluster.add_member(MatrixCoordinate::new(0, 2, 0).unwrap());
+        cluster.add_member(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        cluster.add_member(MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"));
+        cluster.add_member(MatrixCoordinate::new(0, 2, 0).expect("test: valid coordinate"));
 
         assert_eq!(cluster.size(), 3);
         assert!(!cluster.is_empty());
@@ -642,7 +671,7 @@ mod tests {
         assert!(cohesion > 0.0);
 
         // Remove member
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         assert!(cluster.remove_member(&coord));
         assert_eq!(cluster.size(), 2);
     }
@@ -690,8 +719,8 @@ mod tests {
     fn test_hierarchical_clustering() {
         let mut clustering = GeographicClustering::new();
         let nodes = vec![
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(100, 100, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(100, 100, 0).expect("test: valid coordinate"),
         ];
 
         // Create mock zones
@@ -700,13 +729,13 @@ mod tests {
                 "zone1".to_string(),
                 "Zone 1".to_string(),
                 GeographicLevel::City,
-                GeographicBounds::new(-10.0, 10.0, -10.0, 10.0).unwrap(),
+                GeographicBounds::new(-10.0, 10.0, -10.0, 10.0).expect("test: creation"),
             ),
             GeographicZone::new(
                 "zone2".to_string(),
                 "Zone 2".to_string(),
                 GeographicLevel::City,
-                GeographicBounds::new(90.0, 110.0, 90.0, 110.0).unwrap(),
+                GeographicBounds::new(90.0, 110.0, 90.0, 110.0).expect("test: creation"),
             ),
         ];
 
@@ -728,17 +757,17 @@ mod tests {
         let mut clustering = GeographicClustering::new();
 
         // Add first node (creates new cluster)
-        let node1 = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let node1 = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         clustering.add_node(node1, None);
         assert_eq!(clustering.clusters.len(), 1);
 
         // Add nearby node (joins existing cluster)
-        let node2 = MatrixCoordinate::new(1, 1, 0).unwrap();
+        let node2 = MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate");
         clustering.add_node(node2, None);
         assert_eq!(clustering.clusters.len(), 1);
 
         // Add distant node (might create new cluster or join existing)
-        let node3 = MatrixCoordinate::new(100, 100, 0).unwrap();
+        let node3 = MatrixCoordinate::new(100, 100, 0).expect("test: valid coordinate");
         clustering.add_node(node3, Some("custom_cluster".to_string()));
         assert_eq!(clustering.clusters.len(), 2);
 
@@ -758,13 +787,13 @@ mod tests {
         // Create well-separated clusters
         let nodes = vec![
             // Tight cluster 1
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(1, 0, 0).unwrap(),
-            MatrixCoordinate::new(0, 1, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"),
             // Tight cluster 2 (far away)
-            MatrixCoordinate::new(100, 100, 0).unwrap(),
-            MatrixCoordinate::new(101, 100, 0).unwrap(),
-            MatrixCoordinate::new(100, 101, 0).unwrap(),
+            MatrixCoordinate::new(100, 100, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(101, 100, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(100, 101, 0).expect("test: valid coordinate"),
         ];
 
         clustering.kmeans(&nodes, 2, 100);
@@ -801,7 +830,7 @@ mod tests {
     #[test]
     fn test_single_node_clustering() {
         let mut clustering = GeographicClustering::new();
-        let nodes = vec![MatrixCoordinate::new(5, 5, 5).unwrap()];
+        let nodes = vec![MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate")];
 
         // K-means with single node
         clustering.kmeans(&nodes, 1, 10);

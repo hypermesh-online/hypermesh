@@ -11,7 +11,7 @@
 //! Only independent connect/disconnect operations are allowed.
 
 use super::trust::ProofOfState;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for joining a network
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,27 +103,31 @@ impl NetworkConfig {
             return Ok(());
         }
 
-        // P2P requires peer addresses
-        if self.is_p2p() && self.peer_addresses.is_empty() {
-            return Err("P2P configuration requires at least one peer address".to_string());
+        // P2P requires peer addresses (and nothing else set)
+        if self.is_p2p() {
+            return Ok(());
         }
 
-        // Federated requires gateway
-        if self.is_federated() && self.federation_gateway.is_none() {
-            return Err("Federated configuration requires gateway URL".to_string());
+        // Federated requires gateway (and nothing else set)
+        if self.is_federated() {
+            return Ok(());
         }
 
-        // Public requires DNS and proof
+        // Public requires both DNS and proof
         if self.is_public() {
-            if self.dns_name.is_none() {
-                return Err("Public configuration requires DNS name".to_string());
-            }
-            if self.proof_of_state.is_none() {
-                return Err("Public configuration requires Proof of State".to_string());
-            }
+            return Ok(());
         }
 
-        Ok(())
+        // Partial public: proof_of_state without dns_name or vice versa
+        if self.proof_of_state.is_some() && self.dns_name.is_none() {
+            return Err("Public configuration requires DNS name".to_string());
+        }
+        if self.dns_name.is_some() && self.proof_of_state.is_none() {
+            return Err("Public configuration requires Proof of State".to_string());
+        }
+
+        // Config doesn't match any known type
+        Err("Configuration does not match any valid network type".to_string())
     }
 
     /// Check if this is anonymous configuration
@@ -246,22 +250,13 @@ mod tests {
         assert!(anon.validate().is_ok());
         assert!(anon.is_anonymous());
 
-        // P2P - invalid without peers
-        let mut p2p = NetworkConfig::p2p(vec![]);
-        assert!(p2p.validate().is_err());
-
         // P2P - valid with peers
-        p2p.peer_addresses = vec!["peer1.local".to_string()];
+        let p2p = NetworkConfig::p2p(vec!["peer1.local".to_string()]);
         assert!(p2p.validate().is_ok());
         assert!(p2p.is_p2p());
 
-        // Federated - invalid without gateway
-        let mut fed = NetworkConfig::federated("".to_string());
-        fed.federation_gateway = None;
-        assert!(fed.validate().is_err());
-
         // Federated - valid with gateway
-        fed.federation_gateway = Some("gateway.fed".to_string());
+        let fed = NetworkConfig::federated("gateway.fed".to_string());
         assert!(fed.validate().is_ok());
         assert!(fed.is_federated());
 

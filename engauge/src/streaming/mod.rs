@@ -11,15 +11,18 @@
 //! - [`subscriber`] -- Rolling-window frame reception per source node.
 //! - [`aggregator`] -- Multi-node regional aggregation for routing decisions.
 
-pub mod protocol;
+pub mod aggregator;
 pub mod privacy_filter;
+pub mod protocol;
 pub mod publisher;
 pub mod subscriber;
-pub mod aggregator;
 
 // Re-export primary types at module root.
-pub use protocol::{MetricsFrame, MetricsPayload, CapacitySnapshot, CongestionSnapshot, RoutingSnapshot, EconomicSnapshot, VerificationSnapshot, ProtocolError};
+pub use aggregator::{RegionalAggregate, RegionalAggregator};
 pub use privacy_filter::DifferentialPrivacyFilter;
+pub use protocol::{
+    CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame, MetricsPayload,
+    ProtocolError, RoutingSnapshot, VerificationSnapshot,
+};
 pub use publisher::MetricsPublisher;
 pub use subscriber::MetricsSubscriber;
-pub use aggregator::{RegionalAggregator, RegionalAggregate};

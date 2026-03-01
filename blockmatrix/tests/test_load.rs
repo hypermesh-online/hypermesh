@@ -11,10 +11,13 @@
 #[cfg(test)]
 mod load_tests {
     use blockmatrix::os_integration::{create_os_abstraction, types::*};
-    use std::sync::{Arc, Mutex, atomic::{AtomicU64, AtomicBool, Ordering}};
+    use std::collections::VecDeque;
+    use std::sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Mutex,
+    };
     use std::thread;
     use std::time::{Duration, Instant};
-    use std::collections::VecDeque;
 
     #[test]
     fn test_1000_consecutive_cpu_detections() {
@@ -29,8 +32,16 @@ mod load_tests {
             match os.detect_cpu() {
                 Ok(cpu_info) => {
                     // Verify consistent results
-                    assert!(cpu_info.core_count > 0, "Invalid CPU count at iteration {}", i);
-                    assert!(cpu_info.frequency_mhz > 0, "Invalid frequency at iteration {}", i);
+                    assert!(
+                        cpu_info.core_count > 0,
+                        "Invalid CPU count at iteration {}",
+                        i
+                    );
+                    assert!(
+                        cpu_info.frequency_mhz > 0,
+                        "Invalid frequency at iteration {}",
+                        i
+                    );
                 }
                 Err(e) => {
                     eprintln!("CPU detection failed at iteration {}: {}", i, e);
@@ -70,7 +81,11 @@ mod load_tests {
         };
 
         println!("Performance degradation: {:.2}%", degradation);
-        assert!(degradation < 20.0, "Performance degraded by {:.2}%", degradation);
+        assert!(
+            degradation < 20.0,
+            "Performance degraded by {:.2}%",
+            degradation
+        );
     }
 
     #[test]
@@ -149,7 +164,11 @@ mod load_tests {
 
         assert_eq!(total_ops, 1000, "Should complete all operations");
         assert_eq!(total_errors, 0, "Should have no errors");
-        assert!(ops_per_sec > 100.0, "Throughput too low: {:.2} ops/sec", ops_per_sec);
+        assert!(
+            ops_per_sec > 100.0,
+            "Throughput too low: {:.2} ops/sec",
+            ops_per_sec
+        );
 
         // Verify thread safety (no crashes/panics)
         println!("Thread safety verified - no panics or data races");
@@ -190,10 +209,13 @@ mod load_tests {
                 Ok(handle) => {
                     // Optional attach/detach on some iterations
                     if i % 5 == 0 {
-                        let _ = os.attach_ebpf_monitor(handle, EbpfAttachType::Xdp {
-                            interface: "lo".to_string(),
-                            flags: XdpFlags::SkbMode,
-                        });
+                        let _ = os.attach_ebpf_monitor(
+                            handle,
+                            EbpfAttachType::Xdp {
+                                interface: "lo".to_string(),
+                                flags: XdpFlags::SkbMode,
+                            },
+                        );
                     }
 
                     // Always unload
@@ -265,12 +287,23 @@ mod load_tests {
         println!("  Max sample time: {:?}", max_sample_time);
 
         // Should achieve close to target rate
-        assert!(actual_rate > 80.0, "Sample rate too low: {:.2} Hz", actual_rate);
-        assert!(actual_rate < 120.0, "Sample rate too high: {:.2} Hz", actual_rate);
+        assert!(
+            actual_rate > 80.0,
+            "Sample rate too low: {:.2} Hz",
+            actual_rate
+        );
+        assert!(
+            actual_rate < 120.0,
+            "Sample rate too high: {:.2} Hz",
+            actual_rate
+        );
 
         // Sampling should be consistent
-        assert!(max_sample_time < Duration::from_millis(50),
-            "Sample time too variable: {:?}", max_sample_time);
+        assert!(
+            max_sample_time < Duration::from_millis(50),
+            "Sample time too variable: {:?}",
+            max_sample_time
+        );
     }
 
     #[test]
@@ -305,18 +338,25 @@ mod load_tests {
         let expected_increase = 20 * 50; // 1000 MB
         let actual_increase = memory_samples.last().unwrap() - baseline_used;
 
-        println!("Memory increase: {} MB (expected ~{} MB)", actual_increase, expected_increase);
+        println!(
+            "Memory increase: {} MB (expected ~{} MB)",
+            actual_increase, expected_increase
+        );
 
         // Allow for OS overhead and other processes
         assert!(
             actual_increase >= expected_increase * 80 / 100,
             "Memory tracking not accurate: {} MB vs {} MB expected",
-            actual_increase, expected_increase
+            actual_increase,
+            expected_increase
         );
 
         // Detection should still work under memory pressure
         let final_detection = os.detect_memory();
-        assert!(final_detection.is_ok(), "Memory detection failed under pressure");
+        assert!(
+            final_detection.is_ok(),
+            "Memory detection failed under pressure"
+        );
     }
 
     #[test]
@@ -464,14 +504,16 @@ mod load_tests {
 
             // Every 100 operations, check if performance is degrading
             if i > 0 && i % 100 == 0 {
-                let avg: Duration = timing_window.iter().sum::<Duration>() / timing_window.len() as u32;
+                let avg: Duration =
+                    timing_window.iter().sum::<Duration>() / timing_window.len() as u32;
                 println!("Operations {}-{}: avg {:?}", i - 99, i, avg);
 
                 // Performance shouldn't degrade significantly
                 assert!(
                     avg < Duration::from_millis(100),
                     "Performance degraded at operation {}: {:?}",
-                    i, avg
+                    i,
+                    avg
                 );
             }
         }

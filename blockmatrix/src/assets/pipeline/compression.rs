@@ -7,7 +7,7 @@
 //! Provides configurable Brotli compression with streaming support for large assets.
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 /// Compression algorithm
@@ -44,7 +44,7 @@ impl Default for CompressionConfig {
     fn default() -> Self {
         Self {
             algorithm: CompressionAlgorithm::Brotli,
-            level: 4, // Balance speed/ratio (Brotli range 1-11)
+            level: 4,              // Balance speed/ratio (Brotli range 1-11)
             chunk_size: 64 * 1024, // 64KB chunks
             streaming: true,
             window_size: 22, // Default Brotli window size
@@ -106,6 +106,7 @@ impl Compressor {
     }
 
     /// Create compressor with default configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(CompressionConfig::default())
     }
@@ -135,20 +136,20 @@ impl Compressor {
 
     /// Compress using Brotli with streaming support
     fn compress_brotli(&self, data: &[u8]) -> PipelineResult<Vec<u8>> {
-        use brotli::{BrotliCompress, enc::BrotliEncoderParams};
+        use brotli::{enc::BrotliEncoderParams, BrotliCompress};
 
-        let mut params = BrotliEncoderParams::default();
-        params.quality = self.config.level as i32;
-        params.lgwin = self.config.window_size as i32;
+        let params = BrotliEncoderParams {
+            quality: self.config.level as i32,
+            lgwin: self.config.window_size as i32,
+            ..BrotliEncoderParams::default()
+        };
 
         let mut output = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut output);
 
-        BrotliCompress(
-            &mut std::io::Cursor::new(data),
-            &mut cursor,
-            &params
-        ).map_err(|e| PipelineError::CompressionFailed(format!("Brotli compression failed: {}", e)))?;
+        BrotliCompress(&mut std::io::Cursor::new(data), &mut cursor, &params).map_err(|e| {
+            PipelineError::CompressionFailed(format!("Brotli compression failed: {e}"))
+        })?;
 
         Ok(output)
     }
@@ -160,10 +161,9 @@ impl Compressor {
         let mut output = Vec::new();
         let mut cursor = std::io::Cursor::new(&mut output);
 
-        BrotliDecompress(
-            &mut std::io::Cursor::new(data),
-            &mut cursor
-        ).map_err(|e| PipelineError::CompressionFailed(format!("Brotli decompression failed: {}", e)))?;
+        BrotliDecompress(&mut std::io::Cursor::new(data), &mut cursor).map_err(|e| {
+            PipelineError::CompressionFailed(format!("Brotli decompression failed: {e}"))
+        })?;
 
         Ok(output)
     }
@@ -181,48 +181,62 @@ impl Compressor {
 
         match self.config.algorithm {
             CompressionAlgorithm::Brotli => {
-                use brotli::enc::BrotliEncoderParams;
                 use brotli::enc::writer::CompressorWriter;
+                use brotli::enc::BrotliEncoderParams;
                 use std::io::Write;
 
-                let mut params = BrotliEncoderParams::default();
-                params.quality = self.config.level as i32;
-                params.lgwin = self.config.window_size as i32;
+                let params = BrotliEncoderParams {
+                    quality: self.config.level as i32,
+                    lgwin: self.config.window_size as i32,
+                    ..BrotliEncoderParams::default()
+                };
 
                 // Use a buffer to capture output for size tracking
                 let mut output_buffer = Vec::new();
                 {
-                    let mut encoder = CompressorWriter::with_params(&mut output_buffer, 4096, &params);
+                    let mut encoder =
+                        CompressorWriter::with_params(&mut output_buffer, 4096, &params);
                     let mut buffer = vec![0u8; self.config.chunk_size];
 
                     loop {
-                        let n = reader.read(&mut buffer)
-                            .map_err(|e| PipelineError::CompressionFailed(format!("Stream read failed: {}", e)))?;
-                        if n == 0 { break; }
+                        let n = reader.read(&mut buffer).map_err(|e| {
+                            PipelineError::CompressionFailed(format!("Stream read failed: {e}"))
+                        })?;
+                        if n == 0 {
+                            break;
+                        }
 
                         total_read += n;
-                        encoder.write_all(&buffer[..n])
-                            .map_err(|e| PipelineError::CompressionFailed(format!("Stream write failed: {}", e)))?;
+                        encoder.write_all(&buffer[..n]).map_err(|e| {
+                            PipelineError::CompressionFailed(format!("Stream write failed: {e}"))
+                        })?;
                     }
 
-                    encoder.flush()
-                        .map_err(|e| PipelineError::CompressionFailed(format!("Stream flush failed: {}", e)))?;
+                    encoder.flush().map_err(|e| {
+                        PipelineError::CompressionFailed(format!("Stream flush failed: {e}"))
+                    })?;
                 } // encoder dropped here, finalizing compression
 
                 // Now write the compressed data and track its size
                 total_written = output_buffer.len();
-                writer.write_all(&output_buffer)
-                    .map_err(|e| PipelineError::CompressionFailed(format!("Final write failed: {}", e)))?;
+                writer.write_all(&output_buffer).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Final write failed: {e}"))
+                })?;
             }
             CompressionAlgorithm::None => {
-                total_written = std::io::copy(&mut reader, &mut writer)
-                    .map_err(|e| PipelineError::CompressionFailed(format!("Direct copy failed: {}", e)))? as usize;
+                total_written = std::io::copy(&mut reader, &mut writer).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Direct copy failed: {e}"))
+                })? as usize;
                 total_read = total_written;
             }
         }
 
         let duration_ms = start.elapsed().as_millis() as u64;
-        Ok(CompressionStats::calculate(total_read, total_written, duration_ms))
+        Ok(CompressionStats::calculate(
+            total_read,
+            total_written,
+            duration_ms,
+        ))
     }
 
     /// Get compression configuration
@@ -240,11 +254,11 @@ mod tests {
         let compressor = Compressor::default();
         let data = vec![0u8; 10000]; // Highly compressible data
 
-        let (compressed, stats) = compressor.compress(&data).unwrap();
+        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
         assert!(compressed.len() < data.len());
         assert!(stats.ratio < 1.0);
 
-        let decompressed = compressor.decompress(&compressed).unwrap();
+        let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 
@@ -258,11 +272,11 @@ mod tests {
         let compressor = Compressor::new(config);
         let data = b"Hello, World! ".repeat(1000);
 
-        let (compressed, stats) = compressor.compress(&data).unwrap();
+        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
         assert!(compressed.len() < data.len());
         assert!(stats.ratio < 0.1); // Brotli excels at text compression
 
-        let decompressed = compressor.decompress(&compressed).unwrap();
+        let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 
@@ -275,7 +289,7 @@ mod tests {
         let compressor = Compressor::new(config);
         let data = vec![1, 2, 3, 4, 5];
 
-        let (compressed, stats) = compressor.compress(&data).unwrap();
+        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
         assert_eq!(compressed, data);
         assert_eq!(stats.ratio, 1.0);
     }
@@ -285,7 +299,7 @@ mod tests {
         let compressor = Compressor::default();
         let data = vec![0u8; 100000];
 
-        let (_, stats) = compressor.compress(&data).unwrap();
+        let (_, stats) = compressor.compress(&data).expect("test: compression operation");
         assert_eq!(stats.original_size, 100000);
         assert!(stats.compressed_size < stats.original_size);
         assert!(stats.ratio < 1.0);
@@ -304,14 +318,19 @@ mod tests {
             };
             let compressor = Compressor::new(config);
 
-            let (compressed, stats) = compressor.compress(&data).unwrap();
-            let decompressed = compressor.decompress(&compressed).unwrap();
+            let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
+            let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
             assert_eq!(decompressed, data);
             assert!(stats.ratio < 1.0);
 
             // Higher levels should generally give better compression
             if level > 1 {
-                println!("Level {}: ratio = {:.3}, size = {}", level, stats.ratio, compressed.len());
+                println!(
+                    "Level {}: ratio = {:.3}, size = {}",
+                    level,
+                    stats.ratio,
+                    compressed.len()
+                );
             }
         }
     }
@@ -331,13 +350,15 @@ mod tests {
         let mut reader = std::io::Cursor::new(&data);
         let mut output = Vec::new();
 
-        let stats = compressor.compress_stream(&mut reader, &mut output).unwrap();
+        let stats = compressor
+            .compress_stream(&mut reader, &mut output)
+            .expect("test: expected success");
 
         assert!(output.len() < data.len());
         assert!(stats.ratio < 1.0);
 
         // Verify we can decompress
-        let decompressed = compressor.decompress(&output).unwrap();
+        let decompressed = compressor.decompress(&output).expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 }

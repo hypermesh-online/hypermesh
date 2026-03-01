@@ -91,9 +91,15 @@ impl PolicyManager {
         };
 
         // Initialize policies for each mode
-        manager.tier_policies.insert(PrivacyMode::ANONYMOUS, TierPolicy::anonymous());
-        manager.tier_policies.insert(PrivacyMode::PRIVATE, TierPolicy::private_p2p());
-        manager.tier_policies.insert(PrivacyMode::PUBLIC, TierPolicy::public());
+        manager
+            .tier_policies
+            .insert(PrivacyMode::ANONYMOUS, TierPolicy::anonymous());
+        manager
+            .tier_policies
+            .insert(PrivacyMode::PRIVATE, TierPolicy::private_p2p());
+        manager
+            .tier_policies
+            .insert(PrivacyMode::PUBLIC, TierPolicy::public());
 
         manager
     }
@@ -102,7 +108,9 @@ impl PolicyManager {
     pub fn enforce(&mut self, tier: PrivacyMode, action: PolicyAction) -> PolicyResult {
         self.enforcement_stats.total_checks += 1;
 
-        let policy = self.tier_policies.get(&tier)
+        let policy = self
+            .tier_policies
+            .get(&tier)
             .ok_or_else(|| PolicyViolation {
                 violation_type: ViolationType::InvalidTransition,
                 tier,
@@ -182,7 +190,9 @@ impl TierPolicy {
                 ActionType::Connect,
                 ActionType::Disconnect,
                 ActionType::QueryPublic,
-            ].into_iter().collect(),
+            ]
+            .into_iter()
+            .collect(),
             required_validations: vec![],
             access_rules: AccessRules {
                 allow_identity_query: false,
@@ -208,11 +218,10 @@ impl TierPolicy {
                 ActionType::QueryPublic,
                 ActionType::ShareResource,
                 ActionType::ValidatePeer,
-            ].into_iter().collect(),
-            required_validations: vec![
-                ValidationType::PeerIdentity,
-                ValidationType::PeerTrust,
-            ],
+            ]
+            .into_iter()
+            .collect(),
+            required_validations: vec![ValidationType::PeerIdentity, ValidationType::PeerTrust],
             access_rules: AccessRules {
                 allow_identity_query: true,
                 allow_location_query: false,
@@ -260,7 +269,10 @@ impl TierPolicy {
             return Err(PolicyViolation {
                 violation_type: ViolationType::UnauthorizedAccess,
                 tier: self.tier,
-                message: format!("Action {:?} not allowed in {} mode", action.action_type, self.tier),
+                message: format!(
+                    "Action {:?} not allowed in {} mode",
+                    action.action_type, self.tier
+                ),
                 severity: Severity::High,
             });
         }
@@ -271,7 +283,7 @@ impl TierPolicy {
                 return Err(PolicyViolation {
                     violation_type: ViolationType::ValidationMissing,
                     tier: self.tier,
-                    message: format!("Missing required validation: {:?}", required),
+                    message: format!("Missing required validation: {required:?}"),
                     severity: Severity::Medium,
                 });
             }
@@ -325,7 +337,9 @@ impl TierPolicy {
                 description: "Requires approval from trusted peers".to_string(),
                 timeout_ms: Some(5000),
             });
-        } else if self.tier == PrivacyMode::PUBLIC && action.action_type == ActionType::ValidateBlock {
+        } else if self.tier == PrivacyMode::PUBLIC
+            && action.action_type == ActionType::ValidateBlock
+        {
             conditions.push(PolicyCondition {
                 condition_type: ConditionType::RequireProofOfState,
                 description: "Block validation requires full proof of state".to_string(),
@@ -375,7 +389,9 @@ impl ActionType {
             Self::ValidatePeer,
             Self::ValidateBlock,
             Self::SubmitTransaction,
-        ].into_iter().collect()
+        ]
+        .into_iter()
+        .collect()
     }
 }
 
@@ -425,7 +441,8 @@ impl RateLimits {
         let key = (tier, action.action_type);
         let count = self.action_counts.entry(key).or_insert(0);
 
-        let limit = self.tier_limits
+        let limit = self
+            .tier_limits
             .get(&tier)
             .and_then(|l| l.get_limit(action.action_type))
             .unwrap_or(1000);
@@ -466,7 +483,9 @@ impl RateLimit {
         let mut limits = HashMap::new();
         limits.insert(ActionType::Connect, 1);
         limits.insert(ActionType::QueryPublic, 10);
-        Self { actions_per_minute: limits }
+        Self {
+            actions_per_minute: limits,
+        }
     }
 
     pub fn moderate() -> Self {
@@ -474,7 +493,9 @@ impl RateLimit {
         limits.insert(ActionType::Connect, 10);
         limits.insert(ActionType::QueryPublic, 100);
         limits.insert(ActionType::ShareResource, 50);
-        Self { actions_per_minute: limits }
+        Self {
+            actions_per_minute: limits,
+        }
     }
 
     pub fn permissive() -> Self {
@@ -482,11 +503,15 @@ impl RateLimit {
         limits.insert(ActionType::Connect, 100);
         limits.insert(ActionType::QueryPublic, 1000);
         limits.insert(ActionType::ShareResource, 500);
-        Self { actions_per_minute: limits }
+        Self {
+            actions_per_minute: limits,
+        }
     }
 
     pub fn unlimited() -> Self {
-        Self { actions_per_minute: HashMap::new() }
+        Self {
+            actions_per_minute: HashMap::new(),
+        }
     }
 
     pub fn get_limit(&self, action: ActionType) -> Option<u64> {
@@ -505,8 +530,11 @@ pub struct EnforcementStats {
 
 impl std::fmt::Display for PolicyViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{:?}] {} mode: {} (Severity: {:?})",
-               self.violation_type, self.tier, self.message, self.severity)
+        write!(
+            f,
+            "[{:?}] {} mode: {} (Severity: {:?})",
+            self.violation_type, self.tier, self.message, self.severity
+        )
     }
 }
 
@@ -537,7 +565,9 @@ mod tests {
         assert!(policy.access_rules.allow_identity_query);
         assert!(policy.retention_policy.connection_logs);
         assert_eq!(policy.retention_policy.retention_hours, 8760);
-        assert!(policy.required_validations.contains(&ValidationType::ProofOfStake));
+        assert!(policy
+            .required_validations
+            .contains(&ValidationType::ProofOfStake));
     }
 
     #[test]
@@ -588,7 +618,9 @@ mod tests {
         };
 
         let result = policy.evaluate(action);
-        assert!(matches!(result, Err(ref e) if e.violation_type == ViolationType::ValidationMissing));
+        assert!(
+            matches!(result, Err(ref e) if e.violation_type == ViolationType::ValidationMissing)
+        );
     }
 
     #[test]
@@ -643,7 +675,9 @@ mod tests {
             high_value: false,
         };
 
-        manager.enforce(PrivacyMode::ANONYMOUS, action.clone()).unwrap();
+        manager
+            .enforce(PrivacyMode::ANONYMOUS, action.clone())
+            .expect("test: expected success");
         // Second call should fail due to rate limit, but we need to handle the error
         let _ = manager.enforce(PrivacyMode::ANONYMOUS, action);
 
@@ -667,7 +701,9 @@ mod tests {
         };
 
         let result = policy.evaluate(action);
-        assert!(matches!(result, Err(ref e) if e.violation_type == ViolationType::UnauthorizedAccess));
+        assert!(
+            matches!(result, Err(ref e) if e.violation_type == ViolationType::UnauthorizedAccess)
+        );
     }
 
     #[test]

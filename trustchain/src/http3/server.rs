@@ -13,8 +13,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{error, info};
 
+use super::middleware::{add_cors_headers, RequestLogger};
 use super::router::Router;
-use super::middleware::{RequestLogger, add_cors_headers};
 
 pub struct Http3Server {
     addr: SocketAddr,
@@ -63,10 +63,7 @@ impl Http3Server {
     }
 }
 
-async fn handle_connection(
-    connecting: quinn::Connection,
-    router: Arc<Router>,
-) -> Result<()> {
+async fn handle_connection(connecting: quinn::Connection, router: Arc<Router>) -> Result<()> {
     let connection = connecting;
     let mut h3_conn = h3::server::Connection::new(h3_quinn::Connection::new(connection)).await?;
 
@@ -174,12 +171,15 @@ fn generate_self_signed_cert() -> Result<(Vec<CertificateDer<'static>>, PrivateK
 
     let cert = CertificateDer::from(cert_der);
     let key = PrivateKeyDer::try_from(key_der)
-        .map_err(|e| anyhow::anyhow!("Failed to create private key: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to create private key: {e}"))?;
 
     Ok((vec![cert], key))
 }
 
-fn create_server_config(certs: Vec<CertificateDer<'static>>, key: PrivateKeyDer<'static>) -> Result<quinn::ServerConfig> {
+fn create_server_config(
+    certs: Vec<CertificateDer<'static>>,
+    key: PrivateKeyDer<'static>,
+) -> Result<quinn::ServerConfig> {
     let mut crypto = rustls::ServerConfig::builder()
         .with_no_client_auth()
         .with_single_cert(certs, key)?;
@@ -187,6 +187,6 @@ fn create_server_config(certs: Vec<CertificateDer<'static>>, key: PrivateKeyDer<
     crypto.alpn_protocols = vec![b"h3".to_vec()];
 
     Ok(quinn::ServerConfig::with_crypto(Arc::new(
-        quinn::crypto::rustls::QuicServerConfig::try_from(crypto)?
+        quinn::crypto::rustls::QuicServerConfig::try_from(crypto)?,
     )))
 }

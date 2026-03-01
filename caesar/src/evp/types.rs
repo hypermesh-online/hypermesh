@@ -73,9 +73,9 @@ pub struct TierThresholds {
 impl Default for TierThresholds {
     fn default() -> Self {
         Self {
-            l0_max: dec!(10),      // ~$800 at ~$80/g gold
-            l1_max: dec!(1000),    // ~$80K
-            l2_max: dec!(100000),  // ~$8M
+            l0_max: dec!(10),     // ~$800 at ~$80/g gold
+            l1_max: dec!(1000),   // ~$80K
+            l2_max: dec!(100000), // ~$8M
         }
     }
 }
@@ -143,49 +143,70 @@ mod tests {
     fn classify_l0_at_boundary() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(10));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L0);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L0
+        );
     }
 
     #[test]
     fn classify_l0_below_boundary() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(5));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L0);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L0
+        );
     }
 
     #[test]
     fn classify_l1() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(500));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L1);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L1
+        );
     }
 
     #[test]
     fn classify_l1_at_boundary() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(1000));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L1);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L1
+        );
     }
 
     #[test]
     fn classify_l2() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(50000));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L2);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L2
+        );
     }
 
     #[test]
     fn classify_l3_above_l2_max() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(200000));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L3);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L3
+        );
     }
 
     #[test]
     fn classify_zero_value() {
         let thresholds = TierThresholds::default();
         let value = GoldGrams(dec!(0));
-        assert_eq!(TierClassifier::classify(&value, &thresholds), MarketTier::L0);
+        assert_eq!(
+            TierClassifier::classify(&value, &thresholds),
+            MarketTier::L0
+        );
     }
 
     #[test]

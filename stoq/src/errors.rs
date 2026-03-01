@@ -32,16 +32,10 @@ pub enum StoqError {
 #[derive(Debug)]
 pub enum TransportError {
     /// Connection failed with remote endpoint
-    ConnectionFailed {
-        remote: String,
-        reason: String,
-    },
+    ConnectionFailed { remote: String, reason: String },
 
     /// Connection closed unexpectedly
-    ConnectionClosed {
-        remote: String,
-        reason: String,
-    },
+    ConnectionClosed { remote: String, reason: String },
 
     /// Stream operation failed
     StreamError {
@@ -58,10 +52,7 @@ pub enum TransportError {
     },
 
     /// Configuration error
-    ConfigError {
-        parameter: String,
-        reason: String,
-    },
+    ConfigError { parameter: String, reason: String },
 
     /// I/O error
     Io(io::Error),
@@ -73,14 +64,10 @@ pub enum TransportError {
     },
 
     /// Connection pool exhausted
-    PoolExhausted {
-        max_connections: usize,
-    },
+    PoolExhausted { max_connections: usize },
 
     /// Endpoint not reachable
-    EndpointUnreachable {
-        remote: String,
-    },
+    EndpointUnreachable { remote: String },
 }
 
 /// Protocol layer errors
@@ -106,9 +93,7 @@ pub enum ProtocolError {
     },
 
     /// Service not found
-    ServiceNotFound {
-        service_name: String,
-    },
+    ServiceNotFound { service_name: String },
 
     /// Service discovery failed
     DiscoveryFailed {
@@ -117,10 +102,7 @@ pub enum ProtocolError {
     },
 
     /// Cache error
-    CacheError {
-        operation: String,
-        reason: String,
-    },
+    CacheError { operation: String, reason: String },
 
     /// Frame decoding failed
     FrameDecodeFailed {
@@ -129,21 +111,13 @@ pub enum ProtocolError {
     },
 
     /// Frame encoding failed
-    FrameEncodeFailed {
-        frame_type: String,
-        reason: String,
-    },
+    FrameEncodeFailed { frame_type: String, reason: String },
 
     /// Shard reassembly failed
-    ShardReassemblyFailed {
-        shard_id: u32,
-        reason: String,
-    },
+    ShardReassemblyFailed { shard_id: u32, reason: String },
 
     /// Token replay attack detected
-    TokenReplayDetected {
-        token_hash: [u8; 32],
-    },
+    TokenReplayDetected { token_hash: [u8; 32] },
 }
 
 // Re-export ProofType from canonical shared lib (single source of truth)
@@ -210,11 +184,11 @@ pub enum ApiError {
 impl fmt::Display for StoqError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StoqError::Transport(e) => write!(f, "Transport error: {}", e),
-            StoqError::Protocol(e) => write!(f, "Protocol error: {}", e),
-            StoqError::Network(e) => write!(f, "Network error: {}", e),
-            StoqError::Security(e) => write!(f, "Security error: {}", e),
-            StoqError::Api(e) => write!(f, "API error: {}", e),
+            StoqError::Transport(e) => write!(f, "Transport error: {e}"),
+            StoqError::Protocol(e) => write!(f, "Protocol error: {e}"),
+            StoqError::Network(e) => write!(f, "Network error: {e}"),
+            StoqError::Security(e) => write!(f, "Security error: {e}"),
+            StoqError::Api(e) => write!(f, "API error: {e}"),
         }
     }
 }
@@ -222,34 +196,45 @@ impl fmt::Display for StoqError {
 impl fmt::Display for TransportError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TransportError::ConnectionFailed { remote, reason } =>
-                write!(f, "Connection to {} failed: {}", remote, reason),
-            TransportError::ConnectionClosed { remote, reason } =>
-                write!(f, "Connection to {} closed: {}", remote, reason),
-            TransportError::StreamError { stream_id, operation, reason } => {
+            TransportError::ConnectionFailed { remote, reason } => {
+                write!(f, "Connection to {remote} failed: {reason}")
+            }
+            TransportError::ConnectionClosed { remote, reason } => {
+                write!(f, "Connection to {remote} closed: {reason}")
+            }
+            TransportError::StreamError {
+                stream_id,
+                operation,
+                reason,
+            } => {
                 if let Some(id) = stream_id {
-                    write!(f, "Stream {} {} failed: {}", id, operation, reason)
+                    write!(f, "Stream {id} {operation} failed: {reason}")
                 } else {
-                    write!(f, "Stream {} failed: {}", operation, reason)
+                    write!(f, "Stream {operation} failed: {reason}")
                 }
             }
-            TransportError::BindFailed { address, port, reason } =>
-                write!(f, "Failed to bind to [{}]:{}: {}", address, port, reason),
-            TransportError::ConfigError { parameter, reason } =>
-                write!(f, "Config error for '{}': {}", parameter, reason),
-            TransportError::Io(e) =>
-                write!(f, "I/O error: {}", e),
+            TransportError::BindFailed {
+                address,
+                port,
+                reason,
+            } => write!(f, "Failed to bind to [{address}]:{port}: {reason}"),
+            TransportError::ConfigError { parameter, reason } => {
+                write!(f, "Config error for '{parameter}': {reason}")
+            }
+            TransportError::Io(e) => write!(f, "I/O error: {e}"),
             TransportError::QuicError { error_code, reason } => {
                 if let Some(code) = error_code {
-                    write!(f, "QUIC error {}: {}", code, reason)
+                    write!(f, "QUIC error {code}: {reason}")
                 } else {
-                    write!(f, "QUIC error: {}", reason)
+                    write!(f, "QUIC error: {reason}")
                 }
             }
-            TransportError::PoolExhausted { max_connections } =>
-                write!(f, "Connection pool exhausted (max: {})", max_connections),
-            TransportError::EndpointUnreachable { remote } =>
-                write!(f, "Endpoint {} is unreachable", remote),
+            TransportError::PoolExhausted { max_connections } => {
+                write!(f, "Connection pool exhausted (max: {max_connections})")
+            }
+            TransportError::EndpointUnreachable { remote } => {
+                write!(f, "Endpoint {remote} is unreachable")
+            }
         }
     }
 }
@@ -257,31 +242,49 @@ impl fmt::Display for TransportError {
 impl fmt::Display for ProtocolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ProtocolError::ValidationFailed { token_id, errors } =>
-                write!(f, "Token {:?} validation failed: {}", token_id, errors.join(", ")),
-            ProtocolError::TokenExpired { token_id, expired_at, current_time } =>
-                write!(f, "Token {:?} expired at {} (current: {})", token_id, expired_at, current_time),
-            ProtocolError::InvalidProof { proof_type, reason } =>
-                write!(f, "Invalid {} proof: {}", proof_type, reason),
-            ProtocolError::ServiceNotFound { service_name } =>
-                write!(f, "Service '{}' not found", service_name),
-            ProtocolError::DiscoveryFailed { service_name, reason } =>
-                write!(f, "Discovery of '{}' failed: {}", service_name, reason),
-            ProtocolError::CacheError { operation, reason } =>
-                write!(f, "Cache {} error: {}", operation, reason),
+            ProtocolError::ValidationFailed { token_id, errors } => write!(
+                f,
+                "Token {:?} validation failed: {}",
+                token_id,
+                errors.join(", ")
+            ),
+            ProtocolError::TokenExpired {
+                token_id,
+                expired_at,
+                current_time,
+            } => write!(
+                f,
+                "Token {token_id:?} expired at {expired_at} (current: {current_time})"
+            ),
+            ProtocolError::InvalidProof { proof_type, reason } => {
+                write!(f, "Invalid {proof_type} proof: {reason}")
+            }
+            ProtocolError::ServiceNotFound { service_name } => {
+                write!(f, "Service '{service_name}' not found")
+            }
+            ProtocolError::DiscoveryFailed {
+                service_name,
+                reason,
+            } => write!(f, "Discovery of '{service_name}' failed: {reason}"),
+            ProtocolError::CacheError { operation, reason } => {
+                write!(f, "Cache {operation} error: {reason}")
+            }
             ProtocolError::FrameDecodeFailed { frame_type, reason } => {
                 if let Some(ft) = frame_type {
-                    write!(f, "Frame type 0x{:x} decode failed: {}", ft, reason)
+                    write!(f, "Frame type 0x{ft:x} decode failed: {reason}")
                 } else {
-                    write!(f, "Frame decode failed: {}", reason)
+                    write!(f, "Frame decode failed: {reason}")
                 }
             }
-            ProtocolError::FrameEncodeFailed { frame_type, reason } =>
-                write!(f, "Frame {} encode failed: {}", frame_type, reason),
-            ProtocolError::ShardReassemblyFailed { shard_id, reason } =>
-                write!(f, "Shard {} reassembly failed: {}", shard_id, reason),
-            ProtocolError::TokenReplayDetected { token_hash } =>
-                write!(f, "Token replay attack detected: {:?}", token_hash),
+            ProtocolError::FrameEncodeFailed { frame_type, reason } => {
+                write!(f, "Frame {frame_type} encode failed: {reason}")
+            }
+            ProtocolError::ShardReassemblyFailed { shard_id, reason } => {
+                write!(f, "Shard {shard_id} reassembly failed: {reason}")
+            }
+            ProtocolError::TokenReplayDetected { token_hash } => {
+                write!(f, "Token replay attack detected: {token_hash:?}")
+            }
         }
     }
 }
@@ -289,11 +292,11 @@ impl fmt::Display for ProtocolError {
 impl fmt::Display for NetworkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NetworkError::NetworkNotFound(s) => write!(f, "Network not found: {}", s),
-            NetworkError::IsolationViolation(s) => write!(f, "Isolation violation: {}", s),
-            NetworkError::TunnelError(s) => write!(f, "Tunnel error: {}", s),
+            NetworkError::NetworkNotFound(s) => write!(f, "Network not found: {s}"),
+            NetworkError::IsolationViolation(s) => write!(f, "Isolation violation: {s}"),
+            NetworkError::TunnelError(s) => write!(f, "Tunnel error: {s}"),
             NetworkError::NetworkLimitReached => write!(f, "Network limit reached"),
-            NetworkError::PrivacyTierMismatch(s) => write!(f, "Privacy tier mismatch: {}", s),
+            NetworkError::PrivacyTierMismatch(s) => write!(f, "Privacy tier mismatch: {s}"),
         }
     }
 }
@@ -301,11 +304,15 @@ impl fmt::Display for NetworkError {
 impl fmt::Display for SecurityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SecurityError::CertificateError(s) => write!(f, "Certificate error: {}", s),
-            SecurityError::SignatureVerificationFailed => write!(f, "Signature verification failed"),
-            SecurityError::CryptoProviderNotInitialized => write!(f, "Crypto provider not initialized"),
-            SecurityError::TlsError(s) => write!(f, "TLS error: {}", s),
-            SecurityError::KeyGenerationFailed(s) => write!(f, "Key generation failed: {}", s),
+            SecurityError::CertificateError(s) => write!(f, "Certificate error: {s}"),
+            SecurityError::SignatureVerificationFailed => {
+                write!(f, "Signature verification failed")
+            }
+            SecurityError::CryptoProviderNotInitialized => {
+                write!(f, "Crypto provider not initialized")
+            }
+            SecurityError::TlsError(s) => write!(f, "TLS error: {s}"),
+            SecurityError::KeyGenerationFailed(s) => write!(f, "Key generation failed: {s}"),
         }
     }
 }
@@ -313,11 +320,11 @@ impl fmt::Display for SecurityError {
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiError::NotFound(s) => write!(f, "Not found: {}", s),
-            ApiError::InvalidRequest(s) => write!(f, "Invalid request: {}", s),
-            ApiError::HandlerError(s) => write!(f, "Handler error: {}", s),
-            ApiError::SerializationError(s) => write!(f, "Serialization error: {}", s),
-            ApiError::TransportError(s) => write!(f, "Transport error: {}", s),
+            ApiError::NotFound(s) => write!(f, "Not found: {s}"),
+            ApiError::InvalidRequest(s) => write!(f, "Invalid request: {s}"),
+            ApiError::HandlerError(s) => write!(f, "Handler error: {s}"),
+            ApiError::SerializationError(s) => write!(f, "Serialization error: {s}"),
+            ApiError::TransportError(s) => write!(f, "Transport error: {s}"),
         }
     }
 }
@@ -411,9 +418,10 @@ impl From<anyhow::Error> for StoqError {
     fn from(err: anyhow::Error) -> Self {
         // Try to downcast to specific error types
         if let Some(io_err) = err.downcast_ref::<io::Error>() {
-            return StoqError::Transport(TransportError::Io(
-                io::Error::new(io_err.kind(), err.to_string())
-            ));
+            return StoqError::Transport(TransportError::Io(io::Error::new(
+                io_err.kind(),
+                err.to_string(),
+            )));
         }
 
         // Default to transport error for unknown anyhow errors
@@ -482,9 +490,12 @@ mod tests {
 
     #[test]
     fn test_error_conversions() {
-        let io_err = io::Error::new(io::ErrorKind::Other, "test");
+        let io_err = io::Error::other("test");
         let stoq_err: StoqError = io_err.into();
-        assert!(matches!(stoq_err, StoqError::Transport(TransportError::Io(_))));
+        assert!(matches!(
+            stoq_err,
+            StoqError::Transport(TransportError::Io(_))
+        ));
     }
 
     #[test]

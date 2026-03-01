@@ -9,7 +9,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::config::{SecuritySeverity, LintSeverity, ComplianceLevel};
+use super::config::{ComplianceLevel, LintSeverity, SecuritySeverity};
 
 /// Combined validation result
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -7,20 +7,18 @@
 //! This module provides the setup functions for the HyperMesh consensus STOQ API server.
 //! It registers all required handlers and configures the server for TrustChain integration.
 
+use anyhow::{anyhow, Result};
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use tracing::{info, instrument};
 
 use stoq::api::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
 
-use crate::consensus::validation_service::{ConsensusValidationService, ValidationService};
 use crate::consensus::stoq_handlers::{
-    ValidateCertificateHandler,
-    ValidateProofsHandler,
+    ConsensusHealthHandler, ValidateCertificateHandler, ValidateProofsHandler,
     ValidationStatusHandler,
-    ConsensusHealthHandler,
 };
+use crate::consensus::validation_service::{ConsensusValidationService, ValidationService};
 
 /// Consensus API configuration
 #[derive(Debug, Clone)]
@@ -41,7 +39,7 @@ impl Default for ConsensusApiConfig {
     fn default() -> Self {
         Self {
             bind_address: "::".to_string(), // IPv6 all interfaces
-            port: 9292, // STOQ default port for consensus
+            port: 9292,                     // STOQ default port for consensus
             max_concurrent_validations: 100,
             enable_logging: true,
             enable_cache: true,
@@ -55,13 +53,17 @@ pub async fn create_consensus_api_server_with_service(
     validation_service: Arc<ValidationService>,
     config: ConsensusApiConfig,
 ) -> Result<Arc<StoqApiServer>> {
-    info!("Creating HyperMesh consensus API server on {}:{}",
-          config.bind_address, config.port);
+    info!(
+        "Creating HyperMesh consensus API server on {}:{}",
+        config.bind_address, config.port
+    );
 
     // Create STOQ transport configuration
     let transport_config = TransportConfig {
-        bind_address: config.bind_address.parse()
-            .map_err(|e| anyhow!("Invalid bind address: {}", e))?,
+        bind_address: config
+            .bind_address
+            .parse()
+            .map_err(|e| anyhow!("Invalid bind address: {e}"))?,
         port: config.port,
         max_connections: Some(config.max_concurrent_validations as u32),
         ..Default::default()
@@ -71,7 +73,7 @@ pub async fn create_consensus_api_server_with_service(
     let transport = Arc::new(
         StoqTransport::new(transport_config)
             .await
-            .map_err(|e| anyhow!("Failed to create STOQ transport: {}", e))?
+            .map_err(|e| anyhow!("Failed to create STOQ transport: {e}"))?,
     );
 
     // Create API server
@@ -79,23 +81,21 @@ pub async fn create_consensus_api_server_with_service(
 
     // Register consensus handlers
     // ValidateCertificateHandler expects Arc<dyn ConsensusValidationService>
-    server.register_handler(Arc::new(
-        ValidateCertificateHandler::new(validation_service.clone() as Arc<dyn ConsensusValidationService>)
-    ));
+    server.register_handler(Arc::new(ValidateCertificateHandler::new(
+        validation_service.clone() as Arc<dyn ConsensusValidationService>,
+    )));
 
     // ValidateProofsHandler expects Arc<ValidationService>
-    server.register_handler(Arc::new(
-        ValidateProofsHandler::new(validation_service.clone())
-    ));
+    server.register_handler(Arc::new(ValidateProofsHandler::new(
+        validation_service.clone(),
+    )));
 
     // ValidationStatusHandler expects Arc<dyn ConsensusValidationService>
-    server.register_handler(Arc::new(
-        ValidationStatusHandler::new(validation_service.clone() as Arc<dyn ConsensusValidationService>)
-    ));
+    server.register_handler(Arc::new(ValidationStatusHandler::new(
+        validation_service.clone() as Arc<dyn ConsensusValidationService>,
+    )));
 
-    server.register_handler(Arc::new(
-        ConsensusHealthHandler
-    ));
+    server.register_handler(Arc::new(ConsensusHealthHandler));
 
     info!("Registered {} consensus API handlers", 4);
     info!("Consensus API server configured successfully");
@@ -120,7 +120,7 @@ pub async fn create_test_consensus_server(
 ) -> Result<Arc<StoqApiServer>> {
     let config = ConsensusApiConfig {
         bind_address: "[::1]".to_string(), // IPv6 localhost
-        port: 19292, // Test port
+        port: 19292,                       // Test port
         max_concurrent_validations: 10,
         enable_logging: false,
         enable_cache: false,

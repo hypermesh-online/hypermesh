@@ -4,20 +4,26 @@
 
 //! User contribution platform implementation
 
-use std::sync::Arc;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use tokio::sync::{RwLock, Mutex};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::assets::core::{AssetManager, AssetType, AssetAllocation, ConsensusProof};
-use super::hardware::{HardwareConfiguration, CpuInfo, GpuInfo, MemoryInfo, MemoryModule, StorageInfo, StorageType, NetworkInfo, NetworkInterface, NetworkLocation, VerificationStatus};
-use super::sharing::SharingPreferences;
-use super::session::{UserId, ContributionId, ContributionSession, SessionEarnings, SessionPerformance, SessionStatus, AccountStatus};
-use super::rewards::{RewardEngine, PlatformMetrics};
+use super::hardware::{
+    CpuInfo, GpuInfo, HardwareConfiguration, MemoryInfo, MemoryModule, NetworkInfo,
+    NetworkInterface, NetworkLocation, StorageInfo, StorageType, VerificationStatus,
+};
 use super::pricing::PaymentFrequency;
+use super::rewards::{PlatformMetrics, RewardEngine};
+use super::session::{
+    AccountStatus, ContributionId, ContributionSession, SessionEarnings, SessionPerformance,
+    SessionStatus, UserId,
+};
+use super::sharing::SharingPreferences;
+use crate::assets::core::{AssetAllocation, AssetManager, AssetType, ConsensusProof};
 
 /// User contribution platform for hardware sharing
 pub struct UserContributionPlatform {
@@ -70,10 +76,7 @@ impl Default for PlatformConfig {
 
 impl UserContributionPlatform {
     /// Create new user contribution platform
-    pub async fn new(
-        asset_manager: Arc<AssetManager>,
-        config: PlatformConfig,
-    ) -> Result<Self> {
+    pub async fn new(asset_manager: Arc<AssetManager>, config: PlatformConfig) -> Result<Self> {
         let reward_engine = Arc::new(RewardEngine::new());
 
         Ok(Self {
@@ -131,7 +134,8 @@ impl UserContributionPlatform {
     ) -> Result<ContributionSession> {
         let user_profile = {
             let profiles = self.user_profiles.read().await;
-            profiles.get(user_id)
+            profiles
+                .get(user_id)
                 .ok_or_else(|| anyhow!("User not found"))?
                 .clone()
         };
@@ -140,11 +144,9 @@ impl UserContributionPlatform {
 
         let mut asset_allocations = HashMap::new();
         for asset_type in resource_types {
-            let allocation = self.allocate_user_resource(
-                &user_profile,
-                asset_type.clone(),
-                &consensus_proof,
-            ).await?;
+            let allocation = self
+                .allocate_user_resource(&user_profile, asset_type.clone(), &consensus_proof)
+                .await?;
             asset_allocations.insert(asset_type, allocation);
         }
 
@@ -188,55 +190,51 @@ impl UserContributionPlatform {
                 architecture: "x86_64".to_string(),
                 instruction_sets: vec!["AVX2".to_string(), "AVX512".to_string()],
             },
-            gpu_info: vec![
-                GpuInfo {
-                    model: "NVIDIA RTX 4090".to_string(),
-                    vendor: "NVIDIA".to_string(),
-                    memory_usage: 24 * 1024 * 1024 * 1024,
-                    compute_units: 128,
-                    base_clock: 2520,
-                    memory_clock: 10500,
-                    memory_bus_width: 384,
-                    compute_capability: Some("8.9".to_string()),
-                    supported_apis: vec!["Nova".to_string(), "Vulkan".to_string(), "OpenCL".to_string()],
-                }
-            ],
+            gpu_info: vec![GpuInfo {
+                model: "NVIDIA RTX 4090".to_string(),
+                vendor: "NVIDIA".to_string(),
+                memory_usage: 24 * 1024 * 1024 * 1024,
+                compute_units: 128,
+                base_clock: 2520,
+                memory_clock: 10500,
+                memory_bus_width: 384,
+                compute_capability: Some("8.9".to_string()),
+                supported_apis: vec![
+                    "Nova".to_string(),
+                    "Vulkan".to_string(),
+                    "OpenCL".to_string(),
+                ],
+            }],
             memory_info: MemoryInfo {
                 total_capacity: 128 * 1024 * 1024 * 1024,
                 available_capacity: 100 * 1024 * 1024 * 1024,
                 memory_type: "DDR5".to_string(),
                 speed: 5600,
-                modules: vec![
-                    MemoryModule {
-                        size: 32 * 1024 * 1024 * 1024,
-                        speed: 5600,
-                        latency: "CL36".to_string(),
-                        manufacturer: "G.Skill".to_string(),
-                    }
-                ],
+                modules: vec![MemoryModule {
+                    size: 32 * 1024 * 1024 * 1024,
+                    speed: 5600,
+                    latency: "CL36".to_string(),
+                    manufacturer: "G.Skill".to_string(),
+                }],
             },
-            storage_info: vec![
-                StorageInfo {
-                    device_type: StorageType::NVMe,
-                    capacity: 2 * 1024 * 1024 * 1024 * 1024,
-                    available: 1024 * 1024 * 1024 * 1024,
-                    interface: "NVMe 4.0".to_string(),
-                    read_speed: 7000,
-                    write_speed: 6500,
-                    manufacturer: "Samsung".to_string(),
-                    model: "980 PRO".to_string(),
-                }
-            ],
+            storage_info: vec![StorageInfo {
+                device_type: StorageType::NVMe,
+                capacity: 2 * 1024 * 1024 * 1024 * 1024,
+                available: 1024 * 1024 * 1024 * 1024,
+                interface: "NVMe 4.0".to_string(),
+                read_speed: 7000,
+                write_speed: 6500,
+                manufacturer: "Samsung".to_string(),
+                model: "980 PRO".to_string(),
+            }],
             network_info: NetworkInfo {
-                interfaces: vec![
-                    NetworkInterface {
-                        name: "eth0".to_string(),
-                        interface_type: "Ethernet".to_string(),
-                        speed: 10000,
-                        mac_address: "00:11:22:33:44:55".to_string(),
-                        ip_addresses: vec!["192.168.1.100".to_string()],
-                    }
-                ],
+                interfaces: vec![NetworkInterface {
+                    name: "eth0".to_string(),
+                    interface_type: "Ethernet".to_string(),
+                    speed: 10000,
+                    mac_address: "00:11:22:33:44:55".to_string(),
+                    ip_addresses: vec!["192.168.1.100".to_string()],
+                }],
                 bandwidth_upload: 1000,
                 bandwidth_download: 1000,
                 latency: 5,
@@ -256,10 +254,12 @@ impl UserContributionPlatform {
 
     async fn verify_user_eligibility(&self, user_profile: &UserProfile) -> Result<()> {
         match user_profile.account_status {
-            AccountStatus::Active => {},
+            AccountStatus::Active => {}
             AccountStatus::Suspended => return Err(anyhow!("Account suspended")),
             AccountStatus::Banned => return Err(anyhow!("Account banned")),
-            AccountStatus::PendingVerification => return Err(anyhow!("Account pending verification")),
+            AccountStatus::PendingVerification => {
+                return Err(anyhow!("Account pending verification"))
+            }
             AccountStatus::Closed => return Err(anyhow!("Account closed")),
         }
 
@@ -268,7 +268,7 @@ impl UserContributionPlatform {
         }
 
         match user_profile.hardware_config.verification_status {
-            VerificationStatus::Verified => {},
+            VerificationStatus::Verified => {}
             _ => return Err(anyhow!("Hardware not verified")),
         }
 
@@ -281,7 +281,9 @@ impl UserContributionPlatform {
         asset_type: AssetType,
         consensus_proof: &ConsensusProof,
     ) -> Result<AssetAllocation> {
-        let resource_settings = user_profile.sharing_preferences.resource_settings
+        let resource_settings = user_profile
+            .sharing_preferences
+            .resource_settings
             .get(&asset_type)
             .ok_or_else(|| anyhow!("Resource type not configured for sharing"))?;
 
@@ -289,8 +291,10 @@ impl UserContributionPlatform {
             return Err(anyhow!("Resource sharing disabled for this type"));
         }
 
-        let total_capacity = self.get_total_capacity_for_asset_type(&user_profile.hardware_config, &asset_type)?;
-        let shared_capacity = (total_capacity as f64 * resource_settings.share_percentage / 100.0) as u64;
+        let total_capacity =
+            self.get_total_capacity_for_asset_type(&user_profile.hardware_config, &asset_type)?;
+        let shared_capacity =
+            (total_capacity as f64 * resource_settings.share_percentage / 100.0) as u64;
 
         let allocation_request = crate::assets::core::AssetAllocationRequest {
             asset_type,
@@ -316,8 +320,10 @@ impl UserContributionPlatform {
             tags: HashMap::new(),
         };
 
-        self.asset_manager.allocate_asset(allocation_request).await
-            .map_err(|e| anyhow!("Asset allocation failed: {:?}", e))
+        self.asset_manager
+            .allocate_asset(allocation_request)
+            .await
+            .map_err(|e| anyhow!("Asset allocation failed: {e:?}"))
     }
 
     fn get_total_capacity_for_asset_type(
@@ -329,7 +335,9 @@ impl UserContributionPlatform {
             AssetType::Cpu => Ok(hardware_config.cpu_info.threads as u64),
             AssetType::Memory => Ok(hardware_config.memory_info.total_capacity),
             AssetType::Gpu => Ok(hardware_config.gpu_info.len() as u64),
-            AssetType::Storage => Ok(hardware_config.storage_info.iter()
+            AssetType::Storage => Ok(hardware_config
+                .storage_info
+                .iter()
                 .map(|s| s.capacity)
                 .sum()),
             AssetType::Network => Ok(hardware_config.network_info.bandwidth_upload),
@@ -344,7 +352,8 @@ impl UserContributionPlatform {
 
     pub async fn list_user_sessions(&self, user_id: &UserId) -> Vec<ContributionSession> {
         let sessions = self.active_contributions.read().await;
-        sessions.values()
+        sessions
+            .values()
             .filter(|session| &session.user_id == user_id)
             .cloned()
             .collect()

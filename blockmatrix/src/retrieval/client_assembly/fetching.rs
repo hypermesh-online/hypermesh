@@ -9,13 +9,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::matrix::MatrixCoordinate;
 
-use super::{
-    AssemblyProgress, AssemblyStats, ClientAssembler,
-    FetchedShard, ShardLocation,
-};
+use super::{AssemblyProgress, AssemblyStats, ClientAssembler, FetchedShard, ShardLocation};
 
 impl ClientAssembler {
     /// Fetch all shards according to retrieval plan
@@ -24,14 +21,16 @@ impl ClientAssembler {
 
         let plan_data = {
             let plan = self.plan.read().await;
-            let plan = plan.as_ref()
+            let plan = plan
+                .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("No retrieval plan set"))?;
 
-            plan.retrieval_order.iter()
+            plan.retrieval_order
+                .iter()
                 .filter_map(|idx| {
-                    plan.shard_map.get_entry(*idx).map(|entry| {
-                        (*idx, entry.shard_hash, entry.locations.clone())
-                    })
+                    plan.shard_map
+                        .get_entry(*idx)
+                        .map(|entry| (*idx, entry.shard_hash, entry.locations.clone()))
                 })
                 .collect::<Vec<_>>()
         };
@@ -44,7 +43,8 @@ impl ClientAssembler {
                 self.fetched_shards.clone(),
                 self.progress.clone(),
                 self.stats.clone(),
-            ).await?;
+            )
+            .await?;
         }
 
         let elapsed = start.elapsed().as_millis() as u64;
@@ -85,7 +85,7 @@ impl ClientAssembler {
                     let fetched = FetchedShard {
                         _hash: shard_hash,
                         data: data.clone(),
-                        _source: location.position.clone(),
+                        _source: location.position,
                         _fetch_time_ms: fetch_time,
                     };
 
@@ -105,7 +105,7 @@ impl ClientAssembler {
                         st.bytes_fetched += data_size;
                         st.avg_shard_time_ms =
                             (st.avg_shard_time_ms * (st.fallback_attempts as u64) + fetch_time)
-                            / (st.fallback_attempts as u64 + 1);
+                                / (st.fallback_attempts as u64 + 1);
                         if attempt > 0 {
                             st.fallback_attempts += attempt;
                         }

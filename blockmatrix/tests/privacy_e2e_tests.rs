@@ -9,16 +9,13 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
-    PrivacySystem, PrivacyConfig, PrivacyMode,
-    PrivacyFlexibilityMatrix, TierSwitcher,
-    PolicyAction, ActionType, ValidationType,
-    PrivacyEbpfBridge, TransitionResult,
-    NodeId, NetworkId, TrustLevel,
-    validation_requirements_for,
+    validation_requirements_for, ActionType, NetworkId, NodeId, PolicyAction, PrivacyConfig,
+    PrivacyEbpfBridge, PrivacyFlexibilityMatrix, PrivacyMode, PrivacySystem, TierSwitcher,
+    TransitionResult, TrustLevel, ValidationType,
 };
 use std::collections::HashSet;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 #[test]
 fn test_e2e_node_lifecycle_with_tier_transitions() {
@@ -68,10 +65,7 @@ fn test_e2e_mixed_privacy_network() {
     for _ in 0..3 {
         let mut node = PrivacySystem::new();
         node.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
-        let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC
-        );
+        let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
         node.update_flexibility_matrix(matrix).unwrap();
         hybrid_nodes.push(node);
     }
@@ -174,10 +168,7 @@ fn test_e2e_asset_privacy_independence() {
 
     // Set network to anonymous but assets to public
     system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
-    let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyMode::ANONYMOUS,
-        PrivacyMode::PUBLIC
-    );
+    let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
     system.update_flexibility_matrix(matrix.clone()).unwrap();
 
     // Network should be anonymous
@@ -256,8 +247,11 @@ fn test_e2e_privacy_preset_deployment() {
 
     for (name, config) in configs {
         // Each preset should have valid configuration
-        assert!(config.validate_configuration().is_ok(),
-                "Preset {} failed validation", name);
+        assert!(
+            config.validate_configuration().is_ok(),
+            "Preset {} failed validation",
+            name
+        );
 
         // Each should have different characteristics
         let privacy_score = config.privacy_score();
@@ -287,7 +281,11 @@ fn test_e2e_multi_tier_resource_sharing() {
     let mut nodes = Vec::new();
 
     // Create nodes in each mode
-    for tier in &[PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
+    for tier in &[
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
+    ] {
         let mut node = PrivacySystem::new();
         node.switch_tier(*tier).unwrap();
         nodes.push((*tier, node));
@@ -338,9 +336,9 @@ fn test_e2e_privacy_score_impact() {
 
     // Create systems with different privacy scores (3 modes, not 4)
     let configs = vec![
-        (PrivacyMode::ANONYMOUS, PrivacyMode::ANONYMOUS),   // Score: 1.0
-        (PrivacyMode::PRIVATE, PrivacyMode::PRIVATE),       // Score: 0.7
-        (PrivacyMode::PUBLIC, PrivacyMode::PUBLIC),          // Score: 0.0
+        (PrivacyMode::ANONYMOUS, PrivacyMode::ANONYMOUS), // Score: 1.0
+        (PrivacyMode::PRIVATE, PrivacyMode::PRIVATE),     // Score: 0.7
+        (PrivacyMode::PUBLIC, PrivacyMode::PUBLIC),       // Score: 0.0
     ];
 
     for (network_tier, asset_tier) in configs {
@@ -360,8 +358,11 @@ fn test_e2e_privacy_score_impact() {
 
     // Verify privacy scores are in descending order
     for i in 0..systems.len() - 1 {
-        assert!(systems[i].1 >= systems[i + 1].1,
-                "{:?} should have higher privacy than {:?}",
-                systems[i].0, systems[i + 1].0);
+        assert!(
+            systems[i].1 >= systems[i + 1].1,
+            "{:?} should have higher privacy than {:?}",
+            systems[i].0,
+            systems[i + 1].0
+        );
     }
 }

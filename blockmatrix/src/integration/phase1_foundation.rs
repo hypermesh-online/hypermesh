@@ -11,15 +11,17 @@
 //! - Geospatial Integration (Sprint 1.4)
 //! - Matrix Persistence Layer (Sprint 1.5)
 
-use crate::matrix::{MatrixCoordinate, CoordinateError};
-use crate::blockchain::{NodeBlockchain, ChainStateManager, BlockPropagator, PropagationStrategy, Block};
-use crate::persistence::{PersistenceManager, PersistenceConfig, RecoveryManager};
-use std::path::PathBuf;
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use crate::blockchain::{
+    Block, BlockPropagator, ChainStateManager, NodeBlockchain, PropagationStrategy,
+};
+use crate::matrix::{CoordinateError, MatrixCoordinate};
+use crate::persistence::{PersistenceConfig, PersistenceManager, RecoveryManager};
 use anyhow::Result;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::RwLock;
 
 /// Phase 1 Foundation errors
 #[derive(Debug, Error)]
@@ -160,14 +162,13 @@ impl MatrixFoundation {
             disk_error_threshold: 10 * 1024 * 1024,
         };
 
-        let persistence = Arc::new(
-            PersistenceManager::new(persistence_config, "foundation".to_string()).await?
-        );
+        let persistence =
+            Arc::new(PersistenceManager::new(persistence_config, "foundation".to_string()).await?);
 
         // Initialize recovery manager
         let recovery = Arc::new(RecoveryManager::new(
             config.storage_path.clone(),
-            "foundation".to_string()
+            "foundation".to_string(),
         ));
 
         Ok(Self {
@@ -187,9 +188,10 @@ impl MatrixFoundation {
     ) -> Phase1Result<String> {
         let nodes = self.nodes.read().await;
         if nodes.len() >= self.config.max_nodes {
-            return Err(Phase1Error::Configuration(
-                format!("Maximum node count ({}) reached", self.config.max_nodes)
-            ));
+            return Err(Phase1Error::Configuration(format!(
+                "Maximum node count ({}) reached",
+                self.config.max_nodes
+            )));
         }
         drop(nodes);
 
@@ -198,29 +200,20 @@ impl MatrixFoundation {
         tokio::fs::create_dir_all(&node_storage).await?;
 
         // Create blockchain for this node
-        let blockchain = NodeBlockchain::new(coordinate.clone());
+        let blockchain = NodeBlockchain::new(coordinate);
 
         // Create state manager
-        let state_manager = Arc::new(ChainStateManager::new(
-            coordinate.clone(),
-            &node_storage,
-        ));
-        state_manager.initialize().await
-            .map_err(|e| Phase1Error::Blockchain(e))?;
+        let state_manager = Arc::new(ChainStateManager::new(coordinate, &node_storage));
+        state_manager
+            .initialize()
+            .await
+            .map_err(Phase1Error::Blockchain)?;
 
         // Create propagator
-        let propagator = BlockPropagator::new(
-            coordinate.clone(),
-            self.config.propagation_strategy.clone(),
-        );
+        let propagator = BlockPropagator::new(coordinate, self.config.propagation_strategy.clone());
 
         // Create matrix node
-        let matrix_node = MatrixNode::new(
-            node_id.clone(),
-            coordinate,
-            blockchain,
-            propagator,
-        );
+        let matrix_node = MatrixNode::new(node_id.clone(), coordinate, blockchain, propagator);
 
         // Store node and state manager
         let mut nodes = self.nodes.write().await;
@@ -237,7 +230,8 @@ impl MatrixFoundation {
         let mut nodes = self.nodes.write().await;
         let mut state_managers = self.state_managers.write().await;
 
-        nodes.remove(node_id)
+        nodes
+            .remove(node_id)
             .ok_or_else(|| Phase1Error::NodeNotFound(node_id.to_string()))?;
         state_managers.remove(node_id);
 
@@ -247,7 +241,8 @@ impl MatrixFoundation {
     /// Get a node by ID
     pub async fn get_node(&self, node_id: &str) -> Phase1Result<MatrixNode> {
         let nodes = self.nodes.read().await;
-        nodes.get(node_id)
+        nodes
+            .get(node_id)
             .cloned()
             .ok_or_else(|| Phase1Error::NodeNotFound(node_id.to_string()))
     }
@@ -269,8 +264,10 @@ impl MatrixFoundation {
         let node = self.get_node(node_id).await?;
         let blockchain = node.blockchain.write().await;
 
-        blockchain.add_block_with_data(data).await
-            .map_err(|e| Phase1Error::Blockchain(e))
+        blockchain
+            .add_block_with_data(data)
+            .await
+            .map_err(Phase1Error::Blockchain)
     }
 
     /// Get blockchain height for a node
@@ -289,19 +286,14 @@ impl MatrixFoundation {
         use crate::matrix::find_k_nearest;
 
         let nodes = self.nodes.read().await;
-        let coordinates: Vec<MatrixCoordinate> = nodes.values()
-            .map(|n| n.coordinate.clone())
-            .collect();
+        let coordinates: Vec<MatrixCoordinate> = nodes.values().map(|n| n.coordinate).collect();
 
         let nearest = find_k_nearest(center, &coordinates, k);
 
         // Map coordinates back to nodes
-        nearest.into_iter()
-            .filter_map(|(coord, _dist)| {
-                nodes.values()
-                    .find(|n| n.coordinate == coord)
-                    .cloned()
-            })
+        nearest
+            .into_iter()
+            .filter_map(|(coord, _dist)| nodes.values().find(|n| n.coordinate == coord).cloned())
             .collect()
     }
 
@@ -314,19 +306,14 @@ impl MatrixFoundation {
         use crate::matrix::find_neighbors;
 
         let nodes = self.nodes.read().await;
-        let coordinates: Vec<MatrixCoordinate> = nodes.values()
-            .map(|n| n.coordinate.clone())
-            .collect();
+        let coordinates: Vec<MatrixCoordinate> = nodes.values().map(|n| n.coordinate).collect();
 
         let neighbors = find_neighbors(center, &coordinates, radius);
 
         // Map coordinates back to nodes
-        neighbors.into_iter()
-            .filter_map(|coord| {
-                nodes.values()
-                    .find(|n| n.coordinate == coord)
-                    .cloned()
-            })
+        neighbors
+            .into_iter()
+            .filter_map(|coord| nodes.values().find(|n| n.coordinate == coord).cloned())
             .collect()
     }
 
@@ -340,10 +327,9 @@ impl MatrixFoundation {
     pub async fn recover_network_state(&mut self) -> Phase1Result<()> {
         // Note: This is a simplified version - full recovery would need
         // to be implemented with proper node registry persistence
-        let recovery_manager = Arc::get_mut(&mut self.recovery)
-            .ok_or_else(|| Phase1Error::Configuration(
-                "Cannot recover with multiple references".to_string()
-            ))?;
+        let recovery_manager = Arc::get_mut(&mut self.recovery).ok_or_else(|| {
+            Phase1Error::Configuration("Cannot recover with multiple references".to_string())
+        })?;
 
         let report = recovery_manager.recover_all().await?;
 
@@ -356,13 +342,13 @@ impl MatrixFoundation {
                 tracing::warn!("Partial recovery: {} errors", report.errors.len());
                 Ok(())
             }
-            RecoveryStatus::Failed | RecoveryStatus::InProgress => {
-                Err(Phase1Error::Persistence(
-                    crate::persistence::PersistenceError::RecoveryFailed(
-                        format!("Recovery failed: {:?}, {} errors", report.status, report.errors.len())
-                    )
-                ))
-            }
+            RecoveryStatus::Failed | RecoveryStatus::InProgress => Err(Phase1Error::Persistence(
+                crate::persistence::PersistenceError::RecoveryFailed(format!(
+                    "Recovery failed: {:?}, {} errors",
+                    report.status,
+                    report.errors.len()
+                )),
+            )),
         }?;
 
         Ok(())
@@ -373,9 +359,7 @@ impl MatrixFoundation {
         let nodes = self.nodes.read().await;
         let node_count = nodes.len();
 
-        let coordinates: Vec<MatrixCoordinate> = nodes.values()
-            .map(|n| n.coordinate.clone())
-            .collect();
+        let coordinates: Vec<MatrixCoordinate> = nodes.values().map(|n| n.coordinate).collect();
 
         // Calculate network dimensions
         let (min_x, max_x, min_y, max_y, min_z, max_z) = if coordinates.is_empty() {
@@ -392,7 +376,7 @@ impl MatrixFoundation {
                         min_z.min(coord.z),
                         max_z.max(coord.z),
                     )
-                }
+                },
             )
         };
 
@@ -477,7 +461,10 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
-        let node_id = foundation.add_node("node1".to_string(), coord).await.expect("test");
+        let node_id = foundation
+            .add_node("node1".to_string(), coord)
+            .await
+            .expect("test");
 
         assert_eq!(node_id, "node1");
         assert_eq!(foundation.node_count().await, 1);
@@ -489,7 +476,10 @@ mod tests {
 
         for i in 0..10 {
             let coord = MatrixCoordinate::new(i, i, i).expect("test");
-            foundation.add_node(format!("node{}", i), coord).await.expect("test");
+            foundation
+                .add_node(format!("node{i}"), coord)
+                .await
+                .expect("test");
         }
 
         assert_eq!(foundation.node_count().await, 10);
@@ -500,7 +490,10 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test");
-        foundation.add_node("test_node".to_string(), coord.clone()).await.expect("test");
+        foundation
+            .add_node("test_node".to_string(), coord)
+            .await
+            .expect("test");
 
         let node = foundation.get_node("test_node").await.expect("test");
         assert_eq!(node.coordinate, coord);
@@ -512,7 +505,10 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
-        foundation.add_node("node1".to_string(), coord).await.expect("test");
+        foundation
+            .add_node("node1".to_string(), coord)
+            .await
+            .expect("test");
         assert_eq!(foundation.node_count().await, 1);
 
         foundation.remove_node("node1").await.expect("test");
@@ -524,12 +520,21 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test");
-        foundation.add_node("node1".to_string(), coord).await.expect("test");
+        foundation
+            .add_node("node1".to_string(), coord)
+            .await
+            .expect("test");
 
-        let block = foundation.add_block("node1", b"test data".to_vec()).await.expect("test");
+        let block = foundation
+            .add_block("node1", b"test data".to_vec())
+            .await
+            .expect("test");
         assert_eq!(block.asset_count(), 1); // Block should contain one asset
 
-        let height = foundation.get_blockchain_height("node1").await.expect("test");
+        let height = foundation
+            .get_blockchain_height("node1")
+            .await
+            .expect("test");
         assert_eq!(height, 1); // Genesis + 1 block
     }
 
@@ -541,7 +546,10 @@ mod tests {
         for x in 0..5 {
             for y in 0..5 {
                 let coord = MatrixCoordinate::new(x, y, 0).expect("test");
-                foundation.add_node(format!("node_{}_{}", x, y), coord).await.expect("test");
+                foundation
+                    .add_node(format!("node_{x}_{y}"), coord)
+                    .await
+                    .expect("test");
             }
         }
 
@@ -556,16 +564,14 @@ mod tests {
         let (foundation, _temp_dir) = create_test_foundation().await;
 
         // Add nodes
-        let coords = vec![
-            (0, 0, 0),
-            (1, 0, 0),
-            (0, 1, 0),
-            (10, 10, 10),
-        ];
+        let coords = [(0, 0, 0), (1, 0, 0), (0, 1, 0), (10, 10, 10)];
 
         for (i, (x, y, z)) in coords.iter().enumerate() {
             let coord = MatrixCoordinate::new(*x, *y, *z).expect("test");
-            foundation.add_node(format!("node{}", i), coord).await.expect("test");
+            foundation
+                .add_node(format!("node{i}"), coord)
+                .await
+                .expect("test");
         }
 
         let center = MatrixCoordinate::new(0, 0, 0).expect("test");
@@ -585,7 +591,10 @@ mod tests {
             for y in 0..10 {
                 for z in 0..10 {
                     let coord = MatrixCoordinate::new(x, y, z).expect("test");
-                    foundation.add_node(format!("node_{}_{}", x, y * 10 + z), coord).await.expect("test");
+                    foundation
+                        .add_node(format!("node_{}_{}", x, y * 10 + z), coord)
+                        .await
+                        .expect("test");
                 }
             }
         }

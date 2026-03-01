@@ -11,9 +11,7 @@ use rust_decimal_macros::dec;
 
 use hypermesh_lib::economic::GoldGrams;
 
-use crate::{
-    conservation, governor, holding, models, settlement, upi, CaesarProtocol,
-};
+use crate::{conservation, governor, holding, models, settlement, upi, CaesarProtocol};
 
 impl CaesarProtocol {
     /// Dissolve abandoned packet via gravity dissolution.
@@ -39,9 +37,8 @@ impl CaesarProtocol {
             ));
         }
 
-        if !settlement::gravity::GravityDissolution::is_eligible_for_dissolution(
-            record.updated_at,
-        ) {
+        if !settlement::gravity::GravityDissolution::is_eligible_for_dissolution(record.updated_at)
+        {
             return Err(anyhow::anyhow!("not eligible"));
         }
 
@@ -51,10 +48,10 @@ impl CaesarProtocol {
             qualified_nodes,
             shard_holders,
         )
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         let mut packet = models::packet_from_record(&record);
-        packet.dissolve().map_err(|e| anyhow::anyhow!("{}", e))?;
+        packet.dissolve().map_err(|e| anyhow::anyhow!("{e}"))?;
 
         self.storage
             .update_packet_state(
@@ -86,12 +83,12 @@ impl CaesarProtocol {
         let mut packet = models::packet_from_record(&record);
 
         // Transition to Delivered (InTransit -> Delivered)
-        packet.deliver().map_err(|e| anyhow::anyhow!("{}", e))?;
+        packet.deliver().map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Transition to Settling (Delivered -> Settling)
         packet
             .begin_settling()
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Calculate Governor-adjusted fee
         let gov_params = governor::GovernanceParams::default();
@@ -113,11 +110,8 @@ impl CaesarProtocol {
             recipient_criteria: criteria,
         };
 
-        let transit_nodes: Vec<(hypermesh_lib::NodeId, u64)> = record
-            .route
-            .iter()
-            .map(|n| (n.clone(), 1000_u64))
-            .collect();
+        let transit_nodes: Vec<(hypermesh_lib::NodeId, u64)> =
+            record.route.iter().map(|n| (n.clone(), 1000_u64)).collect();
 
         match settlement::protocol::SettlementProtocol::execute_settlement(
             request,
@@ -129,7 +123,7 @@ impl CaesarProtocol {
         .await
         {
             Ok(result) => {
-                packet.settle().map_err(|e| anyhow::anyhow!("{}", e))?;
+                packet.settle().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 // Conservation check: initial = settled + fee + demurrage
                 let _ = self.conservation.verify_settlement(
@@ -141,7 +135,7 @@ impl CaesarProtocol {
 
                 self.storage
                     .store_settlement(models::SettlementRecord {
-                        settlement_id: format!("settle-{}", packet_id),
+                        settlement_id: format!("settle-{packet_id}"),
                         packet_id: *packet_id,
                         egress_node: record.recipient.clone(),
                         finality_type: "instant".to_string(),
@@ -161,9 +155,7 @@ impl CaesarProtocol {
                 Ok(result)
             }
             Err(settlement::protocol::SettlementError::EgressFailed { reason }) => {
-                packet
-                    .disperse()
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                packet.disperse().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 self.holding_buffer
                     .hold(*packet_id, holding::HoldReason::EgressFailure);
@@ -176,12 +168,9 @@ impl CaesarProtocol {
                     )
                     .await?;
 
-                Err(anyhow::anyhow!(
-                    "egress adapter failed: {}",
-                    reason
-                ))
+                Err(anyhow::anyhow!("egress adapter failed: {reason}"))
             }
-            Err(other) => Err(anyhow::anyhow!("{}", other)),
+            Err(other) => Err(anyhow::anyhow!("{other}")),
         }
     }
 
@@ -213,7 +202,7 @@ impl CaesarProtocol {
         // Transition Dispersed -> Settling
         packet
             .retry_settlement()
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Release from holding buffer
         self.holding_buffer.release(packet_id);
@@ -238,11 +227,8 @@ impl CaesarProtocol {
             recipient_criteria: criteria,
         };
 
-        let transit_nodes: Vec<(hypermesh_lib::NodeId, u64)> = record
-            .route
-            .iter()
-            .map(|n| (n.clone(), 1000_u64))
-            .collect();
+        let transit_nodes: Vec<(hypermesh_lib::NodeId, u64)> =
+            record.route.iter().map(|n| (n.clone(), 1000_u64)).collect();
 
         match settlement::protocol::SettlementProtocol::execute_settlement(
             request,
@@ -254,7 +240,7 @@ impl CaesarProtocol {
         .await
         {
             Ok(result) => {
-                packet.settle().map_err(|e| anyhow::anyhow!("{}", e))?;
+                packet.settle().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 let _ = self.conservation.verify_settlement(
                     record.initial_value,
@@ -265,7 +251,7 @@ impl CaesarProtocol {
 
                 self.storage
                     .store_settlement(models::SettlementRecord {
-                        settlement_id: format!("retry-settle-{}", packet_id),
+                        settlement_id: format!("retry-settle-{packet_id}"),
                         packet_id: *packet_id,
                         egress_node: record.recipient.clone(),
                         finality_type: "instant".to_string(),
@@ -285,9 +271,7 @@ impl CaesarProtocol {
                 Ok(result)
             }
             Err(settlement::protocol::SettlementError::EgressFailed { reason }) => {
-                packet
-                    .disperse()
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                packet.disperse().map_err(|e| anyhow::anyhow!("{e}"))?;
 
                 self.holding_buffer
                     .hold(*packet_id, holding::HoldReason::EgressFailure);
@@ -300,20 +284,15 @@ impl CaesarProtocol {
                     )
                     .await?;
 
-                Err(anyhow::anyhow!(
-                    "egress adapter failed: {}",
-                    reason
-                ))
+                Err(anyhow::anyhow!("egress adapter failed: {reason}"))
             }
-            Err(other) => Err(anyhow::anyhow!("{}", other)),
+            Err(other) => Err(anyhow::anyhow!("{other}")),
         }
     }
 
     /// Run full conservation audit.
-    pub async fn audit_conservation(
-        &mut self,
-    ) -> Result<conservation::ConservationAudit> {
-        self.conservation.audit(&*self.storage).await
+    pub async fn audit_conservation(&mut self) -> Result<conservation::ConservationAudit> {
+        self.conservation.audit(&self.storage).await
     }
 }
 
@@ -323,9 +302,7 @@ impl CaesarProtocol {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        holding, models, settlement, storage, CaesarConfig, CaesarProtocol,
-    };
+    use crate::{holding, models, settlement, storage, CaesarConfig, CaesarProtocol};
     use hypermesh_lib::economic::GoldGrams;
     use rust_decimal_macros::dec;
     use tempfile::TempDir;
@@ -333,20 +310,14 @@ mod tests {
     fn test_config(dir: &TempDir) -> CaesarConfig {
         CaesarConfig {
             storage: storage::StorageConfig {
-                path: dir
-                    .path()
-                    .to_str()
-                    .expect("test: tempdir path")
-                    .to_string(),
+                path: dir.path().to_str().expect("test: tempdir path").to_string(),
             },
             ..CaesarConfig::default()
         }
     }
 
     fn make_criteria() -> settlement::acceptance::AcceptanceCriteria {
-        settlement::acceptance::AcceptanceCriteria::new(
-            hypermesh_lib::NodeId::from("recipient"),
-        )
+        settlement::acceptance::AcceptanceCriteria::new(hypermesh_lib::NodeId::from("recipient"))
     }
 
     /// Helper: mint a packet and force it to a specific state with a route.
@@ -446,11 +417,12 @@ mod tests {
         let adapter = MockEgressAdapter::new(GoldGrams::zero());
         let criteria = make_criteria();
 
-        let result = protocol
-            .settle_packet(&packet_id, &adapter, criteria)
-            .await;
+        let result = protocol.settle_packet(&packet_id, &adapter, criteria).await;
 
-        assert!(result.is_err(), "settle should fail with zero-capacity adapter");
+        assert!(
+            result.is_err(),
+            "settle should fail with zero-capacity adapter"
+        );
 
         let stored = protocol
             .storage()

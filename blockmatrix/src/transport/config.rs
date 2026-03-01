@@ -5,8 +5,8 @@
 //! Configuration for HyperMesh Transport Layer
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::net::Ipv6Addr;
+use std::time::Duration;
 
 // Import STOQ configuration types
 use stoq;
@@ -15,7 +15,7 @@ use stoq;
 pub type TransportConfig = HyperMeshTransportConfig;
 
 /// HyperMesh transport configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HyperMeshTransportConfig {
     /// Network configuration
     pub network_usage: NetworkConfig,
@@ -112,18 +112,6 @@ pub struct PerformanceConfig {
 
 // NOTE: validate() implementation moved below to main HyperMeshTransportConfig impl
 
-impl Default for HyperMeshTransportConfig {
-    fn default() -> Self {
-        Self {
-            network_usage: NetworkConfig::default(),
-            pool: ConnectionPoolConfig::default(),
-            auth: AuthenticationConfig::default(),
-            monitoring: MonitoringConfig::default(),
-            performance: PerformanceConfig::default(),
-        }
-    }
-}
-
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
@@ -178,9 +166,9 @@ impl Default for MonitoringConfig {
 impl Default for PerformanceConfig {
     fn default() -> Self {
         Self {
-            send_buffer_size: 1024 * 1024, // 1MB
+            send_buffer_size: 1024 * 1024,    // 1MB
             receive_buffer_size: 1024 * 1024, // 1MB
-            worker_threads: 0, // Auto-detect
+            worker_threads: 0,                // Auto-detect
             enable_zero_copy: true,
             batch_size: 100,
         }
@@ -195,61 +183,62 @@ impl HyperMeshTransportConfig {
 
     /// Convert to STOQ transport configuration
     pub fn to_stoq_transport_config(&self) -> stoq::transport::TransportConfig {
-        let mut config = stoq::transport::TransportConfig::default();
-        config.bind_address = self.network_usage.bind_address;
-        config.port = self.network_usage.port;
-        config.max_connections = self.network_usage.max_connections;
-        config.connection_timeout = self.network_usage.connection_timeout;
-        config.enable_migration = self.network_usage.enable_migration;
-        config.enable_0rtt = self.network_usage.enable_0rtt;
-        config.max_idle_timeout = self.network_usage.max_idle_timeout;
-        config.max_concurrent_streams = self.network_usage.max_concurrent_streams;
-        config.send_buffer_size = self.performance.send_buffer_size;
-        config.receive_buffer_size = self.performance.receive_buffer_size;
-        config.cert_rotation_interval = std::time::Duration::from_secs(24 * 60 * 60); // 24 hours
-        config
+        stoq::transport::TransportConfig {
+            bind_address: self.network_usage.bind_address,
+            port: self.network_usage.port,
+            max_connections: self.network_usage.max_connections,
+            connection_timeout: self.network_usage.connection_timeout,
+            enable_migration: self.network_usage.enable_migration,
+            enable_0rtt: self.network_usage.enable_0rtt,
+            max_idle_timeout: self.network_usage.max_idle_timeout,
+            max_concurrent_streams: self.network_usage.max_concurrent_streams,
+            send_buffer_size: self.performance.send_buffer_size,
+            receive_buffer_size: self.performance.receive_buffer_size,
+            cert_rotation_interval: std::time::Duration::from_secs(24 * 60 * 60), // 24 hours
+            ..stoq::transport::TransportConfig::default()
+        }
     }
 
     // REMOVED: STOQ routing, chunking, and edge configurations
     // These are application-layer concerns not supported by STOQ transport protocol
     // STOQ focuses on pure transport: packet delivery, connection management,
     // flow control, and congestion control only
-    
+
     /// Load configuration from file
     pub fn from_file(path: &str) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let config: Self = serde_yaml::from_str(&content)?;
         Ok(config)
     }
-    
+
     /// Save configuration to file
     pub fn to_file(&self, path: &str) -> anyhow::Result<()> {
         let content = serde_yaml::to_string(self)?;
         std::fs::write(path, content)?;
         Ok(())
     }
-    
+
     /// Validate configuration
     pub fn validate(&self) -> anyhow::Result<()> {
         // Validate network settings
         if self.network_usage.port == 0 {
             return Err(anyhow::anyhow!("Port cannot be 0"));
         }
-        
+
         if self.network_usage.max_concurrent_streams == 0 {
             return Err(anyhow::anyhow!("Max concurrent streams cannot be 0"));
         }
-        
+
         // Validate connection pool settings
         if self.pool.max_pool_size == 0 {
             return Err(anyhow::anyhow!("Connection pool size cannot be 0"));
         }
-        
+
         // Validate performance settings
         if self.performance.send_buffer_size == 0 || self.performance.receive_buffer_size == 0 {
             return Err(anyhow::anyhow!("Buffer sizes cannot be 0"));
         }
-        
+
         Ok(())
     }
 }
@@ -257,29 +246,35 @@ impl HyperMeshTransportConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_config_validation() {
         let config = HyperMeshTransportConfig::default();
         assert!(config.validate().is_ok());
     }
-    
+
     #[test]
     fn test_network_config_conversion() {
         let config = HyperMeshTransportConfig::default();
         let network_config = config.to_network_config();
-        
-        assert_eq!(network_config.bind_address, config.network_usage.bind_address);
+
+        assert_eq!(
+            network_config.bind_address,
+            config.network_usage.bind_address
+        );
         assert_eq!(network_config.port, config.network_usage.port);
-        assert_eq!(network_config.enable_migration, config.network_usage.enable_migration);
+        assert_eq!(
+            network_config.enable_migration,
+            config.network_usage.enable_migration
+        );
     }
-    
+
     #[test]
     fn test_config_serialization() {
         let config = HyperMeshTransportConfig::default();
-        let yaml = serde_yaml::to_string(&config).unwrap();
-        let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).unwrap();
-        
+        let yaml = serde_yaml::to_string(&config).expect("test: expected success");
+        let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).expect("test: expected success");
+
         assert_eq!(config.network_usage.port, deserialized.network_usage.port);
     }
 }

@@ -11,18 +11,17 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::core::{
-    AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
-    PrivacyMode, ConsensusRequirements,
+    AssetManager, AssetRegistration, AssetState, AssetStatus, AssetType, ConsensusRequirements,
+    PrivacyMode,
 };
 
 use blockmatrix::assets::adapters::{
-    CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
-    NetworkAssetAdapter, ContainerAssetAdapter, AdapterRegistry,
+    AdapterRegistry, ContainerAssetAdapter, CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter,
+    NetworkAssetAdapter, StorageAssetAdapter,
 };
 
 use blockmatrix::consensus::proof_of_state_integration::{
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState,
+    ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
 
 use std::time::Duration;
@@ -57,7 +56,10 @@ async fn test_gate2_asset_system_complete() {
     // 3. Register adapters with manager
     println!("\n✓ Registering adapters with Asset Manager...");
     for (asset_type, adapter) in registry.get_all_adapters() {
-        manager.register_adapter(asset_type.clone(), adapter).await.unwrap();
+        manager
+            .register_adapter(asset_type.clone(), adapter)
+            .await
+            .unwrap();
         println!("  ✅ Registered {:?} adapter", asset_type);
     }
 
@@ -76,16 +78,12 @@ async fn test_gate2_asset_system_complete() {
     // 5. Test Consensus Proof Creation
     println!("\n✓ Testing Proof of State Four-Proof Consensus System...");
 
-    let stake_proof = StakeProof::new(
-        "test-holder".to_string(),
-        "holder-id-123".to_string(),
-        1000
-    );
+    let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id-123".to_string(), 1000);
     println!("  ✅ PoStake created (WHO)");
 
     let mut space_proof = SpaceProof::new(
         1024 * 1024 * 10, // 10MB
-        "/test/storage/path".to_string()
+        "/test/storage/path".to_string(),
     );
     space_proof.node_id = "test-node-001".to_string();
     println!("  ✅ PoSpace created (WHERE)");
@@ -103,12 +101,7 @@ async fn test_gate2_asset_system_complete() {
     let time_proof = TimeProof::new(Duration::from_secs(30));
     println!("  ✅ PoTime created (WHEN)");
 
-    let consensus_proof = ConsensusProof::new(
-        stake_proof,
-        space_proof,
-        work_proof,
-        time_proof
-    );
+    let consensus_proof = ConsensusProof::new(stake_proof, space_proof, work_proof, time_proof);
 
     assert!(consensus_proof.validate());
     println!("  ✅ Consensus Proof validated successfully");

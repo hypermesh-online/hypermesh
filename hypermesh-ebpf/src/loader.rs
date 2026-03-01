@@ -11,7 +11,7 @@
 //! The `ebpf-loader` feature gates the compile-from-C functionality
 //! which requires `clang` on the system.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -109,10 +109,7 @@ impl EbpfLoader {
         // Compile all C files in source directory
         let source_dir = &self.sources.source_dir;
         if !source_dir.exists() {
-            tracing::warn!(
-                "eBPF source directory {:?} not found",
-                source_dir
-            );
+            tracing::warn!("eBPF source directory {:?} not found", source_dir);
             return Ok(());
         }
 
@@ -120,11 +117,13 @@ impl EbpfLoader {
             let entry = entry?;
             let path = entry.path();
             if path.extension().map_or(false, |ext| ext == "c") {
-                let stem = path.file_stem()
+                let stem = path
+                    .file_stem()
                     .ok_or_else(|| anyhow!("No file stem for {:?}", path))?;
-                let output = self.sources.output_dir.join(
-                    format!("{}.o", stem.to_string_lossy())
-                );
+                let output = self
+                    .sources
+                    .output_dir
+                    .join(format!("{}.o", stem.to_string_lossy()));
                 self.compile_single(&path, &output)?;
             }
         }
@@ -144,22 +143,22 @@ impl EbpfLoader {
     #[cfg(feature = "ebpf-loader")]
     fn compile_single(&self, source: &Path, output: &Path) -> Result<()> {
         if !source.exists() {
-            tracing::warn!(
-                "eBPF source {:?} not found, skipping",
-                source
-            );
+            tracing::warn!("eBPF source {:?} not found, skipping", source);
             return Ok(());
         }
 
-        let source_str = source.to_str()
+        let source_str = source
+            .to_str()
             .ok_or_else(|| anyhow!("Invalid UTF-8 in source path: {:?}", source))?;
-        let output_str = output.to_str()
+        let output_str = output
+            .to_str()
             .ok_or_else(|| anyhow!("Invalid UTF-8 in output path: {:?}", output))?;
 
         let status = Command::new("clang")
             .args([
                 "-O2",
-                "-target", "bpf",
+                "-target",
+                "bpf",
                 "-c",
                 source_str,
                 "-o",
@@ -171,10 +170,7 @@ impl EbpfLoader {
             .status()?;
 
         if !status.success() {
-            return Err(anyhow!(
-                "Failed to compile eBPF program {:?}",
-                source
-            ));
+            return Err(anyhow!("Failed to compile eBPF program {:?}", source));
         }
 
         tracing::info!("Compiled {:?} -> {:?}", source, output);
@@ -183,10 +179,7 @@ impl EbpfLoader {
 
     /// Check if clang is available on the system
     pub fn check_clang() -> bool {
-        Command::new("clang")
-            .arg("--version")
-            .output()
-            .is_ok()
+        Command::new("clang").arg("--version").output().is_ok()
     }
 
     /// Load compiled eBPF programs into the kernel.
@@ -200,9 +193,7 @@ impl EbpfLoader {
         let load_path = if xdp_path.exists() {
             xdp_path.clone()
         } else if legacy_path.exists() {
-            tracing::info!(
-                "Using legacy stoq_xdp.o (rename to hypermesh_xdp.o recommended)"
-            );
+            tracing::info!("Using legacy stoq_xdp.o (rename to hypermesh_xdp.o recommended)");
             legacy_path
         } else {
             // Try to compile first
@@ -211,9 +202,7 @@ impl EbpfLoader {
             if xdp_path.exists() {
                 xdp_path
             } else {
-                tracing::warn!(
-                    "No compiled eBPF bytecode found. Run compile_ebpf.sh to build."
-                );
+                tracing::warn!("No compiled eBPF bytecode found. Run compile_ebpf.sh to build.");
                 return Ok(());
             }
         };
@@ -224,15 +213,13 @@ impl EbpfLoader {
                 Ok(bpf) => {
                     self.bpf = Some(bpf);
                     self.programs_loaded = true;
-                    tracing::info!(
-                        "eBPF program loaded from {:?}",
-                        load_path
-                    );
+                    tracing::info!("eBPF program loaded from {:?}", load_path);
                 }
                 Err(e) => {
                     tracing::warn!(
                         "Failed to load eBPF from {:?}: {}. Userspace fallback.",
-                        load_path, e
+                        load_path,
+                        e
                     );
                 }
             }
@@ -241,9 +228,7 @@ impl EbpfLoader {
         #[cfg(not(feature = "kernel-attach"))]
         {
             let _ = load_path; // suppress unused warning
-            tracing::info!(
-                "kernel-attach feature not enabled, skipping kernel load"
-            );
+            tracing::info!("kernel-attach feature not enabled, skipping kernel load");
         }
 
         Ok(())
@@ -268,14 +253,12 @@ impl EbpfLoader {
     /// Verify an eBPF program before loading (uses bpftool if available)
     pub fn verify(&self, program_path: &Path) -> Result<()> {
         if !program_path.exists() {
-            return Err(anyhow!(
-                "Program file not found: {:?}",
-                program_path
-            ));
+            return Err(anyhow!("Program file not found: {program_path:?}"));
         }
 
-        let path_str = program_path.to_str()
-            .ok_or_else(|| anyhow!("Invalid UTF-8 in path: {:?}", program_path))?;
+        let path_str = program_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Invalid UTF-8 in path: {program_path:?}"))?;
 
         if let Ok(output) = Command::new("bpftool")
             .args(["prog", "load", path_str, "/sys/fs/bpf/test_verify"])
@@ -283,16 +266,11 @@ impl EbpfLoader {
         {
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(anyhow!(
-                    "Program verification failed: {}",
-                    stderr
-                ));
+                return Err(anyhow!("Program verification failed: {stderr}"));
             }
 
             // Clean up test program
-            let _ = Command::new("rm")
-                .arg("/sys/fs/bpf/test_verify")
-                .status();
+            let _ = Command::new("rm").arg("/sys/fs/bpf/test_verify").status();
         }
 
         Ok(())
@@ -317,11 +295,12 @@ mod tests {
     #[test]
     fn test_loader_creation() {
         let loader = EbpfLoader::new();
-        assert!(
-            loader.sources.output_dir.to_str()
-                .expect("test: output dir to str")
-                .contains("bpf")
-        );
+        assert!(loader
+            .sources
+            .output_dir
+            .to_str()
+            .expect("test: output dir to str")
+            .contains("bpf"));
         assert!(!loader.are_programs_loaded());
     }
 
@@ -342,10 +321,7 @@ mod tests {
             output_dir: PathBuf::from("/tmp/ebpf_out"),
         };
         let loader = EbpfLoader::with_sources(sources);
-        assert_eq!(
-            loader.source_dir(),
-            Path::new("/tmp/ebpf_src")
-        );
+        assert_eq!(loader.source_dir(), Path::new("/tmp/ebpf_src"));
     }
 
     #[test]

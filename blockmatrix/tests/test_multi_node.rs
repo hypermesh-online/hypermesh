@@ -12,12 +12,12 @@
 
 #[cfg(test)]
 mod multi_node_tests {
+    use anyhow::{anyhow, Result};
     use blockmatrix::os_integration::{create_os_abstraction, types::*, OsAbstraction};
-    use std::sync::{Arc, Mutex, mpsc};
+    use std::collections::HashMap;
+    use std::sync::{mpsc, Arc, Mutex};
     use std::thread;
     use std::time::{Duration, Instant};
-    use std::collections::HashMap;
-    use anyhow::{Result, anyhow};
 
     /// Simulated node with its own OS abstraction instance
     struct SimulatedNode {
@@ -68,7 +68,8 @@ mod multi_node_tests {
                             let mut m = metrics.lock().unwrap();
                             m.cpu_usage = usage.cpu_percent;
                             m.memory_used_mb = usage.memory_used_mb;
-                            m.network_bytes = usage.network_bytes_sent + usage.network_bytes_received;
+                            m.network_bytes =
+                                usage.network_bytes_sent + usage.network_bytes_received;
                             m.last_update = Some(Instant::now());
                             m.sample_count += 1;
                         }
@@ -109,7 +110,9 @@ mod multi_node_tests {
                 .expect(&format!("Failed to create node {}", i));
 
             // Verify node has working OS abstraction
-            let cpu_info = node.os.detect_cpu()
+            let cpu_info = node
+                .os
+                .detect_cpu()
                 .expect(&format!("Node {} CPU detection failed", i));
 
             assert!(cpu_info.core_count > 0, "Node {} invalid CPU info", i);
@@ -146,7 +149,8 @@ mod multi_node_tests {
             assert!(
                 metrics.sample_count > 10,
                 "Node {} only collected {} samples",
-                node.id, metrics.sample_count
+                node.id,
+                metrics.sample_count
             );
             assert!(
                 metrics.last_update.is_some(),
@@ -154,7 +158,10 @@ mod multi_node_tests {
                 node.id
             );
 
-            println!("Node {} collected {} samples", node.id, metrics.sample_count);
+            println!(
+                "Node {} collected {} samples",
+                node.id, metrics.sample_count
+            );
         }
 
         // Stop monitoring
@@ -174,7 +181,9 @@ mod multi_node_tests {
                 .expect(&format!("Failed to create node {}", i));
 
             // Get initial metrics
-            let usage = node.os.get_resource_usage()
+            let usage = node
+                .os
+                .get_resource_usage()
                 .expect("Failed to get resource usage");
 
             let mut metrics = node.metrics.lock().unwrap();
@@ -263,9 +272,9 @@ mod multi_node_tests {
     fn test_node_resource_heterogeneity() {
         // Simulate nodes with different capabilities
         let node_configs = vec![
-            ("high-cpu", 32, 64000),  // 32 cores, 64GB
-            ("high-mem", 8, 256000),   // 8 cores, 256GB
-            ("balanced", 16, 32000),   // 16 cores, 32GB
+            ("high-cpu", 32, 64000), // 32 cores, 64GB
+            ("high-mem", 8, 256000), // 8 cores, 256GB
+            ("balanced", 16, 32000), // 16 cores, 32GB
         ];
 
         for (name, expected_cores, expected_mem) in node_configs {
@@ -276,7 +285,10 @@ mod multi_node_tests {
             let mem = node.os.detect_memory().expect("Memory detection failed");
 
             println!("Node {} capabilities:", name);
-            println!("  CPU: {} cores @ {} MHz", cpu.core_count, cpu.frequency_mhz);
+            println!(
+                "  CPU: {} cores @ {} MHz",
+                cpu.core_count, cpu.frequency_mhz
+            );
             println!("  Memory: {} MB total", mem.total_mb);
 
             // In reality, all nodes have same hardware in test
@@ -291,10 +303,7 @@ mod multi_node_tests {
     fn test_concurrent_node_operations() {
         let nodes: Vec<_> = (0..5)
             .map(|i| {
-                Arc::new(
-                    SimulatedNode::new(format!("node-{}", i))
-                        .expect("Failed to create node")
-                )
+                Arc::new(SimulatedNode::new(format!("node-{}", i)).expect("Failed to create node"))
             })
             .collect();
 
@@ -353,12 +362,10 @@ mod multi_node_tests {
         let mut nodes = Vec::new();
 
         for i in 0..3 {
-            let node = SimulatedNode::new(format!("node-{}", i))
-                .expect("Failed to create node");
+            let node = SimulatedNode::new(format!("node-{}", i)).expect("Failed to create node");
 
             // Collect current state
-            let usage = node.os.get_resource_usage()
-                .expect("Failed to get usage");
+            let usage = node.os.get_resource_usage().expect("Failed to get usage");
 
             let mut metrics = node.metrics.lock().unwrap();
             metrics.cpu_usage = usage.cpu_percent;
@@ -380,8 +387,10 @@ mod multi_node_tests {
             }
         }
 
-        println!("Selected node-{} with {:.2}% CPU for workload",
-            best_node_idx, lowest_cpu);
+        println!(
+            "Selected node-{} with {:.2}% CPU for workload",
+            best_node_idx, lowest_cpu
+        );
 
         // Verify selection is reasonable
         assert!(lowest_cpu >= 0.0 && lowest_cpu <= 100.0);
@@ -403,16 +412,21 @@ mod multi_node_tests {
         let mut total_memory = 0;
 
         for node in &nodes {
-            let usage = node.os.get_resource_usage()
-                .expect("Failed to get usage");
+            let usage = node.os.get_resource_usage().expect("Failed to get usage");
 
             total_cpu += usage.cpu_percent;
             total_memory += usage.memory_used_mb;
         }
 
         println!("Cluster resource usage:");
-        println!("  Total CPU: {:.2}% / {:.2}%", total_cpu, max_cluster_cpu_percent);
-        println!("  Total Memory: {} MB / {} MB", total_memory, max_cluster_memory_mb);
+        println!(
+            "  Total CPU: {:.2}% / {:.2}%",
+            total_cpu, max_cluster_cpu_percent
+        );
+        println!(
+            "  Total Memory: {} MB / {} MB",
+            total_memory, max_cluster_memory_mb
+        );
 
         // Check if within limits
         let cpu_headroom = max_cluster_cpu_percent - total_cpu;
@@ -421,8 +435,10 @@ mod multi_node_tests {
         assert!(cpu_headroom > 0.0, "Cluster CPU over limit");
         assert!(mem_headroom > 0, "Cluster memory over limit");
 
-        println!("Cluster has {:.2}% CPU and {} MB memory headroom",
-            cpu_headroom, mem_headroom);
+        println!(
+            "Cluster has {:.2}% CPU and {} MB memory headroom",
+            cpu_headroom, mem_headroom
+        );
     }
 
     #[test]
@@ -433,8 +449,7 @@ mod multi_node_tests {
 
         // Create and start nodes
         for i in 0..3 {
-            let node = SimulatedNode::new(format!("node-{}", i))
-                .expect("Failed to create node");
+            let node = SimulatedNode::new(format!("node-{}", i)).expect("Failed to create node");
             let stop_tx = node.start_monitoring(Duration::from_millis(100));
             stop_channels.push(stop_tx);
             nodes.push(node);
@@ -456,14 +471,19 @@ mod multi_node_tests {
             stop_channels[i] = new_stop;
 
             // Verify other nodes still healthy
-            let healthy: Vec<_> = nodes.iter()
+            let healthy: Vec<_> = nodes
+                .iter()
                 .enumerate()
                 .filter(|(idx, _)| *idx != i)
                 .filter(|(_, n)| n.is_healthy())
                 .collect();
 
-            assert_eq!(healthy.len(), 2,
-                "Expected 2 healthy nodes during update of node {}", i);
+            assert_eq!(
+                healthy.len(),
+                2,
+                "Expected 2 healthy nodes during update of node {}",
+                i
+            );
         }
 
         println!("Rolling update completed successfully");

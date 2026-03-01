@@ -2,22 +2,19 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
-use std::cmp::Ordering;
 
-use crate::AssetRegistration;
 use super::super::topology::NodeLocation;
+use crate::AssetRegistration;
 
 /// Mirror strategy configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MirrorStrategy {
     /// Mirror based on popularity
-    Popularity {
-        threshold: f64,
-        max_mirrors: u32,
-    },
+    Popularity { threshold: f64, max_mirrors: u32 },
     /// Mirror based on geographic distribution
     Geographic {
         regions: Vec<String>,
@@ -137,7 +134,9 @@ pub(in crate::sharing) struct MirrorCandidate {
 
 impl Ord for MirrorCandidate {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.priority.partial_cmp(&other.priority).unwrap_or(Ordering::Equal)
+        self.priority
+            .partial_cmp(&other.priority)
+            .unwrap_or(Ordering::Equal)
     }
 }
 

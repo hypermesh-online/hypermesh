@@ -69,7 +69,7 @@ impl NicCapabilities {
     fn read_driver_name(interface: &str) -> String {
         // Read the symlink at /sys/class/net/{interface}/device/driver
         // The symlink target basename is the driver name
-        let path = format!("/sys/class/net/{}/device/driver", interface);
+        let path = format!("/sys/class/net/{interface}/device/driver");
         std::fs::read_link(&path)
             .ok()
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
@@ -95,7 +95,7 @@ impl NicCapabilities {
 
     /// Read RX/TX queue counts from /sys/class/net/{iface}/queues/
     fn read_queue_counts(interface: &str) -> (u32, u32) {
-        let queues_path = format!("/sys/class/net/{}/queues", interface);
+        let queues_path = format!("/sys/class/net/{interface}/queues");
         let (mut rx, mut tx) = (0u32, 0u32);
 
         if let Ok(entries) = std::fs::read_dir(&queues_path) {
@@ -161,8 +161,7 @@ impl EbpfCapabilities {
     }
 
     fn read_kernel_version() -> String {
-        std::fs::read_to_string("/proc/version")
-            .unwrap_or_else(|_| "Unknown".to_string())
+        std::fs::read_to_string("/proc/version").unwrap_or_else(|_| "Unknown".to_string())
     }
 
     /// Parse kernel version string into (major, minor) tuple.
@@ -324,7 +323,9 @@ mod tests {
         assert!(caps.nic_capabilities.is_none());
         caps.detect_nic("lo");
         assert!(caps.nic_capabilities.is_some());
-        let nic = caps.nic_capabilities.expect("test: nic capabilities should be populated");
+        let nic = caps
+            .nic_capabilities
+            .expect("test: nic capabilities should be populated");
         assert_eq!(nic.interface, "lo");
     }
 }

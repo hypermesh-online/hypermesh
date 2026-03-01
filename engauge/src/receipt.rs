@@ -325,8 +325,7 @@ mod tests {
     fn receipt_serde_roundtrip() {
         let receipt = ContentReceipt::new(b"serde-test", test_node());
         let json = serde_json::to_string(&receipt).expect("test: serialize receipt");
-        let back: ContentReceipt =
-            serde_json::from_str(&json).expect("test: deserialize receipt");
+        let back: ContentReceipt = serde_json::from_str(&json).expect("test: deserialize receipt");
         assert_eq!(receipt.receipt_id, back.receipt_id);
         assert_eq!(receipt.content_hash, back.content_hash);
         assert_eq!(receipt.node_id, back.node_id);

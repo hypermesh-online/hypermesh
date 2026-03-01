@@ -13,10 +13,10 @@
 
 use blockmatrix::container::process::ProcessIsolation;
 use blockmatrix::container::ContainerId;
-use blockmatrix::network::cluster::{ClusterConfig, ClusterManager, NodeStatus};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::os_integration::platform_info::PlatformInfo;
+use blockmatrix::network::cluster::{ClusterConfig, ClusterManager, NodeStatus};
 use blockmatrix::os_integration::create_os_abstraction;
+use blockmatrix::os_integration::platform_info::PlatformInfo;
 use hypermesh_lib::BlockchainScope;
 use std::collections::HashMap;
 
@@ -161,7 +161,10 @@ async fn test_failed_node_triggers_container_cleanup() {
 
     // When a node degrades/fails, the operations layer stops its containers.
     // Simulate that cleanup:
-    assert!(iso_fail.is_running(&cid).await, "container should still be running");
+    assert!(
+        iso_fail.is_running(&cid).await,
+        "container should still be running"
+    );
     iso_fail
         .stop(&cid, std::time::Duration::from_secs(3))
         .await
@@ -247,7 +250,7 @@ fn test_platform_detection_drives_cluster_config() {
     // We should be able to add at least one node per CPU
     for i in 0..info.cpu_count.min(8) {
         mgr.add_node(
-            &format!("cpu-node-{}", i),
+            &format!("cpu-node-{i}"),
             coord(i as i64, 0, 0),
             BlockchainScope::Device,
         )
@@ -271,7 +274,7 @@ fn test_health_check_cycle_with_status_transitions() {
     // Add 4 nodes
     for i in 0..4 {
         mgr.add_node(
-            &format!("hc-node-{}", i),
+            &format!("hc-node-{i}"),
             coord(i, i, 0),
             BlockchainScope::Device,
         )
@@ -281,14 +284,14 @@ fn test_health_check_cycle_with_status_transitions() {
     // All nodes start as Joining
     for i in 0..4 {
         let node = mgr
-            .get_node_status(&format!("hc-node-{}", i))
+            .get_node_status(&format!("hc-node-{i}"))
             .expect("test: node exists");
         assert_eq!(node.status, NodeStatus::Joining);
     }
 
     // Heartbeat all -> Healthy
     for i in 0..4 {
-        mgr.record_heartbeat(&format!("hc-node-{}", i))
+        mgr.record_heartbeat(&format!("hc-node-{i}"))
             .expect("test: heartbeat");
     }
 
@@ -301,14 +304,12 @@ fn test_health_check_cycle_with_status_transitions() {
     mgr.mark_node_degraded("hc-node-2", "test degradation")
         .expect("test: mark degraded");
 
-    let node2 = mgr
-        .get_node_status("hc-node-2")
-        .expect("test: node exists");
+    let node2 = mgr.get_node_status("hc-node-2").expect("test: node exists");
     assert_eq!(node2.status, NodeStatus::Degraded);
 
     // Re-heartbeat only the non-degraded nodes
     for i in [0, 1, 3] {
-        mgr.record_heartbeat(&format!("hc-node-{}", i))
+        mgr.record_heartbeat(&format!("hc-node-{i}"))
             .expect("test: heartbeat");
     }
 
@@ -360,11 +361,7 @@ fn test_platform_info_with_matrix_positions() {
     assert_eq!(mgr.list_nodes().len(), 3);
 
     // Verify positions are distinct
-    let positions: Vec<MatrixCoordinate> = mgr
-        .list_nodes()
-        .iter()
-        .map(|n| n.position)
-        .collect();
+    let positions: Vec<MatrixCoordinate> = mgr.list_nodes().iter().map(|n| n.position).collect();
 
     // At least 2 distinct positions (memory and cpu might share x=0 if mem_gb==0 on some systems)
     let unique_count = {
@@ -375,8 +372,7 @@ fn test_platform_info_with_matrix_positions() {
     };
     assert!(
         unique_count >= 2,
-        "should have at least 2 distinct positions, got {}",
-        unique_count
+        "should have at least 2 distinct positions, got {unique_count}"
     );
 
     // All nodes should have the correct scope
@@ -411,7 +407,10 @@ async fn test_container_proc_usage_on_linux() {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let usage = iso.get_usage(&cid).await.expect("test: get_usage");
-    assert_eq!(usage.processes_current, 1, "should report 1 running process");
+    assert_eq!(
+        usage.processes_current, 1,
+        "should report 1 running process"
+    );
 
     // On Linux, /proc reading gives real memory data
     #[cfg(target_os = "linux")]
@@ -531,11 +530,10 @@ async fn test_container_lifecycle_real_process() {
     // Verify the process actually exists in /proc on Linux
     #[cfg(target_os = "linux")]
     {
-        let proc_path = format!("/proc/{}", pid);
+        let proc_path = format!("/proc/{pid}");
         assert!(
             std::path::Path::new(&proc_path).exists(),
-            "/proc/{} should exist for running process",
-            pid
+            "/proc/{pid} should exist for running process"
         );
     }
 
@@ -543,18 +541,20 @@ async fn test_container_lifecycle_real_process() {
     iso.stop(&cid, std::time::Duration::from_secs(3))
         .await
         .expect("test: stop");
-    assert!(!iso.is_running(&cid).await, "should not be running after stop");
+    assert!(
+        !iso.is_running(&cid).await,
+        "should not be running after stop"
+    );
 
     // Process should no longer exist
     #[cfg(target_os = "linux")]
     {
         // Give OS a moment to clean up
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let proc_path = format!("/proc/{}", pid);
+        let proc_path = format!("/proc/{pid}");
         assert!(
             !std::path::Path::new(&proc_path).exists(),
-            "/proc/{} should not exist after stop",
-            pid
+            "/proc/{pid} should not exist after stop"
         );
     }
 
@@ -660,7 +660,11 @@ async fn test_full_stack_platform_cluster_container_flow() {
         .expect("test: shutdown secondary");
     mgr.graceful_shutdown("primary")
         .expect("test: shutdown primary");
-    assert_eq!(mgr.list_nodes().len(), 0, "cluster should be empty after shutdown");
+    assert_eq!(
+        mgr.list_nodes().len(),
+        0,
+        "cluster should be empty after shutdown"
+    );
 }
 
 /// Stress test: 5 cluster nodes, 3 containers each, verify resource
@@ -682,7 +686,7 @@ async fn test_stress_five_nodes_three_containers_each() {
 
     // Create 5 nodes
     for i in 0..node_count {
-        let node_id = format!("stress-node-{}", i);
+        let node_id = format!("stress-node-{i}");
         mgr.add_node(&node_id, coord(i as i64, 0, 0), BlockchainScope::Device)
             .expect("test: add node");
         mgr.record_heartbeat(&node_id).expect("test: heartbeat");
@@ -715,14 +719,12 @@ async fn test_stress_five_nodes_three_containers_each() {
         assert_eq!(
             iso.total_memory_allocated().await,
             expected_mem,
-            "node {} memory mismatch",
-            i
+            "node {i} memory mismatch"
         );
         assert_eq!(
             iso.total_cpu_allocated().await,
             expected_cpu,
-            "node {} CPU mismatch",
-            i
+            "node {i} CPU mismatch"
         );
     }
 
@@ -757,8 +759,7 @@ async fn test_stress_five_nodes_three_containers_each() {
     for (i, iso) in isolations.iter().enumerate() {
         assert!(
             iso.is_running(&all_cids[i][0]).await,
-            "container on node {} should be running",
-            i
+            "container on node {i} should be running"
         );
     }
 
@@ -777,14 +778,13 @@ async fn test_stress_five_nodes_three_containers_each() {
         assert_eq!(
             iso.total_memory_allocated().await,
             0,
-            "node {} should have 0 memory after cleanup",
-            i
+            "node {i} should have 0 memory after cleanup"
         );
     }
 
     // Graceful shutdown of all cluster nodes
     for i in 0..node_count {
-        mgr.graceful_shutdown(&format!("stress-node-{}", i))
+        mgr.graceful_shutdown(&format!("stress-node-{i}"))
             .expect("test: shutdown node");
     }
     assert_eq!(mgr.list_nodes().len(), 0);
@@ -802,8 +802,7 @@ fn test_os_abstraction_with_cluster_and_platform() {
     assert_eq!(platform, "linux");
 
     // Build PlatformInfo from the same abstraction
-    let info =
-        PlatformInfo::from_abstraction(os.as_ref()).expect("test: from_abstraction");
+    let info = PlatformInfo::from_abstraction(os.as_ref()).expect("test: from_abstraction");
     assert_eq!(info.os_name, platform);
     assert!(info.cpu_count > 0);
 
@@ -817,13 +816,13 @@ fn test_os_abstraction_with_cluster_and_platform() {
     });
 
     mgr.add_node(
-        &format!("{}-node", platform),
+        &format!("{platform}-node"),
         coord(0, 0, 0),
         BlockchainScope::Device,
     )
     .expect("test: add platform node");
 
-    mgr.record_heartbeat(&format!("{}-node", platform))
+    mgr.record_heartbeat(&format!("{platform}-node"))
         .expect("test: heartbeat");
 
     let health = mgr.check_health();

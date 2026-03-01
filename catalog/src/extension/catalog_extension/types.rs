@@ -4,29 +4,27 @@
 
 //! CatalogExtension type definition, constructor, and internal helpers
 
+use semver::Version;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use semver::Version;
 
 use blockmatrix::extensions::{
-    ExtensionMetadata, ExtensionCategory,
-    ExtensionCapability, ExtensionStateData,
-    ExtensionHealth, AssetExtensionHandler,
-    ResourceUsageReport,
+    AssetExtensionHandler, ExtensionCapability, ExtensionCategory, ExtensionHealth,
+    ExtensionMetadata, ExtensionStateData, ResourceUsageReport,
 };
 
 use blockmatrix::assets::core::AssetType;
 
 use crate::{
-    library::{AssetLibrary, LibraryConfig},
     hypermesh_bridge::HyperMeshAssetRegistry,
+    library::{AssetLibrary, LibraryConfig},
     sharing::SharingManager,
     Catalog,
 };
 
 use super::super::asset_handlers::{
-    VirtualMachineHandler, LibraryHandler, DatasetHandler, TemplateHandler,
+    DatasetHandler, LibraryHandler, TemplateHandler, VirtualMachineHandler,
 };
 use super::super::config::CatalogExtensionConfig;
 
@@ -56,7 +54,8 @@ impl CatalogExtension {
             name: "HyperMesh Catalog".to_string(),
             version: Version::parse("0.1.0")
                 .expect("Hardcoded extension version must be valid semver"),
-            description: "Decentralized asset library and package manager for HyperMesh".to_string(),
+            description: "Decentralized asset library and package manager for HyperMesh"
+                .to_string(),
             author: "HyperMesh Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://catalog.hypermesh.online".to_string()),
@@ -102,28 +101,26 @@ impl CatalogExtension {
             enable_metrics: true,
         };
 
-        let library_manager = Arc::new(RwLock::new(
-            AssetLibrary::with_config(library_config)
-        ));
+        let library_manager = Arc::new(RwLock::new(AssetLibrary::with_config(library_config)));
 
         let asset_registry = None;
 
         let mut asset_handlers = HashMap::new();
         asset_handlers.insert(
             AssetType::VirtualMachine,
-            Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(
             AssetType::Library,
-            Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(
             AssetType::Library,
-            Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         asset_handlers.insert(
             AssetType::Container,
-            Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
 
         Self {
@@ -136,7 +133,7 @@ impl CatalogExtension {
             config,
             state: Arc::new(RwLock::new(ExtensionStateData {
                 version: 1,
-                metadata: metadata,
+                metadata,
                 state_data: vec![],
                 checksum: String::new(),
                 exported_at: std::time::SystemTime::now(),
@@ -168,9 +165,7 @@ impl CatalogExtension {
 
         if *count > 100 {
             let mut health = self.health.write().await;
-            *health = ExtensionHealth::Degraded(
-                format!("High error rate: {} errors", *count)
-            );
+            *health = ExtensionHealth::Degraded(format!("High error rate: {} errors", *count));
         }
     }
 

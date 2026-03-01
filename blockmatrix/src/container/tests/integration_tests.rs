@@ -17,7 +17,7 @@ use tokio;
 #[tokio::test]
 async fn test_container_lifecycle() {
     let config = ContainerConfig::default();
-    let runtime = ContainerRuntime::new(config).await.unwrap();
+    let runtime = ContainerRuntime::new(config).await.expect("test: async operation");
     
     // Create container spec
     let spec = ContainerSpec {
@@ -34,37 +34,37 @@ async fn test_container_lifecycle() {
     let options = CreateOptions::default();
     
     // Test container creation
-    let handle = runtime.create(spec, options).await.unwrap();
-    let status = handle.status().await.unwrap();
+    let handle = runtime.create(spec, options).await.expect("test: async operation");
+    let status = handle.status().await.expect("test: async operation");
     assert_eq!(status.state, ContainerState::Created);
     
     // Test container start
-    handle.start().await.unwrap();
-    let status = handle.status().await.unwrap();
+    handle.start().await.expect("test: async operation");
+    let status = handle.status().await.expect("test: async operation");
     assert_eq!(status.state, ContainerState::Running);
     
     // Test container pause/resume
-    handle.pause().await.unwrap();
-    let status = handle.status().await.unwrap();
+    handle.pause().await.expect("test: async operation");
+    let status = handle.status().await.expect("test: async operation");
     assert_eq!(status.state, ContainerState::Paused);
     
-    handle.resume().await.unwrap();
-    let status = handle.status().await.unwrap();
+    handle.resume().await.expect("test: async operation");
+    let status = handle.status().await.expect("test: async operation");
     assert_eq!(status.state, ContainerState::Running);
     
     // Test container stop
-    handle.stop(Some(Duration::from_secs(5))).await.unwrap();
-    let status = handle.status().await.unwrap();
+    handle.stop(Some(Duration::from_secs(5))).await.expect("test: async operation");
+    let status = handle.status().await.expect("test: async operation");
     assert_eq!(status.state, ContainerState::Stopped);
     
     // Test container deletion
-    handle.delete().await.unwrap();
+    handle.delete().await.expect("test: async operation");
 }
 
 #[tokio::test]
 async fn test_resource_management() {
     let config = ContainerConfig::default();
-    let runtime = ContainerRuntime::new(config).await.unwrap();
+    let runtime = ContainerRuntime::new(config).await.expect("test: async operation");
     
     let spec = ContainerSpec {
         image: \"test:latest\".to_string(),
@@ -81,26 +81,26 @@ async fn test_resource_management() {
         security: SecurityConfig::default(),
     };
     
-    let handle = runtime.create(spec, CreateOptions::default()).await.unwrap();
-    handle.start().await.unwrap();
+    let handle = runtime.create(spec, CreateOptions::default()).await.expect("test: async operation");
+    handle.start().await.expect("test: async operation");
     
     // Test resource usage monitoring
-    let usage = handle.usage().await.unwrap();
+    let usage = handle.usage().await.expect("test: async operation");
     assert!(usage.memory_usage > 0);
     assert!(usage.cpu_usage_percent >= 0.0);
     
     // Test metrics collection
-    let metrics = handle.metrics().await.unwrap();
+    let metrics = handle.metrics().await.expect("test: async operation");
     assert!(metrics.uptime_seconds >= 0);
     
-    handle.stop(None).await.unwrap();
-    handle.delete().await.unwrap();
+    handle.stop(None).await.expect("test: async operation");
+    handle.delete().await.expect("test: async operation");
 }
 
 #[tokio::test]
 async fn test_container_migration() {
     let config = ContainerConfig::default();
-    let runtime = ContainerRuntime::new(config).await.unwrap();
+    let runtime = ContainerRuntime::new(config).await.expect("test: async operation");
     
     let spec = ContainerSpec {
         image: \"test:latest\".to_string(),
@@ -113,8 +113,8 @@ async fn test_container_migration() {
         security: SecurityConfig::default(),
     };
     
-    let handle = runtime.create(spec, CreateOptions::default()).await.unwrap();
-    handle.start().await.unwrap();
+    let handle = runtime.create(spec, CreateOptions::default()).await.expect("test: async operation");
+    handle.start().await.expect("test: async operation");
     
     // Test live migration
     let migration_request = hypermesh_container::migration::MigrationRequest {
@@ -125,18 +125,18 @@ async fn test_container_migration() {
         bandwidth_limit: None,
     };
     
-    let result = handle.migrate(migration_request).await.unwrap();
+    let result = handle.migrate(migration_request).await.expect("test: async operation");
     assert!(result.success);
     assert!(result.downtime <= Duration::from_millis(100));
     
-    handle.stop(None).await.unwrap();
-    handle.delete().await.unwrap();
+    handle.stop(None).await.expect("test: async operation");
+    handle.delete().await.expect("test: async operation");
 }
 
 #[tokio::test]
 async fn test_container_performance_targets() {
     let config = ContainerConfig::default();
-    let runtime = ContainerRuntime::new(config).await.unwrap();
+    let runtime = ContainerRuntime::new(config).await.expect("test: async operation");
     
     let spec = ContainerSpec {
         image: \"test:latest\".to_string(),
@@ -151,36 +151,36 @@ async fn test_container_performance_targets() {
     
     // Test container creation time (<50ms)
     let create_start = std::time::Instant::now();
-    let handle = runtime.create(spec, CreateOptions::default()).await.unwrap();
+    let handle = runtime.create(spec, CreateOptions::default()).await.expect("test: async operation");
     let create_time = create_start.elapsed();
     // Note: In simulation mode, this will be much faster than real implementation
     assert!(create_time < Duration::from_millis(1000)); // Relaxed for simulation
     
     // Test container startup time (<100ms)
     let start_time = std::time::Instant::now();
-    handle.start().await.unwrap();
+    handle.start().await.expect("test: async operation");
     let startup_time = start_time.elapsed();
     assert!(startup_time < Duration::from_millis(200)); // Relaxed for simulation
     
     // Test pause/resume time (<10ms pause, <50ms resume)
     let pause_start = std::time::Instant::now();
-    handle.pause().await.unwrap();
+    handle.pause().await.expect("test: async operation");
     let pause_time = pause_start.elapsed();
     assert!(pause_time < Duration::from_millis(100)); // Relaxed for simulation
     
     let resume_start = std::time::Instant::now();
-    handle.resume().await.unwrap();
+    handle.resume().await.expect("test: async operation");
     let resume_time = resume_start.elapsed();
     assert!(resume_time < Duration::from_millis(200)); // Relaxed for simulation
     
-    handle.stop(None).await.unwrap();
-    handle.delete().await.unwrap();
+    handle.stop(None).await.expect("test: async operation");
+    handle.delete().await.expect("test: async operation");
 }
 
 #[tokio::test]
 async fn test_multiple_containers() {
     let config = ContainerConfig::default();
-    let runtime = ContainerRuntime::new(config).await.unwrap();
+    let runtime = ContainerRuntime::new(config).await.expect("test: async operation");
     
     let spec = ContainerSpec {
         image: \"test:latest\".to_string(),
@@ -199,20 +199,20 @@ async fn test_multiple_containers() {
         let mut spec = spec.clone();
         spec.environment.insert(\"CONTAINER_ID\".to_string(), i.to_string());
         
-        let handle = runtime.create(spec, CreateOptions::default()).await.unwrap();
-        handle.start().await.unwrap();
+        let handle = runtime.create(spec, CreateOptions::default()).await.expect("test: async operation");
+        handle.start().await.expect("test: async operation");
         handles.push(handle);
     }
     
     // Verify all containers are running
     for handle in &handles {
-        let status = handle.status().await.unwrap();
+        let status = handle.status().await.expect("test: async operation");
         assert_eq!(status.state, ContainerState::Running);
     }
     
     // Clean up
     for handle in handles {
-        handle.stop(None).await.unwrap();
-        handle.delete().await.unwrap();
+        handle.stop(None).await.expect("test: async operation");
+        handle.delete().await.expect("test: async operation");
     }
 }

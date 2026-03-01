@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use bytes::{Bytes, Buf};
+use bytes::{Buf, Bytes};
 use h3::client::SendRequest;
 use http::{Request, Response, Uri};
 use std::time::Duration;
@@ -33,24 +33,22 @@ impl Http3Proxy {
 
         // Prepare the request - extract values before mutable borrow
         let method_str = req.method().as_str().to_string();
-        let path_str = req.uri().path_and_query().map(|pq| pq.as_str().to_string()).unwrap_or_else(|| "/".to_string());
+        let path_str = req
+            .uri()
+            .path_and_query()
+            .map(|pq| pq.as_str().to_string())
+            .unwrap_or_else(|| "/".to_string());
 
         // Now do mutable borrow
         let headers = req.headers_mut();
 
         // Ensure we have required pseudo-headers for HTTP/3
         if !headers.contains_key(":method") {
-            headers.insert(
-                ":method",
-                http::HeaderValue::from_str(&method_str)?,
-            );
+            headers.insert(":method", http::HeaderValue::from_str(&method_str)?);
         }
 
         if !headers.contains_key(":path") {
-            headers.insert(
-                ":path",
-                http::HeaderValue::from_str(&path_str)?,
-            );
+            headers.insert(":path", http::HeaderValue::from_str(&path_str)?);
         }
 
         if !headers.contains_key(":scheme") {
@@ -138,10 +136,7 @@ impl Http3Proxy {
                     delay = delay.saturating_mul(2);
                 }
                 Err(e) => {
-                    error!(
-                        "Request failed after {} attempts: {}",
-                        max_attempts, e
-                    );
+                    error!("Request failed after {} attempts: {}", max_attempts, e);
                     return Err(e);
                 }
             }
@@ -152,8 +147,8 @@ impl Http3Proxy {
 /// Helper to transform backend paths
 pub fn transform_backend_path(original_path: &str, backend_prefix: &str) -> String {
     // Remove the /api/v1/{service} prefix for backend
-    if original_path.starts_with(backend_prefix) {
-        original_path[backend_prefix.len()..].to_string()
+    if let Some(stripped) = original_path.strip_prefix(backend_prefix) {
+        stripped.to_string()
     } else {
         original_path.to_string()
     }
@@ -175,7 +170,7 @@ pub fn _build_backend_uri(
 
     // Set path and query
     let path_and_query = if let Some(query) = original_uri.query() {
-        format!("{}?{}", transformed_path, query)
+        format!("{transformed_path}?{query}")
     } else {
         transformed_path.to_string()
     };

@@ -6,7 +6,6 @@ phase = "alpha"
 
 [features.working]
 items = [
-    "Certificate Authority with issuance and revocation",
     "FALCON-1024 post-quantum signing",
     "Kyber-1024 key encapsulation",
     "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
@@ -18,19 +17,37 @@ items = [
     "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
     "StateAuthenticator (renamed from ConsensusValidator)",
     "BLAKE3 consensus content hashing",
-    "Certificate rotation scheduler with background task",
     "OCSP responder with FALCON-1024 signed responses",
     "CRL generator and distributor",
     "Threshold cryptography (Shamir SSS over GF(256))",
     "Deployment quality gates",
     "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-    "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
+    "HTTP/3 server with 8 real handler functions (issue, validate, revoke, list, get, health, metrics, dns_resolve)",
     "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
     "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
 ]
 
 [features.in_development]
-items = []
+items = [
+    "Certificate Authority issuance (issue_certificate uses self_signed() instead of signed_by() CA root)",
+    "CA signing hierarchy (all issued certs are currently self-signed, not CA-signed)",
+    "Key rotation logic (scheduler runs, CertificateRotationManager rotates 0 certs)",
+    "Persistent revocation storage (currently in-memory only)",
+    "Canonical type migration (own SpaceProof/StakeProof/WorkProof/TimeProof conflict with lib)",
+    "DNS resolution handler (returns empty — needs STOQ transport wiring)",
+]
 
 [features.planned]
-items = []
+items = [
+    "Identity-typed certificates (service/agent/node distinction)",
+    "KeyUsage/EKU enforcement in issued X.509 certs",
+    "Threshold crypto integration with CA initialization",
+    "Distributed revocation propagation",
+    "Offline device grace period renewal",
+    "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
+    "Identity-scoped certificate extensions (OID-based)",
+    "Cascading revocation (parent→child identity propagation)",
+    "Real certificate operation metrics (issuance latency, validation throughput)",
+    "CRL distribution via blockchain (offline revocation)",
+    "Field device bootstrap with intermittent connectivity",
+]

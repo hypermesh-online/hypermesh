@@ -10,8 +10,8 @@
 use crate::assets::core::{AssetError, AssetResult};
 use crate::assets::pipeline::sharding::Shard;
 use crate::distribution::{
-    NodeInfo, ShardPlacement, pos_validator::StateAuthenticator,
-    matrix_optimizer::distribute_across_octants, audit_trail::record_redistribution,
+    audit_trail::record_redistribution, matrix_optimizer::distribute_across_octants,
+    pos_validator::StateAuthenticator, NodeInfo, ShardPlacement,
 };
 use serde::{Deserialize, Serialize};
 
@@ -115,32 +115,28 @@ where
 
     // Redistribute based on strategy
     let (new_placements, moved_shards) = match strategy {
-        RedistributionStrategy::Minimal => {
-            redistribute_minimal(
-                &affected_shards,
-                current_placements,
-                shards,
-                &eligible_nodes,
-            )?
-        }
+        RedistributionStrategy::Minimal => redistribute_minimal(
+            &affected_shards,
+            current_placements,
+            shards,
+            &eligible_nodes,
+        )?,
         RedistributionStrategy::FullRebalance => {
             redistribute_full_rebalance(shards, &eligible_nodes)?
         }
-        RedistributionStrategy::NearestAvailable => {
-            redistribute_nearest(
-                &affected_shards,
-                current_placements,
-                shards,
-                &eligible_nodes,
-            )?
-        }
+        RedistributionStrategy::NearestAvailable => redistribute_nearest(
+            &affected_shards,
+            current_placements,
+            shards,
+            &eligible_nodes,
+        )?,
     };
 
     // Record redistribution on blockchain
     record_redistribution(
         asset_id,
         &new_placements,
-        &format!("PoS revocation for node {}", revoked_node_id),
+        &format!("PoS revocation for node {revoked_node_id}"),
     )
     .await?;
 
@@ -199,12 +195,13 @@ where
             .await
         }
         _ => Err(AssetError::ValidationError {
-            message: format!("Unsupported trigger: {:?}", trigger),
+            message: format!("Unsupported trigger: {trigger:?}"),
         }),
     }
 }
 
 /// Minimal redistribution - move only affected shards
+#[allow(clippy::type_complexity)]
 fn redistribute_minimal(
     affected_shards: &[&ShardPlacement],
     current_placements: &[ShardPlacement],
@@ -215,8 +212,7 @@ fn redistribute_minimal(
     let mut moved = Vec::new();
 
     // Get affected shard indices
-    let affected_indices: Vec<usize> =
-        affected_shards.iter().map(|p| p.shard_index).collect();
+    let affected_indices: Vec<usize> = affected_shards.iter().map(|p| p.shard_index).collect();
 
     // Select affected shards
     let affected_shard_data: Vec<_> = shards
@@ -258,6 +254,7 @@ fn redistribute_minimal(
 }
 
 /// Full rebalance - redistribute all shards
+#[allow(clippy::type_complexity)]
 fn redistribute_full_rebalance(
     shards: Vec<Shard>,
     eligible_nodes: &[NodeInfo],
@@ -271,6 +268,7 @@ fn redistribute_full_rebalance(
 }
 
 /// Nearest available redistribution
+#[allow(clippy::type_complexity)]
 fn redistribute_nearest(
     affected_shards: &[&ShardPlacement],
     current_placements: &[ShardPlacement],
@@ -298,7 +296,7 @@ fn redistribute_nearest(
         // Create new placement
         let new_placement = ShardPlacement {
             shard_index: affected.shard_index,
-            position: nearest_node.position.clone(),
+            position: nearest_node.position,
             node_id: nearest_node.node_id.clone(),
             octant: affected.octant,
             distance_from_origin: affected
@@ -340,7 +338,7 @@ mod tests {
                 is_parity: false,
                 size: 1024,
                 original_size: 1024,
-                hash: format!("hash-{}", index),
+                hash: format!("hash-{index}"),
             },
         }
     }
@@ -349,21 +347,21 @@ mod tests {
         vec![
             NodeInfo::new(
                 "node1".to_string(),
-                MatrixCoordinate::new(10, 10, 10).unwrap(),
+                MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node2".to_string(),
-                MatrixCoordinate::new(20, 20, 20).unwrap(),
+                MatrixCoordinate::new(20, 20, 20).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node3".to_string(),
-                MatrixCoordinate::new(30, 30, 30).unwrap(),
+                MatrixCoordinate::new(30, 30, 30).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
@@ -379,14 +377,14 @@ mod tests {
         let current_placements = vec![
             ShardPlacement {
                 shard_index: 0,
-                position: nodes[0].position.clone(),
+                position: nodes[0].position,
                 node_id: "node1".to_string(),
                 octant: 0,
                 distance_from_origin: 17.32,
             },
             ShardPlacement {
                 shard_index: 1,
-                position: nodes[1].position.clone(),
+                position: nodes[1].position,
                 node_id: "node2".to_string(),
                 octant: 0,
                 distance_from_origin: 34.64,
@@ -406,7 +404,7 @@ mod tests {
             RedistributionStrategy::Minimal,
         )
         .await
-        .unwrap();
+        .expect("test: expected success");
 
         assert_eq!(result.moved_shards.len(), 1);
         assert_eq!(result.moved_shards[0].0, "node1");
@@ -419,7 +417,7 @@ mod tests {
 
         let current_placements = vec![ShardPlacement {
             shard_index: 0,
-            position: nodes[0].position.clone(),
+            position: nodes[0].position,
             node_id: "node1".to_string(),
             octant: 0,
             distance_from_origin: 17.32,
@@ -438,7 +436,7 @@ mod tests {
             RedistributionStrategy::Minimal,
         )
         .await
-        .unwrap();
+        .expect("test: expected success");
 
         assert_eq!(result.moved_shards.len(), 0);
     }
@@ -451,14 +449,14 @@ mod tests {
         let current_placements = vec![
             ShardPlacement {
                 shard_index: 0,
-                position: nodes[0].position.clone(),
+                position: nodes[0].position,
                 node_id: "node1".to_string(),
                 octant: 0,
                 distance_from_origin: 17.32,
             },
             ShardPlacement {
                 shard_index: 1,
-                position: nodes[1].position.clone(),
+                position: nodes[1].position,
                 node_id: "node2".to_string(),
                 octant: 0,
                 distance_from_origin: 34.64,

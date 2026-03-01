@@ -280,7 +280,8 @@ mod tests {
         t.source_proofs_verified = true;
         t.target_proofs_verified = true;
 
-        t.begin_transit().expect("test: begin_transit should succeed");
+        t.begin_transit()
+            .expect("test: begin_transit should succeed");
         assert_eq!(t.status, TransferStatus::InTransit);
 
         t.confirm().expect("test: confirm should succeed");

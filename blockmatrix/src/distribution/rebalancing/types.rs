@@ -45,10 +45,7 @@ pub enum RebalanceAction {
         to_node: String,
     },
     /// Create a new replica of a shard on a node.
-    ReplicateShard {
-        shard_id: ShardId,
-        to_node: String,
-    },
+    ReplicateShard { shard_id: ShardId, to_node: String },
     /// Remove an excess replica from a node.
     RemoveReplica {
         shard_id: ShardId,

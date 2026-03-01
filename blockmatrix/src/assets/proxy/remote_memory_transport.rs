@@ -8,19 +8,17 @@
 //! NAT-like memory addressing system. This implements zero-copy memory sharing,
 //! RDMA-style operations, and secure memory isolation.
 
+use bytes::{Bytes, BytesMut};
+use quinn::{Connection, Endpoint, RecvStream};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::sync::{RwLock, Mutex, Semaphore};
 use tokio::io::AsyncReadExt;
-use bytes::{Bytes, BytesMut};
-use quinn::{Endpoint, Connection, RecvStream};
-use serde::{Serialize, Deserialize};
+use tokio::sync::{Mutex, RwLock, Semaphore};
 
-use crate::assets::core::{
-    AssetResult, AssetError,
-};
 use super::{GlobalAddress, MemoryPermissions};
+use crate::assets::core::{AssetError, AssetResult};
 
 /// Memory transport protocol for remote access
 #[derive(Clone)]
@@ -147,7 +145,11 @@ pub enum MemoryOperationType {
     /// Write memory
     Write { offset: usize },
     /// Compare and swap
-    CompareAndSwap { offset: usize, expected: Vec<u8>, new_value: Vec<u8> },
+    CompareAndSwap {
+        offset: usize,
+        expected: Vec<u8>,
+        new_value: Vec<u8>,
+    },
     /// Atomic add
     AtomicAdd { offset: usize, value: i64 },
     /// Memory fence
@@ -155,7 +157,10 @@ pub enum MemoryOperationType {
     /// Prefetch
     Prefetch { offset: usize, length: usize },
     /// Memory map
-    Map { size: usize, permissions: MemoryPermissions },
+    Map {
+        size: usize,
+        permissions: MemoryPermissions,
+    },
     /// Memory unmap
     Unmap,
     /// Memory sync
@@ -191,9 +196,7 @@ pub enum MemoryProtocolMessage {
         result: OperationResult,
     },
     /// Heartbeat
-    Heartbeat {
-        timestamp: SystemTime,
-    },
+    Heartbeat { timestamp: SystemTime },
     /// Memory notification
     Notification {
         address: GlobalAddress,
@@ -251,23 +254,27 @@ impl RemoteMemoryTransport {
 
     /// Connect to remote node
     pub async fn connect_to_node(&self, node_id: [u8; 8], address: &str) -> AssetResult<()> {
-        let permit = self.connection_semaphore.acquire().await
-            .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to acquire connection permit: {}", e),
-            })?;
+        let permit =
+            self.connection_semaphore
+                .acquire()
+                .await
+                .map_err(|e| AssetError::NetworkError {
+                    message: format!("Failed to acquire connection permit: {e}"),
+                })?;
 
-        let socket_addr = address.parse()
-            .map_err(|e| AssetError::NetworkError {
-                message: format!("Invalid socket address '{}': {}", address, e),
-            })?;
+        let socket_addr = address.parse().map_err(|e| AssetError::NetworkError {
+            message: format!("Invalid socket address '{address}': {e}"),
+        })?;
 
-        let connection = self.endpoint.connect(socket_addr, "hypermesh-memory")
+        let connection = self
+            .endpoint
+            .connect(socket_addr, "hypermesh-memory")
             .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to connect: {}", e),
+                message: format!("Failed to connect: {e}"),
             })?
             .await
             .map_err(|e| AssetError::NetworkError {
-                message: format!("Connection failed: {}", e),
+                message: format!("Connection failed: {e}"),
             })?;
 
         self.connections.write().await.insert(node_id, connection);
@@ -294,15 +301,13 @@ impl RemoteMemoryTransport {
             permissions: permissions.clone(),
         };
 
-        let result = self.execute_remote_operation(
-            &global_address,
-            operation,
-            None,
-        ).await?;
+        let result = self
+            .execute_remote_operation(&global_address, operation, None)
+            .await?;
 
         if !result.success {
             return Err(AssetError::MemoryMappingFailed {
-                address: format!("{:?}", global_address),
+                address: format!("{global_address:?}"),
                 reason: result.error.unwrap_or_else(|| "Unknown error".to_string()),
             });
         }
@@ -319,7 +324,10 @@ impl RemoteMemoryTransport {
             protection_key: None,
         };
 
-        self.mapped_regions.write().await.insert(global_address, region.clone());
+        self.mapped_regions
+            .write()
+            .await
+            .insert(global_address, region.clone());
 
         Ok(region)
     }
@@ -333,27 +341,32 @@ impl RemoteMemoryTransport {
     ) -> AssetResult<Bytes> {
         // Check if region is mapped
         let regions = self.mapped_regions.read().await;
-        let region = regions.get(global_address)
+        let region = regions
+            .get(global_address)
             .ok_or_else(|| AssetError::MemoryNotMapped {
-                address: format!("{:?}", global_address),
+                address: format!("{global_address:?}"),
             })?;
 
         if !region.permissions.read {
             return Err(AssetError::PermissionDenied {
                 operation: "read".to_string(),
-                resource: format!("{:?}", global_address),
+                resource: format!("{global_address:?}"),
                 reason: "Read permission not granted for this memory region".to_string(),
             });
         }
 
         let operation = MemoryOperationType::Read { offset, length };
-        let result = self.execute_remote_operation(global_address, operation, None).await?;
+        let result = self
+            .execute_remote_operation(global_address, operation, None)
+            .await?;
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                reason: format!("Read failed at {:?}: {}",
+                reason: format!(
+                    "Read failed at {:?}: {}",
                     global_address,
-                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())
+                ),
             });
         }
 
@@ -369,31 +382,32 @@ impl RemoteMemoryTransport {
     ) -> AssetResult<()> {
         // Check if region is mapped
         let regions = self.mapped_regions.read().await;
-        let region = regions.get(global_address)
+        let region = regions
+            .get(global_address)
             .ok_or_else(|| AssetError::MemoryNotMapped {
-                address: format!("{:?}", global_address),
+                address: format!("{global_address:?}"),
             })?;
 
         if !region.permissions.write {
             return Err(AssetError::PermissionDenied {
                 operation: "write".to_string(),
-                resource: format!("{:?}", global_address),
+                resource: format!("{global_address:?}"),
                 reason: "Write permission not granted for this memory region".to_string(),
             });
         }
 
         let operation = MemoryOperationType::Write { offset };
-        let result = self.execute_remote_operation(
-            global_address,
-            operation,
-            Some(data),
-        ).await?;
+        let result = self
+            .execute_remote_operation(global_address, operation, Some(data))
+            .await?;
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                reason: format!("Write failed at {:?}: {}",
+                reason: format!(
+                    "Write failed at {:?}: {}",
                     global_address,
-                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())
+                ),
             });
         }
 
@@ -414,7 +428,9 @@ impl RemoteMemoryTransport {
             new_value,
         };
 
-        let result = self.execute_remote_operation(global_address, operation, None).await?;
+        let result = self
+            .execute_remote_operation(global_address, operation, None)
+            .await?;
         Ok(result.success)
     }
 
@@ -426,13 +442,17 @@ impl RemoteMemoryTransport {
         value: i64,
     ) -> AssetResult<i64> {
         let operation = MemoryOperationType::AtomicAdd { offset, value };
-        let result = self.execute_remote_operation(global_address, operation, None).await?;
+        let result = self
+            .execute_remote_operation(global_address, operation, None)
+            .await?;
 
         if !result.success {
             return Err(AssetError::MemoryAccessFailed {
-                reason: format!("Atomic add failed at {:?}: {}",
+                reason: format!(
+                    "Atomic add failed at {:?}: {}",
                     global_address,
-                    result.error.unwrap_or_else(|| "Unknown error".to_string())),
+                    result.error.unwrap_or_else(|| "Unknown error".to_string())
+                ),
             });
         }
 
@@ -454,10 +474,12 @@ impl RemoteMemoryTransport {
 
         // Get connection to target node
         let connections = self.connections.read().await;
-        let connection = connections.get(&global_address.node_id)
-            .ok_or_else(|| AssetError::NetworkError {
-                message: format!("No connection to node {:?}", global_address.node_id),
-            })?;
+        let connection =
+            connections
+                .get(&global_address.node_id)
+                .ok_or_else(|| AssetError::NetworkError {
+                    message: format!("No connection to node {:?}", global_address.node_id),
+                })?;
 
         // Create pending operation
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -470,7 +492,10 @@ impl RemoteMemoryTransport {
             completion_sender: Arc::new(Mutex::new(Some(tx))),
         };
 
-        self.pending_operations.write().await.insert(operation_id, pending);
+        self.pending_operations
+            .write()
+            .await
+            .insert(operation_id, pending);
 
         // Send request
         let message = MemoryProtocolMessage::Request {
@@ -483,9 +508,10 @@ impl RemoteMemoryTransport {
         self.send_message(connection, message).await?;
 
         // Wait for response with timeout
-        let result = tokio::time::timeout(self.config.operation_timeout, rx).await
+        let result = tokio::time::timeout(self.config.operation_timeout, rx)
+            .await
             .map_err(|_| AssetError::OperationTimeout {
-                operation: format!("memory operation {}", operation_id),
+                operation: format!("memory operation {operation_id}"),
             })?
             .map_err(|_| AssetError::NetworkError {
                 message: "Operation cancelled".to_string(),
@@ -503,7 +529,8 @@ impl RemoteMemoryTransport {
         }
 
         metrics.avg_latency_us = (metrics.avg_latency_us * (metrics.total_operations - 1) as f64
-            + latency_us as f64) / metrics.total_operations as f64;
+            + latency_us as f64)
+            / metrics.total_operations as f64;
 
         if let Some(ref data) = result.data {
             metrics.bytes_transferred += data.len() as u64;
@@ -513,26 +540,32 @@ impl RemoteMemoryTransport {
     }
 
     /// Send protocol message
-    async fn send_message(&self, connection: &Connection, message: MemoryProtocolMessage) -> AssetResult<()> {
-        let mut stream = connection.open_uni().await
+    async fn send_message(
+        &self,
+        connection: &Connection,
+        message: MemoryProtocolMessage,
+    ) -> AssetResult<()> {
+        let mut stream = connection
+            .open_uni()
+            .await
             .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to open stream: {}", e),
+                message: format!("Failed to open stream: {e}"),
             })?;
 
-        let data = bincode::serialize(&message)
-            .map_err(|e| AssetError::SerializationError {
-                message: format!("Failed to serialize message: {}", e),
+        let data = bincode::serialize(&message).map_err(|e| AssetError::SerializationError {
+            message: format!("Failed to serialize message: {e}"),
+        })?;
+
+        stream
+            .write_all(&data)
+            .await
+            .map_err(|e| AssetError::NetworkError {
+                message: format!("Failed to send message: {e}"),
             })?;
 
-        stream.write_all(&data).await
-            .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to send message: {}", e),
-            })?;
-
-        stream.finish()
-            .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to finish stream: {}", e),
-            })?;
+        stream.finish().map_err(|e| AssetError::NetworkError {
+            message: format!("Failed to finish stream: {e}"),
+        })?;
 
         Ok(())
     }
@@ -547,20 +580,29 @@ impl RemoteMemoryTransport {
     /// Handle incoming memory requests (server side)
     pub async fn handle_incoming_request(&self, mut stream: RecvStream) -> AssetResult<()> {
         let mut buf = BytesMut::with_capacity(self.config.max_message_size);
-        stream.read_buf(&mut buf).await
+        stream
+            .read_buf(&mut buf)
+            .await
             .map_err(|e| AssetError::NetworkError {
-                message: format!("Failed to read request: {}", e),
+                message: format!("Failed to read request: {e}"),
             })?;
 
-        let message: MemoryProtocolMessage = bincode::deserialize(&buf)
-            .map_err(|e| AssetError::DeserializationError {
-                message: format!("Failed to deserialize request: {}", e),
+        let message: MemoryProtocolMessage =
+            bincode::deserialize(&buf).map_err(|e| AssetError::DeserializationError {
+                message: format!("Failed to deserialize request: {e}"),
             })?;
 
         match message {
-            MemoryProtocolMessage::Request { operation_id, operation, target_address, data } => {
+            MemoryProtocolMessage::Request {
+                operation_id,
+                operation,
+                target_address,
+                data,
+            } => {
                 // Process the operation
-                let result = self.process_memory_operation(operation, &target_address, data).await;
+                let result = self
+                    .process_memory_operation(operation, &target_address, data)
+                    .await;
 
                 // Send response back
                 let response = MemoryProtocolMessage::Response {
@@ -569,7 +611,11 @@ impl RemoteMemoryTransport {
                 };
 
                 // Would send response back through appropriate channel
-                tracing::debug!("Processed memory operation {}: {:?}", operation_id, response);
+                tracing::debug!(
+                    "Processed memory operation {}: {:?}",
+                    operation_id,
+                    response
+                );
             }
             _ => {
                 tracing::warn!("Received unexpected message type");
@@ -606,7 +652,11 @@ impl RemoteMemoryTransport {
             }
             MemoryOperationType::Write { offset } => {
                 // Simulate writing memory
-                tracing::debug!("Writing {} bytes at offset {}", data.as_ref().map(|d| d.len()).unwrap_or(0), offset);
+                tracing::debug!(
+                    "Writing {} bytes at offset {}",
+                    data.as_ref().map(|d| d.len()).unwrap_or(0),
+                    offset
+                );
 
                 OperationResult {
                     success: true,
@@ -615,14 +665,12 @@ impl RemoteMemoryTransport {
                     latency_us: 150,
                 }
             }
-            MemoryOperationType::CompareAndSwap { .. } => {
-                OperationResult {
-                    success: true,
-                    data: None,
-                    error: None,
-                    latency_us: 200,
-                }
-            }
+            MemoryOperationType::CompareAndSwap { .. } => OperationResult {
+                success: true,
+                data: None,
+                error: None,
+                latency_us: 200,
+            },
             MemoryOperationType::AtomicAdd { value, .. } => {
                 let result_value = value + 1; // Simulate atomic add
                 OperationResult {
@@ -632,14 +680,12 @@ impl RemoteMemoryTransport {
                     latency_us: 180,
                 }
             }
-            _ => {
-                OperationResult {
-                    success: true,
-                    data: None,
-                    error: None,
-                    latency_us: 50,
-                }
-            }
+            _ => OperationResult {
+                success: true,
+                data: None,
+                error: None,
+                latency_us: 50,
+            },
         }
     }
 
@@ -677,29 +723,37 @@ mod tests {
 
     #[tokio::test]
     async fn test_operation_id_generation() {
-        // STUB: Phase 3 - Endpoint configuration needs proper rustls setup
-        // Modern rustls API requires crypto provider setup
-        // Create a dummy server config for testing
-        let cert = rustls::pki_types::CertificateDer::from(vec![]);
-        let key = rustls::pki_types::PrivateKeyDer::Pkcs8(vec![].into());
+        // Install crypto provider for rustls (idempotent)
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .ok();
+
+        // Generate a self-signed certificate for testing
+        let cert_params = rcgen::CertificateParams::new(vec!["localhost".to_string()])
+            .expect("test: valid cert params");
+        let cert_key = rcgen::KeyPair::generate().expect("test: key generation");
+        let cert = cert_params
+            .self_signed(&cert_key)
+            .expect("test: self-signed cert");
+        let cert_der = rustls::pki_types::CertificateDer::from(cert.der().to_vec());
+        let key_der = rustls::pki_types::PrivateKeyDer::Pkcs8(cert_key.serialize_der().into());
+
         let server_crypto = rustls::ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(vec![cert], key)
-            .unwrap();
+            .with_single_cert(vec![cert_der], key_der)
+            .expect("test: server config");
 
         let server_config = quinn::ServerConfig::with_crypto(Arc::new(
-            quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto).unwrap()
+            quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto)
+                .expect("test: quic server config"),
         ));
 
-        let endpoint = quinn::Endpoint::server(
-            server_config,
-            "127.0.0.1:0".parse().unwrap(),
-        ).unwrap();
+        let endpoint = quinn::Endpoint::server(server_config, "127.0.0.1:0".parse().expect("test: valid parse"))
+            .expect("test: endpoint creation");
 
-        let transport = RemoteMemoryTransport::new(
-            endpoint,
-            TransportConfig::default(),
-        ).await.unwrap();
+        let transport = RemoteMemoryTransport::new(endpoint, TransportConfig::default())
+            .await
+            .expect("test: transport creation");
 
         let id1 = transport.generate_operation_id();
         let id2 = transport.generate_operation_id();

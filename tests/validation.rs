@@ -119,8 +119,8 @@ async fn validate_performance_targets() -> PerformanceValidation {
     // Latency targets
     validation.trustchain_latency_ms = measure_trustchain_latency().await;
     validation.consensus_latency_ms = measure_consensus_latency().await;
-    validation.latency_passed = validation.trustchain_latency_ms <= 50.0
-        && validation.consensus_latency_ms <= 100.0;
+    validation.latency_passed =
+        validation.trustchain_latency_ms <= 50.0 && validation.consensus_latency_ms <= 100.0;
 
     // Scalability
     validation.max_connections = test_max_connections().await;
@@ -129,8 +129,8 @@ async fn validate_performance_targets() -> PerformanceValidation {
     // Resource usage
     validation.memory_usage_mb = measure_memory_usage().await;
     validation.cpu_usage_percent = measure_cpu_usage().await;
-    validation.resource_passed = validation.memory_usage_mb <= 1000.0
-        && validation.cpu_usage_percent <= 80.0;
+    validation.resource_passed =
+        validation.memory_usage_mb <= 1000.0 && validation.cpu_usage_percent <= 80.0;
 
     validation
 }
@@ -159,40 +159,30 @@ async fn validate_reliability() -> ReliabilityValidation {
 
 /// Documentation validation
 async fn validate_documentation() -> DocumentationValidation {
-    let mut validation = DocumentationValidation::default();
-
-    // API documentation
-    validation.api_documented = check_api_documentation().await;
-
-    // Configuration documentation
-    validation.config_documented = check_config_documentation().await;
-
-    // Deployment guides
-    validation.deployment_guides = check_deployment_guides().await;
-
-    // Architecture documentation
-    validation.architecture_documented = check_architecture_docs().await;
-
-    validation
+    DocumentationValidation {
+        // API documentation
+        api_documented: check_api_documentation().await,
+        // Configuration documentation
+        config_documented: check_config_documentation().await,
+        // Deployment guides
+        deployment_guides: check_deployment_guides().await,
+        // Architecture documentation
+        architecture_documented: check_architecture_docs().await,
+    }
 }
 
 /// Deployment readiness validation
 async fn validate_deployment_readiness() -> DeploymentValidation {
-    let mut validation = DeploymentValidation::default();
-
-    // Build validation
-    validation.builds_successfully = validate_build().await;
-
-    // Container validation
-    validation.containers_ready = validate_containers().await;
-
-    // Configuration validation
-    validation.configs_valid = validate_configurations().await;
-
-    // Migration readiness
-    validation.migrations_ready = validate_migrations().await;
-
-    validation
+    DeploymentValidation {
+        // Build validation
+        builds_successfully: validate_build().await,
+        // Container validation
+        containers_ready: validate_containers().await,
+        // Configuration validation
+        configs_valid: validate_configurations().await,
+        // Migration readiness
+        migrations_ready: validate_migrations().await,
+    }
 }
 
 // Helper functions for validations
@@ -210,7 +200,7 @@ async fn measure_code_complexity() -> f64 {
 async fn run_clippy_lints() -> usize {
     // Run clippy and count warnings
     let output = Command::new("cargo")
-        .args(&["clippy", "--all-targets", "--", "-D", "warnings"])
+        .args(["clippy", "--all-targets", "--", "-D", "warnings"])
         .output()
         .await
         .unwrap();
@@ -225,7 +215,7 @@ async fn run_clippy_lints() -> usize {
 async fn check_code_formatting() -> usize {
     // Check rustfmt
     let output = Command::new("cargo")
-        .args(&["fmt", "--", "--check"])
+        .args(["fmt", "--", "--check"])
         .output()
         .await
         .unwrap();
@@ -362,24 +352,48 @@ impl ProductionReadinessReport {
         let mut max_score = 0.0;
 
         // Code quality score
-        if self.code_quality.coverage_passed { score += 10.0; }
-        if self.code_quality.complexity_passed { score += 10.0; }
-        if self.code_quality.lint_passed { score += 5.0; }
-        if self.code_quality.format_passed { score += 5.0; }
+        if self.code_quality.coverage_passed {
+            score += 10.0;
+        }
+        if self.code_quality.complexity_passed {
+            score += 10.0;
+        }
+        if self.code_quality.lint_passed {
+            score += 5.0;
+        }
+        if self.code_quality.format_passed {
+            score += 5.0;
+        }
         max_score += 30.0;
 
         // Security score
-        if self.security.vulnerability_passed { score += 15.0; }
-        if self.security.dependency_passed { score += 10.0; }
-        if self.security.crypto_validated { score += 10.0; }
-        if self.security.access_control_validated { score += 5.0; }
+        if self.security.vulnerability_passed {
+            score += 15.0;
+        }
+        if self.security.dependency_passed {
+            score += 10.0;
+        }
+        if self.security.crypto_validated {
+            score += 10.0;
+        }
+        if self.security.access_control_validated {
+            score += 5.0;
+        }
         max_score += 40.0;
 
         // Performance score
-        if self.performance.throughput_passed { score += 10.0; }
-        if self.performance.latency_passed { score += 10.0; }
-        if self.performance.scalability_passed { score += 5.0; }
-        if self.performance.resource_passed { score += 5.0; }
+        if self.performance.throughput_passed {
+            score += 10.0;
+        }
+        if self.performance.latency_passed {
+            score += 10.0;
+        }
+        if self.performance.scalability_passed {
+            score += 5.0;
+        }
+        if self.performance.resource_passed {
+            score += 5.0;
+        }
         max_score += 30.0;
 
         // Calculate percentage

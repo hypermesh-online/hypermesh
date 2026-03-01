@@ -251,8 +251,10 @@ mod tests {
 
     #[test]
     fn probes_per_epoch_respected() {
-        let mut config = VerificationConfig::default();
-        config.probes_per_epoch = 5;
+        let config = VerificationConfig {
+            probes_per_epoch: 5,
+            ..VerificationConfig::default()
+        };
         let mut gen = ProbeGenerator::new(config);
         gen.start_epoch([0x01; 32], 1);
         let bounds = VolumeBounds::default();

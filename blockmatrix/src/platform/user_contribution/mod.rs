@@ -9,61 +9,52 @@
 //! configuring privacy settings for resource sharing.
 
 pub mod hardware;
-pub mod sharing;
-pub mod pricing;
 pub mod notifications;
-pub mod session;
-pub mod rewards;
 pub mod platform;
+pub mod pricing;
+pub mod rewards;
+pub mod session;
+pub mod sharing;
 
 // Re-export main types
 pub use hardware::{
-    HardwareConfiguration, CpuInfo, GpuInfo, MemoryInfo, MemoryModule,
-    StorageInfo, StorageType, NetworkInfo, NetworkInterface, NetworkLocation,
-    VerificationStatus,
+    CpuInfo, GpuInfo, HardwareConfiguration, MemoryInfo, MemoryModule, NetworkInfo,
+    NetworkInterface, NetworkLocation, StorageInfo, StorageType, VerificationStatus,
 };
 
 pub use sharing::{
-    SharingPreferences, ResourceSharingSettings, ResourceConstraints,
-    CpuConstraints, CpuPriority, GpuConstraints, ComputeType,
-    MemoryConstraints, MemoryProtectionLevel, AccessPattern,
-    StorageConstraints, RetentionPolicy, OperatingHours, Weekday,
-    TimeRange, EmergencyOverride, PerformancePreferences,
-    TemperatureLimits, PowerPreferences, PowerSavingMode,
-    PowerSavingConfig, PowerLimit, NoisePreferences, NoiseLevel,
+    AccessPattern, ComputeType, CpuConstraints, CpuPriority, EmergencyOverride, GpuConstraints,
+    MemoryConstraints, MemoryProtectionLevel, NoiseLevel, NoisePreferences, OperatingHours,
+    PerformancePreferences, PowerLimit, PowerPreferences, PowerSavingConfig, PowerSavingMode,
+    ResourceConstraints, ResourceSharingSettings, RetentionPolicy, SharingPreferences,
+    StorageConstraints, TemperatureLimits, TimeRange, Weekday,
 };
 
 pub use pricing::{
-    PricingConfiguration, PriceModel, Currency, VolumeTier,
-    DynamicPricingConfig, PaymentPreferences, PaymentFrequency,
-    TaxReporting, DiscountSettings, LoyaltyDiscount, ReferralBonus,
-    SeasonalPromotion,
+    Currency, DiscountSettings, DynamicPricingConfig, LoyaltyDiscount, PaymentFrequency,
+    PaymentPreferences, PriceModel, PricingConfiguration, ReferralBonus, SeasonalPromotion,
+    TaxReporting, VolumeTier,
 };
 
 pub use notifications::{
-    NotificationPreferences, EmailNotifications, PushNotifications,
-    SmsNotifications, InAppNotifications, NotificationFrequency,
+    EmailNotifications, InAppNotifications, NotificationFrequency, NotificationPreferences,
+    PushNotifications, SmsNotifications,
 };
 
 pub use session::{
-    UserId, ContributionId, ContributionSession, UsageMetrics,
-    SessionEarnings, PayoutStatus, SessionPerformance, SessionStatus,
-    AccountStatus,
+    AccountStatus, ContributionId, ContributionSession, PayoutStatus, SessionEarnings,
+    SessionPerformance, SessionStatus, UsageMetrics, UserId,
 };
 
-pub use rewards::{
-    RewardEngine, PerformanceMultipliers, AuthenticationConfig, PlatformMetrics,
-};
+pub use rewards::{AuthenticationConfig, PerformanceMultipliers, PlatformMetrics, RewardEngine};
 
-pub use platform::{
-    UserContributionPlatform, UserProfile, PlatformConfig,
-};
+pub use platform::{PlatformConfig, UserContributionPlatform, UserProfile};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use crate::assets::core::AssetManager;
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_platform_creation() {
@@ -78,16 +69,20 @@ mod tests {
     async fn test_user_registration() {
         let asset_manager = Arc::new(AssetManager::new());
         let config = PlatformConfig::default();
-        let platform = UserContributionPlatform::new(asset_manager, config).await.unwrap();
+        let platform = UserContributionPlatform::new(asset_manager, config)
+            .await
+            .expect("test: expected success");
 
-        let profile = platform.register_user(
-            "user123".to_string(),
-            "Test User".to_string(),
-            "test@example.com".to_string(),
-        ).await;
+        let profile = platform
+            .register_user(
+                "user123".to_string(),
+                "Test User".to_string(),
+                "test@example.com".to_string(),
+            )
+            .await;
 
         assert!(profile.is_ok());
-        let profile = profile.unwrap();
+        let profile = profile.expect("test: profile operation");
         assert_eq!(profile.user_id, "user123");
         assert_eq!(profile.display_name, "Test User");
     }
@@ -135,8 +130,12 @@ mod tests {
         };
 
         let preferences = SharingPreferences::default_for_hardware(&hardware_config);
-        assert!(preferences.resource_settings.contains_key(&crate::assets::core::AssetType::Cpu));
-        assert!(preferences.resource_settings.contains_key(&crate::assets::core::AssetType::Memory));
+        assert!(preferences
+            .resource_settings
+            .contains_key(&crate::assets::core::AssetType::Cpu));
+        assert!(preferences
+            .resource_settings
+            .contains_key(&crate::assets::core::AssetType::Memory));
 
         let cpu_settings = &preferences.resource_settings[&crate::assets::core::AssetType::Cpu];
         assert!(cpu_settings.enabled);

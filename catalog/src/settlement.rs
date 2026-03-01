@@ -13,16 +13,16 @@
 //! - `ContributionTracker`: Tracks typedef contributions per publisher
 //! - `RewardService`: Calculates and distributes contribution-based rewards
 
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::Utc;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 use caesar::upi::{EgressAdapter, SettlementFinality, SettlementReceipt, UpiError};
 use hypermesh_lib::{GoldGrams, NodeId};
@@ -86,13 +86,19 @@ impl ContributionMetrics {
             + validation_score * 0.25
             + self.maintenance_score * 0.15;
 
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 }
 
 /// Tracks typedef contributions per publisher.
 pub struct ContributionTracker {
     metrics: Arc<RwLock<HashMap<String, ContributionMetrics>>>,
+}
+
+impl Default for ContributionTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ContributionTracker {
@@ -141,8 +147,7 @@ impl ContributionTracker {
         let entry = metrics
             .entry(publisher_id.to_string())
             .or_insert_with(|| ContributionMetrics::new(publisher_id.to_string()));
-        entry.maintenance_score =
-            (entry.maintenance_score + quality_delta).max(0.0).min(1.0);
+        entry.maintenance_score = (entry.maintenance_score + quality_delta).clamp(0.0, 1.0);
         entry.last_contribution = Utc::now();
     }
 
@@ -269,7 +274,7 @@ impl EgressAdapter for CatalogRewardAdapter {
             gold_price_at_settlement: gold_price_usd,
             settling_node: self.node_id.clone(),
             settled_at: Utc::now(),
-            external_reference: format!("catalog-reward-{}", destination),
+            external_reference: format!("catalog-reward-{destination}"),
             finality: SettlementFinality::Trustless,
         })
     }
@@ -351,8 +356,7 @@ impl RewardService {
         }
 
         // Calculate total contribution score
-        let total_score: f64 =
-            contributors.iter().map(|c| c.contribution_score()).sum();
+        let total_score: f64 = contributors.iter().map(|c| c.contribution_score()).sum();
         if total_score <= 0.0 {
             debug!("Total contribution score is zero, skipping distribution");
             return Ok(Vec::new());
@@ -363,10 +367,8 @@ impl RewardService {
         for contributor in &contributors {
             let score = contributor.contribution_score();
             let share = score / total_score;
-            let share_dec =
-                Decimal::from_f64(share).unwrap_or(Decimal::ZERO);
-            let reward_amount =
-                GoldGrams::from_decimal(self.reward_pool.0 * share_dec);
+            let share_dec = Decimal::from_f64(share).unwrap_or(Decimal::ZERO);
+            let reward_amount = GoldGrams::from_decimal(self.reward_pool.0 * share_dec);
 
             if reward_amount.is_zero() {
                 continue;
@@ -420,10 +422,7 @@ impl RewardService {
     }
 
     /// Get distribution history for a publisher.
-    pub async fn publisher_distributions(
-        &self,
-        publisher_id: &str,
-    ) -> Vec<RewardDistribution> {
+    pub async fn publisher_distributions(&self, publisher_id: &str) -> Vec<RewardDistribution> {
         let history = self.distributions.read().await;
         history
             .iter()
@@ -472,13 +471,13 @@ mod tests {
         metrics.maintenance_score = 0.8;
 
         let score = metrics.contribution_score();
-        assert!(score > 0.0 && score <= 1.0, "score {} out of range", score);
+        assert!(score > 0.0 && score <= 1.0, "score {score} out of range");
         // 5 published = ln(6)/5 ~ 0.358 * 0.30 = 0.107
         // 200 refs = 200/1000 = 0.2 * 0.30 = 0.06
         // 90% validation = 0.9 * 0.25 = 0.225
         // 0.8 maintenance * 0.15 = 0.12
         // Total ~ 0.512
-        assert!(score > 0.4, "score {} should be > 0.4", score);
+        assert!(score > 0.4, "score {score} should be > 0.4");
     }
 
     #[tokio::test]

@@ -7,17 +7,17 @@
 //! Manages the state of a node's independent blockchain including
 //! storage, querying, and statistics.
 
-use std::collections::{HashMap, BTreeMap};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tokio::fs;
-use serde::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
-use tracing::{info, debug};
+use tokio::sync::RwLock;
+use tracing::{debug, info};
 
-use crate::matrix::coordinate::MatrixCoordinate;
 use super::block::Block;
+use crate::matrix::coordinate::MatrixCoordinate;
 
 /// State snapshot of a blockchain at a specific point
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,10 +93,7 @@ pub struct ChainStateManager {
 
 impl ChainStateManager {
     /// Create a new state manager
-    pub fn new(
-        node_coordinate: MatrixCoordinate,
-        storage_path: impl AsRef<Path>,
-    ) -> Self {
+    pub fn new(node_coordinate: MatrixCoordinate, storage_path: impl AsRef<Path>) -> Self {
         let storage_path = storage_path.as_ref().to_path_buf();
 
         ChainStateManager {
@@ -113,17 +110,20 @@ impl ChainStateManager {
     /// Initialize storage directory
     pub async fn initialize(&self) -> Result<(), String> {
         // Create storage directory if it doesn't exist
-        fs::create_dir_all(&self.storage_path).await
-            .map_err(|e| format!("Failed to create storage directory: {}", e))?;
+        fs::create_dir_all(&self.storage_path)
+            .await
+            .map_err(|e| format!("Failed to create storage directory: {e}"))?;
 
         // Create subdirectories
         let blocks_dir = self.storage_path.join("blocks");
         let snapshots_dir = self.storage_path.join("snapshots");
 
-        fs::create_dir_all(&blocks_dir).await
-            .map_err(|e| format!("Failed to create blocks directory: {}", e))?;
-        fs::create_dir_all(&snapshots_dir).await
-            .map_err(|e| format!("Failed to create snapshots directory: {}", e))?;
+        fs::create_dir_all(&blocks_dir)
+            .await
+            .map_err(|e| format!("Failed to create blocks directory: {e}"))?;
+        fs::create_dir_all(&snapshots_dir)
+            .await
+            .map_err(|e| format!("Failed to create snapshots directory: {e}"))?;
 
         info!(
             "Initialized chain state storage at {:?} for node ({},{},{})",
@@ -144,10 +144,11 @@ impl ChainStateManager {
         // Write to disk
         let block_path = self.get_block_path(block.index);
         let json = serde_json::to_string_pretty(block)
-            .map_err(|e| format!("Failed to serialize block: {}", e))?;
+            .map_err(|e| format!("Failed to serialize block: {e}"))?;
 
-        fs::write(&block_path, json).await
-            .map_err(|e| format!("Failed to write block to disk: {}", e))?;
+        fs::write(&block_path, json)
+            .await
+            .map_err(|e| format!("Failed to write block to disk: {e}"))?;
 
         debug!("Stored block {} to disk", block.index);
         Ok(())
@@ -164,14 +165,15 @@ impl ChainStateManager {
         let block_path = self.get_block_path(index);
 
         if !block_path.exists() {
-            return Err(format!("Block {} not found", index));
+            return Err(format!("Block {index} not found"));
         }
 
-        let json = fs::read_to_string(&block_path).await
-            .map_err(|e| format!("Failed to read block from disk: {}", e))?;
+        let json = fs::read_to_string(&block_path)
+            .await
+            .map_err(|e| format!("Failed to read block from disk: {e}"))?;
 
-        let block: Block = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to deserialize block: {}", e))?;
+        let block: Block =
+            serde_json::from_str(&json).map_err(|e| format!("Failed to deserialize block: {e}"))?;
 
         // Update cache
         self.update_cache(&block).await;
@@ -254,7 +256,7 @@ impl ChainStateManager {
             height,
             total_blocks: height + 1,
             head_hash,
-            node_coordinate: self.node_coordinate.clone(),
+            node_coordinate: self.node_coordinate,
             metadata: self.metadata.read().await.clone(),
         };
 
@@ -278,15 +280,17 @@ impl ChainStateManager {
         }
 
         // Write to disk
-        let snapshot_path = self.storage_path
+        let snapshot_path = self
+            .storage_path
             .join("snapshots")
             .join(format!("snapshot_{}.json", snapshot.timestamp.timestamp()));
 
         let json = serde_json::to_string_pretty(snapshot)
-            .map_err(|e| format!("Failed to serialize snapshot: {}", e))?;
+            .map_err(|e| format!("Failed to serialize snapshot: {e}"))?;
 
-        fs::write(&snapshot_path, json).await
-            .map_err(|e| format!("Failed to write snapshot to disk: {}", e))?;
+        fs::write(&snapshot_path, json)
+            .await
+            .map_err(|e| format!("Failed to write snapshot to disk: {e}"))?;
 
         info!("Created snapshot at height {}", snapshot.height);
         Ok(())
@@ -325,7 +329,7 @@ impl ChainStateManager {
     fn get_block_path(&self, index: u64) -> PathBuf {
         self.storage_path
             .join("blocks")
-            .join(format!("block_{:010}.json", index))
+            .join(format!("block_{index:010}.json"))
     }
 
     /// Calculate storage statistics
@@ -335,11 +339,15 @@ impl ChainStateManager {
         let mut block_count = 0u64;
 
         // Count blocks and calculate size
-        let mut entries = fs::read_dir(&blocks_dir).await
-            .map_err(|e| format!("Failed to read blocks directory: {}", e))?;
+        let mut entries = fs::read_dir(&blocks_dir)
+            .await
+            .map_err(|e| format!("Failed to read blocks directory: {e}"))?;
 
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| format!("Failed to read directory entry: {}", e))? {
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| format!("Failed to read directory entry: {e}"))?
+        {
             if let Ok(metadata) = entry.metadata().await {
                 total_size += metadata.len();
                 block_count += 1;
@@ -388,14 +396,14 @@ pub struct StorageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use crate::test_utils::test_asset_ids;
+    use tempfile::TempDir;
 
     async fn create_test_manager() -> (ChainStateManager, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let manager = ChainStateManager::new(coord, temp_dir.path());
-        manager.initialize().await.unwrap();
+        manager.initialize().await.expect("test: initialization");
         (manager, temp_dir)
     }
 
@@ -412,14 +420,14 @@ mod tests {
     async fn test_block_storage_and_retrieval() {
         let (manager, _temp_dir) = create_test_manager().await;
 
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let block = Block::genesis(coord);
 
         // Store block
-        manager.store_block(&block).await.unwrap();
+        manager.store_block(&block).await.expect("test: block storage");
 
         // Retrieve block
-        let loaded = manager.load_block(0).await.unwrap();
+        let loaded = manager.load_block(0).await.expect("test: async operation");
         assert_eq!(loaded, block);
     }
 
@@ -428,17 +436,12 @@ mod tests {
         let (mut manager, _temp_dir) = create_test_manager().await;
         manager.cache_size = 3; // Small cache for testing
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
         // Add blocks beyond cache size
         for i in 0..5 {
-            let block = Block::new(
-                i,
-                test_asset_ids(1),
-                format!("prev_{}", i),
-                coord.clone(),
-            );
-            manager.store_block(&block).await.unwrap();
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Check cache size
@@ -450,17 +453,12 @@ mod tests {
     async fn test_block_queries() {
         let (manager, _temp_dir) = create_test_manager().await;
 
-        let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
 
         // Add some blocks
         for i in 0..10 {
-            let block = Block::new(
-                i,
-                test_asset_ids(1),
-                format!("prev_{}", i),
-                coord.clone(),
-            );
-            manager.store_block(&block).await.unwrap();
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Query range
@@ -470,7 +468,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.unwrap();
+        let results = manager.query_blocks(query).await.expect("test: async operation");
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].index, 3);
         assert_eq!(results[4].index, 7);
@@ -480,12 +478,12 @@ mod tests {
     async fn test_query_with_limit() {
         let (manager, _temp_dir) = create_test_manager().await;
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
         // Add blocks
         for i in 0..10 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
-            manager.store_block(&block).await.unwrap();
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Query with limit
@@ -494,7 +492,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.unwrap();
+        let results = manager.query_blocks(query).await.expect("test: async operation");
         assert_eq!(results.len(), 3);
     }
 
@@ -503,17 +501,17 @@ mod tests {
         let (manager, _temp_dir) = create_test_manager().await;
 
         // Create snapshot
-        let snapshot = manager.create_snapshot(
-            10,
-            "head_hash_123".to_string(),
-        ).await.unwrap();
+        let snapshot = manager
+            .create_snapshot(10, "head_hash_123".to_string())
+            .await
+            .expect("test: expected success");
 
         assert_eq!(snapshot.height, 10);
         assert_eq!(snapshot.total_blocks, 11);
         assert_eq!(snapshot.head_hash, "head_hash_123");
 
         // Get latest snapshot
-        let latest = manager.get_latest_snapshot().await.unwrap();
+        let latest = manager.get_latest_snapshot().await.expect("test: async operation");
         assert_eq!(latest.height, snapshot.height);
     }
 
@@ -522,12 +520,22 @@ mod tests {
         let (manager, _temp_dir) = create_test_manager().await;
 
         // Set metadata
-        manager.set_metadata("key1".to_string(), "value1".to_string()).await;
-        manager.set_metadata("key2".to_string(), "value2".to_string()).await;
+        manager
+            .set_metadata("key1".to_string(), "value1".to_string())
+            .await;
+        manager
+            .set_metadata("key2".to_string(), "value2".to_string())
+            .await;
 
         // Get metadata
-        assert_eq!(manager.get_metadata("key1").await, Some("value1".to_string()));
-        assert_eq!(manager.get_metadata("key2").await, Some("value2".to_string()));
+        assert_eq!(
+            manager.get_metadata("key1").await,
+            Some("value1".to_string())
+        );
+        assert_eq!(
+            manager.get_metadata("key2").await,
+            Some("value2".to_string())
+        );
         assert_eq!(manager.get_metadata("nonexistent").await, None);
 
         // Clear metadata
@@ -539,16 +547,16 @@ mod tests {
     async fn test_storage_stats() {
         let (manager, _temp_dir) = create_test_manager().await;
 
-        let coord = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
 
         // Add some blocks
         for i in 0..5 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
-            manager.store_block(&block).await.unwrap();
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Get stats
-        let stats = manager.get_storage_stats().await.unwrap();
+        let stats = manager.get_storage_stats().await.expect("test: async operation");
         assert_eq!(stats.total_blocks, 5);
         assert!(stats.total_size_bytes > 0);
         assert!(stats.cached_blocks <= 5);
@@ -558,12 +566,12 @@ mod tests {
     async fn test_descending_sort() {
         let (manager, _temp_dir) = create_test_manager().await;
 
-        let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
 
         // Add blocks
         for i in 0..5 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{}", i), coord.clone());
-            manager.store_block(&block).await.unwrap();
+            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Query with descending sort
@@ -572,7 +580,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.unwrap();
+        let results = manager.query_blocks(query).await.expect("test: async operation");
         assert!(results.len() >= 5);
         assert!(results[0].index > results[1].index);
     }

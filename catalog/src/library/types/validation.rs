@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use crate::registry::AssetTypeDefinition;
 use super::metadata::*;
+use crate::registry::AssetTypeDefinition;
 
 // Conversion implementations for Asset Registry integration
 impl LibraryAssetPackage {
@@ -15,11 +15,10 @@ impl LibraryAssetPackage {
     pub fn to_asset_type_definition(&self) -> Result<AssetTypeDefinition, anyhow::Error> {
         use blockmatrix::assets::ConsensusProof;
         use blockmatrix::consensus::proof_of_state_integration::{
-            SpaceProof, StakeProof, WorkProof, TimeProof,
-            WorkloadType, WorkState,
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
-        use std::time::Duration;
         use serde_json::json;
+        use std::time::Duration;
 
         let stake_proof = StakeProof::new(
             self.author().unwrap_or("unknown").to_string(),
@@ -43,17 +42,13 @@ impl LibraryAssetPackage {
         );
 
         let time_proof = TimeProof::new(Duration::from_secs(
-            self.metadata.as_ref()
+            self.metadata
+                .as_ref()
                 .map(|m| (m.modified - m.created) as u64)
-                .unwrap_or(0)
+                .unwrap_or(0),
         ));
 
-        let consensus_proof = ConsensusProof::new(
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof,
-        );
+        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         let schema = json!({
             "type": "object",
@@ -66,11 +61,7 @@ impl LibraryAssetPackage {
             "required": ["name", "version", "asset_type"]
         });
 
-        let mut type_def = AssetTypeDefinition::new(
-            self.name.clone(),
-            schema,
-            consensus_proof,
-        );
+        let mut type_def = AssetTypeDefinition::new(self.name.clone(), schema, consensus_proof);
 
         type_def.metadata.version = self.version.clone();
         type_def.metadata.author = self.author().map(|s| s.to_string());
@@ -106,10 +97,27 @@ impl LibraryAssetPackage {
             metadata: Some(PackageMetadata {
                 name: Arc::from(type_def.type_name.as_str()),
                 version: Arc::from(type_def.metadata.version.as_str()),
-                description: type_def.metadata.description.as_ref().map(|d| Arc::from(d.as_str())),
-                author: type_def.metadata.author.as_ref().map(|a| Arc::from(a.as_str())),
-                license: type_def.metadata.license.as_ref().map(|l| Arc::from(l.as_str())),
-                tags: type_def.metadata.tags.iter().map(|t| Arc::from(t.as_str())).collect(),
+                description: type_def
+                    .metadata
+                    .description
+                    .as_ref()
+                    .map(|d| Arc::from(d.as_str())),
+                author: type_def
+                    .metadata
+                    .author
+                    .as_ref()
+                    .map(|a| Arc::from(a.as_str())),
+                license: type_def
+                    .metadata
+                    .license
+                    .as_ref()
+                    .map(|l| Arc::from(l.as_str())),
+                tags: type_def
+                    .metadata
+                    .tags
+                    .iter()
+                    .map(|t| Arc::from(t.as_str()))
+                    .collect(),
                 keywords: Arc::new([]),
                 created: type_def.metadata.created_at.timestamp(),
                 modified: type_def.metadata.updated_at.timestamp(),
@@ -154,27 +162,43 @@ impl LibraryAssetPackage {
                         templates: vec![],
                     },
                     security: AssetSecurity {
-                        consensus_required: self.spec.as_ref().map(|s| s.security.consensus_required).unwrap_or(false),
+                        consensus_required: self
+                            .spec
+                            .as_ref()
+                            .map(|s| s.security.consensus_required)
+                            .unwrap_or(false),
                         certificate_pinning: false,
                         hash_validation: "blake3".to_string(),
-                        sandbox_level: self.spec.as_ref().map(|s| match s.security.sandbox_level {
-                            SandboxLevel::None => "none".to_string(),
-                            SandboxLevel::Standard => "standard".to_string(),
-                            SandboxLevel::Strict => "strict".to_string(),
-                        }).unwrap_or_else(|| "standard".to_string()),
+                        sandbox_level: self
+                            .spec
+                            .as_ref()
+                            .map(|s| match s.security.sandbox_level {
+                                SandboxLevel::None => "none".to_string(),
+                                SandboxLevel::Standard => "standard".to_string(),
+                                SandboxLevel::Strict => "strict".to_string(),
+                            })
+                            .unwrap_or_else(|| "standard".to_string()),
                         allowed_syscalls: vec![],
                         network_access: NetworkAccess {
-                            enabled: self.spec.as_ref().map(|s| s.security.network_access).unwrap_or(false),
+                            enabled: self
+                                .spec
+                                .as_ref()
+                                .map(|s| s.security.network_access)
+                                .unwrap_or(false),
                             allowed_domains: vec![],
                             allowed_ports: vec![],
                             require_tls: true,
                         },
                         file_access: FileAccess {
-                            level: self.spec.as_ref().map(|s| match s.security.filesystem_access {
-                                FilesystemAccess::None => "none".to_string(),
-                                FilesystemAccess::ReadOnly => "read_only".to_string(),
-                                FilesystemAccess::ReadWrite => "read_write".to_string(),
-                            }).unwrap_or_else(|| "none".to_string()),
+                            level: self
+                                .spec
+                                .as_ref()
+                                .map(|s| match s.security.filesystem_access {
+                                    FilesystemAccess::None => "none".to_string(),
+                                    FilesystemAccess::ReadOnly => "read_only".to_string(),
+                                    FilesystemAccess::ReadWrite => "read_write".to_string(),
+                                })
+                                .unwrap_or_else(|| "none".to_string()),
                             allowed_paths: vec![],
                             denied_paths: vec![],
                             allow_temp: false,
@@ -182,46 +206,87 @@ impl LibraryAssetPackage {
                         permissions: vec![],
                     },
                     resources: AssetResources {
-                        cpu_limit: self.spec.as_ref()
+                        cpu_limit: self
+                            .spec
+                            .as_ref()
                             .map(|s| format!("{}m", s.resources.cpu_millicores))
                             .unwrap_or_else(|| "100m".to_string()),
-                        memory_limit: self.spec.as_ref()
+                        memory_limit: self
+                            .spec
+                            .as_ref()
                             .map(|s| format!("{}Mi", s.resources.memory_mb))
                             .unwrap_or_else(|| "128Mi".to_string()),
-                        execution_timeout: self.spec.as_ref()
+                        execution_timeout: self
+                            .spec
+                            .as_ref()
                             .map(|s| format!("{}s", s.resources.timeout_seconds))
                             .unwrap_or_else(|| "30s".to_string()),
-                        storage_required: self.spec.as_ref()
-                            .and_then(|s| s.resources.storage_mb.map(|mb| format!("{}Mi", mb))),
-                        network_bandwidth: self.spec.as_ref()
-                            .and_then(|s| s.resources.network_mbps.map(|mbps| format!("{}Mbps", mbps))),
-                        gpu_required: self.spec.as_ref().map(|s| s.resources.gpu_required).unwrap_or(false),
+                        storage_required: self
+                            .spec
+                            .as_ref()
+                            .and_then(|s| s.resources.storage_mb.map(|mb| format!("{mb}Mi"))),
+                        network_bandwidth: self.spec.as_ref().and_then(|s| {
+                            s.resources.network_mbps.map(|mbps| format!("{mbps}Mbps"))
+                        }),
+                        gpu_required: self
+                            .spec
+                            .as_ref()
+                            .map(|s| s.resources.gpu_required)
+                            .unwrap_or(false),
                         hardware_requirements: vec![],
                     },
                     execution: AssetExecution {
-                        delegation_strategy: self.spec.as_ref().map(|s| match s.execution.strategy {
-                            ExecutionStrategy::NearestNode => "nearest".to_string(),
-                            ExecutionStrategy::RandomNode => "random".to_string(),
-                            ExecutionStrategy::SpecificNode => "specific".to_string(),
-                            ExecutionStrategy::LoadBalanced => "loadbalanced".to_string(),
-                        }).unwrap_or_else(|| "loadbalanced".to_string()),
-                        minimum_consensus: self.spec.as_ref().map(|s| s.execution.min_consensus).unwrap_or(1),
-                        retry_policy: self.spec.as_ref().map(|s| {
-                            if s.execution.retry_policy.exponential_backoff {
-                                format!("exponential:{}:{}", s.execution.retry_policy.max_attempts, s.execution.retry_policy.base_delay_ms)
-                            } else {
-                                format!("fixed:{}:{}", s.execution.retry_policy.max_attempts, s.execution.retry_policy.base_delay_ms)
-                            }
-                        }).unwrap_or_else(|| "exponential:3:1000".to_string()),
+                        delegation_strategy: self
+                            .spec
+                            .as_ref()
+                            .map(|s| match s.execution.strategy {
+                                ExecutionStrategy::NearestNode => "nearest".to_string(),
+                                ExecutionStrategy::RandomNode => "random".to_string(),
+                                ExecutionStrategy::SpecificNode => "specific".to_string(),
+                                ExecutionStrategy::LoadBalanced => "loadbalanced".to_string(),
+                            })
+                            .unwrap_or_else(|| "loadbalanced".to_string()),
+                        minimum_consensus: self
+                            .spec
+                            .as_ref()
+                            .map(|s| s.execution.min_consensus)
+                            .unwrap_or(1),
+                        retry_policy: self
+                            .spec
+                            .as_ref()
+                            .map(|s| {
+                                if s.execution.retry_policy.exponential_backoff {
+                                    format!(
+                                        "exponential:{}:{}",
+                                        s.execution.retry_policy.max_attempts,
+                                        s.execution.retry_policy.base_delay_ms
+                                    )
+                                } else {
+                                    format!(
+                                        "fixed:{}:{}",
+                                        s.execution.retry_policy.max_attempts,
+                                        s.execution.retry_policy.base_delay_ms
+                                    )
+                                }
+                            })
+                            .unwrap_or_else(|| "exponential:3:1000".to_string()),
                         max_concurrent: self.spec.as_ref().and_then(|s| s.execution.max_concurrent),
-                        priority: self.spec.as_ref().map(|s| match s.execution.priority {
-                            ExecutionPriority::Low => "low".to_string(),
-                            ExecutionPriority::Normal => "normal".to_string(),
-                            ExecutionPriority::High => "high".to_string(),
-                            ExecutionPriority::Critical => "critical".to_string(),
-                        }).unwrap_or_else(|| "normal".to_string()),
+                        priority: self
+                            .spec
+                            .as_ref()
+                            .map(|s| match s.execution.priority {
+                                ExecutionPriority::Low => "low".to_string(),
+                                ExecutionPriority::Normal => "normal".to_string(),
+                                ExecutionPriority::High => "high".to_string(),
+                                ExecutionPriority::Critical => "critical".to_string(),
+                            })
+                            .unwrap_or_else(|| "normal".to_string()),
                         timeout_config: TimeoutConfig {
-                            execution: self.spec.as_ref().map(|s| format!("{}s", s.resources.timeout_seconds)).unwrap_or_else(|| "30s".to_string()),
+                            execution: self
+                                .spec
+                                .as_ref()
+                                .map(|s| format!("{}s", s.resources.timeout_seconds))
+                                .unwrap_or_else(|| "30s".to_string()),
                             network: "10s".to_string(),
                             io: "5s".to_string(),
                             compilation: None,
@@ -233,19 +298,30 @@ impl LibraryAssetPackage {
                             anti_affinity: vec![],
                         },
                     },
-                    dependencies: self.dependencies().iter().map(|d| AssetDependency {
-                        name: d.name.to_string(),
-                        version: d.version_constraint.to_string(),
-                        optional: d.optional,
-                        source: DependencySource::Registry {
-                            registry: "default".to_string(),
-                            namespace: None,
-                        },
-                        features: vec![],
-                        platform: d.platform.as_ref().map(|p| p.to_string()),
-                    }).collect(),
-                    environment: self.spec.as_ref()
-                        .map(|s| s.environment.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
+                    dependencies: self
+                        .dependencies()
+                        .iter()
+                        .map(|d| AssetDependency {
+                            name: d.name.to_string(),
+                            version: d.version_constraint.to_string(),
+                            optional: d.optional,
+                            source: DependencySource::Registry {
+                                registry: "default".to_string(),
+                                namespace: None,
+                            },
+                            features: vec![],
+                            platform: d.platform.as_ref().map(|p| p.to_string()),
+                        })
+                        .collect(),
+                    environment: self
+                        .spec
+                        .as_ref()
+                        .map(|s| {
+                            s.environment
+                                .iter()
+                                .map(|(k, v)| (k.to_string(), v.to_string()))
+                                .collect()
+                        })
                         .unwrap_or_default(),
                     config_schema: None,
                 },
@@ -263,7 +339,11 @@ impl LibraryAssetPackage {
                 errors: vec![],
                 warnings: vec![],
                 security_results: SecurityScanResults {
-                    security_score: self.validation.as_ref().map(|v| v.security_score).unwrap_or(0),
+                    security_score: self
+                        .validation
+                        .as_ref()
+                        .map(|v| v.security_score)
+                        .unwrap_or(0),
                     vulnerabilities: vec![],
                     recommendations: vec![],
                     scanned_at: Utc::now(),
@@ -298,13 +378,50 @@ impl LibraryAssetPackage {
             metadata: Some(PackageMetadata {
                 name: Arc::from(package.spec.metadata.name.as_str()),
                 version: Arc::from(package.spec.metadata.version.as_str()),
-                description: package.spec.metadata.description.as_ref().map(|d| Arc::from(d.as_str())),
-                author: package.spec.metadata.author.as_ref().map(|a| Arc::from(a.as_str())),
-                license: package.spec.metadata.license.as_ref().map(|l| Arc::from(l.as_str())),
-                tags: package.spec.metadata.tags.iter().map(|t| Arc::from(t.as_str())).collect(),
-                keywords: package.spec.metadata.keywords.iter().map(|k| Arc::from(k.as_str())).collect(),
-                created: package.spec.metadata.created.map(|t| t.timestamp()).unwrap_or(0),
-                modified: package.spec.metadata.updated.map(|t| t.timestamp()).unwrap_or(0),
+                description: package
+                    .spec
+                    .metadata
+                    .description
+                    .as_ref()
+                    .map(|d| Arc::from(d.as_str())),
+                author: package
+                    .spec
+                    .metadata
+                    .author
+                    .as_ref()
+                    .map(|a| Arc::from(a.as_str())),
+                license: package
+                    .spec
+                    .metadata
+                    .license
+                    .as_ref()
+                    .map(|l| Arc::from(l.as_str())),
+                tags: package
+                    .spec
+                    .metadata
+                    .tags
+                    .iter()
+                    .map(|t| Arc::from(t.as_str()))
+                    .collect(),
+                keywords: package
+                    .spec
+                    .metadata
+                    .keywords
+                    .iter()
+                    .map(|k| Arc::from(k.as_str()))
+                    .collect(),
+                created: package
+                    .spec
+                    .metadata
+                    .created
+                    .map(|t| t.timestamp())
+                    .unwrap_or(0),
+                modified: package
+                    .spec
+                    .metadata
+                    .updated
+                    .map(|t| t.timestamp())
+                    .unwrap_or(0),
             }),
             spec: None,
             content_refs: None,

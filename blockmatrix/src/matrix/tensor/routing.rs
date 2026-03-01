@@ -7,8 +7,8 @@
 //! Provides intelligent routing calculations based on matrix topology,
 //! including direction scoring, path optimization, and load balancing.
 
-use crate::matrix::coordinate::MatrixCoordinate;
 use super::vector::Vector3D;
+use crate::matrix::coordinate::MatrixCoordinate;
 
 /// Calculate optimal routing direction from source to destination
 ///
@@ -29,7 +29,7 @@ pub fn calculate_routing_vector(
     destination: &MatrixCoordinate,
 ) -> Vector3D {
     let vec = Vector3D::from_coordinates(source, destination);
-    vec.normalize().unwrap_or(Vector3D::default())
+    vec.normalize().unwrap_or_default()
 }
 
 /// Find intermediate hops for multi-hop routing
@@ -50,18 +50,18 @@ pub fn calculate_routing_path(
     max_hop_distance: f64,
 ) -> Vec<MatrixCoordinate> {
     if max_hop_distance <= 0.0 {
-        return vec![source.clone(), destination.clone()];
+        return vec![*source, *destination];
     }
 
     let total_distance = source.euclidean_distance(destination);
     if total_distance <= max_hop_distance {
-        return vec![source.clone(), destination.clone()];
+        return vec![*source, *destination];
     }
 
     // Calculate number of hops needed
     let num_hops = (total_distance / max_hop_distance).ceil() as usize;
     let mut path = Vec::with_capacity(num_hops + 1);
-    path.push(source.clone());
+    path.push(*source);
 
     // Generate intermediate points
     for i in 1..num_hops {
@@ -73,16 +73,14 @@ pub fn calculate_routing_path(
         let z = source.z as f64 + t * (destination.z - source.z) as f64;
 
         // Round to nearest integer coordinates
-        if let Ok(coord) = MatrixCoordinate::new(
-            x.round() as i64,
-            y.round() as i64,
-            z.round() as i64,
-        ) {
+        if let Ok(coord) =
+            MatrixCoordinate::new(x.round() as i64, y.round() as i64, z.round() as i64)
+        {
             path.push(coord);
         }
     }
 
-    path.push(destination.clone());
+    path.push(*destination);
     path
 }
 
@@ -100,13 +98,10 @@ pub fn calculate_routing_path(
 /// - 1.0 = same direction
 /// - 0.0 = perpendicular
 /// - -1.0 = opposite direction
-pub fn routing_similarity(
-    direction1: &Vector3D,
-    direction2: &Vector3D,
-) -> f64 {
+pub fn routing_similarity(direction1: &Vector3D, direction2: &Vector3D) -> f64 {
     // Normalize vectors to ensure accurate comparison
-    let d1 = direction1.normalize().unwrap_or(Vector3D::default());
-    let d2 = direction2.normalize().unwrap_or(Vector3D::default());
+    let d1 = direction1.normalize().unwrap_or_default();
+    let d2 = direction2.normalize().unwrap_or_default();
 
     // Dot product of unit vectors gives cosine of angle
     d1.dot(&d2)
@@ -131,7 +126,7 @@ pub fn find_aligned_nodes(
     candidates: &[MatrixCoordinate],
     alignment_threshold: f64,
 ) -> Vec<MatrixCoordinate> {
-    let normalized_target = target_direction.normalize().unwrap_or(Vector3D::default());
+    let normalized_target = target_direction.normalize().unwrap_or_default();
 
     let mut aligned_nodes: Vec<(MatrixCoordinate, f64)> = candidates
         .iter()
@@ -149,7 +144,7 @@ pub fn find_aligned_nodes(
 
             // Only include if above threshold
             if similarity >= alignment_threshold {
-                Some((candidate.clone(), similarity))
+                Some((*candidate, similarity))
             } else {
                 None
             }
@@ -173,10 +168,10 @@ pub fn find_aligned_nodes(
 ///
 /// # Returns
 /// Vector containing two orthogonal directions to the primary direction
-pub fn calculate_orthogonal_routes(
-    primary_direction: &Vector3D,
-) -> Vec<Vector3D> {
-    let normalized = primary_direction.normalize().unwrap_or(Vector3D::new(1.0, 0.0, 0.0));
+pub fn calculate_orthogonal_routes(primary_direction: &Vector3D) -> Vec<Vector3D> {
+    let normalized = primary_direction
+        .normalize()
+        .unwrap_or(Vector3D::new(1.0, 0.0, 0.0));
 
     // Find a vector not parallel to the primary direction
     let arbitrary = if normalized.x.abs() < 0.9 {
@@ -186,10 +181,10 @@ pub fn calculate_orthogonal_routes(
     };
 
     // First orthogonal vector using cross product
-    let ortho1 = normalized.cross(&arbitrary).normalize().unwrap_or(Vector3D::default());
+    let ortho1 = normalized.cross(&arbitrary).normalize().unwrap_or_default();
 
     // Second orthogonal vector, perpendicular to both primary and first orthogonal
-    let ortho2 = normalized.cross(&ortho1).normalize().unwrap_or(Vector3D::default());
+    let ortho2 = normalized.cross(&ortho1).normalize().unwrap_or_default();
 
     vec![ortho1, ortho2]
 }
@@ -233,7 +228,8 @@ pub fn calculate_load_balanced_routes(
         let angle = 2.0 * std::f64::consts::PI * (i as f64) / (num_alternatives as f64);
 
         // Combine primary direction with orthogonal components
-        let deviation = orthogonals[0].scale(angle.cos() * spread)
+        let deviation = orthogonals[0]
+            .scale(angle.cos() * spread)
             .add(&orthogonals[1].scale(angle.sin() * spread));
 
         let alternative = primary.scale(1.0 - spread * 0.3).add(&deviation);
@@ -256,10 +252,7 @@ pub fn calculate_load_balanced_routes(
 ///
 /// # Returns
 /// Quality score (higher is better)
-pub fn score_route_quality(
-    path: &[MatrixCoordinate],
-    ideal_hop_distance: f64,
-) -> f64 {
+pub fn score_route_quality(path: &[MatrixCoordinate], ideal_hop_distance: f64) -> f64 {
     if path.len() < 2 {
         return 0.0;
     }
@@ -275,7 +268,8 @@ pub fn score_route_quality(
         total_distance += hop_distance;
 
         // Penalize deviation from ideal hop distance
-        let distance_penalty = ((hop_distance - ideal_hop_distance).abs() / ideal_hop_distance).min(1.0);
+        let distance_penalty =
+            ((hop_distance - ideal_hop_distance).abs() / ideal_hop_distance).min(1.0);
         total_score -= distance_penalty * 10.0;
 
         // Check for direction changes (penalize zigzagging)
@@ -295,7 +289,7 @@ pub fn score_route_quality(
     total_score -= direction_changes * 15.0;
 
     // Penalize excessive total distance compared to direct route
-    if path.len() > 0 {
+    if !path.is_empty() {
         let direct_distance = path[0].euclidean_distance(&path[path.len() - 1]);
         if direct_distance > 0.0 {
             let efficiency = direct_distance / total_distance;
@@ -313,8 +307,8 @@ mod tests {
 
     #[test]
     fn test_calculate_routing_vector() {
-        let source = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let dest = MatrixCoordinate::new(10, 0, 0).unwrap();
+        let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let dest = MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate");
         let direction = calculate_routing_vector(&source, &dest);
 
         assert!((direction.x - 1.0).abs() < 0.001);
@@ -324,8 +318,8 @@ mod tests {
 
     #[test]
     fn test_calculate_routing_path() {
-        let source = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let dest = MatrixCoordinate::new(100, 0, 0).unwrap();
+        let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let dest = MatrixCoordinate::new(100, 0, 0).expect("test: valid coordinate");
 
         let path = calculate_routing_path(&source, &dest, 30.0);
 
@@ -356,20 +350,22 @@ mod tests {
 
     #[test]
     fn test_find_aligned_nodes() {
-        let source = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let target_direction = Vector3D::new(1.0, 0.0, 0.0);
 
         let candidates = vec![
-            MatrixCoordinate::new(10, 0, 0).unwrap(),  // Perfectly aligned
-            MatrixCoordinate::new(10, 1, 0).unwrap(),  // Slightly off
-            MatrixCoordinate::new(0, 10, 0).unwrap(),  // Perpendicular
-            MatrixCoordinate::new(-10, 0, 0).unwrap(), // Opposite
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), // Perfectly aligned
+            MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate"), // Slightly off
+            MatrixCoordinate::new(0, 10, 0).expect("test: valid coordinate"), // Perpendicular
+            MatrixCoordinate::new(-10, 0, 0).expect("test: valid coordinate"), // Opposite
         ];
 
         let aligned = find_aligned_nodes(&source, &target_direction, &candidates, 0.9);
 
-        assert_eq!(aligned.len(), 1);
-        assert_eq!(aligned[0], MatrixCoordinate::new(10, 0, 0).unwrap());
+        // Both (10,0,0) and (10,1,0) are aligned: similarity ~1.0 and ~0.995 respectively
+        assert_eq!(aligned.len(), 2);
+        assert_eq!(aligned[0], MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"));
+        assert_eq!(aligned[1], MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate"));
 
         let more_aligned = find_aligned_nodes(&source, &target_direction, &candidates, 0.5);
         assert_eq!(more_aligned.len(), 2);
@@ -390,8 +386,8 @@ mod tests {
 
     #[test]
     fn test_load_balanced_routes() {
-        let source = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let dest = MatrixCoordinate::new(100, 0, 0).unwrap();
+        let source = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let dest = MatrixCoordinate::new(100, 0, 0).expect("test: valid coordinate");
 
         let routes = calculate_load_balanced_routes(&source, &dest, 3, 0.5);
 
@@ -407,17 +403,17 @@ mod tests {
     fn test_score_route_quality() {
         // Direct path should score high
         let path1 = vec![
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(10, 0, 0).unwrap(),
-            MatrixCoordinate::new(20, 0, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(20, 0, 0).expect("test: valid coordinate"),
         ];
         let score1 = score_route_quality(&path1, 10.0);
 
         // Zigzag path should score lower
         let path2 = vec![
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(10, 10, 0).unwrap(),
-            MatrixCoordinate::new(20, 0, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(20, 0, 0).expect("test: valid coordinate"),
         ];
         let score2 = score_route_quality(&path2, 10.0);
 

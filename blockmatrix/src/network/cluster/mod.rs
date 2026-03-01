@@ -15,8 +15,8 @@
 //!
 //! Failed nodes may attempt recovery after a configurable timeout.
 
-mod membership;
 mod health;
+mod membership;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -227,10 +227,7 @@ impl ClusterManager {
 
     /// List nodes matching a given status
     pub fn list_by_status(&self, status: NodeStatus) -> Vec<&ClusterNode> {
-        self.nodes
-            .values()
-            .filter(|n| n.status == status)
-            .collect()
+        self.nodes.values().filter(|n| n.status == status).collect()
     }
 
     /// Drain and return all pending events
@@ -392,12 +389,8 @@ mod tests {
         let mut mgr = ClusterManager::new(test_config());
 
         for i in 0..4 {
-            mgr.add_node(
-                &format!("n{}", i),
-                coord(i, 0, 0),
-                BlockchainScope::Device,
-            )
-            .expect("test: add");
+            mgr.add_node(&format!("n{i}"), coord(i, 0, 0), BlockchainScope::Device)
+                .expect("test: add");
         }
 
         mgr.record_heartbeat("n0").expect("test: hb");
@@ -478,12 +471,8 @@ mod tests {
         let mut mgr = ClusterManager::new(test_config());
 
         for i in 0..4 {
-            mgr.add_node(
-                &format!("n{}", i),
-                coord(i, 0, 0),
-                BlockchainScope::Device,
-            )
-            .expect("test: add");
+            mgr.add_node(&format!("n{i}"), coord(i, 0, 0), BlockchainScope::Device)
+                .expect("test: add");
         }
 
         let result = mgr.add_node("n4", coord(4, 0, 0), BlockchainScope::Device);
@@ -530,7 +519,9 @@ mod tests {
 
         let events = mgr.get_events();
         assert_eq!(events.len(), 2);
-        assert!(events.iter().all(|e| matches!(e, ClusterEvent::NodeJoined { .. })));
+        assert!(events
+            .iter()
+            .all(|e| matches!(e, ClusterEvent::NodeJoined { .. })));
 
         let events2 = mgr.get_events();
         assert!(events2.is_empty());
@@ -563,7 +554,10 @@ mod tests {
         node.status = NodeStatus::Failed;
 
         let result = mgr.graceful_shutdown("n1");
-        assert!(matches!(result, Err(ClusterError::InvalidTransition { .. })));
+        assert!(matches!(
+            result,
+            Err(ClusterError::InvalidTransition { .. })
+        ));
     }
 
     // 15. Recovery rejects non-Failed nodes
@@ -575,6 +569,9 @@ mod tests {
         mgr.record_heartbeat("n1").expect("test: hb");
 
         let result = mgr.attempt_recovery("n1");
-        assert!(matches!(result, Err(ClusterError::InvalidTransition { .. })));
+        assert!(matches!(
+            result,
+            Err(ClusterError::InvalidTransition { .. })
+        ));
     }
 }

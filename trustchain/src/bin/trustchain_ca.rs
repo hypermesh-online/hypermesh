@@ -13,17 +13,15 @@ use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::signal;
-use tracing::{info, error, warn};
-use tracing_subscriber::{FmtSubscriber, EnvFilter};
+use tracing::{error, info, warn};
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
-use trustchain::ca::{
-    TrustChainCA, CAConfig, CAMode, CertificateRequest,
-};
+use trustchain::ca::{CAConfig, CAMode, CertificateRequest, TrustChainCA};
 use trustchain::consensus::ConsensusProof;
 use trustchain::http3::{Http3StoqServer, Router};
 
 use http::{Response, StatusCode};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// CA service configuration
 #[derive(Debug, Clone)]
@@ -135,7 +133,7 @@ fn build_error_response(status: StatusCode, message: &str) -> Response<Vec<u8>> 
         Err(_) => Response::builder()
             .status(status)
             .body(vec![])
-            .unwrap_or_default()
+            .unwrap_or_default(),
     }
 }
 
@@ -146,9 +144,11 @@ async fn main() -> Result<()> {
 
     // Initialize logging
     let subscriber = FmtSubscriber::builder()
-        .with_env_filter(EnvFilter::from_default_env()
-            .add_directive("trustchain=debug".parse()?)
-            .add_directive("info".parse()?))
+        .with_env_filter(
+            EnvFilter::from_default_env()
+                .add_directive("trustchain=debug".parse()?)
+                .add_directive("info".parse()?),
+        )
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
@@ -172,15 +172,13 @@ async fn main() -> Result<()> {
             }
             "--port" => {
                 if i + 1 < args.len() {
-                    let port: u16 = args[i + 1].parse()
-                        .context("Invalid port number")?;
+                    let port: u16 = args[i + 1].parse().context("Invalid port number")?;
                     config.bind_addr.set_port(port);
                 }
             }
             "--bind" => {
                 if i + 1 < args.len() {
-                    config.bind_addr = args[i + 1].parse()
-                        .context("Invalid bind address")?;
+                    config.bind_addr = args[i + 1].parse().context("Invalid bind address")?;
                 }
             }
             "--help" | "-h" => {
@@ -216,10 +214,16 @@ async fn main() -> Result<()> {
         CAConfig::default()
     };
 
-    let ca = Arc::new(TrustChainCA::new(ca_config).await
-        .context("Failed to initialize CA")?);
+    let ca = Arc::new(
+        TrustChainCA::new(ca_config)
+            .await
+            .context("Failed to initialize CA")?,
+    );
 
-    info!("CA initialized: {} (mode: {:?})", config.ca_id, config.ca_mode);
+    info!(
+        "CA initialized: {} (mode: {:?})",
+        config.ca_id, config.ca_mode
+    );
 
     let start_time = std::time::Instant::now();
     let service_config = Arc::new(config.clone());
@@ -245,7 +249,6 @@ async fn main() -> Result<()> {
                 }
             }
         })
-
         // Get root certificate
         .get("/ca/root", {
             let ca = ca.clone();
@@ -259,7 +262,7 @@ async fn main() -> Result<()> {
                             let certificate_pem = pem::encode(&pem);
 
                             // Calculate fingerprint
-                            use sha2::{Sha256, Digest};
+                            use sha2::{Digest, Sha256};
                             let mut hasher = Sha256::new();
                             hasher.update(&cert_der);
                             let fingerprint = hex::encode(hasher.finalize());
@@ -274,14 +277,13 @@ async fn main() -> Result<()> {
                             error!("Failed to get root certificate: {}", e);
                             build_error_response(
                                 StatusCode::INTERNAL_SERVER_ERROR,
-                                "Failed to retrieve root certificate"
+                                "Failed to retrieve root certificate",
                             )
                         }
                     }
                 }
             }
         })
-
         // Issue certificate endpoint
         .post("/certificate/issue", {
             let ca = ca.clone();
@@ -298,7 +300,7 @@ async fn main() -> Result<()> {
                             warn!("Invalid certificate request: {}", e);
                             return build_error_response(
                                 StatusCode::BAD_REQUEST,
-                                "Invalid request format"
+                                "Invalid request format",
                             );
                         }
                     };
@@ -312,7 +314,7 @@ async fn main() -> Result<()> {
                                 warn!("Invalid IPv6 address '{}': {}", addr_str, e);
                                 return build_error_response(
                                     StatusCode::BAD_REQUEST,
-                                    &format!("Invalid IPv6 address: {}", addr_str)
+                                    &format!("Invalid IPv6 address: {addr_str}"),
                                 );
                             }
                         }
@@ -344,7 +346,8 @@ async fn main() -> Result<()> {
                                 chain_pem: issued_cert.chain_pem,
                                 serial_number: issued_cert.serial_number,
                                 fingerprint: hex::encode(issued_cert.fingerprint),
-                                expires_at: issued_cert.expires_at
+                                expires_at: issued_cert
+                                    .expires_at
                                     .duration_since(SystemTime::UNIX_EPOCH)
                                     .unwrap_or_default()
                                     .as_secs() as i64,
@@ -357,14 +360,13 @@ async fn main() -> Result<()> {
                             error!("Failed to issue certificate: {}", e);
                             build_error_response(
                                 StatusCode::INTERNAL_SERVER_ERROR,
-                                "Failed to issue certificate"
+                                "Failed to issue certificate",
                             )
                         }
                     }
                 }
             }
         })
-
         // Validate certificate endpoint
         .post("/certificate/validate", {
             let ca = ca.clone();
@@ -379,7 +381,7 @@ async fn main() -> Result<()> {
                             warn!("Invalid validation request: {}", e);
                             return build_error_response(
                                 StatusCode::BAD_REQUEST,
-                                "Invalid request format"
+                                "Invalid request format",
                             );
                         }
                     };
@@ -391,34 +393,37 @@ async fn main() -> Result<()> {
                             warn!("Invalid PEM certificate: {}", e);
                             return build_error_response(
                                 StatusCode::BAD_REQUEST,
-                                "Invalid PEM certificate"
+                                "Invalid PEM certificate",
                             );
                         }
                     };
 
                     // Validate certificate chain
-                    match ca.validate_certificate_chain(&pem_parsed.contents()).await {
+                    match ca.validate_certificate_chain(pem_parsed.contents()).await {
                         Ok(is_valid) => {
                             // Parse certificate to extract details
-                            let (_, cert) = match x509_parser::parse_x509_certificate(&pem_parsed.contents()) {
-                                Ok(parsed) => parsed,
-                                Err(e) => {
-                                    error!("Failed to parse certificate: {}", e);
-                                    return build_error_response(
-                                        StatusCode::BAD_REQUEST,
-                                        "Invalid certificate format"
-                                    );
-                                }
-                            };
+                            let (_, cert) =
+                                match x509_parser::parse_x509_certificate(pem_parsed.contents()) {
+                                    Ok(parsed) => parsed,
+                                    Err(e) => {
+                                        error!("Failed to parse certificate: {}", e);
+                                        return build_error_response(
+                                            StatusCode::BAD_REQUEST,
+                                            "Invalid certificate format",
+                                        );
+                                    }
+                                };
 
-                            let common_name = cert.subject()
+                            let common_name = cert
+                                .subject()
                                 .iter_common_name()
                                 .next()
                                 .and_then(|cn| cn.as_str().ok())
                                 .unwrap_or("Unknown")
                                 .to_string();
 
-                            let issuer = cert.issuer()
+                            let issuer = cert
+                                .issuer()
                                 .iter_common_name()
                                 .next()
                                 .and_then(|cn| cn.as_str().ok())
@@ -438,14 +443,13 @@ async fn main() -> Result<()> {
                             error!("Certificate validation error: {}", e);
                             build_error_response(
                                 StatusCode::INTERNAL_SERVER_ERROR,
-                                "Certificate validation failed"
+                                "Certificate validation failed",
                             )
                         }
                     }
                 }
             }
         })
-
         // Simple certificate request endpoint (for node bootstrap)
         .get("/certificate", {
             let ca = ca.clone();
@@ -504,14 +508,14 @@ async fn main() -> Result<()> {
                                 error!("Failed to auto-issue certificate: {}", e);
                                 build_error_response(
                                     StatusCode::INTERNAL_SERVER_ERROR,
-                                    "Failed to issue certificate"
+                                    "Failed to issue certificate",
                                 )
                             }
                         }
                     } else {
                         build_error_response(
                             StatusCode::FORBIDDEN,
-                            "Auto-issuance not allowed in production mode"
+                            "Auto-issuance not allowed in production mode",
                         )
                     }
                 }
@@ -521,7 +525,10 @@ async fn main() -> Result<()> {
     // Start HTTP/3 server with STOQ transport
     let server = Http3StoqServer::new(config.bind_addr, router);
 
-    info!("TrustChain CA Service listening on https://{}", config.bind_addr);
+    info!(
+        "TrustChain CA Service listening on https://{}",
+        config.bind_addr
+    );
     info!("Mode: {:?}", config.ca_mode);
     if config.allow_self_signed {
         info!("Auto-issuance enabled for development");

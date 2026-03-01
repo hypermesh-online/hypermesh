@@ -12,10 +12,10 @@
 //! - Quantum-resistant security with FALCON-1024
 //! - Remote proxy access for distributed GPU compute
 
-mod types;
+mod adapter;
 mod detection;
 mod operations;
-mod adapter;
+mod types;
 
 pub use types::*;
 

@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::matrix::MatrixCoordinate;
 
 use super::{RetrievalPlan, ShardLocation};
 
@@ -201,10 +201,8 @@ impl ClientAssembler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::retrieval::{
-        RetrievalMetadata, CompleteShardMap, ShardMapEntry, ShardLocation,
-    };
     use crate::assets::pipeline::EncryptionConfig;
+    use crate::retrieval::{CompleteShardMap, RetrievalMetadata, ShardLocation, ShardMapEntry};
 
     fn create_test_plan() -> RetrievalPlan {
         let content_hash = [1u8; 32];
@@ -212,9 +210,10 @@ mod tests {
 
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
-            let locations = vec![
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).unwrap(), 0.9),
-            ];
+            let locations = vec![ShardLocation::new(
+                MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate"),
+                0.9,
+            )];
             let entry = ShardMapEntry::new(shard_hash, locations);
             shard_map.add_entry(entry);
         }
@@ -255,7 +254,7 @@ mod tests {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
-        assembler.initialize(plan).await.unwrap();
+        assembler.initialize(plan).await.expect("test: async operation");
         let result = assembler.fetch_shards().await;
         assert!(result.is_ok());
 
@@ -268,13 +267,13 @@ mod tests {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
-        assembler.initialize(plan).await.unwrap();
-        assembler.fetch_shards().await.unwrap();
+        assembler.initialize(plan).await.expect("test: async operation");
+        assembler.fetch_shards().await.expect("test: async operation");
 
         let reconstructed = assembler.reconstruct().await;
         assert!(reconstructed.is_ok());
 
-        let data = reconstructed.unwrap();
+        let data = reconstructed.expect("test: expected success");
         assert!(!data.is_empty());
     }
 
@@ -283,12 +282,12 @@ mod tests {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
-        assembler.initialize(plan).await.unwrap();
+        assembler.initialize(plan).await.expect("test: async operation");
 
         let progress_before = assembler.get_progress().await;
         assert_eq!(progress_before.percentage, 0.0);
 
-        assembler.fetch_shards().await.unwrap();
+        assembler.fetch_shards().await.expect("test: async operation");
 
         let progress_after = assembler.get_progress().await;
         assert!(progress_after.percentage > 0.0);
@@ -300,8 +299,8 @@ mod tests {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
-        assembler.initialize(plan).await.unwrap();
-        assembler.fetch_shards().await.unwrap();
+        assembler.initialize(plan).await.expect("test: async operation");
+        assembler.fetch_shards().await.expect("test: async operation");
 
         let stats = assembler.get_stats().await;
         assert!(stats.bytes_fetched > 0);
@@ -314,8 +313,8 @@ mod tests {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
-        assembler.initialize(plan).await.unwrap();
-        assembler.fetch_shards().await.unwrap();
+        assembler.initialize(plan).await.expect("test: async operation");
+        assembler.fetch_shards().await.expect("test: async operation");
 
         let progress_before = assembler.get_progress().await;
         assert!(progress_before.fetched_shards > 0);
@@ -330,8 +329,7 @@ mod tests {
     #[tokio::test]
     async fn test_reconstruct_with_pipeline_roundtrip() {
         use crate::assets::pipeline::{
-            Asset, AssetMetadata as PipelineAssetMetadata,
-            AssetPipeline,
+            Asset, AssetMetadata as PipelineAssetMetadata, AssetPipeline,
         };
 
         let original_data = b"Hello, HyperMesh instruction-based retrieval! ".repeat(200);
@@ -347,9 +345,10 @@ mod tests {
             },
         };
 
-        let pipeline = AssetPipeline::default()
-            .expect("test: create pipeline");
-        let processed = pipeline.process_asset(asset).await
+        let pipeline = AssetPipeline::default().expect("test: create pipeline");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
             .expect("test: process asset");
 
         let content_hash = [42u8; 32];
@@ -357,8 +356,7 @@ mod tests {
 
         for (i, shard) in processed.shards.iter().enumerate() {
             let shard_hash = *blake3::hash(&shard.data).as_bytes();
-            let position = MatrixCoordinate::new(i as i64, 0, 0)
-                .expect("test: create coordinate");
+            let position = MatrixCoordinate::new(i as i64, 0, 0).expect("test: create coordinate");
             let location = ShardLocation::new(position, 1.0);
             let entry = ShardMapEntry::new(shard_hash, vec![location]);
             shard_map.add_entry(entry);
@@ -382,14 +380,17 @@ mod tests {
         {
             let mut fetched = assembler.fetched_shards.write().await;
             for (i, shard) in processed.shards.iter().enumerate() {
-                let position = MatrixCoordinate::new(i as i64, 0, 0)
-                    .expect("test: create coordinate");
-                fetched.insert(i, FetchedShard {
-                    _hash: [0u8; 32],
-                    data: shard.data.clone(),
-                    _source: position,
-                    _fetch_time_ms: 0,
-                });
+                let position =
+                    MatrixCoordinate::new(i as i64, 0, 0).expect("test: create coordinate");
+                fetched.insert(
+                    i,
+                    FetchedShard {
+                        _hash: [0u8; 32],
+                        data: shard.data.clone(),
+                        _source: position,
+                        _fetch_time_ms: 0,
+                    },
+                );
             }
 
             let mut progress = assembler.progress.write().await;
@@ -411,8 +412,7 @@ mod tests {
     #[tokio::test]
     async fn test_reconstruct_with_pipeline_aes_fallback() {
         use crate::assets::pipeline::{
-            Asset, AssetMetadata as PipelineAssetMetadata,
-            AssetPipeline, PipelineConfig,
+            Asset, AssetMetadata as PipelineAssetMetadata, AssetPipeline, PipelineConfig,
         };
 
         let original_data = b"AES fallback test data ".repeat(100);
@@ -435,15 +435,15 @@ mod tests {
             },
             ..Default::default()
         };
-        let pipeline = AssetPipeline::new(config)
-            .expect("test: create pipeline");
-        let processed = pipeline.process_asset(asset).await
+        let pipeline = AssetPipeline::new(config).expect("test: create pipeline");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
             .expect("test: process asset");
 
         let mut shard_map = CompleteShardMap::new();
         for i in 0..processed.shards.len() {
-            let position = MatrixCoordinate::new(i as i64, 0, 0)
-                .expect("test: coordinate");
+            let position = MatrixCoordinate::new(i as i64, 0, 0).expect("test: coordinate");
             let location = ShardLocation::new(position, 1.0);
             let entry = ShardMapEntry::new([i as u8; 32], vec![location]);
             shard_map.add_entry(entry);
@@ -467,14 +467,16 @@ mod tests {
         {
             let mut fetched = assembler.fetched_shards.write().await;
             for (i, shard) in processed.shards.iter().enumerate() {
-                let position = MatrixCoordinate::new(i as i64, 0, 0)
-                    .expect("test: coordinate");
-                fetched.insert(i, FetchedShard {
-                    _hash: [0u8; 32],
-                    data: shard.data.clone(),
-                    _source: position,
-                    _fetch_time_ms: 0,
-                });
+                let position = MatrixCoordinate::new(i as i64, 0, 0).expect("test: coordinate");
+                fetched.insert(
+                    i,
+                    FetchedShard {
+                        _hash: [0u8; 32],
+                        data: shard.data.clone(),
+                        _source: position,
+                        _fetch_time_ms: 0,
+                    },
+                );
             }
 
             let mut progress = assembler.progress.write().await;

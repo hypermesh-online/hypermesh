@@ -8,7 +8,7 @@
 //! geographic network topology of Block-MATRIX nodes.
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::geospatial::converter::{GpsCoordinate, GpsConverter};
+use crate::matrix::geospatial::converter::{GpsConverter, GpsCoordinate};
 use crate::matrix::geospatial::hierarchy::GeographicZone;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -153,12 +153,12 @@ impl NetworkTopology {
 
         // Check for duplicate ID
         if self.nodes.contains_key(&node_id) {
-            return Err(format!("Node {} already exists", node_id));
+            return Err(format!("Node {node_id} already exists"));
         }
 
         // Check for duplicate coordinate
         if self.nodes_by_coord.contains_key(&coord) {
-            return Err(format!("Coordinate {:?} already occupied", coord));
+            return Err(format!("Coordinate {coord:?} already occupied"));
         }
 
         // Add to main index
@@ -169,10 +169,7 @@ impl NetworkTopology {
 
         // Add to zone index
         if let Some(zone) = zone_id {
-            self.nodes_by_zone
-                .entry(zone)
-                .or_insert_with(HashSet::new)
-                .insert(node_id);
+            self.nodes_by_zone.entry(zone).or_default().insert(node_id);
         }
 
         Ok(())
@@ -192,7 +189,8 @@ impl NetworkTopology {
             }
 
             // Remove edges involving this node
-            self.edges.retain(|e| e.source != node_id && e.target != node_id);
+            self.edges
+                .retain(|e| e.source != node_id && e.target != node_id);
 
             // Remove from other nodes' peer lists
             for other_node in self.nodes.values_mut() {
@@ -234,18 +232,16 @@ impl NetworkTopology {
 
     /// Get a node by coordinate
     pub fn get_node_at_coord(&self, coord: &MatrixCoordinate) -> Option<&TopologyNode> {
-        self.nodes_by_coord.get(coord)
+        self.nodes_by_coord
+            .get(coord)
             .and_then(|id| self.nodes.get(id))
     }
 
     /// Find nodes in a geographic zone
     pub fn find_nodes_in_zone(&self, zone_id: &str) -> Vec<&TopologyNode> {
-        self.nodes_by_zone.get(zone_id)
-            .map(|ids| {
-                ids.iter()
-                    .filter_map(|id| self.nodes.get(id))
-                    .collect()
-            })
+        self.nodes_by_zone
+            .get(zone_id)
+            .map(|ids| ids.iter().filter_map(|id| self.nodes.get(id)).collect())
             .unwrap_or_default()
     }
 
@@ -255,17 +251,14 @@ impl NetworkTopology {
         center: &MatrixCoordinate,
         radius: f64,
     ) -> Vec<&TopologyNode> {
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|node| center.euclidean_distance(&node.matrix_coord) <= radius)
             .collect()
     }
 
     /// Find nearest nodes to a GPS coordinate
-    pub fn find_nearest_to_gps(
-        &self,
-        gps: &GpsCoordinate,
-        count: usize,
-    ) -> Vec<&TopologyNode> {
+    pub fn find_nearest_to_gps(&self, gps: &GpsCoordinate, count: usize) -> Vec<&TopologyNode> {
         // Convert GPS to matrix coordinate
         let matrix = match self.gps_converter.gps_to_matrix(gps) {
             Ok(coord) => coord,
@@ -273,26 +266,29 @@ impl NetworkTopology {
         };
 
         // Find nearest by matrix distance
-        let mut nodes_with_distance: Vec<_> = self.nodes.values()
+        let mut nodes_with_distance: Vec<_> = self
+            .nodes
+            .values()
             .map(|node| {
                 let dist = matrix.euclidean_distance(&node.matrix_coord);
                 (node, dist)
             })
             .collect();
 
-        nodes_with_distance.sort_by(|a, b| {
-            a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        nodes_with_distance
+            .sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         nodes_with_distance.truncate(count);
 
-        nodes_with_distance.into_iter()
+        nodes_with_distance
+            .into_iter()
             .map(|(node, _)| node)
             .collect()
     }
 
     /// Calculate geographic density for each zone
     pub fn calculate_geographic_density(&self, zones: &[GeographicZone]) -> Vec<GeographicDensity> {
-        zones.iter()
+        zones
+            .iter()
             .filter_map(|zone| {
                 let nodes = self.find_nodes_in_zone(&zone.id);
                 if nodes.is_empty() {
@@ -313,9 +309,7 @@ impl NetworkTopology {
                 let node_count = nodes.len();
                 let density = node_count as f64 / area_sq_km;
 
-                let total_connections: usize = nodes.iter()
-                    .map(|n| n.peer_count())
-                    .sum();
+                let total_connections: usize = nodes.iter().map(|n| n.peer_count()).sum();
                 let avg_connections = total_connections as f64 / node_count as f64;
 
                 Some(GeographicDensity {
@@ -336,9 +330,7 @@ impl NetworkTopology {
         stats.insert("total_edges", self.edges.len());
         stats.insert("total_zones", self.nodes_by_zone.len());
 
-        let connected_nodes = self.nodes.values()
-            .filter(|n| !n.peers.is_empty())
-            .count();
+        let connected_nodes = self.nodes.values().filter(|n| !n.peers.is_empty()).count();
         stats.insert("connected_nodes", connected_nodes);
 
         let isolated_nodes = self.nodes.len() - connected_nodes;
@@ -352,7 +344,8 @@ impl NetworkTopology {
         TopologyVisualization {
             nodes: self.nodes.values().cloned().collect(),
             edges: self.edges.clone(),
-            statistics: self.get_statistics()
+            statistics: self
+                .get_statistics()
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
                 .collect(),
@@ -459,7 +452,7 @@ impl NetworkTopology {
             );
             Ok(())
         } else {
-            Err(format!("Node {} not found", node_id))
+            Err(format!("Node {node_id} not found"))
         }
     }
 }
@@ -490,11 +483,11 @@ mod tests {
     fn test_topology_node() {
         let mut node = TopologyNode::new(
             "node1".to_string(),
-            MatrixCoordinate::new(10, 20, 0).unwrap(),
+            MatrixCoordinate::new(10, 20, 0).expect("test: valid coordinate"),
         );
 
         // Set GPS
-        let gps = GpsCoordinate::at_sea_level(40.7, -74.0).unwrap();
+        let gps = GpsCoordinate::at_sea_level(40.7, -74.0).expect("test: expected success");
         node.set_gps(gps);
         assert!(node.gps_coord.is_some());
 
@@ -514,27 +507,24 @@ mod tests {
         let mut topology = NetworkTopology::new(converter);
 
         // Add nodes
-        let node1 = TopologyNode::new(
-            "node1".to_string(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-        );
+        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         let node2 = TopologyNode::new(
             "node2".to_string(),
-            MatrixCoordinate::new(10, 0, 0).unwrap(),
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
         );
 
-        topology.add_node(node1).unwrap();
-        topology.add_node(node2).unwrap();
+        topology.add_node(node1).expect("test: insertion");
+        topology.add_node(node2).expect("test: insertion");
 
         // Add edge
         let edge = TopologyEdge::new("node1".to_string(), "node2".to_string(), 1.0);
-        topology.add_edge(edge).unwrap();
+        topology.add_edge(edge).expect("test: insertion");
 
         // Verify connectivity
-        let n1 = topology.get_node("node1").unwrap();
+        let n1 = topology.get_node("node1").expect("test: expected success");
         assert!(n1.peers.contains("node2"));
 
-        let n2 = topology.get_node("node2").unwrap();
+        let n2 = topology.get_node("node2").expect("test: expected success");
         assert!(n2.peers.contains("node1"));
     }
 
@@ -542,24 +532,18 @@ mod tests {
     fn test_duplicate_prevention() {
         let mut topology = NetworkTopology::default();
 
-        let node1 = TopologyNode::new(
-            "node1".to_string(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-        );
-        topology.add_node(node1).unwrap();
+        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        topology.add_node(node1).expect("test: insertion");
 
         // Duplicate ID
         let node2 = TopologyNode::new(
             "node1".to_string(),
-            MatrixCoordinate::new(10, 0, 0).unwrap(),
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
         );
         assert!(topology.add_node(node2).is_err());
 
         // Duplicate coordinate
-        let node3 = TopologyNode::new(
-            "node3".to_string(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-        );
+        let node3 = TopologyNode::new("node3".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         assert!(topology.add_node(node3).is_err());
     }
 
@@ -570,11 +554,11 @@ mod tests {
         // Add nodes to zones
         for i in 0..3 {
             let mut node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
             node.zone_id = Some("zone_a".to_string());
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
         let zone_nodes = topology.find_nodes_in_zone("zone_a");
@@ -588,10 +572,10 @@ mod tests {
         // Add nodes at various distances
         for i in 0..5 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
         let center = MatrixCoordinate::origin();
@@ -607,21 +591,21 @@ mod tests {
         let mut topology = NetworkTopology::new(converter.clone());
 
         // Add nodes with GPS coordinates
-        let gps_coords = vec![
-            GpsCoordinate::at_sea_level(40.7, -74.0).unwrap(), // NYC
-            GpsCoordinate::at_sea_level(34.0, -118.2).unwrap(), // LA
-            GpsCoordinate::at_sea_level(41.9, -87.6).unwrap(), // Chicago
+        let gps_coords = [
+            GpsCoordinate::at_sea_level(40.7, -74.0).expect("test: expected success"), // NYC
+            GpsCoordinate::at_sea_level(34.0, -118.2).expect("test: expected success"), // LA
+            GpsCoordinate::at_sea_level(41.9, -87.6).expect("test: expected success"), // Chicago
         ];
 
         for (i, gps) in gps_coords.iter().enumerate() {
-            let matrix = converter.gps_to_matrix(gps).unwrap();
-            let mut node = TopologyNode::new(format!("node{}", i), matrix);
+            let matrix = converter.gps_to_matrix(gps).expect("test: expected success");
+            let mut node = TopologyNode::new(format!("node{i}"), matrix);
             node.set_gps(*gps);
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
         // Find nearest to Boston
-        let boston = GpsCoordinate::at_sea_level(42.3, -71.0).unwrap();
+        let boston = GpsCoordinate::at_sea_level(42.3, -71.0).expect("test: expected success");
         let nearest = topology.find_nearest_to_gps(&boston, 2);
 
         assert_eq!(nearest.len(), 2);
@@ -637,26 +621,46 @@ mod tests {
         // Component 1: nodes 0-2
         for i in 0..3 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
-        topology.add_edge(TopologyEdge::new("node0".to_string(), "node1".to_string(), 1.0)).unwrap();
-        topology.add_edge(TopologyEdge::new("node1".to_string(), "node2".to_string(), 1.0)).unwrap();
+        topology
+            .add_edge(TopologyEdge::new(
+                "node0".to_string(),
+                "node1".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
+        topology
+            .add_edge(TopologyEdge::new(
+                "node1".to_string(),
+                "node2".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
 
         // Component 2: nodes 3-4
         for i in 3..5 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
-        topology.add_edge(TopologyEdge::new("node3".to_string(), "node4".to_string(), 1.0)).unwrap();
+        topology
+            .add_edge(TopologyEdge::new(
+                "node3".to_string(),
+                "node4".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
 
-        let components = topology.find_connected_components();
+        let mut components = topology.find_connected_components();
         assert_eq!(components.len(), 2);
+        // Sort by size descending since HashMap iteration order is non-deterministic
+        components.sort_by_key(|a| std::cmp::Reverse(a.len()));
         assert_eq!(components[0].len(), 3);
         assert_eq!(components[1].len(), 2);
     }
@@ -668,18 +672,20 @@ mod tests {
         // Create a linear chain: 0-1-2-3
         for i in 0..4 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
         for i in 0..3 {
-            topology.add_edge(TopologyEdge::new(
-                format!("node{}", i),
-                format!("node{}", i + 1),
-                1.0,
-            )).unwrap();
+            topology
+                .add_edge(TopologyEdge::new(
+                    format!("node{i}"),
+                    format!("node{}", i + 1),
+                    1.0,
+                ))
+                .expect("test: expected success");
         }
 
         let diameter = topology.calculate_diameter();
@@ -693,14 +699,26 @@ mod tests {
         // Add connected nodes
         for i in 0..3 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
-        topology.add_edge(TopologyEdge::new("node0".to_string(), "node1".to_string(), 1.0)).unwrap();
-        topology.add_edge(TopologyEdge::new("node1".to_string(), "node2".to_string(), 1.0)).unwrap();
+        topology
+            .add_edge(TopologyEdge::new(
+                "node0".to_string(),
+                "node1".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
+        topology
+            .add_edge(TopologyEdge::new(
+                "node1".to_string(),
+                "node2".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
 
         // Remove middle node
         let removed = topology.remove_node("node1");
@@ -710,7 +728,7 @@ mod tests {
         assert_eq!(topology.edges.len(), 0);
 
         // Check that peer lists are updated
-        let node0 = topology.get_node("node0").unwrap();
+        let node0 = topology.get_node("node0").expect("test: expected success");
         assert!(!node0.peers.contains("node1"));
     }
 
@@ -721,15 +739,27 @@ mod tests {
         // Add some nodes and edges
         for i in 0..5 {
             let node = TopologyNode::new(
-                format!("node{}", i),
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
+                format!("node{i}"),
+                MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"),
             );
-            topology.add_node(node).unwrap();
+            topology.add_node(node).expect("test: insertion");
         }
 
         // Connect first 3 nodes
-        topology.add_edge(TopologyEdge::new("node0".to_string(), "node1".to_string(), 1.0)).unwrap();
-        topology.add_edge(TopologyEdge::new("node1".to_string(), "node2".to_string(), 1.0)).unwrap();
+        topology
+            .add_edge(TopologyEdge::new(
+                "node0".to_string(),
+                "node1".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
+        topology
+            .add_edge(TopologyEdge::new(
+                "node1".to_string(),
+                "node2".to_string(),
+                1.0,
+            ))
+            .expect("test: expected success");
 
         let stats = topology.get_statistics();
         assert_eq!(stats[&"total_nodes"], 5);

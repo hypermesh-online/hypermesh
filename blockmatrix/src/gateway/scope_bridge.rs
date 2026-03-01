@@ -37,9 +37,7 @@ pub enum BridgeMessage {
         transfer_id: String,
     },
     /// Confirmation that an asset is locked.
-    LockConfirmed {
-        transfer_id: String,
-    },
+    LockConfirmed { transfer_id: String },
     /// Request to register an asset on the target scope.
     RegisterRequest {
         asset_id: AssetId,
@@ -47,14 +45,9 @@ pub enum BridgeMessage {
         target_scope: BlockchainScope,
     },
     /// Confirmation that registration is complete.
-    RegisterConfirmed {
-        transfer_id: String,
-    },
+    RegisterConfirmed { transfer_id: String },
     /// Request to release a lock (rollback).
-    RollbackRequest {
-        transfer_id: String,
-        reason: String,
-    },
+    RollbackRequest { transfer_id: String, reason: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -90,10 +83,7 @@ impl ScopeBridge {
     ///
     /// This drives the transfer through Lock -> Validate -> Transit -> Confirm.
     /// On failure at any point, the transfer is marked Failed and rolled back.
-    pub async fn bridge_transfer(
-        &self,
-        transfer_id: &str,
-    ) -> Result<TransferStatus, GatewayError> {
+    pub async fn bridge_transfer(&self, transfer_id: &str) -> Result<TransferStatus, GatewayError> {
         // --- Phase 1: Lock on source scope ---
         self.lock_on_source(transfer_id).await?;
 
@@ -106,7 +96,7 @@ impl ScopeBridge {
                 return Ok(TransferStatus::RolledBack);
             }
             Err(e) => {
-                let reason = format!("Proof validation error: {}", e);
+                let reason = format!("Proof validation error: {e}");
                 self.fail_transfer(transfer_id, reason).await?;
                 return Ok(TransferStatus::RolledBack);
             }
@@ -136,7 +126,10 @@ impl ScopeBridge {
                 info!("Routing register request for transfer {}", transfer_id);
                 // Registration is part of confirm_transfer
             }
-            BridgeMessage::RollbackRequest { transfer_id, reason } => {
+            BridgeMessage::RollbackRequest {
+                transfer_id,
+                reason,
+            } => {
                 warn!("Routing rollback for transfer {}: {}", transfer_id, reason);
                 self.fail_transfer(&transfer_id, reason).await?;
             }
@@ -157,10 +150,11 @@ impl ScopeBridge {
         asset_id: &AssetId,
     ) -> Result<Option<TransferStatus>, GatewayError> {
         let transfers = self.transfers.read().await;
-        let active = transfers
-            .values()
-            .find(|t| t.asset_id == *asset_id && t.status != TransferStatus::Confirmed
-                && t.status != TransferStatus::RolledBack);
+        let active = transfers.values().find(|t| {
+            t.asset_id == *asset_id
+                && t.status != TransferStatus::Confirmed
+                && t.status != TransferStatus::RolledBack
+        });
 
         Ok(active.map(|t| t.status))
     }
@@ -174,14 +168,17 @@ impl ScopeBridge {
 
     async fn lock_on_source(&self, transfer_id: &str) -> Result<(), GatewayError> {
         let mut transfers = self.transfers.write().await;
-        let transfer = transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| GatewayError::TransferNotFound {
-                transfer_id: transfer_id.to_string(),
-            })?;
+        let transfer =
+            transfers
+                .get_mut(transfer_id)
+                .ok_or_else(|| GatewayError::TransferNotFound {
+                    transfer_id: transfer_id.to_string(),
+                })?;
         transfer.lock()?;
-        info!("Locked asset {} on {} scope for transfer {}",
-            transfer.asset_id, transfer.source_scope, transfer_id);
+        info!(
+            "Locked asset {} on {} scope for transfer {}",
+            transfer.asset_id, transfer.source_scope, transfer_id
+        );
         Ok(())
     }
 
@@ -210,11 +207,12 @@ impl ScopeBridge {
 
     async fn begin_transit(&self, transfer_id: &str) -> Result<(), GatewayError> {
         let mut transfers = self.transfers.write().await;
-        let transfer = transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| GatewayError::TransferNotFound {
-                transfer_id: transfer_id.to_string(),
-            })?;
+        let transfer =
+            transfers
+                .get_mut(transfer_id)
+                .ok_or_else(|| GatewayError::TransferNotFound {
+                    transfer_id: transfer_id.to_string(),
+                })?;
         transfer.begin_transit()?;
         info!("Transfer {} now in transit", transfer_id);
         Ok(())
@@ -222,28 +220,28 @@ impl ScopeBridge {
 
     async fn confirm_transfer(&self, transfer_id: &str) -> Result<(), GatewayError> {
         let mut transfers = self.transfers.write().await;
-        let transfer = transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| GatewayError::TransferNotFound {
-                transfer_id: transfer_id.to_string(),
-            })?;
+        let transfer =
+            transfers
+                .get_mut(transfer_id)
+                .ok_or_else(|| GatewayError::TransferNotFound {
+                    transfer_id: transfer_id.to_string(),
+                })?;
         transfer.confirm()?;
-        info!("Transfer {} confirmed on {} scope",
-            transfer_id, transfer.target_scope);
+        info!(
+            "Transfer {} confirmed on {} scope",
+            transfer_id, transfer.target_scope
+        );
         Ok(())
     }
 
-    async fn fail_transfer(
-        &self,
-        transfer_id: &str,
-        reason: String,
-    ) -> Result<(), GatewayError> {
+    async fn fail_transfer(&self, transfer_id: &str, reason: String) -> Result<(), GatewayError> {
         let mut transfers = self.transfers.write().await;
-        let transfer = transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| GatewayError::TransferNotFound {
-                transfer_id: transfer_id.to_string(),
-            })?;
+        let transfer =
+            transfers
+                .get_mut(transfer_id)
+                .ok_or_else(|| GatewayError::TransferNotFound {
+                    transfer_id: transfer_id.to_string(),
+                })?;
         transfer.fail(reason)?;
         transfer.rollback()?;
         warn!("Transfer {} rolled back", transfer_id);
@@ -257,8 +255,8 @@ impl ScopeBridge {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::asset_transfer::DefaultTransferValidator;
+    use super::*;
 
     fn make_bridge() -> ScopeBridge {
         ScopeBridge::new(Arc::new(DefaultTransferValidator))
@@ -287,7 +285,9 @@ mod tests {
 
         // Verify final state
         let all = bridge.list_transfers().await;
-        let t = all.iter().find(|t| t.transfer_id == "tx-100")
+        let t = all
+            .iter()
+            .find(|t| t.transfer_id == "tx-100")
             .expect("test: find transfer");
         assert_eq!(t.status, TransferStatus::Confirmed);
         assert!(t.source_proofs_verified);
@@ -343,7 +343,9 @@ mod tests {
             .expect("test: route rollback");
 
         let all = bridge.list_transfers().await;
-        let t = all.iter().find(|t| t.transfer_id == "tx-300")
+        let t = all
+            .iter()
+            .find(|t| t.transfer_id == "tx-300")
             .expect("test: find transfer");
         assert_eq!(t.status, TransferStatus::RolledBack);
     }

@@ -6,19 +6,19 @@
 //!
 //! Implementations for Uniswap, LayerZero, and other crypto exchange protocols
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use ethers::{
-    prelude::*,
     abi::Abi,
     contract::Contract,
-    providers::{Provider, Http},
-    signers::{LocalWallet, Signer},
     middleware::SignerMiddleware,
+    prelude::*,
+    providers::{Http, Provider},
+    signers::{LocalWallet, Signer},
     types::{Address, U256},
 };
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 // U160 not needed - using U256::zero() for sqrtPriceLimitX96 parameter
 use std::sync::Arc;
 
@@ -33,23 +33,16 @@ pub struct UniswapV3Provider {
 }
 
 impl UniswapV3Provider {
-    pub async fn new(
-        rpc_url: &str,
-        private_key: &str,
-        chain_id: u64,
-    ) -> Result<Self> {
+    pub async fn new(rpc_url: &str, private_key: &str, chain_id: u64) -> Result<Self> {
         let provider = Provider::<Http>::try_from(rpc_url)?;
-        let wallet: LocalWallet = private_key.parse::<LocalWallet>()?
-            .with_chain_id(chain_id);
+        let wallet: LocalWallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id);
         let client = SignerMiddleware::new(provider.clone(), wallet);
 
         // Uniswap V3 Router address (Ethereum mainnet)
-        let router_address = "0xE592427A0AEce92De3Edee1F18E0157C05861564"
-            .parse::<Address>()?;
+        let router_address = "0xE592427A0AEce92De3Edee1F18E0157C05861564".parse::<Address>()?;
 
         // Uniswap V3 Quoter address
-        let quoter_address = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6"
-            .parse::<Address>()?;
+        let quoter_address = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6".parse::<Address>()?;
 
         // ABI for Uniswap V3 Router (simplified)
         let router_abi = r#"[
@@ -122,7 +115,7 @@ impl UniswapV3Provider {
             "USDT" => Ok("0xdAC17F958D2ee523a2206206994597C13D831ec7".parse()?),
             "DAI" => Ok("0x6B175474E89094C44Da98b954EedeAC495271d0F".parse()?),
             "CSR" => Ok("0x1234567890123456789012345678901234567890".parse()?), // Placeholder
-            _ => Err(anyhow!("Unsupported token: {}", symbol)),
+            _ => Err(anyhow!("Unsupported token: {symbol}")),
         }
     }
 }
@@ -163,9 +156,13 @@ impl CryptoExchangeProvider for UniswapV3Provider {
         // Use 0.3% fee tier (3000)
         let fee = 3000u32;
 
-        let amount_out: U256 = self.quoter_contract
+        let amount_out: U256 = self
+            .quoter_contract
             .clone()
-            .method::<_, U256>("quoteExactInputSingle", (token_in, token_out, fee, amount_in, U256::zero()))?
+            .method::<_, U256>(
+                "quoteExactInputSingle",
+                (token_in, token_out, fee, amount_in, U256::zero()),
+            )?
             .call()
             .await?;
 
@@ -180,7 +177,8 @@ impl CryptoExchangeProvider for UniswapV3Provider {
         let gas_price = self.provider.get_gas_price().await?;
         let estimated_gas = U256::from(150000); // Typical gas for swap
         let gas_cost_wei = gas_price * estimated_gas;
-        let gas_cost_eth = Decimal::from_str_exact(&gas_cost_wei.to_string())? / dec!(1000000000000000000); // Convert from wei to ETH
+        let gas_cost_eth =
+            Decimal::from_str_exact(&gas_cost_wei.to_string())? / dec!(1000000000000000000); // Convert from wei to ETH
 
         Ok(ExchangeQuote {
             from_amount: amount,
@@ -193,14 +191,20 @@ impl CryptoExchangeProvider for UniswapV3Provider {
         })
     }
 
-    async fn execute_swap(&self, _auth: &CryptoCredentials, swap: &SwapRequest) -> Result<SwapResult> {
+    async fn execute_swap(
+        &self,
+        _auth: &CryptoCredentials,
+        swap: &SwapRequest,
+    ) -> Result<SwapResult> {
         let token_in = self.get_token_address(&swap.from_token)?;
         let token_out = self.get_token_address(&swap.to_token)?;
         let amount_in = U256::from_dec_str(&swap.amount.to_string())?;
         let recipient: Address = swap.recipient.parse()?;
 
         // Calculate minimum amount out with slippage
-        let quote = self.get_quote(&swap.from_token, &swap.to_token, swap.amount).await?;
+        let quote = self
+            .get_quote(&swap.from_token, &swap.to_token, swap.amount)
+            .await?;
         let min_amount_out = quote.to_amount * (dec!(1) - swap.slippage_tolerance);
         let amount_out_min = U256::from_dec_str(&min_amount_out.to_string())?;
 
@@ -236,7 +240,9 @@ impl CryptoExchangeProvider for UniswapV3Provider {
             from_amount: swap.amount,
             to_amount: quote.to_amount, // Would parse from logs in real implementation
             gas_used: Decimal::from_str_exact(&receipt.gas_used.unwrap_or_default().to_string())?,
-            gas_price: Decimal::from_str_exact(&receipt.effective_gas_price.unwrap_or_default().to_string())?,
+            gas_price: Decimal::from_str_exact(
+                &receipt.effective_gas_price.unwrap_or_default().to_string(),
+            )?,
         })
     }
 
@@ -244,10 +250,10 @@ impl CryptoExchangeProvider for UniswapV3Provider {
         // This would require querying Uniswap V3 pool contracts
         // For now, returning mock data
         Ok(LiquidityInfo {
-            reserve_a: dec!(1000000), // 1M tokens
+            reserve_a: dec!(1000000),    // 1M tokens
             reserve_b: dec!(2000000000), // 2B tokens (different decimals)
-            total_supply: dec!(50000), // LP tokens
-            apr: dec!(0.15), // 15% APR
+            total_supply: dec!(50000),   // LP tokens
+            apr: dec!(0.15),             // 15% APR
         })
     }
 
@@ -280,8 +286,7 @@ impl LayerZeroBridgeProvider {
         endpoint_address: &str,
     ) -> Result<Self> {
         let provider = Provider::<Http>::try_from(rpc_url)?;
-        let wallet: LocalWallet = private_key.parse::<LocalWallet>()?
-            .with_chain_id(chain_id);
+        let wallet: LocalWallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id);
         let client = SignerMiddleware::new(provider.clone(), wallet);
 
         let endpoint_addr: Address = endpoint_address.parse()?;
@@ -341,7 +346,7 @@ impl LayerZeroBridgeProvider {
             "polygon" => Ok(109),
             "arbitrum" => Ok(110),
             "optimism" => Ok(111),
-            _ => Err(anyhow!("Unsupported chain: {}", chain_name)),
+            _ => Err(anyhow!("Unsupported chain: {chain_name}")),
         }
     }
 }
@@ -378,13 +383,18 @@ impl CryptoExchangeProvider for LayerZeroBridgeProvider {
         let payload = ethers::utils::hex::encode(b"bridge_payload");
         let adapter_params = ethers::utils::hex::encode(b"");
 
-        let (native_fee, _zro_fee): (U256, U256) = self.endpoint_contract
+        let (native_fee, _zro_fee): (U256, U256) = self
+            .endpoint_contract
             .clone()
-            .method("estimateFees", (dst_chain_id, destination, payload, false, adapter_params))?
+            .method(
+                "estimateFees",
+                (dst_chain_id, destination, payload, false, adapter_params),
+            )?
             .call()
             .await?;
 
-        let fee_decimal = Decimal::from_str_exact(&native_fee.to_string())? / dec!(1000000000000000000); // Convert from wei
+        let fee_decimal =
+            Decimal::from_str_exact(&native_fee.to_string())? / dec!(1000000000000000000); // Convert from wei
 
         Ok(ExchangeQuote {
             from_amount: amount,
@@ -397,7 +407,11 @@ impl CryptoExchangeProvider for LayerZeroBridgeProvider {
         })
     }
 
-    async fn execute_swap(&self, auth: &CryptoCredentials, swap: &SwapRequest) -> Result<SwapResult> {
+    async fn execute_swap(
+        &self,
+        auth: &CryptoCredentials,
+        swap: &SwapRequest,
+    ) -> Result<SwapResult> {
         if swap.from_token != swap.to_token {
             return Err(anyhow!("LayerZero only supports same-token bridging"));
         }
@@ -409,9 +423,19 @@ impl CryptoExchangeProvider for LayerZeroBridgeProvider {
         let adapter_params = ethers::utils::hex::encode(b"");
 
         // Get fee estimate
-        let (native_fee, _): (U256, U256) = self.endpoint_contract
+        let (native_fee, _): (U256, U256) = self
+            .endpoint_contract
             .clone()
-            .method("estimateFees", (dst_chain_id, destination.clone(), payload.clone(), false, adapter_params.clone()))?
+            .method(
+                "estimateFees",
+                (
+                    dst_chain_id,
+                    destination.clone(),
+                    payload.clone(),
+                    false,
+                    adapter_params.clone(),
+                ),
+            )?
             .call()
             .await?;
 
@@ -440,7 +464,9 @@ impl CryptoExchangeProvider for LayerZeroBridgeProvider {
             from_amount: swap.amount,
             to_amount: swap.amount, // 1:1 for bridging
             gas_used: Decimal::from_str_exact(&receipt.gas_used.unwrap_or_default().to_string())?,
-            gas_price: Decimal::from_str_exact(&receipt.effective_gas_price.unwrap_or_default().to_string())?,
+            gas_price: Decimal::from_str_exact(
+                &receipt.effective_gas_price.unwrap_or_default().to_string(),
+            )?,
         })
     }
 
@@ -476,6 +502,13 @@ use std::collections::HashMap;
 pub struct MockCryptoExchangeProvider {
     supported_pairs: Vec<TradingPair>,
     mock_rates: HashMap<String, Decimal>,
+}
+
+#[cfg(test)]
+impl Default for MockCryptoExchangeProvider {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -523,10 +556,8 @@ impl CryptoExchangeProvider for MockCryptoExchangeProvider {
     }
 
     async fn get_quote(&self, from: &str, to: &str, amount: Decimal) -> Result<ExchangeQuote> {
-        let pair_key = format!("{}/{}", from, to);
-        let exchange_rate = self.mock_rates.get(&pair_key)
-            .copied()
-            .unwrap_or(dec!(1));
+        let pair_key = format!("{from}/{to}");
+        let exchange_rate = self.mock_rates.get(&pair_key).copied().unwrap_or(dec!(1));
 
         let to_amount = amount * exchange_rate;
         let fees = amount * dec!(0.003); // 0.3% fee
@@ -542,8 +573,14 @@ impl CryptoExchangeProvider for MockCryptoExchangeProvider {
         })
     }
 
-    async fn execute_swap(&self, _auth: &CryptoCredentials, swap: &SwapRequest) -> Result<SwapResult> {
-        let quote = self.get_quote(&swap.from_token, &swap.to_token, swap.amount).await?;
+    async fn execute_swap(
+        &self,
+        _auth: &CryptoCredentials,
+        swap: &SwapRequest,
+    ) -> Result<SwapResult> {
+        let quote = self
+            .get_quote(&swap.from_token, &swap.to_token, swap.amount)
+            .await?;
 
         Ok(SwapResult {
             transaction_hash: format!("0xmock{}", chrono::Utc::now().timestamp()),

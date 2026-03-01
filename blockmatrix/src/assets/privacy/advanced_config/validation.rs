@@ -6,24 +6,24 @@
 //!
 //! Privacy validation rules and constraints configuration.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetResult, AssetError};
+use crate::assets::core::{AssetError, AssetResult};
 
 /// Privacy constraints and limits
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct PrivacyConstraints {
     /// Global privacy constraints
     pub global_constraints: GlobalPrivacyConstraints,
-    
+
     /// User-defined constraints
     pub user_constraints: Vec<UserDefinedConstraint>,
-    
+
     /// Regulatory constraints
     pub regulatory_constraints: Vec<RegulatoryConstraint>,
-    
+
     /// Organizational constraints
     pub organizational_constraints: Vec<OrganizationalConstraint>,
 }
@@ -33,16 +33,16 @@ pub struct PrivacyConstraints {
 pub struct GlobalPrivacyConstraints {
     /// Maximum data retention period
     pub max_retention_period: Duration,
-    
+
     /// Minimum privacy level
     pub min_privacy_level: String,
-    
+
     /// Required consent types
     pub required_consent_types: Vec<String>,
-    
+
     /// Prohibited data types
     pub prohibited_data_types: Vec<String>,
-    
+
     /// Geographic restrictions
     pub geographic_restrictions: Vec<String>,
 }
@@ -52,16 +52,16 @@ pub struct GlobalPrivacyConstraints {
 pub struct UserDefinedConstraint {
     /// Constraint name
     pub name: String,
-    
+
     /// Constraint description
     pub description: String,
-    
+
     /// Constraint rules
     pub rules: Vec<ConstraintRule>,
-    
+
     /// Constraint priority
     pub priority: u32,
-    
+
     /// Constraint enabled
     pub enabled: bool,
 }
@@ -71,16 +71,16 @@ pub struct UserDefinedConstraint {
 pub struct ConstraintRule {
     /// Rule type
     pub rule_type: ConstraintType,
-    
+
     /// Rule parameters
     pub parameters: HashMap<String, String>,
-    
+
     /// Rule condition
     pub condition: ConstraintCondition,
-    
+
     /// Rule action
     pub action: ConstraintAction,
-    
+
     /// Enforcement level
     pub enforcement_level: EnforcementLevel,
 }
@@ -129,16 +129,16 @@ pub enum EnforcementLevel {
 pub struct RegulatoryConstraint {
     /// Regulation name
     pub regulation: String,
-    
+
     /// Jurisdiction
     pub jurisdiction: String,
-    
+
     /// Compliance requirements
     pub requirements: Vec<ComplianceRequirement>,
-    
+
     /// Effective date
     pub effective_date: String,
-    
+
     /// Expiration date
     pub expiration_date: Option<String>,
 }
@@ -148,13 +148,13 @@ pub struct RegulatoryConstraint {
 pub struct ComplianceRequirement {
     /// Requirement type
     pub requirement_type: ComplianceRequirementType,
-    
+
     /// Requirement description
     pub description: String,
-    
+
     /// Implementation details
     pub implementation: HashMap<String, String>,
-    
+
     /// Verification method
     pub verification_method: String,
 }
@@ -175,16 +175,16 @@ pub enum ComplianceRequirementType {
 pub struct OrganizationalConstraint {
     /// Policy name
     pub policy_name: String,
-    
+
     /// Policy version
     pub version: String,
-    
+
     /// Organizational rules
     pub rules: Vec<OrganizationalRule>,
-    
+
     /// Policy exceptions
     pub exceptions: Vec<PolicyException>,
-    
+
     /// Monitoring requirements
     pub monitoring: OrganizationalMonitoring,
 }
@@ -194,13 +194,13 @@ pub struct OrganizationalConstraint {
 pub struct OrganizationalRule {
     /// Rule name
     pub name: String,
-    
+
     /// Rule scope
     pub scope: Vec<String>,
-    
+
     /// Rule conditions
     pub conditions: HashMap<String, String>,
-    
+
     /// Rule enforcement
     pub enforcement: EnforcementLevel,
 }
@@ -210,13 +210,13 @@ pub struct OrganizationalRule {
 pub struct PolicyException {
     /// Exception name
     pub name: String,
-    
+
     /// Exception criteria
     pub criteria: HashMap<String, String>,
-    
+
     /// Approval process
     pub approval_process: ApprovalProcess,
-    
+
     /// Exception duration
     pub duration: Duration,
 }
@@ -226,13 +226,13 @@ pub struct PolicyException {
 pub struct ApprovalProcess {
     /// Required approvers
     pub approvers: Vec<String>,
-    
+
     /// Approval threshold
     pub threshold: u32,
-    
+
     /// Approval timeout
     pub timeout: Duration,
-    
+
     /// Escalation procedures
     pub escalation: Vec<String>,
 }
@@ -242,29 +242,29 @@ pub struct ApprovalProcess {
 pub struct OrganizationalMonitoring {
     /// Monitoring enabled
     pub enabled: bool,
-    
+
     /// Monitoring frequency
     pub frequency: Duration,
-    
+
     /// Compliance reporting
     pub reporting_requirements: Vec<String>,
-    
+
     /// Audit requirements
     pub audit_requirements: Vec<String>,
 }
 
 /// Privacy validation rules
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct PrivacyValidationRules {
     /// Input validation rules
     pub input_validation: Vec<InputValidationRule>,
-    
+
     /// Configuration validation rules
     pub config_validation: Vec<ConfigValidationRule>,
-    
+
     /// Cross-field validation rules
     pub cross_field_validation: Vec<CrossFieldValidationRule>,
-    
+
     /// Business logic validation rules
     pub business_logic_validation: Vec<BusinessLogicValidationRule>,
 }
@@ -274,16 +274,16 @@ pub struct PrivacyValidationRules {
 pub struct InputValidationRule {
     /// Field name
     pub field_name: String,
-    
+
     /// Validation type
     pub validation_type: ValidationRuleType,
-    
+
     /// Validation parameters
     pub parameters: HashMap<String, String>,
-    
+
     /// Error message
     pub error_message: String,
-    
+
     /// Severity level
     pub severity: ValidationSeverity,
 }
@@ -304,13 +304,13 @@ pub enum ValidationRuleType {
 pub struct ConfigValidationRule {
     /// Configuration section
     pub section: String,
-    
+
     /// Validation type
     pub validation_type: ConfigValidationType,
-    
+
     /// Validation logic
     pub validation_logic: String,
-    
+
     /// Severity level
     pub severity: ValidationSeverity,
 }
@@ -339,16 +339,16 @@ pub enum ValidationSeverity {
 pub struct CrossFieldValidationRule {
     /// Rule name
     pub name: String,
-    
+
     /// Fields involved
     pub fields: Vec<String>,
-    
+
     /// Validation logic
     pub logic: CrossFieldLogic,
-    
+
     /// Error message
     pub error_message: String,
-    
+
     /// Severity level
     pub severity: ValidationSeverity,
 }
@@ -368,16 +368,16 @@ pub enum CrossFieldLogic {
 pub struct BusinessLogicValidationRule {
     /// Rule name
     pub name: String,
-    
+
     /// Business logic type
     pub logic_type: BusinessLogicType,
-    
+
     /// Rule implementation
     pub implementation: String,
-    
+
     /// Rule priority
     pub priority: u32,
-    
+
     /// Severity level
     pub severity: ValidationSeverity,
 }
@@ -395,19 +395,19 @@ pub enum BusinessLogicType {
 impl PrivacyConstraints {
     pub fn validate(&self) -> AssetResult<()> {
         self.global_constraints.validate()?;
-        
+
         for constraint in &self.user_constraints {
             constraint.validate()?;
         }
-        
+
         for constraint in &self.regulatory_constraints {
             constraint.validate()?;
         }
-        
+
         for constraint in &self.organizational_constraints {
             constraint.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -415,13 +415,17 @@ impl PrivacyConstraints {
 impl GlobalPrivacyConstraints {
     pub fn validate(&self) -> AssetResult<()> {
         if self.max_retention_period.as_secs() == 0 {
-            return Err(AssetError::ValidationError { message: "Maximum retention period cannot be zero".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Maximum retention period cannot be zero".to_string(),
+            });
         }
-        
+
         if self.min_privacy_level.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Minimum privacy level cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Minimum privacy level cannot be empty".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -429,17 +433,21 @@ impl GlobalPrivacyConstraints {
 impl UserDefinedConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Constraint name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Constraint name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.rules.is_empty() {
-            return Err(AssetError::ValidationError { message: "Constraint must have at least one rule".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Constraint must have at least one rule".to_string(),
+            });
         }
-        
+
         for rule in &self.rules {
             rule.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -454,13 +462,17 @@ impl ConstraintRule {
 impl RegulatoryConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.regulation.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Regulation name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Regulation name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.jurisdiction.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Jurisdiction cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Jurisdiction cannot be empty".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -468,13 +480,17 @@ impl RegulatoryConstraint {
 impl OrganizationalConstraint {
     pub fn validate(&self) -> AssetResult<()> {
         if self.policy_name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Policy name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Policy name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.rules.is_empty() {
-            return Err(AssetError::ValidationError { message: "Organizational constraint must have at least one rule".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Organizational constraint must have at least one rule".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -484,19 +500,19 @@ impl PrivacyValidationRules {
         for rule in &self.input_validation {
             rule.validate()?;
         }
-        
+
         for rule in &self.config_validation {
             rule.validate()?;
         }
-        
+
         for rule in &self.cross_field_validation {
             rule.validate()?;
         }
-        
+
         for rule in &self.business_logic_validation {
             rule.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -504,13 +520,17 @@ impl PrivacyValidationRules {
 impl InputValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.field_name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Field name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Field name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.error_message.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Error message cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Error message cannot be empty".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -518,9 +538,11 @@ impl InputValidationRule {
 impl ConfigValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.section.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Configuration section cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Configuration section cannot be empty".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -528,13 +550,17 @@ impl ConfigValidationRule {
 impl CrossFieldValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Cross-field validation rule name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Cross-field validation rule name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.fields.len() < 2 {
-            return Err(AssetError::ValidationError { message: "Cross-field validation requires at least two fields".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Cross-field validation requires at least two fields".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -542,25 +568,18 @@ impl CrossFieldValidationRule {
 impl BusinessLogicValidationRule {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Business logic validation rule name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Business logic validation rule name cannot be empty".to_string(),
+            });
         }
-        
-        if self.implementation.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Business logic implementation cannot be empty".to_string() });
-        }
-        
-        Ok(())
-    }
-}
 
-impl Default for PrivacyConstraints {
-    fn default() -> Self {
-        Self {
-            global_constraints: GlobalPrivacyConstraints::default(),
-            user_constraints: Vec::new(),
-            regulatory_constraints: Vec::new(),
-            organizational_constraints: Vec::new(),
+        if self.implementation.trim().is_empty() {
+            return Err(AssetError::ValidationError {
+                message: "Business logic implementation cannot be empty".to_string(),
+            });
         }
+
+        Ok(())
     }
 }
 
@@ -572,17 +591,6 @@ impl Default for GlobalPrivacyConstraints {
             required_consent_types: Vec::new(),
             prohibited_data_types: Vec::new(),
             geographic_restrictions: Vec::new(),
-        }
-    }
-}
-
-impl Default for PrivacyValidationRules {
-    fn default() -> Self {
-        Self {
-            input_validation: Vec::new(),
-            config_validation: Vec::new(),
-            cross_field_validation: Vec::new(),
-            business_logic_validation: Vec::new(),
         }
     }
 }

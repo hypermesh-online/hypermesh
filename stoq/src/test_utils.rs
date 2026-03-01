@@ -17,7 +17,7 @@ pub fn init_test_crypto() {
         // Install crypto provider for tests
         if let Err(e) = rustls::crypto::ring::default_provider().install_default() {
             // Provider might already be installed, which is fine
-            eprintln!("Test crypto provider initialization: {:?}", e);
+            eprintln!("Test crypto provider initialization: {e:?}");
         }
     });
 }

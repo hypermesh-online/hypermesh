@@ -21,8 +21,10 @@
 pub mod asset_transfer;
 pub mod scope_bridge;
 
-pub use asset_transfer::{AssetTransfer, TransferStatus, TransferValidator, DefaultTransferValidator};
-pub use scope_bridge::{ScopeBridge, BridgeMessage};
+pub use asset_transfer::{
+    AssetTransfer, DefaultTransferValidator, TransferStatus, TransferValidator,
+};
+pub use scope_bridge::{BridgeMessage, ScopeBridge};
 
 use std::sync::Arc;
 
@@ -54,7 +56,10 @@ pub enum GatewayError {
 
     /// Asset is already involved in an active transfer.
     #[error("Asset {asset_id} already has an active transfer: {transfer_id}")]
-    AssetAlreadyInTransfer { asset_id: String, transfer_id: String },
+    AssetAlreadyInTransfer {
+        asset_id: String,
+        transfer_id: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +75,12 @@ pub struct GatewayManager {
     bridge: ScopeBridge,
     /// Counter for generating unique transfer IDs.
     next_id: Arc<tokio::sync::Mutex<u64>>,
+}
+
+impl Default for GatewayManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GatewayManager {
@@ -135,12 +146,8 @@ impl GatewayManager {
             id
         };
 
-        let transfer = AssetTransfer::new(
-            transfer_id.clone(),
-            asset_id.clone(),
-            from_scope,
-            to_scope,
-        );
+        let transfer =
+            AssetTransfer::new(transfer_id.clone(), asset_id.clone(), from_scope, to_scope);
 
         info!(
             "Initiating transfer {} for asset {} ({} -> {})",
@@ -170,8 +177,7 @@ impl GatewayManager {
             .await
             .into_iter()
             .filter(|t| {
-                t.status != TransferStatus::Confirmed
-                    && t.status != TransferStatus::RolledBack
+                t.status != TransferStatus::Confirmed && t.status != TransferStatus::RolledBack
             })
             .collect()
     }
@@ -400,7 +406,9 @@ mod tests {
                     )
                     .await
                     .expect("test: conc-a");
-                gw1.validate_transfer(&tid).await.expect("test: conc-a validate")
+                gw1.validate_transfer(&tid)
+                    .await
+                    .expect("test: conc-a validate")
             },
             async move {
                 let tid = gw2
@@ -411,7 +419,9 @@ mod tests {
                     )
                     .await
                     .expect("test: conc-b");
-                gw2.validate_transfer(&tid).await.expect("test: conc-b validate")
+                gw2.validate_transfer(&tid)
+                    .await
+                    .expect("test: conc-b validate")
             },
         );
 

@@ -7,12 +7,12 @@
 //! Canonical storage backend for issued certificates.
 //! Uses DashMap for lock-free concurrent access.
 
-use std::sync::Arc;
 use dashmap::DashMap;
+use std::sync::Arc;
 use tracing::info;
 
+use super::{CertificateStatus, IssuedCertificate};
 use crate::errors::Result as TrustChainResult;
-use super::{IssuedCertificate, CertificateStatus};
 
 /// Metrics for certificate store operations
 #[derive(Default)]
@@ -42,32 +42,52 @@ impl CertificateStore {
 
     /// Store certificate (indexed by serial number)
     pub async fn store_certificate(&self, certificate: &IssuedCertificate) -> TrustChainResult<()> {
-        self.certificates.insert(certificate.serial_number.clone(), certificate.clone());
-        self.metrics.total_certificates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.certificates
+            .insert(certificate.serial_number.clone(), certificate.clone());
+        self.metrics
+            .total_certificates
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 
     /// Get certificate by serial number
-    pub async fn get_certificate_by_serial(&self, serial_number: &str) -> TrustChainResult<Option<IssuedCertificate>> {
-        Ok(self.certificates.get(serial_number).map(|cert| cert.clone()))
+    pub async fn get_certificate_by_serial(
+        &self,
+        serial_number: &str,
+    ) -> TrustChainResult<Option<IssuedCertificate>> {
+        Ok(self
+            .certificates
+            .get(serial_number)
+            .map(|cert| cert.clone()))
     }
 
     /// Get certificate by fingerprint (hex-encoded)
-    pub async fn get_certificate(&self, fingerprint: &str) -> TrustChainResult<Option<IssuedCertificate>> {
-        let cert = self.certificates.iter()
+    pub async fn get_certificate(
+        &self,
+        fingerprint: &str,
+    ) -> TrustChainResult<Option<IssuedCertificate>> {
+        let cert = self
+            .certificates
+            .iter()
             .find(|entry| hex::encode(entry.value().fingerprint) == fingerprint)
             .map(|entry| entry.value().clone());
         Ok(cert)
     }
 
     /// Revoke certificate by serial number
-    pub async fn revoke_certificate(&self, serial_number: &str, reason: String) -> TrustChainResult<()> {
+    pub async fn revoke_certificate(
+        &self,
+        serial_number: &str,
+        reason: String,
+    ) -> TrustChainResult<()> {
         if let Some(mut cert) = self.certificates.get_mut(serial_number) {
             cert.status = CertificateStatus::Revoked {
                 reason,
                 revoked_at: std::time::SystemTime::now(),
             };
-            self.metrics.revoked_certificates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .revoked_certificates
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             info!("Certificate revoked: {}", serial_number);
         }
         Ok(())

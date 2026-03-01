@@ -11,8 +11,8 @@ use hypermesh_lib::economic::{GoldGrams, PacketId, PacketState};
 use hypermesh_lib::NodeId;
 use serde::{Deserialize, Serialize};
 
-use crate::evp::CaesPacket;
 use crate::evp::packet::PacketError;
+use crate::evp::CaesPacket;
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -142,9 +142,7 @@ impl PacketProcessor {
         packet.route.push(next_node.clone());
 
         // Deduct fee from the packet's initial_value
-        packet.initial_value = GoldGrams::from_decimal(
-            packet.initial_value.0 - fee.0,
-        );
+        packet.initial_value = GoldGrams::from_decimal(packet.initial_value.0 - fee.0);
 
         // Transition Minted -> InTransit on first handoff
         if packet.state == PacketState::Minted {
@@ -168,9 +166,7 @@ impl PacketProcessor {
     ) -> Vec<Result<HandoffResult, ProcessorError>> {
         handoffs
             .into_iter()
-            .map(|(mut packet, next_node, fee)| {
-                self.process_handoff(&mut packet, next_node, fee)
-            })
+            .map(|(mut packet, next_node, fee)| self.process_handoff(&mut packet, next_node, fee))
             .collect()
     }
 }
@@ -215,7 +211,8 @@ mod tests {
     fn validate_valid_packet() {
         let pkt = mint_packet(GoldGrams(dec!(100)), GoldGrams(dec!(5)));
         let proc = default_processor();
-        proc.validate_packet(&pkt).expect("test: valid packet should pass");
+        proc.validate_packet(&pkt)
+            .expect("test: valid packet should pass");
     }
 
     #[test]
@@ -228,7 +225,10 @@ mod tests {
         let proc = default_processor();
         let err = proc.validate_packet(&pkt);
         assert!(
-            matches!(err, Err(ProcessorError::TerminalPacket(PacketState::Settled))),
+            matches!(
+                err,
+                Err(ProcessorError::TerminalPacket(PacketState::Settled))
+            ),
             "expected TerminalPacket, got {err:?}"
         );
     }
@@ -275,11 +275,7 @@ mod tests {
         let mut pkt = mint_packet(GoldGrams(dec!(100)), GoldGrams(dec!(5)));
         let proc = default_processor();
 
-        let err = proc.process_handoff(
-            &mut pkt,
-            NodeId::from("relay-1"),
-            GoldGrams(dec!(10)),
-        );
+        let err = proc.process_handoff(&mut pkt, NodeId::from("relay-1"), GoldGrams(dec!(10)));
         assert!(
             matches!(err, Err(ProcessorError::FeeBudgetExceeded { .. })),
             "expected FeeBudgetExceeded, got {err:?}"

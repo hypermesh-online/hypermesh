@@ -30,19 +30,14 @@ pub struct PriceModel {
 }
 
 /// Supported currencies
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum Currency {
     USD,
     EUR,
+    #[default]
     CaesarTokens,
     HyperMeshCredits,
     Custom(String),
-}
-
-impl Default for Currency {
-    fn default() -> Self {
-        Currency::CaesarTokens
-    }
 }
 
 /// Volume discount tier
@@ -130,17 +125,29 @@ pub struct SeasonalPromotion {
 impl Default for PricingConfiguration {
     fn default() -> Self {
         let mut base_prices = HashMap::new();
-        base_prices.insert(AssetType::Cpu, PriceModel {
-            base_price: 0.10,
-            currency: Currency::CaesarTokens,
-            minimum_price: 0.01,
-            peak_multiplier: 1.5,
-            volume_tiers: vec![
-                VolumeTier { min_hours: 10, discount_percentage: 5.0 },
-                VolumeTier { min_hours: 100, discount_percentage: 10.0 },
-                VolumeTier { min_hours: 1000, discount_percentage: 15.0 },
-            ],
-        });
+        base_prices.insert(
+            AssetType::Cpu,
+            PriceModel {
+                base_price: 0.10,
+                currency: Currency::CaesarTokens,
+                minimum_price: 0.01,
+                peak_multiplier: 1.5,
+                volume_tiers: vec![
+                    VolumeTier {
+                        min_hours: 10,
+                        discount_percentage: 5.0,
+                    },
+                    VolumeTier {
+                        min_hours: 100,
+                        discount_percentage: 10.0,
+                    },
+                    VolumeTier {
+                        min_hours: 1000,
+                        discount_percentage: 15.0,
+                    },
+                ],
+            },
+        );
 
         Self {
             base_prices,

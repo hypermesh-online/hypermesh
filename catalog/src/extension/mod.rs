@@ -8,26 +8,16 @@
 //! as a dynamic extension/plugin within the HyperMesh ecosystem, providing
 //! specialized asset library and package management functionality.
 
-pub mod catalog_extension;
 pub mod asset_handlers;
+pub mod catalog_extension;
 pub mod config;
 
+pub use asset_handlers::{DatasetHandler, LibraryHandler, TemplateHandler, VirtualMachineHandler};
 pub use catalog_extension::CatalogExtension;
-pub use asset_handlers::{
-    VirtualMachineHandler,
-    LibraryHandler,
-    DatasetHandler,
-    TemplateHandler,
-};
 pub use config::{CatalogExtensionConfig, ExtensionSettings};
 
 // Re-export key types for convenience
 pub use blockmatrix::extensions::{
-    HyperMeshExtension,
-    AssetLibraryExtension,
-    ExtensionMetadata,
-    ExtensionCategory,
-    ExtensionCapability,
-    ExtensionResult,
-    ExtensionError,
+    AssetLibraryExtension, ExtensionCapability, ExtensionCategory, ExtensionError,
+    ExtensionMetadata, ExtensionResult, HyperMeshExtension,
 };

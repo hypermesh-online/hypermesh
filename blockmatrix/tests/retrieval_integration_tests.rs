@@ -6,20 +6,20 @@
 //!
 //! Tests end-to-end retrieval workflow from instruction generation to file reconstruction.
 
-use blockmatrix::retrieval::{
-    InstructionGenerator, GeneratorConfig, InstructionTransmitter, CompressionFormat,
-    ClientAssembler, FallbackManager, FallbackStrategy,
-    RetrievalPlan, CompleteShardMap, ShardMapEntry, ShardLocation, RetrievalMetadata,
-};
-use blockmatrix::retrieval::fallback::SelectionCriteria;
-use blockmatrix::assets::storage::{ContentAddressedStorage, Hash, ContentAddress};
 use blockmatrix::assets::pipeline::{AssetPipeline, PipelineConfig, Shard, ShardMetadata};
+use blockmatrix::assets::storage::{ContentAddress, ContentAddressedStorage, Hash};
 use blockmatrix::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::MatrixCoordinate;
+use blockmatrix::retrieval::fallback::SelectionCriteria;
+use blockmatrix::retrieval::{
+    ClientAssembler, CompleteShardMap, CompressionFormat, FallbackManager, FallbackStrategy,
+    GeneratorConfig, InstructionGenerator, InstructionTransmitter, RetrievalMetadata,
+    RetrievalPlan, ShardLocation, ShardMapEntry,
+};
 
+use anyhow::Result;
 use std::sync::Arc;
 use tempfile::TempDir;
-use anyhow::Result;
 
 /// Test fixture with all components
 struct RetrievalTestFixture {
@@ -96,7 +96,7 @@ async fn test_end_to_end_retrieval() -> Result<()> {
                 is_parity: i >= 10, // Last 4 are parity shards for Reed-Solomon 10+4
                 size: 1024,
                 original_size: 1024,
-                hash: format!("{:032x}", i), // Simple hash for testing
+                hash: format!("{i:032x}"), // Simple hash for testing
             },
         };
 
@@ -105,9 +105,15 @@ async fn test_end_to_end_retrieval() -> Result<()> {
     }
 
     // Store content mapping
-    fixture.storage.store_content_mapping(content_hash, shard_hashes.clone()).await?;
+    fixture
+        .storage
+        .store_content_mapping(content_hash, shard_hashes.clone())
+        .await?;
 
-    println!("✓ Stored content mapping with {} shards", shard_hashes.len());
+    println!(
+        "✓ Stored content mapping with {} shards",
+        shard_hashes.len()
+    );
 
     // Step 2: Generate retrieval instructions
     let gen_config = GeneratorConfig::default();
@@ -135,8 +141,16 @@ async fn test_end_to_end_retrieval() -> Result<()> {
 
     // Verify instruction size is reasonable (under 2KB for 14 shards)
     // Note: With full position data, instructions can be slightly over 1KB but remain compact
-    assert!(encoded.len() < 2048, "Instruction size {} exceeds 2KB", encoded.len());
-    println!("  - Instruction size: {} bytes ({:.1} bytes/shard)", encoded.len(), encoded.len() as f64 / 14.0);
+    assert!(
+        encoded.len() < 2048,
+        "Instruction size {} exceeds 2KB",
+        encoded.len()
+    );
+    println!(
+        "  - Instruction size: {} bytes ({:.1} bytes/shard)",
+        encoded.len(),
+        encoded.len() as f64 / 14.0
+    );
 
     // Step 4: Decode instructions on client
     let decoded_plan = transmitter.decode(&encoded)?;
@@ -206,12 +220,19 @@ async fn test_instruction_size_scaling() -> Result<()> {
         let plan = RetrievalPlan::new(content_hash, shard_map, metadata);
         let (encoded, stats) = transmitter.encode_with_stats(&plan)?;
 
-        println!("Shards: {} → Instruction size: {} bytes (ratio: {:.2})",
-            shard_count, encoded.len(), stats.compression_ratio);
+        println!(
+            "Shards: {} → Instruction size: {} bytes (ratio: {:.2})",
+            shard_count,
+            encoded.len(),
+            stats.compression_ratio
+        );
 
         // Verify reasonable scaling
         let bytes_per_shard = encoded.len() / shard_count;
-        assert!(bytes_per_shard < 100, "Overhead per shard too high: {} bytes", bytes_per_shard);
+        assert!(
+            bytes_per_shard < 100,
+            "Overhead per shard too high: {bytes_per_shard} bytes"
+        );
     }
 
     println!("\n✅ Instruction size scaling test PASSED\n");
@@ -228,14 +249,14 @@ async fn test_fallback_handling() -> Result<()> {
     let total_shards = 14;
     let min_required = 10;
 
-    println!("Simulating retrieval with {} total shards, {} required", total_shards, min_required);
+    println!("Simulating retrieval with {total_shards} total shards, {min_required} required");
 
     // Mark 3 shards as failed
     for i in 0..3 {
         let shard_hash = [i as u8; 32];
         let pos = MatrixCoordinate::new(i as i64, 0, 0).unwrap();
         manager.handle_failure(shard_hash, pos);
-        println!("  ✗ Shard {} failed", i);
+        println!("  ✗ Shard {i} failed");
     }
 
     // Mark remaining as successful
@@ -250,7 +271,10 @@ async fn test_fallback_handling() -> Result<()> {
     println!("  - Missing: {}", status.missing_shards);
     println!("  - Retrieved: {}", status.retrieved_shards);
     println!("  - Failure rate: {:.1}%", status.failure_rate * 100.0);
-    println!("  - Recommended strategy: {:?}", status.recommended_strategy);
+    println!(
+        "  - Recommended strategy: {:?}",
+        status.recommended_strategy
+    );
 
     // Should still succeed with 11 available shards (need 10)
     assert!(manager.can_succeed(min_required, total_shards));
@@ -279,21 +303,14 @@ async fn test_client_position_optimization() -> Result<()> {
     let mut shard_map = CompleteShardMap::new();
 
     // Create shards at different distances from origin
-    let positions = vec![
-        (10, "far"),
-        (0, "near"),
-        (5, "medium"),
-    ];
+    let positions = [(10, "far"), (0, "near"), (5, "medium")];
 
     for (i, (x, label)) in positions.iter().enumerate() {
         let shard_hash = [i as u8; 32];
-        let location = ShardLocation::new(
-            MatrixCoordinate::new(*x, 0, 0).unwrap(),
-            0.9,
-        );
+        let location = ShardLocation::new(MatrixCoordinate::new(*x, 0, 0).unwrap(), 0.9);
         let entry = ShardMapEntry::new(shard_hash, vec![location]);
         shard_map.add_entry(entry);
-        println!("Shard {} at position x={} ({})", i, x, label);
+        println!("Shard {i} at position x={x} ({label})");
     }
 
     let metadata = RetrievalMetadata {
@@ -367,7 +384,7 @@ async fn test_compression_format_comparison() -> Result<()> {
         let transmitter = InstructionTransmitter::new(format);
         let (encoded, stats) = transmitter.encode_with_stats(&plan)?;
 
-        println!("{:?}:", format);
+        println!("{format:?}:");
         println!("  Size: {} bytes", encoded.len());
         println!("  Ratio: {:.3}", stats.compression_ratio);
         println!("  Encode time: {} μs", stats.encode_time_us);
@@ -421,21 +438,24 @@ async fn test_parallel_vs_sequential_assembly() -> Result<()> {
     assembler_par.fetch_shards().await?;
     let time_par = start_par.elapsed();
 
-    println!("Sequential (1 parallel): {:?}", time_seq);
-    println!("Parallel (4 concurrent): {:?}", time_par);
+    println!("Sequential (1 parallel): {time_seq:?}");
+    println!("Parallel (4 concurrent): {time_par:?}");
 
     let speedup = if time_par.as_micros() > 0 {
         time_seq.as_micros() as f64 / time_par.as_micros() as f64
     } else {
         1.0
     };
-    println!("Speedup: {:.2}x", speedup);
+    println!("Speedup: {speedup:.2}x");
 
     // Parallel should be faster or comparable (allowing small variance due to test overhead)
     // In real scenarios with network I/O, parallel will show significant speedup
     // For dummy fetches, we just verify both complete successfully
     let ratio = time_par.as_millis() as f64 / time_seq.as_millis() as f64;
-    assert!(ratio <= 1.1, "Parallel unexpectedly slower (ratio: {:.2})", ratio);
+    assert!(
+        ratio <= 1.1,
+        "Parallel unexpectedly slower (ratio: {ratio:.2})"
+    );
 
     println!("\n✅ Parallel vs sequential assembly test PASSED\n");
     Ok(())
@@ -482,8 +502,13 @@ async fn test_replica_selection() -> Result<()> {
 
     println!("Selected {} out of 4 replicas", selected.len());
     for (i, loc) in selected.iter().enumerate() {
-        println!("  {}. Position x={}, health={:.2}, latency={}ms",
-            i + 1, loc.position.x, loc.health_score, loc.estimated_latency_ms);
+        println!(
+            "  {}. Position x={}, health={:.2}, latency={}ms",
+            i + 1,
+            loc.position.x,
+            loc.health_score,
+            loc.estimated_latency_ms
+        );
     }
 
     // Should select only replicas meeting criteria (replicas 0 and 3)

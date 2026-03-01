@@ -37,14 +37,14 @@
 //! ```
 
 pub mod coordinate;
-pub mod transforms;
+pub mod geospatial;
 pub mod neighbors;
 pub mod tensor;
-pub mod geospatial;
+pub mod transforms;
 
 // Re-export main types
-pub use coordinate::{MatrixCoordinate, CoordinateError};
-pub use neighbors::{find_neighbors, find_k_nearest, find_neighbors_cubic};
+pub use coordinate::{CoordinateError, MatrixCoordinate};
+pub use neighbors::{find_k_nearest, find_neighbors, find_neighbors_cubic};
 
 #[cfg(test)]
 mod tests;

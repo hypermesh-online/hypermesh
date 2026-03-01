@@ -94,7 +94,7 @@ impl CommandExecutor {
         let record = self
             .packets
             .get(packet_id)
-            .ok_or_else(|| CliError::NotFound(format!("Packet '{}'", packet_id)))?;
+            .ok_or_else(|| CliError::NotFound(format!("Packet '{packet_id}'")))?;
 
         let text = format!(
             "Packet: {}\n  Sender:    {}\n  Recipient: {}\n  Value:     {:.6} g\n  Tier:      {}\n  State:     {}\n  Hops:      {}",
@@ -108,7 +108,7 @@ impl CommandExecutor {
         let record = self
             .packets
             .get(packet_id)
-            .ok_or_else(|| CliError::NotFound(format!("Packet '{}'", packet_id)))?;
+            .ok_or_else(|| CliError::NotFound(format!("Packet '{packet_id}'")))?;
 
         let text = format!("Packet {} state: {}", record.id, record.state);
         Ok(CliOutput::Text(text))
@@ -134,11 +134,7 @@ impl CommandExecutor {
         let mut entries: Vec<&PacketRecord> = self
             .packets
             .values()
-            .filter(|p| {
-                normalized_filter
-                    .as_ref()
-                    .map_or(true, |f| p.state == *f)
-            })
+            .filter(|p| normalized_filter.as_ref().is_none_or(|f| p.state == *f))
             .collect();
         entries.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -174,9 +170,7 @@ impl CommandExecutor {
             ));
         }
         if value_grams <= 0.0 {
-            return Err(CliError::InvalidArgument(
-                "Value must be positive".into(),
-            ));
+            return Err(CliError::InvalidArgument("Value must be positive".into()));
         }
 
         let normalized_tier = parse_tier(tier).map_err(CliError::InvalidArgument)?;
@@ -197,8 +191,7 @@ impl CommandExecutor {
         );
 
         let text = format!(
-            "Minted packet '{}': {:.6} g ({}) from '{}' to '{}'",
-            packet_id, value_grams, normalized_tier, sender, recipient,
+            "Minted packet '{packet_id}': {value_grams:.6} g ({normalized_tier}) from '{sender}' to '{recipient}'",
         );
         Ok(CliOutput::Text(text))
     }
@@ -219,7 +212,7 @@ impl CommandExecutor {
         let record = self
             .nodes
             .get(node_id)
-            .ok_or_else(|| CliError::NotFound(format!("Node '{}'", node_id)))?;
+            .ok_or_else(|| CliError::NotFound(format!("Node '{node_id}'")))?;
 
         let text = format!(
             "Node: {}\n  Settled packets: {}\n  Fee earnings:    {:.6} g",
@@ -253,13 +246,12 @@ impl CommandExecutor {
 
     fn node_preferences(&self, node_id: &str) -> Result<CliOutput, CliError> {
         if !self.nodes.contains_key(node_id) {
-            return Err(CliError::NotFound(format!("Node '{}'", node_id)));
+            return Err(CliError::NotFound(format!("Node '{node_id}'")));
         }
 
         // Default operator preferences (future: wire to real OperatorPreferences)
         let text = format!(
-            "Node '{}' operator preferences:\n  Max concurrent packets: 100\n  Accepted tiers:        L0, L1, L2, L3\n  Min fee threshold:     0.001 g",
-            node_id,
+            "Node '{node_id}' operator preferences:\n  Max concurrent packets: 100\n  Accepted tiers:        L0, L1, L2, L3\n  Min fee threshold:     0.001 g",
         );
         Ok(CliOutput::Text(text))
     }
@@ -278,10 +270,7 @@ impl CommandExecutor {
 
     fn governor_params(&self) -> Result<CliOutput, CliError> {
         // Default PID gains from GovernorPid::new()
-        let mut table = CliTable::new(vec![
-            "Parameter".into(),
-            "Value".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Parameter".into(), "Value".into()]);
 
         let rows = [
             ("Kp (proportional gain)", "0.5"),
@@ -309,11 +298,7 @@ impl CommandExecutor {
     }
 
     fn governor_fee_caps(&self) -> Result<CliOutput, CliError> {
-        let mut table = CliTable::new(vec![
-            "Tier".into(),
-            "Fee Cap".into(),
-            "Percentage".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Tier".into(), "Fee Cap".into(), "Percentage".into()]);
 
         let caps = [
             ("L0 (retail)", "0.05", "5%"),
@@ -354,10 +339,7 @@ impl CommandExecutor {
 
     fn oracle_effective_rate(&self) -> Result<CliOutput, CliError> {
         // Default composite: all components at zero/neutral
-        let mut table = CliTable::new(vec![
-            "Component".into(),
-            "Value".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Component".into(), "Value".into()]);
 
         let rows = [
             ("Network fees component", "0.000"),
@@ -608,7 +590,7 @@ mod tests {
     #[test]
     fn test_node_status_found() {
         let mut exec = CommandExecutor::new();
-        exec.register_node("relay-1", 42, 3.14);
+        exec.register_node("relay-1", 42, std::f64::consts::PI);
 
         let result = exec
             .execute(CliCommand::Node(NodeCommand::Status {
@@ -684,7 +666,7 @@ mod tests {
         match result {
             CliOutput::Table(table) => {
                 assert_eq!(table.row_count(), 6);
-                let rendered = format!("{}", table);
+                let rendered = format!("{table}");
                 assert!(rendered.contains("Kp"));
                 assert!(rendered.contains("0.5"));
                 assert!(rendered.contains("Ki"));
@@ -723,7 +705,7 @@ mod tests {
         match result {
             CliOutput::Table(table) => {
                 assert_eq!(table.row_count(), 4);
-                let rendered = format!("{}", table);
+                let rendered = format!("{table}");
                 assert!(rendered.contains("L0"));
                 assert!(rendered.contains("5%"));
                 assert!(rendered.contains("L1"));
@@ -766,7 +748,7 @@ mod tests {
         match result {
             CliOutput::Table(table) => {
                 assert_eq!(table.row_count(), 4);
-                let rendered = format!("{}", table);
+                let rendered = format!("{table}");
                 assert!(rendered.contains("Network fees"));
                 assert!(rendered.contains("Speculation"));
                 assert!(rendered.contains("Liquidity shadow"));

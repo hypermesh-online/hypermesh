@@ -4,24 +4,23 @@
 
 //! Container asset adapter with resource orchestration.
 
-pub mod types;
 pub mod adapter;
+pub mod types;
 
 // Re-export all public types
-pub use types::*;
 pub use adapter::ContainerAssetAdapter;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::time::{Duration, SystemTime};
     use super::*;
     use crate::assets::core::{
-        AssetAdapter, AssetType, AssetAllocationRequest, ConsensusProof,
-        PrivacyMode, AssetCategory, BaseSystemType,
-        SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState,
-        ContainerRequirements, VolumeMount, PortMapping,
+        AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
+        ConsensusProof, ContainerRequirements, PortMapping, PrivacyMode, SpaceProof, StakeProof,
+        TimeProof, VolumeMount, WorkProof, WorkState, WorkloadType,
     };
+    use std::collections::HashMap;
+    use std::time::{Duration, SystemTime};
 
     async fn create_test_container_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
@@ -100,9 +99,15 @@ mod tests {
         let request = create_test_container_request().await;
 
         let allocation = adapter.allocate_asset(&request).await.expect("test");
-        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Container)));
+        assert!(matches!(
+            allocation.asset_id.category,
+            AssetCategory::BaseSystem(BaseSystemType::Container)
+        ));
 
-        adapter.deallocate_asset(&allocation.asset_id).await.expect("test");
+        adapter
+            .deallocate_asset(&allocation.asset_id)
+            .await
+            .expect("test");
     }
 
     #[tokio::test]
@@ -121,7 +126,11 @@ mod tests {
 
         assert_eq!(capabilities.asset_type, AssetType::Container);
         assert!(capabilities.supports_proxy_addressing);
-        assert!(capabilities.features.contains(&"container_orchestration".to_string()));
-        assert!(capabilities.features.contains(&"security_controls".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"container_orchestration".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"security_controls".to_string()));
     }
 }

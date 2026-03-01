@@ -8,7 +8,7 @@
 //! Each node validates its own chain independently.
 
 use chrono::{DateTime, Utc};
-use tracing::{warn, error, debug};
+use tracing::{debug, error, warn};
 
 use super::block::Block;
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -39,12 +39,12 @@ pub struct ValidationRules {
 impl Default for ValidationRules {
     fn default() -> Self {
         ValidationRules {
-            max_block_time_ms: 3600000,  // 1 hour
-            min_block_time_ms: 0,        // No minimum by default
-            max_block_size: 10485760,    // 10 MB
+            max_block_time_ms: 3600000, // 1 hour
+            min_block_time_ms: 0,       // No minimum by default
+            max_block_size: 10485760,   // 10 MB
             strict_indexing: true,
             validate_ownership: true,
-            max_time_drift_secs: 300,    // 5 minutes
+            max_time_drift_secs: 300, // 5 minutes
         }
     }
 }
@@ -52,6 +52,12 @@ impl Default for ValidationRules {
 /// Chain validator for node-specific blockchains
 pub struct ChainValidator {
     rules: ValidationRules,
+}
+
+impl Default for ChainValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChainValidator {
@@ -127,10 +133,7 @@ impl ChainValidator {
     /// recompute to the same hash.
     ///
     /// Returns `true` if the commitment is absent or matches the map.
-    pub fn validate_shard_commitment(
-        block: &Block,
-        shard_map: Option<&FilteredShardMap>,
-    ) -> bool {
+    pub fn validate_shard_commitment(block: &Block, shard_map: Option<&FilteredShardMap>) -> bool {
         let commitment = match block.shard_commitment {
             Some(c) => c,
             None => {
@@ -178,15 +181,13 @@ impl ChainValidator {
     /// Validate block continuity with previous block
     fn validate_block_continuity(&self, block: &Block, previous: &Block) -> bool {
         // Check index sequence
-        if self.rules.strict_indexing {
-            if block.index != previous.index + 1 {
-                error!(
-                    "Block index mismatch: expected {}, got {}",
-                    previous.index + 1,
-                    block.index
-                );
-                return false;
-            }
+        if self.rules.strict_indexing && block.index != previous.index + 1 {
+            error!(
+                "Block index mismatch: expected {}, got {}",
+                previous.index + 1,
+                block.index
+            );
+            return false;
         }
 
         // Check previous hash link
@@ -200,10 +201,7 @@ impl ChainValidator {
 
         // Check timestamp ordering
         if block.timestamp <= previous.timestamp {
-            error!(
-                "Block {} timestamp not after previous block",
-                block.index
-            );
+            error!("Block {} timestamp not after previous block", block.index);
             return false;
         }
 
@@ -227,14 +225,12 @@ impl ChainValidator {
         }
 
         // Validate node ownership if required
-        if self.rules.validate_ownership {
-            if block.node_coordinate != previous.node_coordinate {
-                error!(
-                    "Block {} node coordinate mismatch with previous",
-                    block.index
-                );
-                return false;
-            }
+        if self.rules.validate_ownership && block.node_coordinate != previous.node_coordinate {
+            error!(
+                "Block {} node coordinate mismatch with previous",
+                block.index
+            );
+            return false;
         }
 
         debug!("Block {} continuity validation passed", block.index);
@@ -247,10 +243,7 @@ impl ChainValidator {
         let diff_secs = (now - timestamp).num_seconds().abs();
 
         if diff_secs > self.rules.max_time_drift_secs {
-            warn!(
-                "Timestamp drift too large: {} seconds",
-                diff_secs
-            );
+            warn!("Timestamp drift too large: {} seconds", diff_secs);
             return false;
         }
 
@@ -292,16 +285,13 @@ impl ChainValidator {
     pub fn validate_chain_ownership(
         &self,
         blocks: &[Block],
-        node_coordinate: &MatrixCoordinate
+        node_coordinate: &MatrixCoordinate,
     ) -> bool {
         for block in blocks {
             if !block.belongs_to_node(node_coordinate) {
                 error!(
                     "Block {} does not belong to node ({},{},{})",
-                    block.index,
-                    node_coordinate.x,
-                    node_coordinate.y,
-                    node_coordinate.z
+                    block.index, node_coordinate.x, node_coordinate.y, node_coordinate.z
                 );
                 return false;
             }
@@ -340,8 +330,8 @@ impl ChainValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
     use crate::test_utils::test_asset_ids;
+    use chrono::Duration;
 
     fn create_test_block(index: u64, previous_hash: String, coord: MatrixCoordinate) -> Block {
         Block::new(index, test_asset_ids(1), previous_hash, coord)
@@ -363,7 +353,7 @@ mod tests {
     #[test]
     fn test_genesis_block_validation() {
         let validator = ChainValidator::new();
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let genesis = Block::genesis(coord);
 
         assert!(validator.validate_block(&genesis, None));
@@ -372,7 +362,7 @@ mod tests {
     #[test]
     fn test_block_integrity_validation() {
         let validator = ChainValidator::new();
-        let coord = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let mut block = create_test_block(1, "prev_hash".to_string(), coord);
 
         // Valid block
@@ -390,38 +380,40 @@ mod tests {
     #[test]
     fn test_block_continuity_validation() {
         let validator = ChainValidator::new();
-        let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
 
-        let block1 = create_test_block(1, "genesis".to_string(), coord.clone());
-        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord.clone());
+        let block1 = create_test_block(1, "genesis".to_string(), coord);
+        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord);
 
         assert!(validator.validate_block_continuity(&block2, &block1));
 
         // Wrong previous hash
-        let bad_block = Block::new(2, test_asset_ids(1), "wrong_hash".to_string(), coord.clone());
+        let bad_block = Block::new(2, test_asset_ids(1), "wrong_hash".to_string(), coord);
         assert!(!validator.validate_block_continuity(&bad_block, &block1));
     }
 
     #[test]
     fn test_index_sequence_validation() {
         let validator = ChainValidator::new();
-        let coord = MatrixCoordinate::new(3, 3, 3).unwrap();
+        let coord = MatrixCoordinate::new(3, 3, 3).expect("test: valid coordinate");
 
-        let block1 = create_test_block(1, "genesis".to_string(), coord.clone());
+        let block1 = create_test_block(1, "genesis".to_string(), coord);
 
         // Correct sequence
-        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord.clone());
+        let block2 = Block::new(2, test_asset_ids(1), block1.hash.clone(), coord);
         assert!(validator.validate_block(&block2, Some(&block1)));
 
         // Wrong index
-        let bad_block = Block::new(3, test_asset_ids(1), block1.hash.clone(), coord.clone());
+        let bad_block = Block::new(3, test_asset_ids(1), block1.hash.clone(), coord);
         assert!(!validator.validate_block(&bad_block, Some(&block1)));
     }
 
     #[test]
     fn test_timestamp_validation() {
-        let mut rules = ValidationRules::default();
-        rules.max_time_drift_secs = 60; // 1 minute
+        let rules = ValidationRules {
+            max_time_drift_secs: 60, // 1 minute
+            ..ValidationRules::default()
+        };
         let validator = ChainValidator::with_rules(rules);
 
         let current_time = Utc::now();
@@ -439,14 +431,14 @@ mod tests {
     #[test]
     fn test_chain_validation() {
         let validator = ChainValidator::new();
-        let coord = MatrixCoordinate::new(4, 4, 4).unwrap();
+        let coord = MatrixCoordinate::new(4, 4, 4).expect("test: valid coordinate");
 
-        let mut chain = vec![Block::genesis(coord.clone())];
+        let mut chain = vec![Block::genesis(coord)];
 
         // Build valid chain
         for i in 1..5 {
-            let prev_hash = chain.last().unwrap().hash.clone();
-            chain.push(Block::new(i, test_asset_ids(1), prev_hash, coord.clone()));
+            let prev_hash = chain.last().expect("test: expected success").hash.clone();
+            chain.push(Block::new(i, test_asset_ids(1), prev_hash, coord));
         }
 
         assert!(validator.validate_chain(&chain));
@@ -455,20 +447,20 @@ mod tests {
         assert!(!validator.validate_chain(&[]));
 
         // Non-genesis first block
-        let bad_chain = vec![create_test_block(1, "hash".to_string(), coord.clone())];
+        let bad_chain = vec![create_test_block(1, "hash".to_string(), coord)];
         assert!(!validator.validate_chain(&bad_chain));
     }
 
     #[test]
     fn test_chain_ownership_validation() {
         let validator = ChainValidator::new();
-        let coord1 = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let coord2 = MatrixCoordinate::new(6, 6, 6).unwrap();
+        let coord1 = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
+        let coord2 = MatrixCoordinate::new(6, 6, 6).expect("test: valid coordinate");
 
         let chain = vec![
-            Block::genesis(coord1.clone()),
-            create_test_block(1, "hash1".to_string(), coord1.clone()),
-            create_test_block(2, "hash2".to_string(), coord1.clone()),
+            Block::genesis(coord1),
+            create_test_block(1, "hash1".to_string(), coord1),
+            create_test_block(2, "hash2".to_string(), coord1),
         ];
 
         // Correct ownership
@@ -480,39 +472,39 @@ mod tests {
 
     #[test]
     fn test_block_ordering_validation() {
-        let coord = MatrixCoordinate::new(7, 7, 7).unwrap();
+        let coord = MatrixCoordinate::new(7, 7, 7).expect("test: valid coordinate");
 
         // Properly ordered chain
         let good_chain = vec![
-            Block::genesis(coord.clone()),
-            create_test_block(1, "hash1".to_string(), coord.clone()),
-            create_test_block(2, "hash2".to_string(), coord.clone()),
+            Block::genesis(coord),
+            create_test_block(1, "hash1".to_string(), coord),
+            create_test_block(2, "hash2".to_string(), coord),
         ];
         assert!(ChainValidator::validate_block_ordering(&good_chain));
 
         // Improperly ordered (by index)
         let bad_chain = vec![
-            Block::genesis(coord.clone()),
-            create_test_block(2, "hash2".to_string(), coord.clone()),
-            create_test_block(1, "hash1".to_string(), coord.clone()),
+            Block::genesis(coord),
+            create_test_block(2, "hash2".to_string(), coord),
+            create_test_block(1, "hash1".to_string(), coord),
         ];
         assert!(!ChainValidator::validate_block_ordering(&bad_chain));
     }
 
     #[test]
     fn test_chain_length_comparison() {
-        let coord = MatrixCoordinate::new(8, 8, 8).unwrap();
+        let coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
 
         let short_chain = vec![
-            Block::genesis(coord.clone()),
-            create_test_block(1, "hash".to_string(), coord.clone()),
+            Block::genesis(coord),
+            create_test_block(1, "hash".to_string(), coord),
         ];
 
         let long_chain = vec![
-            Block::genesis(coord.clone()),
-            create_test_block(1, "hash1".to_string(), coord.clone()),
-            create_test_block(2, "hash2".to_string(), coord.clone()),
-            create_test_block(3, "hash3".to_string(), coord.clone()),
+            Block::genesis(coord),
+            create_test_block(1, "hash1".to_string(), coord),
+            create_test_block(2, "hash2".to_string(), coord),
+            create_test_block(3, "hash3".to_string(), coord),
         ];
 
         assert!(ChainValidator::is_longer_chain(&long_chain, &short_chain));
@@ -538,28 +530,36 @@ mod tests {
 
     #[test]
     fn test_shard_commitment_valid_roundtrip() {
-        use crate::verification::{
-            ShardPlacement as VerifPlacement,
-            create_from_distribution,
-        };
+        use crate::verification::{create_from_distribution, ShardPlacement as VerifPlacement};
         use hypermesh_lib::MatrixPosition;
 
-        let dist_map = create_from_distribution(1, vec![
-            VerifPlacement {
-                shard_index: 0,
-                is_parity: false,
-                target_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
-                shard_hash: [0xAA; 32],
-                target_node_id: hypermesh_lib::NodeId::from("node-a"),
-            },
-            VerifPlacement {
-                shard_index: 1,
-                is_parity: true,
-                target_position: MatrixPosition { x: 4.0, y: 5.0, z: 6.0 },
-                shard_hash: [0xBB; 32],
-                target_node_id: hypermesh_lib::NodeId::from("node-b"),
-            },
-        ]);
+        let dist_map = create_from_distribution(
+            1,
+            vec![
+                VerifPlacement {
+                    shard_index: 0,
+                    is_parity: false,
+                    target_position: MatrixPosition {
+                        x: 1.0,
+                        y: 2.0,
+                        z: 3.0,
+                    },
+                    shard_hash: [0xAA; 32],
+                    target_node_id: hypermesh_lib::NodeId::from("node-a"),
+                },
+                VerifPlacement {
+                    shard_index: 1,
+                    is_parity: true,
+                    target_position: MatrixPosition {
+                        x: 4.0,
+                        y: 5.0,
+                        z: 6.0,
+                    },
+                    shard_hash: [0xBB; 32],
+                    target_node_id: hypermesh_lib::NodeId::from("node-b"),
+                },
+            ],
+        );
 
         let commitment = dist_map.compute_commitment();
         let filtered = dist_map.to_filtered_map(true);
@@ -568,25 +568,31 @@ mod tests {
         let mut block = Block::genesis(coord);
         block.set_shard_commitment(commitment);
 
-        assert!(ChainValidator::validate_shard_commitment(&block, Some(&filtered)));
+        assert!(ChainValidator::validate_shard_commitment(
+            &block,
+            Some(&filtered)
+        ));
     }
 
     #[test]
     fn test_shard_commitment_mismatch_detected() {
-        use crate::verification::{
-            create_from_distribution, ShardPlacement as VerifPlacement,
-        };
+        use crate::verification::{create_from_distribution, ShardPlacement as VerifPlacement};
         use hypermesh_lib::MatrixPosition;
 
-        let dist_map = create_from_distribution(1, vec![
-            VerifPlacement {
+        let dist_map = create_from_distribution(
+            1,
+            vec![VerifPlacement {
                 shard_index: 0,
                 is_parity: false,
-                target_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+                target_position: MatrixPosition {
+                    x: 1.0,
+                    y: 2.0,
+                    z: 3.0,
+                },
                 shard_hash: [0xAA; 32],
                 target_node_id: hypermesh_lib::NodeId::from("node-a"),
-            },
-        ]);
+            }],
+        );
 
         let filtered = dist_map.to_filtered_map(false);
 
@@ -595,6 +601,9 @@ mod tests {
         // Set a WRONG commitment
         block.set_shard_commitment([0xFF; 32]);
 
-        assert!(!ChainValidator::validate_shard_commitment(&block, Some(&filtered)));
+        assert!(!ChainValidator::validate_shard_commitment(
+            &block,
+            Some(&filtered)
+        ));
     }
 }

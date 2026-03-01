@@ -6,11 +6,11 @@
 //!
 //! Geospatial-aware replication based on content popularity and access patterns.
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
-use std::collections::HashMap;
 
 use crate::integration::phase1_foundation::MatrixFoundation;
 use crate::matrix::MatrixCoordinate;
@@ -82,9 +82,9 @@ impl PopularityMetrics {
     /// Calculate popularity score
     pub fn calculate_score(&mut self) {
         let now = chrono::Utc::now().timestamp();
-        let age = (now - self.first_access) as f64;
+        let _age = (now - self.first_access).max(0) as f64;
 
-        if age > 0.0 {
+        if self.access_count > 0 {
             // Base score from access frequency
             let frequency_score = (self.access_frequency * 10.0).min(30.0);
 
@@ -102,9 +102,9 @@ impl PopularityMetrics {
             let viral_score = (self.viral_coefficient * 10.0).min(20.0);
 
             // Combined score (0-100)
-            self.popularity_score = (frequency_score + unique_score + recency_score + geo_score + viral_score)
-                .min(100.0)
-                .max(0.0);
+            self.popularity_score =
+                (frequency_score + unique_score + recency_score + geo_score + viral_score)
+                    .clamp(0.0, 100.0);
         }
     }
 
@@ -139,9 +139,9 @@ impl PopularityMetrics {
 
     /// Check if content needs replication
     pub fn needs_replication(&self, config: &ReplicationConfig) -> bool {
-        self.popularity_score > config.popularity_threshold ||
-        self.access_count > config.access_threshold ||
-        self.is_viral()
+        self.popularity_score > config.popularity_threshold
+            || self.access_count > config.access_threshold
+            || self.is_viral()
     }
 }
 
@@ -255,7 +255,11 @@ impl ReplicationStrategy {
     }
 
     /// Record content access and update metrics
-    pub async fn record_access(&self, content_id: String, accessor: MatrixCoordinate) -> Result<()> {
+    pub async fn record_access(
+        &self,
+        content_id: String,
+        accessor: MatrixCoordinate,
+    ) -> Result<()> {
         let mut popularity = self.popularity.write().await;
         let metrics = popularity.entry(content_id.clone()).or_default();
 
@@ -263,10 +267,14 @@ impl ReplicationStrategy {
 
         // Check if replication needed
         if metrics.needs_replication(&self.config) {
-            let factor = self.calculate_replication_factor(metrics.popularity_score).await;
+            let factor = self
+                .calculate_replication_factor(metrics.popularity_score)
+                .await;
 
             // Make replication decision
-            let decision = self.make_decision(content_id.clone(), factor, metrics.clone()).await?;
+            let decision = self
+                .make_decision(content_id.clone(), factor, metrics.clone())
+                .await?;
 
             let mut decisions = self.decisions.write().await;
             decisions.insert(content_id.clone(), decision);
@@ -344,22 +352,17 @@ impl ReplicationStrategy {
             .iter()
             .filter(|(_, metrics)| {
                 // Rising content with high viral coefficient
-                metrics.viral_coefficient > 0.5 &&
-                metrics.popularity_score > 20.0 &&
-                metrics.access_count < self.config.access_threshold
+                metrics.viral_coefficient > 0.5
+                    && metrics.popularity_score > 20.0
+                    && metrics.access_count < self.config.access_threshold
             })
             .map(|(id, metrics)| (id.clone(), metrics.viral_coefficient))
             .collect();
 
         // Sort by viral coefficient
-        predictions.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        predictions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        predictions.into_iter()
-            .take(10)
-            .map(|(id, _)| id)
-            .collect()
+        predictions.into_iter().take(10).map(|(id, _)| id).collect()
     }
 
     /// Clean up old metrics
@@ -368,9 +371,7 @@ impl ReplicationStrategy {
         let mut popularity = self.popularity.write().await;
 
         let before = popularity.len();
-        popularity.retain(|_, metrics| {
-            ((now - metrics.last_access) as u64) < max_age_seconds
-        });
+        popularity.retain(|_, metrics| ((now - metrics.last_access) as u64) < max_age_seconds);
 
         before - popularity.len()
     }
@@ -392,7 +393,7 @@ mod tests {
 
         // Record multiple accesses
         for i in 0..100 {
-            metrics.record_access(&MatrixCoordinate::new(i % 10, i / 10, 0).unwrap());
+            metrics.record_access(&MatrixCoordinate::new(i % 10, i / 10, 0).expect("test: valid coordinate"));
         }
 
         assert_eq!(metrics.access_count, 100);
@@ -401,16 +402,22 @@ mod tests {
 
     #[test]
     fn test_viral_detection() {
-        let mut metrics = PopularityMetrics::default();
-        metrics.viral_coefficient = 2.0;
-        metrics.popularity_score = 60.0;
+        let metrics = PopularityMetrics {
+            viral_coefficient: 2.0,
+            popularity_score: 60.0,
+            ..PopularityMetrics::default()
+        };
 
         assert!(metrics.is_viral());
     }
 
     #[tokio::test]
     async fn test_replication_factor_calculation() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig::default())
+                .await
+                .expect("test: expected success"),
+        );
         let strategy = ReplicationStrategy::new(foundation);
 
         // Low popularity
@@ -425,31 +432,46 @@ mod tests {
 
     #[tokio::test]
     async fn test_access_recording() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig::default())
+                .await
+                .expect("test: expected success"),
+        );
         let strategy = ReplicationStrategy::new(foundation);
 
         let content_id = "test_content".to_string();
-        let accessor = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let accessor = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
-        strategy.record_access(content_id.clone(), accessor).await.unwrap();
+        strategy
+            .record_access(content_id.clone(), accessor)
+            .await
+            .expect("test: expected success");
 
-        let metrics = strategy.get_metrics(&content_id).await.unwrap();
+        let metrics = strategy.get_metrics(&content_id).await.expect("test: async operation");
         assert_eq!(metrics.access_count, 1);
     }
 
     #[tokio::test]
     async fn test_cleanup_old_metrics() {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig::default())
+                .await
+                .expect("test: expected success"),
+        );
         let strategy = ReplicationStrategy::new(foundation);
 
         // Add some metrics
         let mut popularity = strategy.popularity.write().await;
-        let mut old_metric = PopularityMetrics::default();
-        old_metric.last_access = chrono::Utc::now().timestamp() - 7200; // 2 hours old
+        let old_metric = PopularityMetrics {
+            last_access: chrono::Utc::now().timestamp() - 7200, // 2 hours old
+            ..PopularityMetrics::default()
+        };
         popularity.insert("old".to_string(), old_metric);
 
-        let mut new_metric = PopularityMetrics::default();
-        new_metric.last_access = chrono::Utc::now().timestamp();
+        let new_metric = PopularityMetrics {
+            last_access: chrono::Utc::now().timestamp(),
+            ..PopularityMetrics::default()
+        };
         popularity.insert("new".to_string(), new_metric);
         drop(popularity);
 

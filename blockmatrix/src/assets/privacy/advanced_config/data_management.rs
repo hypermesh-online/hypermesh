@@ -6,25 +6,25 @@
 //!
 //! Configuration for data minimization, retention, deletion, and archival policies.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetResult, AssetError};
-use super::sharing::{SharingMinimizationSettings, AnonymizationPreferences};
+use super::sharing::{AnonymizationPreferences, SharingMinimizationSettings};
+use crate::assets::core::{AssetError, AssetResult};
 
 /// Data minimization settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DataMinimizationSettings {
     /// Enable automatic data minimization
     pub enabled: bool,
-    
+
     /// Data retention preferences
     pub retention_preferences: RetentionPreferences,
-    
+
     /// Data sharing minimization
     pub sharing_minimization: SharingMinimizationSettings,
-    
+
     /// Anonymization preferences
     pub anonymization_preferences: AnonymizationPreferences,
 }
@@ -34,13 +34,13 @@ pub struct DataMinimizationSettings {
 pub struct RetentionPreferences {
     /// Default retention period
     pub default_retention_period: Duration,
-    
+
     /// Per-data-type retention settings
     pub per_type_retention: HashMap<String, Duration>,
-    
+
     /// Auto-deletion settings
     pub auto_deletion: AutoDeletionSettings,
-    
+
     /// Archive preferences
     pub archive_preferences: ArchivePreferences,
 }
@@ -50,13 +50,13 @@ pub struct RetentionPreferences {
 pub struct AutoDeletionSettings {
     /// Enable automatic deletion
     pub enabled: bool,
-    
+
     /// Deletion criteria
     pub criteria: Vec<DeletionCriterion>,
-    
+
     /// Deletion confirmation requirements
     pub confirmation_requirements: DeletionConfirmationSettings,
-    
+
     /// Secure deletion method
     pub deletion_method: SecureDeletionMethod,
 }
@@ -66,13 +66,13 @@ pub struct AutoDeletionSettings {
 pub struct DeletionCriterion {
     /// Criterion name
     pub name: String,
-    
+
     /// Criterion type
     pub criterion_type: DeletionCriterionType,
-    
+
     /// Threshold values
     pub thresholds: HashMap<String, String>,
-    
+
     /// Priority level
     pub priority: u32,
 }
@@ -92,13 +92,13 @@ pub enum DeletionCriterionType {
 pub struct DeletionConfirmationSettings {
     /// Require user confirmation
     pub require_user_confirmation: bool,
-    
+
     /// Confirmation timeout
     pub confirmation_timeout: Duration,
-    
+
     /// Multi-factor confirmation
     pub require_mfa_confirmation: bool,
-    
+
     /// Grace period before deletion
     pub grace_period: Duration,
 }
@@ -117,13 +117,13 @@ pub enum SecureDeletionMethod {
 pub struct ArchivePreferences {
     /// Enable archiving before deletion
     pub enable_archiving: bool,
-    
+
     /// Archive storage location
     pub archive_location: ArchiveLocation,
-    
+
     /// Archive encryption settings
     pub encryption_settings: ArchiveEncryptionSettings,
-    
+
     /// Archive access controls
     pub access_controls: ArchiveAccessControls,
 }
@@ -142,13 +142,13 @@ pub enum ArchiveLocation {
 pub struct ArchiveEncryptionSettings {
     /// Encryption enabled
     pub enabled: bool,
-    
+
     /// Encryption algorithm
     pub algorithm: String,
-    
+
     /// Key management
     pub key_management: KeyManagementSettings,
-    
+
     /// Additional security measures
     pub additional_security: Vec<String>,
 }
@@ -158,10 +158,10 @@ pub struct ArchiveEncryptionSettings {
 pub struct KeyManagementSettings {
     /// Key derivation method
     pub key_derivation: KeyDerivationMethod,
-    
+
     /// Key rotation settings
     pub key_rotation: KeyRotationSettings,
-    
+
     /// Key recovery options
     pub key_recovery: KeyRecoverySettings,
 }
@@ -181,13 +181,13 @@ pub enum KeyDerivationMethod {
 pub struct KeyRotationSettings {
     /// Enable automatic key rotation
     pub enabled: bool,
-    
+
     /// Rotation frequency
     pub frequency: Duration,
-    
+
     /// Trigger conditions
     pub trigger_conditions: Vec<String>,
-    
+
     /// Rotation method
     pub rotation_method: KeyRotationMethod,
 }
@@ -202,17 +202,17 @@ pub enum KeyRotationMethod {
 }
 
 /// Key recovery settings
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct KeyRecoverySettings {
     /// Enable key recovery
     pub enabled: bool,
-    
+
     /// Recovery methods
     pub recovery_methods: Vec<KeyRecoveryMethod>,
-    
+
     /// Recovery verification
     pub verification_requirements: Vec<String>,
-    
+
     /// Recovery limitations
     pub limitations: KeyRecoveryLimitations,
 }
@@ -232,26 +232,26 @@ pub enum KeyRecoveryMethod {
 pub struct KeyRecoveryLimitations {
     /// Maximum recovery attempts
     pub max_attempts: u32,
-    
+
     /// Recovery timeout
     pub recovery_timeout: Duration,
-    
+
     /// Cooling off period
     pub cooloff_period: Duration,
-    
+
     /// Verification escalation
     pub escalation_requirements: Vec<String>,
 }
 
 /// Archive access controls
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ArchiveAccessControls {
     /// Access permissions
     pub permissions: ArchivePermissions,
-    
+
     /// Access logging
     pub access_logging: ArchiveAccessLogging,
-    
+
     /// Access restrictions
     pub restrictions: Vec<ArchiveAccessRestriction>,
 }
@@ -261,13 +261,13 @@ pub struct ArchiveAccessControls {
 pub struct ArchivePermissions {
     /// User can access own archives
     pub user_access: bool,
-    
+
     /// Admin access permissions
     pub admin_access: AdminAccessPermissions,
-    
+
     /// Legal access provisions
     pub legal_access: LegalAccessProvisions,
-    
+
     /// Emergency access procedures
     pub emergency_access: EmergencyAccessProcedures,
 }
@@ -277,29 +277,29 @@ pub struct ArchivePermissions {
 pub struct AdminAccessPermissions {
     /// Allow admin access
     pub allowed: bool,
-    
+
     /// Justification requirements
     pub justification_required: bool,
-    
+
     /// Audit trail requirements
     pub audit_trail_required: bool,
-    
+
     /// User notification requirements
     pub notify_user: bool,
 }
 
 /// Legal access provisions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct LegalAccessProvisions {
     /// Compliance with legal requests
     pub legal_compliance: bool,
-    
+
     /// Jurisdiction restrictions
     pub jurisdiction_restrictions: Vec<String>,
-    
+
     /// Legal process requirements
     pub process_requirements: Vec<String>,
-    
+
     /// User notification policies
     pub notification_policies: LegalNotificationPolicies,
 }
@@ -309,20 +309,20 @@ pub struct LegalAccessProvisions {
 pub struct LegalNotificationPolicies {
     /// Notify user of legal requests
     pub notify_user: bool,
-    
+
     /// Notification delay allowances
     pub delay_allowances: HashMap<String, Duration>,
-    
+
     /// Exception circumstances
     pub exceptions: Vec<String>,
 }
 
 /// Emergency access procedures
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct EmergencyAccessProcedures {
     /// Emergency conditions
     pub conditions: Vec<EmergencyCondition>,
-    
+
     /// Access limitations during emergency
     pub limitations: EmergencyAccessLimitations,
 }
@@ -332,13 +332,13 @@ pub struct EmergencyAccessProcedures {
 pub struct EmergencyCondition {
     /// Condition name
     pub name: String,
-    
+
     /// Condition type
     pub condition_type: EmergencyConditionType,
-    
+
     /// Trigger criteria
     pub trigger_criteria: HashMap<String, String>,
-    
+
     /// Duration of emergency status
     pub duration: Duration,
 }
@@ -354,14 +354,14 @@ pub enum EmergencyConditionType {
 }
 
 /// Emergency access limitations
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct EmergencyAccessLimitations {
     /// Time-based limitations
     pub time_limits: HashMap<String, Duration>,
-    
+
     /// Scope limitations
     pub scope_limitations: Vec<String>,
-    
+
     /// Approval requirements
     pub approval_requirements: Vec<String>,
 }
@@ -371,13 +371,13 @@ pub struct EmergencyAccessLimitations {
 pub struct ArchiveAccessLogging {
     /// Enable access logging
     pub enabled: bool,
-    
+
     /// Log detail level
     pub detail_level: LogDetailLevel,
-    
+
     /// Log retention period
     pub retention_period: Duration,
-    
+
     /// Log security settings
     pub security_settings: LogSecuritySettings,
 }
@@ -396,13 +396,13 @@ pub enum LogDetailLevel {
 pub struct LogSecuritySettings {
     /// Encrypt logs
     pub encryption_enabled: bool,
-    
+
     /// Immutable logging
     pub immutable_logging: bool,
-    
+
     /// Tamper detection
     pub tamper_detection: bool,
-    
+
     /// Access control for logs
     pub log_access_control: bool,
 }
@@ -412,13 +412,13 @@ pub struct LogSecuritySettings {
 pub struct ArchiveAccessRestriction {
     /// Restriction name
     pub name: String,
-    
+
     /// Restriction type
     pub restriction_type: ArchiveRestrictionType,
-    
+
     /// Restriction parameters
     pub parameters: HashMap<String, String>,
-    
+
     /// Override conditions
     pub override_conditions: Vec<String>,
 }
@@ -447,10 +447,10 @@ impl RetentionPreferences {
     pub fn validate(&self) -> AssetResult<()> {
         if self.default_retention_period.as_secs() == 0 {
             return Err(AssetError::ValidationError {
-                message: "Default retention period cannot be zero".to_string()
+                message: "Default retention period cannot be zero".to_string(),
             });
         }
-        
+
         self.auto_deletion.validate()?;
         self.archive_preferences.validate()?;
         Ok(())
@@ -461,14 +461,14 @@ impl AutoDeletionSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.criteria.is_empty() {
             return Err(AssetError::ValidationError {
-                message: "Auto-deletion enabled but no criteria specified".to_string()
+                message: "Auto-deletion enabled but no criteria specified".to_string(),
             });
         }
-        
+
         for criterion in &self.criteria {
             criterion.validate()?;
         }
-        
+
         Ok(())
     }
 }
@@ -476,13 +476,17 @@ impl AutoDeletionSettings {
 impl DeletionCriterion {
     pub fn validate(&self) -> AssetResult<()> {
         if self.name.trim().is_empty() {
-            return Err(AssetError::ValidationError { message: "Deletion criterion name cannot be empty".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Deletion criterion name cannot be empty".to_string(),
+            });
         }
-        
+
         if self.thresholds.is_empty() {
-            return Err(AssetError::ValidationError { message: "Deletion criterion must have at least one threshold".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Deletion criterion must have at least one threshold".to_string(),
+            });
         }
-        
+
         Ok(())
     }
 }
@@ -501,7 +505,10 @@ impl ArchiveEncryptionSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled {
             if self.algorithm.trim().is_empty() {
-                return Err(AssetError::ValidationError { message: "Encryption algorithm must be specified when encryption is enabled".to_string() });
+                return Err(AssetError::ValidationError {
+                    message: "Encryption algorithm must be specified when encryption is enabled"
+                        .to_string(),
+                });
             }
             self.key_management.validate()?;
         }
@@ -520,7 +527,9 @@ impl KeyManagementSettings {
 impl KeyRotationSettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.frequency.as_secs() == 0 {
-            return Err(AssetError::ValidationError { message: "Key rotation frequency cannot be zero when enabled".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Key rotation frequency cannot be zero when enabled".to_string(),
+            });
         }
         Ok(())
     }
@@ -529,7 +538,9 @@ impl KeyRotationSettings {
 impl KeyRecoverySettings {
     pub fn validate(&self) -> AssetResult<()> {
         if self.enabled && self.recovery_methods.is_empty() {
-            return Err(AssetError::ValidationError { message: "Key recovery enabled but no recovery methods specified".to_string() });
+            return Err(AssetError::ValidationError {
+                message: "Key recovery enabled but no recovery methods specified".to_string(),
+            });
         }
         Ok(())
     }
@@ -630,17 +641,6 @@ impl Default for KeyRotationSettings {
     }
 }
 
-impl Default for KeyRecoverySettings {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            recovery_methods: Vec::new(),
-            verification_requirements: Vec::new(),
-            limitations: KeyRecoveryLimitations::default(),
-        }
-    }
-}
-
 impl Default for KeyRecoveryLimitations {
     fn default() -> Self {
         Self {
@@ -648,16 +648,6 @@ impl Default for KeyRecoveryLimitations {
             recovery_timeout: Duration::from_secs(3600), // 1 hour
             cooloff_period: Duration::from_secs(24 * 3600), // 24 hours
             escalation_requirements: Vec::new(),
-        }
-    }
-}
-
-impl Default for ArchiveAccessControls {
-    fn default() -> Self {
-        Self {
-            permissions: ArchivePermissions::default(),
-            access_logging: ArchiveAccessLogging::default(),
-            restrictions: Vec::new(),
         }
     }
 }
@@ -684,42 +674,12 @@ impl Default for AdminAccessPermissions {
     }
 }
 
-impl Default for LegalAccessProvisions {
-    fn default() -> Self {
-        Self {
-            legal_compliance: false,
-            jurisdiction_restrictions: Vec::new(),
-            process_requirements: Vec::new(),
-            notification_policies: LegalNotificationPolicies::default(),
-        }
-    }
-}
-
 impl Default for LegalNotificationPolicies {
     fn default() -> Self {
         Self {
             notify_user: true,
             delay_allowances: HashMap::new(),
             exceptions: Vec::new(),
-        }
-    }
-}
-
-impl Default for EmergencyAccessProcedures {
-    fn default() -> Self {
-        Self {
-            conditions: Vec::new(),
-            limitations: EmergencyAccessLimitations::default(),
-        }
-    }
-}
-
-impl Default for EmergencyAccessLimitations {
-    fn default() -> Self {
-        Self {
-            time_limits: HashMap::new(),
-            scope_limitations: Vec::new(),
-            approval_requirements: Vec::new(),
         }
     }
 }

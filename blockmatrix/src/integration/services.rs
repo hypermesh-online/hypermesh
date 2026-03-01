@@ -4,14 +4,14 @@
 
 //! Service registry and discovery for HyperMesh platform
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
-use crate::{IntegrationResult, IntegrationError};
+use crate::{IntegrationError, IntegrationResult};
 
 /// Service registry for managing platform services
 pub struct ServiceRegistry {
@@ -119,11 +119,18 @@ impl ServiceRegistry {
             discovery_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// Register a service
-    pub async fn register_service(&self, service_id: String, endpoint: ServiceEndpoint) -> IntegrationResult<()> {
-        info!("Registering service: {} at {}:{}", service_id, endpoint.address, endpoint.port);
-        
+    pub async fn register_service(
+        &self,
+        service_id: String,
+        endpoint: ServiceEndpoint,
+    ) -> IntegrationResult<()> {
+        info!(
+            "Registering service: {} at {}:{}",
+            service_id, endpoint.address, endpoint.port
+        );
+
         let registered_service = RegisteredService {
             endpoint,
             metadata: ServiceMetadata::default(),
@@ -131,7 +138,7 @@ impl ServiceRegistry {
             last_health_check: None,
             health_status: ServiceHealthStatus::Unknown,
         };
-        
+
         let service_type = registered_service.endpoint.service_type.clone();
 
         let mut services = self.services.write().await;
@@ -140,18 +147,21 @@ impl ServiceRegistry {
         // Invalidate discovery cache for this service type
         let mut cache = self.discovery_cache.write().await;
         cache.remove(&service_type);
-        
+
         info!("Service {} registered successfully", service_id);
         Ok(())
     }
-    
+
     /// Register service with full metadata
     pub async fn register_service_with_metadata(
         &self,
         registration: ServiceRegistration,
     ) -> IntegrationResult<()> {
-        info!("Registering service with metadata: {}", registration.service_id);
-        
+        info!(
+            "Registering service with metadata: {}",
+            registration.service_id
+        );
+
         let registered_service = RegisteredService {
             endpoint: registration.endpoint.clone(),
             metadata: registration.metadata,
@@ -159,71 +169,80 @@ impl ServiceRegistry {
             last_health_check: None,
             health_status: ServiceHealthStatus::Unknown,
         };
-        
+
         let mut services = self.services.write().await;
         services.insert(registration.service_id.clone(), registered_service);
-        
+
         // Invalidate discovery cache
         let mut cache = self.discovery_cache.write().await;
         cache.remove(&registration.endpoint.service_type);
-        
-        info!("Service {} registered with metadata successfully", registration.service_id);
+
+        info!(
+            "Service {} registered with metadata successfully",
+            registration.service_id
+        );
         Ok(())
     }
-    
+
     /// Unregister a service
     pub async fn unregister_service(&self, service_id: &str) -> IntegrationResult<()> {
         info!("Unregistering service: {}", service_id);
-        
+
         let mut services = self.services.write().await;
         if let Some(service) = services.remove(service_id) {
             // Invalidate discovery cache
             let mut cache = self.discovery_cache.write().await;
             cache.remove(&service.endpoint.service_type);
-            
+
             info!("Service {} unregistered successfully", service_id);
         } else {
-            warn!("Attempted to unregister non-existent service: {}", service_id);
+            warn!(
+                "Attempted to unregister non-existent service: {}",
+                service_id
+            );
         }
-        
+
         Ok(())
     }
-    
+
     /// Update service health status
     pub async fn update_service_health(
         &self,
         service_id: &str,
         health_status: ServiceHealthStatus,
     ) -> IntegrationResult<()> {
-        debug!("Updating health status for service: {} -> {:?}", service_id, health_status);
-        
+        debug!(
+            "Updating health status for service: {} -> {:?}",
+            service_id, health_status
+        );
+
         let mut services = self.services.write().await;
         if let Some(service) = services.get_mut(service_id) {
             service.health_status = health_status;
             service.last_health_check = Some(SystemTime::now());
-            
+
             // Invalidate discovery cache for this service type
             let mut cache = self.discovery_cache.write().await;
             cache.remove(&service.endpoint.service_type);
         } else {
             return Err(IntegrationError::ServiceRegistry {
-                message: format!("Service '{}' not found for health update", service_id),
+                message: format!("Service '{service_id}' not found for health update"),
             });
         }
-        
+
         Ok(())
     }
-    
+
     /// Get service by ID
     pub async fn get_service(&self, service_id: &str) -> Option<RegisteredService> {
         let services = self.services.read().await;
         services.get(service_id).cloned()
     }
-    
+
     /// Discover services by query
     pub async fn discover_services(&self, query: ServiceQuery) -> Vec<ServiceEndpoint> {
         debug!("Discovering services for query: {:?}", query);
-        
+
         // Check cache first
         {
             let cache = self.discovery_cache.read().await;
@@ -231,11 +250,11 @@ impl ServiceRegistry {
                 return self.filter_services(cached_endpoints.clone(), &query);
             }
         }
-        
+
         // Build results from registry
         let services = self.services.read().await;
         let mut matching_services = Vec::new();
-        
+
         for service in services.values() {
             if service.endpoint.service_type == query.service_type {
                 // Check health requirement
@@ -244,56 +263,66 @@ impl ServiceRegistry {
                         continue;
                     }
                 }
-                
+
                 // Check required tags
                 if let Some(required_tags) = &query.required_tags {
-                    if !required_tags.iter().all(|tag| service.metadata.tags.contains(tag)) {
+                    if !required_tags
+                        .iter()
+                        .all(|tag| service.metadata.tags.contains(tag))
+                    {
                         continue;
                     }
                 }
-                
+
                 matching_services.push(service.endpoint.clone());
             }
         }
-        
+
         // Sort by priority and weight
         matching_services.sort_by(|a, b| {
             // This would require access to metadata, simplified for now
             a.service_type.cmp(&b.service_type)
         });
-        
+
         // Apply limit
         if let Some(limit) = query.limit {
             matching_services.truncate(limit);
         }
-        
+
         // Update cache
         {
             let mut cache = self.discovery_cache.write().await;
             cache.insert(query.service_type.clone(), matching_services.clone());
         }
-        
-        debug!("Discovered {} services for type: {}", matching_services.len(), query.service_type);
+
+        debug!(
+            "Discovered {} services for type: {}",
+            matching_services.len(),
+            query.service_type
+        );
         matching_services
     }
-    
+
     /// List all registered services
     pub async fn list_services(&self) -> Vec<(String, RegisteredService)> {
         let services = self.services.read().await;
-        services.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        services
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
-    
+
     /// Get service registry statistics
     pub async fn get_statistics(&self) -> ServiceRegistryStatistics {
         let services = self.services.read().await;
         let total_services = services.len();
-        
+
         let mut healthy_count = 0;
         let mut unhealthy_count = 0;
         let mut degraded_count = 0;
         let mut unknown_count = 0;
         let mut service_types = HashMap::new();
-        
+
         for service in services.values() {
             match service.health_status {
                 ServiceHealthStatus::Healthy => healthy_count += 1,
@@ -301,10 +330,12 @@ impl ServiceRegistry {
                 ServiceHealthStatus::Degraded => degraded_count += 1,
                 ServiceHealthStatus::Unknown => unknown_count += 1,
             }
-            
-            *service_types.entry(service.endpoint.service_type.clone()).or_insert(0) += 1;
+
+            *service_types
+                .entry(service.endpoint.service_type.clone())
+                .or_insert(0) += 1;
         }
-        
+
         ServiceRegistryStatistics {
             total_services,
             healthy_services: healthy_count,
@@ -314,61 +345,83 @@ impl ServiceRegistry {
             service_types,
         }
     }
-    
+
     /// Cleanup expired services (if TTL-based registration was used)
     pub async fn cleanup_expired_services(&self) -> IntegrationResult<()> {
         info!("Cleaning up expired services");
-        
+
         let mut services = self.services.write().await;
         let now = SystemTime::now();
         let mut to_remove = Vec::new();
-        
+
         for (service_id, service) in services.iter() {
             // Check if service is considered stale (no health check in 5 minutes)
             if let Some(last_check) = service.last_health_check {
-                if now.duration_since(last_check).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(300) {
+                if now
+                    .duration_since(last_check)
+                    .unwrap_or(Duration::from_secs(0))
+                    > Duration::from_secs(300)
+                {
                     warn!("Service {} is stale, marking for removal", service_id);
                     to_remove.push(service_id.clone());
                 }
-            } else if now.duration_since(service.registered_at).unwrap_or(Duration::from_secs(0)) > Duration::from_secs(600) {
-                warn!("Service {} never had health check and is old, marking for removal", service_id);
+            } else if now
+                .duration_since(service.registered_at)
+                .unwrap_or(Duration::from_secs(0))
+                > Duration::from_secs(600)
+            {
+                warn!(
+                    "Service {} never had health check and is old, marking for removal",
+                    service_id
+                );
                 to_remove.push(service_id.clone());
             }
         }
-        
+
         // Remove stale services
         for service_id in &to_remove {
             services.remove(service_id);
             info!("Removed expired service: {}", service_id);
         }
-        
+
         // Clear discovery cache
         if !to_remove.is_empty() {
             let mut cache = self.discovery_cache.write().await;
             cache.clear();
         }
-        
+
         info!("Cleaned up {} expired services", to_remove.len());
         Ok(())
     }
-    
+
     /// Helper to filter services by query parameters
-    fn filter_services(&self, services: Vec<ServiceEndpoint>, query: &ServiceQuery) -> Vec<ServiceEndpoint> {
+    fn filter_services(
+        &self,
+        services: Vec<ServiceEndpoint>,
+        query: &ServiceQuery,
+    ) -> Vec<ServiceEndpoint> {
         let mut filtered = services;
-        
+
         // Apply limit
         if let Some(limit) = query.limit {
             filtered.truncate(limit);
         }
-        
+
         filtered
     }
-    
+
     /// Helper to check if health status meets requirement
-    fn meets_health_requirement(&self, actual: &ServiceHealthStatus, required: &ServiceHealthStatus) -> bool {
+    fn meets_health_requirement(
+        &self,
+        actual: &ServiceHealthStatus,
+        required: &ServiceHealthStatus,
+    ) -> bool {
         match required {
             ServiceHealthStatus::Unknown => true, // Any status acceptable
-            ServiceHealthStatus::Degraded => matches!(actual, ServiceHealthStatus::Healthy | ServiceHealthStatus::Degraded),
+            ServiceHealthStatus::Degraded => matches!(
+                actual,
+                ServiceHealthStatus::Healthy | ServiceHealthStatus::Degraded
+            ),
             ServiceHealthStatus::Healthy => matches!(actual, ServiceHealthStatus::Healthy),
             ServiceHealthStatus::Unhealthy => false, // Never want unhealthy services
         }
@@ -380,7 +433,7 @@ impl ServiceDiscovery {
     pub fn new(registry: Arc<ServiceRegistry>) -> Self {
         Self { registry }
     }
-    
+
     /// Discover services of a specific type
     pub async fn discover(&self, service_type: &str) -> Vec<ServiceEndpoint> {
         let query = ServiceQuery {
@@ -390,10 +443,10 @@ impl ServiceDiscovery {
             min_health: Some(ServiceHealthStatus::Degraded), // At least degraded
             limit: None,
         };
-        
+
         self.registry.discover_services(query).await
     }
-    
+
     /// Discover healthy services only
     pub async fn discover_healthy(&self, service_type: &str) -> Vec<ServiceEndpoint> {
         let query = ServiceQuery {
@@ -403,12 +456,16 @@ impl ServiceDiscovery {
             min_health: Some(ServiceHealthStatus::Healthy),
             limit: None,
         };
-        
+
         self.registry.discover_services(query).await
     }
-    
+
     /// Discover services with specific tags
-    pub async fn discover_with_tags(&self, service_type: &str, tags: Vec<String>) -> Vec<ServiceEndpoint> {
+    pub async fn discover_with_tags(
+        &self,
+        service_type: &str,
+        tags: Vec<String>,
+    ) -> Vec<ServiceEndpoint> {
         let query = ServiceQuery {
             service_type: service_type.to_string(),
             required_tags: Some(tags),
@@ -416,7 +473,7 @@ impl ServiceDiscovery {
             min_health: Some(ServiceHealthStatus::Degraded),
             limit: None,
         };
-        
+
         self.registry.discover_services(query).await
     }
 }

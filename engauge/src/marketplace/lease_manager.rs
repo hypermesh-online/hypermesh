@@ -40,6 +40,7 @@ impl LeaseManager {
     /// Validates that the provider has a pool, the resource is configured,
     /// the requested allocation does not exceed the pool limit, and the
     /// tier is accepted. Returns the lease ID on success.
+    #[allow(clippy::too_many_arguments)]
     pub fn propose_lease(
         &mut self,
         provider_id: &NodeId,
@@ -222,7 +223,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(ManagerError::ProviderNotFound(id)) => assert_eq!(id, "unknown-provider"),
-            other => panic!("test: expected ProviderNotFound, got {:?}", other),
+            other => unreachable!("test: expected ProviderNotFound, got {other:?}"),
         }
     }
 
@@ -245,7 +246,7 @@ mod tests {
             Err(ManagerError::ResourceNotConfigured(r)) => {
                 assert_eq!(r, LeaseableResource::Gpu);
             }
-            other => panic!("test: expected ResourceNotConfigured, got {:?}", other),
+            other => unreachable!("test: expected ResourceNotConfigured, got {other:?}"),
         }
     }
 
@@ -272,7 +273,7 @@ mod tests {
                 assert_eq!(requested, 80);
                 assert_eq!(available, 50);
             }
-            other => panic!("test: expected AllocationExceeded, got {:?}", other),
+            other => unreachable!("test: expected AllocationExceeded, got {other:?}"),
         }
     }
 
@@ -297,8 +298,7 @@ mod tests {
         // Proposed does not count as active.
         assert_eq!(mgr.active_lease_count(), 0);
 
-        mgr.activate_lease(&lease_id)
-            .expect("test: activate lease");
+        mgr.activate_lease(&lease_id).expect("test: activate lease");
         assert_eq!(mgr.active_lease_count(), 1);
 
         let provider_leases = mgr.active_leases_for_provider("provider-node");

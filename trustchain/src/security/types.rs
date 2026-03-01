@@ -4,14 +4,14 @@
 
 //! Security types, configuration, and metrics
 
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use dashmap::DashMap;
 use tokio::sync::RwLock;
 
-use crate::consensus::{ConsensusProof, ConsensusResult, ConsensusRequirements};
+use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult};
 
 /// Security configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,15 +98,33 @@ impl Clone for SecurityMetrics {
     fn clone(&self) -> Self {
         use std::sync::atomic::Ordering::Relaxed;
         Self {
-            validations_total: std::sync::atomic::AtomicU64::new(self.validations_total.load(Relaxed)),
-            validations_successful: std::sync::atomic::AtomicU64::new(self.validations_successful.load(Relaxed)),
-            validations_failed: std::sync::atomic::AtomicU64::new(self.validations_failed.load(Relaxed)),
-            consensus_validations: std::sync::atomic::AtomicU64::new(self.consensus_validations.load(Relaxed)),
-            byzantine_detections: std::sync::atomic::AtomicU64::new(self.byzantine_detections.load(Relaxed)),
-            alerts_generated: std::sync::atomic::AtomicU64::new(self.alerts_generated.load(Relaxed)),
-            certificate_consensus_required: std::sync::atomic::AtomicU64::new(self.certificate_consensus_required.load(Relaxed)),
-            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(self.certificate_consensus_approved.load(Relaxed)),
-            average_validation_time_ms: std::sync::atomic::AtomicU64::new(self.average_validation_time_ms.load(Relaxed)),
+            validations_total: std::sync::atomic::AtomicU64::new(
+                self.validations_total.load(Relaxed),
+            ),
+            validations_successful: std::sync::atomic::AtomicU64::new(
+                self.validations_successful.load(Relaxed),
+            ),
+            validations_failed: std::sync::atomic::AtomicU64::new(
+                self.validations_failed.load(Relaxed),
+            ),
+            consensus_validations: std::sync::atomic::AtomicU64::new(
+                self.consensus_validations.load(Relaxed),
+            ),
+            byzantine_detections: std::sync::atomic::AtomicU64::new(
+                self.byzantine_detections.load(Relaxed),
+            ),
+            alerts_generated: std::sync::atomic::AtomicU64::new(
+                self.alerts_generated.load(Relaxed),
+            ),
+            certificate_consensus_required: std::sync::atomic::AtomicU64::new(
+                self.certificate_consensus_required.load(Relaxed),
+            ),
+            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(
+                self.certificate_consensus_approved.load(Relaxed),
+            ),
+            average_validation_time_ms: std::sync::atomic::AtomicU64::new(
+                self.average_validation_time_ms.load(Relaxed),
+            ),
         }
     }
 }
@@ -116,40 +134,80 @@ impl std::fmt::Debug for SecurityMetrics {
         use std::sync::atomic::Ordering::Relaxed;
         f.debug_struct("SecurityMetrics")
             .field("validations_total", &self.validations_total.load(Relaxed))
-            .field("validations_successful", &self.validations_successful.load(Relaxed))
+            .field(
+                "validations_successful",
+                &self.validations_successful.load(Relaxed),
+            )
             .field("validations_failed", &self.validations_failed.load(Relaxed))
-            .field("consensus_validations", &self.consensus_validations.load(Relaxed))
-            .field("byzantine_detections", &self.byzantine_detections.load(Relaxed))
+            .field(
+                "consensus_validations",
+                &self.consensus_validations.load(Relaxed),
+            )
+            .field(
+                "byzantine_detections",
+                &self.byzantine_detections.load(Relaxed),
+            )
             .field("alerts_generated", &self.alerts_generated.load(Relaxed))
-            .field("certificate_consensus_required", &self.certificate_consensus_required.load(Relaxed))
-            .field("certificate_consensus_approved", &self.certificate_consensus_approved.load(Relaxed))
-            .field("average_validation_time_ms", &self.average_validation_time_ms.load(Relaxed))
+            .field(
+                "certificate_consensus_required",
+                &self.certificate_consensus_required.load(Relaxed),
+            )
+            .field(
+                "certificate_consensus_approved",
+                &self.certificate_consensus_approved.load(Relaxed),
+            )
+            .field(
+                "average_validation_time_ms",
+                &self.average_validation_time_ms.load(Relaxed),
+            )
             .finish()
     }
 }
 
 impl Serialize for SecurityMetrics {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         use serde::ser::SerializeStruct;
         use std::sync::atomic::Ordering::Relaxed;
         let mut state = serializer.serialize_struct("SecurityMetrics", 9)?;
         state.serialize_field("validations_total", &self.validations_total.load(Relaxed))?;
-        state.serialize_field("validations_successful", &self.validations_successful.load(Relaxed))?;
+        state.serialize_field(
+            "validations_successful",
+            &self.validations_successful.load(Relaxed),
+        )?;
         state.serialize_field("validations_failed", &self.validations_failed.load(Relaxed))?;
-        state.serialize_field("consensus_validations", &self.consensus_validations.load(Relaxed))?;
-        state.serialize_field("byzantine_detections", &self.byzantine_detections.load(Relaxed))?;
+        state.serialize_field(
+            "consensus_validations",
+            &self.consensus_validations.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "byzantine_detections",
+            &self.byzantine_detections.load(Relaxed),
+        )?;
         state.serialize_field("alerts_generated", &self.alerts_generated.load(Relaxed))?;
-        state.serialize_field("certificate_consensus_required", &self.certificate_consensus_required.load(Relaxed))?;
-        state.serialize_field("certificate_consensus_approved", &self.certificate_consensus_approved.load(Relaxed))?;
-        state.serialize_field("average_validation_time_ms", &self.average_validation_time_ms.load(Relaxed))?;
+        state.serialize_field(
+            "certificate_consensus_required",
+            &self.certificate_consensus_required.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "certificate_consensus_approved",
+            &self.certificate_consensus_approved.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "average_validation_time_ms",
+            &self.average_validation_time_ms.load(Relaxed),
+        )?;
         state.end()
     }
 }
 
 impl<'de> Deserialize<'de> for SecurityMetrics {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
+    where
+        D: serde::Deserializer<'de>,
+    {
         #[derive(serde::Deserialize)]
         struct Data {
             validations_total: u64,
@@ -170,9 +228,15 @@ impl<'de> Deserialize<'de> for SecurityMetrics {
             consensus_validations: std::sync::atomic::AtomicU64::new(data.consensus_validations),
             byzantine_detections: std::sync::atomic::AtomicU64::new(data.byzantine_detections),
             alerts_generated: std::sync::atomic::AtomicU64::new(data.alerts_generated),
-            certificate_consensus_required: std::sync::atomic::AtomicU64::new(data.certificate_consensus_required),
-            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(data.certificate_consensus_approved),
-            average_validation_time_ms: std::sync::atomic::AtomicU64::new(data.average_validation_time_ms),
+            certificate_consensus_required: std::sync::atomic::AtomicU64::new(
+                data.certificate_consensus_required,
+            ),
+            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(
+                data.certificate_consensus_approved,
+            ),
+            average_validation_time_ms: std::sync::atomic::AtomicU64::new(
+                data.average_validation_time_ms,
+            ),
         })
     }
 }
@@ -258,10 +322,14 @@ impl SecurityEventLog {
                 let event_b = self.events.get(b).map(|e| e.timestamp);
                 event_b.cmp(&event_a)
             });
-            indices.by_severity.entry(event.severity.clone())
+            indices
+                .by_severity
+                .entry(event.severity.clone())
                 .or_insert_with(Vec::new)
                 .push(event_id.clone());
-            indices.by_type.entry(event.event_type.clone())
+            indices
+                .by_type
+                .entry(event.event_type.clone())
                 .or_insert_with(Vec::new)
                 .push(event_id.clone());
         }
@@ -269,7 +337,10 @@ impl SecurityEventLog {
     }
 
     /// Get recent events
-    pub async fn get_recent_events(&self, limit: usize) -> crate::errors::Result<Vec<SecurityEvent>> {
+    pub async fn get_recent_events(
+        &self,
+        limit: usize,
+    ) -> crate::errors::Result<Vec<SecurityEvent>> {
         let indices = self.indices.read().await;
         let event_ids = indices.by_timestamp.iter().take(limit);
         let mut events = Vec::new();

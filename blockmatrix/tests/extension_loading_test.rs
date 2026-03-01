@@ -11,13 +11,13 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyMode};
+use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
+use blockmatrix::extensions::registry::{ExtensionLocation, ExtensionRegistry, RegistryConfig};
+use blockmatrix::extensions::security::{ResourceQuotas, SecurityConfig, SecurityManager};
 use blockmatrix::extensions::{
     ExtensionCapability, ExtensionConfig, ExtensionManager, ExtensionManagerConfig,
     ExtensionMetadata, ResourceLimits,
 };
-use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
-use blockmatrix::extensions::registry::{ExtensionRegistry, RegistryConfig, ExtensionLocation};
-use blockmatrix::extensions::security::{SecurityManager, SecurityConfig, ResourceQuotas};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ async fn test_catalog_extension_loading() {
             PathBuf::from("../catalog/target/release"),
             PathBuf::from("./extensions"),
         ],
-        enable_wasm: false, // Only native for now
+        enable_wasm: false,       // Only native for now
         verify_signatures: false, // Disable for testing
         max_extensions: 10,
         default_limits: ResourceLimits::default(),
@@ -78,7 +78,8 @@ async fn test_catalog_extension_loading() {
     println!("Discovered {} extensions", discovered.len());
 
     // Look for catalog extension
-    let catalog_manifest = discovered.iter()
+    let catalog_manifest = discovered
+        .iter()
         .find(|m| m.metadata.id == "catalog")
         .expect("Catalog extension not found");
 
@@ -91,7 +92,10 @@ async fn test_catalog_extension_loading() {
         distribution_hash: None,
     };
 
-    registry.register_extension(catalog_manifest.metadata.clone(), location).await.unwrap();
+    registry
+        .register_extension(catalog_manifest.metadata.clone(), location)
+        .await
+        .unwrap();
 
     // Create security context for the extension
     let granted_capabilities = HashSet::from([
@@ -103,12 +107,15 @@ async fn test_catalog_extension_loading() {
 
     let quotas = ResourceQuotas::from(ResourceLimits::default());
 
-    security_manager.create_context(
-        "catalog".to_string(),
-        &catalog_manifest.metadata,
-        granted_capabilities,
-        quotas,
-    ).await.unwrap();
+    security_manager
+        .create_context(
+            "catalog".to_string(),
+            &catalog_manifest.metadata,
+            granted_capabilities,
+            quotas,
+        )
+        .await
+        .unwrap();
 
     // Load the extension
     let extension_path = PathBuf::from("../catalog/target/debug");
@@ -117,11 +124,16 @@ async fn test_catalog_extension_loading() {
     assert_eq!(extension_id, "catalog");
 
     // Get the loaded extension
-    let extension = loader.get_extension(&extension_id).await
+    let extension = loader
+        .get_extension(&extension_id)
+        .await
         .expect("Failed to get loaded extension");
 
     // Activate the extension in registry
-    registry.activate_extension(&extension_id, extension.clone()).await.unwrap();
+    registry
+        .activate_extension(&extension_id, extension.clone())
+        .await
+        .unwrap();
 
     // Verify extension is active
     assert!(registry.is_active(&extension_id).await);
@@ -135,7 +147,10 @@ async fn test_catalog_extension_loading() {
     println!("Registered {} asset handlers", handlers.len());
 
     // Extend the asset manager
-    extension.extend_manager(asset_manager.clone()).await.unwrap();
+    extension
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Test extension functionality
     let request = hypermesh::extensions::ExtensionRequest {
@@ -168,8 +183,11 @@ async fn test_catalog_extension_loading() {
     // Validate the extension
     let validation = extension.validate().await.unwrap();
     assert!(validation.valid || !validation.warnings.is_empty());
-    println!("Validation report: {} errors, {} warnings",
-             validation.errors.len(), validation.warnings.len());
+    println!(
+        "Validation report: {} errors, {} warnings",
+        validation.errors.len(),
+        validation.warnings.len()
+    );
 
     // Export extension state
     let state = extension.export_state().await.unwrap();
@@ -177,16 +195,20 @@ async fn test_catalog_extension_loading() {
 
     // Check resource usage through security manager
     if let Some(metrics) = security_manager.get_metrics(&extension_id).await {
-        println!("Extension metrics - CPU: {:.1}%, Memory: {} bytes",
-                 metrics.cpu_usage, metrics.memory_usage);
+        println!(
+            "Extension metrics - CPU: {:.1}%, Memory: {} bytes",
+            metrics.cpu_usage, metrics.memory_usage
+        );
     }
 
     // Test capability check
-    let cap_check = security_manager.check_capability(
-        &extension_id,
-        &ExtensionCapability::AssetManagement,
-        "test_operation"
-    ).await;
+    let cap_check = security_manager
+        .check_capability(
+            &extension_id,
+            &ExtensionCapability::AssetManagement,
+            "test_operation",
+        )
+        .await;
     assert!(cap_check.is_ok());
 
     // Deactivate extension
@@ -276,21 +298,24 @@ async fn test_extension_resource_limits() {
     // Create restrictive quotas
     let quotas = ResourceQuotas {
         cpu_percent: 10.0,
-        memory_bytes: 100 * 1024 * 1024, // 100MB
+        memory_bytes: 100 * 1024 * 1024,   // 100MB
         storage_bytes: 1024 * 1024 * 1024, // 1GB
-        network_bandwidth: 1024 * 1024, // 1MB/s
+        network_bandwidth: 1024 * 1024,    // 1MB/s
         file_descriptors: 100,
         max_threads: 10,
         ops_per_second: 100,
     };
 
     // Create security context
-    security_manager.create_context(
-        "test-ext".to_string(),
-        &metadata,
-        HashSet::from([ExtensionCapability::AssetManagement]),
-        quotas,
-    ).await.unwrap();
+    security_manager
+        .create_context(
+            "test-ext".to_string(),
+            &metadata,
+            HashSet::from([ExtensionCapability::AssetManagement]),
+            quotas,
+        )
+        .await
+        .unwrap();
 
     // Update with usage within limits
     let usage = hypermesh::extensions::security::ResourceUsage {
@@ -304,26 +329,40 @@ async fn test_extension_resource_limits() {
         last_update: Some(std::time::SystemTime::now()),
     };
 
-    security_manager.update_usage("test-ext", usage).await.unwrap();
+    security_manager
+        .update_usage("test-ext", usage)
+        .await
+        .unwrap();
 
     // Check resource usage is OK
-    assert!(security_manager.check_resource_usage("test-ext").await.is_ok());
+    assert!(security_manager
+        .check_resource_usage("test-ext")
+        .await
+        .is_ok());
 
     // Update with excessive usage
     let excessive_usage = hypermesh::extensions::security::ResourceUsage {
-        cpu_percent: 50.0, // Exceeds 10% limit
+        cpu_percent: 50.0,               // Exceeds 10% limit
         memory_bytes: 200 * 1024 * 1024, // Exceeds 100MB limit
         ..Default::default()
     };
 
-    security_manager.update_usage("test-ext", excessive_usage).await.unwrap();
+    security_manager
+        .update_usage("test-ext", excessive_usage)
+        .await
+        .unwrap();
 
     // Check should fail
-    assert!(security_manager.check_resource_usage("test-ext").await.is_err());
+    assert!(security_manager
+        .check_resource_usage("test-ext")
+        .await
+        .is_err());
 
     // Record violations
     for i in 0..3 {
-        security_manager.record_violation("test-ext", "resource_limit", &format!("Violation {}", i)).await;
+        security_manager
+            .record_violation("test-ext", "resource_limit", &format!("Violation {}", i))
+            .await;
     }
 
     // Check metrics

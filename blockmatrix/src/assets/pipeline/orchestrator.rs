@@ -7,17 +7,15 @@
 //! Coordinates all pipeline stages: Compression → Encryption → Sharding → Distribution
 
 use crate::assets::pipeline::{
-    Asset, PipelineResult,
-    Compressor, CompressionConfig, CompressionStats,
-    Encryptor, EncryptionConfig, EncryptionStats, EncryptedData, AesKey,
-    KyberEncryptionResult,
-    Sharder, ShardingConfig, Shard, ShardingStats,
-    MatrixDistributor, DistributionConfig, DistributedAsset, DistributionStats,
+    AesKey, Asset, CompressionConfig, CompressionStats, Compressor, DistributedAsset,
+    DistributionConfig, DistributionStats, EncryptedData, EncryptionConfig, EncryptionStats,
+    Encryptor, KyberEncryptionResult, MatrixDistributor, PipelineResult, Shard, Sharder,
+    ShardingConfig, ShardingStats,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Complete pipeline configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PipelineConfig {
     /// Compression configuration
     pub compression: CompressionConfig,
@@ -29,18 +27,6 @@ pub struct PipelineConfig {
     pub distribution: DistributionConfig,
     /// Enable pipeline stages
     pub stages_enabled: PipelineStages,
-}
-
-impl Default for PipelineConfig {
-    fn default() -> Self {
-        Self {
-            compression: CompressionConfig::default(),
-            encryption: EncryptionConfig::default(),
-            sharding: ShardingConfig::default(),
-            distribution: DistributionConfig::default(),
-            stages_enabled: PipelineStages::default(),
-        }
-    }
 }
 
 /// Pipeline stages enable/disable flags
@@ -166,6 +152,7 @@ impl AssetPipeline {
     }
 
     /// Create pipeline with default configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> PipelineResult<Self> {
         Self::new(PipelineConfig::default())
     }
@@ -183,7 +170,11 @@ impl AssetPipeline {
         let start = std::time::Instant::now();
         let original_size = asset.data.len();
 
-        tracing::info!("Starting pipeline for asset {} ({} bytes)", asset.id, original_size);
+        tracing::info!(
+            "Starting pipeline for asset {} ({} bytes)",
+            asset.id,
+            original_size
+        );
 
         // Stage 1: Compression (Brotli)
         // Compress raw data first for best compression ratio
@@ -194,7 +185,8 @@ impl AssetPipeline {
             (asset.data.clone(), CompressionStats::default())
         };
 
-        tracing::info!("Compressed: {} bytes -> {} bytes (ratio: {:.2})",
+        tracing::info!(
+            "Compressed: {} bytes -> {} bytes (ratio: {:.2})",
             compression_stats.original_size,
             compression_stats.compressed_size,
             compression_stats.ratio
@@ -204,29 +196,37 @@ impl AssetPipeline {
         // Encrypt the entire compressed blob, NOT per-shard.
         // Uses Kyber-1024 KEM + AES-256-GCM when quantum_resistant is true,
         // otherwise falls back to plain AES-256-GCM.
-        let (encrypted_blob, decryption_key, encryption_stats) = if self.config.stages_enabled.encryption {
-            tracing::debug!("Stage 2: Encryption (whole blob)");
-            if self.config.encryption.quantum_resistant {
-                let keypair = self.encryptor.generate_keypair()?;
-                let (result, stats) = self.encryptor.encrypt(&compressed_data, &keypair.public_key)?;
-                let dk = DecryptionKey::Kyber {
-                    ciphertext_kem: result.ciphertext_kem,
-                    nonce: result.nonce,
-                    original_size: result.original_size,
-                    secret_key: keypair.secret_key,
-                };
-                (result.encrypted_data, dk, stats)
+        let (encrypted_blob, decryption_key, encryption_stats) =
+            if self.config.stages_enabled.encryption {
+                tracing::debug!("Stage 2: Encryption (whole blob)");
+                if self.config.encryption.quantum_resistant {
+                    let keypair = self.encryptor.generate_keypair()?;
+                    let (result, stats) = self
+                        .encryptor
+                        .encrypt(&compressed_data, &keypair.public_key)?;
+                    let dk = DecryptionKey::Kyber {
+                        ciphertext_kem: result.ciphertext_kem,
+                        nonce: result.nonce,
+                        original_size: result.original_size,
+                        secret_key: keypair.secret_key,
+                    };
+                    (result.encrypted_data, dk, stats)
+                } else {
+                    let key = self.encryptor.generate_aes_key()?;
+                    let (encrypted, stats) = self.encryptor.encrypt_aes(&compressed_data, &key)?;
+                    (encrypted.ciphertext, DecryptionKey::Aes(key), stats)
+                }
             } else {
                 let key = self.encryptor.generate_aes_key()?;
-                let (encrypted, stats) = self.encryptor.encrypt_aes(&compressed_data, &key)?;
-                (encrypted.ciphertext, DecryptionKey::Aes(key), stats)
-            }
-        } else {
-            let key = self.encryptor.generate_aes_key()?;
-            (compressed_data, DecryptionKey::Aes(key), EncryptionStats::default())
-        };
+                (
+                    compressed_data,
+                    DecryptionKey::Aes(key),
+                    EncryptionStats::default(),
+                )
+            };
 
-        tracing::info!("Encrypted: {} bytes -> {} bytes",
+        tracing::info!(
+            "Encrypted: {} bytes -> {} bytes",
             encryption_stats.original_size,
             encryption_stats.encrypted_size
         );
@@ -252,7 +252,8 @@ impl AssetPipeline {
             (vec![shard], ShardingStats::default())
         };
 
-        tracing::info!("Sharded: {} data shards + {} parity shards",
+        tracing::info!(
+            "Sharded: {} data shards + {} parity shards",
             sharding_stats.data_shards,
             sharding_stats.parity_shards
         );
@@ -261,7 +262,8 @@ impl AssetPipeline {
         // Place shards at optimal matrix positions
         let (distributed, distribution_stats) = if self.config.stages_enabled.distribution {
             tracing::debug!("Stage 4: Distribution");
-            self.distributor.distribute(asset.id.clone(), shards.len())?
+            self.distributor
+                .distribute(asset.id.clone(), shards.len())?
         } else {
             // No distribution - return empty stats
             let metadata = crate::assets::pipeline::distribution::DistributionMetadata {
@@ -279,7 +281,8 @@ impl AssetPipeline {
             (distributed, DistributionStats::default())
         };
 
-        tracing::info!("Distributed: {} shards across {} networks (quality: {:.1})",
+        tracing::info!(
+            "Distributed: {} shards across {} networks (quality: {:.1})",
             distribution_stats.shards_distributed,
             distribution_stats.networks_used,
             distribution_stats.quality_score
@@ -295,7 +298,10 @@ impl AssetPipeline {
             sharding: sharding_stats,
             distribution: distribution_stats,
             total_duration_ms,
-            total_throughput_mbps: PipelineStats::calculate_throughput(original_size, total_duration_ms),
+            total_throughput_mbps: PipelineStats::calculate_throughput(
+                original_size,
+                total_duration_ms,
+            ),
             original_size,
             final_size,
         };
@@ -320,10 +326,7 @@ impl AssetPipeline {
     /// Reconstruct asset from processed components
     ///
     /// Reverse pipeline order: Reconstruct shards -> Decrypt -> Decompress
-    pub async fn reconstruct_asset(
-        &self,
-        processed: &ProcessedAsset,
-    ) -> PipelineResult<Vec<u8>> {
+    pub async fn reconstruct_asset(&self, processed: &ProcessedAsset) -> PipelineResult<Vec<u8>> {
         tracing::info!("Reconstructing asset {}", processed.asset_id);
 
         // Stage 1: Reconstruct encrypted blob from shards
@@ -331,7 +334,9 @@ impl AssetPipeline {
             tracing::debug!("Stage 1: Shard reconstruction");
             self.sharder.reconstruct(&processed.shards)?
         } else {
-            processed.shards.first()
+            processed
+                .shards
+                .first()
                 .map(|s| s.data.clone())
                 .unwrap_or_default()
         };
@@ -340,7 +345,12 @@ impl AssetPipeline {
         let compressed_data = if self.config.stages_enabled.encryption {
             tracing::debug!("Stage 2: Decryption (whole blob)");
             match &processed.decryption_key {
-                DecryptionKey::Kyber { ciphertext_kem, nonce, original_size, secret_key } => {
+                DecryptionKey::Kyber {
+                    ciphertext_kem,
+                    nonce,
+                    original_size,
+                    secret_key,
+                } => {
                     let kyber_result = KyberEncryptionResult {
                         ciphertext_kem: ciphertext_kem.clone(),
                         encrypted_data: encrypted_blob,
@@ -392,7 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_pipeline() {
-        let pipeline = AssetPipeline::default().unwrap();
+        let pipeline = AssetPipeline::default().expect("test: expected success");
 
         let asset = Asset {
             id: "test-asset-1".to_string(),
@@ -407,23 +417,26 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.unwrap();
+        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
 
         // Verify processing
         assert_eq!(processed.asset_id, "test-asset-1");
         assert!(!processed.shards.is_empty());
         // Default config is quantum_resistant=true → Kyber key
-        assert!(matches!(processed.decryption_key, DecryptionKey::Kyber { .. }));
+        assert!(matches!(
+            processed.decryption_key,
+            DecryptionKey::Kyber { .. }
+        ));
         assert!(processed.stats.total_throughput_mbps > 0.0);
 
         // Reconstruct and verify
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
+        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 
     #[tokio::test]
     async fn test_pipeline_with_large_data() {
-        let pipeline = AssetPipeline::default().unwrap();
+        let pipeline = AssetPipeline::default().expect("test: expected success");
 
         // 10MB of data
         let data = vec![42u8; 10 * 1024 * 1024];
@@ -439,14 +452,17 @@ mod tests {
             },
         };
 
-        let processed = pipeline.process_asset(asset).await.unwrap();
+        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
 
         // Verify throughput target (should be > 100 MB/s)
-        assert!(processed.stats.total_throughput_mbps > 100.0,
-            "Throughput {} MB/s is below target", processed.stats.total_throughput_mbps);
+        assert!(
+            processed.stats.total_throughput_mbps > 100.0,
+            "Throughput {} MB/s is below target",
+            processed.stats.total_throughput_mbps
+        );
 
         // Reconstruct and verify
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
+        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
         assert_eq!(reconstructed, data);
     }
 
@@ -462,7 +478,7 @@ mod tests {
             ..Default::default()
         };
 
-        let pipeline = AssetPipeline::new(config).unwrap();
+        let pipeline = AssetPipeline::new(config).expect("test: creation");
 
         let asset = Asset {
             id: "test".to_string(),
@@ -477,16 +493,16 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.unwrap();
+        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
 
         // Should still work but with minimal processing
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
+        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 
     #[tokio::test]
     async fn test_pipeline_stats() {
-        let pipeline = AssetPipeline::default().unwrap();
+        let pipeline = AssetPipeline::default().expect("test: expected success");
 
         let data = vec![0u8; 100000];
         let asset = Asset {
@@ -501,7 +517,7 @@ mod tests {
             },
         };
 
-        let processed = pipeline.process_asset(asset).await.unwrap();
+        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
 
         // Verify all stats are populated
         assert_eq!(processed.stats.original_size, 100000);
@@ -524,7 +540,7 @@ mod tests {
             ..Default::default()
         };
 
-        let pipeline = AssetPipeline::new(config).unwrap();
+        let pipeline = AssetPipeline::new(config).expect("test: creation");
 
         let asset = Asset {
             id: "custom-shards".to_string(),
@@ -539,13 +555,13 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.unwrap();
+        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
 
         assert_eq!(processed.stats.sharding.data_shards, 6);
         assert_eq!(processed.stats.sharding.parity_shards, 2);
         assert_eq!(processed.shards.len(), 8);
 
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
+        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 }

@@ -31,8 +31,7 @@ impl OutboundRule {
         };
 
         domain_match
-            && (self.allowed_methods.is_empty()
-                || self.allowed_methods.iter().any(|m| m == method))
+            && (self.allowed_methods.is_empty() || self.allowed_methods.iter().any(|m| m == method))
             && payload_size <= self.max_payload_bytes
     }
 }
@@ -84,14 +83,16 @@ impl OutboundProxy {
             self.stats.requests_denied.fetch_add(1, Ordering::Relaxed);
             warn!(domain, method, "outbound request denied — not in allowlist");
             Err(GatewayError::AuthFailed {
-                reason: format!("outbound request to '{}' not in allowlist", domain),
+                reason: format!("outbound request to '{domain}' not in allowlist"),
             })
         }
     }
 
     /// Record a successfully forwarded outbound request and byte count.
     pub fn record_forward(&self, bytes: u64) {
-        self.stats.requests_forwarded.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .requests_forwarded
+            .fetch_add(1, Ordering::Relaxed);
         self.stats.bytes_sent.fetch_add(bytes, Ordering::Relaxed);
     }
 

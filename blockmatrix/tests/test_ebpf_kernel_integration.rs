@@ -13,7 +13,7 @@
 #![cfg(feature = "future-tests")]
 
 use anyhow::Result;
-use blockmatrix::os_integration::{OsAbstraction, types::*};
+use blockmatrix::os_integration::{types::*, OsAbstraction};
 
 fn create_abstraction() -> Result<Box<dyn OsAbstraction>> {
     blockmatrix::os_integration::create_os_abstraction()
@@ -22,8 +22,8 @@ fn create_abstraction() -> Result<Box<dyn OsAbstraction>> {
 #[cfg(target_os = "linux")]
 mod linux_ebpf_tests {
     use super::*;
-    use std::time::Duration;
     use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_kernel_version_detection() {
@@ -38,7 +38,10 @@ mod linux_ebpf_tests {
 
         // Try to get kernel info from /proc/version
         if let Ok(version_str) = std::fs::read_to_string("/proc/version") {
-            println!("Kernel info: {}", version_str.lines().next().unwrap_or("Unknown"));
+            println!(
+                "Kernel info: {}",
+                version_str.lines().next().unwrap_or("Unknown")
+            );
         }
 
         // Check BPF filesystem
@@ -46,8 +49,8 @@ mod linux_ebpf_tests {
         println!("BPF filesystem mounted: {}", bpf_fs_exists);
 
         // Check debug filesystem
-        let debug_fs = std::path::Path::new("/sys/kernel/debug/tracing").exists() ||
-                       std::path::Path::new("/sys/kernel/tracing").exists();
+        let debug_fs = std::path::Path::new("/sys/kernel/debug/tracing").exists()
+            || std::path::Path::new("/sys/kernel/tracing").exists();
         println!("Debug/Tracing filesystem: {}", debug_fs);
     }
 
@@ -119,10 +122,7 @@ mod linux_ebpf_tests {
                             println!("XDP program loaded with handle: {:?}", handle);
 
                             // Try to attach (Xdp is a unit variant)
-                            let attach_result = os.attach_ebpf_monitor(
-                                handle,
-                                EbpfAttachType::Xdp,
-                            );
+                            let attach_result = os.attach_ebpf_monitor(handle, EbpfAttachType::Xdp);
 
                             match attach_result {
                                 Ok(_) => {
@@ -224,10 +224,7 @@ mod linux_ebpf_tests {
 
                         // Trigger execve by running a simple command
                         println!("Triggering execve event...");
-                        std::process::Command::new("echo")
-                            .arg("test")
-                            .output()
-                            .ok();
+                        std::process::Command::new("echo").arg("test").output().ok();
 
                         thread::sleep(Duration::from_millis(100));
 
@@ -399,10 +396,10 @@ mod linux_ebpf_tests {
         println!("Running as root: {}", is_root);
 
         // Check capabilities (would need cap-std crate for full check)
-        let has_cap_bpf = std::path::Path::new("/sys/fs/bpf").exists() &&
-                          std::fs::metadata("/sys/fs/bpf")
-                              .map(|m| m.permissions().readonly())
-                              .unwrap_or(true);
+        let has_cap_bpf = std::path::Path::new("/sys/fs/bpf").exists()
+            && std::fs::metadata("/sys/fs/bpf")
+                .map(|m| m.permissions().readonly())
+                .unwrap_or(true);
         println!("Likely has CAP_BPF: {}", !has_cap_bpf);
 
         // Try to load program and expect clear error message
@@ -419,9 +416,9 @@ mod linux_ebpf_tests {
 
                 // Verify error message is helpful
                 assert!(
-                    error_msg.contains("permission") ||
-                    error_msg.contains("CAP_BPF") ||
-                    error_msg.contains("root"),
+                    error_msg.contains("permission")
+                        || error_msg.contains("CAP_BPF")
+                        || error_msg.contains("root"),
                     "Error message should mention permissions"
                 );
                 println!("Error message is clear about permission requirements");

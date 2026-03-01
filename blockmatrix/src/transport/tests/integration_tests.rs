@@ -28,7 +28,7 @@ async fn test_transport_initialization() {
     let transport = HyperMeshTransport::new_async(config).await;
     
     assert!(transport.is_ok());
-    let transport = transport.unwrap();
+    let transport = transport.expect("test: expected success");
     
     // Verify initial state
     assert_eq!(transport.connection_count().await, 0);
@@ -59,7 +59,7 @@ async fn test_configuration_validation() {
 #[tokio::test]
 async fn test_connection_failure() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     let node_id = NodeId::new("nonexistent-node".to_string());
     let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 65535); // Unlikely to have service
@@ -70,14 +70,14 @@ async fn test_connection_failure() {
         transport.connect_to_node(node_id, &endpoint)
     ).await;
     
-    assert!(result.is_err() || result.unwrap().is_err());
+    assert!(result.is_err() || result.expect("test: expected result").is_err());
 }
 
 /// Test connection pool management
 #[tokio::test]
 async fn test_connection_pool_management() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     let node_id = NodeId::new("test-node".to_string());
     
@@ -93,7 +93,7 @@ async fn test_connection_pool_management() {
 #[tokio::test]
 async fn test_metrics_collection() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Get initial stats
     let stats = transport.stats().await;
@@ -109,7 +109,7 @@ async fn test_metrics_collection() {
 #[tokio::test]
 async fn test_node_authentication() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     let node_id = NodeId::new("test-node".to_string());
     let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9292);
@@ -123,10 +123,10 @@ async fn test_node_authentication() {
 #[tokio::test]
 async fn test_connection_cleanup() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Cleanup should succeed even with no connections
-    let removed = transport.cleanup_idle_connections().await.unwrap();
+    let removed = transport.cleanup_idle_connections().await.expect("test: async operation");
     assert_eq!(removed, 0);
 }
 
@@ -134,7 +134,7 @@ async fn test_connection_cleanup() {
 #[tokio::test]
 async fn test_transport_shutdown() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Shutdown should succeed
     let result = transport.shutdown().await;
@@ -145,7 +145,7 @@ async fn test_transport_shutdown() {
 #[tokio::test]
 async fn test_concurrent_operations() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Spawn multiple tasks doing operations concurrently
     let mut handles = Vec::new();
@@ -166,7 +166,7 @@ async fn test_concurrent_operations() {
     
     // Wait for all tasks to complete
     for handle in handles {
-        handle.await.unwrap();
+        handle.await.expect("test: async operation");
     }
     
     // Transport should still be functional
@@ -178,7 +178,7 @@ async fn test_concurrent_operations() {
 #[tokio::test]
 async fn test_error_handling() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     let node_id = NodeId::new("nonexistent-node".to_string());
     
@@ -202,11 +202,11 @@ async fn test_configuration_serialization() {
     let config = create_test_config();
     
     // Test YAML serialization
-    let yaml = serde_yaml::to_string(&config).unwrap();
+    let yaml = serde_yaml::to_string(&config).expect("test: expected success");
     assert!(!yaml.is_empty());
     
     // Test deserialization
-    let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).unwrap();
+    let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).expect("test: expected success");
     assert_eq!(config.network.max_connections, deserialized.network.max_connections);
 }
 
@@ -217,7 +217,7 @@ async fn test_memory_cleanup() {
     
     // Create and drop multiple transport instances
     for _ in 0..5 {
-        let transport = HyperMeshTransport::new(config.clone()).await.unwrap();
+        let transport = HyperMeshTransport::new(config.clone()).await.expect("test: async operation");
         
         // Do some operations
         let _ = transport.stats().await;
@@ -231,7 +231,7 @@ async fn test_memory_cleanup() {
 #[tokio::test]
 async fn test_stoq_integration() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Verify STOQ integration is working
     let stats = transport.stats().await;
@@ -246,7 +246,7 @@ async fn test_stoq_integration() {
 #[tokio::test]
 async fn test_performance_basic_operations() {
     let config = create_test_config();
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     let start = std::time::Instant::now();
     
@@ -268,7 +268,7 @@ async fn test_resource_limits() {
     let mut config = create_test_config();
     config.connection_pool.max_pool_size = 2; // Very small pool
     
-    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+    let transport = HyperMeshTransport::new_async(config).await.expect("test: async operation");
     
     // Test that limits are enforced (through connection pool)
     let pool_stats = transport.connection_pool.stats().await;

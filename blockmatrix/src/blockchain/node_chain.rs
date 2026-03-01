@@ -8,17 +8,17 @@
 //! NO merkle tree consolidation, NO shared chain across nodes.
 //! Complete node sovereignty over its own ledger.
 
+use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
-use crate::matrix::coordinate::MatrixCoordinate;
-use crate::assets::core::AssetRegistration;
 use super::block::Block;
-use super::validation::ChainValidator;
 use super::genesis_auth::{GenesisAuthManager, GenesisCredentials};
+use super::validation::ChainValidator;
+use crate::assets::core::AssetRegistration;
+use crate::matrix::coordinate::MatrixCoordinate;
 
 /// Statistics about a node's blockchain
 #[derive(Debug, Clone, Default)]
@@ -65,18 +65,20 @@ pub struct NodeBlockchain {
 impl NodeBlockchain {
     /// Create a new blockchain for a node
     pub fn new(node_coordinate: MatrixCoordinate) -> Self {
-        let genesis = Block::genesis(node_coordinate.clone());
+        let genesis = Block::genesis(node_coordinate);
         let mut blocks = HashMap::new();
         let mut hash_index = HashMap::new();
 
         hash_index.insert(genesis.hash.clone(), genesis.index);
         blocks.insert(genesis.index, genesis.clone());
 
-        let mut stats = ChainStats::default();
-        stats.total_blocks = 1;
-        stats.chain_height = 0;
-        stats.chain_start = Some(genesis.timestamp);
-        stats.total_data_size = genesis.size();
+        let stats = ChainStats {
+            total_blocks: 1,
+            chain_height: 0,
+            chain_start: Some(genesis.timestamp),
+            total_data_size: genesis.size(),
+            ..ChainStats::default()
+        };
 
         info!(
             "Created new blockchain for node at ({}, {}, {})",
@@ -102,7 +104,8 @@ impl NodeBlockchain {
     /// Add a new block to this node's chain
     pub async fn add_block(&self, assets: Vec<AssetRegistration>) -> Result<Block, String> {
         let head = self.head.read().await;
-        let previous = head.as_ref()
+        let previous = head
+            .as_ref()
             .ok_or_else(|| "No head block found".to_string())?;
 
         let new_index = previous.index + 1;
@@ -110,14 +113,17 @@ impl NodeBlockchain {
             new_index,
             assets,
             previous.hash.clone(),
-            self.node_coordinate.clone(),
+            self.node_coordinate,
         );
 
         let previous_clone = previous.clone();
         drop(head); // Release read lock
 
         // Validate the new block
-        if !self.validator.validate_block(&new_block, Some(&previous_clone)) {
+        if !self
+            .validator
+            .validate_block(&new_block, Some(&previous_clone))
+        {
             return Err("Block validation failed".to_string());
         }
 
@@ -126,10 +132,7 @@ impl NodeBlockchain {
 
         info!(
             "Added block #{} to node ({},{},{}) chain",
-            new_index,
-            self.node_coordinate.x,
-            self.node_coordinate.y,
-            self.node_coordinate.z
+            new_index, self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z
         );
 
         Ok(new_block)
@@ -138,7 +141,9 @@ impl NodeBlockchain {
     /// Helper: Create asset from data and add block (temporary compatibility method)
     /// TODO: Remove this once all callers properly create Assets
     pub async fn add_block_with_data(&self, data: Vec<u8>) -> Result<Block, String> {
-        use crate::assets::core::asset_id::{AssetData, AssetCategory, BaseSystemType, NetworkScope};
+        use crate::assets::core::asset_id::{
+            AssetCategory, AssetData, BaseSystemType, NetworkScope,
+        };
 
         // Create an asset from the data
         let asset_data = AssetData {
@@ -155,7 +160,6 @@ impl NodeBlockchain {
 
         self.add_block(vec![asset_id]).await
     }
-
 
     /// Insert a block into the chain (internal helper)
     async fn insert_block(&self, block: Block) -> Result<(), String> {
@@ -181,7 +185,7 @@ impl NodeBlockchain {
         hash_index.insert(block.hash.clone(), block.index);
 
         // Update head if this is the latest block
-        if head.as_ref().map_or(true, |h| block.index > h.index) {
+        if head.as_ref().is_none_or(|h| block.index > h.index) {
             *head = Some(block.clone());
             stats.chain_height = block.index;
         }
@@ -225,7 +229,9 @@ impl NodeBlockchain {
 
     /// Get the chain height (index of latest block)
     pub async fn get_height(&self) -> u64 {
-        self.head.read().await
+        self.head
+            .read()
+            .await
             .as_ref()
             .map(|b| b.index)
             .unwrap_or(0)
@@ -256,7 +262,10 @@ impl NodeBlockchain {
 
         // Validate each block and its link to previous
         for i in 1..chain.len() {
-            if !self.validator.validate_block(&chain[i], Some(&chain[i - 1])) {
+            if !self
+                .validator
+                .validate_block(&chain[i], Some(&chain[i - 1]))
+            {
                 error!("Block {} failed validation", chain[i].index);
                 return false;
             }
@@ -301,10 +310,7 @@ impl NodeBlockchain {
 
     /// Calculate chain's total size in bytes
     pub async fn get_total_size(&self) -> usize {
-        self.blocks.read().await
-            .values()
-            .map(|b| b.size())
-            .sum()
+        self.blocks.read().await.values().map(|b| b.size()).sum()
     }
 
     // === MFA Genesis Authentication Methods ===
@@ -330,16 +336,14 @@ impl NodeBlockchain {
 
         let mut auth_manager = GenesisAuthManager::new();
         let (totp_secret, recovery_codes) = auth_manager
-            .initialize(user_id, passphrase, self.node_coordinate.clone())
-            .map_err(|e| format!("Failed to initialize genesis auth: {}", e))?;
+            .initialize(user_id, passphrase, self.node_coordinate)
+            .map_err(|e| format!("Failed to initialize genesis auth: {e}"))?;
 
         *auth_guard = Some(auth_manager);
 
         info!(
             "Genesis authentication initialized for node ({}, {}, {})",
-            self.node_coordinate.x,
-            self.node_coordinate.y,
-            self.node_coordinate.z
+            self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z
         );
 
         Ok((totp_secret, recovery_codes))
@@ -366,7 +370,7 @@ impl NodeBlockchain {
 
         auth_manager
             .authenticate(passphrase, totp_code)
-            .map_err(|e| format!("Authentication failed: {}", e))
+            .map_err(|e| format!("Authentication failed: {e}"))
     }
 
     /// Recover genesis access using recovery code
@@ -390,17 +394,22 @@ impl NodeBlockchain {
 
         auth_manager
             .recover_with_code(passphrase, recovery_code)
-            .map_err(|e| format!("Recovery failed: {}", e))
+            .map_err(|e| format!("Recovery failed: {e}"))
     }
 
     /// Get genesis credentials for serialization/storage
     pub async fn get_genesis_credentials(&self) -> Option<GenesisCredentials> {
         let auth_guard = self.genesis_auth.read().await;
-        auth_guard.as_ref().and_then(|auth| auth.get_credentials().cloned())
+        auth_guard
+            .as_ref()
+            .and_then(|auth| auth.get_credentials().cloned())
     }
 
     /// Load genesis credentials from external storage
-    pub async fn load_genesis_credentials(&self, credentials: GenesisCredentials) -> Result<(), String> {
+    pub async fn load_genesis_credentials(
+        &self,
+        credentials: GenesisCredentials,
+    ) -> Result<(), String> {
         let mut auth_guard = self.genesis_auth.write().await;
 
         if auth_guard.is_some() {
@@ -410,7 +419,7 @@ impl NodeBlockchain {
         let mut auth_manager = GenesisAuthManager::new();
         auth_manager
             .load_credentials(credentials)
-            .map_err(|e| format!("Failed to load credentials: {}", e))?;
+            .map_err(|e| format!("Failed to load credentials: {e}"))?;
 
         *auth_guard = Some(auth_manager);
         Ok(())
@@ -424,29 +433,35 @@ mod tests {
 
     #[tokio::test]
     async fn test_blockchain_creation() {
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let chain = NodeBlockchain::new(coord.clone());
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
 
         assert_eq!(chain.node_coordinate(), &coord);
         assert_eq!(chain.get_height().await, 0);
 
-        let head = chain.get_head().await.unwrap();
+        let head = chain.get_head().await.expect("test: block retrieval");
         assert!(head.is_genesis());
         assert_eq!(head.node_coordinate, coord);
     }
 
     #[tokio::test]
     async fn test_add_blocks() {
-        let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add first block
-        let block1 = chain.add_block_with_data(b"First block".to_vec()).await.unwrap();
+        let block1 = chain
+            .add_block_with_data(b"First block".to_vec())
+            .await
+            .expect("test: expected success");
         assert_eq!(block1.index, 1);
         assert_eq!(chain.get_height().await, 1);
 
         // Add second block
-        let block2 = chain.add_block_with_data(b"Second block".to_vec()).await.unwrap();
+        let block2 = chain
+            .add_block_with_data(b"Second block".to_vec())
+            .await
+            .expect("test: expected success");
         assert_eq!(block2.index, 2);
         assert_eq!(block2.previous_hash, block1.hash);
         assert_eq!(chain.get_height().await, 2);
@@ -457,17 +472,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_block_retrieval() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
-        let block = chain.add_block_with_data(b"Test data".to_vec()).await.unwrap();
+        let block = chain
+            .add_block_with_data(b"Test data".to_vec())
+            .await
+            .expect("test: expected success");
 
         // Get by index
-        let retrieved = chain.get_block(1).await.unwrap();
+        let retrieved = chain.get_block(1).await.expect("test: block retrieval");
         assert_eq!(retrieved, block);
 
         // Get by hash
-        let retrieved = chain.get_block_by_hash(&block.hash).await.unwrap();
+        let retrieved = chain.get_block_by_hash(&block.hash).await.expect("test: block retrieval");
         assert_eq!(retrieved, block);
 
         // Check existence
@@ -477,13 +495,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_chain_statistics() {
-        let coord = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add some blocks
         for i in 0..5 {
-            let data = format!("Block {}", i);
-            chain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
+            let data = format!("Block {i}");
+            chain
+                .add_block_with_data(data.as_bytes().to_vec())
+                .await
+                .expect("test: expected success");
         }
 
         let stats = chain.get_stats().await;
@@ -495,31 +516,31 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_chain() {
-        let coord = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add blocks
         for i in 0..3 {
-            chain.add_block_with_data(vec![i as u8; 10]).await.unwrap();
+            chain.add_block_with_data(vec![i as u8; 10]).await.expect("test: block addition");
         }
 
         let full_chain = chain.get_chain().await;
         assert_eq!(full_chain.len(), 4); // 3 + genesis
 
         // Verify ordering
-        for i in 0..full_chain.len() {
-            assert_eq!(full_chain[i].index, i as u64);
+        for (i, block) in full_chain.iter().enumerate() {
+            assert_eq!(block.index, i as u64);
         }
     }
 
     #[tokio::test]
     async fn test_recent_blocks() {
-        let coord = MatrixCoordinate::new(3, 3, 3).unwrap();
+        let coord = MatrixCoordinate::new(3, 3, 3).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add 10 blocks
         for i in 0..10 {
-            chain.add_block_with_data(vec![i as u8]).await.unwrap();
+            chain.add_block_with_data(vec![i as u8]).await.expect("test: block addition");
         }
 
         // Get last 5 blocks
@@ -531,7 +552,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_blocks_in_time_range() {
-        let coord = MatrixCoordinate::new(4, 4, 4).unwrap();
+        let coord = MatrixCoordinate::new(4, 4, 4).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         let start_time = Utc::now();
@@ -539,7 +560,7 @@ mod tests {
         // Add blocks with small delays
         for i in 0..3 {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            chain.add_block_with_data(vec![i]).await.unwrap();
+            chain.add_block_with_data(vec![i]).await.expect("test: block addition");
         }
 
         let end_time = Utc::now();
@@ -551,12 +572,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_chain_validation() {
-        let coord = MatrixCoordinate::new(6, 6, 6).unwrap();
+        let coord = MatrixCoordinate::new(6, 6, 6).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add valid blocks
         for i in 0..5 {
-            chain.add_block_with_data(vec![i]).await.unwrap();
+            chain.add_block_with_data(vec![i]).await.expect("test: block addition");
         }
 
         // Chain should be valid
@@ -567,12 +588,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_total_size() {
-        let coord = MatrixCoordinate::new(7, 7, 7).unwrap();
+        let coord = MatrixCoordinate::new(7, 7, 7).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
         // Add blocks with known sizes
-        chain.add_block_with_data(vec![0u8; 100]).await.unwrap();
-        chain.add_block_with_data(vec![0u8; 200]).await.unwrap();
+        chain.add_block_with_data(vec![0u8; 100]).await.expect("test: block addition");
+        chain.add_block_with_data(vec![0u8; 200]).await.expect("test: block addition");
 
         let total_size = chain.get_total_size().await;
         assert!(total_size >= 300); // At least the data we added

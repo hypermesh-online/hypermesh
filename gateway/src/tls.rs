@@ -94,7 +94,7 @@ impl TlsProvider {
         let certs = if is_pem_extension(cert_path) {
             rustls_pemfile::certs(&mut cert_data.as_slice())
                 .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(|e| GatewayError::Tls(format!("PEM certificate parse error: {}", e)))?
+                .map_err(|e| GatewayError::Tls(format!("PEM certificate parse error: {e}")))?
         } else {
             vec![CertificateDer::from(cert_data)]
         };
@@ -124,7 +124,7 @@ impl TlsProvider {
 
         let key = if is_pem_extension(key_path) {
             rustls_pemfile::private_key(&mut key_data.as_slice())
-                .map_err(|e| GatewayError::Tls(format!("PEM key parse error: {}", e)))?
+                .map_err(|e| GatewayError::Tls(format!("PEM key parse error: {e}")))?
                 .ok_or_else(|| GatewayError::Tls("no private key found in PEM file".into()))?
         } else {
             PrivateKeyDer::from(PrivatePkcs8KeyDer::from(key_data))
@@ -141,26 +141,22 @@ impl TlsProvider {
     fn generate_self_signed(
         common_name: &str,
     ) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
-        let key_pair = KeyPair::generate().map_err(|e| {
-            GatewayError::Tls(format!("failed to generate key pair: {}", e))
-        })?;
+        let key_pair = KeyPair::generate()
+            .map_err(|e| GatewayError::Tls(format!("failed to generate key pair: {e}")))?;
 
-        let mut params = CertificateParams::new(vec![common_name.to_string()]).map_err(|e| {
-            GatewayError::Tls(format!("failed to create certificate params: {}", e))
-        })?;
+        let mut params = CertificateParams::new(vec![common_name.to_string()])
+            .map_err(|e| GatewayError::Tls(format!("failed to create certificate params: {e}")))?;
         params.distinguished_name.push(
             rcgen::DnType::CommonName,
             rcgen::DnValue::Utf8String(common_name.to_string()),
         );
 
         let cert = params.self_signed(&key_pair).map_err(|e| {
-            GatewayError::Tls(format!("failed to generate self-signed certificate: {}", e))
+            GatewayError::Tls(format!("failed to generate self-signed certificate: {e}"))
         })?;
 
         let cert_der = CertificateDer::from(cert.der().to_vec());
-        let key_der = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(
-            key_pair.serialize_der(),
-        ));
+        let key_der = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(key_pair.serialize_der()));
 
         warn!(
             "Using self-signed certificate for '{}' -- not trusted by browsers",
@@ -180,7 +176,7 @@ impl TlsProvider {
         let mut tls_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(certs, key)
-            .map_err(|e| GatewayError::Tls(format!("rustls server config error: {}", e)))?;
+            .map_err(|e| GatewayError::Tls(format!("rustls server config error: {e}")))?;
 
         tls_config.alpn_protocols = vec![b"h3".to_vec()];
         Ok(tls_config)
@@ -190,7 +186,7 @@ impl TlsProvider {
 /// Check whether a file path has a PEM-like extension.
 fn is_pem_extension(path: &Path) -> bool {
     path.extension()
-        .map_or(false, |e| e == "pem" || e == "crt" || e == "key")
+        .is_some_and(|e| e == "pem" || e == "crt" || e == "key")
 }
 
 #[cfg(test)]
@@ -269,8 +265,7 @@ mod tests {
         let err_msg = result.expect_err("test: already checked").to_string();
         assert!(
             err_msg.contains("failed to open"),
-            "error should mention file open failure: {}",
-            err_msg
+            "error should mention file open failure: {err_msg}"
         );
     }
 

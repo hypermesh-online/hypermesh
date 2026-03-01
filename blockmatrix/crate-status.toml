@@ -19,7 +19,6 @@ items = [
     "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
     "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
     "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
-    "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)",
     "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
     "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
     "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
@@ -37,11 +36,20 @@ items = [
     "IPv6 asset addressing (AssetAddress: fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
     "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
     "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
+    "Node bootstrap lifecycle (genesis block, self-signed cert, DNS init)",
+    "Service mesh controller (circuit breaker, load balancing, health tracking)",
+    "User contribution platform (hardware sharing, resource pricing, rewards)",
+    "Intelligence layer (multi-component health, event streaming)",
+    "Performance regression detector (baseline tracking, production readiness)",
 ]
 
 [features.in_development]
 items = [
     "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
+    "Instruction-based retrieval client assembly (shard maps work, fetch_from_location is 5ms sleep stub)",
+    "Asset blockchain registration (register_asset_record has TODO — consensus wiring incomplete)",
+    "Distributed shard fetch over STOQ (fetch_from_location placeholder returns zeroed bytes)",
+    "Node binary Anonymous certificate strategy fix",
 ]
 
 [features.planned]
@@ -54,4 +62,8 @@ items = [
     "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
     "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
     "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
+    "mDNS peer discovery (start_mdns_discovery is explicit stub)",
+    "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
+    "Identity-scoped asset access (workload identity → asset permissions)",
+    "Real hardware metrics collection (CPU/GPU/memory/storage/network)",
 ]

@@ -153,7 +153,7 @@ async fn test_cpu_adapter_consensus_validation() {
     let request = create_cpu_allocation_request();
     
     // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
     assert!(valid, "CPU consensus proof validation should pass");
     
     // Test allocation
@@ -173,7 +173,7 @@ async fn test_gpu_adapter_consensus_validation() {
     let request = create_gpu_allocation_request();
     
     // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
     assert!(valid, "GPU consensus proof validation should pass");
     
     // Test allocation
@@ -193,7 +193,7 @@ async fn test_memory_adapter_nat_addressing() {
     let request = create_memory_allocation_request();
     
     // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
     assert!(valid, "Memory consensus proof validation should pass");
     
     // Test allocation with NAT-like addressing
@@ -209,7 +209,7 @@ async fn test_memory_adapter_nat_addressing() {
             // Test proxy address resolution
             let resolved_id = adapter.resolve_proxy_address(&proxy_addr).await;
             assert!(resolved_id.is_ok(), "Memory proxy address resolution should succeed");
-            assert_eq!(resolved_id.unwrap(), allocation.asset_id);
+            assert_eq!(resolved_id.expect("test: assertion value"), allocation.asset_id);
         }
         
         // Test deallocation
@@ -224,7 +224,7 @@ async fn test_storage_adapter_pos_validation() {
     let request = create_storage_allocation_request();
     
     // Test consensus proof validation (critical PoSpace validation for storage)
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
     assert!(valid, "Storage consensus proof validation should pass with proper PoSpace");
     
     // Test allocation with sharding
@@ -271,7 +271,7 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.expect("test: async operation");
     assert!(!valid, "Consensus proof with 0 committed space should fail");
     
     // Test with insufficient stake
@@ -298,7 +298,7 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.expect("test: async operation");
     assert!(!valid, "Consensus proof with insufficient stake should fail");
     
     // Test with insufficient work difficulty
@@ -325,7 +325,7 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_work_proof).await.unwrap();
+    let valid = adapter.validate_consensus_proof(&invalid_work_proof).await.expect("test: async operation");
     assert!(!valid, "Consensus proof with insufficient work difficulty should fail");
 }
 
@@ -367,7 +367,7 @@ async fn test_privacy_level_configuration() {
     let adapter = MemoryAssetAdapter::new().await;
     let request = create_memory_allocation_request();
     
-    let allocation = adapter.allocate_asset(&request).await.unwrap();
+    let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
     
     // Test privacy level changes
     for privacy_level in vec![PrivacyMode::PRIVATE, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
@@ -375,7 +375,7 @@ async fn test_privacy_level_configuration() {
         assert!(result.is_ok(), "Privacy level configuration should succeed for {:?}", privacy_level);
     }
     
-    adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
+    adapter.deallocate_asset(&allocation.asset_id).await.expect("test: async operation");
 }
 
 #[tokio::test]
@@ -383,7 +383,7 @@ async fn test_resource_usage_monitoring() {
     let adapter = CpuAssetAdapter::new().await;
     let request = create_cpu_allocation_request();
     
-    let allocation = adapter.allocate_asset(&request).await.unwrap();
+    let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
     
     // Test resource usage monitoring
     let usage = adapter.get_resource_usage(&allocation.asset_id).await;
@@ -394,5 +394,5 @@ async fn test_resource_usage_monitoring() {
         assert!(usage.measurement_timestamp <= SystemTime::now());
     }
     
-    adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
+    adapter.deallocate_asset(&allocation.asset_id).await.expect("test: async operation");
 }

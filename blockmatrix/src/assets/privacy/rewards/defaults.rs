@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use crate::assets::privacy::PayoutFrequency;
 
-use super::types::*;
 use super::config::*;
+use super::types::*;
 
 impl Default for RewardConfiguration {
     fn default() -> Self {
@@ -53,11 +53,7 @@ impl Default for DynamicAdjustmentFactors {
         Self {
             network_load_factor: NetworkLoadFactor {
                 current_utilization: 0.5,
-                utilization_multipliers: vec![
-                    (0.8, 1.1),
-                    (0.9, 1.2),
-                    (0.95, 1.3),
-                ],
+                utilization_multipliers: vec![(0.8, 1.1), (0.9, 1.2), (0.95, 1.3)],
                 load_balancing_incentives: true,
             },
             economic_factor: EconomicFactor {

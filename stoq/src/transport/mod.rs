@@ -5,17 +5,17 @@
 //! STOQ Transport Layer - QUIC over IPv6 implementation
 
 // Module declarations
-pub mod certificates;
-pub mod certificate_strategy;
-pub mod streams;
-pub mod metrics;
-pub mod falcon;
 pub mod adaptive;
+pub mod certificate_strategy;
+pub mod certificates;
 pub mod config;
 pub mod connection;
-pub mod stats;
+pub mod falcon;
 pub mod manager;
+pub mod metrics;
 pub mod operations;
+pub mod stats;
+pub mod streams;
 
 pub mod multipath;
 
@@ -25,24 +25,28 @@ pub mod ebpf;
 pub mod pos_extension_validator;
 
 // Re-exports for backward compatibility
-pub use config::{NetworkTier, TransportConfig, CongestionControl};
-pub use connection::{Connection, Endpoint, MemoryPool, FrameBatch, Stream};
-pub use stats::{ConnectionPoolStats, PerformanceStats};
-pub use manager::StoqTransport;
-pub use metrics::{TransportMetrics, ProtocolMetrics, IntervalMetrics};
-pub use falcon::{FalconTransport, FalconVariant};
 pub use adaptive::{
-    AdaptiveConnection, AdaptationManager,
-    EwmaBandwidthEstimator, MtuDiscovery, LossBasedAdjuster,
-    BandwidthSample, MtuProbeState, congestion_control_for_tier,
+    congestion_control_for_tier, AdaptationManager, AdaptiveConnection, BandwidthSample,
+    EwmaBandwidthEstimator, LossBasedAdjuster, MtuDiscovery, MtuProbeState,
 };
-pub use certificate_strategy::{CertificateStrategy, NetworkType,
-    AnonymousCertificateStrategy, AuthenticatedCertificateStrategy,
-    P2PCertificateStrategy, FederatedCertificateStrategy, PublicCertificateStrategy};
-pub use certificates::{CertificateManager, CertificateConfig, CertificateMode, StoqNodeCertificate};
+pub use certificate_strategy::{
+    AnonymousCertificateStrategy, AuthenticatedCertificateStrategy, CertificateStrategy,
+    FederatedCertificateStrategy, NetworkType, P2PCertificateStrategy, PublicCertificateStrategy,
+};
+pub use certificates::{
+    CertificateConfig, CertificateManager, CertificateMode, StoqNodeCertificate,
+};
+pub use config::{CongestionControl, NetworkTier, TransportConfig};
+pub use connection::{Connection, Endpoint, FrameBatch, MemoryPool, Stream};
+pub use falcon::{FalconTransport, FalconVariant};
+pub use manager::StoqTransport;
+pub use metrics::{IntervalMetrics, ProtocolMetrics, TransportMetrics};
+pub use multipath::{MultiPathConnection, MultiPathMetrics, PathInfo, PathPolicy, PathScheduler};
 pub use pos_extension_validator::StoqPosExtensionValidator;
-pub use multipath::{MultiPathConnection, PathPolicy, PathScheduler, MultiPathMetrics, PathInfo};
-pub use reflector::{StoqBlockTransport, SyncProtocol, SyncProtocolConfig, ReflectorMessage, ReflectorBridge};
+pub use reflector::{
+    ReflectorBridge, ReflectorMessage, StoqBlockTransport, SyncProtocol, SyncProtocolConfig,
+};
+pub use stats::{ConnectionPoolStats, PerformanceStats};
 
 #[cfg(test)]
 mod tests {
@@ -72,9 +76,10 @@ mod tests {
     async fn test_transport_creation() {
         // Crypto provider is now initialized automatically in StoqTransport::new()
 
-        let mut config = TransportConfig::default();
-        // Use dynamic port to avoid conflicts with other tests
-        config.port = 0; // Let OS assign an available port
+        let config = TransportConfig {
+            port: 0, // Let OS assign an available port
+            ..Default::default()
+        };
         let transport = StoqTransport::new(config).await;
         assert!(transport.is_ok());
     }
@@ -87,9 +92,11 @@ mod tests {
         assert_eq!(config.health_check_interval, 10);
 
         // Test that values can be customized
-        let mut custom_config = TransportConfig::default();
-        custom_config.connection_idle_timeout = 60;
-        custom_config.health_check_interval = 15;
+        let custom_config = TransportConfig {
+            connection_idle_timeout: 60,
+            health_check_interval: 15,
+            ..Default::default()
+        };
         assert_eq!(custom_config.connection_idle_timeout, 60);
         assert_eq!(custom_config.health_check_interval, 15);
     }
@@ -97,7 +104,7 @@ mod tests {
     #[test]
     fn test_lru_eviction_logic() {
         // Test that LRU eviction selects the oldest connection
-        let times = vec![100u64, 50u64, 150u64, 25u64];
+        let times = [100u64, 50u64, 150u64, 25u64];
         let mut lru_idx = 0;
         let mut oldest_time = u64::MAX;
 
@@ -138,12 +145,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_connection_pool_cleanup() {
-        let mut config = TransportConfig::default();
-        config.port = 0; // Let OS assign port
-        config.connection_idle_timeout = 30;
-        config.health_check_interval = 10;
+        let config = TransportConfig {
+            port: 0, // Let OS assign port
+            connection_idle_timeout: 30,
+            health_check_interval: 10,
+            ..Default::default()
+        };
 
-        let transport = StoqTransport::new(config).await.unwrap();
+        let transport = StoqTransport::new(config).await.expect("test: async operation");
 
         // Call cleanup - should not panic even with empty pools
         transport.cleanup_unhealthy_connections();

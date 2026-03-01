@@ -18,41 +18,30 @@
 //!
 //! See STUB_INVENTORY.md for details.
 
-pub mod types;
-pub mod config;
 pub mod auth;
+pub mod config;
 pub mod error;
 pub mod monitoring;
 pub mod pool;
-
+pub mod types;
 
 // Re-export main types
 pub use types::PeerIdentity;
 
-pub use config::{
-    TransportConfig, HyperMeshTransportConfig,
-};
+pub use config::{HyperMeshTransportConfig, TransportConfig};
 
-pub use auth::{
-    AuthManager, NodeAuthenticator,
-};
+pub use auth::{AuthManager, NodeAuthenticator};
 
-pub use error::{
-    TransportError,
-};
+pub use error::TransportError;
 
-pub use monitoring::{
-    TransportMetrics, TransportMonitor,
-};
+pub use monitoring::{TransportMetrics, TransportMonitor};
 
-pub use pool::{
-    StoqConnection, Endpoint, ConnectionPool,
-};
+pub use pool::{ConnectionPool, Endpoint, StoqConnection};
 
 // Main transport types
+use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
-use anyhow::Result;
 
 /// HyperMesh endpoint representation
 #[derive(Debug, Clone)]
@@ -143,7 +132,11 @@ impl HyperMeshTransport {
     }
 
     /// Connect to a node
-    pub async fn connect_to_node(&self, _node_id: PeerIdentity, _endpoint: &stoq::Endpoint) -> Result<()> {
+    pub async fn connect_to_node(
+        &self,
+        _node_id: PeerIdentity,
+        _endpoint: &stoq::Endpoint,
+    ) -> Result<()> {
         Ok(()) // Stub implementation
     }
 
@@ -181,5 +174,5 @@ impl HyperMeshTransport {
 // Re-export as aliases for compatibility
 pub use HyperMeshConnection as Connection;
 pub use HyperMeshEndpoint as HyperEndpoint;
-pub use HyperMeshTransportStats as TransportStats;
 pub use HyperMeshTransport as HyperTransport;
+pub use HyperMeshTransportStats as TransportStats;

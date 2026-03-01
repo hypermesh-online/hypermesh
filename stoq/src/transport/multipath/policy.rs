@@ -49,15 +49,14 @@ impl fmt::Display for PathRejectionReason {
             Self::FederationBoundaryViolation { from, to } => {
                 write!(
                     f,
-                    "Federation boundary violation: {} -> {} not in chain",
-                    from, to
+                    "Federation boundary violation: {from} -> {to} not in chain"
                 )
             }
             Self::PosValidationFailed(reason) => {
-                write!(f, "PoS validation failed: {}", reason)
+                write!(f, "PoS validation failed: {reason}")
             }
             Self::TunnelNotConfigured { from, to } => {
-                write!(f, "No tunnel configured between {} and {}", from, to)
+                write!(f, "No tunnel configured between {from} and {to}")
             }
             Self::MaxPathsExceeded => {
                 write!(f, "Maximum paths per connection exceeded")
@@ -377,11 +376,8 @@ mod tests {
             },
             ..PathPolicy::default()
         };
-        let result = policy.validate_cross_scope(
-            &BlockchainScope::Device,
-            &BlockchainScope::Network,
-            &None,
-        );
+        let result =
+            policy.validate_cross_scope(&BlockchainScope::Device, &BlockchainScope::Network, &None);
         assert!(
             matches!(
                 result,
@@ -482,9 +478,7 @@ mod tests {
         assert!(
             matches!(
                 result,
-                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation {
-                    ..
-                })
+                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation { .. })
             ),
             "Sending outside federation chain should be rejected"
         );
@@ -515,9 +509,7 @@ mod tests {
         assert!(
             matches!(
                 result,
-                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation {
-                    ..
-                })
+                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation { .. })
             ),
             "Target outside nested federation should be rejected"
         );

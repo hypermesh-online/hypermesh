@@ -182,22 +182,20 @@ impl RateLimiter {
     ///
     /// Authenticated users receive double the burst and refill rate.
     pub fn check_identity(&self, identity: &str) -> Result<(), GatewayError> {
-        let mut entry =
-            self.identity_buckets
-                .entry(identity.to_string())
-                .or_insert_with(|| {
-                    TokenBucket::new(
-                        self.config.burst_size as f64 * 2.0,
-                        self.config.requests_per_sec_per_ip as f64 * 2.0,
-                    )
-                });
+        let mut entry = self
+            .identity_buckets
+            .entry(identity.to_string())
+            .or_insert_with(|| {
+                TokenBucket::new(
+                    self.config.burst_size as f64 * 2.0,
+                    self.config.requests_per_sec_per_ip as f64 * 2.0,
+                )
+            });
 
         if entry.try_consume() {
             Ok(())
         } else {
-            self.stats
-                .identity_limited
-                .fetch_add(1, Ordering::Relaxed);
+            self.stats.identity_limited.fetch_add(1, Ordering::Relaxed);
             warn!(identity = %identity, "Identity rate limit exceeded");
             Err(GatewayError::RateLimitExceeded {
                 client: identity.to_string(),
@@ -222,7 +220,11 @@ impl RateLimiter {
         let count = self.global_count.fetch_add(1, Ordering::Relaxed);
         if count >= self.config.global_limit as u64 {
             self.stats.global_limited.fetch_add(1, Ordering::Relaxed);
-            warn!(count = count, limit = self.config.global_limit, "Global rate limit exceeded");
+            warn!(
+                count = count,
+                limit = self.config.global_limit,
+                "Global rate limit exceeded"
+            );
             Err(GatewayError::RateLimitExceeded {
                 client: "global".to_string(),
             })
@@ -265,7 +267,7 @@ impl RateLimiter {
                 .fetch_add(1, Ordering::Relaxed);
             warn!(ip = %ip, count = count + 1, limit = self.config.max_connections_per_ip, "Connection limit exceeded");
             Err(GatewayError::RateLimitExceeded {
-                client: format!("connections:{}", ip),
+                client: format!("connections:{ip}"),
             })
         } else {
             Ok(())

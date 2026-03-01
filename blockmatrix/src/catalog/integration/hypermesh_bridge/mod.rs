@@ -9,10 +9,10 @@
 //! validation and resource management. Code execution is delegated to remote
 //! HyperMesh nodes via STOQ protocol.
 
-pub mod types;
 pub mod config;
 pub mod monitoring;
 pub mod operations;
+pub mod types;
 
 // Re-export all public types
 pub use types::*;
@@ -27,8 +27,7 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn test_catalog_asset_types() {
-    }
+    fn test_catalog_asset_types() {}
 
     #[test]
     fn test_deployment_strategies() {

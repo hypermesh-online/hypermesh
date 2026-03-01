@@ -15,14 +15,14 @@
 //! Implements intelligent load balancing across HyperMesh nodes with
 //! predictive scaling and resource optimization.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetType, AssetResult};
 use super::PeerIdentity;
+use crate::assets::core::{AssetResult, AssetType};
 
 /// Load balancer for resource distribution
 pub struct LoadBalancer {
@@ -113,47 +113,48 @@ impl LoadBalancer {
         let loads = self.node_loads.read().await;
 
         match self.strategy {
-            BalancingStrategy::LeastConnections => {
-                loads.iter()
-                    .min_by_key(|(_, m)| m.active_connections)
-                    .map(|(id, _)| id.clone())
-                    .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {
-                        reason: "No nodes available".to_string(),
-                    })
-            }
-            BalancingStrategy::ResourceAware => {
-                loads.iter()
-                    .min_by(|(_, a), (_, b)| {
-                        let score_a = a.cpu_utilization + a.memory_utilization;
-                        let score_b = b.cpu_utilization + b.memory_utilization;
-                        score_a.partial_cmp(&score_b).unwrap()
-                    })
-                    .map(|(id, _)| id.clone())
-                    .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {
-                        reason: "No nodes available".to_string(),
-                    })
-            }
+            BalancingStrategy::LeastConnections => loads
+                .iter()
+                .min_by_key(|(_, m)| m.active_connections)
+                .map(|(id, _)| id.clone())
+                .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {
+                    reason: "No nodes available".to_string(),
+                }),
+            BalancingStrategy::ResourceAware => loads
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    let score_a = a.cpu_utilization + a.memory_utilization;
+                    let score_b = b.cpu_utilization + b.memory_utilization;
+                    score_a.partial_cmp(&score_b).expect("utilization scores should be valid for comparison")
+                })
+                .map(|(id, _)| id.clone())
+                .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {
+                    reason: "No nodes available".to_string(),
+                }),
             _ => {
                 // Default to first available node
-                loads.keys()
-                    .next()
-                    .cloned()
-                    .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {
+                loads.keys().next().cloned().ok_or_else(|| {
+                    crate::assets::core::AssetError::AllocationFailed {
                         reason: "No nodes available".to_string(),
-                    })
+                    }
+                })
             }
         }
     }
 
     /// Update node metrics
     pub async fn update_metrics(&self, metrics: ResourceMetrics) {
-        self.node_loads.write().await.insert(metrics.node_id.clone(), metrics);
+        self.node_loads
+            .write()
+            .await
+            .insert(metrics.node_id.clone(), metrics);
     }
 
     /// Get load statistics
     pub async fn get_load_stats(&self) -> HashMap<PeerIdentity, f64> {
         let loads = self.node_loads.read().await;
-        loads.iter()
+        loads
+            .iter()
             .map(|(id, m)| {
                 let load = (m.cpu_utilization + m.memory_utilization) / 2.0;
                 (id.clone(), load)
@@ -166,7 +167,8 @@ impl LoadBalancer {
         // Simple prediction based on current load
         // In production, would use ML models
         let loads = self.node_loads.read().await;
-        loads.get(node_id)
+        loads
+            .get(node_id)
             .map(|m| (m.cpu_utilization + m.memory_utilization) / 2.0 * 1.1)
             .unwrap_or(0.5)
     }

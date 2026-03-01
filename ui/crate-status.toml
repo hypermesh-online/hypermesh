@@ -18,14 +18,14 @@ items = [
     "Storybook component documentation (5 stories)",
     "Accessibility wrappers and keyboard navigation",
     "React Router page routing with sidebar navigation",
+    "E2E test suite (Playwright, 5 specs: dashboard, navigation, module-pages, accessibility, trustchain)",
+    "Integration test harness page",
 ]
 
 [features.in_development]
 items = [
-    "E2E test suite (Playwright, 2 specs)",
-    "STOQ native demo (WebAssembly integration)",
-    "Integration test harness page",
-    "Component unit tests (Vitest, 3 test files)",
+    "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
+    "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)",
 ]
 
 [features.planned]

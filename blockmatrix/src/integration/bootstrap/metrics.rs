@@ -4,11 +4,11 @@
 
 //! Bootstrap metrics tracking and health monitoring.
 
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 
 use super::BootstrapPhase;
@@ -21,6 +21,12 @@ pub struct BootstrapMetrics {
     _component_startup_times: DashMap<String, Duration>,
     _error_counts: DashMap<String, u32>,
     _bootstrap_start: Option<Instant>,
+}
+
+impl Default for BootstrapMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BootstrapMetrics {
@@ -61,6 +67,12 @@ pub struct HealthState {
     pub last_check: SystemTime,
     pub error_message: Option<String>,
     pub consecutive_failures: u32,
+}
+
+impl Default for HealthMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HealthMonitor {

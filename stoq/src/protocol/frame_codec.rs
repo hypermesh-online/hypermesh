@@ -7,15 +7,13 @@
 //! Codec functions for serializing and deserializing STOQ custom QUIC frames,
 //! plus QUIC variable-length integer utilities.
 
-use bytes::{Bytes, BytesMut, BufMut, Buf};
+use anyhow::{anyhow, Result};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use quinn::VarInt;
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
 
-use crate::extensions::{PacketToken, PacketShard, HopInfo, SeedInfo, SeedNode, SeedPriority};
-use super::frames::{
-    TokenFrame, ShardFrame, HopFrame, SeedFrame, FalconSigFrame, FalconKeyFrame,
-};
+use super::frames::{FalconKeyFrame, FalconSigFrame, HopFrame, SeedFrame, ShardFrame, TokenFrame};
+use crate::extensions::{HopInfo, PacketShard, PacketToken, SeedInfo, SeedNode, SeedPriority};
 
 // Frame encoding functions
 
@@ -142,7 +140,8 @@ pub(crate) fn encode_falcon_key_frame(buf: &mut BytesMut, frame: &FalconKeyFrame
 // Frame decoding functions
 
 pub(crate) fn decode_token_frame(data: &mut Bytes) -> Result<TokenFrame> {
-    if data.len() < 48 + 1 { // Hash + sequence + timestamp + stream flag
+    if data.len() < 48 + 1 {
+        // Hash + sequence + timestamp + stream flag
         return Err(anyhow!("Token frame too short"));
     }
 
@@ -168,7 +167,8 @@ pub(crate) fn decode_token_frame(data: &mut Bytes) -> Result<TokenFrame> {
 }
 
 pub(crate) fn decode_shard_frame(data: &mut Bytes) -> Result<ShardFrame> {
-    if data.len() < 44 + 4 + 1 { // Metadata + length + stream flag
+    if data.len() < 44 + 4 + 1 {
+        // Metadata + length + stream flag
         return Err(anyhow!("Shard frame too short"));
     }
 
@@ -205,7 +205,8 @@ pub(crate) fn decode_shard_frame(data: &mut Bytes) -> Result<ShardFrame> {
 }
 
 pub(crate) fn decode_hop_frame(data: &mut Bytes) -> Result<HopFrame> {
-    if data.len() < 16 + 2 + 8 + 4 + 2 { // Address + port + timestamp + metadata len + hop counts
+    if data.len() < 16 + 2 + 8 + 4 + 2 {
+        // Address + port + timestamp + metadata len + hop counts
         return Err(anyhow!("Hop frame too short"));
     }
 
@@ -219,7 +220,8 @@ pub(crate) fn decode_hop_frame(data: &mut Bytes) -> Result<HopFrame> {
     let mut metadata = HashMap::new();
 
     for _ in 0..metadata_len {
-        if data.len() < 8 { // Two length fields
+        if data.len() < 8 {
+            // Two length fields
             return Err(anyhow!("Hop metadata truncated"));
         }
 
@@ -258,7 +260,8 @@ pub(crate) fn decode_hop_frame(data: &mut Bytes) -> Result<HopFrame> {
 }
 
 pub(crate) fn decode_seed_frame(data: &mut Bytes) -> Result<SeedFrame> {
-    if data.len() < 32 + 4 { // Packet ID + nodes length
+    if data.len() < 32 + 4 {
+        // Packet ID + nodes length
         return Err(anyhow!("Seed frame too short"));
     }
 
@@ -269,7 +272,8 @@ pub(crate) fn decode_seed_frame(data: &mut Bytes) -> Result<SeedFrame> {
     let mut seed_nodes = Vec::with_capacity(nodes_len);
 
     for _ in 0..nodes_len {
-        if data.len() < 16 + 2 + 1 { // Address + port + reliability
+        if data.len() < 16 + 2 + 1 {
+            // Address + port + reliability
             return Err(anyhow!("Seed node data truncated"));
         }
 
@@ -286,7 +290,8 @@ pub(crate) fn decode_seed_frame(data: &mut Bytes) -> Result<SeedFrame> {
         });
     }
 
-    if data.len() < 4 + 1 { // Replication factor + priority
+    if data.len() < 4 + 1 {
+        // Replication factor + priority
         return Err(anyhow!("Seed info truncated"));
     }
 
@@ -331,7 +336,7 @@ pub(crate) fn decode_falcon_sig_frame(data: &mut Bytes) -> Result<FalconSigFrame
 
     for _ in 0..frames_len {
         signed_frames.push(
-            decode_varint(data).ok_or_else(|| anyhow!("Failed to decode signed frame type"))?
+            decode_varint(data).ok_or_else(|| anyhow!("Failed to decode signed frame type"))?,
         );
     }
 

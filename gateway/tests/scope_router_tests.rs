@@ -45,7 +45,12 @@ fn same_scope_direct_route() {
     );
     match decision {
         RouteDecision::Direct { target } => {
-            assert_eq!(target, "[::1]:9000".parse::<SocketAddr>().expect("test: valid addr"));
+            assert_eq!(
+                target,
+                "[::1]:9000"
+                    .parse::<SocketAddr>()
+                    .expect("test: valid addr")
+            );
         }
         other => unreachable!("expected Direct, got {:?}", other),
     }
@@ -62,7 +67,7 @@ fn same_scope_denied_when_no_gateways() {
     );
     match decision {
         RouteDecision::Denied { reason } => {
-            assert!(reason.contains("no target"), "reason: {}", reason);
+            assert!(reason.contains("no target"), "reason: {reason}");
         }
         other => unreachable!("expected Denied, got {:?}", other),
     }
@@ -87,7 +92,7 @@ fn cross_scope_anonymous_denied() {
     );
     match decision {
         RouteDecision::Denied { reason } => {
-            assert!(reason.contains("anonymous"), "reason: {}", reason);
+            assert!(reason.contains("anonymous"), "reason: {reason}");
         }
         other => unreachable!("expected Denied, got {:?}", other),
     }
@@ -143,8 +148,7 @@ fn cross_scope_untrusted_gateway_denied() {
         RouteDecision::Denied { reason } => {
             assert!(
                 reason.contains("no route"),
-                "expected no-route deny, got: {}",
-                reason
+                "expected no-route deny, got: {reason}"
             );
         }
         other => unreachable!("expected Denied, got {:?}", other),
@@ -239,7 +243,12 @@ fn nearest_gateway_selected() {
     );
     match decision {
         RouteDecision::Direct { target } => {
-            assert_eq!(target, "[::1]:9011".parse::<SocketAddr>().expect("test: valid addr"));
+            assert_eq!(
+                target,
+                "[::1]:9011"
+                    .parse::<SocketAddr>()
+                    .expect("test: valid addr")
+            );
         }
         other => unreachable!("expected Direct to near gateway, got {:?}", other),
     }
@@ -315,7 +324,12 @@ fn gateway_overwrite_on_re_register() {
     );
     match decision {
         RouteDecision::Direct { target } => {
-            assert_eq!(target, "[::1]:9999".parse::<SocketAddr>().expect("test: valid addr"));
+            assert_eq!(
+                target,
+                "[::1]:9999"
+                    .parse::<SocketAddr>()
+                    .expect("test: valid addr")
+            );
         }
         other => unreachable!("expected Direct with updated addr, got {:?}", other),
     }

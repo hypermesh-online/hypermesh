@@ -9,23 +9,23 @@ use parking_lot::RwLock;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use super::adaptive::{AdaptationManager, AdaptiveConnection};
 use super::certificates::CertificateManager;
 use super::config::TransportConfig;
 use super::connection::{Connection, MemoryPool};
+use super::falcon::FalconTransport;
 use super::metrics::TransportMetrics;
 use super::stats::PerformanceStats;
-use super::falcon::FalconTransport;
-use super::adaptive::{AdaptiveConnection, AdaptationManager};
 
-use crate::protocol::{StoqProtocolHandler, handshake::StoqHandshakeExtension, StoqPosIntegration};
 use crate::protocol::pos_fast_validator::PosFastValidator;
+use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, StoqProtocolHandler};
 
 use super::ebpf::StoqEbpfTransport;
 
-mod constructors;
 mod connections;
-mod pos;
+mod constructors;
 mod monitoring;
+mod pos;
 mod trait_impl;
 
 // Global initialization for crypto provider

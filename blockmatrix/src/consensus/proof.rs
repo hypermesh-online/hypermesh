@@ -9,25 +9,25 @@
 
 // Re-export all proof types from parent module
 pub use super::{
+    // BlockMatrix-specific types
+    AccessLevel,
+    AccessPermissions,
+    Consensus,
+    ConsensusError,
     // Core consensus proof
     ConsensusProof,
 
+    LogIndex,
+
+    NetworkPosition,
+    Proof,
+    SpaceProof,
     // Individual proof types
     StakeProof,
     TimeProof,
-    SpaceProof,
     WorkProof,
 
-    // BlockMatrix-specific types
-    AccessLevel,
-    NetworkPosition,
-    AccessPermissions,
-    ConsensusError,
-    Consensus,
-    LogIndex,
-
+    WorkState,
     // Additional types from TrustChain
     WorkloadType,
-    WorkState,
-    Proof,
 };

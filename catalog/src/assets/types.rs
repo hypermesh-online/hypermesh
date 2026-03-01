@@ -4,9 +4,9 @@
 
 //! Asset package types - core data structures for asset specifications
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::registry::AssetValidationStatus;
@@ -31,8 +31,18 @@ impl AssetPackage {
     /// Get package size in bytes (estimated)
     pub fn size(&self) -> u64 {
         self.content.main_content.len() as u64
-            + self.content.file_contents.values().map(|c| c.len()).sum::<usize>() as u64
-            + self.content.binary_contents.values().map(|c| c.len()).sum::<usize>() as u64
+            + self
+                .content
+                .file_contents
+                .values()
+                .map(|c| c.len())
+                .sum::<usize>() as u64
+            + self
+                .content
+                .binary_contents
+                .values()
+                .map(|c| c.len())
+                .sum::<usize>() as u64
     }
 }
 
@@ -242,10 +252,22 @@ pub struct AssetDependency {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum DependencySource {
-    Registry { registry: String, namespace: Option<String> },
-    Git { url: String, reference: String, path: Option<String> },
-    Local { path: String },
-    Http { url: String, blake3_hash: String },
+    Registry {
+        registry: String,
+        namespace: Option<String>,
+    },
+    Git {
+        url: String,
+        reference: String,
+        path: Option<String>,
+    },
+    Local {
+        path: String,
+    },
+    Http {
+        url: String,
+        blake3_hash: String,
+    },
 }
 
 /// Resolved asset content with all files loaded

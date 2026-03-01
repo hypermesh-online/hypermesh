@@ -4,8 +4,8 @@
 
 //! Type definitions for predictive container scaling.
 
-use crate::ServiceId;
 use super::super::ScalingAction;
+use crate::ServiceId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime};
@@ -169,10 +169,22 @@ pub struct ScalingDecision {
 /// Scaling triggers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ScalingTrigger {
-    CpuUtilization { current: f64, threshold: f64 },
-    MemoryUtilization { current: f64, threshold: f64 },
-    RequestRate { current: f64, threshold: f64 },
-    ResponseTime { current: f64, threshold: f64 },
+    CpuUtilization {
+        current: f64,
+        threshold: f64,
+    },
+    MemoryUtilization {
+        current: f64,
+        threshold: f64,
+    },
+    RequestRate {
+        current: f64,
+        threshold: f64,
+    },
+    ResponseTime {
+        current: f64,
+        threshold: f64,
+    },
     PredictiveTrigger {
         predicted_metric: String,
         predicted_value: f64,
@@ -183,7 +195,9 @@ pub enum ScalingTrigger {
         current: f64,
         threshold: f64,
     },
-    Manual { reason: String },
+    Manual {
+        reason: String,
+    },
 }
 
 /// Workload prediction
@@ -330,10 +344,21 @@ pub enum HealthStatus {
 /// Scaling outcome
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ScalingOutcome {
-    Success { completion_time_ms: u64, final_replicas: u32 },
-    PartialSuccess { achieved_replicas: u32, reasons: Vec<String> },
-    Failure { reason: String, failure_time_ms: u64 },
-    Cancelled { reason: String },
+    Success {
+        completion_time_ms: u64,
+        final_replicas: u32,
+    },
+    PartialSuccess {
+        achieved_replicas: u32,
+        reasons: Vec<String>,
+    },
+    Failure {
+        reason: String,
+        failure_time_ms: u64,
+    },
+    Cancelled {
+        reason: String,
+    },
 }
 
 /// Performance impact of scaling

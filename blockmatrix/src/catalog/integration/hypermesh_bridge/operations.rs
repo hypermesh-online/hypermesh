@@ -4,19 +4,19 @@
 
 //! Operations and implementation for the Catalog-HyperMesh Integration Bridge
 
-use std::sync::Arc;
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
-use tokio::sync::{RwLock, Mutex};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::orchestration::hypermesh_integration::{
-    HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
-    PrivacyRequirements, PerformanceRequirements, ContainerMetadata,
-};
 use crate::assets::core::ConsensusProof;
 use crate::container::{ContainerSpec, ResourceRequirements};
+use crate::orchestration::hypermesh_integration::{
+    ContainerMetadata, HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
+    PerformanceRequirements, PrivacyRequirements,
+};
 
 use super::types::*;
 
@@ -75,20 +75,21 @@ impl CatalogHyperMeshBridge {
                 return Err(anyhow!(
                     "VM execution not supported; use remote HyperMesh execution via STOQ"
                 ));
-            },
+            }
             DeploymentStrategy::Container { container_config } => {
-                self.deploy_as_container(&deployment_spec.asset, container_config, &consensus_proof).await?
-            },
+                self.deploy_as_container(&deployment_spec.asset, container_config, &consensus_proof)
+                    .await?
+            }
             DeploymentStrategy::Serverless { .. } => {
                 return Err(anyhow!(
                     "Serverless execution not supported; use remote HyperMesh execution via STOQ"
                 ));
-            },
+            }
             DeploymentStrategy::Hybrid { .. } => {
                 return Err(anyhow!(
                     "Hybrid VM execution not supported; use container deployment or remote HyperMesh execution via STOQ"
                 ));
-            },
+            }
         };
 
         {
@@ -97,7 +98,9 @@ impl CatalogHyperMeshBridge {
                 deployment.status = if deployment_result.success {
                     DeploymentStatus::Running
                 } else {
-                    DeploymentStatus::Failed(deployment_result.error_message.clone().unwrap_or_default())
+                    DeploymentStatus::Failed(
+                        deployment_result.error_message.clone().unwrap_or_default(),
+                    )
                 };
             }
         }
@@ -117,9 +120,11 @@ impl CatalogHyperMeshBridge {
             }
 
             let deployment_time = start_time.elapsed().unwrap_or_default();
-            let total_time = metrics.average_deployment_time.as_micros() as u64 * (metrics.total_deployments - 1)
+            let total_time = metrics.average_deployment_time.as_micros() as u64
+                * (metrics.total_deployments - 1)
                 + deployment_time.as_micros() as u64;
-            metrics.average_deployment_time = Duration::from_micros(total_time / metrics.total_deployments);
+            metrics.average_deployment_time =
+                Duration::from_micros(total_time / metrics.total_deployments);
         }
 
         Ok(CatalogDeploymentResult {
@@ -141,10 +146,14 @@ impl CatalogHyperMeshBridge {
         consensus_proof: &ConsensusProof,
     ) -> Result<InternalDeploymentResult> {
         match asset {
-            CatalogAssetType::ContainerImage { image_name, image_tag, .. } => {
+            CatalogAssetType::ContainerImage {
+                image_name,
+                image_tag,
+                ..
+            } => {
                 let container_spec = ContainerSpec {
-                    name: format!("{}-{}", image_name, image_tag),
-                    image: format!("{}:{}", image_name, image_tag),
+                    name: format!("{image_name}-{image_tag}"),
+                    image: format!("{image_name}:{image_tag}"),
                     command: Some(container_config.command.clone()),
                     args: Some(container_config.args.clone()),
                     env: container_config.environment_variables.clone(),
@@ -169,7 +178,10 @@ impl CatalogHyperMeshBridge {
                     },
                 };
 
-                let deployment_result = self.container_orchestrator.deploy_container(hypermesh_spec).await?;
+                let deployment_result = self
+                    .container_orchestrator
+                    .deploy_container(hypermesh_spec)
+                    .await?;
 
                 Ok(InternalDeploymentResult {
                     success: true,
@@ -178,11 +190,13 @@ impl CatalogHyperMeshBridge {
                         "status": "running"
                     })),
                     error_message: None,
-                    resource_allocations: deployment_result.allocated_assets.keys()
+                    resource_allocations: deployment_result
+                        .allocated_assets
+                        .keys()
                         .map(|asset_type| (asset_type.clone(), 1))
                         .collect(),
                 })
-            },
+            }
             _ => Err(anyhow!("Asset type not supported for container deployment")),
         }
     }

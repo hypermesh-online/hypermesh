@@ -5,14 +5,14 @@
 //! Asset package operations - loading, hashing, validation, and convenience accessors
 
 use anyhow::Result;
+use base64::Engine;
+use chrono::Utc;
 use std::collections::HashMap;
 use std::path::Path;
-use chrono::Utc;
 use uuid::Uuid;
-use base64::Engine;
 
-use super::types::*;
 use super::registry::*;
+use super::types::*;
 
 impl AssetPackage {
     /// Create a new asset package from YAML specification
@@ -71,7 +71,10 @@ impl AssetPackage {
                 Err(e) => {
                     self.validation.errors.push(ValidationError {
                         code: "MAIN_FILE_NOT_FOUND".to_string(),
-                        message: format!("Main file '{}' not found: {}", self.spec.spec.content.main, e),
+                        message: format!(
+                            "Main file '{}' not found: {}",
+                            self.spec.spec.content.main, e
+                        ),
                         file: Some(self.spec.spec.content.main.clone()),
                         line: None,
                         column: None,
@@ -84,12 +87,14 @@ impl AssetPackage {
         for file_path in &self.spec.spec.content.files {
             match tokio::fs::read_to_string(file_path).await {
                 Ok(content) => {
-                    self.content.file_contents.insert(file_path.clone(), content);
+                    self.content
+                        .file_contents
+                        .insert(file_path.clone(), content);
                 }
                 Err(e) => {
                     self.validation.errors.push(ValidationError {
                         code: "FILE_NOT_FOUND".to_string(),
-                        message: format!("File '{}' not found: {}", file_path, e),
+                        message: format!("File '{file_path}' not found: {e}"),
                         file: Some(file_path.clone()),
                         line: None,
                         column: None,
@@ -106,12 +111,17 @@ impl AssetPackage {
         for binary_asset in &self.spec.spec.content.binary {
             match base64::engine::general_purpose::STANDARD.decode(&binary_asset.content) {
                 Ok(decoded) => {
-                    self.content.binary_contents.insert(binary_asset.name.clone(), decoded);
+                    self.content
+                        .binary_contents
+                        .insert(binary_asset.name.clone(), decoded);
                 }
                 Err(e) => {
                     self.validation.errors.push(ValidationError {
                         code: "BINARY_DECODE_ERROR".to_string(),
-                        message: format!("Failed to decode binary asset '{}': {}", binary_asset.name, e),
+                        message: format!(
+                            "Failed to decode binary asset '{}': {}",
+                            binary_asset.name, e
+                        ),
                         file: Some(binary_asset.name.clone()),
                         line: None,
                         column: None,
@@ -161,10 +171,14 @@ impl AssetPackage {
 
     /// Check if asset package is valid for execution
     pub fn is_execution_ready(&self) -> bool {
-        self.validation.is_valid &&
-        self.validation.errors.iter().all(|e| !matches!(e.severity, ErrorSeverity::Critical | ErrorSeverity::Error)) &&
-        self.validation.dependency_results.dependencies_valid &&
-        self.validation.security_results.security_score >= 70
+        self.validation.is_valid
+            && self
+                .validation
+                .errors
+                .iter()
+                .all(|e| !matches!(e.severity, ErrorSeverity::Critical | ErrorSeverity::Error))
+            && self.validation.dependency_results.dependencies_valid
+            && self.validation.security_results.security_score >= 70
     }
 
     /// Get human-readable summary of the asset package
@@ -185,26 +199,52 @@ impl AssetPackage {
 
     // Convenience methods for backward compatibility
 
-    pub fn id(&self) -> &str { &self.spec.metadata.name }
-    pub fn version(&self) -> &str { &self.spec.metadata.version }
-    pub fn asset_type(&self) -> &str { &self.spec.spec.asset_type }
-    pub fn metadata(&self) -> &AssetMetadata { &self.spec.metadata }
-    pub fn description(&self) -> Option<&str> { self.spec.metadata.description.as_deref() }
-    pub fn tags(&self) -> &[String] { &self.spec.metadata.tags }
-    pub fn author(&self) -> Option<&str> { self.spec.metadata.author.as_deref() }
-    pub fn license(&self) -> Option<&str> { self.spec.metadata.license.as_deref() }
-    pub fn dependencies(&self) -> &[AssetDependency] { &self.spec.spec.dependencies }
-    pub fn security(&self) -> &AssetSecurity { &self.spec.spec.security }
-    pub fn resources(&self) -> &AssetResources { &self.spec.spec.resources }
-    pub fn execution(&self) -> &AssetExecution { &self.spec.spec.execution }
-    pub fn is_valid(&self) -> bool { self.validation.is_valid }
+    pub fn id(&self) -> &str {
+        &self.spec.metadata.name
+    }
+    pub fn version(&self) -> &str {
+        &self.spec.metadata.version
+    }
+    pub fn asset_type(&self) -> &str {
+        &self.spec.spec.asset_type
+    }
+    pub fn metadata(&self) -> &AssetMetadata {
+        &self.spec.metadata
+    }
+    pub fn description(&self) -> Option<&str> {
+        self.spec.metadata.description.as_deref()
+    }
+    pub fn tags(&self) -> &[String] {
+        &self.spec.metadata.tags
+    }
+    pub fn author(&self) -> Option<&str> {
+        self.spec.metadata.author.as_deref()
+    }
+    pub fn license(&self) -> Option<&str> {
+        self.spec.metadata.license.as_deref()
+    }
+    pub fn dependencies(&self) -> &[AssetDependency] {
+        &self.spec.spec.dependencies
+    }
+    pub fn security(&self) -> &AssetSecurity {
+        &self.spec.spec.security
+    }
+    pub fn resources(&self) -> &AssetResources {
+        &self.spec.spec.resources
+    }
+    pub fn execution(&self) -> &AssetExecution {
+        &self.spec.spec.execution
+    }
+    pub fn is_valid(&self) -> bool {
+        self.validation.is_valid
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use std::fs;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_asset_package_creation() {

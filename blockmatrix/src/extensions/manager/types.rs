@@ -4,14 +4,12 @@
 
 //! Extension manager types - configuration, state, health, metrics
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 
 use crate::assets::core::PrivacyMode;
-use crate::extensions::{
-    ExtensionCapability, ExtensionMetadata, ResourceLimits,
-};
+use crate::extensions::{ExtensionCapability, ExtensionMetadata, ResourceLimits};
 
 /// Extension manager configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

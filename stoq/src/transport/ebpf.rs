@@ -12,26 +12,49 @@
 //! - Validation hooks registration
 
 pub use hypermesh_ebpf::{
-    HyperMeshEbpf, EbpfConfig, EbpfError, ShardMetadata,
-    // XDP
-    XdpManager, PacketDecision, FilterAction, XdpAttachMode, XdpStats, XdpFilterConfig,
     // AF_XDP
-    AfXdpManager, AfXdpSocket, AfXdpStats, UmemConfig, RingConfig,
-    // Loader
-    EbpfLoader, ProgramType,
+    AfXdpManager,
+    AfXdpSocket,
+    AfXdpStats,
+    AssetHashHeader,
+    AssetHashValidator,
     // Hooks
-    CertificateValidator, PacketValidator, ExtensionValidator,
-    ValidationHooks, PassThroughValidator,
-    // Policy
-    PolicyManager, ValidationPolicy,
-    // Headers
-    ProofOfStateHeader, AssetHashHeader, MatrixRoutingHeader, PrivacyTierHeader,
-    // Validators
-    ProofOfStateValidator, AssetHashValidator,
-    // Metrics
-    HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics,
+    CertificateValidator,
     // Capabilities
     EbpfCapabilities,
+    EbpfConfig,
+    EbpfError,
+    // Loader
+    EbpfLoader,
+    ExtensionValidator,
+    FilterAction,
+    HyperMeshEbpf,
+    // Metrics
+    HyperMeshMetrics,
+    HyperMeshMetricsCollector,
+    MatrixRoutingHeader,
+    PacketDecision,
+    PacketValidator,
+    PassThroughValidator,
+    // Policy
+    PolicyManager,
+    PrivacyTierHeader,
+    ProgramType,
+    // Headers
+    ProofOfStateHeader,
+    // Validators
+    ProofOfStateValidator,
+    RingConfig,
+    ShardMetadata,
+    TransportMetrics,
+    UmemConfig,
+    ValidationHooks,
+    ValidationPolicy,
+    XdpAttachMode,
+    XdpFilterConfig,
+    // XDP
+    XdpManager,
+    XdpStats,
 };
 
 // -----------------------------------------------------------------------
@@ -45,6 +68,12 @@ pub use hypermesh_ebpf::{
 /// does fast structural pre-validation to reject obviously invalid certificates.
 pub struct StoqCertificateValidator;
 
+impl Default for StoqCertificateValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StoqCertificateValidator {
     /// Create a new STOQ certificate validator.
     pub fn new() -> Self {
@@ -54,11 +83,7 @@ impl StoqCertificateValidator {
 
 #[async_trait::async_trait]
 impl CertificateValidator for StoqCertificateValidator {
-    async fn validate(
-        &self,
-        cert_der: &[u8],
-        _context: Option<&[u8]>,
-    ) -> anyhow::Result<()> {
+    async fn validate(&self, cert_der: &[u8], _context: Option<&[u8]>) -> anyhow::Result<()> {
         // Minimum DER certificate size (ASN.1 SEQUENCE header + minimal content)
         const MIN_DER_SIZE: usize = 10;
 
@@ -84,10 +109,7 @@ impl CertificateValidator for StoqCertificateValidator {
             // Long-form length: high bit set, low 7 bits = number of length bytes
             let num_length_bytes = (length_byte & 0x7F) as usize;
             if num_length_bytes == 0 || num_length_bytes > 4 {
-                anyhow::bail!(
-                    "Invalid DER length encoding: {} length bytes",
-                    num_length_bytes
-                );
+                anyhow::bail!("Invalid DER length encoding: {num_length_bytes} length bytes");
             }
             if cert_der.len() < 2 + num_length_bytes {
                 anyhow::bail!(
@@ -98,7 +120,10 @@ impl CertificateValidator for StoqCertificateValidator {
             }
         }
 
-        tracing::trace!("STOQ certificate pre-validation passed ({} bytes)", cert_der.len());
+        tracing::trace!(
+            "STOQ certificate pre-validation passed ({} bytes)",
+            cert_der.len()
+        );
         Ok(())
     }
 
@@ -114,6 +139,12 @@ impl CertificateValidator for StoqCertificateValidator {
 pub struct StoqPacketValidator {
     /// Minimum acceptable packet size
     min_packet_size: usize,
+}
+
+impl Default for StoqPacketValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StoqPacketValidator {
@@ -132,11 +163,7 @@ impl StoqPacketValidator {
 
 #[async_trait::async_trait]
 impl PacketValidator for StoqPacketValidator {
-    async fn validate(
-        &self,
-        packet_data: &[u8],
-        _connection_id: u64,
-    ) -> anyhow::Result<()> {
+    async fn validate(&self, packet_data: &[u8], _connection_id: u64) -> anyhow::Result<()> {
         if packet_data.len() < self.min_packet_size {
             anyhow::bail!(
                 "STOQ packet too short: {} bytes (minimum {})",
@@ -268,8 +295,7 @@ mod tests {
 
     #[test]
     fn test_stoq_ebpf_hooks_registered() {
-        let transport = StoqEbpfTransport::new()
-            .expect("test: create StoqEbpfTransport");
+        let transport = StoqEbpfTransport::new().expect("test: create StoqEbpfTransport");
         let hooks = transport.inner().validation_hooks();
         assert!(hooks.has_validators());
         assert!(hooks.certificate_validator.is_some());
@@ -278,24 +304,21 @@ mod tests {
 
     #[test]
     fn test_stoq_ebpf_capabilities() {
-        let transport = StoqEbpfTransport::new()
-            .expect("test: create StoqEbpfTransport");
+        let transport = StoqEbpfTransport::new().expect("test: create StoqEbpfTransport");
         let caps = transport.capabilities();
         assert!(!caps.kernel_version.is_empty());
     }
 
     #[test]
     fn test_stoq_ebpf_is_available() {
-        let transport = StoqEbpfTransport::new()
-            .expect("test: create StoqEbpfTransport");
+        let transport = StoqEbpfTransport::new().expect("test: create StoqEbpfTransport");
         // Just verify it doesn't panic; availability depends on system
         let _available = transport.is_available();
     }
 
     #[test]
     fn test_stoq_ebpf_metrics() {
-        let transport = StoqEbpfTransport::new()
-            .expect("test: create StoqEbpfTransport");
+        let transport = StoqEbpfTransport::new().expect("test: create StoqEbpfTransport");
         let metrics = transport.metrics().collect();
         assert_eq!(metrics.pos_metrics.total_validations, 0);
     }
@@ -309,7 +332,9 @@ mod tests {
         let validator = StoqCertificateValidator::new();
         let result = validator.validate(&[0x30, 0x01], None).await;
         assert!(result.is_err());
-        let msg = result.expect_err("test: should reject short cert").to_string();
+        let msg = result
+            .expect_err("test: should reject short cert")
+            .to_string();
         assert!(msg.contains("too short"));
     }
 
@@ -351,7 +376,9 @@ mod tests {
         let cert = vec![0x30, 0x80, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01];
         let result = validator.validate(&cert, None).await;
         assert!(result.is_err());
-        let msg = result.expect_err("test: should reject bad length").to_string();
+        let msg = result
+            .expect_err("test: should reject bad length")
+            .to_string();
         assert!(msg.contains("length"));
     }
 
@@ -370,7 +397,9 @@ mod tests {
         let validator = StoqPacketValidator::new();
         let result = validator.validate(&[0x01], 1).await;
         assert!(result.is_err());
-        let msg = result.expect_err("test: should reject short packet").to_string();
+        let msg = result
+            .expect_err("test: should reject short packet")
+            .to_string();
         assert!(msg.contains("too short"));
     }
 
@@ -399,7 +428,9 @@ mod tests {
         let packet = vec![0xC0, 0x00, 0x00, 0x00];
         let result = validator.validate(&packet, 42).await;
         assert!(result.is_err());
-        let msg = result.expect_err("test: should reject truncated long header").to_string();
+        let msg = result
+            .expect_err("test: should reject truncated long header")
+            .to_string();
         assert!(msg.contains("truncated"));
     }
 

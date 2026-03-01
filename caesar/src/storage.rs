@@ -81,8 +81,7 @@ impl CaesarStorage {
         let packets_file = self.storage_path.join("packets.json");
         if packets_file.exists() {
             let data = tokio::fs::read_to_string(&packets_file).await?;
-            if let Ok(loaded) = serde_json::from_str::<Vec<PacketRecord>>(&data)
-            {
+            if let Ok(loaded) = serde_json::from_str::<Vec<PacketRecord>>(&data) {
                 let map: HashMap<PacketId, PacketRecord> =
                     loaded.into_iter().map(|p| (p.packet_id, p)).collect();
                 *self.packets.write().await = map;
@@ -96,9 +95,7 @@ impl CaesarStorage {
         let settlements_file = self.storage_path.join("settlements.json");
         if settlements_file.exists() {
             let data = tokio::fs::read_to_string(&settlements_file).await?;
-            if let Ok(loaded) =
-                serde_json::from_str::<BTreeMap<String, SettlementRecord>>(&data)
-            {
+            if let Ok(loaded) = serde_json::from_str::<BTreeMap<String, SettlementRecord>>(&data) {
                 *self.settlements.write().await = loaded;
                 debug!(
                     "Loaded {} settlements from disk",
@@ -124,8 +121,7 @@ impl CaesarStorage {
         tokio::fs::write(&packets_file, packets_data).await?;
 
         let settlements_file = self.storage_path.join("settlements.json");
-        let settlements_data =
-            serde_json::to_string_pretty(&*self.settlements.read().await)?;
+        let settlements_data = serde_json::to_string_pretty(&*self.settlements.read().await)?;
         tokio::fs::write(&settlements_file, settlements_data).await?;
 
         Ok(())
@@ -143,10 +139,7 @@ impl CaesarStorage {
     }
 
     /// Look up a packet by its identifier.
-    pub async fn get_packet(
-        &self,
-        id: &PacketId,
-    ) -> Result<Option<PacketRecord>> {
+    pub async fn get_packet(&self, id: &PacketId) -> Result<Option<PacketRecord>> {
         Ok(self.packets.read().await.get(id).cloned())
     }
 
@@ -162,7 +155,7 @@ impl CaesarStorage {
         let mut packets = self.packets.write().await;
         let record = packets
             .get_mut(id)
-            .ok_or_else(|| anyhow!("Packet {} not found", id))?;
+            .ok_or_else(|| anyhow!("Packet {id} not found"))?;
         record.state = new_state;
         record.current_value = new_value;
         record.updated_at = Utc::now();
@@ -183,7 +176,7 @@ impl CaesarStorage {
         let id = record.packet_id;
         let mut packets = self.packets.write().await;
         if !packets.contains_key(&id) {
-            return Err(anyhow!("Packet {} not found for replacement", id));
+            return Err(anyhow!("Packet {id} not found for replacement"));
         }
         packets.insert(id, record);
         drop(packets);
@@ -204,10 +197,7 @@ impl CaesarStorage {
     }
 
     /// Return all packets in a specific state.
-    pub async fn list_packets_by_state(
-        &self,
-        state: PacketState,
-    ) -> Result<Vec<PacketRecord>> {
+    pub async fn list_packets_by_state(&self, state: PacketState) -> Result<Vec<PacketRecord>> {
         let packets = self.packets.read().await;
         let filtered: Vec<PacketRecord> = packets
             .values()
@@ -220,10 +210,7 @@ impl CaesarStorage {
     // ---- Settlement operations ----
 
     /// Store a settlement record and persist to disk.
-    pub async fn store_settlement(
-        &self,
-        record: SettlementRecord,
-    ) -> Result<()> {
+    pub async fn store_settlement(&self, record: SettlementRecord) -> Result<()> {
         let id = record.settlement_id.clone();
         self.settlements.write().await.insert(id.clone(), record);
         self.persist_to_disk().await?;
@@ -232,48 +219,28 @@ impl CaesarStorage {
     }
 
     /// Look up a settlement by its identifier.
-    pub async fn get_settlement(
-        &self,
-        id: &str,
-    ) -> Result<Option<SettlementRecord>> {
+    pub async fn get_settlement(&self, id: &str) -> Result<Option<SettlementRecord>> {
         Ok(self.settlements.read().await.get(id).cloned())
     }
 
     /// Return the most recent N settlements (ordered by BTreeMap key).
-    pub async fn list_recent_settlements(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<SettlementRecord>> {
+    pub async fn list_recent_settlements(&self, limit: usize) -> Result<Vec<SettlementRecord>> {
         let settlements = self.settlements.read().await;
-        let recent: Vec<SettlementRecord> = settlements
-            .values()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect();
+        let recent: Vec<SettlementRecord> =
+            settlements.values().rev().take(limit).cloned().collect();
         Ok(recent)
     }
 
     // ---- Metrics operations ----
 
     /// Save a metrics snapshot, keeping only the most recent 1000 entries.
-    pub async fn save_metrics(
-        &self,
-        metrics: serde_json::Value,
-    ) -> Result<()> {
+    pub async fn save_metrics(&self, metrics: serde_json::Value) -> Result<()> {
         let timestamp = Utc::now().to_rfc3339();
-        self.metrics
-            .write()
-            .await
-            .insert(timestamp, metrics);
+        self.metrics.write().await.insert(timestamp, metrics);
 
         let mut store = self.metrics.write().await;
         if store.len() > 1000 {
-            let to_remove: Vec<String> = store
-                .keys()
-                .take(store.len() - 1000)
-                .cloned()
-                .collect();
+            let to_remove: Vec<String> = store.keys().take(store.len() - 1000).cloned().collect();
             for key in to_remove {
                 store.remove(&key);
             }
@@ -285,21 +252,15 @@ impl CaesarStorage {
     }
 
     /// Get the most recently stored metrics snapshot.
-    pub async fn get_latest_metrics(
-        &self,
-    ) -> Result<Option<serde_json::Value>> {
+    pub async fn get_latest_metrics(&self) -> Result<Option<serde_json::Value>> {
         let metrics = self.metrics.read().await;
         Ok(metrics.values().last().cloned())
     }
 
     /// Get up to `limit` metrics snapshots, most recent first.
-    pub async fn get_metrics_history(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<serde_json::Value>> {
+    pub async fn get_metrics_history(&self, limit: usize) -> Result<Vec<serde_json::Value>> {
         let metrics = self.metrics.read().await;
-        let mut history: Vec<serde_json::Value> =
-            metrics.values().cloned().collect();
+        let mut history: Vec<serde_json::Value> = metrics.values().cloned().collect();
         history.reverse();
         history.truncate(limit);
         Ok(history)
@@ -339,10 +300,7 @@ impl CaesarStorage {
     }
 
     /// Sum of `fee_collected` across settlements completed since `since`.
-    pub async fn get_settlement_volume(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<GoldGrams> {
+    pub async fn get_settlement_volume(&self, since: DateTime<Utc>) -> Result<GoldGrams> {
         let settlements = self.settlements.read().await;
         let total = settlements
             .values()
@@ -355,17 +313,27 @@ impl CaesarStorage {
 
     /// Store or update a node's status.
     pub async fn update_node_status(&self, status: crate::models::NodeStatus) -> Result<()> {
-        self.node_statuses.write().await.insert(status.node_id.clone(), status);
+        self.node_statuses
+            .write()
+            .await
+            .insert(status.node_id.clone(), status);
         Ok(())
     }
 
     /// Get a node's status.
-    pub async fn get_node_status(&self, node_id: &NodeId) -> Result<Option<crate::models::NodeStatus>> {
+    pub async fn get_node_status(
+        &self,
+        node_id: &NodeId,
+    ) -> Result<Option<crate::models::NodeStatus>> {
         Ok(self.node_statuses.read().await.get(node_id).cloned())
     }
 
     /// Increment a node's settled count and fee earnings.
-    pub async fn increment_node_settled(&self, node_id: &NodeId, fee_earned: GoldGrams) -> Result<()> {
+    pub async fn increment_node_settled(
+        &self,
+        node_id: &NodeId,
+        fee_earned: GoldGrams,
+    ) -> Result<()> {
         let mut statuses = self.node_statuses.write().await;
         if let Some(status) = statuses.get_mut(node_id) {
             status.settled_count += 1;
@@ -613,14 +581,20 @@ mod tests {
 
         let mut packet = make_packet(50, PacketState::Minted, 100);
         let pid = packet.packet_id;
-        storage.store_packet(packet.clone()).await.expect("test: store");
+        storage
+            .store_packet(packet.clone())
+            .await
+            .expect("test: store");
 
         // Replace with updated state
         packet.state = PacketState::InTransit;
         packet.current_value = GoldGrams::from_decimal(Decimal::new(95, 0));
         storage.replace_packet(packet).await.expect("test: replace");
 
-        let loaded = storage.get_packet(&pid).await.expect("test: get")
+        let loaded = storage
+            .get_packet(&pid)
+            .await
+            .expect("test: get")
             .expect("test: packet should exist");
         assert_eq!(loaded.state, PacketState::InTransit);
         assert_eq!(loaded.current_value.0, Decimal::new(95, 0));
@@ -654,7 +628,10 @@ mod tests {
             last_activity: Utc::now(),
         };
 
-        storage.update_node_status(status.clone()).await.expect("test: update node status");
+        storage
+            .update_node_status(status.clone())
+            .await
+            .expect("test: update node status");
 
         let retrieved = storage
             .get_node_status(&NodeId::from("node-alpha"))
@@ -683,11 +660,20 @@ mod tests {
             operator_preferences: crate::models::OperatorPreferences::default(),
             last_activity: Utc::now(),
         };
-        storage.update_node_status(status).await.expect("test: store node");
+        storage
+            .update_node_status(status)
+            .await
+            .expect("test: store node");
 
         let fee = GoldGrams::from_decimal(Decimal::new(10, 0));
-        storage.increment_node_settled(&NodeId::from("node-beta"), fee).await.expect("test: increment 1");
-        storage.increment_node_settled(&NodeId::from("node-beta"), fee).await.expect("test: increment 2");
+        storage
+            .increment_node_settled(&NodeId::from("node-beta"), fee)
+            .await
+            .expect("test: increment 1");
+        storage
+            .increment_node_settled(&NodeId::from("node-beta"), fee)
+            .await
+            .expect("test: increment 2");
 
         let r = storage
             .get_node_status(&NodeId::from("node-beta"))

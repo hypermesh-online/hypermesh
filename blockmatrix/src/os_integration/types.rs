@@ -176,13 +176,20 @@ pub enum EbpfAttachType {
     TcEgress,
 
     /// Kprobe (kernel probe) - Linux only
-    Kprobe { function: String },
+    Kprobe {
+        function: String,
+    },
 
     /// Tracepoint - Linux only
-    Tracepoint { category: String, name: String },
+    Tracepoint {
+        category: String,
+        name: String,
+    },
 
     /// LSM (Linux Security Module) hook - Linux only
-    Lsm { hook: String },
+    Lsm {
+        hook: String,
+    },
 
     /// Windows eBPF hooks
     WindowsNetworkBind,

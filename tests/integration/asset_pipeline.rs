@@ -8,8 +8,7 @@
 //! wire together with blockmatrix's domain types (AssetType, AssetRegistration).
 
 use hypermesh_lib::{
-    ContentHash, PipelineStage, MatrixPosition, AssetAddress,
-    SystemAssetKind, AssetKind,
+    AssetAddress, AssetKind, ContentHash, MatrixPosition, PipelineStage, SystemAssetKind,
 };
 
 #[test]
@@ -31,12 +30,10 @@ fn pipeline_stages_are_distinct_and_ordered() {
 #[test]
 fn asset_address_round_trip_through_ipv6() {
     let hash = ContentHash::from_bytes([0x42u8; 32]);
-    let addr = AssetAddress::new(10, -20, 30, &hash)
-        .expect("valid coordinates");
+    let addr = AssetAddress::new(10, -20, 30, &hash).expect("valid coordinates");
 
     let ipv6 = addr.to_ipv6();
-    let recovered = AssetAddress::from_ipv6(ipv6)
-        .expect("valid HyperMesh address");
+    let recovered = AssetAddress::from_ipv6(ipv6).expect("valid HyperMesh address");
 
     assert_eq!(addr.matrix_coords(), recovered.matrix_coords());
     assert_eq!(addr.shard_index(), recovered.shard_index());
@@ -45,8 +42,7 @@ fn asset_address_round_trip_through_ipv6() {
 #[test]
 fn shard_derivation_preserves_coordinates() {
     let hash = ContentHash::from_bytes([0xAB; 32]);
-    let parent = AssetAddress::new(5, 10, 15, &hash)
-        .expect("valid coordinates");
+    let parent = AssetAddress::new(5, 10, 15, &hash).expect("valid coordinates");
 
     for idx in 1..=14u8 {
         let shard = parent.shard(idx).expect("valid shard index");
@@ -66,9 +62,18 @@ fn lib_asset_types_wire_to_blockmatrix() {
     assert_eq!(bm_type.type_id(), 0);
 
     // Both layers agree on numeric IDs for the core types
-    assert_eq!(SystemAssetKind::Gpu.type_id(), blockmatrix::AssetType::Gpu.type_id());
-    assert_eq!(SystemAssetKind::Memory.type_id(), blockmatrix::AssetType::Memory.type_id());
-    assert_eq!(SystemAssetKind::Storage.type_id(), blockmatrix::AssetType::Storage.type_id());
+    assert_eq!(
+        SystemAssetKind::Gpu.type_id(),
+        blockmatrix::AssetType::Gpu.type_id()
+    );
+    assert_eq!(
+        SystemAssetKind::Memory.type_id(),
+        blockmatrix::AssetType::Memory.type_id()
+    );
+    assert_eq!(
+        SystemAssetKind::Storage.type_id(),
+        blockmatrix::AssetType::Storage.type_id()
+    );
 }
 
 #[test]
@@ -76,7 +81,11 @@ fn content_hash_and_matrix_position_basics() {
     let hash = ContentHash::from_bytes([1u8; 32]);
     assert_ne!(hash, ContentHash::zeroed());
 
-    let pos = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
+    let pos = MatrixPosition {
+        x: 1.0,
+        y: 2.0,
+        z: 3.0,
+    };
     assert!((pos.x - 1.0).abs() < f64::EPSILON);
 }
 

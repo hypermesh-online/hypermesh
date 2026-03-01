@@ -33,12 +33,7 @@ pub enum CliCommand {
 #[derive(Debug, Clone, PartialEq)]
 pub enum TopologyCommand {
     /// Find nodes within a radius of a matrix position.
-    QueryNeighbors {
-        x: i64,
-        y: i64,
-        z: i64,
-        radius: f64,
-    },
+    QueryNeighbors { x: i64, y: i64, z: i64, radius: f64 },
     /// Calculate the routing cost between two positions.
     RoutingCost {
         from_x: i64,
@@ -97,7 +92,10 @@ pub enum AssetCommand {
         to_scope: BlockchainScope,
     },
     /// Run a pipeline action on a file path.
-    Pipeline { action: PipelineAction, path: String },
+    Pipeline {
+        action: PipelineAction,
+        path: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -131,8 +129,7 @@ pub fn parse_scope(s: &str) -> Result<BlockchainScope, String> {
         "device" => Ok(BlockchainScope::Device),
         "network" => Ok(BlockchainScope::Network),
         other => Err(format!(
-            "Unknown blockchain scope '{}'. Expected 'device' or 'network'.",
-            other,
+            "Unknown blockchain scope '{other}'. Expected 'device' or 'network'.",
         )),
     }
 }
@@ -150,8 +147,7 @@ pub fn parse_pipeline_action(s: &str) -> Result<PipelineAction, String> {
         "encrypt" => Ok(PipelineAction::Encrypt),
         "shard" => Ok(PipelineAction::Shard),
         other => Err(format!(
-            "Unknown pipeline action '{}'. Expected 'compress', 'encrypt', or 'shard'.",
-            other,
+            "Unknown pipeline action '{other}'. Expected 'compress', 'encrypt', or 'shard'.",
         )),
     }
 }
@@ -186,8 +182,14 @@ mod tests {
 
     #[test]
     fn test_parse_pipeline_action() {
-        assert_eq!(parse_pipeline_action("compress"), Ok(PipelineAction::Compress));
-        assert_eq!(parse_pipeline_action("Encrypt"), Ok(PipelineAction::Encrypt));
+        assert_eq!(
+            parse_pipeline_action("compress"),
+            Ok(PipelineAction::Compress)
+        );
+        assert_eq!(
+            parse_pipeline_action("Encrypt"),
+            Ok(PipelineAction::Encrypt)
+        );
         assert_eq!(parse_pipeline_action("SHARD"), Ok(PipelineAction::Shard));
     }
 
@@ -208,8 +210,8 @@ mod tests {
         });
 
         // Verify Debug works (no panic)
-        let _ = format!("{:?}", topo);
-        let _ = format!("{:?}", node);
-        let _ = format!("{:?}", asset);
+        let _ = format!("{topo:?}");
+        let _ = format!("{node:?}");
+        let _ = format!("{asset:?}");
     }
 }

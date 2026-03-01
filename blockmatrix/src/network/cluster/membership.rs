@@ -9,10 +9,7 @@ use tracing::{debug, info};
 use crate::matrix::coordinate::MatrixCoordinate;
 use hypermesh_lib::BlockchainScope;
 
-use super::{
-    ClusterManager, ClusterNode, ClusterError, ClusterEvent,
-    NodeStatus, now_secs,
-};
+use super::{now_secs, ClusterError, ClusterEvent, ClusterManager, ClusterNode, NodeStatus};
 
 impl ClusterManager {
     /// Add a node to the cluster in `Joining` status.
@@ -95,10 +92,7 @@ impl ClusterManager {
     ///
     /// Transitions the node from Healthy/Degraded/Joining to Leaving,
     /// then removes it from the cluster.
-    pub fn graceful_shutdown(
-        &mut self,
-        node_id: &str,
-    ) -> Result<(), ClusterError> {
+    pub fn graceful_shutdown(&mut self, node_id: &str) -> Result<(), ClusterError> {
         let node = self
             .nodes
             .get_mut(node_id)

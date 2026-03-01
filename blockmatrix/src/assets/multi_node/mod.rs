@@ -17,61 +17,61 @@
 //! migration capabilities.
 
 #[cfg(feature = "multi-node")]
+use async_trait::async_trait;
+#[cfg(feature = "multi-node")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "multi-node")]
 use std::collections::{HashMap, HashSet};
 #[cfg(feature = "multi-node")]
 use std::time::{Duration, SystemTime};
-#[cfg(feature = "multi-node")]
-use serde::{Serialize, Deserialize};
-#[cfg(feature = "multi-node")]
-use async_trait::async_trait;
 
 #[cfg(feature = "multi-node")]
 use crate::assets::core::{
-    AssetRegistration, AssetType, AssetResult, AssetState, ConsensusProof, PrivacyMode,
+    AssetRegistration, AssetResult, AssetState, AssetType, ConsensusProof, PrivacyMode,
 };
 
-#[cfg(feature = "multi-node")]
-pub mod coordinator;
 #[cfg(feature = "multi-node")]
 pub mod consensus;
 #[cfg(feature = "multi-node")]
-pub mod migration;
+pub mod coordinator;
 #[cfg(feature = "multi-node")]
 pub mod discovery;
 #[cfg(feature = "multi-node")]
-pub mod load_balancer;
-#[cfg(feature = "multi-node")]
 pub mod fault_tolerance;
 #[cfg(feature = "multi-node")]
-pub mod resource_sharing;
-pub mod network_membership;
+pub mod load_balancer;
+#[cfg(feature = "multi-node")]
+pub mod migration;
 pub mod multi_network_coordinator;
+pub mod network_membership;
+#[cfg(feature = "multi-node")]
+pub mod resource_sharing;
 
 #[cfg(feature = "multi-node")]
-pub use coordinator::{MultiNodeCoordinator, NodeInfo, NodeCapabilities};
+pub use consensus::{ConsensusDecision, ConsensusManager, VotingRound};
 #[cfg(feature = "multi-node")]
-pub use consensus::{ConsensusManager, ConsensusDecision, VotingRound};
+pub use coordinator::{MultiNodeCoordinator, NodeCapabilities, NodeInfo};
 #[cfg(feature = "multi-node")]
-pub use migration::{AssetMigrator, MigrationPlan, MigrationStatus};
-#[cfg(feature = "multi-node")]
-pub use discovery::{NodeDiscovery, DiscoveryProtocol, ServiceAnnouncement};
-#[cfg(feature = "multi-node")]
-pub use load_balancer::{LoadBalancer, BalancingStrategy, ResourceMetrics};
+pub use discovery::{DiscoveryProtocol, NodeDiscovery, ServiceAnnouncement};
 #[cfg(feature = "multi-node")]
 pub use fault_tolerance::{ByzantineDetector, FaultRecovery, NodeHealthMonitor};
 #[cfg(feature = "multi-node")]
-pub use resource_sharing::{ResourceSharing, SharingProtocol, PricingModel};
+pub use load_balancer::{BalancingStrategy, LoadBalancer, ResourceMetrics};
+#[cfg(feature = "multi-node")]
+pub use migration::{AssetMigrator, MigrationPlan, MigrationStatus};
+#[cfg(feature = "multi-node")]
+pub use resource_sharing::{PricingModel, ResourceSharing, SharingProtocol};
 
 // Multi-Network Participation (Revolutionary Concept #4)
-pub use network_membership::{
-    NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
-    PrivacyMode, NetworkDiscovery, MembershipStatus, NetworkRole,
-    NetworkCredentials, JoinRequirements, ApprovalProcess,
-};
 pub use multi_network_coordinator::{
-    MultiNetworkCoordinator, MultiNetworkConfig, IntegerMatrixPosition,
-    NetworkAssetRouter, CrossNetworkValidator, EngagementMonitor,
-    IsolationReport, EngagementEventType, NetworkEngagementMetrics,
+    CrossNetworkValidator, EngagementEventType, EngagementMonitor, IntegerMatrixPosition,
+    IsolationReport, MultiNetworkConfig, MultiNetworkCoordinator, NetworkAssetRouter,
+    NetworkEngagementMetrics,
+};
+pub use network_membership::{
+    ApprovalProcess, JoinRequirements, MembershipStatus, MultiNetworkMembership,
+    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkMembership, NetworkRole, PrivacyMode,
+    TrustChainClient,
 };
 
 // Use canonical PeerIdentity from transport layer
@@ -230,7 +230,11 @@ pub enum DataLocalityRequirement {
     /// Same country
     SameCountry,
     /// Specific geographic coordinates
-    Geographic { latitude: f64, longitude: f64, radius_km: f64 },
+    Geographic {
+        latitude: f64,
+        longitude: f64,
+        radius_km: f64,
+    },
 }
 
 #[cfg(feature = "multi-node")]
@@ -238,23 +242,42 @@ pub enum DataLocalityRequirement {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MultiNodeEvent {
     /// Node joined the network
-    NodeJoined { node: PeerIdentity, capabilities: NodeCapabilities },
+    NodeJoined {
+        node: PeerIdentity,
+        capabilities: NodeCapabilities,
+    },
     /// Node left the network
     NodeLeft { node: PeerIdentity, reason: String },
     /// Node failure detected
-    NodeFailed { node: PeerIdentity, detection_time: SystemTime },
+    NodeFailed {
+        node: PeerIdentity,
+        detection_time: SystemTime,
+    },
     /// Network partition detected
     PartitionDetected { partition: NetworkPartition },
     /// Network partition healed
     PartitionHealed { partition_id: String },
     /// Asset migration started
-    MigrationStarted { asset_id: AssetRegistration, from: PeerIdentity, to: PeerIdentity },
+    MigrationStarted {
+        asset_id: AssetRegistration,
+        from: PeerIdentity,
+        to: PeerIdentity,
+    },
     /// Asset migration completed
-    MigrationCompleted { asset_id: AssetRegistration, new_node: PeerIdentity },
+    MigrationCompleted {
+        asset_id: AssetRegistration,
+        new_node: PeerIdentity,
+    },
     /// Resource sharing negotiation
-    SharingNegotiation { request: ResourceSharingRequest, offers: Vec<ResourceSharingOffer> },
+    SharingNegotiation {
+        request: ResourceSharingRequest,
+        offers: Vec<ResourceSharingOffer>,
+    },
     /// Byzantine behavior detected
-    ByzantineDetected { node: PeerIdentity, evidence: Vec<u8> },
+    ByzantineDetected {
+        node: PeerIdentity,
+        evidence: Vec<u8>,
+    },
 }
 
 #[cfg(feature = "multi-node")]
@@ -274,7 +297,11 @@ pub trait MultiNodeCoordinatorTrait: Send + Sync {
     async fn allocate_asset(&self, asset_id: AssetRegistration) -> AssetResult<AllocationDecision>;
 
     /// Migrate asset between nodes
-    async fn migrate_asset(&self, asset_id: AssetRegistration, target_node: PeerIdentity) -> AssetResult<()>;
+    async fn migrate_asset(
+        &self,
+        asset_id: AssetRegistration,
+        target_node: PeerIdentity,
+    ) -> AssetResult<()>;
 
     /// Handle node failure
     async fn handle_node_failure(&self, failed_node: PeerIdentity) -> AssetResult<()>;
@@ -283,10 +310,16 @@ pub trait MultiNodeCoordinatorTrait: Send + Sync {
     async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>>;
 
     /// Synchronize asset state across nodes
-    async fn sync_asset_state(&self, asset_id: AssetRegistration) -> AssetResult<DistributedAssetState>;
+    async fn sync_asset_state(
+        &self,
+        asset_id: AssetRegistration,
+    ) -> AssetResult<DistributedAssetState>;
 
     /// Request resource sharing from other nodes
-    async fn request_resources(&self, request: ResourceSharingRequest) -> AssetResult<Vec<ResourceSharingOffer>>;
+    async fn request_resources(
+        &self,
+        request: ResourceSharingRequest,
+    ) -> AssetResult<Vec<ResourceSharingOffer>>;
 
     /// Offer resources to other nodes
     async fn offer_resources(&self, offer: ResourceSharingOffer) -> AssetResult<()>;

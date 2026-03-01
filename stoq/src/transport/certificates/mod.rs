@@ -11,14 +11,14 @@
 //! - Real-time certificate fingerprinting and validation
 //! - Generic validation hooks for application-specific logic
 
-pub mod types;
-pub mod trustchain_client;
 pub mod manager;
+pub mod trustchain_client;
+pub mod types;
 
 // Re-export public API so external callers remain unchanged
-pub use types::{CertificateConfig, CertificateMode, StoqNodeCertificate};
-pub use trustchain_client::TrustChainClient;
 pub use manager::CertificateManager;
+pub use trustchain_client::TrustChainClient;
+pub use types::{CertificateConfig, CertificateMode, StoqNodeCertificate};
 
 // Re-export parent module items needed by submodules
 use super::certificate_strategy;
@@ -27,7 +27,6 @@ use super::certificate_strategy;
 mod tests {
     use super::*;
     use anyhow::Result;
-    
 
     #[tokio::test]
     async fn test_localhost_certificate_manager() -> Result<()> {

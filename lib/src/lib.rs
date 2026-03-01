@@ -7,15 +7,15 @@
 //! Canonical definitions for types shared across all HyperMesh crates.
 //! Every crate should import shared types from here, not define their own.
 
-pub mod types;
 pub mod asset;
-pub mod error;
 pub mod crypto;
 pub mod economic;
+pub mod error;
 pub mod http;
+pub mod types;
 
 // Re-export commonly used types at crate root
-pub use types::*;
 pub use asset::*;
-pub use error::HypermeshError;
 pub use economic::*;
+pub use error::HypermeshError;
+pub use types::*;

@@ -40,11 +40,24 @@ mod linux_ebpf_tests {
                 .split(&['.', '-'][..])
                 .collect();
 
-            let major = version_parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0);
-            let minor = version_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-            let patch = version_parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+            let major = version_parts
+                .first()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let minor = version_parts
+                .get(1)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let patch = version_parts
+                .get(2)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
 
-            assert_eq!((major, minor, patch), expected, "Failed to parse: {}", version_str);
+            assert_eq!(
+                (major, minor, patch),
+                expected,
+                "Failed to parse: {version_str}"
+            );
         }
     }
 
@@ -62,8 +75,7 @@ mod linux_ebpf_tests {
             let supports = major > 4 || (major == 4 && minor >= 4);
             assert_eq!(
                 supports, should_support,
-                "Version check failed for {}.{} ({})",
-                major, minor, desc
+                "Version check failed for {major}.{minor} ({desc})"
             );
         }
     }
@@ -110,7 +122,7 @@ mod linux_ebpf_tests {
         // Generate handles
         for i in 1..=1000 {
             let handle = EbpfHandle(i);
-            assert!(handles.insert(handle), "Handle {} should be unique", i);
+            assert!(handles.insert(handle), "Handle {i} should be unique");
         }
 
         assert_eq!(handles.len(), 1000);
@@ -146,8 +158,8 @@ mod linux_ebpf_tests {
         let tracing_exists = Path::new("/sys/kernel/debug/tracing").exists()
             || Path::new("/sys/kernel/tracing").exists();
 
-        println!("BPF filesystem exists: {}", bpf_fs_exists);
-        println!("Tracing filesystem exists: {}", tracing_exists);
+        println!("BPF filesystem exists: {bpf_fs_exists}");
+        println!("Tracing filesystem exists: {tracing_exists}");
 
         // These are informational, not assertions
         // Different systems have different configurations
@@ -157,7 +169,7 @@ mod linux_ebpf_tests {
     fn test_kernel_version_from_proc() {
         // Test reading actual kernel version
         if let Ok(version) = std::fs::read_to_string("/proc/version") {
-            println!("Kernel version: {}", version);
+            println!("Kernel version: {version}");
 
             // Should contain "Linux version"
             assert!(version.contains("Linux") || version.contains("version"));
@@ -243,14 +255,29 @@ mod linux_ebpf_tests {
                 .split(&['.', '-'][..])
                 .collect();
 
-            let major: u32 = version_parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0);
-            let minor: u32 = version_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+            let major: u32 = version_parts
+                .first()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let minor: u32 = version_parts
+                .get(1)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
 
-            println!("  Current kernel: {}.{}", major, minor);
-            println!("  eBPF supported: {}", major > 4 || (major == 4 && minor >= 4));
-            println!("  XDP supported: {}", major > 4 || (major == 4 && minor >= 8));
+            println!("  Current kernel: {major}.{minor}");
+            println!(
+                "  eBPF supported: {}",
+                major > 4 || (major == 4 && minor >= 4)
+            );
+            println!(
+                "  XDP supported: {}",
+                major > 4 || (major == 4 && minor >= 8)
+            );
             println!("  BTF supported: {}", major >= 5);
-            println!("  LSM supported: {}", major > 5 || (major == 5 && minor >= 7));
+            println!(
+                "  LSM supported: {}",
+                major > 5 || (major == 5 && minor >= 7)
+            );
         }
     }
 }

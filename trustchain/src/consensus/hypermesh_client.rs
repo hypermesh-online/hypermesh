@@ -11,17 +11,20 @@
 //!
 //! **STOQ Protocol**: Uses STOQ API (QUIC transport) instead of HTTP
 
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
-use stoq::{StoqApiClient, transport::{StoqTransport, TransportConfig}};
+use stoq::{
+    transport::{StoqTransport, TransportConfig},
+    StoqApiClient,
+};
 
-use crate::ca::CertificateRequest;
 use super::ConsensusRequirements;
+use crate::ca::CertificateRequest;
 
 /// HyperMesh consensus validation client
 pub struct HyperMeshConsensusClient {
@@ -198,7 +201,10 @@ pub enum ConsensusValidationStatus {
     /// All four proofs validated successfully
     Valid,
     /// One or more proofs failed validation
-    Invalid { failed_proofs: Vec<String>, reason: String },
+    Invalid {
+        failed_proofs: Vec<String>,
+        reason: String,
+    },
     /// Validation is still pending
     Pending { estimated_completion: SystemTime },
     /// Validation failed due to system error
@@ -272,8 +278,10 @@ impl HyperMeshConsensusClient {
         info!("Initializing HyperMesh consensus client (STOQ protocol)");
 
         // Create STOQ transport for client (port 0 = OS-assigned to avoid conflicts)
-        let mut transport_config = TransportConfig::default();
-        transport_config.port = 0;
+        let transport_config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
 
         // Create STOQ API client
@@ -293,16 +301,23 @@ impl HyperMeshConsensusClient {
         requirements: &ConsensusRequirements,
     ) -> Result<ConsensusValidationResult> {
         let start_time = std::time::Instant::now();
-        
-        debug!("Validating certificate request with HyperMesh consensus: {}", request.common_name);
+
+        debug!(
+            "Validating certificate request with HyperMesh consensus: {}",
+            request.common_name
+        );
 
         // Create validation request
         let validation_request = ConsensusValidationRequest {
             certificate_request: request.clone(),
             consensus_requirements: requirements.clone(),
-            request_id: format!("trustchain-{}-{}", 
-                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis(),
-                request.common_name),
+            request_id: format!(
+                "trustchain-{}-{}",
+                SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)?
+                    .as_millis(),
+                request.common_name
+            ),
             timestamp: SystemTime::now(),
             validation_context: ValidationContext {
                 ca_id: "trustchain-ca".to_string(),
@@ -313,7 +328,9 @@ impl HyperMeshConsensusClient {
         };
 
         // Send validation request with retries
-        let result = self.send_validation_request_with_retry(validation_request).await?;
+        let result = self
+            .send_validation_request_with_retry(validation_request)
+            .await?;
 
         // Update metrics
         self.update_metrics(start_time, &result).await;
@@ -331,7 +348,7 @@ impl HyperMeshConsensusClient {
         node_id: &str,
     ) -> Result<ConsensusValidationResult> {
         let start_time = std::time::Instant::now();
-        
+
         debug!("Validating four-proof set for operation: {}", operation);
 
         // Create four-proof validation request
@@ -344,7 +361,9 @@ impl HyperMeshConsensusClient {
         };
 
         // Send four-proof validation request
-        let result = self.send_four_proof_validation_request(validation_request).await?;
+        let result = self
+            .send_four_proof_validation_request(validation_request)
+            .await?;
 
         // Update metrics
         self.update_metrics(start_time, &result).await;
@@ -354,7 +373,10 @@ impl HyperMeshConsensusClient {
     }
 
     /// Check consensus validation status for pending requests
-    pub async fn check_validation_status(&self, request_id: &str) -> Result<ConsensusValidationResult> {
+    pub async fn check_validation_status(
+        &self,
+        request_id: &str,
+    ) -> Result<ConsensusValidationResult> {
         debug!("Checking validation status for request: {}", request_id);
 
         #[derive(Serialize)]
@@ -367,10 +389,11 @@ impl HyperMeshConsensusClient {
         };
 
         // Call HyperMesh validation status handler via STOQ
-        let result: ConsensusValidationResult = self.stoq_client
+        let result: ConsensusValidationResult = self
+            .stoq_client
             .call("hypermesh", "consensus/validation_status", &request)
             .await
-            .map_err(|e| anyhow!("STOQ API error checking validation status: {}", e))?;
+            .map_err(|e| anyhow!("STOQ API error checking validation status: {e}"))?;
 
         Ok(result)
     }
@@ -417,10 +440,11 @@ impl HyperMeshConsensusClient {
         request: &ConsensusValidationRequest,
     ) -> Result<ConsensusValidationResult> {
         // Call HyperMesh consensus validation handler via STOQ
-        let result: ConsensusValidationResult = self.stoq_client
+        let result: ConsensusValidationResult = self
+            .stoq_client
             .call("hypermesh", "consensus/validate_certificate", request)
             .await
-            .map_err(|e| anyhow!("STOQ API error sending validation request: {}", e))?;
+            .map_err(|e| anyhow!("STOQ API error sending validation request: {e}"))?;
 
         Ok(result)
     }
@@ -431,20 +455,25 @@ impl HyperMeshConsensusClient {
         request: FourProofValidationRequest,
     ) -> Result<ConsensusValidationResult> {
         // Call HyperMesh four-proof validation handler via STOQ
-        let result: ConsensusValidationResult = self.stoq_client
+        let result: ConsensusValidationResult = self
+            .stoq_client
             .call("hypermesh", "consensus/validate_proofs", &request)
             .await
-            .map_err(|e| anyhow!("STOQ API error sending four-proof validation: {}", e))?;
+            .map_err(|e| anyhow!("STOQ API error sending four-proof validation: {e}"))?;
 
         Ok(result)
     }
 
     // Internal: Update performance metrics
-    async fn update_metrics(&self, start_time: std::time::Instant, result: &ConsensusValidationResult) {
+    async fn update_metrics(
+        &self,
+        start_time: std::time::Instant,
+        result: &ConsensusValidationResult,
+    ) {
         let mut metrics = self.metrics.write().await;
-        
+
         metrics.total_requests += 1;
-        
+
         match result.result {
             ConsensusValidationStatus::Valid => {
                 metrics.successful_validations += 1;
@@ -455,12 +484,14 @@ impl HyperMeshConsensusClient {
         }
 
         let latency_us = start_time.elapsed().as_micros() as u64;
-        
+
         // Update rolling average latency
         if metrics.total_requests == 1 {
             metrics.avg_latency_us = latency_us;
         } else {
-            metrics.avg_latency_us = (metrics.avg_latency_us * (metrics.total_requests - 1) + latency_us) / metrics.total_requests;
+            metrics.avg_latency_us = (metrics.avg_latency_us * (metrics.total_requests - 1)
+                + latency_us)
+                / metrics.total_requests;
         }
 
         metrics.last_updated = Some(SystemTime::now());
@@ -493,7 +524,8 @@ impl ConsensusValidationService for HyperMeshConsensusClient {
         request: &CertificateRequest,
         requirements: &ConsensusRequirements,
     ) -> Result<ConsensusValidationResult> {
-        self.validate_certificate_request(request, requirements).await
+        self.validate_certificate_request(request, requirements)
+            .await
     }
 
     async fn validate_four_proofs(
@@ -503,14 +535,14 @@ impl ConsensusValidationService for HyperMeshConsensusClient {
         asset_id: &str,
         node_id: &str,
     ) -> Result<ConsensusValidationResult> {
-        self.validate_four_proofs(proof_set, operation, asset_id, node_id).await
+        self.validate_four_proofs(proof_set, operation, asset_id, node_id)
+            .await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_client_config_creation() {
@@ -529,8 +561,8 @@ mod tests {
     #[tokio::test]
     async fn test_client_metrics() {
         let config = HyperMeshClientConfig::localhost_testing();
-        let client = HyperMeshConsensusClient::new(config).await.unwrap();
-        
+        let client = HyperMeshConsensusClient::new(config).await.expect("test: async operation");
+
         let metrics = client.get_metrics().await;
         assert_eq!(metrics.total_requests, 0);
         assert_eq!(metrics.successful_validations, 0);

@@ -11,14 +11,14 @@
 //! 3. DNS initialized with localhost → self
 //! 4. Privacy mode determines network participation
 
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
-use std::collections::HashMap;
 
 use crate::blockchain::block::Block;
 use crate::blockchain::node_chain::NodeBlockchain;
@@ -54,6 +54,12 @@ pub struct LocalhostCertificate {
 pub struct DnsResolver {
     /// DNS records (name → IP)
     records: Arc<RwLock<HashMap<String, IpAddr>>>,
+}
+
+impl Default for DnsResolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DnsResolver {
@@ -120,11 +126,11 @@ impl NodeBootstrap {
         );
 
         // 1. Create unique genesis block for THIS node
-        let genesis_block = Block::genesis(node_coordinate.clone());
+        let genesis_block = Block::genesis(node_coordinate);
         info!("Created genesis block: {}", genesis_block.hash);
 
         // 2. Initialize blockchain with genesis
-        let blockchain = Arc::new(NodeBlockchain::new(node_coordinate.clone()));
+        let blockchain = Arc::new(NodeBlockchain::new(node_coordinate));
 
         // 3. Self-sign certificate for localhost
         let localhost_cert = Self::generate_localhost_certificate()?;
@@ -134,8 +140,9 @@ impl NodeBootstrap {
         let dns = DnsResolver::new();
         dns.register(
             "localhost".to_string(),
-            IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]) // ::1
-        ).await;
+            IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]), // ::1
+        )
+        .await;
         info!("DNS initialized with localhost → ::1");
 
         // 5. Default to Private mode (localhost only)
@@ -288,7 +295,10 @@ impl NodeBootstrap {
         }
 
         // 4. Verify DNS has localhost
-        let localhost_addr = self.dns.resolve("localhost").await
+        let localhost_addr = self
+            .dns
+            .resolve("localhost")
+            .await
             .ok_or_else(|| anyhow!("DNS missing localhost entry"))?;
 
         if localhost_addr != IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]) {
@@ -306,8 +316,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_node_bootstrap_initialization() {
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let bootstrap = NodeBootstrap::initialize(coord.clone()).await.unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
 
         // Verify genesis block
         assert_eq!(bootstrap.genesis_block().index, 0);
@@ -328,41 +338,50 @@ mod tests {
 
     #[tokio::test]
     async fn test_privacy_mode_transitions() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let bootstrap = NodeBootstrap::initialize(coord).await.unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
 
         // Start in Private mode
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
 
         // Transition to Anonymous
-        bootstrap.set_privacy_mode(PrivacyMode::ANONYMOUS).await.unwrap();
+        bootstrap
+            .set_privacy_mode(PrivacyMode::ANONYMOUS)
+            .await
+            .expect("test: expected success");
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::ANONYMOUS);
 
         // Transition to Public (network registration)
-        bootstrap.set_privacy_mode(PrivacyMode::PUBLIC).await.unwrap();
+        bootstrap
+            .set_privacy_mode(PrivacyMode::PUBLIC)
+            .await
+            .expect("test: expected success");
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PUBLIC);
 
         // Transition back to Private
-        bootstrap.set_privacy_mode(PrivacyMode::PRIVATE).await.unwrap();
+        bootstrap
+            .set_privacy_mode(PrivacyMode::PRIVATE)
+            .await
+            .expect("test: expected success");
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
     }
 
     #[tokio::test]
     async fn test_node_self_sufficiency() {
-        let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let bootstrap = NodeBootstrap::initialize(coord).await.unwrap();
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
+        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
 
         // Verify self-sufficiency
-        bootstrap.verify_self_sufficient().await.unwrap();
+        bootstrap.verify_self_sufficient().await.expect("test: async operation");
     }
 
     #[tokio::test]
     async fn test_unique_genesis_per_node() {
-        let coord1 = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let coord2 = MatrixCoordinate::new(2, 2, 2).unwrap();
+        let coord1 = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let coord2 = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
 
-        let bootstrap1 = NodeBootstrap::initialize(coord1).await.unwrap();
-        let bootstrap2 = NodeBootstrap::initialize(coord2).await.unwrap();
+        let bootstrap1 = NodeBootstrap::initialize(coord1).await.expect("test: async operation");
+        let bootstrap2 = NodeBootstrap::initialize(coord2).await.expect("test: async operation");
 
         // Each node has unique genesis block
         assert_ne!(

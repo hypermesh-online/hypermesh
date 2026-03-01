@@ -7,16 +7,16 @@
 //! Manages network topology awareness, optimal routing strategies,
 //! and fault tolerance for the decentralized sharing network.
 
-mod types;
 mod routing;
+mod types;
 
 pub use types::*;
 
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::SystemTime;
+use tokio::sync::RwLock;
 
 use super::PeerInfo;
 
@@ -98,9 +98,9 @@ impl NetworkTopology {
 
             // Update capacity based on peer info
             node.capacity.current_connections = peer_info.available_packages.len() as u32;
-            node.capacity.storage_usage =
-                (peer_info.storage_capacity - peer_info.bandwidth_capacity) as f64 /
-                peer_info.storage_capacity as f64;
+            node.capacity.storage_usage = (peer_info.storage_capacity
+                - peer_info.bandwidth_capacity) as f64
+                / peer_info.storage_capacity as f64;
         }
 
         Ok(())
@@ -112,26 +112,27 @@ impl NetworkTopology {
         let from_node = nodes.get(from);
         let to_node = nodes.get(to);
 
-        let (distance_km, latency, bandwidth) = if let (Some(from_n), Some(to_n)) = (from_node, to_node) {
-            if let (Some(from_loc), Some(to_loc)) = (&from_n.location, &to_n.location) {
-                let dist = from_loc.distance_to(to_loc);
-                let base_latency = (dist / 200.0) as u64 + 2;
-                let jitter = (from.len() as u64 + to.len() as u64) % 5;
-                let lat = base_latency + jitter;
-                let bw = if dist < 100.0 {
-                    100 * 1024 * 1024
-                } else if dist < 1000.0 {
-                    50 * 1024 * 1024
+        let (distance_km, latency, bandwidth) =
+            if let (Some(from_n), Some(to_n)) = (from_node, to_node) {
+                if let (Some(from_loc), Some(to_loc)) = (&from_n.location, &to_n.location) {
+                    let dist = from_loc.distance_to(to_loc);
+                    let base_latency = (dist / 200.0) as u64 + 2;
+                    let jitter = (from.len() as u64 + to.len() as u64) % 5;
+                    let lat = base_latency + jitter;
+                    let bw = if dist < 100.0 {
+                        100 * 1024 * 1024
+                    } else if dist < 1000.0 {
+                        50 * 1024 * 1024
+                    } else {
+                        10 * 1024 * 1024
+                    };
+                    (dist, lat, bw)
                 } else {
-                    10 * 1024 * 1024
-                };
-                (dist, lat, bw)
+                    (1000.0, 50, 50 * 1024 * 1024)
+                }
             } else {
-                (1000.0, 50, 50 * 1024 * 1024)
-            }
-        } else {
-            (2000.0, 100, 10 * 1024 * 1024)
-        };
+                (2000.0, 100, 10 * 1024 * 1024)
+            };
 
         let packet_loss = if distance_km < 500.0 { 0.001 } else { 0.005 };
         let reliability = 1.0 - packet_loss;
@@ -159,21 +160,11 @@ impl NetworkTopology {
         let strategy = self.routing_strategy.read().await.clone();
 
         let route = match strategy {
-            RoutingStrategy::ShortestPath => {
-                self.dijkstra_shortest_path(from, to).await?
-            }
-            RoutingStrategy::LowestLatency => {
-                self.lowest_latency_path(from, to).await?
-            }
-            RoutingStrategy::HighestBandwidth => {
-                self.highest_bandwidth_path(from, to).await?
-            }
-            RoutingStrategy::GeographicProximity => {
-                self.geographic_routing(from, to).await?
-            }
-            RoutingStrategy::LoadBalanced => {
-                self.load_balanced_routing(from, to).await?
-            }
+            RoutingStrategy::ShortestPath => self.dijkstra_shortest_path(from, to).await?,
+            RoutingStrategy::LowestLatency => self.lowest_latency_path(from, to).await?,
+            RoutingStrategy::HighestBandwidth => self.highest_bandwidth_path(from, to).await?,
+            RoutingStrategy::GeographicProximity => self.geographic_routing(from, to).await?,
+            RoutingStrategy::LoadBalanced => self.load_balanced_routing(from, to).await?,
             RoutingStrategy::FaultTolerant { redundancy } => {
                 self.fault_tolerant_routing(from, to, redundancy).await?
             }
@@ -192,13 +183,14 @@ impl NetworkTopology {
         let links = self.links.read().await;
 
         // Calculate network metrics
-        let avg_latency: f64 = links.iter()
-            .map(|l| l.latency as f64)
-            .sum::<f64>() / links.len().max(1) as f64;
+        let avg_latency: f64 =
+            links.iter().map(|l| l.latency as f64).sum::<f64>() / links.len().max(1) as f64;
 
-        let avg_load: f64 = nodes.values()
+        let avg_load: f64 = nodes
+            .values()
             .map(|n| n.capacity.network_usage)
-            .sum::<f64>() / nodes.len().max(1) as f64;
+            .sum::<f64>()
+            / nodes.len().max(1) as f64;
 
         // Choose strategy based on conditions
         let mut strategy = self.routing_strategy.write().await;
@@ -228,10 +220,12 @@ impl NetworkTopology {
             }
         }
         if let Ok(links) = self.links.try_read() {
-            let direct = links.iter().any(|l| {
-                (l.from == from && l.to == to) || (l.from == to && l.to == from)
-            });
-            if direct { return 0.5; }
+            let direct = links
+                .iter()
+                .any(|l| (l.from == from && l.to == to) || (l.from == to && l.to == from));
+            if direct {
+                return 0.5;
+            }
         }
         0.25
     }
@@ -285,9 +279,10 @@ impl NetworkTopology {
 
         let mut links = self.links.write().await;
         for new_link in new_links {
-            if let Some(existing) = links.iter_mut().find(|l| {
-                l.from == new_link.from && l.to == new_link.to
-            }) {
+            if let Some(existing) = links
+                .iter_mut()
+                .find(|l| l.from == new_link.from && l.to == new_link.to)
+            {
                 *existing = new_link;
             } else {
                 links.push(new_link);

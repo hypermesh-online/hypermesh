@@ -6,11 +6,11 @@
 //!
 //! Run with: cargo run --example throughput_test --release
 
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 use tokio::time;
 
 const TEST_DURATION_SECS: u64 = 10; // 10 second test
@@ -19,7 +19,10 @@ const DATA_CHUNK_SIZE: usize = 1024 * 1024; // 1MB chunks
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed
     }
 
@@ -114,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 29292);
 
     println!("Test Configuration:");
-    println!("  • Duration: {} seconds", TEST_DURATION_SECS);
+    println!("  • Duration: {TEST_DURATION_SECS} seconds");
     println!("  • Chunk size: {} MB", DATA_CHUNK_SIZE / (1024 * 1024));
     println!("  • Buffer size: 256 MB");
     println!("  • Zero-copy: Enabled");
@@ -187,12 +190,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let total_send_gbps = (current_sent as f64 * 8.0) / (elapsed * 1_000_000_000.0);
             let total_recv_gbps = (current_received as f64 * 8.0) / (elapsed * 1_000_000_000.0);
 
-            println!("  [{:>3}s] Send: {:.2} Gbps (avg: {:.2}), Recv: {:.2} Gbps (avg: {:.2})",
-                     elapsed as u64,
-                     send_rate,
-                     total_send_gbps,
-                     recv_rate,
-                     total_recv_gbps);
+            println!(
+                "  [{:>3}s] Send: {:.2} Gbps (avg: {:.2}), Recv: {:.2} Gbps (avg: {:.2})",
+                elapsed as u64, send_rate, total_send_gbps, recv_rate, total_recv_gbps
+            );
 
             last_sent = current_sent;
             last_received = current_received;
@@ -226,20 +227,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n╔══════════════════════════════════════════════════════════╗");
     println!("║                    TEST RESULTS                           ║");
     println!("╠══════════════════════════════════════════════════════════╣");
-    println!("║ Duration:         {:.2} seconds", test_duration.as_secs_f64());
-    println!("║ Data sent:        {:.2} GB", total_sent as f64 / (1024.0 * 1024.0 * 1024.0));
-    println!("║ Data received:    {:.2} GB", total_received as f64 / (1024.0 * 1024.0 * 1024.0));
-    println!("║ Send throughput:  {:.3} Gbps", send_gbps);
-    println!("║ Recv throughput:  {:.3} Gbps", recv_gbps);
+    println!(
+        "║ Duration:         {:.2} seconds",
+        test_duration.as_secs_f64()
+    );
+    println!(
+        "║ Data sent:        {:.2} GB",
+        total_sent as f64 / (1024.0 * 1024.0 * 1024.0)
+    );
+    println!(
+        "║ Data received:    {:.2} GB",
+        total_received as f64 / (1024.0 * 1024.0 * 1024.0)
+    );
+    println!("║ Send throughput:  {send_gbps:.3} Gbps");
+    println!("║ Recv throughput:  {recv_gbps:.3} Gbps");
     println!("╠══════════════════════════════════════════════════════════╣");
 
     // Get performance stats
     let (peak_gbps, zero_copy_ops, pool_hits, frame_batches) = client.performance_stats();
 
-    println!("║ Peak recorded:    {:.3} Gbps", peak_gbps);
-    println!("║ Zero-copy ops:    {}", zero_copy_ops);
-    println!("║ Memory pool hits: {}", pool_hits);
-    println!("║ Frame batches:    {}", frame_batches);
+    println!("║ Peak recorded:    {peak_gbps:.3} Gbps");
+    println!("║ Zero-copy ops:    {zero_copy_ops}");
+    println!("║ Memory pool hits: {pool_hits}");
+    println!("║ Frame batches:    {frame_batches}");
     println!("╠══════════════════════════════════════════════════════════╣");
 
     // Determine performance tier
@@ -260,7 +270,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if achieved_gbps < 10.0 {
         println!("\n⚠️  Performance below 10 Gbps target!");
-        println!("   Current: {:.3} Gbps", achieved_gbps);
+        println!("   Current: {achieved_gbps:.3} Gbps");
         println!("   Target:  10+ Gbps\n");
         println!("   Optimization suggestions:");
         println!("   • Increase buffer sizes");

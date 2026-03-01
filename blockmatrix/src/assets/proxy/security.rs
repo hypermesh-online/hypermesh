@@ -6,17 +6,21 @@
 //!
 //! Implements FALCON-1024 signatures and Kyber encryption for quantum-resistant security
 
-use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
+use aes_gcm::{AeadCore, AeadInPlace, Aes256Gcm, Key, KeyInit};
 use blake3;
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_kyber::kyber1024;
-use pqcrypto_traits::sign::{PublicKey as SignPublicKey, SecretKey as SignSecretKey, DetachedSignature};
-use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
-use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
+use pqcrypto_traits::kem::{
+    Ciphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret,
+};
+use pqcrypto_traits::sign::{
+    DetachedSignature, PublicKey as SignPublicKey, SecretKey as SignSecretKey,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetResult, AssetError, ProxyAddress};
+use crate::assets::core::{AssetError, AssetResult, ProxyAddress};
 
 /// Quantum-resistant security handler
 pub struct QuantumSecurity {
@@ -56,22 +60,22 @@ pub struct KyberEncryption {
 pub struct SecurityToken {
     /// Token identifier
     pub token_id: String,
-    
+
     /// Associated proxy address
     pub proxy_address: ProxyAddress,
-    
+
     /// FALCON-1024 signature
     pub signature: Vec<u8>,
-    
+
     /// Kyber encrypted payload
     pub encrypted_payload: Vec<u8>,
-    
+
     /// Token creation timestamp
     pub created_at: SystemTime,
-    
+
     /// Token expiration timestamp
     pub expires_at: SystemTime,
-    
+
     /// Token validation status
     pub validation_status: TokenValidationStatus,
 }
@@ -81,16 +85,16 @@ pub struct SecurityToken {
 pub enum TokenValidationStatus {
     /// Token is valid and active
     Valid,
-    
+
     /// Token has expired
     Expired,
-    
+
     /// Token signature is invalid
     InvalidSignature,
-    
+
     /// Token encryption is invalid
     InvalidEncryption,
-    
+
     /// Token has been revoked
     Revoked,
 }
@@ -136,18 +140,18 @@ impl QuantumSecurity {
             config: SecurityConfig::default(),
         })
     }
-    
+
     /// Generate quantum-resistant access tokens
     pub async fn generate_access_tokens(&self, proxy_addr: &ProxyAddress) -> AssetResult<Vec<u8>> {
         // Create token payload
         let token_payload = self.create_token_payload(proxy_addr)?;
-        
+
         // Sign with FALCON-1024
         let signature = self.falcon_signer.sign(&token_payload).await?;
-        
+
         // Encrypt with Kyber
         let encrypted_payload = self.kyber_encryption.encrypt(&token_payload).await?;
-        
+
         // Create security token
         let token_id = self.generate_token_id(proxy_addr)?;
         let token = SecurityToken {
@@ -166,15 +170,20 @@ impl QuantumSecurity {
 
         // Return combined: [4-byte sig_len][signature][encrypted_payload]
         let sig_len = token_clone.signature.len() as u32;
-        let mut access_tokens = Vec::with_capacity(4 + token_clone.signature.len() + token_clone.encrypted_payload.len());
+        let mut access_tokens = Vec::with_capacity(
+            4 + token_clone.signature.len() + token_clone.encrypted_payload.len(),
+        );
         access_tokens.extend_from_slice(&sig_len.to_be_bytes());
         access_tokens.extend_from_slice(&token_clone.signature);
         access_tokens.extend_from_slice(&token_clone.encrypted_payload);
 
-        tracing::debug!("Generated quantum security tokens for proxy address: {}", proxy_addr);
+        tracing::debug!(
+            "Generated quantum security tokens for proxy address: {}",
+            proxy_addr
+        );
         Ok(access_tokens)
     }
-    
+
     /// Validate quantum-resistant access tokens
     pub async fn validate_access_tokens(&self, tokens: &[u8]) -> AssetResult<bool> {
         // Format: [4-byte sig_len][signature][encrypted_payload]
@@ -189,57 +198,58 @@ impl QuantumSecurity {
 
         let signature = &tokens[4..4 + sig_len];
         let encrypted_payload = &tokens[4 + sig_len..];
-        
+
         // Decrypt payload
         let payload = match self.kyber_encryption.decrypt(encrypted_payload).await {
             Ok(p) => p,
             Err(_) => return Ok(false),
         };
-        
+
         // Verify signature
-        let signature_valid = match self.falcon_signer.verify(&payload, signature).await {
-            Ok(valid) => valid,
-            Err(_) => false,
-        };
-        
+        let signature_valid = self
+            .falcon_signer
+            .verify(&payload, signature)
+            .await
+            .unwrap_or_default();
+
         if !signature_valid {
             tracing::warn!("Quantum security token signature validation failed");
             return Ok(false);
         }
-        
+
         // Validate payload structure and expiration
         let token_valid = self.validate_token_payload(&payload).await?;
-        
+
         tracing::debug!("Quantum security token validation result: {}", token_valid);
         Ok(token_valid)
     }
-    
+
     /// Create token payload for signing/encryption
     fn create_token_payload(&self, proxy_addr: &ProxyAddress) -> AssetResult<Vec<u8>> {
         let mut payload = Vec::new();
-        
+
         // Add proxy address components
         payload.extend_from_slice(&proxy_addr.network_id);
         payload.extend_from_slice(&proxy_addr.node_id);
         payload.extend_from_slice(&proxy_addr.asset_port.to_le_bytes());
         payload.extend_from_slice(&proxy_addr.access_token);
-        
+
         // Add timestamp
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|_| AssetError::AdapterError {
-                message: "Invalid system time".to_string()
+                message: "Invalid system time".to_string(),
             })?
             .as_secs();
         payload.extend_from_slice(&timestamp.to_le_bytes());
-        
+
         // Add random nonce
         let nonce: u64 = fastrand::u64(..);
         payload.extend_from_slice(&nonce.to_le_bytes());
-        
+
         Ok(payload)
     }
-    
+
     /// Generate unique token ID
     fn generate_token_id(&self, proxy_addr: &ProxyAddress) -> AssetResult<String> {
         let mut hasher = blake3::Hasher::new();
@@ -249,7 +259,7 @@ impl QuantumSecurity {
         let nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|_| AssetError::AdapterError {
-                message: "Invalid system time for token ID generation".to_string()
+                message: "Invalid system time for token ID generation".to_string(),
             })?
             .as_nanos();
         hasher.update(&nanos.to_le_bytes());
@@ -257,51 +267,55 @@ impl QuantumSecurity {
         let hash = hasher.finalize();
         Ok(hex::encode(&hash.as_bytes()[..16])) // Use first 16 bytes as token ID
     }
-    
+
     /// Store active token
     async fn store_active_token(&self, token_id: String, _token: SecurityToken) {
         // TODO: In real implementation, this would be thread-safe
         // For now, we'll simulate token storage
         tracing::debug!("Stored security token: {}", token_id);
     }
-    
+
     /// Validate token payload structure and expiration
     async fn validate_token_payload(&self, payload: &[u8]) -> AssetResult<bool> {
-        if payload.len() < 32 { // Minimum expected size
+        if payload.len() < 32 {
+            // Minimum expected size
             return Ok(false);
         }
-        
+
         // Extract timestamp from payload (last 8 bytes before nonce)
         if payload.len() >= 16 {
             let timestamp_bytes = &payload[payload.len() - 16..payload.len() - 8];
-            let timestamp = u64::from_le_bytes(timestamp_bytes.try_into().map_err(|_| AssetError::AdapterError {
-                message: "Invalid timestamp bytes in token payload".to_string()
+            let timestamp = u64::from_le_bytes(timestamp_bytes.try_into().map_err(|_| {
+                AssetError::AdapterError {
+                    message: "Invalid timestamp bytes in token payload".to_string(),
+                }
             })?);
-            
+
             let token_time = SystemTime::UNIX_EPOCH + Duration::from_secs(timestamp);
             let now = SystemTime::now();
-            
+
             // Check if token has expired
             if token_time + self.config.token_lifetime < now {
                 return Ok(false);
             }
-            
+
             // Check if token is from the future (clock skew protection)
-            if token_time > now + Duration::from_secs(300) { // 5 minute tolerance
+            if token_time > now + Duration::from_secs(300) {
+                // 5 minute tolerance
                 return Ok(false);
             }
         }
-        
+
         Ok(true)
     }
-    
+
     /// Revoke security token
     pub async fn revoke_token(&self, token_id: &str) -> AssetResult<()> {
         // TODO: Implement token revocation
         tracing::info!("Revoked security token: {}", token_id);
         Ok(())
     }
-    
+
     /// Cleanup expired tokens
     pub async fn cleanup_expired_tokens(&self) -> AssetResult<u64> {
         // TODO: Implement expired token cleanup
@@ -323,10 +337,11 @@ impl FalconSigner {
 
     /// Sign data with FALCON-1024
     pub async fn sign(&self, data: &[u8]) -> AssetResult<Vec<u8>> {
-        let sk = falcon1024::SecretKey::from_bytes(&self.secret_key_bytes)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid FALCON-1024 secret key: {}", e),
-            })?;
+        let sk = falcon1024::SecretKey::from_bytes(&self.secret_key_bytes).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid FALCON-1024 secret key: {e}"),
+            }
+        })?;
 
         let sig = falcon1024::detached_sign(data, &sk);
         let sig_bytes = sig.as_bytes().to_vec();
@@ -337,10 +352,11 @@ impl FalconSigner {
 
     /// Verify FALCON-1024 signature
     pub async fn verify(&self, data: &[u8], signature: &[u8]) -> AssetResult<bool> {
-        let pk = falcon1024::PublicKey::from_bytes(&self.public_key_bytes)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid FALCON-1024 public key: {}", e),
-            })?;
+        let pk = falcon1024::PublicKey::from_bytes(&self.public_key_bytes).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid FALCON-1024 public key: {e}"),
+            }
+        })?;
 
         let sig = match falcon1024::DetachedSignature::from_bytes(signature) {
             Ok(s) => s,
@@ -376,10 +392,11 @@ impl KyberEncryption {
     ///
     /// Output format: [4-byte KEM ciphertext length][KEM ciphertext][12-byte nonce][16-byte tag][AES ciphertext]
     pub async fn encrypt(&self, data: &[u8]) -> AssetResult<Vec<u8>> {
-        let pk = kyber1024::PublicKey::from_bytes(&self.public_key_bytes)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 public key: {}", e),
-            })?;
+        let pk = kyber1024::PublicKey::from_bytes(&self.public_key_bytes).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 public key: {e}"),
+            }
+        })?;
 
         // KEM encapsulation produces a shared secret and ciphertext
         let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
@@ -392,9 +409,10 @@ impl KyberEncryption {
         let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());
 
         let mut buffer = data.to_vec();
-        let tag = cipher.encrypt_in_place_detached(&nonce, b"", &mut buffer)
+        let tag = cipher
+            .encrypt_in_place_detached(&nonce, b"", &mut buffer)
             .map_err(|e| AssetError::AdapterError {
-                message: format!("AES-GCM encryption failed: {}", e),
+                message: format!("AES-GCM encryption failed: {e}"),
             })?;
 
         // Build output: [kem_ct_len (4 bytes)][kem_ct][nonce (12)][tag (16)][aes_ct]
@@ -406,7 +424,11 @@ impl KyberEncryption {
         output.extend_from_slice(&tag);
         output.extend_from_slice(&buffer);
 
-        tracing::debug!("Kyber-1024 encrypted {} bytes -> {} bytes", data.len(), output.len());
+        tracing::debug!(
+            "Kyber-1024 encrypted {} bytes -> {} bytes",
+            data.len(),
+            output.len()
+        );
         Ok(output)
     }
 
@@ -420,8 +442,10 @@ impl KyberEncryption {
         }
 
         let kem_ct_len = u32::from_be_bytes([
-            encrypted_data[0], encrypted_data[1],
-            encrypted_data[2], encrypted_data[3],
+            encrypted_data[0],
+            encrypted_data[1],
+            encrypted_data[2],
+            encrypted_data[3],
         ]) as usize;
 
         let min_len = 4 + kem_ct_len + 12 + 16; // header + kem_ct + nonce + tag
@@ -437,15 +461,17 @@ impl KyberEncryption {
         let aes_ct = &encrypted_data[4 + kem_ct_len + 28..];
 
         // KEM decapsulation
-        let sk = kyber1024::SecretKey::from_bytes(&self.secret_key_bytes)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 secret key: {}", e),
-            })?;
+        let sk = kyber1024::SecretKey::from_bytes(&self.secret_key_bytes).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 secret key: {e}"),
+            }
+        })?;
 
-        let kem_ct = kyber1024::Ciphertext::from_bytes(kem_ct_bytes)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 ciphertext: {}", e),
-            })?;
+        let kem_ct = kyber1024::Ciphertext::from_bytes(kem_ct_bytes).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 ciphertext: {e}"),
+            }
+        })?;
 
         let shared_secret = kyber1024::decapsulate(&kem_ct, &sk);
         let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
@@ -457,9 +483,10 @@ impl KyberEncryption {
         let tag = Tag::from_slice(tag_bytes);
 
         let mut buffer = aes_ct.to_vec();
-        cipher.decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
+        cipher
+            .decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
             .map_err(|e| AssetError::AdapterError {
-                message: format!("AES-GCM decryption failed: {}", e),
+                message: format!("AES-GCM decryption failed: {e}"),
             })?;
 
         tracing::debug!("Kyber-1024 decrypted {} bytes", buffer.len());
@@ -484,13 +511,15 @@ impl KyberEncryption {
 mod tests {
     use super::*;
     use crate::assets::core::ProxyAddress;
-    
+
     #[tokio::test]
     async fn test_quantum_security_creation() {
-        let security = QuantumSecurity::new().await.expect("Failed to create QuantumSecurity");
+        let security = QuantumSecurity::new()
+            .await
+            .expect("Failed to create QuantumSecurity");
         assert_eq!(security._active_tokens.len(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_falcon_signer() {
         let signer = FalconSigner::new().expect("Failed to create FalconSigner");
@@ -499,35 +528,55 @@ mod tests {
         let signature = signer.sign(test_data).await.expect("Failed to sign data");
         assert!(!signature.is_empty());
 
-        let valid = signer.verify(test_data, &signature).await.expect("Failed to verify signature");
+        let valid = signer
+            .verify(test_data, &signature)
+            .await
+            .expect("Failed to verify signature");
         assert!(valid);
 
         // Test with different data - should not verify
-        let invalid = signer.verify(b"different message", &signature).await.expect("Failed to verify invalid signature");
+        let invalid = signer
+            .verify(b"different message", &signature)
+            .await
+            .expect("Failed to verify invalid signature");
         assert!(!invalid);
     }
-    
+
     #[tokio::test]
     async fn test_kyber_encryption() {
         let kyber = KyberEncryption::new().expect("Failed to create KyberEncryption");
         let test_data = b"sensitive data for encryption";
 
-        let encrypted = kyber.encrypt(test_data).await.expect("Failed to encrypt data");
+        let encrypted = kyber
+            .encrypt(test_data)
+            .await
+            .expect("Failed to encrypt data");
         assert_ne!(encrypted, test_data);
 
-        let decrypted = kyber.decrypt(&encrypted).await.expect("Failed to decrypt data");
+        let decrypted = kyber
+            .decrypt(&encrypted)
+            .await
+            .expect("Failed to decrypt data");
         assert_eq!(decrypted, test_data);
     }
-    
+
     #[tokio::test]
     async fn test_access_token_generation_and_validation() {
-        let security = QuantumSecurity::new().await.expect("Failed to create QuantumSecurity");
+        let security = QuantumSecurity::new()
+            .await
+            .expect("Failed to create QuantumSecurity");
         let proxy_addr = ProxyAddress::new([1u8; 16], [2u8; 8], 8080);
 
-        let tokens = security.generate_access_tokens(&proxy_addr).await.expect("Failed to generate access tokens");
+        let tokens = security
+            .generate_access_tokens(&proxy_addr)
+            .await
+            .expect("Failed to generate access tokens");
         assert!(!tokens.is_empty());
 
-        let valid = security.validate_access_tokens(&tokens).await.expect("Failed to validate access tokens");
+        let valid = security
+            .validate_access_tokens(&tokens)
+            .await
+            .expect("Failed to validate access tokens");
         assert!(valid);
     }
 }

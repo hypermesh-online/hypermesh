@@ -13,17 +13,16 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 // Use local Catalog AssetPackage
-use crate::assets::AssetPackage;
-use super::config::{ValidationConfig, SecuritySeverity};
+use super::config::{SecuritySeverity, ValidationConfig};
 use super::dependency::{DependencyResolver, VersionConflict};
 use super::results::{
-    ValidationResult, ValidationSummary, SecurityValidationResult,
-    SyntaxValidationResult, PerformanceValidationResult,
-    ComplianceValidationResult, RiskLevel, ResourceUsage,
-    ComplexityAnalysis, HalsteadMetrics
+    ComplexityAnalysis, ComplianceValidationResult, HalsteadMetrics, PerformanceValidationResult,
+    ResourceUsage, RiskLevel, SecurityValidationResult, SyntaxValidationResult, ValidationResult,
+    ValidationSummary,
 };
 use super::scanners::StaticSecurityScanner;
 use super::traits::{SecurityScanner, TypeValidator};
+use crate::assets::AssetPackage;
 
 /// Asset validator for comprehensive package validation
 pub struct AssetValidator {
@@ -35,6 +34,12 @@ pub struct AssetValidator {
     security_scanners: Vec<Box<dyn SecurityScanner>>,
     /// Dependency resolver
     dependency_resolver: DependencyResolver,
+}
+
+impl Default for AssetValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AssetValidator {
@@ -67,7 +72,8 @@ impl AssetValidator {
 
     /// Register default security scanners
     fn register_default_scanners(&mut self) {
-        self.security_scanners.push(Box::new(StaticSecurityScanner::new()));
+        self.security_scanners
+            .push(Box::new(StaticSecurityScanner::new()));
     }
 
     /// Register a custom type validator
@@ -184,11 +190,17 @@ impl AssetValidator {
             let result = scanner.scan(asset).await?;
 
             // Combine results
-            combined_result.vulnerabilities.extend(result.vulnerabilities);
+            combined_result
+                .vulnerabilities
+                .extend(result.vulnerabilities);
             combined_result.malware.extend(result.malware);
-            combined_result.injection_risks.extend(result.injection_risks);
+            combined_result
+                .injection_risks
+                .extend(result.injection_risks);
             combined_result.rule_failures.extend(result.rule_failures);
-            combined_result.recommendations.extend(result.recommendations);
+            combined_result
+                .recommendations
+                .extend(result.recommendations);
 
             // Take minimum score
             combined_result.score = combined_result.score.min(result.score);
@@ -198,14 +210,17 @@ impl AssetValidator {
     }
 
     /// Validate asset performance
-    async fn validate_performance(&self, _asset: &AssetPackage) -> Result<PerformanceValidationResult> {
+    async fn validate_performance(
+        &self,
+        _asset: &AssetPackage,
+    ) -> Result<PerformanceValidationResult> {
         // Simplified performance validation
         Ok(PerformanceValidationResult {
             resource_usage: ResourceUsage {
                 cpu_usage: 10.0,
                 memory_usage: 100 * 1024 * 1024, // 100MB
-                disk_io: 1024 * 1024,             // 1MB/s
-                network_io: 512 * 1024,           // 512KB/s
+                disk_io: 1024 * 1024,            // 1MB/s
+                network_io: 512 * 1024,          // 512KB/s
             },
             complexity: ComplexityAnalysis {
                 cyclomatic_complexity: 10,
@@ -230,7 +245,10 @@ impl AssetValidator {
     }
 
     /// Validate asset compliance
-    async fn validate_compliance(&self, _asset: &AssetPackage) -> Result<ComplianceValidationResult> {
+    async fn validate_compliance(
+        &self,
+        _asset: &AssetPackage,
+    ) -> Result<ComplianceValidationResult> {
         // Simplified compliance validation
         Ok(ComplianceValidationResult {
             compliant: true,
@@ -323,7 +341,8 @@ impl AssetValidator {
                 return false;
             }
 
-            let critical_count = sec.vulnerabilities
+            let critical_count = sec
+                .vulnerabilities
                 .iter()
                 .filter(|v| v.severity == SecuritySeverity::Critical)
                 .count() as u32;
@@ -351,7 +370,10 @@ impl AssetValidator {
     }
 
     /// Validate dependencies
-    pub async fn validate_dependencies(&self, asset: &AssetPackage) -> Result<Vec<VersionConflict>> {
+    pub async fn validate_dependencies(
+        &self,
+        asset: &AssetPackage,
+    ) -> Result<Vec<VersionConflict>> {
         let graph = self.dependency_resolver.resolve(asset).await?;
 
         // Check dependency depth

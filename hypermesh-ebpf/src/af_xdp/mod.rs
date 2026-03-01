@@ -15,11 +15,11 @@
 //! Without `kernel-attach` or when the kernel probe fails, sockets track
 //! statistics and fall back to standard I/O.
 
-mod kernel_types;
+mod batch_io;
 mod helpers;
+mod kernel_types;
 mod manager;
 mod socket_io;
-mod batch_io;
 
 pub use manager::*;
 
@@ -66,7 +66,9 @@ mod tests {
     #[test]
     fn test_af_xdp_socket_close() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let _socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let _socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
 
         assert!(manager.close_socket("eth0", 0).is_ok());
         assert_eq!(manager.socket_count(), 0);
@@ -78,7 +80,9 @@ mod tests {
     #[test]
     fn test_af_xdp_socket_not_kernel_backed() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         assert!(!socket.is_kernel_backed());
         assert_eq!(socket.interface(), "eth0");
         assert_eq!(socket.queue_id(), 0);
@@ -87,7 +91,9 @@ mod tests {
     #[test]
     fn test_af_xdp_socket_free_frames_fallback() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         // Non-kernel-backed sockets report 0 free frames
         assert_eq!(socket.free_frames(), 0);
     }
@@ -95,7 +101,9 @@ mod tests {
     #[test]
     fn test_af_xdp_socket_clone() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         let cloned = socket.clone();
         assert_eq!(cloned.interface(), "eth0");
         assert_eq!(cloned.queue_id(), 0);
@@ -152,8 +160,12 @@ mod tests {
     #[test]
     fn test_af_xdp_manager_close_all() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let _s1 = manager.create_socket("eth0", 0).expect("test: create socket 1");
-        let _s2 = manager.create_socket("eth1", 0).expect("test: create socket 2");
+        let _s1 = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket 1");
+        let _s2 = manager
+            .create_socket("eth1", 0)
+            .expect("test: create socket 2");
         assert_eq!(manager.socket_count(), 2);
 
         manager.close_all().expect("test: close all");
@@ -163,7 +175,9 @@ mod tests {
     #[tokio::test]
     async fn test_af_xdp_send_fallback_error() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         let result = socket.send(&[1, 2, 3, 4]).await;
         assert!(result.is_err());
         let stats = socket.get_stats();
@@ -174,7 +188,9 @@ mod tests {
     #[tokio::test]
     async fn test_af_xdp_receive_fallback_error() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         let result = socket.receive().await;
         assert!(result.is_err());
         let stats = socket.get_stats();
@@ -184,7 +200,9 @@ mod tests {
     #[tokio::test]
     async fn test_af_xdp_send_batch_fallback_error() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         let packets: Vec<&[u8]> = vec![&[1, 2], &[3, 4, 5]];
         let result = socket.send_batch(&packets).await;
         assert!(result.is_err());
@@ -196,7 +214,9 @@ mod tests {
     #[tokio::test]
     async fn test_af_xdp_receive_batch_fallback_error() {
         let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager.create_socket("eth0", 0).expect("test: create socket");
+        let socket = manager
+            .create_socket("eth0", 0)
+            .expect("test: create socket");
         let result = socket.receive_batch(10).await;
         assert!(result.is_err());
         let stats = socket.get_stats();
@@ -205,9 +225,9 @@ mod tests {
 
     #[cfg(feature = "kernel-attach")]
     mod kernel_tests {
+        use super::super::helpers::validate_config;
         use super::super::kernel_types::*;
         use super::super::manager::*;
-        use super::super::helpers::validate_config;
 
         #[test]
         fn test_validate_config_valid() {

@@ -4,7 +4,7 @@
 
 //! AF_XDP batch packet I/O: send_batch, receive_batch, and batch kernel helpers.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 #[cfg(feature = "kernel-attach")]
@@ -43,9 +43,10 @@ impl AfXdpSocket {
     /// Batch send via kernel: enqueue multiple frames then kick once.
     #[cfg(feature = "kernel-attach")]
     fn send_batch_kernel(&self, packets: &[&[u8]]) -> Result<usize> {
-        let ks = self.kernel_state.as_ref().ok_or_else(|| {
-            anyhow!("kernel_backed=true but no kernel state")
-        })?;
+        let ks = self
+            .kernel_state
+            .as_ref()
+            .ok_or_else(|| anyhow!("kernel_backed=true but no kernel state"))?;
 
         let max_payload = ks.frame_size as usize - ks.headroom as usize;
 
@@ -128,10 +129,7 @@ impl AfXdpSocket {
     }
 
     /// Receive multiple packets in batch
-    pub async fn receive_batch(
-        &self,
-        max_packets: usize,
-    ) -> Result<Vec<Bytes>> {
+    pub async fn receive_batch(&self, max_packets: usize) -> Result<Vec<Bytes>> {
         if !self.kernel_backed {
             self.stats.write().rx_ring_empty += 1;
             return Err(anyhow!(
@@ -154,9 +152,10 @@ impl AfXdpSocket {
     /// Batch receive via kernel: drain RX ring up to max_packets.
     #[cfg(feature = "kernel-attach")]
     fn receive_batch_kernel(&self, max_packets: usize) -> Result<Vec<Bytes>> {
-        let ks = self.kernel_state.as_ref().ok_or_else(|| {
-            anyhow!("kernel_backed=true but no kernel state")
-        })?;
+        let ks = self
+            .kernel_state
+            .as_ref()
+            .ok_or_else(|| anyhow!("kernel_backed=true but no kernel state"))?;
 
         let mut cons = ks.rx_ring.load_consumer();
         let prod = ks.rx_ring.load_producer();
@@ -198,11 +197,7 @@ impl AfXdpSocket {
 
             let mut buf = vec![0u8; len];
             unsafe {
-                std::ptr::copy_nonoverlapping(
-                    ks.umem_area.add(addr),
-                    buf.as_mut_ptr(),
-                    len,
-                );
+                std::ptr::copy_nonoverlapping(ks.umem_area.add(addr), buf.as_mut_ptr(), len);
             }
 
             // Calculate frame base address for refill

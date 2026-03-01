@@ -4,8 +4,8 @@
 
 //! Asset validation types - validation status, errors, warnings, security scan results
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Asset validation status
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -10,8 +10,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetRegistration, AssetResult, AssetError,
-    ProxyAddress, GpuRequirements, ConsensusProof,
+    AssetError, AssetRegistration, AssetResult, ConsensusProof, GpuRequirements, ProxyAddress,
 };
 
 use super::types::*;
@@ -47,16 +46,22 @@ impl GpuAssetAdapter {
         let mut available_devices: Vec<u32> = devices
             .iter()
             .filter(|(_, device)| {
-                matches!(device.status, GpuStatus::Available) &&
-                device.available_memory_bytes >= gpu_req.min_memory_mb.unwrap_or(0) as u64 * 1024 * 1024 &&
-                gpu_req.compute_capability.as_ref().map_or(true, |cc| device.compute_capability >= *cc)
+                matches!(device.status, GpuStatus::Available)
+                    && device.available_memory_bytes
+                        >= gpu_req.min_memory_mb.unwrap_or(0) * 1024 * 1024
+                    && gpu_req
+                        .compute_capability
+                        .as_ref()
+                        .is_none_or(|cc| device.compute_capability >= *cc)
             })
             .map(|(device_id, _)| *device_id)
             .collect();
 
         // Sort by available memory (largest first)
         available_devices.sort_by_key(|device_id| {
-            let device = devices.get(device_id).expect("device_id from filtered iterator must exist");
+            let device = devices
+                .get(device_id)
+                .expect("device_id from filtered iterator must exist");
             std::cmp::Reverse(device.available_memory_bytes)
         });
 
@@ -65,18 +70,22 @@ impl GpuAssetAdapter {
             return Err(AssetError::AllocationFailed {
                 reason: format!(
                     "Insufficient GPU devices: {} requested, {} available",
-                    gpu_req.units, available_devices.len()
-                )
+                    gpu_req.units,
+                    available_devices.len()
+                ),
             });
         }
 
         // Allocate the requested number of devices
-        let memory_per_device = gpu_req.min_memory_mb.unwrap_or(1024) as u64 * 1024 * 1024;
+        let memory_per_device = gpu_req.min_memory_mb.unwrap_or(1024) * 1024 * 1024;
 
         for &device_id in available_devices.iter().take(gpu_req.units as usize) {
-            let device = devices.get_mut(&device_id).ok_or_else(|| AssetError::AllocationFailed {
-                reason: format!("GPU device {} disappeared during allocation", device_id),
-            })?;
+            let device =
+                devices
+                    .get_mut(&device_id)
+                    .ok_or_else(|| AssetError::AllocationFailed {
+                        reason: format!("GPU device {device_id} disappeared during allocation"),
+                    })?;
 
             if device.available_memory_bytes < memory_per_device {
                 continue;
@@ -103,7 +112,7 @@ impl GpuAssetAdapter {
             }
 
             return Err(AssetError::AllocationFailed {
-                reason: "Insufficient GPU memory across available devices".to_string()
+                reason: "Insufficient GPU memory across available devices".to_string(),
             });
         }
 
@@ -115,16 +124,26 @@ impl GpuAssetAdapter {
         let mut node_id = [0u8; 8];
         node_id.copy_from_slice(&asset_id.content_hash[..8]);
         ProxyAddress::new(
-            [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad,
-             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
+            [
+                0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01,
+            ],
             node_id,
-            8080
+            8080,
         )
     }
 
     /// Create GPU compute context for isolation
-    pub(crate) async fn create_gpu_context(&self, asset_id: &AssetRegistration, device_id: u32) -> String {
-        let context_id = format!("gpu_ctx_{}_{}", device_id, hex::encode(&asset_id.content_hash[..8]));
+    pub(crate) async fn create_gpu_context(
+        &self,
+        asset_id: &AssetRegistration,
+        device_id: u32,
+    ) -> String {
+        let context_id = format!(
+            "gpu_ctx_{}_{}",
+            device_id,
+            hex::encode(&asset_id.content_hash[..8])
+        );
 
         let context = GpuContext {
             context_id: context_id.clone(),
@@ -143,12 +162,20 @@ impl GpuAssetAdapter {
     }
 
     /// Accelerate consensus proof validation using GPU
-    pub(crate) async fn accelerate_consensus_validation(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    pub(crate) async fn accelerate_consensus_validation(
+        &self,
+        proof: &ConsensusProof,
+    ) -> AssetResult<bool> {
         Ok(proof.validate())
     }
 
     /// Update usage statistics
-    pub(crate) async fn update_usage_stats(&self, operation: GpuOperation, _devices: u32, memory_bytes: u64) {
+    pub(crate) async fn update_usage_stats(
+        &self,
+        operation: GpuOperation,
+        _devices: u32,
+        memory_bytes: u64,
+    ) {
         let mut stats = self.usage_stats.write().await;
 
         match operation {
@@ -156,18 +183,19 @@ impl GpuAssetAdapter {
                 stats.total_allocations += 1;
                 stats.active_allocations += 1;
                 stats.total_memory_allocated += memory_bytes;
-            },
+            }
             GpuOperation::Deallocate => {
                 stats.total_deallocations += 1;
                 stats.active_allocations = stats.active_allocations.saturating_sub(1);
-                stats.total_memory_allocated = stats.total_memory_allocated.saturating_sub(memory_bytes);
-            },
+                stats.total_memory_allocated =
+                    stats.total_memory_allocated.saturating_sub(memory_bytes);
+            }
             GpuOperation::_Compute => {
                 stats.compute_operations += 1;
-            },
+            }
             GpuOperation::_MemoryTransfer => {
                 stats.memory_transfers += 1;
-            },
+            }
         }
     }
 }

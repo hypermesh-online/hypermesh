@@ -7,12 +7,12 @@
 //! This module provides comprehensive performance monitoring for the intelligence layer,
 //! tracking latency, throughput, and resource utilization across all components.
 
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use std::collections::{HashMap, VecDeque};
 use tokio::sync::RwLock;
 use tracing::instrument;
-use serde::{Serialize, Deserialize};
 
 /// Performance monitor for the intelligence layer
 pub struct PerformanceMonitor {
@@ -272,13 +272,15 @@ impl LatencyTracker {
         let max = *self.samples.iter().max().unwrap_or(&0);
 
         // Calculate standard deviation
-        let variance: f64 = self.samples
+        let variance: f64 = self
+            .samples
             .iter()
             .map(|&x| {
                 let diff = x as f64 - avg as f64;
                 diff * diff
             })
-            .sum::<f64>() / self.samples.len() as f64;
+            .sum::<f64>()
+            / self.samples.len() as f64;
 
         let std_dev = variance.sqrt() as u64;
 
@@ -289,10 +291,7 @@ impl LatencyTracker {
         percentiles.insert("p95".to_string(), self.calculate_percentile(95.0));
         percentiles.insert("p99".to_string(), self.calculate_percentile(99.0));
 
-        let histogram: Vec<(u64, u64)> = self.histogram
-            .iter()
-            .map(|(&k, &v)| (k, v))
-            .collect();
+        let histogram: Vec<(u64, u64)> = self.histogram.iter().map(|(&k, &v)| (k, v)).collect();
 
         LatencyMetrics {
             min_ms: min,
@@ -398,13 +397,9 @@ impl ThroughputTracker {
             return 0.0;
         }
 
-        let total_bytes: u64 = self.bytes_processed
-            .iter()
-            .map(|(_, bytes)| bytes)
-            .sum();
+        let total_bytes: u64 = self.bytes_processed.iter().map(|(_, bytes)| bytes).sum();
 
-        let mbps = (total_bytes as f64 / 1_048_576.0) / self.window.as_secs_f64();
-        mbps
+        (total_bytes as f64 / 1_048_576.0) / self.window.as_secs_f64()
     }
 
     fn get_metrics(&self) -> ThroughputMetrics {
@@ -492,7 +487,9 @@ impl PerformanceMonitor {
             enabled,
             metrics: Arc::new(RwLock::new(PerformanceMetrics::default())),
             latency_tracker: Arc::new(RwLock::new(LatencyTracker::new(10000))),
-            throughput_tracker: Arc::new(RwLock::new(ThroughputTracker::new(Duration::from_secs(60)))),
+            throughput_tracker: Arc::new(RwLock::new(ThroughputTracker::new(Duration::from_secs(
+                60,
+            )))),
             resource_tracker: Arc::new(RwLock::new(ResourceTracker::new(1000))),
         }
     }
@@ -516,7 +513,10 @@ impl PerformanceMonitor {
         self.latency_tracker.write().await.record(latency_ms);
 
         // Update throughput tracker
-        self.throughput_tracker.write().await.record_operation(bytes);
+        self.throughput_tracker
+            .write()
+            .await
+            .record_operation(bytes);
 
         // Update metrics
         let mut metrics = self.metrics.write().await;
@@ -527,7 +527,8 @@ impl PerformanceMonitor {
         }
 
         // Update component metrics
-        let component_metrics = metrics.component_metrics
+        let component_metrics = metrics
+            .component_metrics
             .entry(component.to_string())
             .or_insert_with(ComponentMetrics::default);
 
@@ -538,16 +539,17 @@ impl PerformanceMonitor {
             component_metrics.errors += 1;
         }
 
-        component_metrics.success_rate =
-            (component_metrics.operations - component_metrics.errors) as f64
+        component_metrics.success_rate = (component_metrics.operations - component_metrics.errors)
+            as f64
             / component_metrics.operations as f64;
 
         // Update average latency for component
         if component_metrics.operations == 1 {
             component_metrics.avg_latency_ms = latency_ms;
         } else {
-            component_metrics.avg_latency_ms =
-                (component_metrics.avg_latency_ms * (component_metrics.operations - 1) + latency_ms)
+            component_metrics.avg_latency_ms = (component_metrics.avg_latency_ms
+                * (component_metrics.operations - 1)
+                + latency_ms)
                 / component_metrics.operations;
         }
     }
@@ -601,11 +603,14 @@ impl PerformanceMonitor {
         let mut recommendations = Vec::new();
 
         if latency.percentiles.get("p99").copied().unwrap_or(0) > 1000 {
-            recommendations.push("High P99 latency detected - consider optimizing slow operations".to_string());
+            recommendations.push(
+                "High P99 latency detected - consider optimizing slow operations".to_string(),
+            );
         }
 
         if throughput.current_ops_per_sec < throughput.avg_ops_per_sec * 0.5 {
-            recommendations.push("Throughput degradation detected - investigate bottlenecks".to_string());
+            recommendations
+                .push("Throughput degradation detected - investigate bottlenecks".to_string());
         }
 
         if resources.cpu_percentage > 80.0 {
@@ -649,12 +654,14 @@ mod tests {
 
         // Record some operations
         for i in 0..10 {
-            monitor.record_operation(
-                "test_component",
-                Duration::from_millis(50 + i * 10),
-                Some(1024 * (i + 1) as u64),
-                true,
-            ).await;
+            monitor
+                .record_operation(
+                    "test_component",
+                    Duration::from_millis(50 + i * 10),
+                    Some(1024 * (i + 1)),
+                    true,
+                )
+                .await;
         }
 
         // Record resources

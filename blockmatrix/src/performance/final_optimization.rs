@@ -160,7 +160,7 @@ impl FinalPerformanceOptimizer {
 
         // Update optimization status
         {
-            let mut status = self.optimization_status.write().unwrap();
+            let mut status = self.optimization_status.write().expect("rwlock should not be poisoned");
             status.memory_optimization_active = true;
             status.stoq_optimization_active = true;
             status.container_optimization_active = true;
@@ -361,7 +361,7 @@ impl FinalPerformanceOptimizer {
 
     /// Get current optimization status
     pub fn get_optimization_status(&self) -> OptimizationStatus {
-        self.optimization_status.read().unwrap().clone()
+        self.optimization_status.read().expect("rwlock should not be poisoned").clone()
     }
 
     /// Enable continuous optimization monitoring
@@ -585,7 +585,7 @@ mod tests {
     async fn test_optimization_status_tracking() {
         let metrics_collector = Arc::new(MetricsCollector::new());
         let targets = PerformanceTargets::default();
-        let optimizer = FinalPerformanceOptimizer::new(metrics_collector, targets).await.unwrap();
+        let optimizer = FinalPerformanceOptimizer::new(metrics_collector, targets).await.expect("test: async operation");
 
         let status = optimizer.get_optimization_status();
         assert_eq!(status.overall_optimization_percentage, 0.0);

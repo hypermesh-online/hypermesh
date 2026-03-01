@@ -6,16 +6,14 @@
 
 use crate::assets::*;
 use crate::registry::{
-    SearchQuery, LegacySearchResults as SearchResults,
-    SortCriteria,
     AssetDiscovery, AssetFilters, AssetIndexEntry, AssetSearchResult,
-    RecommendationContext
+    LegacySearchResults as SearchResults, RecommendationContext, SearchQuery, SortCriteria,
 };
 
 use anyhow::Result;
 use std::collections::HashMap;
 
-use super::{HyperMeshAssetRegistry, CatalogMetadata, SearchIndex};
+use super::{CatalogMetadata, HyperMeshAssetRegistry, SearchIndex};
 
 #[async_trait::async_trait]
 impl AssetDiscovery for HyperMeshAssetRegistry {
@@ -38,7 +36,8 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
             }
         } else {
             // Perform text search using inverted index
-            let query_terms: Vec<String> = query.query
+            let query_terms: Vec<String> = query
+                .query
                 .split_whitespace()
                 .map(|s| s.to_lowercase())
                 .collect();
@@ -53,7 +52,7 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
                                 let score = self.calculate_relevance_score(
                                     &package_id,
                                     term,
-                                    &cache.search_index
+                                    &cache.search_index,
                                 );
                                 *scored_results.entry(package_id).or_insert(0.0) += score;
                             }
@@ -120,7 +119,10 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
         Ok(results)
     }
 
-    async fn get_recommendations(&self, context: &RecommendationContext) -> Result<Vec<AssetIndexEntry>> {
+    async fn get_recommendations(
+        &self,
+        context: &RecommendationContext,
+    ) -> Result<Vec<AssetIndexEntry>> {
         let cache = self.catalog_cache.read().await;
         let mut recommendations = Vec::new();
 
@@ -146,7 +148,7 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
             if score > 0.0 {
                 recommendations.push((
                     self.metadata_to_index_entry(*package_id, metadata).await?,
-                    score
+                    score,
                 ));
             }
         }
@@ -156,7 +158,8 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
         // Default to 10 recommendations if not specified
         const DEFAULT_RECOMMENDATION_COUNT: usize = 10;
 
-        Ok(recommendations.into_iter()
+        Ok(recommendations
+            .into_iter()
             .take(DEFAULT_RECOMMENDATION_COUNT)
             .map(|(entry, _)| entry)
             .collect())
@@ -165,7 +168,11 @@ impl AssetDiscovery for HyperMeshAssetRegistry {
 
 impl HyperMeshAssetRegistry {
     /// Check if metadata matches search filters
-    pub(super) async fn matches_filters(&self, metadata: &CatalogMetadata, query: &SearchQuery) -> bool {
+    pub(super) async fn matches_filters(
+        &self,
+        metadata: &CatalogMetadata,
+        query: &SearchQuery,
+    ) -> bool {
         if let Some(_asset_type) = &query.asset_type {
             // Would need to fetch from library to check type
             // For now, assume match
@@ -188,7 +195,11 @@ impl HyperMeshAssetRegistry {
     }
 
     /// Check if metadata matches asset filters
-    pub(super) async fn matches_asset_filters(&self, metadata: &CatalogMetadata, filters: &AssetFilters) -> bool {
+    pub(super) async fn matches_asset_filters(
+        &self,
+        metadata: &CatalogMetadata,
+        filters: &AssetFilters,
+    ) -> bool {
         if !filters.tags.is_empty() {
             let has_all_tags = filters.tags.iter().all(|tag| metadata.tags.contains(tag));
             if !has_all_tags {
@@ -214,7 +225,10 @@ impl HyperMeshAssetRegistry {
         let stats = self.get_package_stats(&package_id).await?;
 
         // Fetch package info from library for complete data
-        let package_info = self.asset_library.get_package(&package_id.to_string()).await
+        let package_info = self
+            .asset_library
+            .get_package(&package_id.to_string())
+            .await
             .ok_or_else(|| anyhow::anyhow!("Package not found in library"))?;
 
         Ok(AssetIndexEntry {
@@ -225,7 +239,7 @@ impl HyperMeshAssetRegistry {
             description: metadata.description.clone(),
             tags: metadata.tags.clone(),
             keywords: metadata.keywords.clone(),
-            location: format!("hypermesh://{}", package_id),
+            location: format!("hypermesh://{package_id}"),
             size: package_info.size,
             hash: package_info.hash.clone(),
             published_at: metadata.updated_at,
@@ -244,13 +258,15 @@ impl HyperMeshAssetRegistry {
         term: &str,
         search_index: &SearchIndex,
     ) -> f64 {
-        let tf = search_index.term_frequencies
+        let tf = search_index
+            .term_frequencies
             .get(term)
             .and_then(|freqs| freqs.get(package_id))
             .copied()
             .unwrap_or(0) as f64;
 
-        let df = search_index.inverted_index
+        let df = search_index
+            .inverted_index
             .get(term)
             .map(|ids| ids.len())
             .unwrap_or(1) as f64;
@@ -261,13 +277,17 @@ impl HyperMeshAssetRegistry {
     }
 
     /// Generate search highlights
-    pub(super) fn generate_highlights(&self, metadata: &CatalogMetadata, query_terms: &[String]) -> Vec<String> {
+    pub(super) fn generate_highlights(
+        &self,
+        metadata: &CatalogMetadata,
+        query_terms: &[String],
+    ) -> Vec<String> {
         let mut highlights = Vec::new();
 
         if let Some(description) = &metadata.description {
             for term in query_terms {
                 if description.to_lowercase().contains(term) {
-                    highlights.push(format!("...{}...", term));
+                    highlights.push(format!("...{term}..."));
                 }
             }
         }
@@ -279,7 +299,11 @@ impl HyperMeshAssetRegistry {
     pub(super) fn sort_results(&self, results: &mut [AssetSearchResult], sort_by: &SortCriteria) {
         match sort_by {
             SortCriteria::Relevance => {
-                results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| {
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             SortCriteria::Published => {
                 results.sort_by(|a, b| b.entry.published_at.cmp(&a.entry.published_at));
@@ -291,7 +315,12 @@ impl HyperMeshAssetRegistry {
                 results.sort_by(|a, b| b.entry.download_count.cmp(&a.entry.download_count));
             }
             SortCriteria::Rating => {
-                results.sort_by(|a, b| b.entry.rating.partial_cmp(&a.entry.rating).unwrap_or(std::cmp::Ordering::Equal));
+                results.sort_by(|a, b| {
+                    b.entry
+                        .rating
+                        .partial_cmp(&a.entry.rating)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
             }
             SortCriteria::Name => {
                 results.sort_by(|a, b| a.entry.name.cmp(&b.entry.name));

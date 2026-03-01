@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use crate::transport::{NetworkTier, CongestionControl};
+use crate::transport::{CongestionControl, NetworkTier};
 
 pub fn congestion_control_for_tier(tier: &NetworkTier) -> CongestionControl {
     match tier {

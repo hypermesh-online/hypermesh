@@ -17,7 +17,7 @@ use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use super::super::types::*;
-use super::{LinuxAbstraction, EbpfProgramState};
+use super::{EbpfProgramState, LinuxAbstraction};
 
 impl LinuxAbstraction {
     /// Validate eBPF program bytecode (basic validation)
@@ -51,8 +51,7 @@ impl LinuxAbstraction {
 
     /// Check CAP_BPF or CAP_SYS_ADMIN capability
     pub(super) fn check_bpf_permissions(&self) -> bool {
-        Path::new("/sys/kernel/debug/tracing").exists()
-            || Path::new("/sys/kernel/tracing").exists()
+        Path::new("/sys/kernel/debug/tracing").exists() || Path::new("/sys/kernel/tracing").exists()
     }
 
     /// SIMULATION ONLY -- does not load real eBPF bytecode into the kernel.
@@ -85,7 +84,10 @@ impl LinuxAbstraction {
             last_update: std::time::SystemTime::now(),
         };
 
-        self.ebpf_programs.lock().map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?.insert(handle, state);
+        self.ebpf_programs
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?
+            .insert(handle, state);
 
         tracing::info!(
             "eBPF program loaded: handle={}, size={} bytes ({} instructions), kernel={:?}",
@@ -104,10 +106,13 @@ impl LinuxAbstraction {
         handle: EbpfHandle,
         attach_type: EbpfAttachType,
     ) -> Result<()> {
-        let mut programs = self.ebpf_programs.lock().map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
+        let mut programs = self
+            .ebpf_programs
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
         let state = programs
             .get_mut(&handle)
-            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {:?}", handle))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {handle:?}"))?;
 
         if state.attached {
             return Err(anyhow::anyhow!(
@@ -145,10 +150,13 @@ impl LinuxAbstraction {
 
     /// SIMULATION ONLY -- returns synthetic metrics, not real kernel data.
     pub(super) fn read_ebpf_metrics_impl(&self, handle: EbpfHandle) -> Result<EbpfMetrics> {
-        let mut programs = self.ebpf_programs.lock().map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
+        let mut programs = self
+            .ebpf_programs
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
         let state = programs
             .get_mut(&handle)
-            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {:?}", handle))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {handle:?}"))?;
 
         if !state.attached {
             return Err(anyhow::anyhow!(
@@ -162,7 +170,7 @@ impl LinuxAbstraction {
         let mut metadata = HashMap::new();
 
         if let Some(ref attach_type) = state.attach_type {
-            metadata.insert("attach_type".to_string(), format!("{:?}", attach_type));
+            metadata.insert("attach_type".to_string(), format!("{attach_type:?}"));
 
             match attach_type {
                 EbpfAttachType::Xdp => {
@@ -204,11 +212,14 @@ impl LinuxAbstraction {
 
     /// SIMULATION ONLY -- removes local state but does not unload kernel programs.
     pub(super) fn unload_ebpf_program_impl(&self, handle: EbpfHandle) -> Result<()> {
-        let mut programs = self.ebpf_programs.lock().map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
+        let mut programs = self
+            .ebpf_programs
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ebpf programs mutex poisoned"))?;
 
         let state = programs
             .remove(&handle)
-            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {:?}", handle))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid eBPF handle: {handle:?}"))?;
 
         tracing::info!(
             "eBPF program unloaded: handle={:?}, was_attached={}, type={:?}",

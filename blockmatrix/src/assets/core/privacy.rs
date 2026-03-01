@@ -9,14 +9,14 @@
 //!
 //! Uses hypermesh_lib::PrivacyMode directly (no type alias).
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
 
 use hypermesh_lib::PrivacyMode;
 
-use super::AssetRegistration;
 use super::status::AssetStatus;
+use super::AssetRegistration;
 
 // ---------------------------------------------------------------------------
 // Free functions operating on PrivacyMode
@@ -314,7 +314,7 @@ impl Default for DurationConfig {
     fn default() -> Self {
         Self {
             max_duration: Some(Duration::from_secs(24 * 60 * 60)), // 24 hours default
-            min_duration: Some(Duration::from_secs(5 * 60)), // 5 minutes minimum
+            min_duration: Some(Duration::from_secs(5 * 60)),       // 5 minutes minimum
             auto_renewal: false,
             grace_period: Duration::from_secs(5 * 60), // 5 minutes
         }
@@ -417,13 +417,21 @@ impl AssetAllocation {
 
     /// Check if access is allowed for a certificate
     pub fn allows_access(&self, certificate_fingerprint: &str) -> bool {
-        self.access_config.allowed_certificates.contains(&certificate_fingerprint.to_string())
+        self.access_config
+            .allowed_certificates
+            .contains(&certificate_fingerprint.to_string())
     }
 
     /// Add allowed certificate
     pub fn add_allowed_certificate(&mut self, certificate_fingerprint: String) {
-        if !self.access_config.allowed_certificates.contains(&certificate_fingerprint) {
-            self.access_config.allowed_certificates.push(certificate_fingerprint);
+        if !self
+            .access_config
+            .allowed_certificates
+            .contains(&certificate_fingerprint)
+        {
+            self.access_config
+                .allowed_certificates
+                .push(certificate_fingerprint);
         }
     }
 
@@ -441,13 +449,18 @@ impl AssetAllocation {
         let base_rate = caesar_reward_multiplier(&self.allocation_config.privacy_level);
 
         // Adjust based on resource allocation
-        let resource_factor = (
-            self.allocation_config.resource_allocation.cpu_allocation +
-            self.allocation_config.resource_allocation.gpu_allocation +
-            self.allocation_config.resource_allocation.memory_allocation +
-            self.allocation_config.resource_allocation.storage_allocation +
-            self.allocation_config.resource_allocation.network_allocation
-        ) / 5.0;
+        let resource_factor = (self.allocation_config.resource_allocation.cpu_allocation
+            + self.allocation_config.resource_allocation.gpu_allocation
+            + self.allocation_config.resource_allocation.memory_allocation
+            + self
+                .allocation_config
+                .resource_allocation
+                .storage_allocation
+            + self
+                .allocation_config
+                .resource_allocation
+                .network_allocation)
+            / 5.0;
 
         base_rate * resource_factor
     }
@@ -456,15 +469,24 @@ impl AssetAllocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::AssetType;
     use crate::assets::core::status::AssetStatus;
     use crate::test_utils::test_asset_id;
+    use crate::AssetType;
 
     #[test]
     fn test_privacy_level_access_control() {
-        assert!(!allows_access_from(&PrivacyMode::ANONYMOUS, &PrivacyMode::PUBLIC));
-        assert!(allows_access_from(&PrivacyMode::PUBLIC, &PrivacyMode::ANONYMOUS));
-        assert!(allows_access_from(&PrivacyMode::PRIVATE, &PrivacyMode::PRIVATE));
+        assert!(!allows_access_from(
+            &PrivacyMode::ANONYMOUS,
+            &PrivacyMode::PUBLIC
+        ));
+        assert!(allows_access_from(
+            &PrivacyMode::PUBLIC,
+            &PrivacyMode::ANONYMOUS
+        ));
+        assert!(allows_access_from(
+            &PrivacyMode::PRIVATE,
+            &PrivacyMode::PRIVATE
+        ));
     }
 
     #[test]
@@ -486,7 +508,10 @@ mod tests {
         let allocation = AssetAllocation::new(asset_id.clone(), status, PrivacyMode::PRIVATE);
 
         assert_eq!(allocation.asset_id, asset_id);
-        assert_eq!(allocation.allocation_config.privacy_level, PrivacyMode::PRIVATE);
+        assert_eq!(
+            allocation.allocation_config.privacy_level,
+            PrivacyMode::PRIVATE
+        );
         assert!(!allocation.is_expired());
     }
 

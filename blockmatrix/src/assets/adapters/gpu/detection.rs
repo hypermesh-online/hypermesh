@@ -24,32 +24,49 @@ impl GpuAssetAdapter {
 
                         for (device_id, gpu_info) in gpu_infos.iter().enumerate() {
                             let device_id = device_id as u32;
-                            let compute_capability = Self::detect_compute_capability(&gpu_info.model, &gpu_info.capabilities);
-                            let (vulkan_compute_units, base_clock, memory_clock) = Self::estimate_gpu_specs(&gpu_info.model);
-                            let (temperature, power) = Self::read_gpu_sensors(&gpu_info.pci_address);
+                            let compute_capability = Self::detect_compute_capability(
+                                &gpu_info.model,
+                                &gpu_info.capabilities,
+                            );
+                            let (vulkan_compute_units, base_clock, memory_clock) =
+                                Self::estimate_gpu_specs(&gpu_info.model);
+                            let (temperature, power) =
+                                Self::read_gpu_sensors(&gpu_info.pci_address);
 
-                            gpu_devices.insert(device_id, GpuDevice {
+                            gpu_devices.insert(
                                 device_id,
-                                device_name: gpu_info.model.clone(),
-                                compute_capability,
-                                total_memory_bytes: gpu_info.memory_bytes.unwrap_or(0),
-                                available_memory_bytes: gpu_info.available_bytes.unwrap_or(gpu_info.memory_bytes.unwrap_or(0)),
-                                vulkan_compute_units,
-                                nova_execution_units: vulkan_compute_units / 128,
-                                base_clock_mhz: base_clock,
-                                memory_clock_mhz: memory_clock,
-                                pci_bus_id: gpu_info.pci_address.clone().unwrap_or_else(|| format!("Unknown:{}", device_id)),
-                                status: GpuStatus::Available,
-                                allocated_to: None,
-                                temperature_celsius: temperature,
-                                power_watts: power,
-                            });
+                                GpuDevice {
+                                    device_id,
+                                    device_name: gpu_info.model.clone(),
+                                    compute_capability,
+                                    total_memory_bytes: gpu_info.memory_bytes.unwrap_or(0),
+                                    available_memory_bytes: gpu_info
+                                        .available_bytes
+                                        .unwrap_or(gpu_info.memory_bytes.unwrap_or(0)),
+                                    vulkan_compute_units,
+                                    nova_execution_units: vulkan_compute_units / 128,
+                                    base_clock_mhz: base_clock,
+                                    memory_clock_mhz: memory_clock,
+                                    pci_bus_id: gpu_info
+                                        .pci_address
+                                        .clone()
+                                        .unwrap_or_else(|| format!("Unknown:{device_id}")),
+                                    status: GpuStatus::Available,
+                                    allocated_to: None,
+                                    temperature_celsius: temperature,
+                                    power_watts: power,
+                                },
+                            );
                         }
 
                         tracing::info!(
                             "Detected {} GPU(s) via OS abstraction: {}",
                             total_devices,
-                            gpu_infos.iter().map(|g| g.model.as_str()).collect::<Vec<_>>().join(", ")
+                            gpu_infos
+                                .iter()
+                                .map(|g| g.model.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
                         );
 
                         return (total_devices, gpu_devices);
@@ -76,33 +93,60 @@ impl GpuAssetAdapter {
         let model_lower = model.to_lowercase();
 
         // NVIDIA GPUs
-        if model_lower.contains("nvidia") || model_lower.contains("geforce") || model_lower.contains("rtx") || model_lower.contains("gtx") {
-            if model_lower.contains("rtx 40") || model_lower.contains("4090") || model_lower.contains("4080") {
+        if model_lower.contains("nvidia")
+            || model_lower.contains("geforce")
+            || model_lower.contains("rtx")
+            || model_lower.contains("gtx")
+        {
+            if model_lower.contains("rtx 40")
+                || model_lower.contains("4090")
+                || model_lower.contains("4080")
+            {
                 return "8.9".to_string();
             }
-            if model_lower.contains("rtx 30") || model_lower.contains("3090") || model_lower.contains("3080") {
+            if model_lower.contains("rtx 30")
+                || model_lower.contains("3090")
+                || model_lower.contains("3080")
+            {
                 return "8.6".to_string();
             }
-            if model_lower.contains("rtx 20") || model_lower.contains("2080") || model_lower.contains("2070") {
+            if model_lower.contains("rtx 20")
+                || model_lower.contains("2080")
+                || model_lower.contains("2070")
+            {
                 return "7.5".to_string();
             }
-            if model_lower.contains("gtx 10") || model_lower.contains("1080") || model_lower.contains("1070") {
+            if model_lower.contains("gtx 10")
+                || model_lower.contains("1080")
+                || model_lower.contains("1070")
+            {
                 return "6.1".to_string();
             }
             return "7.0".to_string();
         }
 
         // AMD GPUs
-        if model_lower.contains("amd") || model_lower.contains("radeon") || model_lower.contains("rx ") {
-            if model_lower.contains("rx 7") { return "RDNA 3".to_string(); }
-            if model_lower.contains("rx 6") { return "RDNA 2".to_string(); }
-            if model_lower.contains("rx 5") { return "RDNA 1".to_string(); }
+        if model_lower.contains("amd")
+            || model_lower.contains("radeon")
+            || model_lower.contains("rx ")
+        {
+            if model_lower.contains("rx 7") {
+                return "RDNA 3".to_string();
+            }
+            if model_lower.contains("rx 6") {
+                return "RDNA 2".to_string();
+            }
+            if model_lower.contains("rx 5") {
+                return "RDNA 1".to_string();
+            }
             return "GCN 5".to_string();
         }
 
         // Intel GPUs
         if model_lower.contains("intel") || model_lower.contains("arc") {
-            if model_lower.contains("arc") { return "Xe-HPG".to_string(); }
+            if model_lower.contains("arc") {
+                return "Xe-HPG".to_string();
+            }
             return "Xe".to_string();
         }
 
@@ -120,13 +164,27 @@ impl GpuAssetAdapter {
     pub(crate) fn estimate_gpu_specs(model: &str) -> (u32, u32, u32) {
         let model_lower = model.to_lowercase();
 
-        if model_lower.contains("4080") { return (9728, 2505, 11400); }
-        if model_lower.contains("4090") { return (16384, 2520, 10080); }
-        if model_lower.contains("3090") { return (10496, 1695, 9750); }
-        if model_lower.contains("3080") { return (8704, 1710, 9500); }
-        if model_lower.contains("7900 xtx") { return (6144, 2500, 10000); }
-        if model_lower.contains("6900 xt") { return (5120, 2250, 8000); }
-        if model_lower.contains("arc a770") { return (4096, 2400, 8560); }
+        if model_lower.contains("4080") {
+            return (9728, 2505, 11400);
+        }
+        if model_lower.contains("4090") {
+            return (16384, 2520, 10080);
+        }
+        if model_lower.contains("3090") {
+            return (10496, 1695, 9750);
+        }
+        if model_lower.contains("3080") {
+            return (8704, 1710, 9500);
+        }
+        if model_lower.contains("7900 xtx") {
+            return (6144, 2500, 10000);
+        }
+        if model_lower.contains("6900 xt") {
+            return (5120, 2250, 8000);
+        }
+        if model_lower.contains("arc a770") {
+            return (4096, 2400, 8560);
+        }
 
         // Default reasonable specs
         (4096, 1800, 7000)

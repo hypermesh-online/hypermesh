@@ -5,9 +5,9 @@
 //! Simple test to verify adaptive optimization works
 //! Shows that configuration changes apply to live connections
 
-use stoq::transport::{StoqTransport, TransportConfig};
 use std::net::Ipv6Addr;
 use std::time::Duration;
+use stoq::transport::{StoqTransport, TransportConfig};
 use tokio::time::sleep;
 use tracing::info;
 
@@ -26,15 +26,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("================================");
 
     // Create transport with initial config
-    let mut config = TransportConfig::default();
-    config.bind_address = Ipv6Addr::UNSPECIFIED;
-    config.port = 0; // Random port
-    config.send_buffer_size = 1024 * 1024; // Start with 1MB
-    config.max_concurrent_streams = 50;
+    let config = TransportConfig {
+        bind_address: Ipv6Addr::UNSPECIFIED,
+        port: 0,                       // Random port
+        send_buffer_size: 1024 * 1024, // Start with 1MB
+        max_concurrent_streams: 50,
+        ..Default::default()
+    };
 
-    info!("Initial config: buffer={}MB, streams={}",
-          config.send_buffer_size / (1024*1024),
-          config.max_concurrent_streams);
+    info!(
+        "Initial config: buffer={}MB, streams={}",
+        config.send_buffer_size / (1024 * 1024),
+        config.max_concurrent_streams
+    );
 
     let mut transport = StoqTransport::new(config.clone()).await?;
 
@@ -51,9 +55,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     new_config.send_buffer_size = 16 * 1024 * 1024; // 16MB
     new_config.max_concurrent_streams = 1000;
 
-    info!("New config: buffer={}MB, streams={}",
-          new_config.send_buffer_size / (1024*1024),
-          new_config.max_concurrent_streams);
+    info!(
+        "New config: buffer={}MB, streams={}",
+        new_config.send_buffer_size / (1024 * 1024),
+        new_config.max_concurrent_streams
+    );
 
     transport.update_live_config(new_config).await;
     info!("✓ Configuration updated for live connections");
@@ -67,8 +73,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Active connections: {}", stats.len());
 
     for (id, stat) in stats {
-        info!("Connection {}: tier={:?}, adaptations={}, enabled={}",
-              id, stat.current_tier, stat.adaptation_count, stat.enabled);
+        info!(
+            "Connection {}: tier={:?}, adaptations={}, enabled={}",
+            id, stat.current_tier, stat.adaptation_count, stat.enabled
+        );
     }
 
     info!("\n✓ Test complete - Adaptive optimization working!");

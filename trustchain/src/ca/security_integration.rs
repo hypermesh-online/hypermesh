@@ -3,20 +3,22 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Security-Integrated Certificate Authority
-//! 
+//!
 //! Certificate Authority with mandatory consensus validation and security monitoring
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
-use tracing::{info, debug, warn, error};
+use tracing::{debug, error, info, warn};
 
+use super::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
 use crate::consensus::ConsensusResult;
+use crate::crypto::{FalconKeyPair, FalconSignature, PQCAlgorithm, PostQuantumCrypto};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::security::monitoring::{
+    ConsensusValidationStatus, LiveCertificateOperation, OperationState,
+};
 use crate::security::{SecurityMonitor, SecurityValidationResult};
-use crate::security::monitoring::{LiveCertificateOperation, ConsensusValidationStatus, OperationState};
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use crate::crypto::{PostQuantumCrypto, FalconKeyPair, FalconSignature, PQCAlgorithm};
-use super::{CertificateRequest, IssuedCertificate, TrustChainCA, CAConfig};
 
 /// Security-integrated Certificate Authority wrapper
 pub struct SecurityIntegratedCA {
@@ -66,9 +68,9 @@ impl Default for SecurityIntegrationConfig {
             block_on_security_failure: true,
             mandatory_consensus: true,
             log_all_operations: true,
-            mandatory_post_quantum: true,    // CRITICAL: Enable FALCON-1024 by default
+            mandatory_post_quantum: true, // CRITICAL: Enable FALCON-1024 by default
             enable_hybrid_signatures: true, // Enable for transition period
-            quantum_security_level: 128,    // 128-bit quantum security
+            quantum_security_level: 128,  // 128-bit quantum security
         }
     }
 }
@@ -119,26 +121,38 @@ impl SecurityIntegratedCA {
         let ca = Arc::new(TrustChainCA::new(ca_config.clone()).await?);
 
         // Initialize post-quantum cryptography system
-        let pqc = Arc::new(PostQuantumCrypto::new()
-            .map_err(|e| TrustChainError::Internal { message: format!("Failed to initialize post-quantum crypto: {}", e) })?);
+        let pqc = Arc::new(
+            PostQuantumCrypto::new().map_err(|e| TrustChainError::Internal {
+                message: format!("Failed to initialize post-quantum crypto: {e}"),
+            })?,
+        );
 
         // Generate CA FALCON-1024 key pair
-        let ca_falcon_keypair = Arc::new(pqc.generate_ca_keypair(&ca_config.ca_id).await
-            .map_err(|e| TrustChainError::Internal { message: format!("Failed to generate CA FALCON-1024 keypair: {}", e) })?);
+        let ca_falcon_keypair = Arc::new(pqc.generate_ca_keypair(&ca_config.ca_id).await.map_err(
+            |e| TrustChainError::Internal {
+                message: format!("Failed to generate CA FALCON-1024 keypair: {e}"),
+            },
+        )?);
 
-        info!("✅ FALCON-1024 CA keypair generated: {}", ca_falcon_keypair.public_key);
+        info!(
+            "✅ FALCON-1024 CA keypair generated: {}",
+            ca_falcon_keypair.public_key
+        );
 
         // Validate quantum security requirements
         if security_config.mandatory_post_quantum {
-            let quantum_valid = pqc.validate_quantum_resistance(&PQCAlgorithm::Falcon1024)
-                .map_err(|e| TrustChainError::Internal { message: format!("Quantum resistance validation failed: {}", e) })?;
-            
+            let quantum_valid = pqc
+                .validate_quantum_resistance(&PQCAlgorithm::Falcon1024)
+                .map_err(|e| TrustChainError::Internal {
+                    message: format!("Quantum resistance validation failed: {e}"),
+                })?;
+
             if !quantum_valid {
-                return Err(TrustChainError::SecurityError { 
-                    message: "FALCON-1024 quantum resistance validation failed".to_string() 
+                return Err(TrustChainError::SecurityError {
+                    message: "FALCON-1024 quantum resistance validation failed".to_string(),
                 });
             }
-            
+
             info!("✅ Quantum resistance validated: FALCON-1024 meets security requirements");
         }
 
@@ -163,10 +177,19 @@ impl SecurityIntegratedCA {
         };
 
         info!("✅ Security-Integrated CA initialized with FALCON-1024");
-        info!("🔐 Mandatory consensus: {}", integrated_ca.config.mandatory_consensus);
-        info!("🔐 Mandatory post-quantum: {}", integrated_ca.config.mandatory_post_quantum);
-        info!("🔐 Quantum security level: {} bits", integrated_ca.config.quantum_security_level);
-        
+        info!(
+            "🔐 Mandatory consensus: {}",
+            integrated_ca.config.mandatory_consensus
+        );
+        info!(
+            "🔐 Mandatory post-quantum: {}",
+            integrated_ca.config.mandatory_post_quantum
+        );
+        info!(
+            "🔐 Quantum security level: {} bits",
+            integrated_ca.config.quantum_security_level
+        );
+
         Ok(integrated_ca)
     }
 
@@ -181,12 +204,17 @@ impl SecurityIntegratedCA {
     }
 
     /// Issue certificate with mandatory security validation
-    pub async fn issue_certificate_secure(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
+    pub async fn issue_certificate_secure(
+        &self,
+        request: CertificateRequest,
+    ) -> TrustChainResult<IssuedCertificate> {
         let operation_id = uuid::Uuid::new_v4().to_string();
         let start_time = SystemTime::now();
-        
-        info!("Starting secure certificate issuance for: {} (operation: {})", 
-              request.common_name, operation_id);
+
+        info!(
+            "Starting secure certificate issuance for: {} (operation: {})",
+            request.common_name, operation_id
+        );
 
         // Create secure operation tracking
         let mut operation = SecureCertificateOperation {
@@ -201,7 +229,7 @@ impl SecurityIntegratedCA {
 
         // PHASE 1: MANDATORY SECURITY VALIDATION
         operation.state = SecureOperationState::SecurityValidation;
-        
+
         // Add to security monitoring dashboard
         if self.config.log_all_operations {
             let _live_operation = LiveCertificateOperation {
@@ -214,154 +242,216 @@ impl SecurityIntegratedCA {
                 started_at: start_time,
                 state: OperationState::ConsensusValidation,
             };
-            
+
             // Get security monitoring dashboard (this would typically be a shared component)
             // For now, we'll log the operation directly through the security monitor
-            debug!("Adding certificate operation to security monitoring: {}", operation_id);
+            debug!(
+                "Adding certificate operation to security monitoring: {}",
+                operation_id
+            );
         }
 
         // CRITICAL: Perform mandatory security validation with consensus
         let _security_result = if self.config.mandatory_security_validation {
-            info!("MANDATORY security validation for operation: {}", operation_id);
-            
-            let result = self.security_monitor.validate_certificate_operation(
-                "issue_certificate",
-                &request.consensus_proof,
-                &format!("cert_issue_{}", operation_id),
-            ).await?;
-            
+            info!(
+                "MANDATORY security validation for operation: {}",
+                operation_id
+            );
+
+            let result = self
+                .security_monitor
+                .validate_certificate_operation(
+                    "issue_certificate",
+                    &request.consensus_proof,
+                    &format!("cert_issue_{operation_id}"),
+                )
+                .await?;
+
             operation.security_validation = Some(result.clone());
-            
+
             // Check if security validation passed
             if !result.is_valid {
-                error!("SECURITY VALIDATION FAILED for operation {}: score={:.2}", 
-                       operation_id, result.metrics.security_score);
-                
+                error!(
+                    "SECURITY VALIDATION FAILED for operation {}: score={:.2}",
+                    operation_id, result.metrics.security_score
+                );
+
                 operation.state = SecureOperationState::SecurityBlocked {
                     reason: "Security validation failed".to_string(),
                 };
-                
+
                 if self.config.block_on_security_failure {
                     return Err(TrustChainError::SecurityValidationFailed {
-                        reason: format!("Security validation failed: score={:.2}", result.metrics.security_score),
+                        reason: format!(
+                            "Security validation failed: score={:.2}",
+                            result.metrics.security_score
+                        ),
                     });
                 }
             } else {
-                info!("Security validation PASSED for operation {}: score={:.2}", 
-                      operation_id, result.metrics.security_score);
+                info!(
+                    "Security validation PASSED for operation {}: score={:.2}",
+                    operation_id, result.metrics.security_score
+                );
                 operation.state = SecureOperationState::SecurityApproved;
             }
-            
+
             Some(result)
         } else {
-            warn!("Security validation DISABLED - CRITICAL SECURITY RISK for operation: {}", operation_id);
+            warn!(
+                "Security validation DISABLED - CRITICAL SECURITY RISK for operation: {}",
+                operation_id
+            );
             None
         };
 
         // PHASE 2: MANDATORY CONSENSUS VALIDATION
         operation.state = SecureOperationState::ConsensusValidation;
-        
+
         let _consensus_result = if self.config.mandatory_consensus {
-            info!("MANDATORY consensus validation for operation: {}", operation_id);
-            
+            info!(
+                "MANDATORY consensus validation for operation: {}",
+                operation_id
+            );
+
             // Use the CA's internal consensus validator
             let mut consensus_guard = self.ca.consensus.lock().await;
-            let result = consensus_guard.validate_consensus(&request.consensus_proof).await?;
-            
+            let result = consensus_guard
+                .validate_consensus(&request.consensus_proof)
+                .await?;
+
             operation.consensus_validation = Some(result.clone());
-            
+
             if !result.is_valid() {
-                error!("CONSENSUS VALIDATION FAILED for operation {}: {:?}", operation_id, result);
-                
+                error!(
+                    "CONSENSUS VALIDATION FAILED for operation {}: {:?}",
+                    operation_id, result
+                );
+
                 operation.state = SecureOperationState::ConsensusRejected {
                     reason: "Consensus validation failed".to_string(),
                 };
-                
+
                 return Err(TrustChainError::ConsensusValidationFailed {
                     reason: "Consensus validation failed".to_string(),
                 });
             } else {
-                info!("Consensus validation PASSED for operation: {}", operation_id);
+                info!(
+                    "Consensus validation PASSED for operation: {}",
+                    operation_id
+                );
             }
-            
+
             Some(result)
         } else {
-            warn!("Consensus validation DISABLED - CRITICAL SECURITY RISK for operation: {}", operation_id);
+            warn!(
+                "Consensus validation DISABLED - CRITICAL SECURITY RISK for operation: {}",
+                operation_id
+            );
             None
         };
 
         // PHASE 3: POST-QUANTUM CERTIFICATE GENERATION
         operation.state = SecureOperationState::CertificateGeneration;
-        
-        info!("Proceeding with FALCON-1024 certificate generation for operation: {}", operation_id);
-        
+
+        info!(
+            "Proceeding with FALCON-1024 certificate generation for operation: {}",
+            operation_id
+        );
+
         // Issue certificate with post-quantum signature if enabled
         let issued_cert = if self.config.mandatory_post_quantum {
             info!("🔐 Generating certificate with FALCON-1024 post-quantum signature");
-            self.issue_certificate_with_falcon(&request, &operation_id).await?
+            self.issue_certificate_with_falcon(&request, &operation_id)
+                .await?
         } else {
             warn!("⚠️  Using classical certificate generation (not quantum-resistant)");
             self.ca.issue_certificate_local(request).await?
         };
-        
+
         // PHASE 4: CT LOGGING
         operation.state = SecureOperationState::CTLogging;
-        
+
         // The core CA already handles CT logging, so we just need to verify it happened
-        info!("Certificate CT logging completed for operation: {}", operation_id);
-        
+        info!(
+            "Certificate CT logging completed for operation: {}",
+            operation_id
+        );
+
         // PHASE 5: COMPLETION
         operation.state = SecureOperationState::Completed;
-        
+
         let total_time = start_time.elapsed().unwrap_or_default().as_millis();
 
-        self.certificates_issued.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.total_issuance_time_ms.fetch_add(total_time as u64, std::sync::atomic::Ordering::Relaxed);
+        self.certificates_issued
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.total_issuance_time_ms
+            .fetch_add(total_time as u64, std::sync::atomic::Ordering::Relaxed);
 
-        info!("Secure certificate issuance COMPLETED for operation {} in {}ms: {}",
-              operation_id, total_time, issued_cert.serial_number);
+        info!(
+            "Secure certificate issuance COMPLETED for operation {} in {}ms: {}",
+            operation_id, total_time, issued_cert.serial_number
+        );
 
         Ok(issued_cert)
     }
 
     /// Validate certificate with security monitoring
-    pub async fn validate_certificate_secure(&self, certificate_der: &[u8]) -> TrustChainResult<CertificateValidationResult> {
+    pub async fn validate_certificate_secure(
+        &self,
+        certificate_der: &[u8],
+    ) -> TrustChainResult<CertificateValidationResult> {
         let operation_id = uuid::Uuid::new_v4().to_string();
 
-        info!("Starting secure certificate validation (operation: {})", operation_id);
+        info!(
+            "Starting secure certificate validation (operation: {})",
+            operation_id
+        );
 
         // Generate real consensus proof from network state for validation
-        let node_id = format!("validator_{}", operation_id);
-        let consensus_proof = crate::consensus::ConsensusProof::generate_from_network(&node_id).await
+        let node_id = format!("validator_{operation_id}");
+        let consensus_proof = crate::consensus::ConsensusProof::generate_from_network(&node_id)
+            .await
             .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                reason: format!("Failed to generate consensus proof for validation: {}", e)
+                reason: format!("Failed to generate consensus proof for validation: {e}"),
             })?;
-        
+
         // Perform security validation
-        let security_result = self.security_monitor.validate_certificate_operation(
-            "validate_certificate",
-            &consensus_proof,
-            &format!("cert_validate_{}", operation_id),
-        ).await?;
-        
+        let security_result = self
+            .security_monitor
+            .validate_certificate_operation(
+                "validate_certificate",
+                &consensus_proof,
+                &format!("cert_validate_{operation_id}"),
+            )
+            .await?;
+
         // Create validation result
         let validation_result = CertificateValidationResult {
             is_valid: security_result.is_valid,
-            consensus_validated: security_result.consensus_result.as_ref()
+            consensus_validated: security_result
+                .consensus_result
+                .as_ref()
                 .map(|r| r.is_valid())
                 .unwrap_or(false),
             security_validation: Some(security_result),
             certificate_fingerprint: self.calculate_certificate_fingerprint(certificate_der),
             validated_at: SystemTime::now(),
         };
-        
-        self.validations_performed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        info!("Secure certificate validation completed: valid={}", validation_result.is_valid);
+
+        self.validations_performed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        info!(
+            "Secure certificate validation completed: valid={}",
+            validation_result.is_valid
+        );
         Ok(validation_result)
     }
 
     /// Get security monitoring dashboard data
-    pub async fn get_security_dashboard(&self) -> TrustChainResult<crate::security::SecurityDashboard> {
+    pub async fn get_security_dashboard(
+        &self,
+    ) -> TrustChainResult<crate::security::SecurityDashboard> {
         self.security_monitor.get_monitoring_dashboard().await
     }
 
@@ -379,7 +469,11 @@ impl SecurityIntegratedCA {
             certificates_issued: issued,
             validation_requests: validations,
             avg_issuance_time_ms: if issued > 0 { total_time / issued } else { 0 },
-            success_rate: if total_ops > 0 { issued as f64 / total_ops as f64 } else { 1.0 },
+            success_rate: if total_ops > 0 {
+                issued as f64 / total_ops as f64
+            } else {
+                1.0
+            },
         };
         let security_metrics = self.security_monitor.get_metrics().await;
 
@@ -393,80 +487,108 @@ impl SecurityIntegratedCA {
 
     /// Issue certificate with FALCON-1024 post-quantum signature
     async fn issue_certificate_with_falcon(
-        &self, 
-        request: &CertificateRequest, 
-        _operation_id: &str
+        &self,
+        request: &CertificateRequest,
+        _operation_id: &str,
     ) -> TrustChainResult<IssuedCertificate> {
-        info!("🔐 Issuing post-quantum certificate with FALCON-1024 for: {}", request.common_name);
-        
+        info!(
+            "🔐 Issuing post-quantum certificate with FALCON-1024 for: {}",
+            request.common_name
+        );
+
         // Issue certificate through core CA using pre-validated consensus path
         // (SecurityIntegratedCA already performed consensus validation in Phases 1-2)
         let mut cert = self.ca.issue_certificate_local(request.clone()).await?;
-        
+
         // Add FALCON-1024 signature to certificate metadata
-        let falcon_signature = self.pqc.sign_with_falcon(
-            &cert.certificate_der, 
-            &self.ca_falcon_keypair.private_key
-        ).await.map_err(|e| TrustChainError::Internal { 
-            message: format!("FALCON-1024 signature generation failed: {}", e) 
-        })?;
-        
+        let falcon_signature = self
+            .pqc
+            .sign_with_falcon(&cert.certificate_der, &self.ca_falcon_keypair.private_key)
+            .await
+            .map_err(|e| TrustChainError::Internal {
+                message: format!("FALCON-1024 signature generation failed: {e}"),
+            })?;
+
         // Add post-quantum metadata to certificate
-        cert.metadata.tags.insert("pq_algorithm".to_string(), "FALCON-1024".to_string());
-        cert.metadata.tags.insert("quantum_security_level".to_string(), 
-                                  self.config.quantum_security_level.to_string());
-        cert.metadata.tags.insert("falcon_signature".to_string(), 
-                                  hex::encode(&falcon_signature.signature_bytes));
-        cert.metadata.tags.insert("falcon_public_key".to_string(), 
-                                  hex::encode(&self.ca_falcon_keypair.public_key.key_bytes));
-        cert.metadata.tags.insert("pq_ca_fingerprint".to_string(), 
-                                  hex::encode(&self.ca_falcon_keypair.public_key.fingerprint));
+        cert.metadata
+            .tags
+            .insert("pq_algorithm".to_string(), "FALCON-1024".to_string());
+        cert.metadata.tags.insert(
+            "quantum_security_level".to_string(),
+            self.config.quantum_security_level.to_string(),
+        );
+        cert.metadata.tags.insert(
+            "falcon_signature".to_string(),
+            hex::encode(&falcon_signature.signature_bytes),
+        );
+        cert.metadata.tags.insert(
+            "falcon_public_key".to_string(),
+            hex::encode(&self.ca_falcon_keypair.public_key.key_bytes),
+        );
+        cert.metadata.tags.insert(
+            "pq_ca_fingerprint".to_string(),
+            hex::encode(self.ca_falcon_keypair.public_key.fingerprint),
+        );
         cert.metadata.signature_algorithm = Some("FALCON-1024".to_string());
-        
+
         // Add hybrid signature if enabled
         if self.config.enable_hybrid_signatures {
             info!("🔐 Adding hybrid signature support to certificate");
-            cert.metadata.tags.insert("hybrid_signature_support".to_string(), "true".to_string());
-            cert.metadata.tags.insert("migration_ready".to_string(), "true".to_string());
+            cert.metadata
+                .tags
+                .insert("hybrid_signature_support".to_string(), "true".to_string());
+            cert.metadata
+                .tags
+                .insert("migration_ready".to_string(), "true".to_string());
         }
-        
-        info!("✅ Post-quantum certificate issued with FALCON-1024: {}", cert.serial_number);
+
+        info!(
+            "✅ Post-quantum certificate issued with FALCON-1024: {}",
+            cert.serial_number
+        );
         Ok(cert)
     }
-    
+
     /// Validate post-quantum certificate signature
-    pub async fn validate_falcon_certificate(&self, certificate_der: &[u8]) -> TrustChainResult<bool> {
+    pub async fn validate_falcon_certificate(
+        &self,
+        certificate_der: &[u8],
+    ) -> TrustChainResult<bool> {
         info!("🔍 Validating FALCON-1024 certificate signature");
-        
+
         // Extract FALCON signature from certificate (this is simplified)
         // In production, this would parse the certificate extensions properly
-        let is_valid = self.pqc.verify_falcon_signature(
-            certificate_der,
-            &FalconSignature {
-                signature_bytes: vec![], // Would extract from certificate
-                algorithm: "FALCON-1024".to_string(),
-                signed_at: SystemTime::now(),
-                message_hash: [0u8; 32], // Would extract from certificate
-            },
-            &self.ca_falcon_keypair.public_key,
-        ).await.map_err(|e| TrustChainError::Internal { 
-            message: format!("FALCON-1024 verification failed: {}", e) 
-        })?;
-        
+        let is_valid = self
+            .pqc
+            .verify_falcon_signature(
+                certificate_der,
+                &FalconSignature {
+                    signature_bytes: vec![], // Would extract from certificate
+                    algorithm: "FALCON-1024".to_string(),
+                    signed_at: SystemTime::now(),
+                    message_hash: [0u8; 32], // Would extract from certificate
+                },
+                &self.ca_falcon_keypair.public_key,
+            )
+            .await
+            .map_err(|e| TrustChainError::Internal {
+                message: format!("FALCON-1024 verification failed: {e}"),
+            })?;
+
         if is_valid {
             info!("✅ FALCON-1024 certificate signature verification successful");
         } else {
             warn!("❌ FALCON-1024 certificate signature verification failed");
         }
-        
+
         Ok(is_valid)
     }
-    
+
     /// Get post-quantum cryptography information
     pub fn get_pq_info(&self) -> PQCInfo {
         PQCInfo {
             algorithm: PQCAlgorithm::Falcon1024,
-            ca_public_key_fingerprint: hex::encode(&self.ca_falcon_keypair.public_key.fingerprint),
+            ca_public_key_fingerprint: hex::encode(self.ca_falcon_keypair.public_key.fingerprint),
             quantum_security_level: self.config.quantum_security_level,
             hybrid_signatures_enabled: self.config.enable_hybrid_signatures,
             mandatory_post_quantum: self.config.mandatory_post_quantum,
@@ -475,36 +597,48 @@ impl SecurityIntegratedCA {
             performance_info: self.pqc.get_performance_info(&PQCAlgorithm::Falcon1024),
         }
     }
-    
+
     /// Generate new asset authentication key for remote proxy
     pub async fn generate_asset_keypair(&self) -> TrustChainResult<FalconKeyPair> {
         info!("🔑 Generating FALCON-1024 asset authentication keypair");
-        
-        let keypair = self.pqc.generate_asset_keypair().await
-            .map_err(|e| TrustChainError::Internal { 
-                message: format!("Asset keypair generation failed: {}", e) 
-            })?;
-        
-        info!("✅ Asset authentication keypair generated: {}", keypair.public_key);
+
+        let keypair =
+            self.pqc
+                .generate_asset_keypair()
+                .await
+                .map_err(|e| TrustChainError::Internal {
+                    message: format!("Asset keypair generation failed: {e}"),
+                })?;
+
+        info!(
+            "✅ Asset authentication keypair generated: {}",
+            keypair.public_key
+        );
         Ok(keypair)
     }
-    
+
     /// Generate new remote proxy authentication key
     pub async fn generate_proxy_keypair(&self) -> TrustChainResult<FalconKeyPair> {
         info!("🔑 Generating FALCON-1024 remote proxy authentication keypair");
-        
-        let keypair = self.pqc.generate_proxy_keypair().await
-            .map_err(|e| TrustChainError::Internal { 
-                message: format!("Proxy keypair generation failed: {}", e) 
-            })?;
-        
-        info!("✅ Remote proxy authentication keypair generated: {}", keypair.public_key);
+
+        let keypair =
+            self.pqc
+                .generate_proxy_keypair()
+                .await
+                .map_err(|e| TrustChainError::Internal {
+                    message: format!("Proxy keypair generation failed: {e}"),
+                })?;
+
+        info!(
+            "✅ Remote proxy authentication keypair generated: {}",
+            keypair.public_key
+        );
         Ok(keypair)
     }
 
     /// Calculate certificate fingerprint
     fn calculate_certificate_fingerprint(&self, cert_der: &[u8]) -> [u8; 32] {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(cert_der);
         hasher.finalize().into()
@@ -576,15 +710,16 @@ pub struct PQCInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
     use crate::ca::CAConfig;
+    use crate::consensus::ConsensusProof;
 
     #[tokio::test]
     async fn test_security_integrated_ca_creation() {
         let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
+            .await
             .expect("Failed to create security-integrated CA");
         assert!(integrated_ca.config.mandatory_consensus);
         assert!(integrated_ca.config.mandatory_security_validation);
@@ -595,7 +730,8 @@ mod tests {
         let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
+            .await
             .expect("Failed to create security-integrated CA");
 
         let request = CertificateRequest {
@@ -609,7 +745,11 @@ mod tests {
 
         let result = integrated_ca.issue_certificate_secure(request).await;
         // Should succeed with valid consensus proof
-        assert!(result.is_ok(), "test: certificate issuance failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "test: certificate issuance failed: {:?}",
+            result.err()
+        );
 
         let cert = result.expect("Failed to issue secure certificate");
         assert_eq!(cert.common_name, "secure.test.com");
@@ -620,10 +760,13 @@ mod tests {
         let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig::default();
 
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
+            .await
             .expect("Failed to create security-integrated CA");
 
-        let dashboard = integrated_ca.get_security_dashboard().await
+        let dashboard = integrated_ca
+            .get_security_dashboard()
+            .await
             .expect("Failed to get security dashboard");
 
         // Should have valid dashboard data
@@ -634,10 +777,13 @@ mod tests {
     #[tokio::test]
     async fn test_mandatory_consensus_disabled() {
         let ca_config = CAConfig::testing(); // Use testing config with random port
-        let mut security_config = SecurityIntegrationConfig::default();
-        security_config.mandatory_consensus = false;
+        let security_config = SecurityIntegrationConfig {
+            mandatory_consensus: false,
+            ..Default::default()
+        };
 
-        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config).await
+        let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
+            .await
             .expect("Failed to create CA with consensus disabled");
 
         // Should still work but with reduced security

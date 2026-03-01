@@ -9,7 +9,7 @@
 
 use crate::assets::core::{AssetError, AssetResult};
 use crate::assets::pipeline::sharding::Shard;
-use crate::distribution::{NodeInfo, ShardPlacement, DistributionResult};
+use crate::distribution::{DistributionResult, NodeInfo, ShardPlacement};
 use crate::matrix::coordinate::MatrixCoordinate;
 use serde::{Deserialize, Serialize};
 
@@ -33,10 +33,9 @@ pub struct Octant(pub u8);
 impl Octant {
     /// Determine octant from matrix coordinate
     pub fn from_coordinate(coord: &MatrixCoordinate) -> Self {
-        let octant =
-            (if coord.x < 0 { 1 } else { 0 }) |
-            (if coord.y < 0 { 2 } else { 0 }) |
-            (if coord.z < 0 { 4 } else { 0 });
+        let octant = (if coord.x < 0 { 1 } else { 0 })
+            | (if coord.y < 0 { 2 } else { 0 })
+            | (if coord.z < 0 { 4 } else { 0 });
         Octant(octant)
     }
 
@@ -97,12 +96,8 @@ pub fn distribute_across_octants(
     let shard_octants = calculate_octant_placements(shards.len(), &octant_nodes)?;
 
     // Place shards in assigned octants
-    let placements = place_shards_in_octants(
-        &shards,
-        &shard_octants,
-        &octant_nodes,
-        eligible_nodes,
-    )?;
+    let placements =
+        place_shards_in_octants(&shards, &shard_octants, &octant_nodes, eligible_nodes)?;
 
     // Calculate statistics
     let stats = calculate_distribution_stats(&placements);
@@ -176,7 +171,7 @@ fn place_shards_in_octants(
 
         if nodes.is_empty() {
             return Err(AssetError::ValidationError {
-                message: format!("No nodes available in octant {}", octant),
+                message: format!("No nodes available in octant {octant}"),
             });
         }
 
@@ -186,7 +181,7 @@ fn place_shards_in_octants(
 
         placements.push(ShardPlacement {
             shard_index: shard_idx,
-            position: node.position.clone(),
+            position: node.position,
             node_id: node.node_id.clone(),
             octant,
             distance_from_origin: origin.euclidean_distance(&node.position),
@@ -207,9 +202,11 @@ fn select_optimal_node<'a>(
         .min_by(|a, b| {
             let dist_a = (origin.euclidean_distance(&a.position) - target_distance).abs();
             let dist_b = (origin.euclidean_distance(&b.position) - target_distance).abs();
-            dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            dist_a
+                .partial_cmp(&dist_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
-        .unwrap()
+        .expect("nodes collection should not be empty")
 }
 
 /// Distribution statistics
@@ -229,7 +226,10 @@ fn calculate_distribution_stats(placements: &[ShardPlacement]) -> DistributionSt
 
     // Calculate average distance
     let avg_distance = if !placements.is_empty() {
-        placements.iter().map(|p| p.distance_from_origin).sum::<f64>()
+        placements
+            .iter()
+            .map(|p| p.distance_from_origin)
+            .sum::<f64>()
             / placements.len() as f64
     } else {
         0.0
@@ -259,11 +259,8 @@ fn calculate_distribution_stats(placements: &[ShardPlacement]) -> DistributionSt
     // Distance uniformity score
     if !distances.is_empty() {
         let mean = distances.iter().sum::<f64>() / distances.len() as f64;
-        let variance = distances
-            .iter()
-            .map(|d| (d - mean).powi(2))
-            .sum::<f64>()
-            / distances.len() as f64;
+        let variance =
+            distances.iter().map(|d| (d - mean).powi(2)).sum::<f64>() / distances.len() as f64;
         let std_dev = variance.sqrt();
         let uniformity = 1.0 - (std_dev / mean).min(1.0);
         quality += uniformity * 40.0;
@@ -292,7 +289,7 @@ mod tests {
                 is_parity: false,
                 size: 1024,
                 original_size: 1024,
-                hash: format!("hash-{}", index),
+                hash: format!("hash-{index}"),
             },
         }
     }
@@ -301,28 +298,28 @@ mod tests {
         vec![
             NodeInfo::new(
                 "node1".to_string(),
-                MatrixCoordinate::new(10, 10, 10).unwrap(),
+                MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node2".to_string(),
-                MatrixCoordinate::new(-10, 10, 10).unwrap(),
+                MatrixCoordinate::new(-10, 10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node3".to_string(),
-                MatrixCoordinate::new(10, -10, 10).unwrap(),
+                MatrixCoordinate::new(10, -10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node4".to_string(),
-                MatrixCoordinate::new(-10, -10, 10).unwrap(),
+                MatrixCoordinate::new(-10, -10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
@@ -332,13 +329,13 @@ mod tests {
 
     #[test]
     fn test_octant_from_coordinate() {
-        let coord1 = MatrixCoordinate::new(10, 10, 10).unwrap();
+        let coord1 = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
         assert_eq!(Octant::from_coordinate(&coord1).value(), 0);
 
-        let coord2 = MatrixCoordinate::new(-10, 10, 10).unwrap();
+        let coord2 = MatrixCoordinate::new(-10, 10, 10).expect("test: valid coordinate");
         assert_eq!(Octant::from_coordinate(&coord2).value(), 1);
 
-        let coord3 = MatrixCoordinate::new(10, -10, 10).unwrap();
+        let coord3 = MatrixCoordinate::new(10, -10, 10).expect("test: valid coordinate");
         assert_eq!(Octant::from_coordinate(&coord3).value(), 2);
     }
 
@@ -359,12 +356,11 @@ mod tests {
         let nodes = create_test_nodes();
         let grouped = group_nodes_by_octant(&nodes);
 
-        let placements = calculate_octant_placements(8, &grouped).unwrap();
+        let placements = calculate_octant_placements(8, &grouped).expect("test: expected success");
         assert_eq!(placements.len(), 8);
 
         // Verify octants are distributed
-        let unique_octants: std::collections::HashSet<_> =
-            placements.iter().copied().collect();
+        let unique_octants: std::collections::HashSet<_> = placements.iter().copied().collect();
         assert!(unique_octants.len() > 1);
     }
 
@@ -378,7 +374,7 @@ mod tests {
             create_test_shard(3),
         ];
 
-        let result = distribute_across_octants(shards, &nodes).unwrap();
+        let result = distribute_across_octants(shards, &nodes).expect("test: expected result");
 
         assert_eq!(result.placements.len(), 4);
         assert!(result.quality_score > 0.0);
@@ -391,7 +387,7 @@ mod tests {
         let nodes = create_test_nodes();
         let shards: Vec<_> = (0..10).map(create_test_shard).collect();
 
-        let result = distribute_across_octants(shards, &nodes).unwrap();
+        let result = distribute_across_octants(shards, &nodes).expect("test: expected result");
 
         // Verify golden ratio spacing in distances
         let distances: Vec<f64> = result

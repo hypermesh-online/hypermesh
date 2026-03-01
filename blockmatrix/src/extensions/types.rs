@@ -4,13 +4,13 @@
 
 //! Extension system type definitions
 
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
-use semver::Version;
 
-use crate::assets::core::{AssetType, PrivacyMode, ConsensusProof};
+use crate::assets::core::{AssetType, ConsensusProof, PrivacyMode};
 
 /// Extension system errors
 #[derive(Debug, thiserror::Error)]

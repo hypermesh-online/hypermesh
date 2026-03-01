@@ -18,27 +18,27 @@
 //! 3. Federated Private: http3://admin.nike → Network-scoped pool
 //! 4. Fully Federated: http3://classified.gov → Zero public access
 
-pub mod records;
-pub mod pools;
-pub mod resolver;
-pub mod registration;
-pub mod validation;
 pub mod cache;
+pub mod pools;
+pub mod records;
+pub mod registration;
+pub mod resolver;
 pub mod trustchain;
+pub mod validation;
 
 // Re-export public API
-pub use records::{DnsRecord, DnsRecordType, DnsRecordData};
-pub use pools::{DnsPoolManager, DnsPool, DnsPoolType, PoolVisibility};
-pub use resolver::{DnsResolver, DnsResolutionTier, DnsQuery, DnsResponse};
+pub use cache::{CacheEntry, DnsCache};
+pub use pools::{DnsPool, DnsPoolManager, DnsPoolType, PoolVisibility};
+pub use records::{DnsRecord, DnsRecordData, DnsRecordType};
 pub use registration::{DnsRegistrar, DnsRegistration, RegistrationStatus};
+pub use resolver::{DnsQuery, DnsResolutionTier, DnsResolver, DnsResponse};
+pub use trustchain::{TrustChainDnsClient, TrustChainDnsService};
 pub use validation::{DnsValidator, ValidationResult};
-pub use cache::{DnsCache, CacheEntry};
-pub use trustchain::{TrustChainDnsService, TrustChainDnsClient};
 
 use anyhow::Result;
-use thiserror::Error;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
+use thiserror::Error;
 
 /// DNS-as-Asset error types
 #[derive(Debug, Error)]
@@ -107,7 +107,7 @@ impl Domain {
             });
         }
 
-        let root = parts.last().unwrap().to_string();
+        let root = parts.last().expect("parts is non-empty after length check").to_string();
         let subdomains: Vec<String> = parts[..parts.len() - 1]
             .iter()
             .map(|s| s.to_string())
@@ -191,33 +191,33 @@ mod tests {
     #[test]
     fn test_domain_parsing() {
         // Public domain
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         assert_eq!(domain.root, "nike");
         assert_eq!(domain.subdomains.len(), 0);
         assert!(domain.is_public());
         assert!(!domain.is_federated());
 
         // Federated domain
-        let domain = Domain::parse("admin.nike").unwrap();
+        let domain = Domain::parse("admin.nike").expect("test: expected success");
         assert_eq!(domain.root, "nike");
         assert_eq!(domain.subdomains, vec!["admin"]);
         assert!(!domain.is_public());
         assert!(domain.is_federated());
 
         // Multi-level federated
-        let domain = Domain::parse("warehouse.admin.nike").unwrap();
+        let domain = Domain::parse("warehouse.admin.nike").expect("test: expected success");
         assert_eq!(domain.root, "nike");
         assert_eq!(domain.subdomains, vec!["warehouse", "admin"]);
     }
 
     #[test]
     fn test_domain_parent() {
-        let domain = Domain::parse("warehouse.admin.nike").unwrap();
-        let parent = domain.parent().unwrap();
+        let domain = Domain::parse("warehouse.admin.nike").expect("test: expected success");
+        let parent = domain.parent().expect("test: expected success");
         assert_eq!(parent.full, "admin.nike");
         assert_eq!(parent.subdomains, vec!["admin"]);
 
-        let parent = parent.parent().unwrap();
+        let parent = parent.parent().expect("test: expected success");
         assert_eq!(parent.full, "nike");
         assert_eq!(parent.subdomains.len(), 0);
 
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_http3_prefix() {
-        let domain = Domain::parse("http3://nike").unwrap();
+        let domain = Domain::parse("http3://nike").expect("test: expected success");
         assert_eq!(domain.root, "nike");
         assert_eq!(domain.full, "nike");
     }

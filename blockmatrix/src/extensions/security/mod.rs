@@ -6,15 +6,15 @@
 //!
 //! Implements capability-based security, resource quotas, and runtime monitoring.
 
-mod types;
+mod audit;
 mod manager;
 mod monitoring;
-mod audit;
+mod types;
 
-pub use types::*;
+pub use audit::*;
 pub use manager::*;
 pub use monitoring::*;
-pub use audit::*;
+pub use types::*;
 
 #[cfg(test)]
 mod tests;

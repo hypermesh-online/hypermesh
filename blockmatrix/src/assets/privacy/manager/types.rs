@@ -4,15 +4,15 @@
 
 //! Privacy manager type definitions.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 use super::super::{
-    PrivacyAllocationResult, ResourceAllocationConfig, ConsensusRequirementConfig,
-    CaesarRewardConfig,
+    CaesarRewardConfig, ConsensusRequirementConfig, PrivacyAllocationResult,
+    ResourceAllocationConfig,
 };
 use crate::assets::core::PrivacyMode;
 use crate::assets::proxy::RemoteProxyManager;
@@ -315,7 +315,14 @@ pub struct AccessAction {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AccessActionType {
-    Allow, Deny, Redirect, Throttle, Queue, Authenticate, Log, Alert,
+    Allow,
+    Deny,
+    Redirect,
+    Throttle,
+    Queue,
+    Authenticate,
+    Log,
+    Alert,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -327,7 +334,12 @@ pub struct NotificationSettings {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum NotificationPriority { Low, Medium, High, Critical }
+pub enum NotificationPriority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ActionLoggingConfig {
@@ -338,7 +350,12 @@ pub struct ActionLoggingConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum LogLevel { Debug, Info, Warn, Error }
+pub enum LogLevel {
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
 
 /// CAESAR reward preferences
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -437,7 +454,12 @@ pub struct PrivacyViolationRecord {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ViolationSeverity { Low, Medium, High, Critical }
+pub enum ViolationSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImpactAssessment {
@@ -448,7 +470,13 @@ pub struct ImpactAssessment {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DataExposureLevel { None, Minimal, Moderate, Significant, Severe }
+pub enum DataExposureLevel {
+    None,
+    Minimal,
+    Moderate,
+    Significant,
+    Severe,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PrivacyPreferenceChange {

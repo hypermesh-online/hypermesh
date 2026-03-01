@@ -7,11 +7,11 @@
 //! Provides the foundational asset package format parsing, validation, and management
 //! for the Catalog asset library ecosystem.
 
-pub mod types;
-pub mod registry;
 pub mod operations;
+pub mod registry;
+pub mod types;
 
 // Re-export everything publicly for backward compatibility
-pub use types::*;
 pub use registry::*;
+pub use types::*;
 // operations module adds impl blocks on AssetPackage, no separate types to re-export

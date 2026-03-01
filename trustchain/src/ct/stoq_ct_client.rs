@@ -7,20 +7,17 @@
 //! Production-ready CT log operations using STOQ transport for
 //! certificate logging, verification, and retrieval through TrustChain CT.
 
+use bytes::Bytes;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
-use bytes::Bytes;
+use tracing::{debug, error, info, warn};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use crate::stoq_client::{
-    TrustChainStoqClient,
-    ServiceEndpoint, ServiceType
-};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::stoq_client::{ServiceEndpoint, ServiceType, TrustChainStoqClient};
 
 /// CT log operations via STOQ transport
 pub struct CtStoqClient {
@@ -245,13 +242,12 @@ impl Default for CtStoqConfig {
             cache_ttl: Duration::from_secs(1800), // 30 minutes
             max_cache_entries: 500,
             enable_auto_logging: true,
-            ct_endpoints: vec![
-                ServiceEndpoint::new(
-                    ServiceType::CertificateTransparency,
-                    Ipv6Addr::LOCALHOST,
-                    6962
-                ).with_service_name("ct.trustchain.local".to_string()),
-            ],
+            ct_endpoints: vec![ServiceEndpoint::new(
+                ServiceType::CertificateTransparency,
+                Ipv6Addr::LOCALHOST,
+                6962,
+            )
+            .with_service_name("ct.trustchain.local".to_string())],
             max_retries: 3,
             retry_delay: Duration::from_millis(1000),
         }
@@ -264,7 +260,10 @@ impl CtStoqClient {
         stoq_client: Arc<TrustChainStoqClient>,
         config: CtStoqConfig,
     ) -> TrustChainResult<Self> {
-        info!("Initializing CT STOQ client with {} endpoints", config.ct_endpoints.len());
+        info!(
+            "Initializing CT STOQ client with {} endpoints",
+            config.ct_endpoints.len()
+        );
 
         let client = Self {
             stoq_client,
@@ -279,17 +278,25 @@ impl CtStoqClient {
     }
 
     /// Submit certificate to CT log via STOQ
-    pub async fn submit_to_ct_log(&self, submission: StoqCtSubmission) -> TrustChainResult<StoqCtSubmissionResponse> {
+    pub async fn submit_to_ct_log(
+        &self,
+        submission: StoqCtSubmission,
+    ) -> TrustChainResult<StoqCtSubmissionResponse> {
         let start_time = std::time::Instant::now();
-        
+
         let fingerprint = hex::encode(sha2::Sha256::digest(&submission.certificate));
-        debug!("Submitting certificate to CT log via STOQ: {} (log: {})", fingerprint, submission.log_id);
+        debug!(
+            "Submitting certificate to CT log via STOQ: {} (log: {})",
+            fingerprint, submission.log_id
+        );
 
         // Check cache first
         if let Some(cached_entry) = self.check_ct_cache(&fingerprint).await {
             debug!("Certificate already in CT log cache: {}", fingerprint);
-            self.metrics.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            
+            self.metrics
+                .cache_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
             // Convert cached entry to submission response
             return Ok(StoqCtSubmissionResponse {
                 sct: StoqSct {
@@ -305,30 +312,43 @@ impl CtStoqClient {
             });
         }
 
-        self.metrics.cache_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cache_misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Perform submission with retries
         let mut last_error = None;
-        
+
         for attempt in 0..=self.config.max_retries {
             match self.submit_with_stoq(&submission, attempt).await {
                 Ok(response) => {
                     // Cache the result
                     self.cache_ct_submission(&submission, &response).await;
-                    
+
                     // Update metrics
                     let latency = start_time.elapsed().as_micros() as u64;
-                    self.metrics.log_submissions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    self.metrics.scts_generated.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .log_submissions
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .scts_generated
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     self.update_avg_latency(latency);
-                    
-                    info!("Certificate submitted to CT log successfully: {} ({}μs)", fingerprint, latency);
+
+                    info!(
+                        "Certificate submitted to CT log successfully: {} ({}μs)",
+                        fingerprint, latency
+                    );
                     return Ok(response);
                 }
                 Err(e) => {
                     if attempt < self.config.max_retries {
-                        warn!("CT submission attempt {} failed for {}, retrying: {}",
-                              attempt + 1, fingerprint, &e);
+                        warn!(
+                            "CT submission attempt {} failed for {}, retrying: {}",
+                            attempt + 1,
+                            fingerprint,
+                            &e
+                        );
                         tokio::time::sleep(self.config.retry_delay).await;
                     }
                     last_error = Some(e);
@@ -337,10 +357,15 @@ impl CtStoqClient {
         }
 
         // All retries failed
-        self.metrics.failed_operations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        error!("CT submission failed after {} attempts: {}", 
-               self.config.max_retries + 1, fingerprint);
-        
+        self.metrics
+            .failed_operations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        error!(
+            "CT submission failed after {} attempts: {}",
+            self.config.max_retries + 1,
+            fingerprint
+        );
+
         Err(last_error.unwrap_or_else(|| TrustChainError::NetworkError {
             operation: "ct_submission".to_string(),
             reason: "All retry attempts failed".to_string(),
@@ -350,15 +375,18 @@ impl CtStoqClient {
     /// Query CT log via STOQ
     pub async fn query_ct_log(&self, query: StoqCtQuery) -> TrustChainResult<StoqCtQueryResponse> {
         let start_time = std::time::Instant::now();
-        
-        debug!("Querying CT log via STOQ: {:?} (log: {})", query.query_type, query.log_id);
+
+        debug!(
+            "Querying CT log via STOQ: {:?} (log: {})",
+            query.query_type, query.log_id
+        );
 
         // Select CT endpoint
         let ct_endpoint = self.select_ct_endpoint().await?;
 
         // Serialize query
-        let query_data = bincode::serialize(&query)
-            .map_err(|e| TrustChainError::SerializationError {
+        let query_data =
+            bincode::serialize(&query).map_err(|e| TrustChainError::SerializationError {
                 operation: "ct_query_serialize".to_string(),
                 reason: e.to_string(),
             })?;
@@ -367,18 +395,24 @@ impl CtStoqClient {
         let response_data = self.send_ct_request(&ct_endpoint, &query_data).await?;
 
         // Deserialize response
-        let response: StoqCtQueryResponse = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let response: StoqCtQueryResponse = bincode::deserialize(&response_data).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "ct_query_deserialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // Update metrics
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.log_queries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .log_queries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.update_avg_latency(latency);
 
-        debug!("CT query completed successfully: {:?} ({}μs)", query.query_type, latency);
+        debug!(
+            "CT query completed successfully: {:?} ({}μs)",
+            query.query_type, latency
+        );
         Ok(response)
     }
 
@@ -390,9 +424,11 @@ impl CtStoqClient {
         tree_head: &StoqSignedTreeHead,
     ) -> TrustChainResult<bool> {
         let start_time = std::time::Instant::now();
-        
-        debug!("Verifying Merkle proof via STOQ: leaf_index={}, tree_size={}", 
-               proof.leaf_index, proof.tree_size);
+
+        debug!(
+            "Verifying Merkle proof via STOQ: leaf_index={}, tree_size={}",
+            proof.leaf_index, proof.tree_size
+        );
 
         // Create verification request
         let verification_request = StoqMerkleVerification {
@@ -405,33 +441,44 @@ impl CtStoqClient {
         let ct_endpoint = self.select_ct_endpoint().await?;
 
         // Serialize verification request
-        let request_data = bincode::serialize(&verification_request)
-            .map_err(|e| TrustChainError::SerializationError {
+        let request_data = bincode::serialize(&verification_request).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "merkle_verification_serialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // Send verification request via STOQ
         let response_data = self.send_ct_request(&ct_endpoint, &request_data).await?;
 
         // Deserialize response
-        let is_valid: bool = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let is_valid: bool = bincode::deserialize(&response_data).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "merkle_verification_deserialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // Update metrics
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.proof_verifications.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .proof_verifications
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.update_avg_latency(latency);
 
-        debug!("Merkle proof verification completed: {} ({}μs)", is_valid, latency);
+        debug!(
+            "Merkle proof verification completed: {} ({}μs)",
+            is_valid, latency
+        );
         Ok(is_valid)
     }
 
     /// Submit with retry logic
-    async fn submit_with_stoq(&self, submission: &StoqCtSubmission, attempt: u32) -> TrustChainResult<StoqCtSubmissionResponse> {
+    async fn submit_with_stoq(
+        &self,
+        submission: &StoqCtSubmission,
+        attempt: u32,
+    ) -> TrustChainResult<StoqCtSubmissionResponse> {
         // Select CT endpoint (round-robin based on attempt)
         let endpoints = self.ct_endpoints.read().await;
         if endpoints.is_empty() {
@@ -440,16 +487,20 @@ impl CtStoqClient {
                 reason: "No CT endpoints configured".to_string(),
             });
         }
-        
+
         let endpoint_index = attempt as usize % endpoints.len();
         let ct_endpoint = &endpoints[endpoint_index];
 
-        debug!("Using CT endpoint: [{}]:{} (attempt {})", 
-               ct_endpoint.address, ct_endpoint.port, attempt + 1);
+        debug!(
+            "Using CT endpoint: [{}]:{} (attempt {})",
+            ct_endpoint.address,
+            ct_endpoint.port,
+            attempt + 1
+        );
 
         // Serialize submission
-        let submission_data = bincode::serialize(submission)
-            .map_err(|e| TrustChainError::SerializationError {
+        let submission_data =
+            bincode::serialize(submission).map_err(|e| TrustChainError::SerializationError {
                 operation: "ct_submission_serialize".to_string(),
                 reason: e.to_string(),
             })?;
@@ -458,39 +509,58 @@ impl CtStoqClient {
         let response_data = self.send_ct_request(ct_endpoint, &submission_data).await?;
 
         // Deserialize response
-        let response: StoqCtSubmissionResponse = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
-                operation: "ct_submission_deserialize".to_string(),
-                reason: e.to_string(),
+        let response: StoqCtSubmissionResponse =
+            bincode::deserialize(&response_data).map_err(|e| {
+                TrustChainError::SerializationError {
+                    operation: "ct_submission_deserialize".to_string(),
+                    reason: e.to_string(),
+                }
             })?;
 
         Ok(response)
     }
 
     /// Send CT request via STOQ transport
-    async fn send_ct_request(&self, endpoint: &ServiceEndpoint, data: &[u8]) -> TrustChainResult<Bytes> {
+    async fn send_ct_request(
+        &self,
+        endpoint: &ServiceEndpoint,
+        data: &[u8],
+    ) -> TrustChainResult<Bytes> {
         // Create STOQ endpoint
-        let stoq_endpoint = stoq::Endpoint::new(endpoint.address, endpoint.port)
-            .with_server_name(endpoint.service_name.clone().unwrap_or_else(|| {
-                "ct.trustchain.local".to_string()
-            }));
+        let stoq_endpoint = stoq::Endpoint::new(endpoint.address, endpoint.port).with_server_name(
+            endpoint
+                .service_name
+                .clone()
+                .unwrap_or_else(|| "ct.trustchain.local".to_string()),
+        );
 
         // Get connection
-        let connection = self.stoq_client.transport().connect(&stoq_endpoint).await
+        let connection = self
+            .stoq_client
+            .transport()
+            .connect(&stoq_endpoint)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ct_stoq_connection".to_string(),
                 reason: e.to_string(),
             })?;
 
         // Send request
-        self.stoq_client.transport().send(&connection, data).await
+        self.stoq_client
+            .transport()
+            .send(&connection, data)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ct_request_send".to_string(),
                 reason: e.to_string(),
             })?;
 
         // Receive response
-        let response = self.stoq_client.transport().receive(&connection).await
+        let response = self
+            .stoq_client
+            .transport()
+            .receive(&connection)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ct_response_receive".to_string(),
                 reason: e.to_string(),
@@ -502,7 +572,8 @@ impl CtStoqClient {
     /// Select best CT endpoint
     async fn select_ct_endpoint(&self) -> TrustChainResult<ServiceEndpoint> {
         let endpoints = self.ct_endpoints.read().await;
-        endpoints.first()
+        endpoints
+            .first()
             .cloned()
             .ok_or_else(|| TrustChainError::ServiceDiscoveryError {
                 service: "certificate_transparency".to_string(),
@@ -523,9 +594,13 @@ impl CtStoqClient {
     }
 
     /// Cache CT submission result
-    async fn cache_ct_submission(&self, submission: &StoqCtSubmission, response: &StoqCtSubmissionResponse) {
+    async fn cache_ct_submission(
+        &self,
+        submission: &StoqCtSubmission,
+        response: &StoqCtSubmissionResponse,
+    ) {
         let fingerprint = hex::encode(sha2::Sha256::digest(&submission.certificate));
-        
+
         let ct_entry = StoqCtEntry {
             index: response.entry_index,
             certificate: submission.certificate.clone(),
@@ -574,41 +649,62 @@ impl CtStoqClient {
 
     /// Update average latency metric
     fn update_avg_latency(&self, latency_us: u64) {
-        let current_avg = self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .avg_latency_us
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = if current_avg == 0 {
             latency_us
         } else {
             (current_avg * 9 + latency_us) / 10 // Moving average
         };
-        self.metrics.avg_latency_us.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .avg_latency_us
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get CT client metrics
     pub fn get_metrics(&self) -> CtStoqMetrics {
         CtStoqMetrics {
             log_submissions: std::sync::atomic::AtomicU64::new(
-                self.metrics.log_submissions.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .log_submissions
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             log_queries: std::sync::atomic::AtomicU64::new(
-                self.metrics.log_queries.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .log_queries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             proof_verifications: std::sync::atomic::AtomicU64::new(
-                self.metrics.proof_verifications.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .proof_verifications
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             scts_generated: std::sync::atomic::AtomicU64::new(
-                self.metrics.scts_generated.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .scts_generated
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_hits: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_hits
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_misses: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_misses.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_misses
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             failed_operations: std::sync::atomic::AtomicU64::new(
-                self.metrics.failed_operations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .failed_operations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             avg_latency_us: std::sync::atomic::AtomicU64::new(
-                self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .avg_latency_us
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -616,10 +712,19 @@ impl CtStoqClient {
     /// Get cache statistics
     pub async fn get_cache_stats(&self) -> (usize, usize, f64) {
         let total_entries = self.ct_cache.len();
-        let total_ops = self.metrics.log_submissions.load(std::sync::atomic::Ordering::Relaxed) +
-                       self.metrics.log_queries.load(std::sync::atomic::Ordering::Relaxed);
-        let cache_hits = self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed);
-        
+        let total_ops = self
+            .metrics
+            .log_submissions
+            .load(std::sync::atomic::Ordering::Relaxed)
+            + self
+                .metrics
+                .log_queries
+                .load(std::sync::atomic::Ordering::Relaxed);
+        let cache_hits = self
+            .metrics
+            .cache_hits
+            .load(std::sync::atomic::Ordering::Relaxed);
+
         let hit_ratio = if total_ops > 0 {
             cache_hits as f64 / total_ops as f64
         } else {
@@ -654,7 +759,10 @@ impl CtStoqClient {
         let mut endpoints = self.ct_endpoints.write().await;
         if !endpoints.contains(&endpoint) {
             endpoints.push(endpoint.clone());
-            info!("Added CT endpoint: [{}]:{}", endpoint.address, endpoint.port);
+            info!(
+                "Added CT endpoint: [{}]:{}",
+                endpoint.address, endpoint.port
+            );
         }
         Ok(())
     }
@@ -663,7 +771,10 @@ impl CtStoqClient {
     pub async fn remove_ct_endpoint(&self, endpoint: &ServiceEndpoint) -> TrustChainResult<()> {
         let mut endpoints = self.ct_endpoints.write().await;
         endpoints.retain(|e| e != endpoint);
-        info!("Removed CT endpoint: [{}]:{}", endpoint.address, endpoint.port);
+        info!(
+            "Removed CT endpoint: [{}]:{}",
+            endpoint.address, endpoint.port
+        );
         Ok(())
     }
 }
@@ -686,7 +797,7 @@ mod tests {
     #[test]
     fn test_ct_stoq_config_default() {
         let config = CtStoqConfig::default();
-        
+
         assert_eq!(config.submission_timeout, Duration::from_secs(30));
         assert_eq!(config.query_timeout, Duration::from_secs(10));
         assert_eq!(config.cache_ttl, Duration::from_secs(1800));
@@ -708,8 +819,8 @@ mod tests {
             extensions: None,
         };
 
-        let serialized = bincode::serialize(&submission).unwrap();
-        let deserialized: StoqCtSubmission = bincode::deserialize(&serialized).unwrap();
+        let serialized = bincode::serialize(&submission).expect("test: expected success");
+        let deserialized: StoqCtSubmission = bincode::deserialize(&serialized).expect("test: expected success");
 
         assert_eq!(submission.certificate, deserialized.certificate);
         assert_eq!(submission.chain, deserialized.chain);
@@ -720,10 +831,30 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_initialization() {
         let metrics = CtStoqMetrics::default();
-        
-        assert_eq!(metrics.log_submissions.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.log_queries.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.proof_verifications.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.scts_generated.load(std::sync::atomic::Ordering::Relaxed), 0);
+
+        assert_eq!(
+            metrics
+                .log_submissions
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .log_queries
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .proof_verifications
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .scts_generated
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
     }
 }

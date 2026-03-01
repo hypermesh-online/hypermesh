@@ -17,17 +17,13 @@ use blockmatrix::blockchain::sync_manager::{
     BlockProvider, SyncConfig, SyncManager, SyncMessage, SyncObserver, SyncState,
 };
 use blockmatrix::bootstrap::PrivacyMode;
-use blockmatrix::distribution::rebalancing::{
-    RebalanceAction, RebalanceConfig, RebalanceManager,
-};
-use blockmatrix::gateway::{
-    AssetTransfer, GatewayManager, TransferStatus, TransferValidator,
-};
+use blockmatrix::distribution::rebalancing::{RebalanceAction, RebalanceConfig, RebalanceManager};
+use blockmatrix::gateway::GatewayError;
+use blockmatrix::gateway::{AssetTransfer, GatewayManager, TransferStatus, TransferValidator};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::reflector_pool::{Reflector, ReflectorConfig, ReflectorPool};
-use blockmatrix::network::sync_dispatch::{DispatchResponse, SyncDispatcher};
 use blockmatrix::network::stoq_integration::MatrixMessage;
-use blockmatrix::gateway::GatewayError;
+use blockmatrix::network::sync_dispatch::{DispatchResponse, SyncDispatcher};
 
 use hypermesh_lib::{AssetId, BlockchainScope, MatrixPosition};
 
@@ -44,7 +40,7 @@ impl BlockProvider for TestBlockProvider {
     fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64) {
         let end = (from_height + max_blocks as u64).min(self.chain_height);
         let hashes: Vec<String> = (from_height..end)
-            .map(|h| format!("block-hash-{}", h))
+            .map(|h| format!("block-hash-{h}"))
             .collect();
         (hashes, self.chain_height)
     }
@@ -98,10 +94,7 @@ async fn test_sync_join_then_gateway_transfer() {
         .expect("test: join alpha-net");
 
     assert!(sync.is_member("alpha-net"));
-    assert_eq!(
-        sync.sync_state("alpha-net"),
-        Some(&SyncState::Discovering)
-    );
+    assert_eq!(sync.sync_state("alpha-net"), Some(&SyncState::Discovering));
 
     // Transition to Synchronized (simulating completed sync)
     sync.update_sync_state(
@@ -276,10 +269,7 @@ async fn test_gateway_transfer_triggers_rebalance() {
         )
         .await
         .expect("test: initiate transfer");
-    let status = gw
-        .validate_transfer(&tid)
-        .await
-        .expect("test: validate");
+    let status = gw.validate_transfer(&tid).await.expect("test: validate");
     assert_eq!(status, TransferStatus::Confirmed);
 
     // Step 3: Simulate that the transfer caused a new node to join
@@ -390,10 +380,7 @@ async fn test_node_failure_during_transfer_and_rebalance() {
 
     #[async_trait::async_trait]
     impl TransferValidator for RejectValidator {
-        async fn validate_transfer(
-            &self,
-            _transfer: &AssetTransfer,
-        ) -> Result<bool, GatewayError> {
+        async fn validate_transfer(&self, _transfer: &AssetTransfer) -> Result<bool, GatewayError> {
             // Simulate validation failure (e.g., node went down)
             Ok(false)
         }
@@ -410,10 +397,7 @@ async fn test_node_failure_during_transfer_and_rebalance() {
         .expect("test: initiate transfer");
 
     // Transfer should be rolled back due to validation failure
-    let status = gw
-        .validate_transfer(&tid)
-        .await
-        .expect("test: validate");
+    let status = gw.validate_transfer(&tid).await.expect("test: validate");
     assert_eq!(status, TransferStatus::RolledBack);
 
     // Step 2: Simultaneously, the failing node triggers rebalancing
@@ -425,8 +409,7 @@ async fn test_node_failure_during_transfer_and_rebalance() {
     rebalance.register_shard("shard-fragile".to_string(), "failed-node", &pos_a);
     rebalance.register_shard("shard-fragile".to_string(), "healthy-node-1", &pos_b);
     // Add a spare node for re-replication
-    rebalance
-        .register_shard("other-shard".to_string(), "healthy-node-2", &pos_c);
+    rebalance.register_shard("other-shard".to_string(), "healthy-node-2", &pos_c);
 
     // Node failure triggers emergency rebalancing
     let actions = rebalance.on_node_failed("failed-node");
@@ -450,7 +433,10 @@ async fn test_node_failure_during_transfer_and_rebalance() {
 
     // Execute the emergency actions
     let result = rebalance.execute_actions(&actions);
-    assert_eq!(result.actions_failed, 0, "Emergency replication should succeed");
+    assert_eq!(
+        result.actions_failed, 0,
+        "Emergency replication should succeed"
+    );
 
     // Verify shard-fragile still has sufficient replicas
     let dist = rebalance.get_shard_distribution();
@@ -511,9 +497,7 @@ async fn test_sync_join_triggers_rebalance_distribution() {
 
     assert!(
         replicate_count >= 1,
-        "Under-replicated shard should be replicated to new node, got {} actions: {:?}",
-        replicate_count,
-        actions
+        "Under-replicated shard should be replicated to new node, got {replicate_count} actions: {actions:?}"
     );
 
     // Execute the rebalancing
@@ -524,7 +508,7 @@ async fn test_sync_join_triggers_rebalance_distribution() {
     let dist = rebalance.get_shard_distribution();
     assert!(
         dist.get("new-node")
-            .map_or(false, |s| s.contains(&"shard-data-1".to_string())),
+            .is_some_and(|s| s.contains(&"shard-data-1".to_string())),
         "new-node should host shard-data-1 after rebalancing"
     );
 }
@@ -552,7 +536,8 @@ async fn test_node_leave_triggers_rebalance() {
     rebalance.register_shard("shard-other".to_string(), "node-beta", &positions[1].1);
 
     // Step 1: Node leaves the sync network
-    sync.leave_network("mesh-net").expect("test: leave mesh-net");
+    sync.leave_network("mesh-net")
+        .expect("test: leave mesh-net");
     assert!(!sync.is_member("mesh-net"));
 
     // Step 2: Node also leaves the rebalancing topology
@@ -573,8 +558,7 @@ async fn test_node_leave_triggers_rebalance() {
 
     assert!(
         !replicate_other.is_empty(),
-        "shard-other should be re-replicated after node-alpha leaves: {:?}",
-        actions
+        "shard-other should be re-replicated after node-alpha leaves: {actions:?}"
     );
 
     // Execute
@@ -627,8 +611,11 @@ async fn test_reflector_prune_triggers_rebalance() {
         &coord(-10, 10, 10),
     );
     // Register the spare node for potential replication
-    rebalance
-        .register_shard("other-shard".to_string(), "fresh-node-2", &coord(10, -10, 10));
+    rebalance.register_shard(
+        "other-shard".to_string(),
+        "fresh-node-2",
+        &coord(10, -10, 10),
+    );
 
     // Step 1: Prune stale reflectors (now_ms=30_000, stale timeout=10_000)
     // cutoff = (30000 - 10000) / 1000 = 20 seconds
@@ -654,8 +641,7 @@ async fn test_reflector_prune_triggers_rebalance() {
 
     assert!(
         !replicate_actions.is_empty(),
-        "Pruned node's shards should be re-replicated: {:?}",
-        actions
+        "Pruned node's shards should be re-replicated: {actions:?}"
     );
 
     let result = rebalance.execute_actions(&actions);
@@ -727,10 +713,7 @@ async fn test_full_pipeline_join_transfer_rebalance() {
         .await
         .expect("test: initiate production transfer");
 
-    let status = gw
-        .validate_transfer(&tid)
-        .await
-        .expect("test: validate");
+    let status = gw.validate_transfer(&tid).await.expect("test: validate");
     assert_eq!(status, TransferStatus::Confirmed);
 
     // --- Phase C: Rebalancing after topology change ---
@@ -796,7 +779,7 @@ async fn test_multi_node_cluster_integration() {
 
     // Distribute 4 shards across the first 2 nodes initially (imbalanced)
     for i in 0..4 {
-        let shard_id = format!("shard-{}", i);
+        let shard_id = format!("shard-{i}");
         rebalance.register_shard(shard_id.clone(), "node-0", &node_positions[0].1);
         rebalance.register_shard(shard_id, "node-1", &node_positions[1].1);
     }
@@ -807,8 +790,7 @@ async fn test_multi_node_cluster_integration() {
         let result = rebalance.execute_actions(&actions);
         assert_eq!(
             result.actions_failed, 0,
-            "Node {} join actions should succeed",
-            nid
+            "Node {nid} join actions should succeed"
         );
     }
 
@@ -837,7 +819,7 @@ async fn test_multi_node_cluster_integration() {
     let mut confirmed_count = 0;
 
     for i in 0..3 {
-        let asset = AssetId::from(format!("cluster-asset-{}", i));
+        let asset = AssetId::from(format!("cluster-asset-{i}"));
         let (from, to) = if i % 2 == 0 {
             (BlockchainScope::Device, BlockchainScope::Network)
         } else {
@@ -881,7 +863,7 @@ async fn test_multi_node_cluster_integration() {
 
     // Each shard should appear on at least min_replicas nodes
     for i in 0..4 {
-        let shard_id = format!("shard-{}", i);
+        let shard_id = format!("shard-{i}");
         let host_count = dist
             .iter()
             .filter(|(_, shards)| shards.contains(&shard_id))
@@ -890,9 +872,7 @@ async fn test_multi_node_cluster_integration() {
         // reach 3 if there aren't enough candidates, but should be >= 2
         assert!(
             host_count >= 2,
-            "shard-{} should have >= 2 replicas, has {}",
-            i,
-            host_count
+            "shard-{i} should have >= 2 replicas, has {host_count}"
         );
     }
 

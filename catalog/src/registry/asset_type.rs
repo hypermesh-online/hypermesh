@@ -111,11 +111,7 @@ pub enum ValidationRuleType {
 
 impl AssetTypeDefinition {
     /// Create a new asset type definition
-    pub fn new(
-        type_name: String,
-        schema: JsonValue,
-        consensus_proof: ConsensusProof,
-    ) -> Self {
+    pub fn new(type_name: String, schema: JsonValue, consensus_proof: ConsensusProof) -> Self {
         // Create AssetRegistration from type definition data
         let asset_data = blockmatrix::assets::core::AssetData {
             config: type_name.as_bytes().to_vec(),
@@ -187,7 +183,7 @@ impl AssetTypeDefinition {
 
         // Validate against JSON schema
         if let Err(e) = self.validate_schema(instance_data) {
-            errors.push(format!("Schema validation failed: {}", e));
+            errors.push(format!("Schema validation failed: {e}"));
         }
 
         // Apply validation rules
@@ -210,7 +206,7 @@ impl AssetTypeDefinition {
         if instance_data.is_object() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Expected object, got {:?}", instance_data))
+            Err(anyhow::anyhow!("Expected object, got {instance_data:?}"))
         }
     }
 
@@ -267,22 +263,13 @@ mod tests {
 
     fn create_test_consensus_proof() -> ConsensusProof {
         use blockmatrix::consensus::proof_of_state_integration::{
-            SpaceProof, StakeProof, WorkProof, TimeProof,
-            WorkloadType, WorkState,
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
         use std::time::Duration;
 
-        let stake_proof = StakeProof::new(
-            "test-holder".to_string(),
-            "test-id".to_string(),
-            1000
-        );
+        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
 
-        let space_proof = SpaceProof::new(
-            "test-node".to_string(),
-            "/test".to_string(),
-            1024
-        );
+        let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
 
         let work_proof = WorkProof::new(
             "test-owner".to_string(),
@@ -312,11 +299,7 @@ mod tests {
         });
 
         let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new(
-            "Vehicle".to_string(),
-            schema,
-            consensus_proof,
-        );
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
 
         assert_eq!(type_def.type_name, "Vehicle");
         // asset_type is a method on AssetRegistration, not a field
@@ -335,11 +318,7 @@ mod tests {
         });
 
         let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new(
-            "Vehicle".to_string(),
-            schema,
-            consensus_proof,
-        );
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
 
         let instance = json!({
             "vin": "1HGBH41JXMN109186",
@@ -347,7 +326,7 @@ mod tests {
             "model": "Accord"
         });
 
-        let result = type_def.validate_instance(&instance).unwrap();
+        let result = type_def.validate_instance(&instance).expect("test: validation");
         assert!(result.valid);
     }
 }

@@ -6,26 +6,28 @@
 //!
 //! Handles encrypted/sharded data access through proxy system
 
+use aes_gcm::{AeadCore, AeadInPlace, Aes256Gcm, Key, KeyInit};
+use blake3;
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::kem::{
+    Ciphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret,
+};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use blake3;
-use pqcrypto_kyber::kyber1024;
-use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext, SharedSecret};
-use aes_gcm::{Aes256Gcm, Key, AeadCore, AeadInPlace, KeyInit};
 
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult};
 
 /// Sharded data access handler
 pub struct ShardedDataAccess {
     /// Shard manager
     shard_manager: Arc<ShardManager>,
-    
+
     /// Active shard sessions
     active_sessions: Arc<RwLock<HashMap<String, ShardSession>>>,
-    
+
     /// Shard access configuration
     config: ShardAccessConfig,
 }
@@ -56,37 +58,37 @@ pub struct ShardManager {
 pub struct EncryptedShard {
     /// Shard identifier
     pub shard_id: String,
-    
+
     /// Shard key for access
     pub shard_key: String,
-    
+
     /// Associated asset ID
     pub asset_id: AssetRegistration,
-    
+
     /// Shard sequence number
     pub sequence_number: u32,
-    
+
     /// Total number of shards for this data
     pub total_shards: u32,
-    
+
     /// Encrypted shard data
     pub encrypted_data: Vec<u8>,
-    
+
     /// Shard checksum for integrity
     pub checksum: [u8; 32],
-    
+
     /// Encryption metadata
     pub encryption_metadata: EncryptionMetadata,
-    
+
     /// Shard size in bytes
     pub size_bytes: u64,
-    
+
     /// Shard creation timestamp
     pub created_at: SystemTime,
-    
+
     /// Shard expiration timestamp
     pub expires_at: SystemTime,
-    
+
     /// Storage node locations
     pub storage_nodes: Vec<String>,
 }
@@ -115,25 +117,25 @@ pub struct EncryptionMetadata {
 struct ShardSession {
     /// Session identifier
     session_id: String,
-    
+
     /// Associated asset ID
     asset_id: AssetRegistration,
-    
+
     /// Requested shard keys
     requested_shards: Vec<String>,
-    
+
     /// Retrieved shards
     retrieved_shards: HashMap<String, EncryptedShard>,
-    
+
     /// Session start time
     started_at: SystemTime,
-    
+
     /// Session timeout
     timeout_at: SystemTime,
-    
+
     /// Session status
     status: SessionStatus,
-    
+
     /// Progress tracking
     progress: SessionProgress,
 }
@@ -143,19 +145,19 @@ struct ShardSession {
 enum SessionStatus {
     /// Session is active
     Active,
-    
+
     /// Session is completing reconstruction
     Reconstructing,
-    
+
     /// Session completed successfully
     Completed,
-    
+
     /// Session failed
     Failed { reason: String },
-    
+
     /// Session timed out
     TimedOut,
-    
+
     /// Session was cancelled
     Cancelled,
 }
@@ -165,16 +167,16 @@ enum SessionStatus {
 pub struct SessionProgress {
     /// Total shards needed
     total_shards_needed: u32,
-    
+
     /// Shards retrieved so far
     shards_retrieved: u32,
-    
+
     /// Bytes downloaded so far
     bytes_downloaded: u64,
-    
+
     /// Total bytes expected
     total_bytes_expected: u64,
-    
+
     /// Progress percentage (0-100)
     progress_percentage: f32,
 }
@@ -206,10 +208,10 @@ impl Default for ShardAccessConfig {
         Self {
             max_concurrent_sessions: 100,
             session_timeout: Duration::from_secs(300), // 5 minutes
-            _max_shard_size: 64 * 1024 * 1024, // 64MB
+            _max_shard_size: 64 * 1024 * 1024,         // 64MB
             _enable_reconstruction_cache: true,
             _cache_timeout: Duration::from_secs(3600), // 1 hour
-            _max_cache_size: 1024 * 1024 * 1024, // 1GB
+            _max_cache_size: 1024 * 1024 * 1024,       // 1GB
         }
     }
 }
@@ -254,37 +256,51 @@ impl ShardedDataAccess {
             config: ShardAccessConfig::default(),
         })
     }
-    
+
     /// Get shard data for asset
-    pub async fn get_shard_data(&self, asset_id: &AssetRegistration, shard_key: &str) -> AssetResult<Vec<u8>> {
+    pub async fn get_shard_data(
+        &self,
+        asset_id: &AssetRegistration,
+        shard_key: &str,
+    ) -> AssetResult<Vec<u8>> {
         // Create new shard session
-        let session_id = self.create_shard_session(asset_id, vec![shard_key.to_string()]).await?;
-        
+        let session_id = self
+            .create_shard_session(asset_id, vec![shard_key.to_string()])
+            .await?;
+
         // Retrieve shard data
         let shard_data = self.retrieve_shard_data(&session_id, shard_key).await?;
-        
+
         // Complete session
         self.complete_shard_session(&session_id).await?;
-        
-        tracing::info!("Retrieved shard data for asset {} (key: {})", asset_id, shard_key);
+
+        tracing::info!(
+            "Retrieved shard data for asset {} (key: {})",
+            asset_id,
+            shard_key
+        );
         Ok(shard_data)
     }
-    
+
     /// Create new shard access session
-    async fn create_shard_session(&self, asset_id: &AssetRegistration, shard_keys: Vec<String>) -> AssetResult<String> {
+    async fn create_shard_session(
+        &self,
+        asset_id: &AssetRegistration,
+        shard_keys: Vec<String>,
+    ) -> AssetResult<String> {
         // Check concurrent session limit
         {
             let sessions = self.active_sessions.read().await;
             if sessions.len() >= self.config.max_concurrent_sessions as usize {
                 return Err(AssetError::AdapterError {
-                    message: "Maximum concurrent shard sessions reached".to_string()
+                    message: "Maximum concurrent shard sessions reached".to_string(),
                 });
             }
         }
-        
+
         // Generate session ID
         let session_id = self.generate_session_id(asset_id);
-        
+
         // Create session
         let session = ShardSession {
             session_id: session_id.clone(),
@@ -302,70 +318,80 @@ impl ShardedDataAccess {
                 progress_percentage: 0.0,
             },
         };
-        
+
         // Store session
         {
             let mut sessions = self.active_sessions.write().await;
             sessions.insert(session_id.clone(), session);
         }
-        
-        tracing::debug!("Created shard session {} for asset {}", session_id, asset_id);
+
+        tracing::debug!(
+            "Created shard session {} for asset {}",
+            session_id,
+            asset_id
+        );
         Ok(session_id)
     }
-    
+
     /// Retrieve shard data for session
     async fn retrieve_shard_data(&self, session_id: &str, shard_key: &str) -> AssetResult<Vec<u8>> {
         // Get session
         let mut session = {
             let sessions = self.active_sessions.read().await;
-            sessions.get(session_id)
+            sessions
+                .get(session_id)
                 .ok_or_else(|| AssetError::AdapterError {
-                    message: format!("Shard session not found: {}", session_id)
+                    message: format!("Shard session not found: {session_id}"),
                 })?
                 .clone()
         };
-        
+
         // Check session timeout
         if SystemTime::now() > session.timeout_at {
-            self.update_session_status(session_id, SessionStatus::TimedOut).await?;
+            self.update_session_status(session_id, SessionStatus::TimedOut)
+                .await?;
             return Err(AssetError::AdapterError {
-                message: "Shard session timed out".to_string()
+                message: "Shard session timed out".to_string(),
             });
         }
-        
+
         // Get shard from manager
         let shard = self.shard_manager.get_shard(shard_key).await?;
-        
+
         // Decrypt shard data
         let decrypted_data = self.decrypt_shard_data(&shard).await?;
-        
+
         // Update session progress
-        session.retrieved_shards.insert(shard_key.to_string(), shard.clone());
+        session
+            .retrieved_shards
+            .insert(shard_key.to_string(), shard.clone());
         session.progress.shards_retrieved += 1;
         session.progress.bytes_downloaded += shard.size_bytes;
-        session.progress.progress_percentage = 
-            (session.progress.shards_retrieved as f32 / session.progress.total_shards_needed as f32) * 100.0;
-        
+        session.progress.progress_percentage = (session.progress.shards_retrieved as f32
+            / session.progress.total_shards_needed as f32)
+            * 100.0;
+
         // Update session in storage
         {
             let mut sessions = self.active_sessions.write().await;
             sessions.insert(session_id.to_string(), session);
         }
-        
+
         tracing::debug!(
             "Retrieved shard data for session {} (key: {}, {} bytes)",
             session_id,
             shard_key,
             decrypted_data.len()
         );
-        
+
         Ok(decrypted_data)
     }
-    
+
     /// Complete shard session
     async fn complete_shard_session(&self, session_id: &str) -> AssetResult<()> {
-        self.update_session_status(session_id, SessionStatus::Completed).await?;
-        
+        self.update_session_status(session_id, SessionStatus::Completed)
+            .await?;
+
         // Remove session after a short delay to allow status queries
         tokio::spawn({
             let sessions = Arc::clone(&self.active_sessions);
@@ -376,33 +402,36 @@ impl ShardedDataAccess {
                 sessions.remove(&session_id);
             }
         });
-        
+
         tracing::debug!("Completed shard session: {}", session_id);
         Ok(())
     }
-    
+
     /// Update session status
-    async fn update_session_status(&self, session_id: &str, status: SessionStatus) -> AssetResult<()> {
+    async fn update_session_status(
+        &self,
+        session_id: &str,
+        status: SessionStatus,
+    ) -> AssetResult<()> {
         let mut sessions = self.active_sessions.write().await;
         if let Some(session) = sessions.get_mut(session_id) {
             session.status = status;
         }
         Ok(())
     }
-    
+
     /// Decrypt shard data using Kyber-1024 KEM + AES-256-GCM via the shard manager
     async fn decrypt_shard_data(&self, shard: &EncryptedShard) -> AssetResult<Vec<u8>> {
-        let decrypted_data = self.shard_manager.decrypt_shard_data_internal(
-            &shard.encrypted_data,
-            &shard.encryption_metadata,
-        )?;
+        let decrypted_data = self
+            .shard_manager
+            .decrypt_shard_data_internal(&shard.encrypted_data, &shard.encryption_metadata)?;
 
         // Verify checksum against plaintext
         if self.shard_manager.config.enable_integrity_checking {
             let calculated_checksum = self.calculate_checksum(&decrypted_data);
             if calculated_checksum != shard.checksum {
                 return Err(AssetError::AdapterError {
-                    message: "Shard integrity check failed - checksum mismatch".to_string()
+                    message: "Shard integrity check failed - checksum mismatch".to_string(),
                 });
             }
         }
@@ -410,7 +439,7 @@ impl ShardedDataAccess {
         tracing::debug!("Decrypted shard data ({} bytes)", decrypted_data.len());
         Ok(decrypted_data)
     }
-    
+
     /// Calculate checksum for integrity verification
     fn calculate_checksum(&self, data: &[u8]) -> [u8; 32] {
         *blake3::hash(data).as_bytes()
@@ -432,40 +461,42 @@ impl ShardedDataAccess {
         let hash = hasher.finalize();
         hex::encode(&hash.as_bytes()[..16])
     }
-    
+
     /// Get session progress
     pub async fn get_session_progress(&self, session_id: &str) -> AssetResult<SessionProgress> {
         let sessions = self.active_sessions.read().await;
-        let session = sessions.get(session_id)
+        let session = sessions
+            .get(session_id)
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("Shard session not found: {}", session_id)
+                message: format!("Shard session not found: {session_id}"),
             })?;
-        
+
         Ok(session.progress.clone())
     }
-    
+
     /// Cancel shard session
     pub async fn cancel_session(&self, session_id: &str) -> AssetResult<()> {
-        self.update_session_status(session_id, SessionStatus::Cancelled).await?;
-        
+        self.update_session_status(session_id, SessionStatus::Cancelled)
+            .await?;
+
         let mut sessions = self.active_sessions.write().await;
         sessions.remove(session_id);
-        
+
         tracing::info!("Cancelled shard session: {}", session_id);
         Ok(())
     }
-    
+
     /// Cleanup expired sessions
     pub async fn cleanup_expired_sessions(&self) -> AssetResult<u64> {
         let mut sessions = self.active_sessions.write().await;
         let now = SystemTime::now();
-        
+
         let initial_count = sessions.len();
         sessions.retain(|_, session| session.timeout_at > now);
         let final_count = sessions.len();
-        
+
         let removed_count = initial_count - final_count;
-        
+
         tracing::debug!("Cleaned up {} expired shard sessions", removed_count);
         Ok(removed_count as u64)
     }
@@ -485,30 +516,31 @@ impl ShardManager {
             config: ShardManagerConfig::default(),
         })
     }
-    
+
     /// Get shard by key
     async fn get_shard(&self, shard_key: &str) -> AssetResult<EncryptedShard> {
         let shards = self.available_shards.read().await;
-        shards.get(shard_key)
+        shards
+            .get(shard_key)
             .cloned()
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("Shard not found: {}", shard_key)
+                message: format!("Shard not found: {shard_key}"),
             })
     }
-    
+
     /// Store shard
     pub async fn store_shard(&self, shard: EncryptedShard) -> AssetResult<()> {
         let shard_key = shard.shard_key.clone();
-        
+
         {
             let mut shards = self.available_shards.write().await;
             shards.insert(shard_key.clone(), shard);
         }
-        
+
         tracing::debug!("Stored shard: {}", shard_key);
         Ok(())
     }
-    
+
     /// Create encrypted shards from data
     pub async fn create_shards(
         &self,
@@ -516,15 +548,15 @@ impl ShardManager {
         data: &[u8],
     ) -> AssetResult<Vec<EncryptedShard>> {
         let target_shard_size = self.config.target_shard_size as usize;
-        let total_shards = (data.len() + target_shard_size - 1) / target_shard_size; // Ceiling division
-        
+        let total_shards = data.len().div_ceil(target_shard_size); // Ceiling division
+
         let mut shards = Vec::new();
-        
+
         for i in 0..total_shards {
             let start = i * target_shard_size;
             let end = std::cmp::min(start + target_shard_size, data.len());
             let shard_data = &data[start..end];
-            
+
             // Create encryption metadata (KEM ciphertext, nonce, tag populated during encrypt)
             let mut encryption_metadata = EncryptionMetadata {
                 algorithm: "Kyber-1024-KEM+AES-256-GCM".to_string(),
@@ -535,15 +567,17 @@ impl ShardManager {
             };
 
             // Encrypt shard data with Kyber-1024 KEM + AES-256-GCM
-            let encrypted_data = self.encrypt_shard_data(shard_data, &mut encryption_metadata).await?;
-            
+            let encrypted_data = self
+                .encrypt_shard_data(shard_data, &mut encryption_metadata)
+                .await?;
+
             // Calculate checksum
             let checksum = *blake3::hash(shard_data).as_bytes();
-            
+
             // Create shard
             let shard = EncryptedShard {
-                shard_id: format!("shard_{}_{}", asset_id, i),
-                shard_key: format!("{}:shard:{}", asset_id, i),
+                shard_id: format!("shard_{asset_id}_{i}"),
+                shard_key: format!("{asset_id}:shard:{i}"),
                 asset_id: asset_id.clone(),
                 sequence_number: i as u32,
                 total_shards: total_shards as u32,
@@ -555,14 +589,14 @@ impl ShardManager {
                 expires_at: SystemTime::now() + Duration::from_secs(86400 * 7), // 7 days
                 storage_nodes: Vec::new(), // Will be populated when distributed
             };
-            
+
             shards.push(shard);
         }
-        
+
         tracing::info!("Created {} shards for asset {}", shards.len(), asset_id);
         Ok(shards)
     }
-    
+
     /// Encrypt shard data with Kyber-1024 KEM + AES-256-GCM
     ///
     /// Returns the AES-GCM ciphertext. The KEM ciphertext, nonce, and auth tag
@@ -573,10 +607,11 @@ impl ShardManager {
         data: &[u8],
         metadata: &mut EncryptionMetadata,
     ) -> AssetResult<Vec<u8>> {
-        let pk = kyber1024::PublicKey::from_bytes(&self.kyber_public_key)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 public key in shard manager: {}", e),
-            })?;
+        let pk = kyber1024::PublicKey::from_bytes(&self.kyber_public_key).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 public key in shard manager: {e}"),
+            }
+        })?;
 
         // KEM encapsulation produces shared secret + ciphertext
         let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
@@ -589,9 +624,10 @@ impl ShardManager {
         let nonce = Aes256Gcm::generate_nonce(rand::thread_rng());
 
         let mut buffer = data.to_vec();
-        let tag = cipher.encrypt_in_place_detached(&nonce, b"", &mut buffer)
+        let tag = cipher
+            .encrypt_in_place_detached(&nonce, b"", &mut buffer)
             .map_err(|e| AssetError::AdapterError {
-                message: format!("AES-GCM shard encryption failed: {}", e),
+                message: format!("AES-GCM shard encryption failed: {e}"),
             })?;
 
         // Store crypto artifacts in metadata for later decryption
@@ -615,15 +651,17 @@ impl ShardManager {
         metadata: &EncryptionMetadata,
     ) -> AssetResult<Vec<u8>> {
         // KEM decapsulation to recover shared secret
-        let sk = kyber1024::SecretKey::from_bytes(&self.kyber_secret_key)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 secret key in shard manager: {}", e),
-            })?;
+        let sk = kyber1024::SecretKey::from_bytes(&self.kyber_secret_key).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 secret key in shard manager: {e}"),
+            }
+        })?;
 
-        let kem_ct = kyber1024::Ciphertext::from_bytes(&metadata.kem_ciphertext)
-            .map_err(|e| AssetError::AdapterError {
-                message: format!("Invalid Kyber-1024 KEM ciphertext in shard metadata: {}", e),
-            })?;
+        let kem_ct = kyber1024::Ciphertext::from_bytes(&metadata.kem_ciphertext).map_err(|e| {
+            AssetError::AdapterError {
+                message: format!("Invalid Kyber-1024 KEM ciphertext in shard metadata: {e}"),
+            }
+        })?;
 
         let shared_secret = kyber1024::decapsulate(&kem_ct, &sk);
         let aes_key = Self::derive_aes_key(shared_secret.as_bytes());
@@ -652,9 +690,10 @@ impl ShardManager {
         let tag = Tag::from_slice(&metadata.auth_tag);
 
         let mut buffer = encrypted_data.to_vec();
-        cipher.decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
+        cipher
+            .decrypt_in_place_detached(nonce, b"", &mut buffer, tag)
             .map_err(|e| AssetError::AdapterError {
-                message: format!("AES-GCM shard decryption failed: {}", e),
+                message: format!("AES-GCM shard decryption failed: {e}"),
             })?;
 
         tracing::debug!(
@@ -698,14 +737,17 @@ mod tests {
         let asset_id = test_asset_id(AssetType::Storage);
         let test_data = b"This is test data that will be sharded and encrypted";
 
-        let shards = manager.create_shards(&asset_id, test_data).await.expect("test: create shards");
-        
+        let shards = manager
+            .create_shards(&asset_id, test_data)
+            .await
+            .expect("test: create shards");
+
         assert!(!shards.is_empty());
         assert_eq!(shards[0].asset_id, asset_id);
         assert_eq!(shards[0].sequence_number, 0);
         assert!(shards[0].total_shards > 0);
     }
-    
+
     #[tokio::test]
     async fn test_store_and_get_shard() {
         let manager = ShardManager::new().await.expect("test: create manager");
@@ -732,9 +774,15 @@ mod tests {
             storage_nodes: Vec::new(),
         };
 
-        manager.store_shard(shard.clone()).await.expect("test: store shard");
+        manager
+            .store_shard(shard.clone())
+            .await
+            .expect("test: store shard");
 
-        let retrieved_shard = manager.get_shard(&shard.shard_key).await.expect("test: get shard");
+        let retrieved_shard = manager
+            .get_shard(&shard.shard_key)
+            .await
+            .expect("test: get shard");
         assert_eq!(retrieved_shard.shard_id, shard.shard_id);
         assert_eq!(retrieved_shard.encrypted_data, shard.encrypted_data);
     }
@@ -752,7 +800,10 @@ mod tests {
             auth_tag: Vec::new(),
         };
 
-        let ciphertext = manager.encrypt_shard_data(plaintext, &mut metadata).await.expect("test: encrypt");
+        let ciphertext = manager
+            .encrypt_shard_data(plaintext, &mut metadata)
+            .await
+            .expect("test: encrypt");
 
         // Ciphertext must differ from plaintext
         assert_ne!(ciphertext, plaintext.to_vec());
@@ -761,7 +812,9 @@ mod tests {
         assert_eq!(metadata.nonce.len(), 12);
         assert_eq!(metadata.auth_tag.len(), 16);
 
-        let decrypted = manager.decrypt_shard_data_internal(&ciphertext, &metadata).expect("test: decrypt");
+        let decrypted = manager
+            .decrypt_shard_data_internal(&ciphertext, &metadata)
+            .expect("test: decrypt");
         assert_eq!(decrypted, plaintext.to_vec());
     }
 
@@ -771,7 +824,10 @@ mod tests {
         let asset_id = test_asset_id(AssetType::Storage);
         let original_data = b"Data that goes through full shard creation pipeline with real crypto";
 
-        let shards = manager.create_shards(&asset_id, original_data).await.expect("test: create shards");
+        let shards = manager
+            .create_shards(&asset_id, original_data)
+            .await
+            .expect("test: create shards");
         assert!(!shards.is_empty());
 
         // Decrypt each shard and reassemble
@@ -799,7 +855,10 @@ mod tests {
             auth_tag: Vec::new(),
         };
 
-        let mut ciphertext = manager.encrypt_shard_data(plaintext, &mut metadata).await.expect("test: encrypt");
+        let mut ciphertext = manager
+            .encrypt_shard_data(plaintext, &mut metadata)
+            .await
+            .expect("test: encrypt");
 
         // Tamper with the ciphertext
         if let Some(byte) = ciphertext.first_mut() {
@@ -807,6 +866,9 @@ mod tests {
         }
 
         let result = manager.decrypt_shard_data_internal(&ciphertext, &metadata);
-        assert!(result.is_err(), "Tampered ciphertext should fail AES-GCM authentication");
+        assert!(
+            result.is_err(),
+            "Tampered ciphertext should fail AES-GCM authentication"
+        );
     }
 }

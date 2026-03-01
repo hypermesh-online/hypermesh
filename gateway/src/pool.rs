@@ -4,9 +4,9 @@
 
 use anyhow::{anyhow, Result};
 use arc_swap::ArcSwap;
+use bytes::Bytes;
 use dashmap::DashMap;
 use h3::client::SendRequest;
-use bytes::Bytes;
 use quinn::{ClientConfig, Endpoint};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -68,7 +68,7 @@ impl ConnectionPool {
         tls_config.alpn_protocols = vec![b"h3".to_vec()];
 
         let client_config = ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(tls_config)?
+            quinn::crypto::rustls::QuicClientConfig::try_from(tls_config)?,
         ));
 
         // Create endpoint
@@ -155,8 +155,8 @@ impl ConnectionPool {
             .await?;
 
         // Create HTTP/3 connection
-        let (mut driver, send_request) = h3::client::new(h3_quinn::Connection::new(quic_conn))
-            .await?;
+        let (mut driver, send_request) =
+            h3::client::new(h3_quinn::Connection::new(quic_conn)).await?;
 
         // Spawn driver task
         tokio::spawn(async move {
@@ -177,7 +177,9 @@ impl ConnectionPool {
 
         self.connections.insert(id, pooled);
         self.stats.total_connections.fetch_add(1, Ordering::Relaxed);
-        self.stats.active_connections.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .active_connections
+            .fetch_add(1, Ordering::Relaxed);
 
         info!("Created new connection to {:?}", self.backend_addr);
         Ok(send_request)
@@ -199,8 +201,10 @@ impl ConnectionPool {
         }
 
         for id in to_remove {
-            if let Some(_) = self.connections.remove(&id) {
-                self.stats.active_connections.fetch_sub(1, Ordering::Relaxed);
+            if self.connections.remove(&id).is_some() {
+                self.stats
+                    .active_connections
+                    .fetch_sub(1, Ordering::Relaxed);
                 debug!("Removed stale connection {}", id);
             }
         }
@@ -210,7 +214,9 @@ impl ConnectionPool {
     pub fn _mark_unhealthy(&self, _conn: &SendRequest<h3_quinn::OpenStreams, Bytes>) {
         // In a real implementation, we'd track which specific connection failed
         // For now, we'll just increment the failed counter
-        self.stats.failed_connections.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .failed_connections
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Get pool statistics

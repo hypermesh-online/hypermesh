@@ -4,21 +4,21 @@
 
 //! Certificate manager with TrustChain integration
 
+use anyhow::{anyhow, Result};
+use dashmap::DashMap;
+use rcgen::generate_simple_self_signed;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use sha2::{Digest, Sha256};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use anyhow::{Result, anyhow};
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rcgen::generate_simple_self_signed;
 use tokio::sync::RwLock;
-use dashmap::DashMap;
-use tracing::{info, debug};
-use sha2::{Sha256, Digest};
+use tracing::{debug, info};
 
-use crate::protocol::STOQ_ALPN;
 use super::certificate_strategy::CertificateStrategy;
-use super::types::{CertificateConfig, CertificateMode, StoqNodeCertificate, AcceptAllVerifier};
 use super::trustchain_client::TrustChainClient;
+use super::types::{AcceptAllVerifier, CertificateConfig, CertificateMode, StoqNodeCertificate};
+use crate::protocol::STOQ_ALPN;
 
 /// Certificate manager with TrustChain integration
 pub struct CertificateManager {
@@ -86,7 +86,10 @@ impl CertificateManager {
 
     /// Create certificate manager with network strategy
     pub async fn with_strategy(strategy: Arc<dyn CertificateStrategy>) -> Result<Self> {
-        info!("Initializing STOQ certificate manager with strategy: {}", strategy.strategy_name());
+        info!(
+            "Initializing STOQ certificate manager with strategy: {}",
+            strategy.strategy_name()
+        );
 
         let config = CertificateConfig {
             mode: CertificateMode::NetworkStrategy,
@@ -106,7 +109,11 @@ impl CertificateManager {
             certificate_strategy: Some(strategy),
         };
 
-        if manager.certificate_strategy.as_ref().map_or(true, |s| s.requires_certificate()) {
+        if manager
+            .certificate_strategy
+            .as_ref()
+            .is_none_or(|s| s.requires_certificate())
+        {
             manager.initialize_certificate().await?;
         }
 
@@ -120,22 +127,20 @@ impl CertificateManager {
             if let Some(ref strategy) = self.certificate_strategy {
                 if !strategy.requires_certificate() {
                     // Use the strategy's ephemeral cert (tunnel-aware for Anonymous).
-                    let ephemeral = strategy.get_certificate().await?
-                        .ok_or_else(|| anyhow!("Anonymous strategy failed to generate ephemeral cert"))?;
+                    let ephemeral = strategy.get_certificate().await?.ok_or_else(|| {
+                        anyhow!("Anonymous strategy failed to generate ephemeral cert")
+                    })?;
 
                     let fp = ephemeral.fingerprint();
 
                     let mut server_config = rustls::ServerConfig::builder()
                         .with_no_client_auth()
                         .with_single_cert(
-                            vec![ephemeral.certificate],
-                            ephemeral.private_key.clone_key(),
-                        )?;
+                        vec![ephemeral.certificate],
+                        ephemeral.private_key.clone_key(),
+                    )?;
 
-                    server_config.alpn_protocols = vec![
-                        STOQ_ALPN.to_vec(),
-                        b"h3".to_vec(),
-                    ];
+                    server_config.alpn_protocols = vec![STOQ_ALPN.to_vec(), b"h3".to_vec()];
 
                     debug!("Server crypto config created with ephemeral cert: {}", fp);
                     return Ok(server_config);
@@ -144,34 +149,31 @@ impl CertificateManager {
         }
 
         let cert_guard = self.current_certificate.read().await;
-        let cert = cert_guard.as_ref().ok_or_else(|| anyhow!("No certificate available"))?;
+        let cert = cert_guard
+            .as_ref()
+            .ok_or_else(|| anyhow!("No certificate available"))?;
 
         let mut server_config = rustls::ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(
-                vec![cert.certificate.clone()],
-                cert.private_key.clone_key(),
-            )?;
+            .with_single_cert(vec![cert.certificate.clone()], cert.private_key.clone_key())?;
 
-        server_config.alpn_protocols = vec![
-            STOQ_ALPN.to_vec(),
-            b"h3".to_vec(),
-        ];
+        server_config.alpn_protocols = vec![STOQ_ALPN.to_vec(), b"h3".to_vec()];
 
-        debug!("Server crypto config created with certificate: {} and ALPN protocols: {:?}",
-               cert.fingerprint(), server_config.alpn_protocols);
+        debug!(
+            "Server crypto config created with certificate: {} and ALPN protocols: {:?}",
+            cert.fingerprint(),
+            server_config.alpn_protocols
+        );
         Ok(server_config)
     }
 
     /// Get client crypto configuration for QUIC
     pub async fn client_crypto_config(&self) -> Result<rustls::ClientConfig> {
         let mut config = match self.config.mode {
-            CertificateMode::LocalhostTesting => {
-                rustls::ClientConfig::builder()
-                    .dangerous()
-                    .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
-                    .with_no_client_auth()
-            }
+            CertificateMode::LocalhostTesting => rustls::ClientConfig::builder()
+                .dangerous()
+                .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                .with_no_client_auth(),
             CertificateMode::TrustChainProduction => {
                 let mut root_store = rustls::RootCertStore::empty();
                 root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -182,12 +184,10 @@ impl CertificateManager {
             CertificateMode::NetworkStrategy => {
                 if let Some(ref strategy) = self.certificate_strategy {
                     match strategy.strategy_name() {
-                        "Anonymous" | "P2P" => {
-                            rustls::ClientConfig::builder()
-                                .dangerous()
-                                .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
-                                .with_no_client_auth()
-                        }
+                        "Anonymous" | "P2P" => rustls::ClientConfig::builder()
+                            .dangerous()
+                            .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                            .with_no_client_auth(),
                         _ => {
                             let mut root_store = rustls::RootCertStore::empty();
                             root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -205,12 +205,12 @@ impl CertificateManager {
             }
         };
 
-        config.alpn_protocols = vec![
-            STOQ_ALPN.to_vec(),
-            b"h3".to_vec(),
-        ];
+        config.alpn_protocols = vec![STOQ_ALPN.to_vec(), b"h3".to_vec()];
 
-        debug!("Client crypto config created with ALPN protocols: {:?}", config.alpn_protocols);
+        debug!(
+            "Client crypto config created with ALPN protocols: {:?}",
+            config.alpn_protocols
+        );
         Ok(config)
     }
 
@@ -246,7 +246,8 @@ impl CertificateManager {
                     let temp_cert = StoqNodeCertificate {
                         node_id: "unknown".to_string(),
                         certificate: CertificateDer::from(cert_der.to_vec()),
-                        private_key: PrivateKeyDer::try_from(vec![0u8]).expect("placeholder private key"),
+                        private_key: PrivateKeyDer::try_from(vec![0u8])
+                            .expect("placeholder private key"),
                         issued_at: SystemTime::now(),
                         expires_at: SystemTime::now() + Duration::from_secs(3600),
                         fingerprint_sha256: fingerprint,
@@ -265,13 +266,18 @@ impl CertificateManager {
         if self.config.mode == CertificateMode::NetworkStrategy {
             if let Some(ref strategy) = self.certificate_strategy {
                 if !strategy.requires_certificate() {
-                    return Ok("0000000000000000000000000000000000000000000000000000000000000000".to_string());
+                    return Ok(
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                            .to_string(),
+                    );
                 }
             }
         }
 
         let cert_guard = self.current_certificate.read().await;
-        let cert = cert_guard.as_ref().ok_or_else(|| anyhow!("No certificate available"))?;
+        let cert = cert_guard
+            .as_ref()
+            .ok_or_else(|| anyhow!("No certificate available"))?;
         Ok(cert.fingerprint())
     }
 
@@ -309,10 +315,16 @@ impl CertificateManager {
                     if strategy.requires_certificate() {
                         if let Some(cert) = strategy.get_certificate().await? {
                             *self.current_certificate.write().await = Some(cert);
-                            info!("Certificate obtained from {} strategy", strategy.strategy_name());
+                            info!(
+                                "Certificate obtained from {} strategy",
+                                strategy.strategy_name()
+                            );
                         }
                     } else {
-                        info!("No certificate required for {} strategy", strategy.strategy_name());
+                        info!(
+                            "No certificate required for {} strategy",
+                            strategy.strategy_name()
+                        );
                     }
                 } else {
                     return Err(anyhow!("No certificate strategy configured"));
@@ -329,7 +341,7 @@ impl CertificateManager {
         let cert_key = generate_simple_self_signed(vec![self.config.common_name.clone()])?;
         let cert_der = cert_key.cert.der().clone();
         let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
-            .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize private key: {e}"))?;
 
         let fingerprint = self.calculate_fingerprint(cert_der.as_ref());
         let now = SystemTime::now();
@@ -356,11 +368,13 @@ impl CertificateManager {
 
         if let Some(client) = &self.trustchain_client {
             let metadata = self.generate_certificate_metadata().await?;
-            let stoq_cert = client.request_certificate(
-                &self.config.common_name,
-                &self.config.ipv6_addresses,
-                Some(&metadata),
-            ).await?;
+            let stoq_cert = client
+                .request_certificate(
+                    &self.config.common_name,
+                    &self.config.ipv6_addresses,
+                    Some(&metadata),
+                )
+                .await?;
 
             *self.current_certificate.write().await = Some(stoq_cert);
             info!("TrustChain certificate obtained successfully");
@@ -374,7 +388,12 @@ impl CertificateManager {
     async fn generate_certificate_metadata(&self) -> Result<Vec<u8>> {
         let mut hasher = Sha256::new();
         hasher.update(self.config.node_id.as_bytes());
-        hasher.update(&SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs().to_be_bytes());
+        hasher.update(
+            SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)?
+                .as_secs()
+                .to_be_bytes(),
+        );
         Ok(hasher.finalize().to_vec())
     }
 
@@ -394,7 +413,10 @@ impl CertificateManager {
     }
 
     /// Backward compatibility: generate_self_signed for tests
-    #[deprecated(since = "0.1.0", note = "use CertificateManager::new with LocalhostTesting mode")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use CertificateManager::new with LocalhostTesting mode"
+    )]
     pub async fn generate_self_signed() -> Result<Self> {
         let config = CertificateConfig::localhost_testing(
             "test-node".to_string(),
@@ -405,7 +427,10 @@ impl CertificateManager {
     }
 
     /// Backward compatibility: new_self_signed for tests
-    #[deprecated(since = "0.1.0", note = "use CertificateManager::new with LocalhostTesting mode")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "use CertificateManager::new with LocalhostTesting mode"
+    )]
     #[allow(deprecated)]
     pub async fn new_self_signed() -> Result<Self> {
         Self::generate_self_signed().await

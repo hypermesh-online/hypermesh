@@ -4,10 +4,10 @@
 
 //! Test that Accept() method is properly implemented
 
-use stoq::{StoqTransport, TransportConfig, Endpoint};
+use anyhow::Result;
 use std::net::Ipv6Addr;
 use std::sync::Arc;
-use anyhow::Result;
+use stoq::{Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -17,19 +17,24 @@ async fn main() -> Result<()> {
         .init();
 
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore error
     }
 
     // Create server transport
-    let mut server_config = TransportConfig::default();
-    server_config.bind_address = Ipv6Addr::LOCALHOST;
-    server_config.port = 19292; // Use different port to avoid conflicts
+    let server_config = TransportConfig {
+        bind_address: Ipv6Addr::LOCALHOST,
+        port: 19292, // Use different port to avoid conflicts
+        ..Default::default()
+    };
 
     let server_transport = Arc::new(StoqTransport::new(server_config).await?);
 
     println!("Server created successfully");
-    println!("Accept() method is available: {}", true);
+    println!("Accept() method is available: true");
 
     // Test that we can call accept() without panic
     let server_clone = server_transport.clone();
@@ -41,7 +46,7 @@ async fn main() -> Result<()> {
                     println!("Accepted connection from: {:?}", conn.endpoint());
                 }
                 Err(e) => {
-                    println!("Accept error (expected if no client connects): {}", e);
+                    println!("Accept error (expected if no client connects): {e}");
                     break;
                 }
             }
@@ -64,7 +69,7 @@ async fn main() -> Result<()> {
             println!("✓ Accept() method is working correctly!");
         }
         Err(e) => {
-            println!("Client connection failed: {}", e);
+            println!("Client connection failed: {e}");
         }
     }
 

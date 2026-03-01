@@ -13,9 +13,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use blockmatrix::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 use blockmatrix::assets::{AssetRegistration, ConsensusProof};
 use hypermesh_lib::PrivacyMode;
-use blockmatrix::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
 use super::asset_type::AssetTypeDefinition;
 
@@ -106,7 +106,7 @@ impl CatalogRegistry {
     pub fn new(privacy: PrivacyMode, trust_policy: TrustPolicy, config: RegistryConfig) -> Self {
         // Create registry AssetRegistration from registry configuration
         let asset_data = AssetData {
-            config: format!("registry_{:?}", privacy).as_bytes().to_vec(),
+            config: format!("registry_{privacy:?}").as_bytes().to_vec(),
             definition: b"catalog_registry".to_vec(),
             metadata: b"{}".to_vec(),
         };
@@ -166,7 +166,7 @@ impl CatalogRegistry {
         index
             .get(name)
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Type '{}' not found", name))
+            .ok_or_else(|| anyhow::anyhow!("Type '{name}' not found"))
     }
 
     /// List all registered types
@@ -205,7 +205,10 @@ impl CatalogRegistry {
                 let mut ms = 0.0f64;
                 // Tag match bonus
                 if !query.tags.is_empty() {
-                    let tag_matches = def.metadata.tags.iter()
+                    let tag_matches = def
+                        .metadata
+                        .tags
+                        .iter()
                         .filter(|t| query.tags.iter().any(|qt| qt.eq_ignore_ascii_case(t)))
                         .count();
                     ms += (tag_matches as f64 / query.tags.len().max(1) as f64) * 0.2;
@@ -242,7 +245,9 @@ impl CatalogRegistry {
         match query.sort_by {
             SortCriteria::Relevance => {
                 matching_types.sort_by(|a, b| {
-                    b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
             SortCriteria::Name => {
@@ -251,7 +256,9 @@ impl CatalogRegistry {
             _ => {
                 // Rating, Downloads, Updated, Published - sort by score as fallback
                 matching_types.sort_by(|a, b| {
-                    b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)
+                    b.score
+                        .partial_cmp(&a.score)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 });
             }
         }
@@ -353,20 +360,15 @@ pub struct SearchQuery {
 }
 
 /// Sort criteria for search results
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum SortCriteria {
+    #[default]
     Relevance,
     Name,
     Rating,
     Downloads,
     Updated,
     Published,
-}
-
-impl Default for SortCriteria {
-    fn default() -> Self {
-        SortCriteria::Relevance
-    }
 }
 
 /// Date range filter
@@ -440,24 +442,15 @@ mod tests {
     use super::*;
     use crate::registry::asset_type::AssetTypeDefinition;
     use blockmatrix::consensus::proof_of_state_integration::{
-        SpaceProof, StakeProof, WorkProof, TimeProof,
-        WorkloadType, WorkState,
+        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
-    use std::time::Duration;
     use serde_json::json;
+    use std::time::Duration;
 
     fn create_test_consensus_proof() -> ConsensusProof {
-        let stake_proof = StakeProof::new(
-            "test-holder".to_string(),
-            "test-id".to_string(),
-            1000
-        );
+        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
 
-        let space_proof = SpaceProof::new(
-            "test-node".to_string(),
-            "/test".to_string(),
-            1024
-        );
+        let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
 
         let work_proof = WorkProof::new(
             "test-owner".to_string(),
@@ -489,14 +482,10 @@ mod tests {
         });
 
         let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new(
-            "Vehicle".to_string(),
-            schema,
-            consensus_proof,
-        );
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
 
-        let asset_id = registry.register_type(type_def).await.unwrap();
-        let found_id = registry.find_type("Vehicle").await.unwrap();
+        let asset_id = registry.register_type(type_def).await.expect("test: async operation");
+        let found_id = registry.find_type("Vehicle").await.expect("test: async operation");
 
         assert_eq!(asset_id, found_id);
     }
@@ -513,12 +502,8 @@ mod tests {
         for name in &["Vehicle", "VehicleInsurance", "Driver"] {
             let schema = json!({ "type": "object" });
             let consensus_proof = create_test_consensus_proof();
-            let type_def = AssetTypeDefinition::new(
-                name.to_string(),
-                schema,
-                consensus_proof,
-            );
-            registry.register_type(type_def).await.unwrap();
+            let type_def = AssetTypeDefinition::new(name.to_string(), schema, consensus_proof);
+            registry.register_type(type_def).await.expect("test: async operation");
         }
 
         // Search for "Vehicle"
@@ -527,7 +512,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = registry.search_types(&query).await.unwrap();
+        let results = registry.search_types(&query).await.expect("test: async operation");
         assert_eq!(results.results.len(), 2); // Vehicle and VehicleInsurance
     }
 

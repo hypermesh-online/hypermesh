@@ -4,8 +4,8 @@
 
 //! Execution and deployment configuration types for catalog deployments
 
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use serde::{Serialize, Deserialize};
 
 /// Execution configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

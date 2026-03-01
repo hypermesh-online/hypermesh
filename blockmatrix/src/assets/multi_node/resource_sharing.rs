@@ -15,14 +15,14 @@
 //! Implements resource sharing protocols, pricing models, and secure
 //! resource trading between HyperMesh nodes.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetType, AssetResult, AssetError, PrivacyMode};
 use super::{PeerIdentity, ResourceAmount, ServiceLevelAgreement};
+use crate::assets::core::{AssetError, AssetResult, AssetType, PrivacyMode};
 
 /// Resource sharing manager
 pub struct ResourceSharing {
@@ -215,7 +215,11 @@ pub struct PerformanceMetrics {
 
 impl ResourceSharing {
     /// Create new resource sharing manager
-    pub fn new(protocol: SharingProtocol, pricing_model: PricingModel, config: SharingConfig) -> Self {
+    pub fn new(
+        protocol: SharingProtocol,
+        pricing_model: PricingModel,
+        config: SharingConfig,
+    ) -> Self {
         Self {
             agreements: Arc::new(RwLock::new(HashMap::new())),
             offers: Arc::new(RwLock::new(Vec::new())),
@@ -255,13 +259,12 @@ impl ResourceSharing {
 
         for offer in offers.iter() {
             // Find matching request
-            let matching_request = requests.iter()
-                .position(|req| {
-                    req.resource_type == offer.resource_type &&
-                    req.max_price_per_hour >= offer.price_per_hour &&
-                    req.expires_at > SystemTime::now() &&
-                    offer.expires_at > SystemTime::now()
-                });
+            let matching_request = requests.iter().position(|req| {
+                req.resource_type == offer.resource_type
+                    && req.max_price_per_hour >= offer.price_per_hour
+                    && req.expires_at > SystemTime::now()
+                    && offer.expires_at > SystemTime::now()
+            });
 
             if let Some(idx) = matching_request {
                 let request = requests.remove(idx);
@@ -281,10 +284,10 @@ impl ResourceSharing {
                     status: AgreementStatus::Active,
                 };
 
-                self.agreements.write().await.insert(
-                    agreement.agreement_id.clone(),
-                    agreement,
-                );
+                self.agreements
+                    .write()
+                    .await
+                    .insert(agreement.agreement_id.clone(), agreement);
             }
         }
 
@@ -333,7 +336,9 @@ impl ResourceSharing {
 
     /// Get active agreements
     pub async fn get_active_agreements(&self) -> Vec<SharingAgreement> {
-        self.agreements.read().await
+        self.agreements
+            .read()
+            .await
             .values()
             .filter(|a| a.status == AgreementStatus::Active)
             .cloned()
@@ -344,7 +349,8 @@ impl ResourceSharing {
     pub async fn cancel_agreement(&self, agreement_id: &str) -> AssetResult<()> {
         let mut agreements = self.agreements.write().await;
 
-        let agreement = agreements.get_mut(agreement_id)
+        let agreement = agreements
+            .get_mut(agreement_id)
             .ok_or_else(|| AssetError::NotFound {
                 resource: agreement_id.to_string(),
             })?;

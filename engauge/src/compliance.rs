@@ -221,8 +221,7 @@ mod tests {
             expires_in_secs: 86400,
         };
         let json = serde_json::to_string(&result).expect("test: serialize result");
-        let back: ComplianceResult =
-            serde_json::from_str(&json).expect("test: deserialize result");
+        let back: ComplianceResult = serde_json::from_str(&json).expect("test: deserialize result");
         assert_eq!(result, back);
     }
 }

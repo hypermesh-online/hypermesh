@@ -9,7 +9,7 @@ mod proxy;
 mod router;
 
 use anyhow::Result;
-use bytes::{Bytes, Buf};
+use bytes::{Buf, Bytes};
 use h3::{quic, server::Connection};
 use h3_quinn::quinn;
 use http::{Method, Request, Response};
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     tls_config.alpn_protocols = vec![b"h3".to_vec()];
 
     let server_config = quinn::ServerConfig::with_crypto(Arc::new(
-        quinn::crypto::rustls::QuicServerConfig::try_from(tls_config)?
+        quinn::crypto::rustls::QuicServerConfig::try_from(tls_config)?,
     ));
 
     // Create endpoint
@@ -83,17 +83,15 @@ async fn main() -> Result<()> {
 }
 
 /// Handle incoming QUIC connection
-async fn handle_connection(
-    incoming: quinn::Incoming,
-    router: Arc<GatewayRouter>,
-) -> Result<()> {
+async fn handle_connection(incoming: quinn::Incoming, router: Arc<GatewayRouter>) -> Result<()> {
     let connection = incoming.await?;
     let remote_addr = connection.remote_address();
 
     info!("New connection from {}", remote_addr);
 
     // Create HTTP/3 connection
-    let mut h3_conn: h3::server::Connection<_, Bytes> = Connection::new(h3_quinn::Connection::new(connection)).await?;
+    let mut h3_conn: h3::server::Connection<_, Bytes> =
+        Connection::new(h3_quinn::Connection::new(connection)).await?;
 
     // Handle requests via h3 0.0.8 RequestResolver API
     loop {
@@ -155,7 +153,7 @@ where
             error!("Routing error: {}", e);
             Response::builder()
                 .status(502)
-                .body(Bytes::from(format!("Gateway error: {}", e)))?
+                .body(Bytes::from(format!("Gateway error: {e}")))?
         }
     };
 
@@ -172,10 +170,8 @@ where
 
 /// Check if request has a body
 fn has_body(req: &Request<()>) -> bool {
-    matches!(
-        req.method(),
-        &Method::POST | &Method::PUT | &Method::PATCH
-    ) || req.headers().contains_key("content-length")
+    matches!(req.method(), &Method::POST | &Method::PUT | &Method::PATCH)
+        || req.headers().contains_key("content-length")
         || req.headers().contains_key("transfer-encoding")
 }
 
@@ -189,9 +185,11 @@ async fn load_certificates(
     let mut cert_data = Vec::new();
     cert_file.read_to_end(&mut cert_data).await?;
 
-    let certs = if cert_path.extension().map_or(false, |e| e == "pem" || e == "crt") {
-        rustls_pemfile::certs(&mut cert_data.as_slice())
-            .collect::<Result<Vec<_>, _>>()?
+    let certs = if cert_path
+        .extension()
+        .is_some_and(|e| e == "pem" || e == "crt")
+    {
+        rustls_pemfile::certs(&mut cert_data.as_slice()).collect::<Result<Vec<_>, _>>()?
     } else {
         vec![CertificateDer::from(cert_data)]
     };
@@ -201,7 +199,10 @@ async fn load_certificates(
     let mut key_data = Vec::new();
     key_file.read_to_end(&mut key_data).await?;
 
-    let key = if key_path.extension().map_or(false, |e| e == "pem" || e == "key") {
+    let key = if key_path
+        .extension()
+        .is_some_and(|e| e == "pem" || e == "key")
+    {
         rustls_pemfile::private_key(&mut key_data.as_slice())?
             .ok_or_else(|| anyhow::anyhow!("No private key found in PEM file"))?
     } else {

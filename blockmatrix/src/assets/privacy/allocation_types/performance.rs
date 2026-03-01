@@ -4,8 +4,8 @@
 
 //! Performance characteristics and integration settings for privacy allocation types
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Performance characteristics for allocation types
 #[derive(Clone, Debug, Serialize, Deserialize)]

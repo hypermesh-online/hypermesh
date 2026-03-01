@@ -3,6 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Tests for network isolation manager
+#![allow(clippy::module_inception)]
 
 use super::*;
 use crate::network::isolation::default::DefaultIsolationManager;
@@ -21,8 +22,14 @@ mod tests {
         let net1 = new_random_network_id();
         let net2 = new_random_network_id();
 
-        isolation.configure_network(net1, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(net2, NetworkType::P2P).await.expect("test: isolation op");
+        isolation
+            .configure_network(net1, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(net2, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
 
         // Create packet attempting to cross network boundary
         let packet = Packet {
@@ -36,12 +43,18 @@ mod tests {
         // Should be rejected due to boundary violation
         let result = isolation.validate_packet(&packet).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot cross network boundary"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("cannot cross network boundary"));
 
         // Check violation was logged
         let violations = isolation.check_violations().await;
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].violation_type, ViolationType::CrossNetworkPacket);
+        assert_eq!(
+            violations[0].violation_type,
+            ViolationType::CrossNetworkPacket
+        );
         assert_eq!(violations[0].source_network, net1);
         assert_eq!(violations[0].destination_network, net2);
 
@@ -57,7 +70,10 @@ mod tests {
         let isolation = DefaultIsolationManager::new();
         let net_id = new_random_network_id();
 
-        isolation.configure_network(net_id, NetworkType::Public).await.expect("test: isolation op");
+        isolation
+            .configure_network(net_id, NetworkType::Public)
+            .await
+            .expect("test: isolation op");
 
         // Packet within same network should be allowed
         let packet = Packet {
@@ -91,14 +107,29 @@ mod tests {
         let net2 = new_random_network_id();
 
         // Configure two networks
-        isolation.configure_network(net1, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(net2, NetworkType::Federated {
-            gateway_url: "test.federation.local".to_string()
-        }).await.expect("test: isolation op");
+        isolation
+            .configure_network(net1, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(
+                net2,
+                NetworkType::Federated {
+                    gateway_url: "test.federation.local".to_string(),
+                },
+            )
+            .await
+            .expect("test: isolation op");
 
         // Get connection pools
-        let pool1 = isolation.get_connection_pool(net1).await.expect("test: isolation op");
-        let pool2 = isolation.get_connection_pool(net2).await.expect("test: isolation op");
+        let pool1 = isolation
+            .get_connection_pool(net1)
+            .await
+            .expect("test: isolation op");
+        let pool2 = isolation
+            .get_connection_pool(net2)
+            .await
+            .expect("test: isolation op");
 
         // Pools must be different instances
         assert!(!Arc::ptr_eq(&pool1, &pool2));
@@ -108,8 +139,14 @@ mod tests {
         assert_eq!(pool2.network_id, net2);
 
         // Add connections to each pool
-        pool1.add_connection(Connection::new("192.168.1.1:8080".to_string())).await.expect("test: isolation op");
-        pool2.add_connection(Connection::new("192.168.1.2:8080".to_string())).await.expect("test: isolation op");
+        pool1
+            .add_connection(Connection::new("192.168.1.1:8080".to_string()))
+            .await
+            .expect("test: isolation op");
+        pool2
+            .add_connection(Connection::new("192.168.1.2:8080".to_string()))
+            .await
+            .expect("test: isolation op");
 
         // Verify isolation
         assert_eq!(pool1.connection_count().await, 1);
@@ -122,21 +159,37 @@ mod tests {
         let net_id = new_random_network_id();
 
         // Configure network
-        isolation.configure_network(net_id, NetworkType::P2P).await.expect("test: isolation op");
+        isolation
+            .configure_network(net_id, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
 
         // Add some connections
-        let pool = isolation.get_connection_pool(net_id).await.expect("test: isolation op");
-        pool.add_connection(Connection::new("10.0.0.1:5000".to_string())).await.expect("test: isolation op");
-        pool.add_connection(Connection::new("10.0.0.2:5000".to_string())).await.expect("test: isolation op");
+        let pool = isolation
+            .get_connection_pool(net_id)
+            .await
+            .expect("test: isolation op");
+        pool.add_connection(Connection::new("10.0.0.1:5000".to_string()))
+            .await
+            .expect("test: isolation op");
+        pool.add_connection(Connection::new("10.0.0.2:5000".to_string()))
+            .await
+            .expect("test: isolation op");
 
         assert_eq!(pool.connection_count().await, 2);
 
         // Track some packets
         let packet = Packet::new(net_id, net_id, zero_hash());
-        isolation.validate_packet(&packet).await.expect("test: isolation op");
+        isolation
+            .validate_packet(&packet)
+            .await
+            .expect("test: isolation op");
 
         // Remove network
-        isolation.remove_network(net_id).await.expect("test: isolation op");
+        isolation
+            .remove_network(net_id)
+            .await
+            .expect("test: isolation op");
 
         // Should no longer be able to get pool
         let result = isolation.get_connection_pool(net_id).await;
@@ -154,12 +207,27 @@ mod tests {
         let pub_net = new_random_network_id();
 
         // Configure all networks
-        isolation.configure_network(anon_net, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(p2p_net, NetworkType::P2P).await.expect("test: isolation op");
-        isolation.configure_network(fed_net, NetworkType::Federated {
-            gateway_url: "fed.example.com".to_string()
-        }).await.expect("test: isolation op");
-        isolation.configure_network(pub_net, NetworkType::Public).await.expect("test: isolation op");
+        isolation
+            .configure_network(anon_net, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(p2p_net, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(
+                fed_net,
+                NetworkType::Federated {
+                    gateway_url: "fed.example.com".to_string(),
+                },
+            )
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(pub_net, NetworkType::Public)
+            .await
+            .expect("test: isolation op");
 
         // Create packets for each network (same-network only)
         let packets = vec![
@@ -172,7 +240,7 @@ mod tests {
         // All should be valid
         for packet in packets {
             let result = isolation.validate_packet(&packet).await;
-            assert!(result.is_ok(), "Packet validation failed: {:?}", result);
+            assert!(result.is_ok(), "Packet validation failed: {result:?}");
         }
 
         // Create cross-network packets (should all fail)
@@ -185,7 +253,10 @@ mod tests {
 
         for packet in cross_packets {
             let result = isolation.validate_packet(&packet).await;
-            assert!(result.is_err(), "Cross-network packet should have been rejected");
+            assert!(
+                result.is_err(),
+                "Cross-network packet should have been rejected"
+            );
         }
 
         // Check violations
@@ -210,8 +281,14 @@ mod tests {
         let net1 = new_random_network_id();
         let net2 = new_random_network_id();
 
-        isolation.configure_network(net1, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(net2, NetworkType::P2P).await.expect("test: isolation op");
+        isolation
+            .configure_network(net1, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(net2, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
 
         // Create 10 violations
         for _i in 0..10 {
@@ -241,8 +318,14 @@ mod tests {
         let net1 = new_random_network_id();
         let net2 = new_random_network_id();
 
-        isolation.configure_network(net1, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(net2, NetworkType::Public).await.expect("test: isolation op");
+        isolation
+            .configure_network(net1, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(net2, NetworkType::Public)
+            .await
+            .expect("test: isolation op");
 
         // Create some violations
         for _ in 0..3 {
@@ -254,7 +337,10 @@ mod tests {
         assert_eq!(isolation.check_violations().await.len(), 3);
 
         // Clear violations
-        isolation.clear_violations().await.expect("test: isolation op");
+        isolation
+            .clear_violations()
+            .await
+            .expect("test: isolation op");
 
         // Verify violations cleared
         assert_eq!(isolation.check_violations().await.len(), 0);
@@ -270,9 +356,15 @@ mod tests {
         let isolation = DefaultIsolationManager::new();
         let net_id = new_random_network_id();
 
-        isolation.configure_network(net_id, NetworkType::P2P).await.expect("test: isolation op");
+        isolation
+            .configure_network(net_id, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
 
-        let pool = isolation.get_connection_pool(net_id).await.expect("test: isolation op");
+        let pool = isolation
+            .get_connection_pool(net_id)
+            .await
+            .expect("test: isolation op");
 
         // Pool should have capacity initially
         assert!(pool.has_capacity().await);
@@ -288,9 +380,14 @@ mod tests {
         assert_eq!(pool.connection_count().await, 100);
 
         // Adding another should fail
-        let result = pool.add_connection(Connection::new("192.168.1.200:8080".to_string())).await;
+        let result = pool
+            .add_connection(Connection::new("192.168.1.200:8080".to_string()))
+            .await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Connection pool full"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Connection pool full"));
     }
 
     #[tokio::test]
@@ -299,12 +396,18 @@ mod tests {
         let net_id = new_random_network_id();
 
         // First configuration should succeed
-        isolation.configure_network(net_id, NetworkType::Anonymous).await.expect("test: isolation op");
+        isolation
+            .configure_network(net_id, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
 
         // Second configuration with same ID should fail
         let result = isolation.configure_network(net_id, NetworkType::P2P).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("already configured"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("already configured"));
     }
 
     #[tokio::test]
@@ -330,14 +433,26 @@ mod tests {
         let net2 = new_random_network_id();
         let net3 = new_random_network_id();
 
-        isolation.configure_network(net1, NetworkType::Anonymous).await.expect("test: isolation op");
-        isolation.configure_network(net2, NetworkType::P2P).await.expect("test: isolation op");
-        isolation.configure_network(net3, NetworkType::Public).await.expect("test: isolation op");
+        isolation
+            .configure_network(net1, NetworkType::Anonymous)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(net2, NetworkType::P2P)
+            .await
+            .expect("test: isolation op");
+        isolation
+            .configure_network(net3, NetworkType::Public)
+            .await
+            .expect("test: isolation op");
 
         // Valid packets
         for _ in 0..5 {
             let packet = Packet::new(net1, net1, zero_hash());
-            isolation.validate_packet(&packet).await.expect("test: isolation op");
+            isolation
+                .validate_packet(&packet)
+                .await
+                .expect("test: isolation op");
         }
 
         // Invalid packets (cross-network)
@@ -354,7 +469,9 @@ mod tests {
         assert_eq!(stats.packets_rejected, 3);
         assert_eq!(stats.violations_detected, 3);
         assert_eq!(
-            stats.violations_by_type.get(&ViolationType::CrossNetworkPacket.to_string()),
+            stats
+                .violations_by_type
+                .get(&ViolationType::CrossNetworkPacket.to_string()),
             Some(&3)
         );
     }

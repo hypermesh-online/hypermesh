@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Request Validators
-//! 
+//!
 //! Input validation for API requests.
 
 use std::net::Ipv6Addr;
@@ -15,22 +15,28 @@ pub fn validate_domain_name(domain: &str) -> TrustChainResult<()> {
     if domain.is_empty() {
         return Err(ApiError::InvalidRequestFormat {
             reason: "Domain name cannot be empty".to_string(),
-        }.into());
+        }
+        .into());
     }
-    
+
     if domain.len() > 253 {
         return Err(ApiError::InvalidRequestFormat {
             reason: "Domain name too long".to_string(),
-        }.into());
+        }
+        .into());
     }
-    
+
     // Basic domain validation
-    if !domain.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+    if !domain
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+    {
         return Err(ApiError::InvalidRequestFormat {
             reason: "Invalid characters in domain name".to_string(),
-        }.into());
+        }
+        .into());
     }
-    
+
     Ok(())
 }
 
@@ -39,17 +45,19 @@ pub fn validate_ipv6_addresses(addresses: &[Ipv6Addr]) -> TrustChainResult<()> {
     if addresses.is_empty() {
         return Err(ApiError::InvalidRequestFormat {
             reason: "At least one IPv6 address required".to_string(),
-        }.into());
+        }
+        .into());
     }
-    
+
     for addr in addresses {
         if addr.is_unspecified() {
             return Err(ApiError::InvalidRequestFormat {
                 reason: "Unspecified IPv6 address not allowed".to_string(),
-            }.into());
+            }
+            .into());
         }
     }
-    
+
     Ok(())
 }
 
@@ -60,13 +68,13 @@ pub fn validate_certificate_request(
     ipv6_addresses: &[Ipv6Addr],
 ) -> TrustChainResult<()> {
     validate_domain_name(common_name)?;
-    
+
     for san in san_entries {
         validate_domain_name(san)?;
     }
-    
+
     validate_ipv6_addresses(ipv6_addresses)?;
-    
+
     Ok(())
 }
 
@@ -97,7 +105,7 @@ mod tests {
     fn test_invalid_ipv6() {
         let addresses = vec![];
         assert!(validate_ipv6_addresses(&addresses).is_err());
-        
+
         let unspecified = vec![Ipv6Addr::UNSPECIFIED];
         assert!(validate_ipv6_addresses(&unspecified).is_err());
     }

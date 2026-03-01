@@ -11,18 +11,16 @@
 //! - Partial Federation (Phase 2): Federated discovery, required consensus
 //! - Full Federation (Phase 3): Full federated discovery, full consensus
 
+use anyhow::Result;
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use anyhow::Result;
-use async_trait::async_trait;
 pub use trustchain::consensus::ConsensusProof;
 
 use super::{
-    BootstrapPhase, ServiceDiscovery, CertificateProvider,
-    TransportProvider, ConsensusProvider, Listener,
-    ServiceEndpoint, ServiceType, ServiceRegistration,
-    Connection, Certificate,
+    BootstrapPhase, Certificate, CertificateProvider, Connection, ConsensusProvider, Listener,
+    ServiceDiscovery, ServiceEndpoint, ServiceRegistration, ServiceType, TransportProvider,
 };
 
 // --- Discovery Providers ---
@@ -32,7 +30,9 @@ pub(crate) struct TraditionalDNS {
 }
 
 impl TraditionalDNS {
-    pub fn new(servers: Vec<String>) -> Self { Self { _servers: servers } }
+    pub fn new(servers: Vec<String>) -> Self {
+        Self { _servers: servers }
+    }
 }
 
 #[async_trait]
@@ -45,9 +45,13 @@ impl ServiceDiscovery for TraditionalDNS {
         })
     }
 
-    async fn register(&self, _registration: ServiceRegistration) -> Result<()> { Ok(()) }
+    async fn register(&self, _registration: ServiceRegistration) -> Result<()> {
+        Ok(())
+    }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Traditional
+    }
 }
 
 pub(crate) struct HybridDiscovery {
@@ -57,7 +61,10 @@ pub(crate) struct HybridDiscovery {
 
 impl HybridDiscovery {
     pub fn new(traditional_dns: Vec<String>, trustchain_addr: SocketAddr) -> Self {
-        Self { _traditional_dns: traditional_dns, trustchain_addr }
+        Self {
+            _traditional_dns: traditional_dns,
+            trustchain_addr,
+        }
     }
 }
 
@@ -71,9 +78,13 @@ impl ServiceDiscovery for HybridDiscovery {
         })
     }
 
-    async fn register(&self, _registration: ServiceRegistration) -> Result<()> { Ok(()) }
+    async fn register(&self, _registration: ServiceRegistration) -> Result<()> {
+        Ok(())
+    }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Hybrid }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Hybrid
+    }
 }
 
 pub(crate) struct FederatedDiscovery {
@@ -83,7 +94,10 @@ pub(crate) struct FederatedDiscovery {
 
 impl FederatedDiscovery {
     pub fn new(hypermesh_addr: SocketAddr, fallback_dns: Option<Vec<String>>) -> Self {
-        Self { hypermesh_addr, fallback_dns }
+        Self {
+            hypermesh_addr,
+            fallback_dns,
+        }
     }
 }
 
@@ -97,7 +111,9 @@ impl ServiceDiscovery for FederatedDiscovery {
         })
     }
 
-    async fn register(&self, _registration: ServiceRegistration) -> Result<()> { Ok(()) }
+    async fn register(&self, _registration: ServiceRegistration) -> Result<()> {
+        Ok(())
+    }
 
     fn phase(&self) -> BootstrapPhase {
         if self.fallback_dns.is_some() {
@@ -113,7 +129,9 @@ impl ServiceDiscovery for FederatedDiscovery {
 pub(crate) struct SelfSignedProvider;
 
 impl SelfSignedProvider {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
@@ -129,9 +147,13 @@ impl CertificateProvider for SelfSignedProvider {
         })
     }
 
-    async fn validate(&self, cert: &Certificate) -> Result<bool> { Ok(cert.is_self_signed) }
+    async fn validate(&self, cert: &Certificate) -> Result<bool> {
+        Ok(cert.is_self_signed)
+    }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Traditional
+    }
 }
 
 pub(crate) struct TrustChainProvider {
@@ -139,7 +161,11 @@ pub(crate) struct TrustChainProvider {
 }
 
 impl TrustChainProvider {
-    pub fn new(trustchain_addr: SocketAddr) -> Self { Self { _trustchain_addr: trustchain_addr } }
+    pub fn new(trustchain_addr: SocketAddr) -> Self {
+        Self {
+            _trustchain_addr: trustchain_addr,
+        }
+    }
 }
 
 #[async_trait]
@@ -155,9 +181,13 @@ impl CertificateProvider for TrustChainProvider {
         })
     }
 
-    async fn validate(&self, cert: &Certificate) -> Result<bool> { Ok(!cert.is_self_signed) }
+    async fn validate(&self, cert: &Certificate) -> Result<bool> {
+        Ok(!cert.is_self_signed)
+    }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Hybrid }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Hybrid
+    }
 }
 
 // --- Transport Providers ---
@@ -165,7 +195,9 @@ impl CertificateProvider for TrustChainProvider {
 pub(crate) struct BasicTransport;
 
 impl BasicTransport {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
@@ -183,7 +215,9 @@ impl TransportProvider for BasicTransport {
         Ok(Box::new(BasicListener { addr }))
     }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Traditional
+    }
 }
 
 pub(crate) struct BasicListener {
@@ -201,7 +235,9 @@ impl Listener for BasicListener {
         })
     }
 
-    fn local_addr(&self) -> Result<SocketAddr> { Ok(self.addr) }
+    fn local_addr(&self) -> Result<SocketAddr> {
+        Ok(self.addr)
+    }
 }
 
 // --- Consensus Providers ---
@@ -209,25 +245,42 @@ impl Listener for BasicListener {
 pub(crate) struct NoOpConsensus;
 
 impl NoOpConsensus {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl ConsensusProvider for NoOpConsensus {
-    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> { Ok(true) }
+    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
+        Ok(true)
+    }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use trustchain::consensus::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
         Ok(ConsensusProof::new(
             StakeProof::new("noop".to_string(), "noop".to_string(), 0),
             TimeProof::new(Duration::from_secs(0)),
             SpaceProof::new("noop".to_string(), "/dev/null".to_string(), 0),
-            WorkProof::new("noop".to_string(), "noop_work".to_string(), 0, 0, WorkloadType::Compute, WorkState::Completed),
+            WorkProof::new(
+                "noop".to_string(),
+                "noop_work".to_string(),
+                0,
+                0,
+                WorkloadType::Compute,
+                WorkState::Completed,
+            ),
         ))
     }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Traditional }
-    fn is_required(&self) -> bool { false }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Traditional
+    }
+    fn is_required(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) struct OptionalConsensus {
@@ -235,25 +288,44 @@ pub(crate) struct OptionalConsensus {
 }
 
 impl OptionalConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self {
+        Self {
+            _hypermesh_addr: hypermesh_addr,
+        }
+    }
 }
 
 #[async_trait]
 impl ConsensusProvider for OptionalConsensus {
-    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> { Ok(true) }
+    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
+        Ok(true)
+    }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use trustchain::consensus::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
         Ok(ConsensusProof::new(
             StakeProof::new("optional".to_string(), "validator1".to_string(), 1000),
             TimeProof::new(Duration::from_secs(1)),
             SpaceProof::new("optional".to_string(), "/tmp/optional".to_string(), 1024),
-            WorkProof::new("optional".to_string(), "optional_work".to_string(), 1, 100, WorkloadType::Compute, WorkState::Running),
+            WorkProof::new(
+                "optional".to_string(),
+                "optional_work".to_string(),
+                1,
+                100,
+                WorkloadType::Compute,
+                WorkState::Running,
+            ),
         ))
     }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::Hybrid }
-    fn is_required(&self) -> bool { false }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::Hybrid
+    }
+    fn is_required(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) struct RequiredConsensus {
@@ -261,7 +333,11 @@ pub(crate) struct RequiredConsensus {
 }
 
 impl RequiredConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self {
+        Self {
+            _hypermesh_addr: hypermesh_addr,
+        }
+    }
 }
 
 #[async_trait]
@@ -271,17 +347,30 @@ impl ConsensusProvider for RequiredConsensus {
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use trustchain::consensus::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
         Ok(ConsensusProof::new(
             StakeProof::new("required".to_string(), "validator2".to_string(), 5000),
             TimeProof::new(Duration::from_secs(5)),
             SpaceProof::new("required".to_string(), "/tmp/required".to_string(), 10240),
-            WorkProof::new("required".to_string(), "required_work".to_string(), 2, 500, WorkloadType::Certificate, WorkState::Running),
+            WorkProof::new(
+                "required".to_string(),
+                "required_work".to_string(),
+                2,
+                500,
+                WorkloadType::Certificate,
+                WorkState::Running,
+            ),
         ))
     }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::PartialFederation }
-    fn is_required(&self) -> bool { true }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::PartialFederation
+    }
+    fn is_required(&self) -> bool {
+        true
+    }
 }
 
 pub(crate) struct FullConsensus {
@@ -289,7 +378,11 @@ pub(crate) struct FullConsensus {
 }
 
 impl FullConsensus {
-    pub fn new(hypermesh_addr: SocketAddr) -> Self { Self { _hypermesh_addr: hypermesh_addr } }
+    pub fn new(hypermesh_addr: SocketAddr) -> Self {
+        Self {
+            _hypermesh_addr: hypermesh_addr,
+        }
+    }
 }
 
 #[async_trait]
@@ -301,15 +394,28 @@ impl ConsensusProvider for FullConsensus {
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{StakeProof, TimeProof, SpaceProof, WorkProof, WorkloadType, WorkState};
+        use trustchain::consensus::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
         Ok(ConsensusProof::new(
             StakeProof::new("full".to_string(), "validator4".to_string(), 100000),
             TimeProof::new(Duration::from_secs(10)),
             SpaceProof::new("full".to_string(), "/var/hypermesh".to_string(), 1048576),
-            WorkProof::new("full".to_string(), "full_work".to_string(), 4, 10000, WorkloadType::Certificate, WorkState::Running),
+            WorkProof::new(
+                "full".to_string(),
+                "full_work".to_string(),
+                4,
+                10000,
+                WorkloadType::Certificate,
+                WorkState::Running,
+            ),
         ))
     }
 
-    fn phase(&self) -> BootstrapPhase { BootstrapPhase::FullFederation }
-    fn is_required(&self) -> bool { true }
+    fn phase(&self) -> BootstrapPhase {
+        BootstrapPhase::FullFederation
+    }
+    fn is_required(&self) -> bool {
+        true
+    }
 }

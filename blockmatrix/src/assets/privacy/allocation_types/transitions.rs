@@ -4,11 +4,11 @@
 
 //! Privacy transition validation and impact assessment types
 
-use std::time::{Duration, SystemTime};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, SystemTime};
 
-use crate::assets::core::AssetResult;
 use super::PrivacyAllocationType;
+use crate::assets::core::AssetResult;
 
 /// Privacy transition validation and management
 #[derive(Clone, Debug, Serialize, Deserialize)]

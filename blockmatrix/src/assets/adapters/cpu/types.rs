@@ -4,12 +4,12 @@
 
 //! CPU adapter types: allocation records, core info, scheduling, and statistics.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use sysinfo::System;
+use tokio::sync::RwLock;
 
 use crate::assets::core::{AssetRegistration, PrivacyMode, ProxyAddress};
 

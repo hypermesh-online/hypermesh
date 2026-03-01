@@ -3,35 +3,34 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Certificate Authority Implementation
-//! 
+//!
 //! TrustChain Certificate Authority with Proof of State validation and mandatory security integration
 //! Supports both localhost testing and production deployment with IPv6-only networking
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
+use tracing::{debug, error, info, warn};
 
 use rcgen::{generate_simple_self_signed, Certificate as RcgenCertificate, KeyPair};
 use x509_parser::parse_x509_certificate;
 
 use crate::consensus::{
-    ConsensusProof, ConsensusContext, ConsensusRequirements,
-    HyperMeshConsensusClient, HyperMeshClientConfig,
-    ConsensusValidationStatus, ConsensusValidationResult, ConsensusClientMetrics,
-    FourProofSet
+    ConsensusClientMetrics, ConsensusContext, ConsensusProof, ConsensusRequirements,
+    ConsensusValidationResult, ConsensusValidationStatus, FourProofSet, HyperMeshClientConfig,
+    HyperMeshConsensusClient,
 };
 
+pub mod certificate_authority;
 pub mod certificate_manager;
 pub mod certificate_store;
-pub mod policy;
-pub mod certificate_authority;
-pub mod stoq_ca_client;
-pub mod security_integration; // Security integration module
 pub mod federation;
+pub mod policy;
+pub mod security_integration; // Security integration module
+pub mod stoq_ca_client;
 
 pub use certificate_manager::*;
 pub use certificate_store::{CertificateStore as CertStore, CertificateStoreMetrics};
@@ -44,8 +43,8 @@ pub use certificate_authority::{TrustChainCA as TrustChainCAImpl, *};
 pub use security_integration::*;
 // Re-export federation types
 pub use federation::{
-    FederationManager, FederatedCA, FederationTrustLevel,
-    FederationPolicy, FederatedValidationResult, FederationStatus,
+    FederatedCA, FederatedValidationResult, FederationManager, FederationPolicy, FederationStatus,
+    FederationTrustLevel,
 };
 
 /// TrustChain Certificate Authority (Legacy - use SecurityIntegratedCA for new deployments)
@@ -105,7 +104,7 @@ impl Default for CAConfig {
         Self {
             ca_id: "trustchain-ca-localhost".to_string(),
             bind_address: std::net::Ipv6Addr::LOCALHOST,
-            port: 8443, // Standard CA port (use testing() method for port 0)
+            port: 8443,            // Standard CA port (use testing() method for port 0)
             cert_validity_days: 1, // 24 hour certificates
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             mode: CAMode::LocalhostTesting,
@@ -141,7 +140,7 @@ impl CAConfig {
             mode: CAMode::Production,
             consensus_requirements: ConsensusRequirements::production(),
             hypermesh_client_config: HyperMeshClientConfig::production(
-                "https://hypermesh.hypermesh.online:8080".to_string()
+                "https://hypermesh.hypermesh.online:8080".to_string(),
             ),
         }
     }
@@ -209,7 +208,10 @@ pub struct CertificateMetadata {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum CertificateStatus {
     Valid,
-    Revoked { reason: String, revoked_at: SystemTime },
+    Revoked {
+        reason: String,
+        revoked_at: SystemTime,
+    },
     Expired,
 }
 
@@ -229,20 +231,25 @@ impl Clone for CAMetrics {
     fn clone(&self) -> Self {
         Self {
             certificates_issued: std::sync::atomic::AtomicU64::new(
-                self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed)
+                self.certificates_issued
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             // AWS CloudHSM dependencies REMOVED - hsm_operations removed
             consensus_validations: std::sync::atomic::AtomicU64::new(
-                self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed)
+                self.consensus_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             ct_log_entries: std::sync::atomic::AtomicU64::new(
-                self.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed)
+                self.ct_log_entries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
-                self.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed)
+                self.average_issuance_time_ms
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             performance_violations: std::sync::atomic::AtomicU64::new(
-                self.performance_violations.load(std::sync::atomic::Ordering::Relaxed)
+                self.performance_violations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -251,12 +258,37 @@ impl Clone for CAMetrics {
 impl std::fmt::Debug for CAMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CAMetrics")
-            .field("certificates_issued", &self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed))
+            .field(
+                "certificates_issued",
+                &self
+                    .certificates_issued
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
             // AWS CloudHSM dependencies REMOVED - hsm_operations field removed
-            .field("consensus_validations", &self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed))
-            .field("ct_log_entries", &self.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed))
-            .field("average_issuance_time_ms", &self.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed))
-            .field("performance_violations", &self.performance_violations.load(std::sync::atomic::Ordering::Relaxed))
+            .field(
+                "consensus_validations",
+                &self
+                    .consensus_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "ct_log_entries",
+                &self
+                    .ct_log_entries
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "average_issuance_time_ms",
+                &self
+                    .average_issuance_time_ms
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+            .field(
+                "performance_violations",
+                &self
+                    .performance_violations
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
             .finish()
     }
 }
@@ -268,12 +300,37 @@ impl serde::Serialize for CAMetrics {
     {
         use serde::ser::SerializeStruct;
         let mut state = serializer.serialize_struct("CAMetrics", 5)?; // AWS CloudHSM dependencies REMOVED - reduced field count
-        state.serialize_field("certificates_issued", &self.certificates_issued.load(std::sync::atomic::Ordering::Relaxed))?;
+        state.serialize_field(
+            "certificates_issued",
+            &self
+                .certificates_issued
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )?;
         // AWS CloudHSM dependencies REMOVED - hsm_operations serialization removed
-        state.serialize_field("consensus_validations", &self.consensus_validations.load(std::sync::atomic::Ordering::Relaxed))?;
-        state.serialize_field("ct_log_entries", &self.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed))?;
-        state.serialize_field("average_issuance_time_ms", &self.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed))?;
-        state.serialize_field("performance_violations", &self.performance_violations.load(std::sync::atomic::Ordering::Relaxed))?;
+        state.serialize_field(
+            "consensus_validations",
+            &self
+                .consensus_validations
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )?;
+        state.serialize_field(
+            "ct_log_entries",
+            &self
+                .ct_log_entries
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )?;
+        state.serialize_field(
+            "average_issuance_time_ms",
+            &self
+                .average_issuance_time_ms
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )?;
+        state.serialize_field(
+            "performance_violations",
+            &self
+                .performance_violations
+                .load(std::sync::atomic::Ordering::Relaxed),
+        )?;
         state.end()
     }
 }
@@ -292,14 +349,16 @@ impl<'de> serde::Deserialize<'de> for CAMetrics {
             average_issuance_time_ms: u64,
             performance_violations: u64,
         }
-        
+
         let data = CAMetricsData::deserialize(deserializer)?;
         Ok(Self {
             certificates_issued: std::sync::atomic::AtomicU64::new(data.certificates_issued),
             // AWS CloudHSM dependencies REMOVED - software-only operation
             consensus_validations: std::sync::atomic::AtomicU64::new(data.consensus_validations),
             ct_log_entries: std::sync::atomic::AtomicU64::new(data.ct_log_entries),
-            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(data.average_issuance_time_ms),
+            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
+                data.average_issuance_time_ms,
+            ),
             performance_violations: std::sync::atomic::AtomicU64::new(data.performance_violations),
         })
     }
@@ -337,12 +396,13 @@ impl TrustChainCA {
         ));
 
         // Initialize HyperMesh consensus client
-        let hypermesh_client = Arc::new(
-            HyperMeshConsensusClient::new(config.hypermesh_client_config.clone()).await?
-        );
+        let hypermesh_client =
+            Arc::new(HyperMeshConsensusClient::new(config.hypermesh_client_config.clone()).await?);
 
         // Initialize four-proof consensus validator
-        let consensus = Arc::new(tokio::sync::Mutex::new(crate::consensus::FourProofValidator::new()));
+        let consensus = Arc::new(tokio::sync::Mutex::new(
+            crate::consensus::FourProofValidator::new(),
+        ));
 
         let ca = Self {
             root_ca: Arc::new(RwLock::new(root_ca)),
@@ -359,34 +419,63 @@ impl TrustChainCA {
     }
 
     /// Issue a new certificate with HyperMesh consensus validation
-    pub async fn issue_certificate(&self, request: CertificateRequest) -> Result<IssuedCertificate> {
-        info!("Processing certificate request for: {} with HyperMesh consensus validation", request.common_name);
+    pub async fn issue_certificate(
+        &self,
+        request: CertificateRequest,
+    ) -> Result<IssuedCertificate> {
+        info!(
+            "Processing certificate request for: {} with HyperMesh consensus validation",
+            request.common_name
+        );
 
         // Validate certificate request through HyperMesh consensus
-        let consensus_result = self.hypermesh_client.validate_certificate_request(
-            &request,
-            &self.config.consensus_requirements,
-        ).await?;
+        let consensus_result = self
+            .hypermesh_client
+            .validate_certificate_request(&request, &self.config.consensus_requirements)
+            .await?;
 
         // Process consensus validation result
         match consensus_result.result {
             ConsensusValidationStatus::Valid => {
-                info!("HyperMesh consensus validation successful for: {}", request.common_name);
+                info!(
+                    "HyperMesh consensus validation successful for: {}",
+                    request.common_name
+                );
             }
-            ConsensusValidationStatus::Invalid { failed_proofs, reason } => {
-                error!("HyperMesh consensus validation failed for {}: {} (failed proofs: {:?})", 
-                       request.common_name, reason, failed_proofs);
-                return Err(anyhow!("HyperMesh consensus validation failed: {} (failed proofs: {:?})", reason, failed_proofs));
+            ConsensusValidationStatus::Invalid {
+                failed_proofs,
+                reason,
+            } => {
+                error!(
+                    "HyperMesh consensus validation failed for {}: {} (failed proofs: {:?})",
+                    request.common_name, reason, failed_proofs
+                );
+                return Err(anyhow!(
+                    "HyperMesh consensus validation failed: {reason} (failed proofs: {failed_proofs:?})"
+                ));
             }
-            ConsensusValidationStatus::Pending { estimated_completion } => {
-                error!("HyperMesh consensus validation pending for {}, estimated completion: {:?}", 
-                       request.common_name, estimated_completion);
-                return Err(anyhow!("HyperMesh consensus validation pending, try again later"));
+            ConsensusValidationStatus::Pending {
+                estimated_completion,
+            } => {
+                error!(
+                    "HyperMesh consensus validation pending for {}, estimated completion: {:?}",
+                    request.common_name, estimated_completion
+                );
+                return Err(anyhow!(
+                    "HyperMesh consensus validation pending, try again later"
+                ));
             }
-            ConsensusValidationStatus::Error { error_code, message } => {
-                error!("HyperMesh consensus validation error for {}: {} ({})", 
-                       request.common_name, message, error_code);
-                return Err(anyhow!("HyperMesh consensus validation error: {} ({})", message, error_code));
+            ConsensusValidationStatus::Error {
+                error_code,
+                message,
+            } => {
+                error!(
+                    "HyperMesh consensus validation error for {}: {} ({})",
+                    request.common_name, message, error_code
+                );
+                return Err(anyhow!(
+                    "HyperMesh consensus validation error: {message} ({error_code})"
+                ));
             }
         }
 
@@ -396,19 +485,32 @@ impl TrustChainCA {
         }
 
         // Generate certificate with HyperMesh consensus proof
-        let issued_cert = self.generate_certificate_with_consensus(request, consensus_result).await?;
+        let issued_cert = self
+            .generate_certificate_with_consensus(request, consensus_result)
+            .await?;
 
         // Store certificate
-        self.certificate_store.store_certificate(&issued_cert).await?;
+        self.certificate_store
+            .store_certificate(&issued_cert)
+            .await?;
 
-        info!("Certificate issued successfully with HyperMesh consensus: {}", issued_cert.serial_number);
+        info!(
+            "Certificate issued successfully with HyperMesh consensus: {}",
+            issued_cert.serial_number
+        );
         Ok(issued_cert)
     }
 
     /// Issue certificate with pre-validated consensus (skips HyperMesh network call).
     /// Used by SecurityIntegratedCA which already performed local consensus validation.
-    pub async fn issue_certificate_local(&self, request: CertificateRequest) -> Result<IssuedCertificate> {
-        info!("Processing certificate request for: {} (pre-validated consensus)", request.common_name);
+    pub async fn issue_certificate_local(
+        &self,
+        request: CertificateRequest,
+    ) -> Result<IssuedCertificate> {
+        info!(
+            "Processing certificate request for: {} (pre-validated consensus)",
+            request.common_name
+        );
 
         // Validate certificate policy
         if !self.policy_engine.validate_request(&request).await? {
@@ -419,7 +521,7 @@ impl TrustChainCA {
         let local_result = ConsensusValidationResult {
             result: ConsensusValidationStatus::Valid,
             proof_hash: request.consensus_proof.hash().ok().map(|h| {
-                let bytes = hex::decode(&h).unwrap_or_default();
+                let bytes = hex::decode(h).unwrap_or_default();
                 let mut arr = [0u8; 32];
                 let len = bytes.len().min(32);
                 arr[..len].copy_from_slice(&bytes[..len]);
@@ -453,10 +555,17 @@ impl TrustChainCA {
             },
         };
 
-        let issued_cert = self.generate_certificate_with_consensus(request, local_result).await?;
-        self.certificate_store.store_certificate(&issued_cert).await?;
+        let issued_cert = self
+            .generate_certificate_with_consensus(request, local_result)
+            .await?;
+        self.certificate_store
+            .store_certificate(&issued_cert)
+            .await?;
 
-        info!("Certificate issued successfully (pre-validated consensus): {}", issued_cert.serial_number);
+        info!(
+            "Certificate issued successfully (pre-validated consensus): {}",
+            issued_cert.serial_number
+        );
         Ok(issued_cert)
     }
 
@@ -466,13 +575,17 @@ impl TrustChainCA {
 
         // Parse certificate
         let (_, _parsed_cert) = parse_x509_certificate(cert_der)
-            .map_err(|e| anyhow!("Failed to parse certificate: {}", e))?;
+            .map_err(|e| anyhow!("Failed to parse certificate: {e}"))?;
 
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(cert_der);
 
         // Check if certificate exists in store
-        if let Some(stored_cert) = self.certificate_store.get_certificate(&hex::encode(fingerprint)).await? {
+        if let Some(stored_cert) = self
+            .certificate_store
+            .get_certificate(&hex::encode(fingerprint))
+            .await?
+        {
             // Validate certificate status
             match stored_cert.status {
                 CertificateStatus::Valid => {
@@ -481,14 +594,17 @@ impl TrustChainCA {
                         warn!("Certificate expired: {}", stored_cert.serial_number);
                         return Ok(false);
                     }
-                    
+
                     // Validate consensus proof through HyperMesh (for legacy certificates with embedded proofs)
                     // For certificates issued with HyperMesh consensus, they are already validated
                     if stored_cert.consensus_proof.hash().is_ok() {
                         debug!("Certificate validation successful (HyperMesh consensus validated)");
                         return Ok(true);
                     } else {
-                        warn!("Consensus proof validation failed for certificate: {}", stored_cert.serial_number);
+                        warn!(
+                            "Consensus proof validation failed for certificate: {}",
+                            stored_cert.serial_number
+                        );
                         return Ok(false);
                     }
                 }
@@ -511,7 +627,9 @@ impl TrustChainCA {
     pub async fn revoke_certificate(&self, serial_number: &str, reason: String) -> Result<()> {
         info!("Revoking certificate: {}", serial_number);
 
-        self.certificate_store.revoke_certificate(serial_number, reason).await?;
+        self.certificate_store
+            .revoke_certificate(serial_number, reason)
+            .await?;
 
         info!("Certificate revoked successfully: {}", serial_number);
         Ok(())
@@ -538,41 +656,51 @@ impl TrustChainCA {
 
     /// Internal: Generate certificate with HyperMesh consensus validation result
     async fn generate_certificate_with_consensus(
-        &self, 
+        &self,
         request: CertificateRequest,
         consensus_result: ConsensusValidationResult,
     ) -> Result<IssuedCertificate> {
         let root_ca = self.root_ca.read().await;
-        
+
         // rcgen 0.13: Create certificate with requested parameters (returns Result)
         let mut params = rcgen::CertificateParams::new(vec![request.common_name.clone()])?;
 
         // Add SAN entries (rcgen 0.13: SanType uses Ia5String)
         for san in &request.san_entries {
-            params.subject_alt_names.push(rcgen::SanType::DnsName(
-                rcgen::Ia5String::try_from(san.as_str())?
-            ));
+            params
+                .subject_alt_names
+                .push(rcgen::SanType::DnsName(rcgen::Ia5String::try_from(
+                    san.as_str(),
+                )?));
         }
 
         // Add IPv6 addresses
         for ipv6_addr in &request.ipv6_addresses {
-            params.subject_alt_names.push(rcgen::SanType::IpAddress(std::net::IpAddr::V6(*ipv6_addr)));
+            params
+                .subject_alt_names
+                .push(rcgen::SanType::IpAddress(std::net::IpAddr::V6(*ipv6_addr)));
         }
 
         // Set validity period
         let now = SystemTime::now();
-        let expires_at = now + Duration::from_secs(self.config.cert_validity_days as u64 * 24 * 60 * 60);
+        let expires_at =
+            now + Duration::from_secs(self.config.cert_validity_days as u64 * 24 * 60 * 60);
 
         params.not_before = now.into();
         params.not_after = expires_at.into();
 
         // Add HyperMesh consensus metadata as certificate extension
         if let Some(proof_hash) = consensus_result.proof_hash {
-            let consensus_extension = format!("HyperMesh-Consensus: {}, Validator: {}",
-                                              hex::encode(proof_hash),
-                                              consensus_result.validator_id);
+            let consensus_extension = format!(
+                "HyperMesh-Consensus: {}, Validator: {}",
+                hex::encode(proof_hash),
+                consensus_result.validator_id
+            );
             // Note: In production, this would be added as a proper X.509 extension
-            debug!("Adding HyperMesh consensus metadata: {}", consensus_extension);
+            debug!(
+                "Adding HyperMesh consensus metadata: {}",
+                consensus_extension
+            );
         }
 
         // rcgen 0.13: Generate key pair and create certificate
@@ -591,7 +719,7 @@ impl TrustChainCA {
         let root_ca_pem = root_ca.pem();
 
         // Build certificate chain (leaf + root)
-        let chain_pem = format!("{}\n{}", certificate_pem, root_ca_pem);
+        let chain_pem = format!("{certificate_pem}\n{root_ca_pem}");
 
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(&cert_der);
@@ -601,14 +729,23 @@ impl TrustChainCA {
 
         // Create enhanced metadata with HyperMesh consensus information
         let mut metadata = CertificateMetadata::default();
-        metadata.tags.insert("consensus_validator".to_string(), consensus_result.validator_id);
+        metadata.tags.insert(
+            "consensus_validator".to_string(),
+            consensus_result.validator_id,
+        );
         if let Some(proof_hash) = consensus_result.proof_hash {
-            metadata.tags.insert("consensus_proof_hash".to_string(), hex::encode(proof_hash));
+            metadata
+                .tags
+                .insert("consensus_proof_hash".to_string(), hex::encode(proof_hash));
         }
-        metadata.tags.insert("consensus_validation_time".to_string(),
-                             consensus_result.metrics.validation_time_us.to_string());
-        metadata.tags.insert("consensus_confidence".to_string(),
-                             consensus_result.metrics.confidence_level.to_string());
+        metadata.tags.insert(
+            "consensus_validation_time".to_string(),
+            consensus_result.metrics.validation_time_us.to_string(),
+        );
+        metadata.tags.insert(
+            "consensus_confidence".to_string(),
+            consensus_result.metrics.confidence_level.to_string(),
+        );
 
         Ok(IssuedCertificate {
             serial_number,
@@ -645,25 +782,37 @@ impl TrustChainCA {
         asset_id: &str,
         node_id: &str,
     ) -> Result<ConsensusValidationResult> {
-        info!("Validating four-proof set through HyperMesh for operation: {}", operation);
-        
-        let result = self.hypermesh_client.validate_four_proofs(
-            proof_set,
-            operation,
-            asset_id,
-            node_id,
-        ).await?;
+        info!(
+            "Validating four-proof set through HyperMesh for operation: {}",
+            operation
+        );
+
+        let result = self
+            .hypermesh_client
+            .validate_four_proofs(proof_set, operation, asset_id, node_id)
+            .await?;
 
         match &result.result {
             ConsensusValidationStatus::Valid => {
-                info!("Four-proof validation successful for operation: {}", operation);
+                info!(
+                    "Four-proof validation successful for operation: {}",
+                    operation
+                );
             }
-            ConsensusValidationStatus::Invalid { failed_proofs, reason } => {
-                warn!("Four-proof validation failed for operation {}: {} (failed: {:?})", 
-                      operation, reason, failed_proofs);
+            ConsensusValidationStatus::Invalid {
+                failed_proofs,
+                reason,
+            } => {
+                warn!(
+                    "Four-proof validation failed for operation {}: {} (failed: {:?})",
+                    operation, reason, failed_proofs
+                );
             }
             status => {
-                debug!("Four-proof validation status for operation {}: {:?}", operation, status);
+                debug!(
+                    "Four-proof validation status for operation {}: {:?}",
+                    operation, status
+                );
             }
         }
 
@@ -672,7 +821,7 @@ impl TrustChainCA {
 
     /// Internal: Calculate certificate fingerprint
     fn calculate_fingerprint(&self, cert_der: &[u8]) -> [u8; 32] {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(cert_der);
         hasher.finalize().into()
@@ -687,10 +836,13 @@ mod tests {
     #[tokio::test]
     async fn test_ca_creation() {
         let config = CAConfig::testing(); // Use testing config with random port
-        let ca = TrustChainCA::new(config).await
+        let ca = TrustChainCA::new(config)
+            .await
             .expect("Failed to create CA");
 
-        let ca_cert = ca.get_ca_certificate().await
+        let ca_cert = ca
+            .get_ca_certificate()
+            .await
             .expect("Failed to get CA certificate");
         assert!(!ca_cert.is_empty());
     }
@@ -698,7 +850,8 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_issuance() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::testing(); // Use testing config with random port
-        let ca = TrustChainCA::new(config).await
+        let ca = TrustChainCA::new(config)
+            .await
             .expect("Failed to create CA");
 
         let request = CertificateRequest {
@@ -710,7 +863,9 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate_local(request).await
+        let issued_cert = ca
+            .issue_certificate_local(request)
+            .await
             .expect("Failed to issue certificate");
         assert_eq!(issued_cert.common_name, "test.localhost");
         assert!(matches!(issued_cert.status, CertificateStatus::Valid));
@@ -720,7 +875,8 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_validation() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfig::testing(); // Use testing config with random port
-        let ca = TrustChainCA::new(config).await
+        let ca = TrustChainCA::new(config)
+            .await
             .expect("Failed to create CA");
 
         let request = CertificateRequest {
@@ -732,9 +888,13 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate_local(request).await
+        let issued_cert = ca
+            .issue_certificate_local(request)
+            .await
             .expect("Failed to issue certificate");
-        let is_valid = ca.validate_certificate_chain(&issued_cert.certificate_der).await
+        let is_valid = ca
+            .validate_certificate_chain(&issued_cert.certificate_der)
+            .await
             .expect("Failed to validate certificate chain");
         assert!(is_valid);
         Ok(())

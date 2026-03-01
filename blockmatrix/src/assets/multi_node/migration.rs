@@ -15,14 +15,14 @@
 //! Handles live migration of assets between nodes with minimal downtime
 //! and data consistency guarantees.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetRegistration, AssetResult};
 use super::PeerIdentity;
+use crate::assets::core::{AssetRegistration, AssetResult};
 
 /// Asset migrator for moving assets between nodes
 pub struct AssetMigrator {
@@ -164,12 +164,15 @@ impl AssetMigrator {
                 MigrationStrategy::StopAndCopy
             },
             estimated_duration: Duration::from_secs(60), // Placeholder
-            data_size: 0, // Would be calculated based on asset
+            data_size: 0,                                // Would be calculated based on asset
             priority,
             created_at: SystemTime::now(),
         };
 
-        self.active_migrations.write().await.insert(asset_id, plan.clone());
+        self.active_migrations
+            .write()
+            .await
+            .insert(asset_id, plan.clone());
 
         Ok(plan)
     }
@@ -215,7 +218,8 @@ impl AssetMigrator {
     /// Get migration status
     pub async fn get_status(&self, asset_id: &AssetRegistration) -> Option<MigrationStatus> {
         let history = self.migration_history.read().await;
-        history.iter()
+        history
+            .iter()
             .find(|s| s.plan.asset_id == *asset_id)
             .cloned()
     }

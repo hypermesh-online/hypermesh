@@ -5,7 +5,7 @@
 //! Privacy Configuration Management
 //!
 //! User privacy configurations, settings validation, and configuration templates.
-//! 
+//!
 //! This module is broken down into logical sub-modules:
 //! - `core`: Core privacy structures and types
 //! - `retention`: Data retention and deletion management  
@@ -18,28 +18,26 @@
 
 // Re-export core types for convenience
 pub use super::core::{
-    UserPrivacyConfig, PrivacySettings, PrivacyPreference, DataMinimizationSettings,
-    RetentionPreferences, ResourcePrivacySettings, PrivacyConstraints,
-    PrivacyValidationRules, PrivacyTemplate, PrivacyPreset, AdvancedPrivacyOptions,
-    ConsentManagementSettings, DashboardPreferences, SharingMinimizationSettings,
-    AnonymizationPreferences,
+    AdvancedPrivacyOptions, AnonymizationPreferences, ConsentManagementSettings,
+    DashboardPreferences, DataMinimizationSettings, PrivacyConstraints, PrivacyPreference,
+    PrivacyPreset, PrivacySettings, PrivacyTemplate, PrivacyValidationRules,
+    ResourcePrivacySettings, RetentionPreferences, SharingMinimizationSettings, UserPrivacyConfig,
 };
 
 // Import from retention module
 pub use super::retention::{
-    AutoDeletionSettings, DeletionCriterion, DeletionCriterionType,
-    DeletionConfirmationSettings, SecureDeletionMethod, ArchivePreferences,
-    ArchiveLocation, ArchiveEncryptionSettings, KeyDerivationSettings,
+    ArchiveEncryptionSettings, ArchiveLocation, ArchivePreferences, AutoDeletionSettings,
+    DeletionConfirmationSettings, DeletionCriterion, DeletionCriterionType, KeyDerivationSettings,
+    SecureDeletionMethod,
 };
 
 pub use super::keys::{
-    KeyManagementSettings, KeyDerivationMethod, KeyRotationSettings,
-    KeyRotationMethod, KeyRecoverySettings, KeyRecoveryMethod,
-    KeyRecoveryLimitations,
+    KeyDerivationMethod, KeyManagementSettings, KeyRecoveryLimitations, KeyRecoveryMethod,
+    KeyRecoverySettings, KeyRotationMethod, KeyRotationSettings,
 };
 
-use std::collections::HashMap;
 use crate::assets::core::AssetResult;
+use std::collections::HashMap;
 
 use super::PrivacyAllocationType;
 
@@ -55,25 +53,25 @@ impl PrivacyConfigManager {
             configs: HashMap::new(),
         }
     }
-    
+
     /// Load user privacy configuration
     pub async fn load_config(&self, user_id: &str) -> AssetResult<Option<UserPrivacyConfig>> {
         Ok(self.configs.get(user_id).cloned())
     }
-    
+
     /// Save user privacy configuration
     pub async fn save_config(&mut self, config: UserPrivacyConfig) -> AssetResult<()> {
         self.validate_config(&config)?;
         self.configs.insert(config.user_id.clone(), config);
         Ok(())
     }
-    
+
     /// Validate privacy configuration
     fn validate_config(&self, _config: &UserPrivacyConfig) -> AssetResult<()> {
         // Basic validation - can be expanded
         Ok(())
     }
-    
+
     /// Get default privacy configuration
     pub fn default_config(user_id: String) -> UserPrivacyConfig {
         UserPrivacyConfig {

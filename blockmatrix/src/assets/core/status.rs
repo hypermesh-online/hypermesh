@@ -7,14 +7,14 @@
 //! Real-time asset status monitoring with state management,
 //! resource usage tracking, and consensus proof validation.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
 
+use super::adapter::ResourceUsage;
+use super::proxy::ProxyAddress;
 use super::{AssetRegistration, ConsensusProof};
 use hypermesh_lib::PrivacyMode;
-use super::proxy::ProxyAddress;
-use super::adapter::ResourceUsage;
 
 /// Current status of an asset instance
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,19 +63,22 @@ pub enum AssetState {
 impl AssetState {
     /// Check if asset is operational (can be used)
     pub fn is_operational(&self) -> bool {
-        matches!(self, AssetState::Available | AssetState::Allocated | AssetState::InUse)
+        matches!(
+            self,
+            AssetState::Available | AssetState::Allocated | AssetState::InUse
+        )
     }
-    
+
     /// Check if asset is actively processing
     pub fn is_active(&self) -> bool {
         matches!(self, AssetState::InUse)
     }
-    
+
     /// Check if asset is available for allocation
     pub fn is_available(&self) -> bool {
         matches!(self, AssetState::Available)
     }
-    
+
     /// Get state priority for scheduling (lower is higher priority)
     pub fn priority(&self) -> u8 {
         match self {
@@ -86,7 +89,7 @@ impl AssetState {
             AssetState::Failed => 4,
         }
     }
-    
+
     /// Get human-readable state description
     pub fn description(&self) -> &'static str {
         match self {
@@ -101,7 +104,7 @@ impl AssetState {
 
 impl std::fmt::Display for AssetState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -209,7 +212,7 @@ impl AssetStatus {
         privacy_level: PrivacyMode,
     ) -> Self {
         let now = SystemTime::now();
-        
+
         Self {
             asset_id,
             state: AssetState::Available,
@@ -232,34 +235,34 @@ impl AssetStatus {
             performance_metrics: AssetPerformanceMetrics::default(),
         }
     }
-    
+
     /// Update asset state
     pub fn update_state(&mut self, new_state: AssetState) {
         self.state = new_state;
         self.last_accessed = SystemTime::now();
     }
-    
+
     /// Add consensus proof
     pub fn add_consensus_proof(&mut self, proof: ConsensusProof) {
         self.consensus_proofs.push(proof);
     }
-    
+
     /// Set proxy address
     pub fn set_proxy_address(&mut self, proxy_address: ProxyAddress) {
         self.proxy_address = Some(proxy_address);
     }
-    
+
     /// Update resource usage
     pub fn update_resource_usage(&mut self, usage: ResourceUsage) {
         self.resource_usage = usage;
         self.last_accessed = SystemTime::now();
     }
-    
+
     /// Add metadata entry
     pub fn add_metadata(&mut self, key: String, value: String) {
         self.metadata.insert(key, value);
     }
-    
+
     /// Add health alert
     pub fn add_alert(&mut self, alert: AssetAlert) {
         // Update health score based on alert severity
@@ -269,47 +272,49 @@ impl AssetStatus {
             AlertSeverity::Warning => self.health_status.health_score *= 0.9,
             AlertSeverity::Info => {} // No impact on health score
         }
-        
+
         self.health_status.alerts.push(alert);
-        
+
         // Ensure health score doesn't go below 0
         self.health_status.health_score = self.health_status.health_score.max(0.0);
     }
-    
+
     /// Clear resolved alerts
     pub fn clear_resolved_alerts(&mut self, category: Option<AlertCategory>) {
         match category {
             Some(cat) => {
-                self.health_status.alerts.retain(|alert| 
+                self.health_status.alerts.retain(|alert| {
                     std::mem::discriminant(&alert.category) != std::mem::discriminant(&cat)
-                );
-            },
+                });
+            }
             None => self.health_status.alerts.clear(),
         }
     }
-    
+
     /// Calculate uptime since allocation
     pub fn uptime(&self) -> Option<std::time::Duration> {
         SystemTime::now().duration_since(self.allocated_at).ok()
     }
-    
+
     /// Check if asset requires maintenance
     pub fn requires_maintenance(&self) -> bool {
-        self.health_status.health_score < 0.5 ||
-        self.health_status.alerts.iter().any(|alert| 
-            alert.severity == AlertSeverity::Critical
-        )
+        self.health_status.health_score < 0.5
+            || self
+                .health_status
+                .alerts
+                .iter()
+                .any(|alert| alert.severity == AlertSeverity::Critical)
     }
-    
+
     /// Get age since last access
     pub fn idle_time(&self) -> Option<std::time::Duration> {
         SystemTime::now().duration_since(self.last_accessed).ok()
     }
-    
+
     /// Check if consensus proofs are valid
     pub fn validate_consensus_proofs(&self) -> bool {
-        !self.consensus_proofs.is_empty() &&
-        self.consensus_proofs.iter().all(|proof| proof.validate())
+        !self.consensus_proofs.is_empty()
+            && self.consensus_proofs.iter().all(|proof| proof.validate())
     }
 }
 
@@ -356,18 +361,18 @@ impl AssetAlert {
             metadata: HashMap::new(),
         }
     }
-    
+
     /// Add metadata to alert
     pub fn with_metadata(mut self, key: String, value: String) -> Self {
         self.metadata.insert(key, value);
         self
     }
-    
+
     /// Check if alert is critical
     pub fn is_critical(&self) -> bool {
         self.severity == AlertSeverity::Critical
     }
-    
+
     /// Get alert age
     pub fn age(&self) -> Option<std::time::Duration> {
         SystemTime::now().duration_since(self.timestamp).ok()
@@ -394,18 +399,18 @@ impl std::fmt::Display for AlertCategory {
             AlertCategory::Network => write!(f, "Network"),
             AlertCategory::Hardware => write!(f, "Hardware"),
             AlertCategory::Configuration => write!(f, "Configuration"),
-            AlertCategory::Custom(name) => write!(f, "{}", name),
+            AlertCategory::Custom(name) => write!(f, "{name}"),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::AssetRegistration;
+    use super::*;
+    use crate::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
     use crate::AssetType;
     use hypermesh_lib::PrivacyMode;
-    use crate::assets::core::{AssetData, NetworkScope, AssetCategory, BaseSystemType};
 
     // Test helper to create AssetRegistration from AssetType
     fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
@@ -435,7 +440,7 @@ mod tests {
         assert!(!AssetState::InUse.is_available());
         assert!(AssetState::InUse.is_active());
     }
-    
+
     #[test]
     fn test_asset_status_creation() {
         let asset_id = test_asset_id(AssetType::Cpu);
@@ -444,13 +449,13 @@ mod tests {
             "test-cert-fingerprint".to_string(),
             PrivacyMode::PRIVATE,
         );
-        
+
         assert_eq!(status.asset_id, asset_id);
         assert_eq!(status.state, AssetState::Available);
         assert_eq!(status.privacy_level, PrivacyMode::PRIVATE);
         assert_eq!(status.health_status.health_score, 1.0);
     }
-    
+
     #[test]
     fn test_asset_alert_creation() {
         let alert = AssetAlert::new(
@@ -459,21 +464,17 @@ mod tests {
             AlertCategory::Performance,
             "cpu-monitor".to_string(),
         );
-        
+
         assert_eq!(alert.severity, AlertSeverity::Warning);
         assert!(!alert.is_critical());
         assert!(alert.message.contains("CPU"));
     }
-    
+
     #[test]
     fn test_health_status_with_alerts() {
         let asset_id = test_asset_id(AssetType::Memory);
-        let mut status = AssetStatus::new(
-            asset_id,
-            "test-cert".to_string(),
-            PrivacyMode::PUBLIC,
-        );
-        
+        let mut status = AssetStatus::new(asset_id, "test-cert".to_string(), PrivacyMode::PUBLIC);
+
         // Add critical alert
         let critical_alert = AssetAlert::new(
             AlertSeverity::Critical,
@@ -481,7 +482,7 @@ mod tests {
             AlertCategory::Hardware,
             "hardware-monitor".to_string(),
         );
-        
+
         status.add_alert(critical_alert);
         assert!(status.health_status.health_score < 1.0);
         assert!(status.requires_maintenance());

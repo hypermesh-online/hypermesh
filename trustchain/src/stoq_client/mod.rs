@@ -8,12 +8,12 @@
 //! Certificate Authority, Certificate Transparency, and DNS services. All transport
 //! operations are delegated to STOQ protocol for high-performance networking.
 
-pub mod types;
 pub mod operations;
+pub mod types;
 
 // Re-export all public types for backward compatibility
-pub use types::*;
 pub use operations::*;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
@@ -28,17 +28,19 @@ mod tests {
         // In integration tests, we would mock the STOQ transport
         if let Ok(client) = TrustChainStoqClient::new(config).await {
             let metrics = client.get_metrics();
-            assert_eq!(metrics.dns_queries.load(std::sync::atomic::Ordering::Relaxed), 0);
+            assert_eq!(
+                metrics
+                    .dns_queries
+                    .load(std::sync::atomic::Ordering::Relaxed),
+                0
+            );
         }
     }
 
     #[test]
     fn test_service_endpoint_creation() {
-        let endpoint = ServiceEndpoint::new(
-            ServiceType::Dns,
-            Ipv6Addr::LOCALHOST,
-            853
-        ).with_service_name("dns.test.local".to_string());
+        let endpoint = ServiceEndpoint::new(ServiceType::Dns, Ipv6Addr::LOCALHOST, 853)
+            .with_service_name("dns.test.local".to_string());
 
         assert_eq!(endpoint.service_type, ServiceType::Dns);
         assert_eq!(endpoint.port, 853);

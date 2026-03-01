@@ -77,7 +77,10 @@ impl ShardDistributionMap {
                 },
             })
             .collect();
-        FilteredShardMap { entries, commitment }
+        FilteredShardMap {
+            entries,
+            commitment,
+        }
     }
 }
 
@@ -170,7 +173,10 @@ mod tests {
         let c1 = map.compute_commitment();
         map.entries[0].shard_hash = [0xFF; 32];
         let c2 = map.compute_commitment();
-        assert_ne!(c1, c2, "different shard hash must yield different commitment");
+        assert_ne!(
+            c1, c2,
+            "different shard hash must yield different commitment"
+        );
     }
 
     #[test]

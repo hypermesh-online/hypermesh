@@ -5,12 +5,10 @@
 //! Security framework integration tests
 
 use crate::security::{
-    SecurityConfig, SecurityError, SecurityManager,
-    monitoring::SecurityMonitor,
-    types::{
-        HyperMeshSecurity, NetworkPacket, SystemCall, ProcessContext,
-    },
     ebpf::EBPFSecurityManager,
+    monitoring::SecurityMonitor,
+    types::{HyperMeshSecurity, NetworkPacket, ProcessContext, SystemCall},
+    SecurityConfig, SecurityError, SecurityManager,
 };
 use std::time::SystemTime;
 
@@ -43,25 +41,33 @@ async fn test_security_monitor() {
 #[tokio::test]
 async fn test_security_framework_initialization() {
     let config = SecurityConfig::default();
-    let mut security = HyperMeshSecurity::new(config).await
+    let mut security = HyperMeshSecurity::new(config)
+        .await
         .expect("test: create HyperMeshSecurity");
 
     // Test initialization
-    security.initialize().await
+    security
+        .initialize()
+        .await
         .expect("test: initialize security framework");
 
     // Test shutdown
-    security.shutdown().await
+    security
+        .shutdown()
+        .await
         .expect("test: shutdown security framework");
 }
 
 #[tokio::test]
 async fn test_ebpf_security_manager() {
-    let mut ebpf_manager = EBPFSecurityManager::new().await
+    let mut ebpf_manager = EBPFSecurityManager::new()
+        .await
         .expect("test: create EBPFSecurityManager");
 
     // Test loading default programs
-    ebpf_manager.load_default_programs().await
+    ebpf_manager
+        .load_default_programs()
+        .await
         .expect("test: load default programs");
 
     // Test program listing
@@ -84,13 +90,16 @@ async fn test_ebpf_security_manager() {
     // With XDP attached, the string-serialized packet may be dropped by the
     // XDP pipeline (it expects raw packet bytes, not metadata strings), so
     // we only assert the call succeeds without error.
-    let _allowed = ebpf_manager.process_packet(&packet).await
+    let _allowed = ebpf_manager
+        .process_packet(&packet)
+        .await
         .expect("test: process packet should not error");
 }
 
 #[tokio::test]
 async fn test_ebpf_syscall_tracing() {
-    let ebpf_manager = EBPFSecurityManager::new().await
+    let ebpf_manager = EBPFSecurityManager::new()
+        .await
         .expect("test: create EBPFSecurityManager");
 
     let safe_call = SystemCall {
@@ -109,7 +118,9 @@ async fn test_ebpf_syscall_tracing() {
         timestamp: SystemTime::now(),
     };
 
-    let result = ebpf_manager.trace_syscall(&safe_call).await
+    let result = ebpf_manager
+        .trace_syscall(&safe_call)
+        .await
         .expect("test: trace safe syscall");
     assert!(result, "read syscall should be allowed");
 
@@ -130,7 +141,9 @@ async fn test_ebpf_syscall_tracing() {
         timestamp: SystemTime::now(),
     };
 
-    let result = ebpf_manager.trace_syscall(&dangerous_call).await
+    let result = ebpf_manager
+        .trace_syscall(&dangerous_call)
+        .await
         .expect("test: trace dangerous syscall");
     assert!(!result, "ptrace syscall should be denied");
 }
@@ -168,6 +181,6 @@ async fn test_security_manager_invalid_config() {
         Err(SecurityError::ConfigurationError { message }) => {
             assert!(message.contains("evaluation mode"));
         }
-        other => panic!("test: expected ConfigurationError, got {:?}", other),
+        other => panic!("test: expected ConfigurationError, got {other:?}"),
     }
 }

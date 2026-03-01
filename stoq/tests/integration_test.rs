@@ -2,13 +2,13 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use stoq::extensions::{DefaultStoqExtensions, StoqProtocolExtension, StoqPacket};
-use stoq::config::TransportConfig;
-use stoq::transport::{StoqTransport, Endpoint};
-use stoq::transport::falcon::{FalconEngine, FalconVariant};
 use bytes::Bytes;
 use std::net::Ipv6Addr;
 use std::time::Instant;
+use stoq::config::TransportConfig;
+use stoq::extensions::{DefaultStoqExtensions, StoqPacket, StoqProtocolExtension};
+use stoq::transport::falcon::{FalconEngine, FalconVariant};
+use stoq::transport::{Endpoint, StoqTransport};
 
 #[test]
 fn test_protocol_extensions_functionality() {
@@ -77,21 +77,33 @@ fn test_falcon_crypto_implementation() {
     let (private_key, public_key) = engine.generate_keypair().unwrap();
     assert_eq!(public_key.key_data.len(), 1793, "Wrong public key size");
     // private_key.key_data() is private, so we check variant instead
-    assert_eq!(private_key.variant, FalconVariant::Falcon1024, "Wrong variant");
+    assert_eq!(
+        private_key.variant,
+        FalconVariant::Falcon1024,
+        "Wrong variant"
+    );
     println!("✓ FALCON-1024 Key Generation: WORKING");
 
     // Test signing
     let test_data = b"Test message for FALCON signature";
     let signature = engine.sign(&private_key, test_data).unwrap();
     assert_eq!(signature.signature_data.len(), 1330, "Wrong signature size");
-    println!("✓ FALCON Signing: {} byte signature", signature.signature_data.len());
+    println!(
+        "✓ FALCON Signing: {} byte signature",
+        signature.signature_data.len()
+    );
 
     // Test verification (NOTE: This is mock implementation)
     let valid = engine.verify(&public_key, &signature, test_data).unwrap();
-    println!("✓ FALCON Verification: {}", if valid { "MOCK VALID" } else { "FAILED" });
+    println!(
+        "✓ FALCON Verification: {}",
+        if valid { "MOCK VALID" } else { "FAILED" }
+    );
 
     // Test with wrong data
-    let invalid = engine.verify(&public_key, &signature, b"wrong data").unwrap();
+    let invalid = engine
+        .verify(&public_key, &signature, b"wrong data")
+        .unwrap();
     assert!(!invalid, "Should reject wrong data");
     println!("✓ Wrong Data Rejection: WORKING");
 
@@ -105,11 +117,7 @@ fn test_real_vs_claimed_performance() {
     let extensions = DefaultStoqExtensions::new();
 
     // Test different data sizes
-    let test_sizes = vec![
-        (1024, "1 KB"),
-        (64 * 1024, "64 KB"),
-        (1024 * 1024, "1 MB"),
-    ];
+    let test_sizes = vec![(1024, "1 KB"), (64 * 1024, "64 KB"), (1024 * 1024, "1 MB")];
 
     println!("\nProtocol Extension Performance:");
     for (size, label) in test_sizes {
@@ -122,14 +130,19 @@ fn test_real_vs_claimed_performance() {
         }
         let elapsed = start.elapsed();
         let throughput = (size as f64 * 100.0) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
-        println!("  {} Tokenization: {:.2} MB/s", label, throughput);
+        println!("  {label} Tokenization: {throughput:.2} MB/s");
 
         // Measure sharding
         let start = Instant::now();
         let shards = extensions.shard_packet(&data, 64 * 1024).unwrap();
         let elapsed = start.elapsed();
         let throughput = (size as f64) / elapsed.as_secs_f64() / (1024.0 * 1024.0);
-        println!("  {} Sharding: {:.2} MB/s ({} shards)", label, throughput, shards.len());
+        println!(
+            "  {} Sharding: {:.2} MB/s ({} shards)",
+            label,
+            throughput,
+            shards.len()
+        );
     }
 
     println!("\n⚠ Performance Reality Check:");
@@ -144,7 +157,10 @@ async fn test_transport_creation_failure() {
     println!("\n=== Testing Transport Creation ===");
 
     // Initialize crypto
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed
     }
 
@@ -157,7 +173,7 @@ async fn test_transport_creation_failure() {
     } else {
         println!("✗ Transport creation: FAILED");
         if let Err(e) = result {
-            println!("  Error: {}", e);
+            println!("  Error: {e}");
         }
     }
 }

@@ -12,9 +12,8 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::pipeline::{
-    Asset, AssetMetadata, AssetPipeline, PipelineConfig,
-    CompressionAlgorithm, CompressionConfig,
-    ShardingConfig, DistributionConfig, MatrixConstraints,
+    Asset, AssetMetadata, AssetPipeline, CompressionAlgorithm, CompressionConfig,
+    DistributionConfig, MatrixConstraints, PipelineConfig, ShardingConfig,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 
@@ -76,23 +75,21 @@ async fn main() -> anyhow::Result<()> {
     let mut pipeline = AssetPipeline::new(config)?;
 
     // Register some nodes
-    pipeline.distributor_mut().register_node(
-        "node-1".to_string(),
-        MatrixCoordinate::new(10, 20, 30)?,
-    );
-    pipeline.distributor_mut().register_node(
-        "node-2".to_string(),
-        MatrixCoordinate::new(50, 60, 70)?,
-    );
-    pipeline.distributor_mut().register_node(
-        "node-3".to_string(),
-        MatrixCoordinate::new(-10, -20, 15)?,
-    );
+    pipeline
+        .distributor_mut()
+        .register_node("node-1".to_string(), MatrixCoordinate::new(10, 20, 30)?);
+    pipeline
+        .distributor_mut()
+        .register_node("node-2".to_string(), MatrixCoordinate::new(50, 60, 70)?);
+    pipeline
+        .distributor_mut()
+        .register_node("node-3".to_string(), MatrixCoordinate::new(-10, -20, 15)?);
 
     println!("🔧 Pipeline Configuration:");
     println!("   Compression: Zstd level 3");
     println!("   Sharding: 10 data + 4 parity shards");
-    println!("   Distribution: {} networks, {} nodes",
+    println!(
+        "   Distribution: {} networks, {} nodes",
         num_networks,
         pipeline.distributor_mut().node_count()
     );
@@ -106,46 +103,95 @@ async fn main() -> anyhow::Result<()> {
     println!("📊 Pipeline Statistics:");
     println!();
     println!("   Stage 1 - Compression:");
-    println!("      Original: {} bytes", processed.stats.compression.original_size);
-    println!("      Compressed: {} bytes", processed.stats.compression.compressed_size);
+    println!(
+        "      Original: {} bytes",
+        processed.stats.compression.original_size
+    );
+    println!(
+        "      Compressed: {} bytes",
+        processed.stats.compression.compressed_size
+    );
     println!("      Ratio: {:.2}x", processed.stats.compression.ratio);
     println!("      Time: {} ms", processed.stats.compression.duration_ms);
-    println!("      Throughput: {:.2} MB/s", processed.stats.compression.throughput_mbps);
+    println!(
+        "      Throughput: {:.2} MB/s",
+        processed.stats.compression.throughput_mbps
+    );
     println!();
 
     println!("   Stage 2 - Sharding:");
-    println!("      Data shards: {}", processed.stats.sharding.data_shards);
-    println!("      Parity shards: {}", processed.stats.sharding.parity_shards);
-    println!("      Total size: {} bytes", processed.stats.sharding.total_shard_size);
-    println!("      Redundancy: {:.2}x", processed.stats.sharding.redundancy_factor);
+    println!(
+        "      Data shards: {}",
+        processed.stats.sharding.data_shards
+    );
+    println!(
+        "      Parity shards: {}",
+        processed.stats.sharding.parity_shards
+    );
+    println!(
+        "      Total size: {} bytes",
+        processed.stats.sharding.total_shard_size
+    );
+    println!(
+        "      Redundancy: {:.2}x",
+        processed.stats.sharding.redundancy_factor
+    );
     println!("      Time: {} ms", processed.stats.sharding.duration_ms);
     println!();
 
     println!("   Stage 3 - Encryption:");
-    println!("      Shards encrypted: {}", processed.stats.encryption.shards_encrypted);
-    println!("      Total size: {} bytes", processed.stats.encryption.encrypted_size);
+    println!(
+        "      Shards encrypted: {}",
+        processed.stats.encryption.shards_encrypted
+    );
+    println!(
+        "      Total size: {} bytes",
+        processed.stats.encryption.encrypted_size
+    );
     println!("      Time: {} ms", processed.stats.encryption.duration_ms);
-    println!("      Throughput: {:.2} MB/s", processed.stats.encryption.throughput_mbps);
+    println!(
+        "      Throughput: {:.2} MB/s",
+        processed.stats.encryption.throughput_mbps
+    );
     println!();
 
     println!("   Stage 4 - Distribution:");
-    println!("      Shards distributed: {}", processed.stats.distribution.shards_distributed);
-    println!("      Networks used: {}", processed.stats.distribution.networks_used);
-    println!("      Avg shard distance: {:.2}", processed.stats.distribution.avg_shard_distance);
-    println!("      Quality score: {:.1}/100", processed.stats.distribution.quality_score);
-    println!("      Time: {} ms", processed.stats.distribution.duration_ms);
+    println!(
+        "      Shards distributed: {}",
+        processed.stats.distribution.shards_distributed
+    );
+    println!(
+        "      Networks used: {}",
+        processed.stats.distribution.networks_used
+    );
+    println!(
+        "      Avg shard distance: {:.2}",
+        processed.stats.distribution.avg_shard_distance
+    );
+    println!(
+        "      Quality score: {:.1}/100",
+        processed.stats.distribution.quality_score
+    );
+    println!(
+        "      Time: {} ms",
+        processed.stats.distribution.duration_ms
+    );
     println!();
 
     println!("   Overall:");
     println!("      Total time: {} ms", processed.stats.total_duration_ms);
-    println!("      Total throughput: {:.2} MB/s", processed.stats.total_throughput_mbps);
+    println!(
+        "      Total throughput: {:.2} MB/s",
+        processed.stats.total_throughput_mbps
+    );
     println!("      Final size: {} bytes", processed.stats.final_size);
     println!();
 
     // Show shard placements
     println!("📍 Shard Placements:");
     for (i, placement) in processed.distributed.placements.iter().take(5).enumerate() {
-        println!("   Shard {}: ({}, {}, {}) on {} (distance: {:.2})",
+        println!(
+            "   Shard {}: ({}, {}, {}) on {} (distance: {:.2})",
             placement.shard_index,
             placement.position.x,
             placement.position.y,
@@ -155,7 +201,10 @@ async fn main() -> anyhow::Result<()> {
         );
     }
     if processed.distributed.placements.len() > 5 {
-        println!("   ... and {} more shards", processed.distributed.placements.len() - 5);
+        println!(
+            "   ... and {} more shards",
+            processed.distributed.placements.len() - 5
+        );
     }
     println!();
 
@@ -168,7 +217,10 @@ async fn main() -> anyhow::Result<()> {
         println!("✅ SUCCESS: Asset reconstructed perfectly!");
         println!("   Original size: {} bytes", data.len());
         println!("   Reconstructed size: {} bytes", reconstructed.len());
-        println!("   Match: {}", if reconstructed == data { "✓" } else { "✗" });
+        println!(
+            "   Match: {}",
+            if reconstructed == data { "✓" } else { "✗" }
+        );
     } else {
         println!("❌ ERROR: Reconstruction failed!");
         return Err(anyhow::anyhow!("Data integrity check failed"));

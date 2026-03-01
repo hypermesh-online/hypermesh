@@ -7,24 +7,24 @@
 //! Unified interface for all persistence operations with background
 //! processing, transaction support, and disk monitoring.
 
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
-use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use super::{
-    PersistenceError, PersistenceResult,
+    blockchain_storage::{BlockQuery, BlockchainStorage},
     matrix_state::{MatrixState, MatrixStateSerializer, SerializationFormat},
-    blockchain_storage::{BlockchainStorage, BlockQuery},
-    topology_backup::{TopologyBackup, BackupMode},
-    snapshots::{SnapshotManager, SnapshotSchedule},
     recovery::{RecoveryManager, RecoveryReport},
+    snapshots::{SnapshotManager, SnapshotSchedule},
+    topology_backup::{BackupMode, TopologyBackup},
+    PersistenceError, PersistenceResult,
 };
 
-use crate::blockchain::block::Block;
 use super::topology_backup::NetworkTopology;
+use crate::blockchain::block::Block;
 
 /// Serde helper for SerializationFormat
 mod serialization_format_serde {
@@ -52,7 +52,7 @@ mod serialization_format_serde {
             "bincode" => Ok(SerializationFormat::Bincode),
             "json" => Ok(SerializationFormat::Json),
             "messagepack" => Ok(SerializationFormat::MessagePack),
-            _ => Err(serde::de::Error::custom(format!("Unknown format: {}", s))),
+            _ => Err(serde::de::Error::custom(format!("Unknown format: {s}"))),
         }
     }
 }
@@ -92,11 +92,13 @@ impl Default for PersistenceConfig {
             enable_compression: true,
             compression_level: 3,
             matrix_format: SerializationFormat::Bincode,
-            snapshot_schedule: SnapshotSchedule::TimeBased { interval_secs: 3600 },
+            snapshot_schedule: SnapshotSchedule::TimeBased {
+                interval_secs: 3600,
+            },
             max_snapshots: 10,
             max_backups: 5,
             enable_background: true,
-            background_interval_secs: 300, // 5 minutes
+            background_interval_secs: 300,             // 5 minutes
             disk_warning_threshold: 100 * 1024 * 1024, // 100MB
             disk_error_threshold: 10 * 1024 * 1024,    // 10MB
         }
@@ -158,7 +160,7 @@ impl PersistenceTransaction {
     pub async fn rollback(self) -> PersistenceResult<()> {
         if self.committed {
             return Err(PersistenceError::LockError(
-                "Cannot rollback committed transaction".to_string()
+                "Cannot rollback committed transaction".to_string(),
             ));
         }
 
@@ -215,16 +217,15 @@ pub struct PersistenceManager {
 
 impl PersistenceManager {
     /// Create new persistence manager
-    pub async fn new(
-        config: PersistenceConfig,
-        node_id: String,
-    ) -> PersistenceResult<Self> {
+    pub async fn new(config: PersistenceConfig, node_id: String) -> PersistenceResult<Self> {
         // Expand home directory
         let storage_dir = if config.storage_dir.starts_with("~") {
-            let home = dirs::home_dir()
-                .ok_or_else(|| PersistenceError::InvalidPath("Cannot determine home directory".to_string()))?;
-            let relative_path = config.storage_dir.strip_prefix("~")
-                .map_err(|_| PersistenceError::InvalidPath("Invalid home directory path".to_string()))?;
+            let home = dirs::home_dir().ok_or_else(|| {
+                PersistenceError::InvalidPath("Cannot determine home directory".to_string())
+            })?;
+            let relative_path = config.storage_dir.strip_prefix("~").map_err(|_| {
+                PersistenceError::InvalidPath("Invalid home directory path".to_string())
+            })?;
             home.join(relative_path)
         } else {
             config.storage_dir.clone()
@@ -235,32 +236,24 @@ impl PersistenceManager {
         std::fs::create_dir_all(&node_dir)?;
 
         // Initialize components
-        let matrix_serializer = MatrixStateSerializer::new(
-            config.matrix_format,
-            config.enable_compression,
-        ).with_compression_level(config.compression_level);
+        let matrix_serializer =
+            MatrixStateSerializer::new(config.matrix_format, config.enable_compression)
+                .with_compression_level(config.compression_level);
 
-        let blockchain_storage = BlockchainStorage::new(
-            storage_dir.clone(),
-            node_id.clone(),
-        ).await?;
+        let blockchain_storage =
+            BlockchainStorage::new(storage_dir.clone(), node_id.clone()).await?;
 
-        let topology_backup = TopologyBackup::new(
-            storage_dir.clone(),
-            node_id.clone(),
-        )?;
+        let topology_backup = TopologyBackup::new(storage_dir.clone(), node_id.clone())?;
 
         let mut snapshot_manager = SnapshotManager::new(
             storage_dir.clone(),
             node_id.clone(),
             config.snapshot_schedule.clone(),
-        ).await?;
+        )
+        .await?;
         snapshot_manager.set_max_snapshots(config.max_snapshots);
 
-        let recovery_manager = RecoveryManager::new(
-            storage_dir.clone(),
-            node_id.clone(),
-        );
+        let recovery_manager = RecoveryManager::new(storage_dir.clone(), node_id.clone());
 
         let manager = Self {
             config: Arc::new(config),
@@ -292,25 +285,31 @@ impl PersistenceManager {
 
         let serialized = self.matrix_serializer.serialize(state)?;
 
-        let state_file = self.get_storage_dir()
+        let state_file = self
+            .get_storage_dir()
             .join(&self.node_id)
             .join("matrix")
             .join("coordinates.bin");
 
-        let parent_dir = state_file.parent()
+        let parent_dir = state_file
+            .parent()
             .ok_or_else(|| PersistenceError::InvalidPath("Invalid state file path".to_string()))?;
         std::fs::create_dir_all(parent_dir)?;
         std::fs::write(&state_file, serialized)?;
 
-        info!("Saved matrix state ({} neighbors, {} cache entries)",
-              state.neighbors.len(), state.distance_cache.len());
+        info!(
+            "Saved matrix state ({} neighbors, {} cache entries)",
+            state.neighbors.len(),
+            state.distance_cache.len()
+        );
 
         Ok(())
     }
 
     /// Load matrix state
     pub async fn load_matrix_state(&self) -> PersistenceResult<Option<MatrixState>> {
-        let state_file = self.get_storage_dir()
+        let state_file = self
+            .get_storage_dir()
             .join(&self.node_id)
             .join("matrix")
             .join("coordinates.bin");
@@ -349,18 +348,16 @@ impl PersistenceManager {
         mode: BackupMode,
     ) -> PersistenceResult<PathBuf> {
         match mode {
-            BackupMode::Full => {
-                self.topology_backup.create_full_backup(topology).await
-            }
-            BackupMode::Essential => {
-                self.topology_backup.create_essential_backup(topology).await
-            }
+            BackupMode::Full => self.topology_backup.create_full_backup(topology).await,
+            BackupMode::Essential => self.topology_backup.create_essential_backup(topology).await,
             BackupMode::Incremental => {
                 // Need previous backup for incremental
                 let backups = self.topology_backup.list_backups()?;
                 if let Some(latest) = backups.first() {
                     let previous = self.topology_backup.restore_backup(&latest.path).await?;
-                    self.topology_backup.create_incremental_backup(topology, &previous).await
+                    self.topology_backup
+                        .create_incremental_backup(topology, &previous)
+                        .await
                 } else {
                     // Fall back to full backup if no previous
                     self.topology_backup.create_full_backup(topology).await
@@ -374,10 +371,9 @@ impl PersistenceManager {
         // Collect all data for snapshot
         let snapshot_data = self.collect_snapshot_data().await?;
 
-        self.snapshot_manager.create_snapshot(
-            || Ok(snapshot_data),
-            super::snapshots::SnapshotType::Full,
-        ).await
+        self.snapshot_manager
+            .create_snapshot(|| Ok(snapshot_data), super::snapshots::SnapshotType::Full)
+            .await
     }
 
     /// Begin transaction
@@ -386,7 +382,7 @@ impl PersistenceManager {
         *counter += 1;
 
         Ok(PersistenceTransaction {
-            _id: format!("txn_{}", counter),
+            _id: format!("txn_{counter}"),
             operations: Vec::new(),
             rollback: Vec::new(),
             committed: false,
@@ -473,9 +469,8 @@ impl PersistenceManager {
         let interval_secs = self.config.background_interval_secs;
 
         let handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                tokio::time::Duration::from_secs(interval_secs)
-            );
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
 
             loop {
                 interval.tick().await;
@@ -496,7 +491,10 @@ impl PersistenceManager {
 
         *self.background_handle.write().await = Some(handle);
 
-        info!("Started background persistence (interval: {}s)", interval_secs);
+        info!(
+            "Started background persistence (interval: {}s)",
+            interval_secs
+        );
 
         Ok(())
     }
@@ -540,7 +538,10 @@ impl PersistenceManager {
         if self.config.storage_dir.starts_with("~") {
             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
             // Safe: we already checked it starts with "~" above
-            let relative = self.config.storage_dir.strip_prefix("~")
+            let relative = self
+                .config
+                .storage_dir
+                .strip_prefix("~")
                 .unwrap_or_else(|_| &self.config.storage_dir);
             home.join(relative)
         } else {
@@ -576,8 +577,10 @@ impl PersistenceManager {
         let stats = self.stats.read().await;
 
         if stats.disk_available < self.config.disk_error_threshold {
-            error!("Critical: Disk space below error threshold ({} bytes available)",
-                   stats.disk_available);
+            error!(
+                "Critical: Disk space below error threshold ({} bytes available)",
+                stats.disk_available
+            );
             return Err(PersistenceError::InsufficientDiskSpace {
                 needed: self.config.disk_error_threshold,
                 available: stats.disk_available,
@@ -585,8 +588,10 @@ impl PersistenceManager {
         }
 
         if stats.disk_available < self.config.disk_warning_threshold {
-            warn!("Disk space below warning threshold ({} bytes available)",
-                  stats.disk_available);
+            warn!(
+                "Disk space below warning threshold ({} bytes available)",
+                stats.disk_available
+            );
         }
 
         Ok(())
@@ -625,17 +630,21 @@ struct SnapshotData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use crate::matrix::coordinate::MatrixCoordinate;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_persistence_manager_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
         let stats = manager.get_stats().await;
 
         assert_eq!(stats.block_count, 0);
@@ -644,40 +653,51 @@ mod tests {
 
     #[tokio::test]
     async fn test_save_and_load_matrix_state() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let mut state = MatrixState::new(coord);
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).unwrap());
+        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"));
 
         // Save
-        manager.save_matrix_state(&state).await.unwrap();
+        manager.save_matrix_state(&state).await.expect("test: async operation");
 
         // Load
-        let loaded = manager.load_matrix_state().await.unwrap();
+        let loaded = manager.load_matrix_state().await.expect("test: async operation");
         assert!(loaded.is_some());
 
-        let loaded_state = loaded.unwrap();
+        let loaded_state = loaded.expect("test: expected success");
         assert_eq!(loaded_state.coordinate, state.coordinate);
         assert_eq!(loaded_state.neighbors.len(), 1);
     }
 
     #[tokio::test]
     async fn test_create_snapshot() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        let snapshot_id = manager.create_snapshot().await.unwrap();
+        let snapshot_id = manager.create_snapshot().await.expect("test: async operation");
         assert!(!snapshot_id.is_empty());
+
+        // Refresh stats after snapshot creation (cached stats are stale)
+        manager.update_stats().await.expect("test: async operation");
 
         let stats = manager.get_stats().await;
         assert!(stats.snapshot_count > 0);
@@ -685,72 +705,94 @@ mod tests {
 
     #[tokio::test]
     async fn test_transaction() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        let mut txn = manager.begin_transaction().await.unwrap();
+        let mut txn = manager.begin_transaction().await.expect("test: async operation");
 
-        let state = MatrixState::new(MatrixCoordinate::new(0, 0, 0).unwrap());
+        let state = MatrixState::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         txn.add_operation(PersistenceOperation::SaveMatrixState(state));
 
-        txn.commit().await.unwrap();
+        txn.commit().await.expect("test: async operation");
     }
 
     #[tokio::test]
     async fn test_recovery() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        let report = manager.recover().await.unwrap();
-        assert!(report.status == crate::persistence::recovery::RecoveryStatus::Completed ||
-                report.status == crate::persistence::recovery::RecoveryStatus::Partial);
+        let report = manager.recover().await.expect("test: async operation");
+        assert!(
+            report.status == crate::persistence::recovery::RecoveryStatus::Completed
+                || report.status == crate::persistence::recovery::RecoveryStatus::Partial
+        );
     }
 
     #[tokio::test]
     async fn test_verify_integrity() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        let valid = manager.verify_integrity().await.unwrap();
+        let valid = manager.verify_integrity().await.expect("test: async operation");
         assert!(valid);
     }
 
     #[tokio::test]
     async fn test_flush() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = false;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: false,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
-        manager.flush().await.unwrap();
+        manager.flush().await.expect("test: async operation");
     }
 
     #[tokio::test]
     async fn test_shutdown() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut config = PersistenceConfig::default();
-        config.storage_dir = temp_dir.path().to_path_buf();
-        config.enable_background = true;
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let config = PersistenceConfig {
+            storage_dir: temp_dir.path().to_path_buf(),
+            enable_background: true,
+            ..PersistenceConfig::default()
+        };
 
-        let manager = PersistenceManager::new(config, "test_node".to_string()).await.unwrap();
+        let manager = PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
         // Let background task run briefly
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        manager.shutdown().await.unwrap();
+        manager.shutdown().await.expect("test: async operation");
     }
 }

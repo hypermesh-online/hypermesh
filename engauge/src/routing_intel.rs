@@ -11,8 +11,8 @@
 use hypermesh_lib::{MatrixPosition, NodeId};
 
 use crate::streaming::aggregator::RegionalAggregate;
-use crate::streaming::subscriber::MetricsSubscriber;
 use crate::streaming::protocol::MetricsPayload;
+use crate::streaming::subscriber::MetricsSubscriber;
 use crate::trending::EpochTracker;
 
 /// A routing weight adjustment for a single candidate node.
@@ -88,10 +88,7 @@ pub trait RoutingAdvisor {
 /// recommendations from engauge.
 pub trait PathAdvisor {
     /// Recommend path policy adjustments based on observed network state.
-    fn recommend_path_policy(
-        &self,
-        aggregate: &RegionalAggregate,
-    ) -> PathPolicyRecommendation;
+    fn recommend_path_policy(&self, aggregate: &RegionalAggregate) -> PathPolicyRecommendation;
 }
 
 /// Transforms aggregated network metrics into routing recommendations.
@@ -109,11 +106,11 @@ const CONGESTION_LOW: f64 = 0.3;
 const CONGESTION_HIGH: f64 = 0.7;
 
 /// Throughput thresholds (bps).
-const THROUGHPUT_LOW_BPS: f64 = 100_000_000.0;  // 100 Mbps
+const THROUGHPUT_LOW_BPS: f64 = 100_000_000.0; // 100 Mbps
 const THROUGHPUT_HIGH_BPS: f64 = 1_000_000_000.0; // 1 Gbps
 
 /// Latency thresholds (microseconds).
-const LATENCY_LOW_US: f64 = 5_000.0;   // 5ms
+const LATENCY_LOW_US: f64 = 5_000.0; // 5ms
 const LATENCY_HIGH_US: f64 = 50_000.0; // 50ms
 
 impl RoutingIntelligence {
@@ -194,9 +191,7 @@ fn weight_from_congestion(
 }
 
 /// Derive weight factor and reason from a routing snapshot.
-fn weight_from_routing(
-    snap: &crate::streaming::protocol::RoutingSnapshot,
-) -> (f64, WeightReason) {
+fn weight_from_routing(snap: &crate::streaming::protocol::RoutingSnapshot) -> (f64, WeightReason) {
     let latency = snap.avg_latency_us as f64;
     let throughput = snap.throughput_bps as f64;
 
@@ -264,10 +259,7 @@ impl RoutingAdvisor for RoutingIntelligence {
 }
 
 impl PathAdvisor for RoutingIntelligence {
-    fn recommend_path_policy(
-        &self,
-        aggregate: &RegionalAggregate,
-    ) -> PathPolicyRecommendation {
+    fn recommend_path_policy(&self, aggregate: &RegionalAggregate) -> PathPolicyRecommendation {
         if aggregate.node_count == 0 {
             return PathPolicyRecommendation {
                 enable_redundant: false,
@@ -317,29 +309,56 @@ mod tests {
     }
 
     fn make_congestion_frame(node: &str, fullness: f64) -> MetricsFrame {
-        make_frame(node, MetricsPayload::Congestion(CongestionSnapshot {
-            buffer_fullness_ratio: fullness, queue_depth: 10,
-            dropped_packets_epoch: 0, avg_queue_wait_us: 100,
-        }))
+        make_frame(
+            node,
+            MetricsPayload::Congestion(CongestionSnapshot {
+                buffer_fullness_ratio: fullness,
+                queue_depth: 10,
+                dropped_packets_epoch: 0,
+                avg_queue_wait_us: 100,
+            }),
+        )
     }
 
     fn make_routing_frame(node: &str, latency_us: u64, throughput_bps: u64) -> MetricsFrame {
-        make_frame(node, MetricsPayload::Routing(RoutingSnapshot {
-            avg_latency_us: latency_us, throughput_bps,
-            path_count: 3, active_connections: 10,
-        }))
+        make_frame(
+            node,
+            MetricsPayload::Routing(RoutingSnapshot {
+                avg_latency_us: latency_us,
+                throughput_bps,
+                path_count: 3,
+                active_connections: 10,
+            }),
+        )
     }
 
     fn make_capacity_frame(node: &str, bandwidth_bps: u64) -> MetricsFrame {
-        make_frame(node, MetricsPayload::Capacity(CapacitySnapshot {
-            bytes_served: 1000, compute_delivered: 500,
-            storage_maintained_bytes: 10000,
-            bandwidth_available_bps: bandwidth_bps, uptime_ratio: 0.99,
-        }))
+        make_frame(
+            node,
+            MetricsPayload::Capacity(CapacitySnapshot {
+                bytes_served: 1000,
+                compute_delivered: 500,
+                storage_maintained_bytes: 10000,
+                bandwidth_available_bps: bandwidth_bps,
+                uptime_ratio: 0.99,
+            }),
+        )
     }
 
-    fn origin() -> MatrixPosition { MatrixPosition { x: 0.0, y: 0.0, z: 0.0 } }
-    fn dest() -> MatrixPosition { MatrixPosition { x: 1.0, y: 1.0, z: 1.0 } }
+    fn origin() -> MatrixPosition {
+        MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
+    }
+    fn dest() -> MatrixPosition {
+        MatrixPosition {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        }
+    }
 
     #[test]
     fn no_data_returns_neutral_weight() {
@@ -361,7 +380,10 @@ mod tests {
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert_eq!(weights.len(), 1);
-        assert!(weights[0].weight_factor < 0.5, "high congestion should lower weight");
+        assert!(
+            weights[0].weight_factor < 0.5,
+            "high congestion should lower weight"
+        );
         assert_eq!(weights[0].reason, WeightReason::HighCongestion);
     }
 
@@ -373,7 +395,10 @@ mod tests {
         let candidates = vec![NodeId::from("clear")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
-        assert!(weights[0].weight_factor > 1.0, "low congestion should raise weight");
+        assert!(
+            weights[0].weight_factor > 1.0,
+            "low congestion should raise weight"
+        );
         assert_eq!(weights[0].reason, WeightReason::LowCongestion);
     }
 
@@ -385,7 +410,10 @@ mod tests {
         let candidates = vec![NodeId::from("slow")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
-        assert!(weights[0].weight_factor < 1.0, "high latency should lower weight");
+        assert!(
+            weights[0].weight_factor < 1.0,
+            "high latency should lower weight"
+        );
         assert_eq!(weights[0].reason, WeightReason::HighLatency);
     }
 
@@ -397,7 +425,10 @@ mod tests {
         let candidates = vec![NodeId::from("fast")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
-        assert!(weights[0].weight_factor > 1.5, "low latency + high throughput should raise weight");
+        assert!(
+            weights[0].weight_factor > 1.5,
+            "low latency + high throughput should raise weight"
+        );
         assert_eq!(weights[0].reason, WeightReason::LowLatency);
     }
 
@@ -405,7 +436,7 @@ mod tests {
     fn capacity_bandwidth_affects_weight() {
         let mut intel = RoutingIntelligence::new(30);
         intel.ingest(make_capacity_frame("high-bw", 2_000_000_000)); // 2 Gbps
-        intel.ingest(make_capacity_frame("low-bw", 10_000_000));     // 10 Mbps
+        intel.ingest(make_capacity_frame("low-bw", 10_000_000)); // 10 Mbps
 
         let candidates = vec![NodeId::from("high-bw"), NodeId::from("low-bw")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
@@ -428,7 +459,10 @@ mod tests {
         assert_eq!(weights.len(), 3);
         assert!(weights[0].weight_factor > 1.0, "a should be preferred");
         assert!(weights[1].weight_factor < 0.5, "b should be penalized");
-        assert!((weights[2].weight_factor - 1.0).abs() < 1e-6, "c should be neutral");
+        assert!(
+            (weights[2].weight_factor - 1.0).abs() < 1e-6,
+            "c should be neutral"
+        );
     }
 
     #[test]

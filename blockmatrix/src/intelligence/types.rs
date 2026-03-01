@@ -4,14 +4,14 @@
 
 //! Type definitions for the Phase 2 Intelligence Layer
 
-use std::time::{Duration, SystemTime};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 
-use crate::assets::multi_node::NetworkId;
 use crate::assets::core::PrivacyMode;
-use crate::assets::storage::{ContentAddress, DeduplicationResult};
+use crate::assets::multi_node::NetworkId;
 use crate::assets::pipeline::PipelineStats;
+use crate::assets::storage::{ContentAddress, DeduplicationResult};
 
 /// Asset handle returned after processing
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -114,12 +114,12 @@ pub struct IntelligenceMetrics {
 
 /// Inline stub for TrustChainClient (trustchain_stub module removed - was zeroed-key placeholder)
 pub(crate) mod inline_trustchain_stub {
-    use async_trait::async_trait;
+    use crate::assets::core::AssetResult;
     use crate::assets::multi_node::network_membership::{
-        TrustChainClient, NetworkCredentials, NetworkDiscovery,
+        NetworkCredentials, NetworkDiscovery, TrustChainClient,
     };
     use crate::assets::multi_node::NetworkId;
-    use crate::assets::core::AssetResult;
+    use async_trait::async_trait;
 
     pub struct StubTrustChainClient;
 
@@ -131,7 +131,10 @@ pub(crate) mod inline_trustchain_stub {
 
     #[async_trait]
     impl TrustChainClient for StubTrustChainClient {
-        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
+        async fn request_credentials(
+            &self,
+            _network_id: NetworkId,
+        ) -> AssetResult<NetworkCredentials> {
             Ok(NetworkCredentials {
                 certificate: vec![],
                 public_key: vec![],

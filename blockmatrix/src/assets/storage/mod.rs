@@ -22,28 +22,28 @@
 //! - Storage Savings: 10x reduction for viral content
 //! - Matrix Placement: Shards within 5 hops of requester
 
+use anyhow::Result;
+use blake3;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use blake3;
-use anyhow::Result;
 
 // Sub-modules
-pub mod hash_bucket;
 pub mod bucket_mapper;
-pub mod deduplication;
 pub mod content_address;
+pub mod deduplication;
+pub mod hash_bucket;
 pub mod replication;
 
 // Re-exports
-pub use hash_bucket::{HashBucket, BucketId, ShardMetadata};
 pub use bucket_mapper::{BucketMapper, MatrixConstraints};
+pub use content_address::{ContentAddress, ContentMetadata, RetrievalInstructions, ShardMap};
 pub use deduplication::{DeduplicationEngine, DeduplicationResult, DeduplicationStats};
-pub use content_address::{ContentAddress, RetrievalInstructions, ShardMap, ContentMetadata};
-pub use replication::{ReplicationStrategy, ReplicationConfig, PopularityMetrics};
+pub use hash_bucket::{BucketId, HashBucket, ShardMetadata};
+pub use replication::{PopularityMetrics, ReplicationConfig, ReplicationStrategy};
 
-use crate::integration::phase1_foundation::MatrixFoundation;
 use crate::assets::pipeline::Shard;
+use crate::integration::phase1_foundation::MatrixFoundation;
 
 /// Hash type (SHA-256)
 pub type Hash = [u8; 32];
@@ -112,7 +112,12 @@ impl ContentAddressedStorage {
         let start = std::time::Instant::now();
 
         // Process through deduplication engine
-        let result = self.deduplication.write().await.process_shard(shard).await?;
+        let result = self
+            .deduplication
+            .write()
+            .await
+            .process_shard(shard)
+            .await?;
 
         // Update statistics
         let mut stats = self.stats.write().await;
@@ -127,14 +132,14 @@ impl ContentAddressedStorage {
 
         // Calculate deduplication rate
         if stats.total_references > 0 {
-            stats.deduplication_rate =
-                (stats.total_references - stats.unique_shards) as f64 / stats.total_references as f64;
+            stats.deduplication_rate = (stats.total_references - stats.unique_shards) as f64
+                / stats.total_references as f64;
         }
 
         // Update lookup time
         let elapsed = start.elapsed().as_micros() as u64;
-        stats.avg_lookup_time_us =
-            (stats.avg_lookup_time_us * (stats.total_references - 1) as u64 + elapsed)
+        stats.avg_lookup_time_us = (stats.avg_lookup_time_us * (stats.total_references - 1) as u64
+            + elapsed)
             / stats.total_references as u64;
 
         Ok(result)
@@ -142,15 +147,28 @@ impl ContentAddressedStorage {
 
     /// Retrieve content by hash
     pub async fn retrieve(&self, content_hash: Hash) -> Result<RetrievalInstructions> {
-        self.deduplication.read().await.get_retrieval_instructions(content_hash).await
+        self.deduplication
+            .read()
+            .await
+            .get_retrieval_instructions(content_hash)
+            .await
     }
 
     /// Get content address for a file
-    pub async fn get_content_address(&self, file_hash: Hash, shard_hashes: Vec<Hash>) -> Result<ContentAddress> {
+    pub async fn get_content_address(
+        &self,
+        file_hash: Hash,
+        shard_hashes: Vec<Hash>,
+    ) -> Result<ContentAddress> {
         let mut shard_map = Vec::new();
 
         for shard_hash in &shard_hashes {
-            let positions = self.deduplication.read().await.get_shard_positions(*shard_hash).await?;
+            let positions = self
+                .deduplication
+                .read()
+                .await
+                .get_shard_positions(*shard_hash)
+                .await?;
             shard_map.push((*shard_hash, positions));
         }
 
@@ -159,22 +177,34 @@ impl ContentAddressedStorage {
 
     /// Calculate replication factor based on popularity
     pub async fn update_replication(&self, content_hash: Hash, access_count: usize) -> Result<()> {
-        let factor = self.replication.calculate_replication_factor(access_count as f64).await;
+        let factor = self
+            .replication
+            .calculate_replication_factor(access_count as f64)
+            .await;
 
         if factor > 1 {
             // Get current positions
-            let positions = self.deduplication.read().await
-                .get_shard_positions(content_hash).await?;
+            let positions = self
+                .deduplication
+                .read()
+                .await
+                .get_shard_positions(content_hash)
+                .await?;
 
             // Calculate additional replica positions needed
             if factor > positions.len() {
                 let bucket_id = BucketId::from_hash(&content_hash);
-                let new_positions = self.mapper
-                    .select_replica_positions(&bucket_id, factor - positions.len()).await?;
+                let new_positions = self
+                    .mapper
+                    .select_replica_positions(&bucket_id, factor - positions.len())
+                    .await?;
 
                 // Update deduplication engine with new positions
-                self.deduplication.write().await
-                    .add_replica_positions(content_hash, new_positions).await?;
+                self.deduplication
+                    .write()
+                    .await
+                    .add_replica_positions(content_hash, new_positions)
+                    .await?;
             }
         }
 
@@ -192,8 +222,16 @@ impl ContentAddressedStorage {
     }
 
     /// Store content to shard mapping for retrieval
-    pub async fn store_content_mapping(&self, content_hash: Hash, shard_hashes: Vec<Hash>) -> Result<()> {
-        self.deduplication.write().await.store_content_mapping(content_hash, shard_hashes).await
+    pub async fn store_content_mapping(
+        &self,
+        content_hash: Hash,
+        shard_hashes: Vec<Hash>,
+    ) -> Result<()> {
+        self.deduplication
+            .write()
+            .await
+            .store_content_mapping(content_hash, shard_hashes)
+            .await
     }
 }
 
@@ -225,7 +263,7 @@ mod tests {
             let mut hash = [0u8; 32];
             hash[0] = i;
             let bucket_id = bucket_id_from_hash(&hash);
-            assert_eq!(bucket_id, format!("{:02x}", i));
+            assert_eq!(bucket_id, format!("{i:02x}"));
         }
     }
 }

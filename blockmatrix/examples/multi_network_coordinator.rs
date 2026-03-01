@@ -8,18 +8,16 @@
 //! showing complete isolation between networks and per-network asset visibility control.
 
 use anyhow::Result;
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::network::{
+    isolation::{DefaultIsolationManager, IsolationManager},
     multi_network::{MultiNetworkCoordinator, NetworkConfig},
     trust::{NetworkType, ProofOfState},
-    isolation::{DefaultIsolationManager, IsolationManager},
-};
-use blockmatrix::assets::core::{
-    AssetRegistration, AssetCategory, BaseSystemType, NetworkScope,
-    AssetData,
 };
 use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber;
 
 /// Create a test asset ID
 fn create_test_asset() -> AssetRegistration {
@@ -64,46 +62,50 @@ async fn main() -> Result<()> {
     info!("--------------------------------");
 
     // 1. Join Anonymous network
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
     info!("✅ Joined Anonymous network: {}", anon_id);
     info!("   - No persistent identity");
     info!("   - Ephemeral connections");
     info!("   - No certificate validation");
 
     // 2. Join P2P network
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec![
-            "peer1.local:8080".to_string(),
-            "peer2.local:8080".to_string(),
-        ]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec![
+                "peer1.local:8080".to_string(),
+                "peer2.local:8080".to_string(),
+            ]),
+        )
+        .await?;
     info!("✅ Joined P2P network: {}", p2p_id);
     info!("   - Direct peer connections");
     info!("   - Self-signed certificates");
     info!("   - Manual trust decisions");
 
     // 3. Join Federated network
-    let fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.company.internal".to_string() },
-        NetworkConfig::federated("gateway.company.internal".to_string()),
-    ).await?;
+    let fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.company.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.company.internal".to_string()),
+        )
+        .await?;
     info!("✅ Joined Federated network: {}", fed_id);
     info!("   - Federation gateway: gateway.company.internal");
     info!("   - Federation-scoped trust");
     info!("   - Limited to federation members");
 
     // 4. Join Public network (with full PoS)
-    let pub_id = coordinator.join_network(
-        NetworkType::Public,
-        NetworkConfig::public(
-            "mynode.hypermesh.online".to_string(),
-            generate_test_proof(),
-        ),
-    ).await?;
+    let pub_id = coordinator
+        .join_network(
+            NetworkType::Public,
+            NetworkConfig::public("mynode.hypermesh.online".to_string(), generate_test_proof()),
+        )
+        .await?;
     info!("✅ Joined Public network: {}", pub_id);
     info!("   - DNS: mynode.hypermesh.online");
     info!("   - Full Proof of State validation");
@@ -141,48 +143,60 @@ async fn main() -> Result<()> {
     // Configure asset visibility for different network combinations
 
     // Asset 1: Only visible to Anonymous and P2P
-    coordinator.set_asset_visibility(
-        asset1.clone(),
-        vec![anon_id.clone(), p2p_id.clone()],
-    ).await?;
+    coordinator
+        .set_asset_visibility(asset1.clone(), vec![anon_id, p2p_id])
+        .await?;
     info!("📦 Asset 1 configured: visible to Anonymous + P2P networks only");
 
     // Asset 2: Only visible to Federated
-    coordinator.set_asset_visibility(
-        asset2.clone(),
-        vec![fed_id.clone()],
-    ).await?;
+    coordinator
+        .set_asset_visibility(asset2.clone(), vec![fed_id])
+        .await?;
     info!("📦 Asset 2 configured: visible to Federated network only");
 
     // Asset 3: Visible to all networks
-    coordinator.set_asset_visibility(
-        asset3.clone(),
-        vec![anon_id.clone(), p2p_id.clone(), fed_id.clone(), pub_id.clone()],
-    ).await?;
+    coordinator
+        .set_asset_visibility(asset3.clone(), vec![anon_id, p2p_id, fed_id, pub_id])
+        .await?;
     info!("📦 Asset 3 configured: visible to ALL networks");
 
     info!("\n🧪 Testing Asset Access Control...");
     info!("-----------------------------------");
 
     // Test Asset 1 access (should work for Anonymous, fail for Federated)
-    let response = coordinator.handle_asset_request(anon_id.clone(), asset1.clone()).await?;
-    info!("✅ Anonymous network can access Asset 1: {}", response.authorized);
+    let response = coordinator
+        .handle_asset_request(anon_id, asset1.clone())
+        .await?;
+    info!(
+        "✅ Anonymous network can access Asset 1: {}",
+        response.authorized
+    );
     assert!(response.authorized, "Anonymous should access Asset 1");
 
-    let response = coordinator.handle_asset_request(fed_id.clone(), asset1.clone()).await?;
-    info!("❌ Federated network blocked from Asset 1: {}", !response.authorized);
+    let response = coordinator
+        .handle_asset_request(fed_id, asset1.clone())
+        .await?;
+    info!(
+        "❌ Federated network blocked from Asset 1: {}",
+        !response.authorized
+    );
     assert!(!response.authorized, "Federated should NOT access Asset 1");
 
     // Test Asset 3 access (should work for all)
     for (network_id, network_name) in [
-        (anon_id.clone(), "Anonymous"),
-        (p2p_id.clone(), "P2P"),
-        (fed_id.clone(), "Federated"),
-        (pub_id.clone(), "Public"),
+        (anon_id, "Anonymous"),
+        (p2p_id, "P2P"),
+        (fed_id, "Federated"),
+        (pub_id, "Public"),
     ] {
-        let response = coordinator.handle_asset_request(network_id, asset3.clone()).await?;
-        info!("✅ {} network can access Asset 3: {}", network_name, response.authorized);
-        assert!(response.authorized, "{} should access Asset 3", network_name);
+        let response = coordinator
+            .handle_asset_request(network_id, asset3.clone())
+            .await?;
+        info!(
+            "✅ {} network can access Asset 3: {}",
+            network_name, response.authorized
+        );
+        assert!(response.authorized, "{network_name} should access Asset 3");
     }
 
     info!("\n🔍 Testing Network Isolation...");
@@ -200,22 +214,41 @@ async fn main() -> Result<()> {
     info!("--------------------------------");
 
     // Leave Anonymous network
-    coordinator.leave_network(anon_id.clone()).await?;
+    coordinator.leave_network(anon_id).await?;
     info!("📤 Left Anonymous network");
 
     // Verify network count decreased
     let remaining = coordinator.active_networks().await;
-    info!("   Active networks after departure: {} (3 remaining)", remaining.len());
-    assert_eq!(remaining.len(), 3, "Should have 3 networks after leaving one");
+    info!(
+        "   Active networks after departure: {} (3 remaining)",
+        remaining.len()
+    );
+    assert_eq!(
+        remaining.len(),
+        3,
+        "Should have 3 networks after leaving one"
+    );
 
     // Verify Anonymous network is no longer connected
-    assert!(!coordinator.is_connected(anon_id).await, "Anonymous network should be disconnected");
+    assert!(
+        !coordinator.is_connected(anon_id).await,
+        "Anonymous network should be disconnected"
+    );
     info!("✅ Confirmed Anonymous network disconnected");
 
     // Verify other networks still active
-    assert!(coordinator.is_connected(p2p_id).await, "P2P should still be connected");
-    assert!(coordinator.is_connected(fed_id).await, "Federated should still be connected");
-    assert!(coordinator.is_connected(pub_id).await, "Public should still be connected");
+    assert!(
+        coordinator.is_connected(p2p_id).await,
+        "P2P should still be connected"
+    );
+    assert!(
+        coordinator.is_connected(fed_id).await,
+        "Federated should still be connected"
+    );
+    assert!(
+        coordinator.is_connected(pub_id).await,
+        "Public should still be connected"
+    );
     info!("✅ Other networks remain connected");
 
     info!("\n🎯 Multi-Network Coordinator Test Complete!");

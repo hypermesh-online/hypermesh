@@ -16,21 +16,21 @@
 
 mod discovery;
 
-use crate::assets::{*, NetworkAccess, FileAccess, TimeoutConfig, SecurityScanResults, DependencyValidationResults, SchedulingConfig};
-use crate::library::{
-    AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface
+use crate::assets::{
+    DependencyValidationResults, FileAccess, NetworkAccess, SchedulingConfig, SecurityScanResults,
+    TimeoutConfig, *,
 };
+use crate::library::{AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryInterface};
 
 use anyhow::Result;
 use blockmatrix::assets::core::{
-    AssetManager, AssetType,
-    AssetAllocationRequest, ConsensusProof, ResourceRequirements,
+    AssetAllocationRequest, AssetManager, AssetType, ConsensusProof, ResourceRequirements,
 };
+use chrono::{DateTime, Utc};
 use hypermesh_lib::PrivacyMode;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::{DateTime, Utc};
 
 /// HyperMesh-integrated asset registry that replaces the standalone HTTP registry
 pub struct HyperMeshAssetRegistry {
@@ -136,16 +136,13 @@ pub(crate) struct SearchIndex {
 
 impl HyperMeshAssetRegistry {
     /// Create a new HyperMesh-integrated asset registry
-    pub async fn _new(
-        asset_manager: Arc<AssetManager>,
-        config: BridgeConfig,
-    ) -> Result<Self> {
+    pub async fn _new(asset_manager: Arc<AssetManager>, config: BridgeConfig) -> Result<Self> {
         // Initialize asset library with HyperMesh-optimized configuration
         let library_config = LibraryConfig {
             enable_cache: true,
             l1_cache_size: 100,  // Hot assets in memory
             l2_cache_size: 1000, // Warm assets in memory
-            l3_cache_path: None,  // No disk cache - use HyperMesh storage
+            l3_cache_path: None, // No disk cache - use HyperMesh storage
             enable_zero_copy: config._enable_zero_copy,
             max_concurrent_ops: 100,
             enable_metrics: true,
@@ -175,9 +172,7 @@ impl HyperMeshAssetRegistry {
         consensus_proof: Option<ConsensusProof>,
     ) -> Result<AssetAllocationRequest> {
         let consensus = if self._config._enable_consensus {
-            consensus_proof.unwrap_or_else(|| {
-                ConsensusProof::default()
-            })
+            consensus_proof.unwrap_or_default()
         } else {
             ConsensusProof::default()
         };
@@ -187,7 +182,7 @@ impl HyperMeshAssetRegistry {
         Ok(AssetAllocationRequest {
             asset_type: self._map_asset_type(&package.spec.spec.asset_type),
             requested_resources: requirements,
-            privacy_level: self._config._default_privacy.clone(),
+            privacy_level: self._config._default_privacy,
             consensus_proof: consensus,
             certificate_fingerprint: package.spec.metadata.author.clone().unwrap_or_default(),
             duration_limit: None,
@@ -285,25 +280,36 @@ impl HyperMeshAssetRegistry {
 
         let allocation_request = self._package_to_allocation_request(&package, None).await?;
 
-        let allocation = self._asset_manager.allocate_asset(allocation_request).await
-            .map_err(|e| anyhow::anyhow!("Failed to allocate asset in HyperMesh: {:?}", e))?;
+        let allocation = self
+            ._asset_manager
+            .allocate_asset(allocation_request)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to allocate asset in HyperMesh: {e:?}"))?;
 
-        self.asset_library.store_package(package_id.to_string(), package.clone()).await?;
+        self.asset_library
+            .store_package(package_id.to_string(), package.clone())
+            .await?;
 
         let mut cache = self.catalog_cache.write().await;
-        cache.package_metadata.insert(package_id, CatalogMetadata {
-            tags: package.spec.metadata.tags.clone(),
-            description: package.spec.metadata.description.clone(),
-            author: package.spec.metadata.author.clone(),
-            keywords: self._generate_keywords(&package),
-            _template_info: None,
-            updated_at: Utc::now(),
-        });
+        cache.package_metadata.insert(
+            package_id,
+            CatalogMetadata {
+                tags: package.spec.metadata.tags.clone(),
+                description: package.spec.metadata.description.clone(),
+                author: package.spec.metadata.author.clone(),
+                keywords: self._generate_keywords(&package),
+                _template_info: None,
+                updated_at: Utc::now(),
+            },
+        );
 
         self._update_search_index(&mut cache.search_index, &package_id, &package);
 
-        tracing::info!("Published asset {} through HyperMesh with allocation ID: {}",
-            package_id, allocation.asset_id);
+        tracing::info!(
+            "Published asset {} through HyperMesh with allocation ID: {}",
+            package_id,
+            allocation.asset_id
+        );
 
         Ok(package_id)
     }
@@ -314,11 +320,14 @@ impl HyperMeshAssetRegistry {
             return self.library_package_to_asset_package((*package).clone());
         }
 
-        Err(anyhow::anyhow!("Asset package {} not found in HyperMesh", id))
+        Err(anyhow::anyhow!("Asset package {id} not found in HyperMesh"))
     }
 
     /// Convert library package to catalog asset package format
-    fn library_package_to_asset_package(&self, lib_package: LibraryAssetPackage) -> Result<AssetPackage> {
+    fn library_package_to_asset_package(
+        &self,
+        lib_package: LibraryAssetPackage,
+    ) -> Result<AssetPackage> {
         use chrono::Utc;
 
         let spec = AssetSpec {
@@ -447,18 +456,25 @@ impl HyperMeshAssetRegistry {
         let mut keywords = Vec::new();
 
         keywords.extend(
-            package.spec.metadata.name
+            package
+                .spec
+                .metadata
+                .name
                 .split(|c: char| !c.is_alphanumeric())
                 .filter(|s| !s.is_empty())
-                .map(|s| s.to_lowercase())
+                .map(|s| s.to_lowercase()),
         );
 
         if let Some(desc) = &package.spec.metadata.description {
             keywords.extend(
                 desc.split_whitespace()
                     .filter(|s| s.len() > 2)
-                    .map(|s| s.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
-                    .filter(|s| !s.is_empty())
+                    .map(|s| {
+                        s.to_lowercase()
+                            .trim_matches(|c: char| !c.is_alphanumeric())
+                            .to_string()
+                    })
+                    .filter(|s| !s.is_empty()),
             );
         }
 
@@ -479,14 +495,16 @@ impl HyperMeshAssetRegistry {
         let keywords = self._generate_keywords(package);
 
         for keyword in keywords {
-            index.inverted_index
+            index
+                .inverted_index
                 .entry(keyword.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(*package_id);
 
-            *index.term_frequencies
+            *index
+                .term_frequencies
                 .entry(keyword)
-                .or_insert_with(HashMap::new)
+                .or_default()
                 .entry(*package_id)
                 .or_insert(0) += 1;
         }
@@ -523,14 +541,16 @@ impl HyperMeshAssetRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::registry::{SearchQuery, SortCriteria, AssetDiscovery};
+    use crate::registry::{AssetDiscovery, SearchQuery, SortCriteria};
 
     #[tokio::test]
     async fn test_hypermesh_bridge_creation() {
         let asset_manager = Arc::new(AssetManager::new());
         let config = BridgeConfig::default();
 
-        let registry = HyperMeshAssetRegistry::_new(asset_manager, config).await.unwrap();
+        let registry = HyperMeshAssetRegistry::_new(asset_manager, config)
+            .await
+            .expect("test: expected success");
 
         // Test empty search
         let query = SearchQuery {
@@ -545,7 +565,7 @@ mod tests {
             offset: 0,
         };
 
-        let results = registry.search(&query).await.unwrap();
+        let results = registry.search(&query).await.expect("test: async operation");
         assert_eq!(results.total_count, 0);
     }
 }

@@ -7,19 +7,19 @@
 //! Implements secure sharing protocols over STOQ with permissions,
 //! bandwidth management, and incentive mechanisms.
 
-mod types;
 mod transfers;
+mod types;
 
 pub use types::*;
 
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Semaphore};
 use std::time::SystemTime;
+use tokio::sync::{RwLock, Semaphore};
 
-use crate::AssetRegistration;
 use super::PeerInfo;
+use crate::AssetRegistration;
 
 /// Sharing protocol implementation
 pub struct SharingProtocol {
@@ -107,11 +107,7 @@ impl SharingProtocol {
     }
 
     /// Notify peer about package availability
-    pub async fn notify_availability(
-        &self,
-        peer_id: &str,
-        asset_id: &str,
-    ) -> Result<()> {
+    pub async fn notify_availability(&self, peer_id: &str, asset_id: &str) -> Result<()> {
         let message = ProtocolMessage::AvailabilityNotification {
             asset_id: asset_id.to_string(),
             available: true,
@@ -121,11 +117,7 @@ impl SharingProtocol {
     }
 
     /// Negotiate bandwidth with peer
-    pub async fn negotiate_bandwidth(
-        &self,
-        peer_id: &str,
-        requested_rate: u64,
-    ) -> Result<u64> {
+    pub async fn negotiate_bandwidth(&self, peer_id: &str, requested_rate: u64) -> Result<u64> {
         // Check available bandwidth
         let available = self.get_available_bandwidth().await?;
         let allocated = requested_rate.min(available).min(self.fair_use_limit);
@@ -170,7 +162,7 @@ impl SharingProtocol {
             // Simple reward calculation based on contribution
             let reward = (contribution.bytes_uploaded / (1024 * 1024)) // MB uploaded
                 * 10 // 10 credits per MB
-                * (contribution.ratio.max(0.5).min(2.0) as u64); // Ratio multiplier
+                * (contribution.ratio.clamp(0.5, 2.0) as u64); // Ratio multiplier
 
             Ok(reward)
         } else {
@@ -191,9 +183,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_bandwidth_negotiation() {
-        let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024).await.unwrap();
-        let allocated = protocol.negotiate_bandwidth("test-peer", 2 * 1024 * 1024).await;
+        let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024)
+            .await
+            .expect("test: expected success");
+        let allocated = protocol
+            .negotiate_bandwidth("test-peer", 2 * 1024 * 1024)
+            .await;
         assert!(allocated.is_ok());
-        assert!(allocated.unwrap() <= 1024 * 1024); // Should be limited by fair use
+        assert!(allocated.expect("test: assertion value") <= 1024 * 1024); // Should be limited by fair use
     }
 }

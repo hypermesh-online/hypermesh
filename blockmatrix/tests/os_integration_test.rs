@@ -20,8 +20,9 @@
 //! - Graceful degradation on headless systems
 
 use blockmatrix::os_integration::{
-    create_os_abstraction, OsAbstraction,
-    types::{CpuInfo, MemoryInfo, StorageInfo, GpuInfo, ResourceUsage},
+    create_os_abstraction,
+    types::{CpuInfo, GpuInfo, MemoryInfo, ResourceUsage, StorageInfo},
+    OsAbstraction,
 };
 
 use blockmatrix::assets::adapters::{
@@ -39,7 +40,10 @@ fn test_os_abstraction_creation() {
     println!("\n=== Platform Detection Test ===");
 
     let result = create_os_abstraction();
-    assert!(result.is_ok(), "Should create OS abstraction for current platform");
+    assert!(
+        result.is_ok(),
+        "Should create OS abstraction for current platform"
+    );
 
     let os = result.unwrap();
     let platform = os.platform();
@@ -93,9 +97,19 @@ fn test_cpu_detection_returns_valid_data() {
     // Validations
     assert!(cpu.cores > 0, "Should detect at least one CPU core");
     assert!(!cpu.model.is_empty(), "Should detect CPU model name");
-    assert!(!cpu.architecture.is_empty(), "Should detect CPU architecture");
-    assert_ne!(cpu.architecture, "unknown", "Architecture should not be 'unknown'");
-    assert_eq!(cpu.architecture, std::env::consts::ARCH, "Architecture should match compilation target");
+    assert!(
+        !cpu.architecture.is_empty(),
+        "Should detect CPU architecture"
+    );
+    assert_ne!(
+        cpu.architecture, "unknown",
+        "Architecture should not be 'unknown'"
+    );
+    assert_eq!(
+        cpu.architecture,
+        std::env::consts::ARCH,
+        "Architecture should match compilation target"
+    );
 }
 
 #[test]
@@ -114,7 +128,10 @@ fn test_cpu_detection_on_linux_reads_proc_cpuinfo() {
         // Model should contain actual CPU name (not fallback)
         assert_ne!(cpu.model, "Unknown");
 
-        println!("✅ Successfully parsed /proc/cpuinfo: {} cores, {}", cpu.cores, cpu.model);
+        println!(
+            "✅ Successfully parsed /proc/cpuinfo: {} cores, {}",
+            cpu.cores, cpu.model
+        );
     }
 }
 
@@ -127,7 +144,9 @@ fn test_gpu_detection_handles_no_gpu() {
     println!("\n=== GPU Detection Test (May Have No GPU) ===");
 
     let os = create_os_abstraction().expect("Failed to create OS abstraction");
-    let gpus = os.detect_gpu().expect("Failed to detect GPU (should handle gracefully)");
+    let gpus = os
+        .detect_gpu()
+        .expect("Failed to detect GPU (should handle gracefully)");
 
     println!("GPU Detection Result:");
     if gpus.is_empty() {
@@ -143,7 +162,10 @@ fn test_gpu_detection_handles_no_gpu() {
     }
 
     // Should return empty list gracefully on systems without GPUs, not error
-    assert!(gpus.is_empty() || !gpus.is_empty(), "GPU detection should complete without panic");
+    assert!(
+        gpus.is_empty() || !gpus.is_empty(),
+        "GPU detection should complete without panic"
+    );
 }
 
 #[test]
@@ -160,7 +182,10 @@ fn test_gpu_detection_structure_is_valid() {
         // If memory is specified, it should be reasonable
         if let Some(mem) = gpu.memory_bytes {
             assert!(mem > 0, "GPU memory should be positive if specified");
-            assert!(mem < 1_000_000_000_000, "GPU memory should be < 1 TB (sanity check)");
+            assert!(
+                mem < 1_000_000_000_000,
+                "GPU memory should be < 1 TB (sanity check)"
+            );
         }
     }
 
@@ -194,17 +219,28 @@ fn test_memory_detection_returns_valid_data() {
     let mem = os.detect_memory().expect("Failed to detect memory");
 
     println!("Memory Information:");
-    println!("  Total: {} GB", mem.total_bytes / (1024*1024*1024));
-    println!("  Available: {} GB", mem.available_bytes / (1024*1024*1024));
-    println!("  Used: {} GB", mem.used_bytes / (1024*1024*1024));
+    println!("  Total: {} GB", mem.total_bytes / (1024 * 1024 * 1024));
+    println!(
+        "  Available: {} GB",
+        mem.available_bytes / (1024 * 1024 * 1024)
+    );
+    println!("  Used: {} GB", mem.used_bytes / (1024 * 1024 * 1024));
     println!("  Usage: {:.2}%", mem.usage_percent);
 
     // Validations
     assert!(mem.total_bytes > 0, "Should detect non-zero total memory");
-    assert!(mem.usage_percent >= 0.0 && mem.usage_percent <= 100.0,
-            "Usage percentage should be 0-100");
-    assert!(mem.used_bytes <= mem.total_bytes, "Used should not exceed total");
-    assert!(mem.available_bytes <= mem.total_bytes, "Available should not exceed total");
+    assert!(
+        mem.usage_percent >= 0.0 && mem.usage_percent <= 100.0,
+        "Usage percentage should be 0-100"
+    );
+    assert!(
+        mem.used_bytes <= mem.total_bytes,
+        "Used should not exceed total"
+    );
+    assert!(
+        mem.available_bytes <= mem.total_bytes,
+        "Available should not exceed total"
+    );
 }
 
 #[test]
@@ -222,10 +258,15 @@ fn test_memory_detection_on_linux_reads_proc_meminfo() {
 
         // Swap info should be available on Linux
         if let (Some(swap_total), Some(swap_used)) = (mem.swap_total_bytes, mem.swap_used_bytes) {
-            println!("Swap: {} / {} MB",
-                     swap_used / (1024*1024),
-                     swap_total / (1024*1024));
-            assert!(swap_used <= swap_total, "Swap used should not exceed swap total");
+            println!(
+                "Swap: {} / {} MB",
+                swap_used / (1024 * 1024),
+                swap_total / (1024 * 1024)
+            );
+            assert!(
+                swap_used <= swap_total,
+                "Swap used should not exceed swap total"
+            );
         }
 
         println!("✅ Successfully parsed /proc/meminfo");
@@ -244,15 +285,20 @@ fn test_storage_detection_finds_root_filesystem() {
     let storage = os.detect_storage().expect("Failed to detect storage");
 
     // Should have at least root filesystem or equivalent
-    assert!(!storage.is_empty(), "Should detect at least one storage device");
+    assert!(
+        !storage.is_empty(),
+        "Should detect at least one storage device"
+    );
 
     println!("Storage Devices Found: {}", storage.len());
     for (i, device) in storage.iter().enumerate() {
         println!("[{}] {} @ {}", i, device.device, device.mount_point);
-        println!("    Size: {:.2} GB, Used: {:.2} GB ({:.1}%)",
-                 device.total_bytes as f64 / (1024*1024*1024),
-                 device.used_bytes as f64 / (1024*1024*1024),
-                 device.usage_percent);
+        println!(
+            "    Size: {:.2} GB, Used: {:.2} GB ({:.1}%)",
+            device.total_bytes as f64 / (1024 * 1024 * 1024),
+            device.used_bytes as f64 / (1024 * 1024 * 1024),
+            device.usage_percent
+        );
     }
 }
 
@@ -264,13 +310,22 @@ fn test_storage_detection_validates_data() {
     let storage = os.detect_storage().expect("Failed to detect storage");
 
     for device in storage {
-        assert!(device.total_bytes > 0, "Storage should have non-zero capacity");
-        assert!(device.usage_percent >= 0.0 && device.usage_percent <= 100.0,
-                "Usage percentage should be 0-100");
-        assert!(device.used_bytes <= device.total_bytes,
-                "Used storage should not exceed total");
-        assert!(device.available_bytes <= device.total_bytes,
-                "Available storage should not exceed total");
+        assert!(
+            device.total_bytes > 0,
+            "Storage should have non-zero capacity"
+        );
+        assert!(
+            device.usage_percent >= 0.0 && device.usage_percent <= 100.0,
+            "Usage percentage should be 0-100"
+        );
+        assert!(
+            device.used_bytes <= device.total_bytes,
+            "Used storage should not exceed total"
+        );
+        assert!(
+            device.available_bytes <= device.total_bytes,
+            "Available storage should not exceed total"
+        );
     }
 
     println!("✅ Storage validation passed");
@@ -287,10 +342,15 @@ fn test_storage_detection_on_linux_reads_proc_mounts() {
 
         // Should have at least root filesystem
         let root_device = storage.iter().find(|s| s.mount_point == "/");
-        assert!(root_device.is_some() || storage.len() > 0,
-                "Should find root filesystem or other mounted devices");
+        assert!(
+            root_device.is_some() || storage.len() > 0,
+            "Should find root filesystem or other mounted devices"
+        );
 
-        println!("✅ Successfully parsed /proc/mounts: {} devices", storage.len());
+        println!(
+            "✅ Successfully parsed /proc/mounts: {} devices",
+            storage.len()
+        );
     }
 }
 
@@ -303,14 +363,19 @@ fn test_resource_usage_detection() {
     println!("\n=== Resource Usage Test ===");
 
     let os = create_os_abstraction().expect("Failed to create OS abstraction");
-    let usage = os.get_resource_usage().expect("Failed to get resource usage");
+    let usage = os
+        .get_resource_usage()
+        .expect("Failed to get resource usage");
 
     println!("Current Resource Usage:");
     println!("  CPU: {:.2}%", usage.cpu_usage_percent);
     println!("  Memory: {:.2}%", usage.memory_usage_percent);
 
     if let Some(load) = usage.load_average {
-        println!("  Load Average: {:.2}, {:.2}, {:.2}", load[0], load[1], load[2]);
+        println!(
+            "  Load Average: {:.2}, {:.2}, {:.2}",
+            load[0], load[1], load[2]
+        );
     }
 
     if let Some(count) = usage.process_count {
@@ -318,10 +383,14 @@ fn test_resource_usage_detection() {
     }
 
     // Validations
-    assert!(usage.cpu_usage_percent >= 0.0 && usage.cpu_usage_percent <= 100.0,
-            "CPU usage should be 0-100%");
-    assert!(usage.memory_usage_percent >= 0.0 && usage.memory_usage_percent <= 100.0,
-            "Memory usage should be 0-100%");
+    assert!(
+        usage.cpu_usage_percent >= 0.0 && usage.cpu_usage_percent <= 100.0,
+        "CPU usage should be 0-100%"
+    );
+    assert!(
+        usage.memory_usage_percent >= 0.0 && usage.memory_usage_percent <= 100.0,
+        "Memory usage should be 0-100%"
+    );
 }
 
 #[test]
@@ -331,13 +400,21 @@ fn test_resource_usage_on_linux_includes_load_average() {
         println!("\n=== Linux Load Average Test ===");
 
         let os = create_os_abstraction().expect("Failed to create OS abstraction");
-        let usage = os.get_resource_usage().expect("Failed to get resource usage");
+        let usage = os
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
 
-        assert!(usage.load_average.is_some(), "Load average should be available on Linux");
+        assert!(
+            usage.load_average.is_some(),
+            "Load average should be available on Linux"
+        );
         let load = usage.load_average.unwrap();
         assert!(load[0] >= 0.0, "Load average should be non-negative");
 
-        println!("✅ Load average: {:.2}, {:.2}, {:.2}", load[0], load[1], load[2]);
+        println!(
+            "✅ Load average: {:.2}, {:.2}, {:.2}",
+            load[0], load[1], load[2]
+        );
     }
 }
 
@@ -410,8 +487,10 @@ fn test_memory_adapter_uses_os_abstraction() {
     // Memory adapter should be able to work with this data
     assert!(mem.total_bytes > 0, "Memory should be detected");
 
-    println!("✅ Memory adapter can use detected: {} GB total",
-             mem.total_bytes / (1024*1024*1024));
+    println!(
+        "✅ Memory adapter can use detected: {} GB total",
+        mem.total_bytes / (1024 * 1024 * 1024)
+    );
 }
 
 #[test]
@@ -424,7 +503,10 @@ fn test_storage_adapter_uses_os_abstraction() {
     // Storage adapter should be able to work with this data
     assert!(!storage.is_empty(), "Storage devices should be detected");
 
-    println!("✅ Storage adapter can use detected: {} device(s)", storage.len());
+    println!(
+        "✅ Storage adapter can use detected: {} device(s)",
+        storage.len()
+    );
 }
 
 // ======================
@@ -441,12 +523,17 @@ fn test_cpu_detection_performance() {
     let cpu = os.detect_cpu().expect("CPU detection should work");
     let duration = start.elapsed();
 
-    println!("CPU detection completed in {:.2}ms", duration.as_secs_f64() * 1000.0);
+    println!(
+        "CPU detection completed in {:.2}ms",
+        duration.as_secs_f64() * 1000.0
+    );
 
     // Should complete quickly (< 100ms)
-    assert!(duration.as_millis() < 100,
-            "CPU detection should complete in < 100ms, took {}ms",
-            duration.as_millis());
+    assert!(
+        duration.as_millis() < 100,
+        "CPU detection should complete in < 100ms, took {}ms",
+        duration.as_millis()
+    );
 }
 
 #[test]
@@ -459,11 +546,16 @@ fn test_memory_detection_performance() {
     let mem = os.detect_memory().expect("Memory detection should work");
     let duration = start.elapsed();
 
-    println!("Memory detection completed in {:.2}ms", duration.as_secs_f64() * 1000.0);
+    println!(
+        "Memory detection completed in {:.2}ms",
+        duration.as_secs_f64() * 1000.0
+    );
 
-    assert!(duration.as_millis() < 100,
-            "Memory detection should complete in < 100ms, took {}ms",
-            duration.as_millis());
+    assert!(
+        duration.as_millis() < 100,
+        "Memory detection should complete in < 100ms, took {}ms",
+        duration.as_millis()
+    );
 }
 
 #[test]
@@ -476,11 +568,16 @@ fn test_storage_detection_performance() {
     let storage = os.detect_storage().expect("Storage detection should work");
     let duration = start.elapsed();
 
-    println!("Storage detection completed in {:.2}ms", duration.as_secs_f64() * 1000.0);
+    println!(
+        "Storage detection completed in {:.2}ms",
+        duration.as_secs_f64() * 1000.0
+    );
 
-    assert!(duration.as_millis() < 100,
-            "Storage detection should complete in < 100ms, took {}ms",
-            duration.as_millis());
+    assert!(
+        duration.as_millis() < 100,
+        "Storage detection should complete in < 100ms, took {}ms",
+        duration.as_millis()
+    );
 }
 
 #[test]
@@ -493,11 +590,16 @@ fn test_gpu_detection_performance() {
     let _gpus = os.detect_gpu().expect("GPU detection should work");
     let duration = start.elapsed();
 
-    println!("GPU detection completed in {:.2}ms", duration.as_secs_f64() * 1000.0);
+    println!(
+        "GPU detection completed in {:.2}ms",
+        duration.as_secs_f64() * 1000.0
+    );
 
-    assert!(duration.as_millis() < 100,
-            "GPU detection should complete in < 100ms, took {}ms",
-            duration.as_millis());
+    assert!(
+        duration.as_millis() < 100,
+        "GPU detection should complete in < 100ms, took {}ms",
+        duration.as_millis()
+    );
 }
 
 #[test]
@@ -515,15 +617,20 @@ fn test_all_detection_combined_performance() {
 
     let duration = start.elapsed();
 
-    println!("All detections combined: {:.2}ms", duration.as_secs_f64() * 1000.0);
+    println!(
+        "All detections combined: {:.2}ms",
+        duration.as_secs_f64() * 1000.0
+    );
     println!("  CPU: {} cores", cpu.cores);
-    println!("  Memory: {} GB", mem.total_bytes / (1024*1024*1024));
+    println!("  Memory: {} GB", mem.total_bytes / (1024 * 1024 * 1024));
     println!("  Storage: {} devices", storage.len());
 
     // All detection should complete in reasonable time
-    assert!(duration.as_millis() < 500,
-            "All detections should complete in < 500ms, took {}ms",
-            duration.as_millis());
+    assert!(
+        duration.as_millis() < 500,
+        "All detections should complete in < 500ms, took {}ms",
+        duration.as_millis()
+    );
 }
 
 // ======================
@@ -568,7 +675,10 @@ fn test_memory_detection_never_panics() {
     let result = os.detect_memory();
 
     match result {
-        Ok(mem) => println!("✅ Memory detected: {} GB", mem.total_bytes / (1024*1024*1024)),
+        Ok(mem) => println!(
+            "✅ Memory detected: {} GB",
+            mem.total_bytes / (1024 * 1024 * 1024)
+        ),
         Err(e) => println!("⚠️  Memory detection returned error: {}", e),
     }
 }
@@ -601,16 +711,28 @@ fn test_all_platforms_have_consistent_interface() {
     assert!(!os.platform().is_empty(), "Platform should have a name");
 
     let cpu_result = os.detect_cpu();
-    assert!(cpu_result.is_ok(), "CPU detection should work on all platforms");
+    assert!(
+        cpu_result.is_ok(),
+        "CPU detection should work on all platforms"
+    );
 
     let mem_result = os.detect_memory();
-    assert!(mem_result.is_ok(), "Memory detection should work on all platforms");
+    assert!(
+        mem_result.is_ok(),
+        "Memory detection should work on all platforms"
+    );
 
     let storage_result = os.detect_storage();
-    assert!(storage_result.is_ok(), "Storage detection should work on all platforms");
+    assert!(
+        storage_result.is_ok(),
+        "Storage detection should work on all platforms"
+    );
 
     let gpu_result = os.detect_gpu();
-    assert!(gpu_result.is_ok(), "GPU detection should work on all platforms");
+    assert!(
+        gpu_result.is_ok(),
+        "GPU detection should work on all platforms"
+    );
 
     println!("✅ All platforms implement consistent interface");
 }
@@ -652,7 +774,7 @@ fn test_full_system_profile() {
             if let Some(vendor) = &cpu.vendor {
                 println!("  Vendor: {}", vendor);
             }
-        },
+        }
         Err(e) => println!("CPU Profile Error: {}", e),
     }
 
@@ -660,11 +782,20 @@ fn test_full_system_profile() {
     match os.detect_memory() {
         Ok(mem) => {
             println!("\nMemory Profile:");
-            println!("  Total: {:.2} GB", mem.total_bytes as f64 / (1024.0*1024.0*1024.0));
-            println!("  Available: {:.2} GB", mem.available_bytes as f64 / (1024.0*1024.0*1024.0));
-            println!("  Used: {:.2} GB", mem.used_bytes as f64 / (1024.0*1024.0*1024.0));
+            println!(
+                "  Total: {:.2} GB",
+                mem.total_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+            );
+            println!(
+                "  Available: {:.2} GB",
+                mem.available_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+            );
+            println!(
+                "  Used: {:.2} GB",
+                mem.used_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+            );
             println!("  Usage: {:.2}%", mem.usage_percent);
-        },
+        }
         Err(e) => println!("Memory Profile Error: {}", e),
     }
 
@@ -678,11 +809,11 @@ fn test_full_system_profile() {
                 for (i, gpu) in gpus.iter().enumerate() {
                     println!("  [{}] {} ({})", i, gpu.model, gpu.vendor);
                     if let Some(mem) = gpu.memory_bytes {
-                        println!("       Memory: {} MB", mem / (1024*1024));
+                        println!("       Memory: {} MB", mem / (1024 * 1024));
                     }
                 }
             }
-        },
+        }
         Err(e) => println!("GPU Profile Error: {}", e),
     }
 
@@ -691,16 +822,18 @@ fn test_full_system_profile() {
         Ok(storage) => {
             println!("\nStorage Profile:");
             for device in storage.iter().take(3) {
-                println!("  {} ({}): {:.2} GB / {:.2} GB",
-                         device.mount_point,
-                         device.filesystem,
-                         device.available_bytes as f64 / (1024.0*1024.0*1024.0),
-                         device.total_bytes as f64 / (1024.0*1024.0*1024.0));
+                println!(
+                    "  {} ({}): {:.2} GB / {:.2} GB",
+                    device.mount_point,
+                    device.filesystem,
+                    device.available_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    device.total_bytes as f64 / (1024.0 * 1024.0 * 1024.0)
+                );
             }
             if storage.len() > 3 {
                 println!("  ... and {} more devices", storage.len() - 3);
             }
-        },
+        }
         Err(e) => println!("Storage Profile Error: {}", e),
     }
 
@@ -713,7 +846,7 @@ fn test_full_system_profile() {
             if let Some(load) = usage.load_average {
                 println!("  Load Avg: {:.2}, {:.2}, {:.2}", load[0], load[1], load[2]);
             }
-        },
+        }
         Err(e) => println!("Resource Usage Error: {}", e),
     }
 
@@ -743,18 +876,25 @@ fn test_cpu_adapter_uses_real_os_metrics() {
     // Adapter should use real OS metrics
     let adapter_metrics = cpu_adapter.get_metrics();
 
-    println!("OS CPU Info: {} cores @ {}MHz", cpu_info.cores,
-             cpu_info.frequency_mhz.unwrap_or(0));
+    println!(
+        "OS CPU Info: {} cores @ {}MHz",
+        cpu_info.cores,
+        cpu_info.frequency_mhz.unwrap_or(0)
+    );
     println!("OS CPU Usage: {:.2}%", usage.cpu_usage_percent);
     println!("Adapter CPU metrics: {:?}", adapter_metrics);
 
     // Verify adapter reflects OS state
-    assert_eq!(adapter_metrics.core_count, cpu_info.cores,
-               "Adapter should report correct core count");
+    assert_eq!(
+        adapter_metrics.core_count, cpu_info.cores,
+        "Adapter should report correct core count"
+    );
 
     // CPU usage should be reasonable
-    assert!(usage.cpu_usage_percent >= 0.0 && usage.cpu_usage_percent <= 100.0,
-            "CPU usage should be between 0-100%");
+    assert!(
+        usage.cpu_usage_percent >= 0.0 && usage.cpu_usage_percent <= 100.0,
+        "CPU usage should be between 0-100%"
+    );
 }
 
 #[test]
@@ -775,23 +915,32 @@ fn test_memory_adapter_tracks_real_pressure() {
     // Get updated memory
     let mem_after = os.detect_memory().expect("Memory detection failed");
 
-    println!("Memory before: {} MB used / {} MB total",
-             mem_before.used_bytes / (1024*1024),
-             mem_before.total_bytes / (1024*1024));
-    println!("Memory after: {} MB used / {} MB total",
-             mem_after.used_bytes / (1024*1024),
-             mem_after.total_bytes / (1024*1024));
+    println!(
+        "Memory before: {} MB used / {} MB total",
+        mem_before.used_bytes / (1024 * 1024),
+        mem_before.total_bytes / (1024 * 1024)
+    );
+    println!(
+        "Memory after: {} MB used / {} MB total",
+        mem_after.used_bytes / (1024 * 1024),
+        mem_after.total_bytes / (1024 * 1024)
+    );
 
     // Adapter should reflect memory pressure
     let adapter_metrics = mem_adapter.get_metrics();
     println!("Adapter memory metrics: {:?}", adapter_metrics);
 
     // Memory usage should have increased
-    assert!(mem_after.used_bytes > mem_before.used_bytes,
-            "Memory usage should increase after allocation");
+    assert!(
+        mem_after.used_bytes > mem_before.used_bytes,
+        "Memory usage should increase after allocation"
+    );
 
     // Adapter should track this
-    assert!(adapter_metrics.used_mb > 0, "Adapter should report memory usage");
+    assert!(
+        adapter_metrics.used_mb > 0,
+        "Adapter should report memory usage"
+    );
 }
 
 #[test]
@@ -808,10 +957,12 @@ fn test_storage_adapter_monitors_real_io() {
 
     println!("Storage devices detected: {}", storage_info.len());
     for device in &storage_info {
-        println!("  Device {}: {} MB total, {} MB free",
-                 device.mount_point.display(),
-                 device.total_bytes / (1024*1024),
-                 device.free_bytes / (1024*1024));
+        println!(
+            "  Device {}: {} MB total, {} MB free",
+            device.mount_point.display(),
+            device.total_bytes / (1024 * 1024),
+            device.free_bytes / (1024 * 1024)
+        );
     }
 
     // Get initial I/O stats
@@ -837,8 +988,14 @@ fn test_storage_adapter_monitors_real_io() {
     // Clean up
     let _ = std::fs::remove_file(temp_file);
 
-    println!("Disk I/O before: {} bytes written", usage_before.disk_bytes_written);
-    println!("Disk I/O after: {} bytes written", usage_after.disk_bytes_written);
+    println!(
+        "Disk I/O before: {} bytes written",
+        usage_before.disk_bytes_written
+    );
+    println!(
+        "Disk I/O after: {} bytes written",
+        usage_after.disk_bytes_written
+    );
 
     // Adapter should track I/O
     let adapter_metrics = storage_adapter.get_metrics();
@@ -872,8 +1029,10 @@ fn test_gpu_adapter_handles_no_gpu_gracefully() {
         println!("Adapter GPU metrics (no GPU): {:?}", adapter_metrics);
 
         // Should not panic or error
-        assert!(adapter_metrics.gpu_count == 0,
-                "Adapter should report 0 GPUs when none present");
+        assert!(
+            adapter_metrics.gpu_count == 0,
+            "Adapter should report 0 GPUs when none present"
+        );
     } else {
         println!("GPUs detected: {}", gpu_info.len());
         for gpu in &gpu_info {
@@ -884,8 +1043,11 @@ fn test_gpu_adapter_handles_no_gpu_gracefully() {
         let adapter_metrics = gpu_adapter.get_metrics();
         println!("Adapter GPU metrics: {:?}", adapter_metrics);
 
-        assert_eq!(adapter_metrics.gpu_count, gpu_info.len(),
-                   "Adapter should report correct GPU count");
+        assert_eq!(
+            adapter_metrics.gpu_count,
+            gpu_info.len(),
+            "Adapter should report correct GPU count"
+        );
     }
 }
 
@@ -912,10 +1074,19 @@ fn test_all_adapters_handle_os_errors_gracefully() {
     println!("  GPU: {:?}", gpu_metrics);
 
     // Basic validation
-    assert!(cpu_metrics.core_count >= 0, "CPU cores should be non-negative");
+    assert!(
+        cpu_metrics.core_count >= 0,
+        "CPU cores should be non-negative"
+    );
     assert!(mem_metrics.total_mb >= 0, "Memory should be non-negative");
-    assert!(storage_metrics.device_count >= 0, "Storage devices should be non-negative");
-    assert!(gpu_metrics.gpu_count >= 0, "GPU count should be non-negative");
+    assert!(
+        storage_metrics.device_count >= 0,
+        "Storage devices should be non-negative"
+    );
+    assert!(
+        gpu_metrics.gpu_count >= 0,
+        "GPU count should be non-negative"
+    );
 }
 
 #[test]
@@ -950,6 +1121,9 @@ fn test_adapter_integration_performance() {
     println!("Throughput: {:.2} ops/sec", ops_per_sec);
 
     // Should be fast
-    assert!(duration.as_millis() < 5000,
-            "Adapter operations too slow: {:?} for 500 ops", duration);
+    assert!(
+        duration.as_millis() < 5000,
+        "Adapter operations too slow: {:?} for 500 ops",
+        duration
+    );
 }

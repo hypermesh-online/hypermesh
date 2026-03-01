@@ -8,28 +8,28 @@
 //! the Catalog extension implementation which does not currently exist in BlockMatrix.
 //! These tests are prepared for when Catalog is implemented.
 
-use blockmatrix::assets::core::{AssetManager, AssetType, PrivacyMode, AssetRegistration};
+use blockmatrix::assets::core::{AssetManager, AssetRegistration, AssetType, PrivacyMode};
+use blockmatrix::consensus::{ConsensusProof, ProofType};
+use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
+use blockmatrix::extensions::registry::{ExtensionLocation, ExtensionRegistry, RegistryConfig};
+use blockmatrix::extensions::security::{
+    IsolationLevel, ResourceQuotas, ResourceUsage, SecurityConfig, SecurityManager,
+};
 use blockmatrix::extensions::{
     ExtensionCapability, ExtensionConfig, ExtensionManager, ExtensionManagerConfig,
     ExtensionMetadata, ExtensionRequest, ExtensionResponse, ResourceLimits,
 };
-use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
-use blockmatrix::extensions::registry::{ExtensionRegistry, RegistryConfig, ExtensionLocation};
-use blockmatrix::extensions::security::{
-    SecurityManager, SecurityConfig, ResourceQuotas, ResourceUsage, IsolationLevel,
-};
-use blockmatrix::consensus::{ConsensusProof, ProofType};
+use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::time::sleep;
-use tracing::{info, debug, warn, error};
-use serde_json::json;
+use tracing::{debug, error, info, warn};
 
 // Re-export submodules
-pub mod lifecycle;
 pub mod integration;
+pub mod lifecycle;
 pub mod operations;
 pub mod reliability;
 

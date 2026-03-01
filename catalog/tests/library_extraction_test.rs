@@ -13,9 +13,8 @@
 mod common;
 
 use catalog::library::{
-    AssetLibrary, AssetPackageManager, LibraryConfig, LibraryInterface,
-    SearchQuery, PackageSummary, LibraryAssetPackage,
-    types::*,
+    types::*, AssetLibrary, AssetPackageManager, LibraryAssetPackage, LibraryConfig,
+    LibraryInterface, PackageSummary, SearchQuery,
 };
 use std::sync::Arc;
 
@@ -93,10 +92,7 @@ async fn test_package_manager_lifecycle() {
     library.add_package(package).await.unwrap();
 
     // Create package manager
-    let manager = AssetPackageManager::new(
-        library.clone(),
-        Default::default(),
-    );
+    let manager = AssetPackageManager::new(library.clone(), Default::default());
 
     // Install package
     let result = manager.install_package("lifecycle-pkg").await.unwrap();
@@ -125,10 +121,8 @@ async fn test_search_functionality() {
     for i in 0..5 {
         let mut package = create_test_package(&format!("search-pkg-{}", i));
         package.metadata.tags = Arc::new([Arc::from(format!("tag-{}", i % 2))]);
-        package.metadata.keywords = Arc::new([
-            Arc::from("search"),
-            Arc::from(format!("keyword-{}", i)),
-        ]);
+        package.metadata.keywords =
+            Arc::new([Arc::from("search"), Arc::from(format!("keyword-{}", i))]);
         library.add_package(package).await.unwrap();
     }
 
@@ -200,7 +194,10 @@ async fn test_performance_metrics() {
 
     // Access packages to generate metrics
     for i in 0..10 {
-        let _ = library.get_package(&format!("metrics-pkg-{}", i)).await.unwrap();
+        let _ = library
+            .get_package(&format!("metrics-pkg-{}", i))
+            .await
+            .unwrap();
     }
 
     // Check metrics

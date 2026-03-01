@@ -6,21 +6,23 @@
 //!
 //! Migrated to use BlockMatrix retrieval and Asset Registry
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
-use tokio::sync::{RwLock, Semaphore};
+use anyhow::{Context, Result};
+use futures::stream::{self, StreamExt};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use futures::stream::{self, StreamExt};
+use std::sync::Arc;
+use tokio::sync::{RwLock, Semaphore};
 
+use super::{
+    content_addressing::{Chunk, CompressionType, ContentChunker, MerkleTree},
+    dht::DhtNodeId,
+    stoq_transport::{
+        ChunkData, PackageInfo, PackageMetadata, RequestType, ResponseData, StoqTransportLayer,
+    },
+    ContentAddress, ContentStore,
+};
 use crate::assets::{AssetPackage, AssetPackageId};
 use crate::registry::CatalogRegistry;
-use super::{
-    ContentStore, ContentAddress,
-    content_addressing::{MerkleTree, ContentChunker, CompressionType, Chunk},
-    stoq_transport::{StoqTransportLayer, PackageInfo, ChunkData, RequestType, ResponseData, PackageMetadata},
-    dht::DhtNodeId,
-};
 
 /// Package manager for handling package storage and transfers
 pub struct PackageManager {
@@ -64,7 +66,8 @@ impl PackageManager {
         storage_dir: PathBuf,
     ) -> Result<Self> {
         // Create storage directory
-        tokio::fs::create_dir_all(&storage_dir).await
+        tokio::fs::create_dir_all(&storage_dir)
+            .await
             .context("Failed to create storage directory")?;
 
         // STUB: InstructionGenerator requires BlockMatrix components not available in Catalog
@@ -79,9 +82,9 @@ impl PackageManager {
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             chunk_cache: Arc::new(RwLock::new(ChunkCache::new(100 * 1024 * 1024))), // 100MB cache
             download_semaphore: Arc::new(Semaphore::new(10)), // Max 10 concurrent downloads
-            _upload_semaphore: Arc::new(Semaphore::new(10)),   // Max 10 concurrent uploads
+            _upload_semaphore: Arc::new(Semaphore::new(10)),  // Max 10 concurrent uploads
             chunker: ContentChunker::new(1024 * 1024, CompressionType::Zstd), // 1MB chunks with Zstd
-            // instruction_generator,  // Commented until BlockMatrix integration
+                                                                              // instruction_generator,  // Commented until BlockMatrix integration
         })
     }
 
@@ -90,18 +93,20 @@ impl PackageManager {
         let package_id = package.get_package_id();
 
         // Serialize package
-        let package_data = bincode::serialize(package)
-            .context("Failed to serialize package")?;
+        let package_data = bincode::serialize(package).context("Failed to serialize package")?;
 
         // Create chunks
-        let chunks = self.chunker.chunk_data(&package_data)
+        let chunks = self
+            .chunker
+            .chunk_data(&package_data)
             .context("Failed to chunk package data")?;
 
         // Store chunks in content store
         let mut content_addresses = Vec::new();
         for chunk in &chunks {
             let address = ContentAddress::from_data(&chunk.data);
-            self.content_store.storage
+            self.content_store
+                .storage
                 .store_chunk(&address, &chunk.data)
                 .await
                 .context("Failed to store chunk")?;
@@ -113,16 +118,17 @@ impl PackageManager {
             let mut index = self.content_store.index.write().await;
             index.by_package.insert(
                 package_id,
-                chunks.iter()
+                chunks
+                    .iter()
                     .map(|c| ContentAddress::from_data(&c.data))
                     .collect(),
             );
         }
 
         // Create and store Merkle tree
-        let merkle_tree = MerkleTree::from_chunks(
-            &chunks.iter().map(|c| c.data.clone()).collect::<Vec<_>>()
-        ).context("Failed to create Merkle tree")?;
+        let merkle_tree =
+            MerkleTree::from_chunks(&chunks.iter().map(|c| c.data.clone()).collect::<Vec<_>>())
+                .context("Failed to create Merkle tree")?;
 
         {
             let mut trees = self.content_store.merkle_trees.write().await;
@@ -150,7 +156,8 @@ impl PackageManager {
         if let Some(parent) = package_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        tokio::fs::write(&package_path, &package_data).await
+        tokio::fs::write(&package_path, &package_data)
+            .await
             .context("Failed to save package file")?;
 
         Ok(content_addresses)
@@ -168,26 +175,27 @@ impl PackageManager {
         }
 
         // Get package info from first available peer
-        let package_info = self.get_package_info_from_peers(package_id, peers, &transport).await?;
+        let package_info = self
+            .get_package_info_from_peers(package_id, peers, &transport)
+            .await?;
 
         // Calculate chunks to download
         let chunk_indices: Vec<usize> = (0..package_info.metadata.chunk_count).collect();
 
         // Download chunks in parallel from multiple peers
-        let chunks = self.download_chunks_parallel(
-            package_id,
-            &chunk_indices,
-            peers,
-            &transport,
-        ).await?;
+        let chunks = self
+            .download_chunks_parallel(package_id, &chunk_indices, peers, &transport)
+            .await?;
 
         // Reassemble package
-        let package_data = self.chunker.reassemble(&chunks)
+        let package_data = self
+            .chunker
+            .reassemble(&chunks)
             .context("Failed to reassemble package")?;
 
         // Deserialize package
-        let package: AssetPackage = bincode::deserialize(&package_data)
-            .context("Failed to deserialize package")?;
+        let package: AssetPackage =
+            bincode::deserialize(&package_data).context("Failed to deserialize package")?;
 
         // Store locally for future seeding
         self.store_package(&package).await?;
@@ -203,10 +211,10 @@ impl PackageManager {
         transport: &Arc<StoqTransportLayer>,
     ) -> Result<PackageInfo> {
         for peer in peers {
-            match transport.send_request(
-                peer,
-                RequestType::GetPackageInfo(*package_id),
-            ).await {
+            match transport
+                .send_request(peer, RequestType::GetPackageInfo(*package_id))
+                .await
+            {
                 Ok(ResponseData::PackageInfo(info)) => return Ok(info),
                 Ok(_) => continue,
                 Err(_) => continue,
@@ -240,17 +248,20 @@ impl PackageManager {
             let fut = async move {
                 let _permit = semaphore.acquire().await?;
 
-                match transport.send_request(
-                    &peer_id,
-                    RequestType::GetChunk {
-                        package_id,
-                        chunk_index,
-                    },
-                ).await {
+                match transport
+                    .send_request(
+                        &peer_id,
+                        RequestType::GetChunk {
+                            package_id,
+                            chunk_index,
+                        },
+                    )
+                    .await
+                {
                     Ok(ResponseData::Chunk(chunk_data)) => {
                         Ok::<_, anyhow::Error>((chunk_index, chunk_data))
                     }
-                    Ok(_) => Err(anyhow::anyhow!("Invalid response for chunk {}", chunk_index)),
+                    Ok(_) => Err(anyhow::anyhow!("Invalid response for chunk {chunk_index}")),
                     Err(e) => Err(e),
                 }
             };
@@ -259,8 +270,7 @@ impl PackageManager {
         }
 
         // Execute downloads in parallel
-        let mut stream = stream::iter(download_futures)
-            .buffer_unordered(10); // Max 10 concurrent downloads
+        let mut stream = stream::iter(download_futures).buffer_unordered(10); // Max 10 concurrent downloads
 
         let mut chunk_map = HashMap::new();
         while let Some(result) = stream.next().await {
@@ -285,8 +295,9 @@ impl PackageManager {
 
         // Sort chunks by index
         for i in 0..chunk_count {
-            let chunk_data = chunk_map.remove(&i)
-                .ok_or_else(|| anyhow::anyhow!("Missing chunk {}", i))?;
+            let chunk_data = chunk_map
+                .remove(&i)
+                .ok_or_else(|| anyhow::anyhow!("Missing chunk {i}"))?;
 
             let data_len = chunk_data.data.len();
             chunks.push(Chunk {
@@ -310,7 +321,7 @@ impl PackageManager {
             cache.get(package_id).cloned()
         };
 
-        let metadata = metadata.ok_or_else(|| anyhow::anyhow!("Package {} not found", package_id))?;
+        let metadata = metadata.ok_or_else(|| anyhow::anyhow!("Package {package_id} not found"))?;
 
         // Get available chunks
         let available_chunks = self.get_available_chunks(package_id).await?;
@@ -318,7 +329,8 @@ impl PackageManager {
         // Get Merkle root
         let merkle_root = {
             let trees = self.content_store.merkle_trees.read().await;
-            trees.get(package_id)
+            trees
+                .get(package_id)
                 .map(|tree| tree.root_hash().to_hex())
                 .unwrap_or_default()
         };
@@ -331,7 +343,11 @@ impl PackageManager {
     }
 
     /// Get a specific chunk
-    pub async fn get_chunk(&self, package_id: &AssetPackageId, chunk_index: usize) -> Result<ChunkData> {
+    pub async fn get_chunk(
+        &self,
+        package_id: &AssetPackageId,
+        chunk_index: usize,
+    ) -> Result<ChunkData> {
         // Check chunk cache first
         {
             let mut cache = self.chunk_cache.write().await;
@@ -339,22 +355,26 @@ impl PackageManager {
                 return Ok(ChunkData {
                     index: chunk_index,
                     data: data.clone(),
-                    hash: ContentAddress::from_data(&data).to_hex(),
+                    hash: ContentAddress::from_data(data).to_hex(),
                 });
             }
         }
 
         // Load from content store
         let index = self.content_store.index.read().await;
-        let addresses = index.by_package.get(package_id)
-            .ok_or_else(|| anyhow::anyhow!("Package {} not found", package_id))?;
+        let addresses = index
+            .by_package
+            .get(package_id)
+            .ok_or_else(|| anyhow::anyhow!("Package {package_id} not found"))?;
 
         if chunk_index >= addresses.len() {
-            return Err(anyhow::anyhow!("Chunk index {} out of bounds", chunk_index));
+            return Err(anyhow::anyhow!("Chunk index {chunk_index} out of bounds"));
         }
 
         let address = &addresses[chunk_index];
-        let data = self.content_store.storage
+        let data = self
+            .content_store
+            .storage
             .get_chunk(address)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Chunk not found"))?;
@@ -375,8 +395,10 @@ impl PackageManager {
     /// Get available chunks for a package
     async fn get_available_chunks(&self, package_id: &AssetPackageId) -> Result<Vec<usize>> {
         let index = self.content_store.index.read().await;
-        let addresses = index.by_package.get(package_id)
-            .ok_or_else(|| anyhow::anyhow!("Package {} not found", package_id))?;
+        let addresses = index
+            .by_package
+            .get(package_id)
+            .ok_or_else(|| anyhow::anyhow!("Package {package_id} not found"))?;
 
         let mut available = Vec::new();
         for (i, address) in addresses.iter().enumerate() {
@@ -392,7 +414,7 @@ impl PackageManager {
     fn get_package_path(&self, package_id: &AssetPackageId) -> PathBuf {
         self.storage_dir
             .join("packages")
-            .join(format!("{}.pkg", package_id))
+            .join(format!("{package_id}.pkg"))
     }
 
     /// Load package from local storage
@@ -497,7 +519,8 @@ impl ChunkCache {
     }
 
     fn evict_lru(&mut self) {
-        if let Some((oldest_key, _)) = self.access_times
+        if let Some((oldest_key, _)) = self
+            .access_times
             .iter()
             .min_by_key(|(_, time)| *time)
             .map(|(k, v)| (*k, *v))
@@ -513,13 +536,13 @@ impl ChunkCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
     use hypermesh_lib::PrivacyMode;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_package_manager() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let storage_dir = temp_dir.path().to_path_buf();
 
         // Create mock registry
@@ -530,14 +553,16 @@ mod tests {
         ));
 
         // Create mock content store
-        let storage = super::super::FileBasedStorage::new(storage_dir.clone()).unwrap();
+        let storage = super::super::FileBasedStorage::new(storage_dir.clone()).expect("test: creation");
         let content_store = Arc::new(ContentStore {
             storage: Arc::new(storage),
             index: Arc::new(RwLock::new(super::super::ContentIndex::default())),
             merkle_trees: Arc::new(RwLock::new(HashMap::new())),
         });
 
-        let manager = PackageManager::new(registry, content_store, storage_dir).await.unwrap();
+        let manager = PackageManager::new(registry, content_store, storage_dir)
+            .await
+            .expect("test: expected success");
 
         // Test basic operations
         assert!(manager.get_storage_stats().await.is_ok());

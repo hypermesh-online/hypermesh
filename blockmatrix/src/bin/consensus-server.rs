@@ -7,16 +7,12 @@
 //! Standalone consensus validation server that provides STOQ API endpoints
 //! for TrustChain and other services to validate certificates and proofs.
 
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use clap::{Arg, Command};
+use std::sync::Arc;
 use tracing::info;
-use tracing_subscriber;
 
-use blockmatrix::consensus::{
-    validation_service::ValidationService,
-    ConsensusConfig,
-};
+use blockmatrix::consensus::{validation_service::ValidationService, ConsensusConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,7 +27,7 @@ async fn main() -> Result<()> {
                 .long("bind")
                 .value_name("ADDRESS")
                 .help("IPv6 bind address")
-                .default_value("::")
+                .default_value("::"),
         )
         .arg(
             Arg::new("port")
@@ -39,7 +35,7 @@ async fn main() -> Result<()> {
                 .long("port")
                 .value_name("PORT")
                 .help("Listen port")
-                .default_value("9292")
+                .default_value("9292"),
         )
         .arg(
             Arg::new("node-id")
@@ -47,7 +43,7 @@ async fn main() -> Result<()> {
                 .long("node-id")
                 .value_name("ID")
                 .help("Node identifier")
-                .default_value("hypermesh-consensus-1")
+                .default_value("hypermesh-consensus-1"),
         )
         .arg(
             Arg::new("log-level")
@@ -55,25 +51,26 @@ async fn main() -> Result<()> {
                 .long("log-level")
                 .value_name("LEVEL")
                 .help("Log level (trace, debug, info, warn, error)")
-                .default_value("info")
+                .default_value("info"),
         )
         .arg(
             Arg::new("max-validations")
                 .long("max-validations")
                 .value_name("NUM")
                 .help("Maximum concurrent validations")
-                .default_value("100")
+                .default_value("100"),
         )
         .arg(
             Arg::new("cache")
                 .long("cache")
                 .help("Enable validation result caching")
-                .action(clap::ArgAction::SetTrue)
+                .action(clap::ArgAction::SetTrue),
         )
         .get_matches();
 
     // Initialize logging
-    let log_level = matches.get_one::<String>("log-level")
+    let log_level = matches
+        .get_one::<String>("log-level")
         .ok_or_else(|| anyhow!("Log level argument missing"))?;
     let log_filter = match log_level.as_str() {
         "trace" => "trace",
@@ -94,20 +91,24 @@ async fn main() -> Result<()> {
     info!("Starting HyperMesh Consensus Server v0.1.0");
 
     // Parse configuration
-    let bind_address = matches.get_one::<String>("bind")
+    let bind_address = matches
+        .get_one::<String>("bind")
         .ok_or_else(|| anyhow!("Bind address argument missing"))?
         .to_string();
-    let port: u16 = matches.get_one::<String>("port")
+    let port: u16 = matches
+        .get_one::<String>("port")
         .ok_or_else(|| anyhow!("Port argument missing"))?
         .parse()
-        .map_err(|e| anyhow!("Invalid port: {}", e))?;
-    let node_id = matches.get_one::<String>("node-id")
+        .map_err(|e| anyhow!("Invalid port: {e}"))?;
+    let node_id = matches
+        .get_one::<String>("node-id")
         .ok_or_else(|| anyhow!("Node ID argument missing"))?
         .to_string();
-    let max_validations: usize = matches.get_one::<String>("max-validations")
+    let max_validations: usize = matches
+        .get_one::<String>("max-validations")
         .ok_or_else(|| anyhow!("Max validations argument missing"))?
         .parse()
-        .map_err(|e| anyhow!("Invalid max-validations: {}", e))?;
+        .map_err(|e| anyhow!("Invalid max-validations: {e}"))?;
     let enable_cache = matches.contains_id("cache");
 
     info!("Configuration:");

@@ -10,8 +10,8 @@
 
 use chrono::{DateTime, Utc};
 use hypermesh_lib::{GoldGrams, NodeId, PacketId};
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 /// Dissolution timeout: 90 days (mirrors standard wire transfer timeframes).
@@ -146,13 +146,13 @@ impl GravityDissolution {
         }
 
         // Distribute proportionally
-        let total_dec = Decimal::from_u32(total_weight)
-            .expect("test: total weight should convert to Decimal");
+        let total_dec =
+            Decimal::from_u32(total_weight).expect("test: total weight should convert to Decimal");
         let distributions: Vec<GravityDistribution> = weights
             .iter()
             .map(|(q, weight, is_holder)| {
-                let weight_dec = Decimal::from_u32(*weight)
-                    .expect("test: weight should convert to Decimal");
+                let weight_dec =
+                    Decimal::from_u32(*weight).expect("test: weight should convert to Decimal");
                 let share = residual_value.0 * weight_dec / total_dec;
                 GravityDistribution {
                     node_id: q.node_id.clone(),
@@ -237,44 +237,50 @@ mod tests {
 
         q.demonstrable_capacity = true;
         q.active_routing_current_epoch = false;
-        assert!(!q.is_qualified(), "missing routing participation should disqualify");
+        assert!(
+            !q.is_qualified(),
+            "missing routing participation should disqualify"
+        );
     }
 
     #[test]
     fn missing_capacity_disqualifies() {
         let mut q = qualified_node("node-cap");
         q.demonstrable_capacity = false;
-        assert!(!q.is_qualified(), "missing demonstrable_capacity should disqualify");
+        assert!(
+            !q.is_qualified(),
+            "missing demonstrable_capacity should disqualify"
+        );
     }
 
     #[test]
     fn missing_routing_participation_disqualifies() {
         let mut q = qualified_node("node-route");
         q.active_routing_current_epoch = false;
-        assert!(!q.is_qualified(), "missing active_routing_current_epoch should disqualify");
+        assert!(
+            !q.is_qualified(),
+            "missing active_routing_current_epoch should disqualify"
+        );
     }
 
     // -- Eligibility --------------------------------------------------------
 
     #[test]
     fn eligible_after_90_days() {
-        let past = Utc::now()
-            - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64 + 1);
+        let past = Utc::now() - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64 + 1);
         assert!(GravityDissolution::is_eligible_for_dissolution(past));
     }
 
     #[test]
     fn not_eligible_before_90_days() {
-        let recent = Utc::now()
-            - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64 - 3600);
+        let recent = Utc::now() - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64 - 3600);
         assert!(!GravityDissolution::is_eligible_for_dissolution(recent));
     }
 
     #[test]
     fn eligible_at_exact_boundary() {
         // At exactly 90 days, should be eligible (>=)
-        let boundary = Utc::now()
-            - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64);
+        let boundary = Utc::now() - chrono::Duration::seconds(DISSOLUTION_TIMEOUT_SECS as i64);
         assert!(GravityDissolution::is_eligible_for_dissolution(boundary));
     }
 
@@ -348,10 +354,7 @@ mod tests {
 
     #[test]
     fn unqualified_nodes_excluded() {
-        let nodes = vec![
-            qualified_node("good"),
-            unqualified_node("bad"),
-        ];
+        let nodes = vec![qualified_node("good"), unqualified_node("bad")];
         let result = GravityDissolution::dissolve(
             PacketId::zero(),
             GoldGrams::from_decimal(dec!(100)),
@@ -385,13 +388,8 @@ mod tests {
     #[test]
     fn zero_residual_value_returns_error() {
         let nodes = vec![qualified_node("a")];
-        let err = GravityDissolution::dissolve(
-            PacketId::zero(),
-            GoldGrams::zero(),
-            &nodes,
-            &[],
-        )
-        .expect_err("test: zero value should fail");
+        let err = GravityDissolution::dissolve(PacketId::zero(), GoldGrams::zero(), &nodes, &[])
+            .expect_err("test: zero value should fail");
         assert!(
             matches!(err, GravityError::ZeroResidualValue),
             "expected ZeroResidualValue, got: {err}"
@@ -419,13 +417,19 @@ mod tests {
         // h1 gets 2/5 * 100 = 40, h2 gets 2/5 * 100 = 40, n1 gets 1/5 * 100 = 20
         assert_eq!(result.distributions.len(), 3);
 
-        let h1 = result.distributions.iter()
+        let h1 = result
+            .distributions
+            .iter()
             .find(|d| d.node_id == NodeId::from("h1"))
             .expect("test: h1 should be in distributions");
-        let h2 = result.distributions.iter()
+        let h2 = result
+            .distributions
+            .iter()
             .find(|d| d.node_id == NodeId::from("h2"))
             .expect("test: h2 should be in distributions");
-        let n1 = result.distributions.iter()
+        let n1 = result
+            .distributions
+            .iter()
             .find(|d| d.node_id == NodeId::from("n1"))
             .expect("test: n1 should be in distributions");
 
@@ -441,13 +445,8 @@ mod tests {
     fn total_dissolved_matches_input() {
         let nodes = vec![qualified_node("a"), qualified_node("b")];
         let value = GoldGrams::from_decimal(dec!(77.5));
-        let result = GravityDissolution::dissolve(
-            PacketId::zero(),
-            value,
-            &nodes,
-            &[],
-        )
-        .expect("test: dissolution should succeed");
+        let result = GravityDissolution::dissolve(PacketId::zero(), value, &nodes, &[])
+            .expect("test: dissolution should succeed");
         assert_eq!(result.total_dissolved, value);
     }
 }

@@ -14,14 +14,14 @@
 //! - Privacy tier enforcement
 //! - Zero cross-talk guarantee
 
+use anyhow::{anyhow, Result};
+use hypermesh_lib::PrivacyMode;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use hypermesh_lib::PrivacyMode;
 
-use crate::transport::{StoqTransport, Connection};
+use crate::transport::{Connection, StoqTransport};
 
 /// Network identifier re-exported from hypermesh_lib (128-bit, UUID-compatible)
 pub use hypermesh_lib::NetworkId;
@@ -189,10 +189,9 @@ impl NetworkIsolationManager {
         let transport_config = crate::config::TransportConfig::default();
 
         #[cfg(test)]
-        let transport_config = {
-            let mut config = crate::config::TransportConfig::default();
-            config.port = 0; // Let OS assign an available port
-            config
+        let transport_config = crate::config::TransportConfig {
+            port: 0, // Let OS assign an available port
+            ..Default::default()
         };
 
         let transport = Arc::new(StoqTransport::new(transport_config).await?);
@@ -200,7 +199,11 @@ impl NetworkIsolationManager {
         // Push the privacy tier to the eBPF policy layer so the XDP program
         // enforces the correct validation policy for this network's packets.
         if let Some(ref ebpf) = transport.ebpf_transport {
-            if let Err(e) = ebpf.read().inner().set_privacy_tier(network_id, privacy_tier) {
+            if let Err(e) = ebpf
+                .read()
+                .inner()
+                .set_privacy_tier(network_id, privacy_tier)
+            {
                 tracing::warn!(
                     "Failed to set eBPF privacy tier for network {}: {}",
                     network_id,
@@ -245,10 +248,7 @@ impl NetworkIsolationManager {
             let mut connections = stack.connections.write().await;
             connections.clear();
 
-            tracing::info!(
-                "Removed network stack for {}",
-                network_id
-            );
+            tracing::info!("Removed network stack for {}", network_id);
             Ok(())
         } else {
             Err(anyhow!("Network stack not found"))
@@ -275,7 +275,8 @@ impl NetworkIsolationManager {
 
         let stacks = self.network_stacks.read().await;
 
-        let from_stack = stacks.get(&from_network)
+        let from_stack = stacks
+            .get(&from_network)
             .ok_or_else(|| anyhow!("Source network not found"))?;
 
         if !stacks.contains_key(&to_network) {
@@ -293,11 +294,7 @@ impl NetworkIsolationManager {
         let mut tunnels = from_stack.tunnels.write().await;
         tunnels.insert(to_network, tunnel);
 
-        tracing::info!(
-            "Created tunnel from {} to {}",
-            from_network,
-            to_network
-        );
+        tracing::info!("Created tunnel from {} to {}", from_network, to_network);
 
         Ok(())
     }
@@ -351,7 +348,8 @@ impl NetworkIsolationManager {
             target_network: *destination_network,
             violation_type: ViolationType::PacketLeakage,
             connection_id: Some(connection_id),
-        }).await;
+        })
+        .await;
 
         false
     }
@@ -435,19 +433,25 @@ mod tests {
 
         // Create bank network
         let bank_network = NetworkId([1u8; 16]);
-        manager.create_network_stack(
-            bank_network,
-            "Bank Customer Portal".to_string(),
-            PrivacyMode::PUBLIC,
-        ).await.unwrap();
+        manager
+            .create_network_stack(
+                bank_network,
+                "Bank Customer Portal".to_string(),
+                PrivacyMode::PUBLIC,
+            )
+            .await
+            .expect("test: expected success");
 
         // Create employee network
         let employee_network = NetworkId([2u8; 16]);
-        manager.create_network_stack(
-            employee_network,
-            "Employee VPN".to_string(),
-            PrivacyMode::PRIVATE,
-        ).await.unwrap();
+        manager
+            .create_network_stack(
+                employee_network,
+                "Employee VPN".to_string(),
+                PrivacyMode::PRIVATE,
+            )
+            .await
+            .expect("test: expected success");
 
         // Verify both exist
         let networks = manager.active_networks().await;
@@ -462,23 +466,29 @@ mod tests {
         let network1 = NetworkId([1u8; 16]);
         let network2 = NetworkId([2u8; 16]);
 
-        manager.create_network_stack(
-            network1,
-            "Network 1".to_string(),
-            PrivacyMode::PUBLIC,
-        ).await.unwrap();
+        manager
+            .create_network_stack(network1, "Network 1".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: expected success");
 
-        manager.create_network_stack(
-            network2,
-            "Network 2".to_string(),
-            PrivacyMode::PUBLIC,
-        ).await.unwrap();
+        manager
+            .create_network_stack(network2, "Network 2".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: expected success");
 
         // Verify same-network traffic allowed
-        assert!(manager.verify_packet_isolation(&network1, 1, &network1, &TrafficType::All).await);
+        assert!(
+            manager
+                .verify_packet_isolation(&network1, 1, &network1, &TrafficType::All)
+                .await
+        );
 
         // Verify cross-network traffic blocked
-        assert!(!manager.verify_packet_isolation(&network1, 1, &network2, &TrafficType::All).await);
+        assert!(
+            !manager
+                .verify_packet_isolation(&network1, 1, &network2, &TrafficType::All)
+                .await
+        );
 
         // Check violation recorded
         let violations = manager.get_violations().await;
@@ -495,29 +505,29 @@ mod tests {
         let network1 = NetworkId([1u8; 16]);
         let network2 = NetworkId([2u8; 16]);
 
-        manager.create_network_stack(
-            network1,
-            "Network 1".to_string(),
-            PrivacyMode::PUBLIC,
-        ).await.unwrap();
+        manager
+            .create_network_stack(network1, "Network 1".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: expected success");
 
-        manager.create_network_stack(
-            network2,
-            "Network 2".to_string(),
-            PrivacyMode::PRIVATE,
-        ).await.unwrap();
+        manager
+            .create_network_stack(network2, "Network 2".to_string(), PrivacyMode::PRIVATE)
+            .await
+            .expect("test: expected success");
 
         // Create tunnel
-        manager.create_tunnel(
-            network1,
-            network2,
-            vec![TrafficType::AssetProof],
-            true,
-        ).await.unwrap();
+        manager
+            .create_tunnel(network1, network2, vec![TrafficType::AssetProof], true)
+            .await
+            .expect("test: expected success");
 
         // Now cross-network traffic should be allowed (tunnel allows AssetProof)
         manager.clear_violations().await;
-        assert!(manager.verify_packet_isolation(&network1, 1, &network2, &TrafficType::AssetProof).await);
+        assert!(
+            manager
+                .verify_packet_isolation(&network1, 1, &network2, &TrafficType::AssetProof)
+                .await
+        );
 
         // No violations
         let violations = manager.get_violations().await;
@@ -530,15 +540,14 @@ mod tests {
         let manager = NetworkIsolationManager::new(IsolationConfig::default());
 
         let network1 = NetworkId([1u8; 16]);
-        manager.create_network_stack(
-            network1,
-            "Network 1".to_string(),
-            PrivacyMode::PUBLIC,
-        ).await.unwrap();
+        manager
+            .create_network_stack(network1, "Network 1".to_string(), PrivacyMode::PUBLIC)
+            .await
+            .expect("test: expected success");
 
         assert_eq!(manager.active_networks().await.len(), 1);
 
-        manager.remove_network_stack(network1).await.unwrap();
+        manager.remove_network_stack(network1).await.expect("test: async operation");
 
         assert_eq!(manager.active_networks().await.len(), 0);
     }

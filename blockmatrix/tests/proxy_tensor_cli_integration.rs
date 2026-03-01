@@ -29,10 +29,7 @@ fn coord(x: i64, y: i64, z: i64) -> MatrixCoordinate {
 }
 
 /// Build a ScopeAwareRouter pre-loaded with a Device<->Network gateway.
-fn scope_router_with_gateway(
-    gw_id: &str,
-    gw_pos: MatrixCoordinate,
-) -> ScopeAwareRouter {
+fn scope_router_with_gateway(gw_id: &str, gw_pos: MatrixCoordinate) -> ScopeAwareRouter {
     let mut router = ScopeAwareRouter::new(ScopeRoutingConfig::default());
     router.register_gateway_node(
         gw_id,
@@ -131,8 +128,7 @@ fn proxy_tensor_cross_scope_consistency() {
     // Register gateway in proxy router
     let mut scope_router = scope_router_with_gateway("gw-shared", gw_pos);
     // Register same node as relay in tensor router
-    let mut tx_router =
-        tx_router_with_relay("gw-shared", gw_pos, BlockchainScope::Network);
+    let mut tx_router = tx_router_with_relay("gw-shared", gw_pos, BlockchainScope::Network);
 
     // Proxy route
     let proxy_route = scope_router
@@ -155,7 +151,10 @@ fn proxy_tensor_cross_scope_consistency() {
         .expect("test: tensor route");
 
     // Both identify the gateway/relay at the same position
-    let proxy_gw_pos = proxy_route.path.last().copied()
+    let proxy_gw_pos = proxy_route
+        .path
+        .last()
+        .copied()
         .expect("test: proxy path should have gateway");
     let tensor_relay_pos = tensor_route.hops[1].position;
 
@@ -222,7 +221,10 @@ fn cli_asset_transfer_produces_valid_scope_transition() {
     assert!(text.contains("Transfer queued"), "test: should say queued");
     assert!(text.contains("gpu-42"), "test: should contain asset id");
     assert!(text.contains("Device"), "test: should contain source scope");
-    assert!(text.contains("Network"), "test: should contain target scope");
+    assert!(
+        text.contains("Network"),
+        "test: should contain target scope"
+    );
     assert!(text.contains("Pending"), "test: should show pending status");
 }
 
@@ -462,7 +464,10 @@ fn full_stack_register_route_resolve() {
         )
         .expect("test: proxy route");
 
-    let proxy_gw_pos = proxy_route.path.last().copied()
+    let proxy_gw_pos = proxy_route
+        .path
+        .last()
+        .copied()
         .expect("test: proxy path should end at gateway");
 
     // All three subsystems agree on the gateway position
@@ -504,11 +509,7 @@ fn full_stack_multi_scope_topology() {
         }))
         .expect("test: register device node");
 
-        tx_router.register_node(
-            &format!("dev-{i}"),
-            coord(x, y, 0),
-            BlockchainScope::Device,
-        );
+        tx_router.register_node(&format!("dev-{i}"), coord(x, y, 0), BlockchainScope::Device);
     }
 
     // Register 6 Network nodes (some also serve as gateways)
@@ -603,7 +604,7 @@ fn full_stack_multi_scope_topology() {
         .expect("test: query neighbors");
     let neighbor_count = extract_table_row_count(neighbor_output);
     assert!(
-        neighbor_count >= 1 && neighbor_count < 12,
+        (1..12).contains(&neighbor_count),
         "test: should find some but not all nodes, found {neighbor_count}"
     );
 }

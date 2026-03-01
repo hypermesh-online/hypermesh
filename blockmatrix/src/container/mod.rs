@@ -7,54 +7,37 @@
 //! This module provides container runtime and orchestration capabilities
 //! integrated with the HyperMesh asset management system.
 
-pub mod runtime;
 pub mod config;
-pub mod lifecycle;
-pub mod resources;
-pub mod image;
-pub mod network;
-pub mod filesystem;
-pub mod monitoring;
-pub mod migration;
 pub mod error;
-pub mod types;
+pub mod filesystem;
+pub mod image;
+pub mod lifecycle;
+pub mod migration;
+pub mod monitoring;
+pub mod network;
 pub mod process;
-
+pub mod resources;
+pub mod runtime;
+pub mod types;
 
 // Re-export main types
-pub use runtime::{
-    ContainerRuntime, RuntimeMetrics,
-};
+pub use runtime::{ContainerRuntime, RuntimeMetrics};
 
-pub use config::{
-    ContainerConfig,
-};
+pub use config::ContainerConfig;
 
 // Re-export from types module
-pub use types::{
-    ContainerId, ContainerSpec, ContainerStatus, ContainerHandle,
-};
+pub use types::{ContainerHandle, ContainerId, ContainerSpec, ContainerStatus};
 
 pub use types::{
-    CreateOptions, ContainerState, ResourceRequirements, ResourceLimits, ResourceUsage,
+    ContainerState, CreateOptions, ResourceLimits, ResourceRequirements, ResourceUsage,
 };
 
-pub use error::{
-    ContainerError,
-};
+pub use error::ContainerError;
 
-pub use self::resources::{
-    ResourceAllocation, ResourceConstraints,
-};
+pub use self::resources::{ResourceAllocation, ResourceConstraints};
 
-pub use image::{
-    ContainerImage, ImageManager,
-};
+pub use image::{ContainerImage, ImageManager};
 
-pub use network::{
-    NetworkConfig,
-};
+pub use network::NetworkConfig;
 
-pub use monitoring::{
-    ContainerMetrics,
-};
+pub use monitoring::ContainerMetrics;

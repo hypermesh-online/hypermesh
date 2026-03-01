@@ -10,22 +10,22 @@
 //! CRITICAL: This module replaces classical cryptography (ed25519, RSA) with
 //! quantum-resistant alternatives to protect against future quantum attacks.
 
-use std::fmt;
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
-use tracing::{info, debug, warn, error};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use tracing::{debug, error, info, warn};
 
-pub mod falcon;
-pub mod kyber;
-pub mod hybrid;
 pub mod certificate;
+pub mod falcon;
+pub mod hybrid;
+pub mod kyber;
 pub mod threshold;
 
-pub use falcon::*;
-pub use kyber::*;
-pub use hybrid::*;
 pub use certificate::*;
-pub use threshold::{ThresholdConfig, ThresholdScheme, SecretShare, KeyShare, ThresholdSigner};
+pub use falcon::*;
+pub use hybrid::*;
+pub use kyber::*;
+pub use threshold::{KeyShare, SecretShare, ThresholdConfig, ThresholdScheme, ThresholdSigner};
 
 /// Post-quantum cryptographic key pair for FALCON-1024
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -139,32 +139,36 @@ pub enum PQCAlgorithm {
 pub enum PQCError {
     #[error("FALCON-1024 key generation failed: {message}")]
     FalconKeyGeneration { message: String },
-    
+
     #[error("FALCON-1024 signature creation failed: {message}")]
     FalconSigningError { message: String },
-    
+
     #[error("FALCON-1024 signature verification failed: {message}")]
     FalconVerificationError { message: String },
-    
+
     #[error("Kyber encryption failed: {message}")]
     KyberEncryptionError { message: String },
-    
+
     #[error("Kyber decryption failed: {message}")]
     KyberDecryptionError { message: String },
-    
+
     #[error("Invalid key format: {message}")]
     InvalidKeyFormat { message: String },
-    
+
     #[error("Cryptographic operation failed: {message}")]
     CryptographicFailure { message: String },
-    
+
     #[error("Quantum resistance validation failed: {message}")]
     QuantumResistanceFailure { message: String },
 }
 
 impl fmt::Display for FalconPublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FALCON-1024 PubKey: {}", hex::encode(&self.fingerprint[..8]))
+        write!(
+            f,
+            "FALCON-1024 PubKey: {}",
+            hex::encode(&self.fingerprint[..8])
+        )
     }
 }
 
@@ -218,11 +222,11 @@ impl PostQuantumCrypto {
     /// Initialize post-quantum cryptography system
     pub fn new() -> Result<Self> {
         info!("🔐 Initializing post-quantum cryptography with FALCON-1024");
-        
+
         let falcon = falcon::FalconCrypto::new()?;
         let kyber = kyber::KyberCrypto::new()?;
         let hybrid = hybrid::HybridCrypto::new()?;
-        
+
         info!("✅ Post-quantum cryptography initialized successfully");
         Ok(Self {
             falcon,
@@ -230,40 +234,58 @@ impl PostQuantumCrypto {
             hybrid,
         })
     }
-    
+
     /// Generate FALCON-1024 key pair for certificate authority
     pub async fn generate_ca_keypair(&self, ca_id: &str) -> Result<FalconKeyPair> {
         info!("🔑 Generating FALCON-1024 CA key pair for: {}", ca_id);
-        
-        let keypair = self.falcon.generate_keypair(KeyUsage::CertificateAuthority).await?;
-        
-        info!("✅ FALCON-1024 CA key pair generated: {}", keypair.public_key);
+
+        let keypair = self
+            .falcon
+            .generate_keypair(KeyUsage::CertificateAuthority)
+            .await?;
+
+        info!(
+            "✅ FALCON-1024 CA key pair generated: {}",
+            keypair.public_key
+        );
         Ok(FalconKeyPair {
             ca_id: Some(ca_id.to_string()),
             ..keypair
         })
     }
-    
+
     /// Generate asset authentication key pair
     pub async fn generate_asset_keypair(&self) -> Result<FalconKeyPair> {
         info!("🔑 Generating FALCON-1024 asset authentication key pair");
-        
-        let keypair = self.falcon.generate_keypair(KeyUsage::AssetAuthentication).await?;
-        
-        info!("✅ FALCON-1024 asset key pair generated: {}", keypair.public_key);
+
+        let keypair = self
+            .falcon
+            .generate_keypair(KeyUsage::AssetAuthentication)
+            .await?;
+
+        info!(
+            "✅ FALCON-1024 asset key pair generated: {}",
+            keypair.public_key
+        );
         Ok(keypair)
     }
-    
+
     /// Generate remote proxy authentication key pair
     pub async fn generate_proxy_keypair(&self) -> Result<FalconKeyPair> {
         info!("🔑 Generating FALCON-1024 remote proxy authentication key pair");
-        
-        let keypair = self.falcon.generate_keypair(KeyUsage::RemoteProxyAuth).await?;
-        
-        info!("✅ FALCON-1024 proxy key pair generated: {}", keypair.public_key);
+
+        let keypair = self
+            .falcon
+            .generate_keypair(KeyUsage::RemoteProxyAuth)
+            .await?;
+
+        info!(
+            "✅ FALCON-1024 proxy key pair generated: {}",
+            keypair.public_key
+        );
         Ok(keypair)
     }
-    
+
     /// Sign data with FALCON-1024
     pub async fn sign_with_falcon(
         &self,
@@ -271,13 +293,16 @@ impl PostQuantumCrypto {
         private_key: &FalconPrivateKey,
     ) -> Result<FalconSignature> {
         debug!("🔏 Signing data with FALCON-1024 ({} bytes)", data.len());
-        
+
         let signature = self.falcon.sign(data, private_key).await?;
-        
-        debug!("✅ FALCON-1024 signature created ({} bytes)", signature.signature_bytes.len());
+
+        debug!(
+            "✅ FALCON-1024 signature created ({} bytes)",
+            signature.signature_bytes.len()
+        );
         Ok(signature)
     }
-    
+
     /// Verify FALCON-1024 signature
     pub async fn verify_falcon_signature(
         &self,
@@ -285,29 +310,35 @@ impl PostQuantumCrypto {
         signature: &FalconSignature,
         public_key: &FalconPublicKey,
     ) -> Result<bool> {
-        debug!("🔍 Verifying FALCON-1024 signature ({} bytes)", signature.signature_bytes.len());
-        
+        debug!(
+            "🔍 Verifying FALCON-1024 signature ({} bytes)",
+            signature.signature_bytes.len()
+        );
+
         let is_valid = self.falcon.verify(data, signature, public_key).await?;
-        
+
         if is_valid {
             debug!("✅ FALCON-1024 signature verification successful");
         } else {
             warn!("❌ FALCON-1024 signature verification failed");
         }
-        
+
         Ok(is_valid)
     }
-    
+
     /// Generate Kyber encryption key pair
     pub async fn generate_encryption_keypair(&self) -> Result<KyberKeyPair> {
         info!("🔑 Generating Kyber encryption key pair");
-        
+
         let keypair = self.kyber.generate_keypair().await?;
-        
-        info!("✅ Kyber encryption key pair generated: fingerprint {}", hex::encode(&keypair.public_key.fingerprint[..8]));
+
+        info!(
+            "✅ Kyber encryption key pair generated: fingerprint {}",
+            hex::encode(&keypair.public_key.fingerprint[..8])
+        );
         Ok(keypair)
     }
-    
+
     /// Encrypt data with Kyber
     pub async fn encrypt_with_kyber(
         &self,
@@ -315,13 +346,13 @@ impl PostQuantumCrypto {
         public_key: &KyberPublicKey,
     ) -> Result<Vec<u8>> {
         debug!("🔒 Encrypting data with Kyber ({} bytes)", data.len());
-        
+
         let ciphertext = self.kyber.encrypt(data, public_key).await?;
-        
+
         debug!("✅ Kyber encryption completed ({} bytes)", ciphertext.len());
         Ok(ciphertext)
     }
-    
+
     /// Decrypt data with Kyber
     pub async fn decrypt_with_kyber(
         &self,
@@ -329,13 +360,13 @@ impl PostQuantumCrypto {
         private_key: &KyberPrivateKey,
     ) -> Result<Vec<u8>> {
         debug!("🔓 Decrypting data with Kyber ({} bytes)", ciphertext.len());
-        
+
         let plaintext = self.kyber.decrypt(ciphertext, private_key).await?;
-        
+
         debug!("✅ Kyber decryption completed ({} bytes)", plaintext.len());
         Ok(plaintext)
     }
-    
+
     /// Create hybrid signature (FALCON-1024 + classical for transition)
     pub async fn create_hybrid_signature(
         &self,
@@ -344,13 +375,16 @@ impl PostQuantumCrypto {
         ed25519_key: &ed25519_dalek::SigningKey,
     ) -> Result<hybrid::HybridSignature> {
         debug!("🔏 Creating hybrid signature (FALCON-1024 + Ed25519)");
-        
-        let signature = self.hybrid.create_hybrid_signature(data, falcon_key, ed25519_key).await?;
-        
+
+        let signature = self
+            .hybrid
+            .create_hybrid_signature(data, falcon_key, ed25519_key)
+            .await?;
+
         debug!("✅ Hybrid signature created");
         Ok(signature)
     }
-    
+
     /// Verify hybrid signature
     pub async fn verify_hybrid_signature(
         &self,
@@ -360,23 +394,21 @@ impl PostQuantumCrypto {
         ed25519_pubkey: &ed25519_dalek::VerifyingKey,
     ) -> Result<bool> {
         debug!("🔍 Verifying hybrid signature");
-        
-        let is_valid = self.hybrid.verify_hybrid_signature(
-            data,
-            signature,
-            falcon_pubkey,
-            ed25519_pubkey,
-        ).await?;
-        
+
+        let is_valid = self
+            .hybrid
+            .verify_hybrid_signature(data, signature, falcon_pubkey, ed25519_pubkey)
+            .await?;
+
         if is_valid {
             debug!("✅ Hybrid signature verification successful");
         } else {
             warn!("❌ Hybrid signature verification failed");
         }
-        
+
         Ok(is_valid)
     }
-    
+
     /// Validate quantum resistance of a key
     pub fn validate_quantum_resistance(&self, algorithm: &PQCAlgorithm) -> Result<bool> {
         match algorithm {
@@ -394,7 +426,7 @@ impl PostQuantumCrypto {
             }
         }
     }
-    
+
     /// Get cryptographic algorithm info
     pub fn get_algorithm_info(&self, algorithm: &PQCAlgorithm) -> String {
         match algorithm {
@@ -412,15 +444,17 @@ impl PostQuantumCrypto {
             }
         }
     }
-    
+
     /// Get performance characteristics
     pub fn get_performance_info(&self, algorithm: &PQCAlgorithm) -> String {
         match algorithm {
             PQCAlgorithm::Falcon1024 => {
-                "Fast signing (~0.1ms), Fast verification (~0.05ms), Compact keys (897+1281 bytes)".to_string()
+                "Fast signing (~0.1ms), Fast verification (~0.05ms), Compact keys (897+1281 bytes)"
+                    .to_string()
             }
             PQCAlgorithm::Kyber1024 => {
-                "Fast encapsulation (~0.1ms), Fast decapsulation (~0.1ms), Moderate key sizes".to_string()
+                "Fast encapsulation (~0.1ms), Fast decapsulation (~0.1ms), Moderate key sizes"
+                    .to_string()
             }
             PQCAlgorithm::HybridFalconEd25519 => {
                 "Combined performance of both algorithms, ~2x signature size".to_string()
@@ -441,76 +475,87 @@ impl Default for PostQuantumCrypto {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_post_quantum_crypto_initialization() {
-        let pqc = PostQuantumCrypto::new().unwrap();
-        
+        let pqc = PostQuantumCrypto::new().expect("test: creation");
+
         // Verify quantum resistance validation
-        assert!(pqc.validate_quantum_resistance(&PQCAlgorithm::Falcon1024).unwrap());
-        assert!(pqc.validate_quantum_resistance(&PQCAlgorithm::Kyber1024).unwrap());
+        assert!(pqc
+            .validate_quantum_resistance(&PQCAlgorithm::Falcon1024)
+            .expect("test: expected success"));
+        assert!(pqc
+            .validate_quantum_resistance(&PQCAlgorithm::Kyber1024)
+            .expect("test: expected success"));
     }
-    
+
     #[tokio::test]
     async fn test_falcon_keypair_generation() {
-        let pqc = PostQuantumCrypto::new().unwrap();
-        
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.unwrap();
+        let pqc = PostQuantumCrypto::new().expect("test: creation");
+
+        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
         assert_eq!(ca_keypair.key_usage, KeyUsage::CertificateAuthority);
         assert_eq!(ca_keypair.ca_id, Some("test-ca".to_string()));
-        
-        let asset_keypair = pqc.generate_asset_keypair().await.unwrap();
+
+        let asset_keypair = pqc.generate_asset_keypair().await.expect("test: async operation");
         assert_eq!(asset_keypair.key_usage, KeyUsage::AssetAuthentication);
     }
-    
+
     #[tokio::test]
     async fn test_falcon_sign_verify() {
-        let pqc = PostQuantumCrypto::new().unwrap();
-        let keypair = pqc.generate_ca_keypair("test-ca").await.unwrap();
-        
+        let pqc = PostQuantumCrypto::new().expect("test: creation");
+        let keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
+
         let test_data = b"Hello, Post-Quantum World!";
-        let signature = pqc.sign_with_falcon(test_data, &keypair.private_key).await.unwrap();
-        
-        let is_valid = pqc.verify_falcon_signature(
-            test_data,
-            &signature,
-            &keypair.public_key,
-        ).await.unwrap();
-        
+        let signature = pqc
+            .sign_with_falcon(test_data, &keypair.private_key)
+            .await
+            .expect("test: expected success");
+
+        let is_valid = pqc
+            .verify_falcon_signature(test_data, &signature, &keypair.public_key)
+            .await
+            .expect("test: expected success");
+
         assert!(is_valid);
-        
+
         // Test with tampered data
         let tampered_data = b"Hello, Tampered World!";
-        let is_invalid = pqc.verify_falcon_signature(
-            tampered_data,
-            &signature,
-            &keypair.public_key,
-        ).await.unwrap();
-        
+        let is_invalid = pqc
+            .verify_falcon_signature(tampered_data, &signature, &keypair.public_key)
+            .await
+            .expect("test: expected success");
+
         assert!(!is_invalid);
     }
-    
+
     #[tokio::test]
     async fn test_kyber_encrypt_decrypt() {
-        let pqc = PostQuantumCrypto::new().unwrap();
-        let keypair = pqc.generate_encryption_keypair().await.unwrap();
-        
+        let pqc = PostQuantumCrypto::new().expect("test: creation");
+        let keypair = pqc.generate_encryption_keypair().await.expect("test: async operation");
+
         let test_data = b"Secret quantum-resistant message";
-        let ciphertext = pqc.encrypt_with_kyber(test_data, &keypair.public_key).await.unwrap();
-        
-        let decrypted = pqc.decrypt_with_kyber(&ciphertext, &keypair.private_key).await.unwrap();
-        
+        let ciphertext = pqc
+            .encrypt_with_kyber(test_data, &keypair.public_key)
+            .await
+            .expect("test: expected success");
+
+        let decrypted = pqc
+            .decrypt_with_kyber(&ciphertext, &keypair.private_key)
+            .await
+            .expect("test: expected success");
+
         assert_eq!(test_data, decrypted.as_slice());
     }
-    
+
     #[tokio::test]
     async fn test_algorithm_info() {
-        let pqc = PostQuantumCrypto::new().unwrap();
-        
+        let pqc = PostQuantumCrypto::new().expect("test: creation");
+
         let falcon_info = pqc.get_algorithm_info(&PQCAlgorithm::Falcon1024);
         assert!(falcon_info.contains("FALCON-1024"));
         assert!(falcon_info.contains("Lattice-based"));
-        
+
         let kyber_info = pqc.get_algorithm_info(&PQCAlgorithm::Kyber1024);
         assert!(kyber_info.contains("Kyber-1024"));
         assert!(kyber_info.contains("NIST PQC"));

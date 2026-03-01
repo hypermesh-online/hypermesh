@@ -3,18 +3,18 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Real-time Certificate Fingerprint Tracker
-//! 
+//!
 //! Tracks certificate fingerprints for real-time monitoring and
 //! duplicate detection with efficient in-memory and persistent storage.
 
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
-use tokio::sync::{RwLock, Mutex};
+use std::time::{Duration, SystemTime};
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::{interval, Instant};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use crate::errors::Result as TrustChainResult;
 
@@ -129,7 +129,7 @@ impl Default for FingerprintConfig {
             recent_retention: Duration::from_secs(3600), // 1 hour
             duplicate_detection_window: Duration::from_secs(300), // 5 minutes
             cleanup_interval: Duration::from_secs(1800), // 30 minutes
-            suspicious_threshold: 100, // 100 certs per domain per hour
+            suspicious_threshold: 100,                   // 100 certs per domain per hour
         }
     }
 }
@@ -167,11 +167,14 @@ impl FingerprintTracker {
             return Ok(FingerprintStatus::Normal);
         }
 
-        debug!("Tracking certificate fingerprint: {}", hex::encode(fingerprint));
+        debug!(
+            "Tracking certificate fingerprint: {}",
+            hex::encode(fingerprint)
+        );
 
         // Check for duplicates in recent fingerprints
         let is_duplicate = self.check_for_duplicate(&fingerprint).await?;
-        
+
         // Extract domain from common name
         let domain = self.extract_domain(&common_name);
 
@@ -180,7 +183,7 @@ impl FingerprintTracker {
             // Update existing fingerprint
             metadata.last_seen = timestamp;
             metadata.seen_count += 1;
-            
+
             if !metadata.domains.contains(&domain) {
                 metadata.domains.push(domain.clone());
             }
@@ -213,7 +216,8 @@ impl FingerprintTracker {
         };
 
         // Update domain tracking (only add if not already present)
-        self.domain_tracking.entry(domain.clone())
+        self.domain_tracking
+            .entry(domain.clone())
             .and_modify(|fingerprints| {
                 if !fingerprints.contains(&fingerprint) {
                     fingerprints.push(fingerprint);
@@ -222,7 +226,8 @@ impl FingerprintTracker {
             .or_insert_with(|| vec![fingerprint]);
 
         // Add to recent fingerprints
-        self.add_to_recent_fingerprints(fingerprint, common_name).await;
+        self.add_to_recent_fingerprints(fingerprint, common_name)
+            .await;
 
         // Check for suspicious activity
         let suspicious_status = self.check_suspicious_activity(&domain).await?;
@@ -241,13 +246,19 @@ impl FingerprintTracker {
     }
 
     /// Get fingerprint metadata
-    pub async fn get_fingerprint_metadata(&self, fingerprint: &[u8; 32]) -> Option<FingerprintMetadata> {
-        self.fingerprint_cache.get(fingerprint).map(|entry| entry.clone())
+    pub async fn get_fingerprint_metadata(
+        &self,
+        fingerprint: &[u8; 32],
+    ) -> Option<FingerprintMetadata> {
+        self.fingerprint_cache
+            .get(fingerprint)
+            .map(|entry| entry.clone())
     }
 
     /// Get domain fingerprints
     pub async fn get_domain_fingerprints(&self, domain: &str) -> Vec<[u8; 32]> {
-        self.domain_tracking.get(domain)
+        self.domain_tracking
+            .get(domain)
             .map(|entry| entry.clone())
             .unwrap_or_default()
     }
@@ -259,18 +270,29 @@ impl FingerprintTracker {
 
     /// Check if fingerprint is suspicious
     pub async fn is_suspicious(&self, fingerprint: &[u8; 32]) -> bool {
-        self.fingerprint_cache.get(fingerprint)
+        self.fingerprint_cache
+            .get(fingerprint)
             .map(|metadata| matches!(metadata.status, FingerprintStatus::Suspicious { .. }))
             .unwrap_or(false)
     }
 
     /// Mark fingerprint as revoked
-    pub async fn mark_revoked(&self, fingerprint: &[u8; 32], reason: String) -> TrustChainResult<()> {
+    pub async fn mark_revoked(
+        &self,
+        fingerprint: &[u8; 32],
+        reason: String,
+    ) -> TrustChainResult<()> {
         if let Some(mut metadata) = self.fingerprint_cache.get_mut(fingerprint) {
             metadata.status = FingerprintStatus::Revoked { reason };
-            info!("Marked fingerprint as revoked: {}", hex::encode(fingerprint));
+            info!(
+                "Marked fingerprint as revoked: {}",
+                hex::encode(fingerprint)
+            );
         } else {
-            warn!("Attempted to mark unknown fingerprint as revoked: {}", hex::encode(fingerprint));
+            warn!(
+                "Attempted to mark unknown fingerprint as revoked: {}",
+                hex::encode(fingerprint)
+            );
         }
         Ok(())
     }
@@ -372,7 +394,8 @@ impl FingerprintTracker {
         let cutoff_time = Instant::now() - config.duplicate_detection_window;
 
         let recent = self.recent_fingerprints.read().await;
-        let is_duplicate = recent.iter()
+        let is_duplicate = recent
+            .iter()
             .filter(|fp| fp.timestamp > cutoff_time)
             .any(|fp| fp.fingerprint == *fingerprint);
 
@@ -402,15 +425,19 @@ impl FingerprintTracker {
 
         // Count recent certificates for this domain
         let recent = self.recent_fingerprints.read().await;
-        let recent_count = recent.iter()
+        let recent_count = recent
+            .iter()
             .filter(|fp| fp.timestamp > one_hour_ago)
             .filter(|fp| self.extract_domain(&fp.common_name) == domain)
             .count() as u64;
 
         if recent_count > config.suspicious_threshold {
-            warn!("Suspicious activity detected for domain {}: {} certificates in 1 hour", domain, recent_count);
+            warn!(
+                "Suspicious activity detected for domain {}: {} certificates in 1 hour",
+                domain, recent_count
+            );
             Ok(FingerprintStatus::Suspicious {
-                reason: format!("High certificate issuance rate: {} certs/hour", recent_count),
+                reason: format!("High certificate issuance rate: {recent_count} certs/hour"),
             })
         } else {
             Ok(FingerprintStatus::Normal)
@@ -437,14 +464,14 @@ impl FingerprintTracker {
 
     async fn update_stats(&self) {
         let mut stats = self.stats.write().await;
-        
+
         stats.total_tracked = self.fingerprint_cache.len() as u64;
         stats.unique_domains = self.domain_tracking.len() as u64;
-        
+
         // Count duplicates and suspicious
         let mut duplicate_count = 0;
         let mut suspicious_count = 0;
-        
+
         for item in self.fingerprint_cache.iter() {
             match &item.status {
                 FingerprintStatus::Duplicate => duplicate_count += 1,
@@ -452,11 +479,11 @@ impl FingerprintTracker {
                 _ => {}
             }
         }
-        
+
         stats.duplicate_count = duplicate_count;
         stats.suspicious_count = suspicious_count;
         stats.last_cleanup = SystemTime::now();
-        
+
         // Estimate memory usage
         stats.memory_usage_bytes = self.estimate_memory_usage();
     }
@@ -464,7 +491,7 @@ impl FingerprintTracker {
     fn estimate_memory_usage(&self) -> u64 {
         let fingerprint_count = self.fingerprint_cache.len() as u64;
         let domain_count = self.domain_tracking.len() as u64;
-        
+
         // Rough estimate: 200 bytes per fingerprint + 100 bytes per domain
         fingerprint_count * 200 + domain_count * 100
     }
@@ -489,13 +516,16 @@ pub struct FingerprintSearchResult {
 
 impl FingerprintTracker {
     /// Search fingerprints with query parameters
-    pub async fn search_fingerprints(&self, query: &FingerprintQuery) -> TrustChainResult<FingerprintSearchResult> {
+    pub async fn search_fingerprints(
+        &self,
+        query: &FingerprintQuery,
+    ) -> TrustChainResult<FingerprintSearchResult> {
         let mut matching_fingerprints = Vec::new();
         let limit = query.limit.unwrap_or(100) as usize;
 
         for item in self.fingerprint_cache.iter() {
             let metadata = item.value();
-            
+
             // Apply filters
             if let Some(ref domain_filter) = query.domain {
                 if !metadata.domains.iter().any(|d| d.contains(domain_filter)) {
@@ -505,7 +535,8 @@ impl FingerprintTracker {
 
             if let Some(ref status_filter) = query.status {
                 if !std::mem::discriminant(&metadata.status)
-                    .eq(&std::mem::discriminant(status_filter)) {
+                    .eq(&std::mem::discriminant(status_filter))
+                {
                     continue;
                 }
             }
@@ -537,58 +568,75 @@ impl FingerprintTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[tokio::test]
     async fn test_fingerprint_tracker_creation() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
         let stats = tracker.get_stats().await;
         assert_eq!(stats.total_tracked, 0);
     }
 
     #[tokio::test]
     async fn test_certificate_tracking() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         let fingerprint = [1u8; 32];
         let common_name = "test.example.com".to_string();
         let timestamp = SystemTime::now();
 
-        let status = tracker.track_certificate(fingerprint, common_name, timestamp).await.unwrap();
+        let status = tracker
+            .track_certificate(fingerprint, common_name, timestamp)
+            .await
+            .expect("test: expected success");
         assert!(matches!(status, FingerprintStatus::Normal));
 
-        let metadata = tracker.get_fingerprint_metadata(&fingerprint).await.unwrap();
+        let metadata = tracker
+            .get_fingerprint_metadata(&fingerprint)
+            .await
+            .expect("test: expected success");
         assert_eq!(metadata.common_name, "test.example.com");
         assert_eq!(metadata.seen_count, 1);
     }
 
     #[tokio::test]
     async fn test_duplicate_detection() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         let fingerprint = [2u8; 32];
         let common_name = "test.example.com".to_string();
         let timestamp = SystemTime::now();
 
         // First tracking should be normal
-        let status1 = tracker.track_certificate(fingerprint, common_name.clone(), timestamp).await.unwrap();
+        let status1 = tracker
+            .track_certificate(fingerprint, common_name.clone(), timestamp)
+            .await
+            .expect("test: expected success");
         assert!(matches!(status1, FingerprintStatus::Normal));
 
         // Immediate second tracking should detect duplicate
-        let status2 = tracker.track_certificate(fingerprint, common_name, timestamp).await.unwrap();
+        let status2 = tracker
+            .track_certificate(fingerprint, common_name, timestamp)
+            .await
+            .expect("test: expected success");
         assert!(matches!(status2, FingerprintStatus::Duplicate));
     }
 
     #[tokio::test]
     async fn test_domain_fingerprints() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         let domain = "example.com";
         let fingerprint1 = [3u8; 32];
         let fingerprint2 = [4u8; 32];
 
-        tracker.track_certificate(fingerprint1, format!("test1.{}", domain), SystemTime::now()).await.unwrap();
-        tracker.track_certificate(fingerprint2, format!("test2.{}", domain), SystemTime::now()).await.unwrap();
+        tracker
+            .track_certificate(fingerprint1, format!("test1.{domain}"), SystemTime::now())
+            .await
+            .expect("test: expected success");
+        tracker
+            .track_certificate(fingerprint2, format!("test2.{domain}"), SystemTime::now())
+            .await
+            .expect("test: expected success");
 
         let domain_fingerprints = tracker.get_domain_fingerprints(domain).await;
         assert_eq!(domain_fingerprints.len(), 2);
@@ -598,47 +646,69 @@ mod tests {
 
     #[tokio::test]
     async fn test_suspicious_activity_detection() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         // Generate many certificates for the same domain
         let domain = "suspicious.example.com";
-        for i in 0..150u8 { // Above suspicious threshold
+        for i in 0..150u8 {
+            // Above suspicious threshold
             let fingerprint = [i; 32];
-            tracker.track_certificate(fingerprint, domain.to_string(), SystemTime::now()).await.unwrap();
+            tracker
+                .track_certificate(fingerprint, domain.to_string(), SystemTime::now())
+                .await
+                .expect("test: expected success");
         }
 
         // The last certificate should be marked as suspicious
         let last_fingerprint = [149u8; 32];
-        let metadata = tracker.get_fingerprint_metadata(&last_fingerprint).await.unwrap();
-        assert!(matches!(metadata.status, FingerprintStatus::Suspicious { .. }));
+        let metadata = tracker
+            .get_fingerprint_metadata(&last_fingerprint)
+            .await
+            .expect("test: expected success");
+        assert!(matches!(
+            metadata.status,
+            FingerprintStatus::Suspicious { .. }
+        ));
     }
 
     #[tokio::test]
     async fn test_revocation_marking() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         let fingerprint = [5u8; 32];
         let common_name = "revoked.example.com".to_string();
 
         // Track certificate
-        tracker.track_certificate(fingerprint, common_name, SystemTime::now()).await.unwrap();
+        tracker
+            .track_certificate(fingerprint, common_name, SystemTime::now())
+            .await
+            .expect("test: expected success");
 
         // Mark as revoked
-        tracker.mark_revoked(&fingerprint, "Private key compromised".to_string()).await.unwrap();
+        tracker
+            .mark_revoked(&fingerprint, "Private key compromised".to_string())
+            .await
+            .expect("test: expected success");
 
-        let metadata = tracker.get_fingerprint_metadata(&fingerprint).await.unwrap();
+        let metadata = tracker
+            .get_fingerprint_metadata(&fingerprint)
+            .await
+            .expect("test: expected success");
         assert!(matches!(metadata.status, FingerprintStatus::Revoked { .. }));
     }
 
     #[tokio::test]
     async fn test_fingerprint_search() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         // Add test fingerprints
         for i in 0..10u8 {
             let fingerprint = [i; 32];
-            let common_name = format!("test{}.example.com", i);
-            tracker.track_certificate(fingerprint, common_name, SystemTime::now()).await.unwrap();
+            let common_name = format!("test{i}.example.com");
+            tracker
+                .track_certificate(fingerprint, common_name, SystemTime::now())
+                .await
+                .expect("test: expected success");
         }
 
         // Search by domain
@@ -649,19 +719,22 @@ mod tests {
             limit: Some(5),
         };
 
-        let results = tracker.search_fingerprints(&query).await.unwrap();
+        let results = tracker.search_fingerprints(&query).await.expect("test: async operation");
         assert_eq!(results.fingerprints.len(), 5);
         assert!(results.has_more);
     }
 
     #[tokio::test]
     async fn test_stats_tracking() {
-        let tracker = FingerprintTracker::new(true).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+
         // Add some fingerprints
         for i in 0..5u8 {
             let fingerprint = [i; 32];
-            tracker.track_certificate(fingerprint, format!("test{}.com", i), SystemTime::now()).await.unwrap();
+            tracker
+                .track_certificate(fingerprint, format!("test{i}.com"), SystemTime::now())
+                .await
+                .expect("test: expected success");
         }
 
         let stats = tracker.get_stats().await;
@@ -671,13 +744,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_tracker() {
-        let tracker = FingerprintTracker::new(false).await.unwrap();
-        
+        let tracker = FingerprintTracker::new(false).await.expect("test: async operation");
+
         let fingerprint = [6u8; 32];
-        let status = tracker.track_certificate(fingerprint, "test.com".to_string(), SystemTime::now()).await.unwrap();
-        
+        let status = tracker
+            .track_certificate(fingerprint, "test.com".to_string(), SystemTime::now())
+            .await
+            .expect("test: expected success");
+
         assert!(matches!(status, FingerprintStatus::Normal));
-        
+
         let metadata = tracker.get_fingerprint_metadata(&fingerprint).await;
         assert!(metadata.is_none()); // Should not track when disabled
     }

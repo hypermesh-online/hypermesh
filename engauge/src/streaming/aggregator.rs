@@ -74,12 +74,7 @@ impl RegionalAggregator {
 
     /// Aggregate latest frames across **all** tracked sources.
     pub fn aggregate(&self) -> RegionalAggregate {
-        let sources: Vec<String> = self
-            .subscriber
-            .sources()
-            .into_iter()
-            .cloned()
-            .collect();
+        let sources: Vec<String> = self.subscriber.sources().into_iter().cloned().collect();
         self.aggregate_for_sources(&sources)
     }
 
@@ -140,11 +135,17 @@ struct FrameAccumulator {
 /// Accumulate metric values from a slice of frames into running totals.
 fn accumulate_frames(frames: &[&MetricsFrame]) -> FrameAccumulator {
     let mut acc = FrameAccumulator {
-        buf_sum: 0.0, buf_count: 0,
-        lat_sum: 0.0, lat_count: 0,
-        thr_sum: 0.0, thr_count: 0,
-        bw_total: 0, cap_sum: 0.0, cap_count: 0,
-        verif_sum: 0.0, verif_count: 0,
+        buf_sum: 0.0,
+        buf_count: 0,
+        lat_sum: 0.0,
+        lat_count: 0,
+        thr_sum: 0.0,
+        thr_count: 0,
+        bw_total: 0,
+        cap_sum: 0.0,
+        cap_count: 0,
+        verif_sum: 0.0,
+        verif_count: 0,
     };
 
     for frame in frames {
@@ -177,15 +178,11 @@ fn accumulate_frames(frames: &[&MetricsFrame]) -> FrameAccumulator {
 
 /// Compute a capacity score from a snapshot using the same weights as
 /// [`crate::capacity::CapacityScore`].
-fn capacity_score_from_snapshot(
-    c: &super::protocol::CapacitySnapshot,
-) -> f64 {
+fn capacity_score_from_snapshot(c: &super::protocol::CapacitySnapshot) -> f64 {
     let bytes_norm = (c.bytes_served as f64 / 1_073_741_824.0).clamp(0.0, 1.0);
     let compute_norm = (c.compute_delivered as f64 / 1_000_000.0).clamp(0.0, 1.0);
-    let storage_norm =
-        (c.storage_maintained_bytes as f64 / 10_737_418_240.0).clamp(0.0, 1.0);
-    let bw_norm =
-        (c.bandwidth_available_bps as f64 / 1_000_000_000.0).clamp(0.0, 1.0);
+    let storage_norm = (c.storage_maintained_bytes as f64 / 10_737_418_240.0).clamp(0.0, 1.0);
+    let bw_norm = (c.bandwidth_available_bps as f64 / 1_000_000_000.0).clamp(0.0, 1.0);
     let uptime = c.uptime_ratio.clamp(0.0, 1.0);
 
     bytes_norm * 0.25 + compute_norm * 0.25 + storage_norm * 0.20 + bw_norm * 0.20 + uptime * 0.10

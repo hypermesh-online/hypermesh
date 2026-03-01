@@ -7,18 +7,18 @@
 //! The central component for managing asset packages in memory with
 //! high-performance operations and zero-copy optimizations.
 
-use super::types::*;
 use super::cache::PackageCache;
 use super::index::LibraryIndex;
+use super::types::*;
+use super::{DependencyResolution, PackageSummary, SearchQuery, ValidationResult};
 use super::{LibraryConfig, LibraryInterface, LibraryMetrics, LibraryStats};
-use super::{SearchQuery, PackageSummary, ValidationResult, DependencyResolution};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::RwLock;
 
 /// Core asset library for package collection management
 pub struct AssetLibrary {
@@ -32,6 +32,12 @@ pub struct AssetLibrary {
     index: Arc<LibraryIndex>,
     /// Performance metrics
     metrics: Arc<LibraryMetrics>,
+}
+
+impl Default for AssetLibrary {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AssetLibrary {
@@ -76,7 +82,9 @@ impl AssetLibrary {
 
         // Update cache
         if self.config.enable_cache {
-            self.cache.insert(Arc::clone(&id), Arc::clone(&package_arc)).await?;
+            self.cache
+                .insert(Arc::clone(&id), Arc::clone(&package_arc))
+                .await?;
         }
 
         // Update index
@@ -214,10 +222,15 @@ impl AssetLibrary {
     pub async fn search_packages(&self, query: &str) -> Vec<Arc<LibraryAssetPackage>> {
         // Simple search implementation - can be enhanced
         let packages = self.packages.read().await;
-        packages.values()
+        packages
+            .values()
             .filter(|pkg| {
-                pkg.name.to_lowercase().contains(&query.to_lowercase()) ||
-                pkg.description.as_ref().map(|d| d.to_lowercase().contains(&query.to_lowercase())).unwrap_or(false)
+                pkg.name.to_lowercase().contains(&query.to_lowercase())
+                    || pkg
+                        .description
+                        .as_ref()
+                        .map(|d| d.to_lowercase().contains(&query.to_lowercase()))
+                        .unwrap_or(false)
             })
             .cloned()
             .collect()
@@ -237,7 +250,9 @@ impl AssetLibrary {
 
     /// Verify package integrity
     pub async fn verify_package(&self, id: &str) -> Result<bool> {
-        let package = self.get_package(id).await
+        let package = self
+            .get_package(id)
+            .await
             .ok_or_else(|| anyhow::anyhow!("Package not found"))?;
 
         // Basic hash verification
@@ -254,26 +269,34 @@ impl AssetLibrary {
             name: package.name.clone(),
             version: package.version.clone(),
             description: package.description.clone(),
-            tags: package.metadata.as_ref()
+            tags: package
+                .metadata
+                .as_ref()
                 .map(|m| m.tags.iter().map(|t| t.to_string()).collect())
                 .unwrap_or_default(),
             asset_type: package.asset_type.clone(),
             size: package.size,
-            last_modified: package.metadata.as_ref()
-                .map(|m| m.modified)
-                .unwrap_or(0),
+            last_modified: package.metadata.as_ref().map(|m| m.modified).unwrap_or(0),
         }
     }
 
     /// Store a package for HyperMesh bridge integration
-    pub async fn store_package(&self, id: String, package: crate::assets::AssetPackage) -> Result<()> {
+    pub async fn store_package(
+        &self,
+        id: String,
+        package: crate::assets::AssetPackage,
+    ) -> Result<()> {
         // Convert AssetPackage to LibraryAssetPackage
         let lib_package = self.convert_to_library_package(id, package)?;
         self.add_package(lib_package).await
     }
 
     /// Convert AssetPackage to LibraryAssetPackage
-    fn convert_to_library_package(&self, id: String, package: crate::assets::AssetPackage) -> Result<LibraryAssetPackage> {
+    fn convert_to_library_package(
+        &self,
+        id: String,
+        package: crate::assets::AssetPackage,
+    ) -> Result<LibraryAssetPackage> {
         // AssetType removed - use runtime type string directly
         let asset_type = package.spec.spec.asset_type.clone();
 
@@ -286,10 +309,10 @@ impl AssetLibrary {
             size: package.content.main_content.len() as u64,
             hash: package.package_hash.clone(),
             content: package.content.main_content.clone(),
-            metadata: None, // TODO: Convert from AssetPackage metadata
-            spec: None, // TODO: Convert from AssetPackage spec
+            metadata: None,     // TODO: Convert from AssetPackage metadata
+            spec: None,         // TODO: Convert from AssetPackage spec
             content_refs: None, // TODO: Convert from AssetPackage content refs
-            validation: None, // TODO: Set validation status
+            validation: None,   // TODO: Set validation status
         })
     }
 }
@@ -332,10 +355,8 @@ impl LibraryInterface for AssetLibrary {
         let start = Instant::now();
 
         let packages = self.packages.read().await;
-        let summaries: Vec<PackageSummary> = packages
-            .values()
-            .map(|p| Self::create_summary(p))
-            .collect();
+        let summaries: Vec<PackageSummary> =
+            packages.values().map(|p| Self::create_summary(p)).collect();
 
         // Record metrics
         let elapsed_us = start.elapsed().as_micros() as u64;
@@ -411,7 +432,9 @@ impl LibraryInterface for AssetLibrary {
         }
 
         // Calculate security score (simplified)
-        let security_score = package.spec.as_ref()
+        let security_score = package
+            .spec
+            .as_ref()
             .map(|s| match s.security.sandbox_level {
                 SandboxLevel::Strict => 90,
                 SandboxLevel::Standard => 70,
@@ -431,7 +454,10 @@ impl LibraryInterface for AssetLibrary {
         })
     }
 
-    async fn resolve_dependencies(&self, package: &LibraryAssetPackage) -> Result<DependencyResolution> {
+    async fn resolve_dependencies(
+        &self,
+        package: &LibraryAssetPackage,
+    ) -> Result<DependencyResolution> {
         let start = Instant::now();
 
         let mut resolved = Vec::new();
@@ -507,7 +533,7 @@ mod tests {
     async fn test_asset_library_creation() {
         let library = AssetLibrary::new();
 
-        let stats = library.get_stats().await.unwrap();
+        let stats = library.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_packages, 0);
     }
 
@@ -520,15 +546,15 @@ mod tests {
         let package_id = package.id.to_string();
 
         // Add package
-        library.add_package(package).await.unwrap();
+        library.add_package(package).await.expect("test: async operation");
 
         // Get package
         let retrieved = library.get_package(&package_id).await;
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.unwrap().id.as_ref(), package_id);
+        assert_eq!(retrieved.expect("test: assertion value").id.as_ref(), package_id);
 
         // Check stats
-        let stats = library.get_stats().await.unwrap();
+        let stats = library.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_packages, 1);
     }
 
@@ -539,9 +565,9 @@ mod tests {
         // Add test packages
         for i in 0..5 {
             let mut package = create_test_package();
-            package.id = Arc::from(format!("test-{}", i));
-            package.name = format!("Package {}", i);
-            library.add_package(package).await.unwrap();
+            package.id = Arc::from(format!("test-{i}"));
+            package.name = format!("Package {i}");
+            library.add_package(package).await.expect("test: async operation");
         }
 
         // Search packages using the simple string search

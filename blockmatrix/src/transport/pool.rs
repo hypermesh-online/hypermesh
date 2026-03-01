@@ -4,14 +4,14 @@
 
 //! Connection Pool Management for HyperMesh Transport
 
-use std::sync::Arc;
-use std::time::Duration;
-use std::net::SocketAddr;
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::time::{interval, Instant};
-use tracing::{debug, warn, info};
-use serde::{Serialize, Deserialize};
+use tracing::{debug, info, warn};
 
 use super::config::ConnectionPoolConfig;
 use super::HyperMeshConnection;
@@ -132,10 +132,8 @@ impl ConnectionPool {
         if let Some(mut entries) = self.connections.get_mut(addr) {
             entries.retain(|entry| {
                 let conn = &entry.connection;
-                (**conn).is_active() && !entry.is_expired(
-                    self.config.max_connection_age,
-                    self.config.idle_timeout,
-                )
+                (**conn).is_active()
+                    && !entry.is_expired(self.config.max_connection_age, self.config.idle_timeout)
             });
 
             if let Some(entry) = entries.first() {
@@ -162,16 +160,16 @@ impl ConnectionPool {
         // Check pool size limit
         let total_connections = self.count_total_connections();
         if total_connections >= self.config.max_pool_size {
-            warn!("Connection pool is full ({}/{}), not adding connection to {}",
-                  total_connections, self.config.max_pool_size, addr);
+            warn!(
+                "Connection pool is full ({}/{}), not adding connection to {}",
+                total_connections, self.config.max_pool_size, addr
+            );
             return;
         }
 
         let entry = PoolEntry::new(connection);
 
-        self.connections.entry(addr)
-            .or_insert_with(Vec::new)
-            .push(entry);
+        self.connections.entry(addr).or_default().push(entry);
 
         // Update stats
         let mut stats = self.stats.write();
@@ -198,7 +196,9 @@ impl ConnectionPool {
     pub async fn close_all(&self) {
         info!("Closing all pooled connections");
 
-        let connections: Vec<_> = self.connections.iter()
+        let connections: Vec<_> = self
+            .connections
+            .iter()
             .flat_map(|entry| entry.value().clone())
             .collect();
 
@@ -224,7 +224,8 @@ impl ConnectionPool {
 
     /// Count total connections in pool
     fn count_total_connections(&self) -> usize {
-        self.connections.iter()
+        self.connections
+            .iter()
             .map(|entry| entry.value().len())
             .sum()
     }
@@ -242,15 +243,13 @@ impl ConnectionPool {
 
             // Clean up expired connections
             for mut entry in self.connections.iter_mut() {
-                let addr = entry.key().clone();
+                let addr = *entry.key();
                 let initial_count = entry.value().len();
 
                 entry.value_mut().retain(|pool_entry| {
-                    let should_keep = pool_entry.connection.is_active() &&
-                        !pool_entry.is_expired(
-                            self.config.max_connection_age,
-                            self.config.idle_timeout,
-                        );
+                    let should_keep = pool_entry.connection.is_active()
+                        && !pool_entry
+                            .is_expired(self.config.max_connection_age, self.config.idle_timeout);
 
                     if should_keep {
                         total_age += pool_entry.age().as_secs_f64();
@@ -277,10 +276,14 @@ impl ConnectionPool {
             } else {
                 0.0
             };
-            stats.utilization_percent = (total_count as f64 / self.config.max_pool_size as f64) * 100.0;
+            stats.utilization_percent =
+                (total_count as f64 / self.config.max_pool_size as f64) * 100.0;
 
             if removed_count > 0 {
-                debug!("Pool maintenance: removed {} expired connections", removed_count);
+                debug!(
+                    "Pool maintenance: removed {} expired connections",
+                    removed_count
+                );
             }
         }
     }
@@ -300,12 +303,13 @@ impl Clone for ConnectionPool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_pool_entry_lifecycle() {
-        // Create a mock connection (would need proper mock in real tests)
-        // For now, just test the pool entry logic
-
-        let config = ConnectionPoolConfig::default();
+    #[tokio::test]
+    async fn test_pool_entry_lifecycle() {
+        // Create a pool with reuse disabled to avoid spawning background tasks
+        let config = ConnectionPoolConfig {
+            enable_reuse: false,
+            ..ConnectionPoolConfig::default()
+        };
         let pool = ConnectionPool::new(config);
 
         assert_eq!(pool.count_total_connections(), 0);

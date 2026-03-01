@@ -6,12 +6,12 @@
 //!
 //! Manages public and federated DNS pools with privacy boundaries.
 
-use super::{DnsRecord, DnsError, DnsResult};
-use serde::{Serialize, Deserialize};
+use super::{DnsError, DnsRecord, DnsResult};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// DNS pool type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -144,11 +144,7 @@ impl DnsPoolManager {
     }
 
     /// Register federated DNS record
-    pub async fn register_federated(
-        &self,
-        network_id: String,
-        record: DnsRecord,
-    ) -> DnsResult<()> {
+    pub async fn register_federated(&self, network_id: String, record: DnsRecord) -> DnsResult<()> {
         info!(
             "Registering federated DNS: {} (network: {})",
             record.domain, network_id
@@ -157,7 +153,7 @@ impl DnsPoolManager {
         let mut pools = self.federated_pools.write().await;
         let pool = pools.entry(network_id.clone()).or_insert_with(|| {
             Arc::new(DnsPool::new(
-                format!("federated-{}", network_id),
+                format!("federated-{network_id}"),
                 DnsPoolType::Federated {
                     network_id: network_id.clone(),
                 },
@@ -204,9 +200,7 @@ impl DnsPoolManager {
             // Public pool is always accessible
             (_, DnsPoolType::Public) => true,
             // Federated pool requires matching network ID
-            (Some(req_network), DnsPoolType::Federated { network_id }) => {
-                req_network == network_id
-            }
+            (Some(req_network), DnsPoolType::Federated { network_id }) => req_network == network_id,
             // No network ID provided, cannot access federated
             (None, DnsPoolType::Federated { .. }) => false,
         }
@@ -254,8 +248,8 @@ impl Default for DnsPoolManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dns::DnsRecordType;
     use crate::dns::DnsRecordData;
+    use crate::dns::DnsRecordType;
     use std::net::Ipv6Addr;
 
     fn create_test_record(domain: &str, owner: &str) -> DnsRecord {
@@ -273,9 +267,9 @@ mod tests {
         let manager = DnsPoolManager::new();
         let record = create_test_record("nike", "node-1");
 
-        manager.register_public(record).await.unwrap();
+        manager.register_public(record).await.expect("test: async operation");
 
-        let records = manager.query_public("nike").await.unwrap();
+        let records = manager.query_public("nike").await.expect("test: async operation");
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].domain, "nike");
     }
@@ -288,12 +282,12 @@ mod tests {
         manager
             .register_federated("nike-internal".to_string(), record)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         let records = manager
             .query_federated("nike-internal", "admin.nike")
             .await
-            .unwrap();
+            .expect("test: expected success");
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].domain, "admin.nike");
     }
@@ -303,26 +297,14 @@ mod tests {
         let manager = DnsPoolManager::new();
 
         // Public pool accessible
-        assert!(
-            manager
-                .can_access(None, &DnsPoolType::Public)
-                .await
-        );
+        assert!(manager.can_access(None, &DnsPoolType::Public).await);
 
         // Federated pool requires matching network
         let federated = DnsPoolType::Federated {
             network_id: "nike-internal".to_string(),
         };
-        assert!(
-            manager
-                .can_access(Some("nike-internal"), &federated)
-                .await
-        );
-        assert!(
-            !manager
-                .can_access(Some("other-network"), &federated)
-                .await
-        );
+        assert!(manager.can_access(Some("nike-internal"), &federated).await);
+        assert!(!manager.can_access(Some("other-network"), &federated).await);
         assert!(!manager.can_access(None, &federated).await);
     }
 
@@ -333,13 +315,13 @@ mod tests {
         record.ttl = 0;
         record.expires_at = std::time::SystemTime::now();
 
-        manager.register_public(record).await.unwrap();
+        manager.register_public(record).await.expect("test: async operation");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let removed = manager.cleanup_all().await.unwrap();
+        let removed = manager.cleanup_all().await.expect("test: async operation");
         assert_eq!(removed, 1);
 
-        let records = manager.query_public("test").await.unwrap();
+        let records = manager.query_public("test").await.expect("test: async operation");
         assert_eq!(records.len(), 0);
     }
 }

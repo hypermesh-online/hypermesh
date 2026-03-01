@@ -3,16 +3,16 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Production Consensus Validator
-//! 
+//!
 //! Real four-proof consensus validation with Byzantine fault detection.
 //! Replaces ALL security bypasses and testing shortcuts.
 
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
-use std::time::{SystemTime, Duration};
-use std::collections::HashMap;
-use tracing::{info, warn, error};
 use crate::consensus::proof::*;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
+use tracing::{error, info, warn};
 
 /// Production consensus validator with Byzantine fault detection
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,6 +144,12 @@ impl Default for StateAuthenticator {
     }
 }
 
+impl Default for ByzantineDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ByzantineDetector {
     pub fn new() -> Self {
         Self {
@@ -154,13 +160,20 @@ impl ByzantineDetector {
     }
 
     /// Detect potential Byzantine behavior
-    pub fn detect_byzantine_behavior(&mut self, node_id: &str, violation: SecurityViolationType) -> bool {
-        let activity = self.suspicious_activity.entry(node_id.to_string()).or_insert(SuspiciousActivity {
-            failed_validations: 0,
-            invalid_signatures: 0,
-            timestamp_anomalies: 0,
-            last_activity: SystemTime::now(),
-        });
+    pub fn detect_byzantine_behavior(
+        &mut self,
+        node_id: &str,
+        violation: SecurityViolationType,
+    ) -> bool {
+        let activity = self
+            .suspicious_activity
+            .entry(node_id.to_string())
+            .or_insert(SuspiciousActivity {
+                failed_validations: 0,
+                invalid_signatures: 0,
+                timestamp_anomalies: 0,
+                last_activity: SystemTime::now(),
+            });
 
         // Update suspicious activity based on violation type
         match violation {
@@ -172,12 +185,15 @@ impl ByzantineDetector {
         activity.last_activity = SystemTime::now();
 
         // Check if node exceeds Byzantine thresholds
-        let is_byzantine = activity.failed_validations >= self.thresholds.max_failed_validations ||
-                          activity.invalid_signatures >= 5 ||
-                          activity.timestamp_anomalies >= 3;
+        let is_byzantine = activity.failed_validations >= self.thresholds.max_failed_validations
+            || activity.invalid_signatures >= 5
+            || activity.timestamp_anomalies >= 3;
 
         if is_byzantine {
-            warn!("🚨 Byzantine node detected: {} - Violation: {:?}", node_id, violation);
+            warn!(
+                "🚨 Byzantine node detected: {} - Violation: {:?}",
+                node_id, violation
+            );
             self.mark_as_malicious(node_id, violation);
         }
 
@@ -194,7 +210,8 @@ impl ByzantineDetector {
             confidence_score: 0.95,
         };
 
-        self.malicious_nodes.insert(node_id.to_string(), malicious_info);
+        self.malicious_nodes
+            .insert(node_id.to_string(), malicious_info);
         error!("🔒 Node {} marked as malicious and blocked", node_id);
     }
 
@@ -217,6 +234,12 @@ pub struct FourProofValidator {
     pub metrics: ValidationMetrics,
     /// Security configuration
     pub security_config: SecurityConfig,
+}
+
+impl Default for FourProofValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FourProofValidator {
@@ -246,23 +269,29 @@ impl FourProofValidator {
     }
 
     /// PRODUCTION CONSENSUS VALIDATION - REPLACES ALL SECURITY BYPASSES
-    pub async fn validate_consensus(&mut self, proof: &crate::consensus::ConsensusProof) -> Result<crate::consensus::ConsensusResult> {
+    pub async fn validate_consensus(
+        &mut self,
+        proof: &crate::consensus::ConsensusProof,
+    ) -> Result<crate::consensus::ConsensusResult> {
         use crate::consensus::ConsensusResult;
         use std::time::SystemTime;
-        
+
         info!("🔐 Starting PRODUCTION consensus validation (strict mode)");
         let start_time = std::time::Instant::now();
-        
+
         self.metrics.total_validations += 1;
         let mut failed_proofs = Vec::new();
 
         // CRITICAL: Check for Byzantine nodes FIRST
         let node_id = &proof.stake_proof.stake_holder_id;
         if self.byzantine_detector.is_malicious(node_id) {
-            error!("🚨 SECURITY VIOLATION: Rejecting proof from known malicious node: {}", node_id);
+            error!(
+                "🚨 SECURITY VIOLATION: Rejecting proof from known malicious node: {}",
+                node_id
+            );
             self.metrics.rejected_proofs += 1;
             return Ok(ConsensusResult::Invalid {
-                reason: format!("Byzantine node detected: {}", node_id),
+                reason: format!("Byzantine node detected: {node_id}"),
                 failed_proofs: vec!["BYZANTINE_NODE".to_string()],
                 validation_timestamp: SystemTime::now(),
             });
@@ -270,45 +299,61 @@ impl FourProofValidator {
 
         // 1. PROOF OF SPACE VALIDATION (WHERE)
         info!("🔍 Validating Proof of Space (WHERE)");
-        let space_valid = self.space_validator.validate_production(&proof.space_proof).await?;
+        let space_valid = self
+            .space_validator
+            .validate_production(&proof.space_proof)
+            .await?;
         if !space_valid {
             failed_proofs.push("SPACE_PROOF_FAILED".to_string());
-            self.byzantine_detector.detect_byzantine_behavior(node_id, SecurityViolationType::StorageCommitmentFraud);
+            self.byzantine_detector
+                .detect_byzantine_behavior(node_id, SecurityViolationType::StorageCommitmentFraud);
         }
 
-        // 2. PROOF OF STAKE VALIDATION (WHO)  
+        // 2. PROOF OF STAKE VALIDATION (WHO)
         info!("🔍 Validating Proof of Stake (WHO)");
-        let stake_valid = self.stake_validator.validate_production(&proof.stake_proof, &self.security_config).await?;
+        let stake_valid = self
+            .stake_validator
+            .validate_production(&proof.stake_proof, &self.security_config)
+            .await?;
         if !stake_valid {
             failed_proofs.push("STAKE_PROOF_FAILED".to_string());
-            self.byzantine_detector.detect_byzantine_behavior(node_id, SecurityViolationType::FalseStakeProof);
+            self.byzantine_detector
+                .detect_byzantine_behavior(node_id, SecurityViolationType::FalseStakeProof);
         }
 
         // 3. PROOF OF WORK VALIDATION (WHAT)
         info!("🔍 Validating Proof of Work (WHAT)");
-        let work_valid = self.work_validator.validate_production(&proof.work_proof).await?;
+        let work_valid = self
+            .work_validator
+            .validate_production(&proof.work_proof)
+            .await?;
         if !work_valid {
             failed_proofs.push("WORK_PROOF_FAILED".to_string());
-            self.byzantine_detector.detect_byzantine_behavior(node_id, SecurityViolationType::ComputationalFraud);
+            self.byzantine_detector
+                .detect_byzantine_behavior(node_id, SecurityViolationType::ComputationalFraud);
         }
 
         // 4. PROOF OF TIME VALIDATION (WHEN)
         info!("🔍 Validating Proof of Time (WHEN)");
-        let time_valid = self.time_validator.validate_production(&proof.time_proof, &self.security_config).await?;
+        let time_valid = self
+            .time_validator
+            .validate_production(&proof.time_proof, &self.security_config)
+            .await?;
         if !time_valid {
             failed_proofs.push("TIME_PROOF_FAILED".to_string());
-            self.byzantine_detector.detect_byzantine_behavior(node_id, SecurityViolationType::TimestampManipulation);
+            self.byzantine_detector
+                .detect_byzantine_behavior(node_id, SecurityViolationType::TimestampManipulation);
         }
 
         // CRITICAL: ALL FOUR PROOFS MUST PASS IN PRODUCTION
         let all_proofs_valid = space_valid && stake_valid && work_valid && time_valid;
-        
+
         let validation_time = start_time.elapsed().as_millis();
-        
+
         if all_proofs_valid {
             let _proof_hash = proof.hash()?;
             self.metrics.successful_validations += 1;
-            
+
             info!("✅ CONSENSUS VALIDATION SUCCESSFUL ({}ms)", validation_time);
             Ok(ConsensusResult::Valid {
                 confidence_score: 1.0,
@@ -318,10 +363,16 @@ impl FourProofValidator {
         } else {
             self.metrics.failed_validations += 1;
             self.metrics.rejected_proofs += 1;
-            
-            error!("❌ CONSENSUS VALIDATION FAILED - Rejected proofs: {:?} ({}ms)", failed_proofs, validation_time);
+
+            error!(
+                "❌ CONSENSUS VALIDATION FAILED - Rejected proofs: {:?} ({}ms)",
+                failed_proofs, validation_time
+            );
             Ok(ConsensusResult::Invalid {
-                reason: format!("Production validation failed: {} out of 4 proofs invalid", failed_proofs.len()),
+                reason: format!(
+                    "Production validation failed: {} out of 4 proofs invalid",
+                    failed_proofs.len()
+                ),
                 failed_proofs,
                 validation_timestamp: SystemTime::now(),
             })
@@ -354,6 +405,12 @@ pub struct StorageNodeInfo {
     is_verified: bool,
 }
 
+impl Default for ProofOfSpaceValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProofOfSpaceValidator {
     pub fn new() -> Self {
         Self {
@@ -368,7 +425,10 @@ impl ProofOfSpaceValidator {
 
     /// PRODUCTION VALIDATION - Real storage commitment verification
     pub async fn validate_production(&mut self, proof: &SpaceProof) -> Result<bool> {
-        info!("🔍 PRODUCTION Space Proof validation for node: {}", proof.node_id);
+        info!(
+            "🔍 PRODUCTION Space Proof validation for node: {}",
+            proof.node_id
+        );
 
         // 1. Basic validation first
         if !proof.validate() {
@@ -391,7 +451,10 @@ impl ProofOfSpaceValidator {
         // 4. Verify node is not claiming impossible storage amounts
         const MAX_REASONABLE_STORAGE: u64 = 100 * 1024 * 1024 * 1024 * 1024; // 100TB max per node
         if proof.total_storage > MAX_REASONABLE_STORAGE {
-            error!("❌ Space proof: Unrealistic storage claim: {} bytes", proof.total_storage);
+            error!(
+                "❌ Space proof: Unrealistic storage claim: {} bytes",
+                proof.total_storage
+            );
             return Ok(false);
         }
 
@@ -416,14 +479,20 @@ impl ProofOfSpaceValidator {
         }
 
         // Update known storage nodes
-        self.known_storage_nodes.insert(proof.node_id.clone(), StorageNodeInfo {
-            node_id: proof.node_id.clone(),
-            verified_capacity: proof.total_storage,
-            last_verified: SystemTime::now(),
-            is_verified: true,
-        });
+        self.known_storage_nodes.insert(
+            proof.node_id.clone(),
+            StorageNodeInfo {
+                node_id: proof.node_id.clone(),
+                verified_capacity: proof.total_storage,
+                last_verified: SystemTime::now(),
+                is_verified: true,
+            },
+        );
 
-        info!("✅ Space proof validation PASSED for node: {}", proof.node_id);
+        info!(
+            "✅ Space proof validation PASSED for node: {}",
+            proof.node_id
+        );
         Ok(true)
     }
 }
@@ -432,6 +501,12 @@ impl ProofOfSpaceValidator {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProofOfStakeValidator {
     minimum_stake_requirements: HashMap<String, u64>,
+}
+
+impl Default for ProofOfStakeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProofOfStakeValidator {
@@ -447,8 +522,15 @@ impl ProofOfStakeValidator {
     }
 
     /// PRODUCTION VALIDATION - Real economic stake verification
-    pub async fn validate_production(&mut self, proof: &StakeProof, config: &SecurityConfig) -> Result<bool> {
-        info!("🔍 PRODUCTION Stake Proof validation for holder: {}", proof.stake_holder);
+    pub async fn validate_production(
+        &mut self,
+        proof: &StakeProof,
+        config: &SecurityConfig,
+    ) -> Result<bool> {
+        info!(
+            "🔍 PRODUCTION Stake Proof validation for holder: {}",
+            proof.stake_holder
+        );
 
         // 1. Basic validation first
         if !proof.validate() {
@@ -458,8 +540,10 @@ impl ProofOfStakeValidator {
 
         // 2. CRITICAL: Verify minimum stake threshold
         if proof.stake_amount < config.minimum_stake_threshold {
-            error!("❌ Stake proof: Insufficient stake - {} < {} required", 
-                   proof.stake_amount, config.minimum_stake_threshold);
+            error!(
+                "❌ Stake proof: Insufficient stake - {} < {} required",
+                proof.stake_amount, config.minimum_stake_threshold
+            );
             return Ok(false);
         }
 
@@ -478,14 +562,21 @@ impl ProofOfStakeValidator {
         // 5. Check for reasonable stake amounts (prevent overflow attacks)
         const MAX_REASONABLE_STAKE: u64 = 1_000_000_000_000; // 1 trillion max
         if proof.stake_amount > MAX_REASONABLE_STAKE {
-            error!("❌ Stake proof: Unrealistic stake amount: {}", proof.stake_amount);
+            error!(
+                "❌ Stake proof: Unrealistic stake amount: {}",
+                proof.stake_amount
+            );
             return Ok(false);
         }
 
         // 6. Timestamp validation - stake must not be too old
         if let Ok(elapsed) = proof.stake_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(30 * 24 * 60 * 60) { // 30 days max
-                error!("❌ Stake proof: Stake timestamp too old ({}s)", elapsed.as_secs());
+            if elapsed > Duration::from_secs(30 * 24 * 60 * 60) {
+                // 30 days max
+                error!(
+                    "❌ Stake proof: Stake timestamp too old ({}s)",
+                    elapsed.as_secs()
+                );
                 return Ok(false);
             }
         }
@@ -497,8 +588,10 @@ impl ProofOfStakeValidator {
             return Ok(false);
         }
 
-        info!("✅ Stake proof validation PASSED for holder: {} (stake: {})", 
-              proof.stake_holder, proof.stake_amount);
+        info!(
+            "✅ Stake proof validation PASSED for holder: {} (stake: {})",
+            proof.stake_holder, proof.stake_amount
+        );
         Ok(true)
     }
 }
@@ -506,6 +599,12 @@ impl ProofOfStakeValidator {
 /// Proof of Work validator
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProofOfWorkValidator;
+
+impl Default for ProofOfWorkValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ProofOfWorkValidator {
     pub fn new() -> Self {
@@ -518,7 +617,10 @@ impl ProofOfWorkValidator {
 
     /// Production validation - validates real computational work
     pub async fn validate_production(&self, proof: &WorkProof) -> Result<bool> {
-        info!("🔍 PRODUCTION Work Proof validation for workload: {}", proof.workload_id);
+        info!(
+            "🔍 PRODUCTION Work Proof validation for workload: {}",
+            proof.workload_id
+        );
 
         // Basic validation first
         if !proof.validate() {
@@ -533,7 +635,10 @@ impl ProofOfWorkValidator {
         }
 
         if proof.computational_power > 1_000_000 {
-            error!("❌ Work proof: Suspiciously high computational power: {}", proof.computational_power);
+            error!(
+                "❌ Work proof: Suspiciously high computational power: {}",
+                proof.computational_power
+            );
             return Ok(false);
         }
 
@@ -542,7 +647,10 @@ impl ProofOfWorkValidator {
             warn!("⚠️ Work proof: Non-certificate workload type");
         }
 
-        info!("✅ Work proof validation PASSED for workload: {}", proof.workload_id);
+        info!(
+            "✅ Work proof validation PASSED for workload: {}",
+            proof.workload_id
+        );
         Ok(true)
     }
 }
@@ -550,6 +658,12 @@ impl ProofOfWorkValidator {
 /// Proof of Time validator
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProofOfTimeValidator;
+
+impl Default for ProofOfTimeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ProofOfTimeValidator {
     pub fn new() -> Self {
@@ -561,7 +675,11 @@ impl ProofOfTimeValidator {
     }
 
     /// Production validation - validates real time synchronization
-    pub async fn validate_production(&self, proof: &TimeProof, config: &SecurityConfig) -> Result<bool> {
+    pub async fn validate_production(
+        &self,
+        proof: &TimeProof,
+        config: &SecurityConfig,
+    ) -> Result<bool> {
         info!("🔍 PRODUCTION Time Proof validation");
 
         // Basic validation first
@@ -572,14 +690,17 @@ impl ProofOfTimeValidator {
 
         // Verify time synchronization is within acceptable bounds
         if proof.network_time_offset > config.maximum_time_variance {
-            error!("❌ Time proof: Network time offset too large: {:?} > {:?}",
-                   proof.network_time_offset, config.maximum_time_variance);
+            error!(
+                "❌ Time proof: Network time offset too large: {:?} > {:?}",
+                proof.network_time_offset, config.maximum_time_variance
+            );
             return Ok(false);
         }
 
         // Verify proof timestamp is recent
         if let Ok(elapsed) = proof.time_verification_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(300) { // 5 minutes max age
+            if elapsed > Duration::from_secs(300) {
+                // 5 minutes max age
                 error!("❌ Time proof: Timestamp too old: {}s", elapsed.as_secs());
                 return Ok(false);
             }

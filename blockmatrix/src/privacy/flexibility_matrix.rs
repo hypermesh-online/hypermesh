@@ -73,10 +73,10 @@ impl PrivacyFlexibilityMatrix {
 
     /// Check if configuration is privacy-focused (both modes untracked or bounded)
     pub fn is_privacy_focused(&self) -> bool {
-        let net_private = !self.network_tier.tracked
-            || self.network_tier.scope == AccessScope::Bounded;
-        let asset_private = !self.asset_tier.tracked
-            || self.asset_tier.scope == AccessScope::Bounded;
+        let net_private =
+            !self.network_tier.tracked || self.network_tier.scope == AccessScope::Bounded;
+        let asset_private =
+            !self.asset_tier.tracked || self.asset_tier.scope == AccessScope::Bounded;
         net_private && asset_private
     }
 
@@ -114,18 +114,17 @@ impl PrivacyFlexibilityMatrix {
     /// Validate a privacy configuration for consistency
     pub fn validate_configuration(&self) -> Result<(), ValidationError> {
         // Anonymous network with private assets is invalid (no identity for peer trust)
-        if self.network_tier == PrivacyMode::ANONYMOUS
-            && self.asset_tier == PrivacyMode::PRIVATE
-        {
+        if self.network_tier == PrivacyMode::ANONYMOUS && self.asset_tier == PrivacyMode::PRIVATE {
             return Err(ValidationError::InvalidCombination(
-                "Cannot have anonymous network with private assets (no identity for peer trust)".into()
+                "Cannot have anonymous network with private assets (no identity for peer trust)"
+                    .into(),
             ));
         }
 
         // Warn about reduced rewards for certain combinations
         if self.caesar_multiplier() < 0.2 {
             return Err(ValidationError::LowRewards(
-                "Configuration results in very low CAESAR rewards".into()
+                "Configuration results in very low CAESAR rewards".into(),
             ));
         }
 
@@ -264,9 +263,9 @@ pub enum ValidationError {
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValidationError::InvalidCombination(msg) => write!(f, "Invalid combination: {}", msg),
-            ValidationError::LowRewards(msg) => write!(f, "Low rewards warning: {}", msg),
-            ValidationError::SecurityRisk(msg) => write!(f, "Security risk: {}", msg),
+            ValidationError::InvalidCombination(msg) => write!(f, "Invalid combination: {msg}"),
+            ValidationError::LowRewards(msg) => write!(f, "Low rewards warning: {msg}"),
+            ValidationError::SecurityRisk(msg) => write!(f, "Security risk: {msg}"),
         }
     }
 }
@@ -321,10 +320,7 @@ mod tests {
 
     #[test]
     fn test_independent_tiers() {
-        let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC,
-        );
+        let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
         assert_eq!(matrix.network_tier, PrivacyMode::ANONYMOUS);
         assert_eq!(matrix.asset_tier, PrivacyMode::PUBLIC);
         assert!(matrix.is_anonymous_public());
@@ -353,10 +349,8 @@ mod tests {
         let anon_matrix = PrivacyFlexibilityMatrix::uniform(PrivacyMode::ANONYMOUS);
         assert_eq!(anon_matrix.caesar_multiplier(), 0.0);
 
-        let anon_public = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC,
-        );
+        let anon_public =
+            PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
         // (0.0 + 1.0) / 2.0 * 1.2 = 0.6
         assert!((anon_public.caesar_multiplier() - 0.6).abs() < 0.01);
     }
@@ -366,24 +360,19 @@ mod tests {
         let private_matrix = PrivacyFlexibilityMatrix::uniform(PrivacyMode::PRIVATE);
         assert!(private_matrix.is_privacy_focused());
 
-        let mixed_matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC,
-        );
+        let mixed_matrix =
+            PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
         assert!(!mixed_matrix.is_privacy_focused());
     }
 
     #[test]
     fn test_combined_requirements() {
-        let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::PRIVATE,
-            PrivacyMode::PUBLIC,
-        );
+        let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::PRIVATE, PrivacyMode::PUBLIC);
         let reqs = matrix.combined_requirements();
 
         assert!(reqs.peer_validation); // From PRIVATE
-        assert!(reqs.proof_of_stake);  // From PUBLIC
-        assert!(reqs.proof_of_work);   // From PUBLIC
+        assert!(reqs.proof_of_stake); // From PUBLIC
+        assert!(reqs.proof_of_work); // From PUBLIC
     }
 
     #[test]
@@ -391,10 +380,7 @@ mod tests {
         let valid = PrivacyFlexibilityMatrix::uniform(PrivacyMode::PUBLIC);
         assert!(valid.validate_configuration().is_ok());
 
-        let invalid = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PRIVATE,
-        );
+        let invalid = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE);
         assert!(invalid.validate_configuration().is_err());
     }
 
@@ -408,10 +394,7 @@ mod tests {
         assert_eq!(public.privacy_score(), 0.0);
         assert_eq!(public.openness_score(), 1.0);
 
-        let mixed = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC,
-        );
+        let mixed = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
         assert_eq!(mixed.privacy_score(), 0.5);
         assert_eq!(mixed.openness_score(), 0.5);
     }

@@ -8,9 +8,9 @@
 //! fees, demurrage overrides, and routing incentives across L0-L3 market tiers.
 
 use hypermesh_lib::{GoldGrams, MarketTier};
-use rust_decimal::Decimal;
 #[cfg(feature = "engauge")]
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 
@@ -94,7 +94,12 @@ impl GovernorPid {
 
     /// Create with custom PID gains.
     pub fn with_gains(kp: Decimal, ki: Decimal, kd: Decimal) -> Self {
-        Self { kp, ki, kd, ..Self::new() }
+        Self {
+            kp,
+            ki,
+            kd,
+            ..Self::new()
+        }
     }
 
     /// Return the last computed governance parameters.
@@ -137,7 +142,9 @@ impl GovernorPid {
                 PressureQuadrant::Bottleneck
             };
         }
-        if dev < -GOLD_DEV_EMERGENCY { return PressureQuadrant::Crash; }
+        if dev < -GOLD_DEV_EMERGENCY {
+            return PressureQuadrant::Crash;
+        }
         if m.network_velocity < LOW_VELOCITY && m.transaction_volume < LOW_VOLUME {
             return PressureQuadrant::Stagnation;
         }
@@ -158,13 +165,21 @@ impl GovernorPid {
 
     /// Map health score to fee adjustment fraction.
     pub fn score_to_fee_adjustment(&self, score: Decimal) -> Decimal {
-        if score >= dec!(85) { dec!(-0.008) }
-        else if score >= dec!(75) { dec!(-0.006) }
-        else if score >= dec!(65) { dec!(-0.004) }
-        else if score >= dec!(55) { dec!(-0.002) }
-        else if score >= dec!(50) { dec!(0) }
-        else if score >= dec!(40) { dec!(0.002) }
-        else { dec!(0.005) }
+        if score >= dec!(85) {
+            dec!(-0.008)
+        } else if score >= dec!(75) {
+            dec!(-0.006)
+        } else if score >= dec!(65) {
+            dec!(-0.004)
+        } else if score >= dec!(55) {
+            dec!(-0.002)
+        } else if score >= dec!(50) {
+            dec!(0)
+        } else if score >= dec!(40) {
+            dec!(0.002)
+        } else {
+            dec!(0.005)
+        }
     }
 
     /// Calculate effective fee for a tier, clamped to the constitutional cap.
@@ -192,7 +207,9 @@ impl GovernorPid {
     }
 
     fn gold_deviation(&self, m: &NetworkMetrics) -> Decimal {
-        if m.target_gold_price_usd.is_zero() { return dec!(0); }
+        if m.target_gold_price_usd.is_zero() {
+            return dec!(0);
+        }
         (m.current_gold_price_usd - m.target_gold_price_usd) / m.target_gold_price_usd
     }
 
@@ -241,7 +258,11 @@ impl GovernorPid {
     }
 }
 
-impl Default for GovernorPid { fn default() -> Self { Self::new() } }
+impl Default for GovernorPid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 // ===========================================================================
 // Tests
@@ -252,8 +273,12 @@ mod tests {
     use super::*;
 
     fn metrics(
-        gold: Decimal, target: Decimal, volatility: Decimal,
-        volume: Decimal, liquidity: Decimal, velocity: Decimal,
+        gold: Decimal,
+        target: Decimal,
+        volatility: Decimal,
+        volume: Decimal,
+        liquidity: Decimal,
+        velocity: Decimal,
     ) -> NetworkMetrics {
         NetworkMetrics {
             current_gold_price_usd: gold,
@@ -268,28 +293,69 @@ mod tests {
     }
 
     fn golden_era() -> NetworkMetrics {
-        metrics(dec!(84.5), dec!(84), dec!(0.10), dec!(500000), dec!(1500000), dec!(1.0))
+        metrics(
+            dec!(84.5),
+            dec!(84),
+            dec!(0.10),
+            dec!(500000),
+            dec!(1500000),
+            dec!(1.0),
+        )
     }
     fn bubble() -> NetworkMetrics {
-        metrics(dec!(110), dec!(84), dec!(0.45), dec!(2000000), dec!(5000000), dec!(2.0))
+        metrics(
+            dec!(110),
+            dec!(84),
+            dec!(0.45),
+            dec!(2000000),
+            dec!(5000000),
+            dec!(2.0),
+        )
     }
     fn crash() -> NetworkMetrics {
-        metrics(dec!(64), dec!(84), dec!(0.80), dec!(5000000), dec!(100000), dec!(0.5))
+        metrics(
+            dec!(64),
+            dec!(84),
+            dec!(0.80),
+            dec!(5000000),
+            dec!(100000),
+            dec!(0.5),
+        )
     }
     fn stagnation() -> NetworkMetrics {
-        metrics(dec!(83), dec!(84), dec!(0.05), dec!(50000), dec!(200000), dec!(0.1))
+        metrics(
+            dec!(83),
+            dec!(84),
+            dec!(0.05),
+            dec!(50000),
+            dec!(200000),
+            dec!(0.1),
+        )
     }
     fn vacuum() -> NetworkMetrics {
-        metrics(dec!(84.2), dec!(84), dec!(0.05), dec!(50000), dec!(2000000), dec!(0.8))
+        metrics(
+            dec!(84.2),
+            dec!(84),
+            dec!(0.05),
+            dec!(50000),
+            dec!(2000000),
+            dec!(0.8),
+        )
     }
 
     #[test]
     fn pressure_classification() {
         let g = GovernorPid::new();
-        assert_eq!(g.classify_pressure(&golden_era()), PressureQuadrant::GoldenEra);
+        assert_eq!(
+            g.classify_pressure(&golden_era()),
+            PressureQuadrant::GoldenEra
+        );
         assert_eq!(g.classify_pressure(&bubble()), PressureQuadrant::Bubble);
         assert_eq!(g.classify_pressure(&crash()), PressureQuadrant::Crash);
-        assert_eq!(g.classify_pressure(&stagnation()), PressureQuadrant::Stagnation);
+        assert_eq!(
+            g.classify_pressure(&stagnation()),
+            PressureQuadrant::Stagnation
+        );
         assert_eq!(g.classify_pressure(&vacuum()), PressureQuadrant::Vacuum);
     }
 
@@ -298,9 +364,12 @@ mod tests {
         let g = GovernorPid::new();
         let era_score = g.calculate_economic_health_score(&golden_era());
         let crash_score = g.calculate_economic_health_score(&crash());
-        assert!(era_score > dec!(4), "golden era score {} > 4", era_score);
-        assert!(crash_score < dec!(5), "crash score {} < 5", crash_score);
-        assert!(era_score > crash_score, "golden era {} > crash {}", era_score, crash_score);
+        assert!(era_score > dec!(4), "golden era score {era_score} > 4");
+        assert!(crash_score < dec!(5), "crash score {crash_score} < 5");
+        assert!(
+            era_score > crash_score,
+            "golden era {era_score} > crash {crash_score}"
+        );
     }
 
     #[test]
@@ -329,7 +398,10 @@ mod tests {
         );
 
         let discounted = GovernanceParams {
-            fee_modifiers: TierModifiers { l0: dec!(0.5), ..TierModifiers::default() },
+            fee_modifiers: TierModifiers {
+                l0: dec!(0.5),
+                ..TierModifiers::default()
+            },
             ..GovernanceParams::default()
         };
         assert_eq!(
@@ -338,7 +410,10 @@ mod tests {
         );
 
         let negative = GovernanceParams {
-            fee_modifiers: TierModifiers { l0: dec!(-1), ..TierModifiers::default() },
+            fee_modifiers: TierModifiers {
+                l0: dec!(-1),
+                ..TierModifiers::default()
+            },
             ..GovernanceParams::default()
         };
         assert_eq!(
@@ -361,26 +436,48 @@ mod tests {
 
     #[test]
     fn pid_integral_accumulates() {
-        let mild = metrics(dec!(85), dec!(84), dec!(0.10), dec!(500000), dec!(1500000), dec!(1.0));
+        let mild = metrics(
+            dec!(85),
+            dec!(84),
+            dec!(0.10),
+            dec!(500000),
+            dec!(1500000),
+            dec!(1.0),
+        );
         let mut g = GovernorPid::new();
         let p1 = g.recalculate(&mild);
         let p2 = g.recalculate(&mild);
-        assert_ne!(p1.recommended_fee_adjustment, p2.recommended_fee_adjustment,
-            "integral should cause drift between calls");
+        assert_ne!(
+            p1.recommended_fee_adjustment, p2.recommended_fee_adjustment,
+            "integral should cause drift between calls"
+        );
     }
 
     #[test]
     fn fee_adjustment_clamped() {
         let mut g = GovernorPid::new();
         let up = g.recalculate(&bubble());
-        assert!(up.recommended_fee_adjustment <= dec!(0.02),
-            "upper clamp: {}", up.recommended_fee_adjustment);
+        assert!(
+            up.recommended_fee_adjustment <= dec!(0.02),
+            "upper clamp: {}",
+            up.recommended_fee_adjustment
+        );
 
         let mut g2 = GovernorPid::new();
-        let healthy = metrics(dec!(84), dec!(84), dec!(0.01), dec!(10000000), dec!(10000000), dec!(1.0));
+        let healthy = metrics(
+            dec!(84),
+            dec!(84),
+            dec!(0.01),
+            dec!(10000000),
+            dec!(10000000),
+            dec!(1.0),
+        );
         let down = g2.recalculate(&healthy);
-        assert!(down.recommended_fee_adjustment >= dec!(-0.02),
-            "lower clamp: {}", down.recommended_fee_adjustment);
+        assert!(
+            down.recommended_fee_adjustment >= dec!(-0.02),
+            "lower clamp: {}",
+            down.recommended_fee_adjustment
+        );
     }
 
     #[test]
@@ -388,7 +485,11 @@ mod tests {
         let mut g = GovernorPid::new();
         let era = g.recalculate(&golden_era());
         assert_eq!(era.pressure, PressureQuadrant::GoldenEra);
-        assert!(era.health_score > dec!(3), "health {} > 3", era.health_score);
+        assert!(
+            era.health_score > dec!(3),
+            "health {} > 3",
+            era.health_score
+        );
 
         let mut g2 = GovernorPid::new();
         let cr = g2.recalculate(&crash());
@@ -399,8 +500,10 @@ mod tests {
     fn tier_modifier_sensitivity() {
         let g = GovernorPid::new();
         let m = g.compute_tier_modifiers(dec!(0.01));
-        assert!((m.l0 - dec!(1)).abs() > (m.l3 - dec!(1)).abs(),
-            "L0 more sensitive than L3");
+        assert!(
+            (m.l0 - dec!(1)).abs() > (m.l3 - dec!(1)).abs(),
+            "L0 more sensitive than L3"
+        );
     }
 
     #[test]
@@ -431,14 +534,24 @@ mod tests {
         let m = bubble();
         let result = g.recalculate(&m);
         let stored = g.last_params();
-        assert_eq!(stored.recommended_fee_adjustment, result.recommended_fee_adjustment);
+        assert_eq!(
+            stored.recommended_fee_adjustment,
+            result.recommended_fee_adjustment
+        );
         assert_eq!(stored.pressure, result.pressure);
     }
 
     #[test]
     fn gold_deviation_zero_target() {
         let g = GovernorPid::new();
-        let m = metrics(dec!(100), dec!(0), dec!(0.1), dec!(500000), dec!(1000000), dec!(1.0));
+        let m = metrics(
+            dec!(100),
+            dec!(0),
+            dec!(0.1),
+            dec!(500000),
+            dec!(1000000),
+            dec!(1.0),
+        );
         assert_eq!(g.gold_deviation(&m), dec!(0));
     }
 
@@ -449,12 +562,15 @@ mod tests {
         let mut params = GovernanceParams::default();
         let signal = engauge::ThrottleSignal {
             activity_score: 0.8,
-            band_modifier: 0.5,  // organic: cheaper
-            demurrage_modifier: 0.8,  // organic: slower decay
+            band_modifier: 0.5,      // organic: cheaper
+            demurrage_modifier: 0.8, // organic: slower decay
             organic_ratio: 1.0,
         };
         g.apply_throttle_signal(&mut params, &signal);
-        assert!(params.fee_modifiers.l0 < dec!(1), "organic should reduce fees");
+        assert!(
+            params.fee_modifiers.l0 < dec!(1),
+            "organic should reduce fees"
+        );
     }
 
     // -- Fee cap enforcement tests (18D) ------------------------------------
@@ -464,7 +580,10 @@ mod tests {
         let g = GovernorPid::new();
         let params = GovernanceParams {
             // High modifier to push fee above cap
-            fee_modifiers: TierModifiers { l0: dec!(10), ..TierModifiers::default() },
+            fee_modifiers: TierModifiers {
+                l0: dec!(10),
+                ..TierModifiers::default()
+            },
             ..GovernanceParams::default()
         };
         // base=10, modifier=10x => raw=100, but L0 cap = 5% of 100 = 5
@@ -485,7 +604,10 @@ mod tests {
     fn calculate_fee_l3_tight_cap() {
         let g = GovernorPid::new();
         let params = GovernanceParams {
-            fee_modifiers: TierModifiers { l3: dec!(5), ..TierModifiers::default() },
+            fee_modifiers: TierModifiers {
+                l3: dec!(5),
+                ..TierModifiers::default()
+            },
             ..GovernanceParams::default()
         };
         // base=10, modifier=5x => raw=50, L3 cap = 0.1% of 1000 = 1

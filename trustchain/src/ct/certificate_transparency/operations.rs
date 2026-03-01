@@ -4,19 +4,19 @@
 
 //! Certificate Transparency Log operations
 
+use dashmap::DashMap;
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use ring::rand::{SecureRandom, SystemRandom};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::SystemTime;
-use dashmap::DashMap;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
-use sha2::{Sha256, Digest};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
-use ed25519_dalek::{SigningKey, VerifyingKey, Signer};
-use ring::rand::{SystemRandom, SecureRandom};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use crate::ca::IssuedCertificate;
 use super::types::*;
+use crate::ca::IssuedCertificate;
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Certificate Transparency Log with Merkle tree verification
 pub struct CertificateTransparencyLog {
@@ -48,16 +48,18 @@ impl CertificateTransparencyLog {
 
     /// Create new Certificate Transparency log with custom configuration
     pub async fn new_with_config(config: CTConfig) -> TrustChainResult<Self> {
-        info!("Initializing Certificate Transparency log: {}", config.log_id);
+        info!(
+            "Initializing Certificate Transparency log: {}",
+            config.log_id
+        );
 
         let rng = SystemRandom::new();
         let (signing_key, verifying_key) = Self::generate_signing_keypair(&rng)?;
 
         let merkle_tree = Arc::new(RwLock::new(()));
         let storage = Arc::new(S3BackedStorage::new(config.storage_config.clone()).await?);
-        let performance_monitor = Arc::new(CTPerformanceMonitor::new(
-            config.performance_targets.clone()
-        ).await?);
+        let performance_monitor =
+            Arc::new(CTPerformanceMonitor::new(config.performance_targets.clone()).await?);
         let entries_cache = Arc::new(DashMap::new());
         let metrics = Arc::new(CTMetrics::default());
         let consistency_checker = Arc::new(ConsistencyChecker::new().await?);
@@ -79,11 +81,13 @@ impl CertificateTransparencyLog {
     }
 
     /// Generate cryptographic signing keypair for CT log
-    fn generate_signing_keypair(rng: &SystemRandom) -> TrustChainResult<(SigningKey, VerifyingKey)> {
+    fn generate_signing_keypair(
+        rng: &SystemRandom,
+    ) -> TrustChainResult<(SigningKey, VerifyingKey)> {
         let mut secret_key_bytes = [0u8; 32];
         rng.fill(&mut secret_key_bytes)
             .map_err(|e| TrustChainError::CryptoError {
-                reason: format!("random_key_generation: {}", e.to_string()),
+                reason: format!("random_key_generation: {e}"),
             })?;
         let signing_key = SigningKey::from_bytes(&secret_key_bytes);
         let verifying_key = signing_key.verifying_key();
@@ -91,19 +95,30 @@ impl CertificateTransparencyLog {
     }
 
     /// Add certificate to transparency log
-    pub async fn add_certificate(&self, certificate: &IssuedCertificate) -> TrustChainResult<CTEntry> {
+    pub async fn add_certificate(
+        &self,
+        certificate: &IssuedCertificate,
+    ) -> TrustChainResult<CTEntry> {
         let start_time = std::time::Instant::now();
-        info!("Adding certificate to CT log: {}", certificate.serial_number);
+        info!(
+            "Adding certificate to CT log: {}",
+            certificate.serial_number
+        );
 
         self.validate_certificate(certificate).await?;
 
-        let certificate_fingerprint = self.calculate_certificate_fingerprint(&certificate.certificate_der);
+        let certificate_fingerprint =
+            self.calculate_certificate_fingerprint(&certificate.certificate_der);
         let entry_id = Uuid::new_v4().to_string();
-        let sequence_number = self.metrics.entries_added.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let sequence_number = self
+            .metrics
+            .entries_added
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let timestamp = SystemTime::now();
         let log_id = self.calculate_log_id();
 
-        let entry_data = self.create_entry_data(&certificate.certificate_der, timestamp, sequence_number)?;
+        let entry_data =
+            self.create_entry_data(&certificate.certificate_der, timestamp, sequence_number)?;
         let signature = self.sign_entry_data(&entry_data).await?;
         let leaf_hash = self.calculate_leaf_hash(&entry_data)?;
 
@@ -122,34 +137,62 @@ impl CertificateTransparencyLog {
 
         {
             let _tree = self.merkle_tree.write().await;
-            debug!("Added entry {} to merkle tree (tracking: {})", entry_id, ct_entry.leaf_hash.len());
+            debug!(
+                "Added entry {} to merkle tree (tracking: {})",
+                entry_id,
+                ct_entry.leaf_hash.len()
+            );
         }
 
         self.storage.store_entry(&ct_entry).await?;
-        self.entries_cache.insert(entry_id.clone(), ct_entry.clone());
+        self.entries_cache
+            .insert(entry_id.clone(), ct_entry.clone());
 
-        self.metrics.merkle_tree_updates.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.storage_operations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.current_tree_size.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .merkle_tree_updates
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .storage_operations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .current_tree_size
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         let latency = start_time.elapsed().as_millis() as u64;
-        self.metrics.average_latency_ms.store(latency, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .average_latency_ms
+            .store(latency, std::sync::atomic::Ordering::Relaxed);
 
         if latency > self.config.performance_targets.max_latency_ms {
-            warn!("CT log performance violation: {}ms > {}ms target",
-                  latency, self.config.performance_targets.max_latency_ms);
-            self.metrics.performance_violations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            warn!(
+                "CT log performance violation: {}ms > {}ms target",
+                latency, self.config.performance_targets.max_latency_ms
+            );
+            self.metrics
+                .performance_violations
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        info!("Certificate added to CT log successfully: {} ({}ms)", entry_id, latency);
+        info!(
+            "Certificate added to CT log successfully: {} ({}ms)",
+            entry_id, latency
+        );
         Ok(ct_entry)
     }
 
     /// Create entry data for signing
-    fn create_entry_data(&self, cert_der: &[u8], timestamp: SystemTime, sequence_number: u64) -> TrustChainResult<Vec<u8>> {
+    fn create_entry_data(
+        &self,
+        cert_der: &[u8],
+        timestamp: SystemTime,
+        sequence_number: u64,
+    ) -> TrustChainResult<Vec<u8>> {
         let mut data = Vec::new();
-        let timestamp_secs = timestamp.duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| TrustChainError::TimestampError { reason: e.to_string() })?
+        let timestamp_secs = timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|e| TrustChainError::TimestampError {
+                reason: e.to_string(),
+            })?
             .as_secs();
         data.extend_from_slice(&timestamp_secs.to_be_bytes());
         data.extend_from_slice(&sequence_number.to_be_bytes());
@@ -193,9 +236,16 @@ impl CertificateTransparencyLog {
         let mut data_to_sign = Vec::new();
         data_to_sign.extend_from_slice(&entry.log_id);
         data_to_sign.extend_from_slice(&entry.sequence_number.to_be_bytes());
-        data_to_sign.extend_from_slice(&entry.timestamp.duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| TrustChainError::TimestampError { reason: e.to_string() })?
-            .as_secs().to_be_bytes());
+        data_to_sign.extend_from_slice(
+            &entry
+                .timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_err(|e| TrustChainError::TimestampError {
+                    reason: e.to_string(),
+                })?
+                .as_secs()
+                .to_be_bytes(),
+        );
         data_to_sign.extend_from_slice(&entry.certificate_der);
         let signature = self.signing_key.sign(&data_to_sign);
         Ok(signature.to_bytes().to_vec())
@@ -210,10 +260,15 @@ impl CertificateTransparencyLog {
         let mut tree_head_data = Vec::new();
         tree_head_data.extend_from_slice(&self.calculate_log_id());
         tree_head_data.extend_from_slice(&tree_size.to_be_bytes());
-        tree_head_data.extend_from_slice(&SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| TrustChainError::TimestampError { reason: e.to_string() })?
-            .as_secs().to_be_bytes());
+        tree_head_data.extend_from_slice(
+            &SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map_err(|e| TrustChainError::TimestampError {
+                    reason: e.to_string(),
+                })?
+                .as_secs()
+                .to_be_bytes(),
+        );
         tree_head_data.extend_from_slice(&tree_root);
         let signature = self.signing_key.sign(&tree_head_data);
         Ok(signature.to_bytes().to_vec())
@@ -258,36 +313,55 @@ impl CertificateTransparencyLog {
 
     /// Get current log size
     async fn get_log_size(&self) -> TrustChainResult<u64> {
-        Ok(self.metrics.current_tree_size.load(std::sync::atomic::Ordering::Relaxed))
+        Ok(self
+            .metrics
+            .current_tree_size
+            .load(std::sync::atomic::Ordering::Relaxed))
     }
 
     /// Get log metrics
     pub async fn get_metrics(&self) -> CTMetrics {
         CTMetrics {
             entries_added: std::sync::atomic::AtomicU64::new(
-                self.metrics.entries_added.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .entries_added
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             merkle_tree_updates: std::sync::atomic::AtomicU64::new(
-                self.metrics.merkle_tree_updates.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .merkle_tree_updates
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             storage_operations: std::sync::atomic::AtomicU64::new(
-                self.metrics.storage_operations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .storage_operations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             performance_violations: std::sync::atomic::AtomicU64::new(
-                self.metrics.performance_violations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .performance_violations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             average_latency_ms: std::sync::atomic::AtomicU64::new(
-                self.metrics.average_latency_ms.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .average_latency_ms
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             current_tree_size: std::sync::atomic::AtomicU64::new(
-                self.metrics.current_tree_size.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .current_tree_size
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
 
     /// Get CT entry by fingerprint
     pub async fn get_entry(&self, fingerprint: &str) -> TrustChainResult<Option<CTEntry>> {
-        if let Some(entry) = self.entries_cache.iter().find(|e| hex::encode(e.certificate_fingerprint) == fingerprint) {
+        if let Some(entry) = self
+            .entries_cache
+            .iter()
+            .find(|e| hex::encode(e.certificate_fingerprint) == fingerprint)
+        {
             return Ok(Some(entry.clone()));
         }
         let fingerprint_bytes: [u8; 32] = hex::decode(fingerprint)
@@ -298,9 +372,14 @@ impl CertificateTransparencyLog {
     }
 
     /// Get inclusion proof for a certificate
-    pub async fn get_inclusion_proof(&self, fingerprint: &str) -> TrustChainResult<InclusionProofData> {
-        let entry = self.get_entry(fingerprint).await?
-            .ok_or_else(|| TrustChainError::NotFound)?;
+    pub async fn get_inclusion_proof(
+        &self,
+        fingerprint: &str,
+    ) -> TrustChainResult<InclusionProofData> {
+        let entry = self
+            .get_entry(fingerprint)
+            .await?
+            .ok_or(TrustChainError::NotFound)?;
         let proof_hashes = vec![
             hex::encode(self.calculate_leaf_hash(&entry.certificate_der)?),
             hex::encode(self.calculate_log_id()),
@@ -316,10 +395,14 @@ impl CertificateTransparencyLog {
     }
 
     /// Get consistency proof between two tree sizes
-    pub async fn get_consistency_proof(&self, old_size: u64, new_size: u64) -> TrustChainResult<ConsistencyProofData> {
+    pub async fn get_consistency_proof(
+        &self,
+        old_size: u64,
+        new_size: u64,
+    ) -> TrustChainResult<ConsistencyProofData> {
         if new_size <= old_size {
             return Err(TrustChainError::InvalidRequest {
-                reason: "New size must be greater than old size".to_string()
+                reason: "New size must be greater than old size".to_string(),
             });
         }
         Ok(ConsistencyProofData {
@@ -333,7 +416,7 @@ impl CertificateTransparencyLog {
     pub async fn get_entries(&self, start: u64, end: u64) -> TrustChainResult<Vec<CTEntry>> {
         if end <= start {
             return Err(TrustChainError::InvalidRequest {
-                reason: "End must be greater than start".to_string()
+                reason: "End must be greater than start".to_string(),
             });
         }
         let mut entries = Vec::new();
@@ -354,7 +437,9 @@ impl CertificateTransparencyLog {
         let metrics = self.get_metrics().await;
         Ok(CTStatistics {
             log_id: hex::encode(self.calculate_log_id()),
-            total_entries: metrics.entries_added.load(std::sync::atomic::Ordering::Relaxed),
+            total_entries: metrics
+                .entries_added
+                .load(std::sync::atomic::Ordering::Relaxed),
             shard_count: 1,
             tree_size: self.get_log_size().await?,
             root_hash: self.calculate_root_hash().await?,
@@ -368,7 +453,7 @@ impl CertificateTransparencyLog {
     async fn calculate_root_hash(&self) -> TrustChainResult<Vec<u8>> {
         let mut hasher = Sha256::new();
         hasher.update(self.calculate_log_id());
-        hasher.update(&self.get_log_size().await?.to_be_bytes());
+        hasher.update(self.get_log_size().await?.to_be_bytes());
         Ok(hasher.finalize().to_vec())
     }
 }

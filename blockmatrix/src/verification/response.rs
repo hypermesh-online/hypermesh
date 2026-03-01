@@ -7,6 +7,7 @@
 //! 1. Challenge response matches BLAKE3(nonce || chain_head)
 //! 2. Shard commitment in response matches recomputed commitment from shard map
 //! 3. Response was within timeout
+//!
 //! Result is binary: consistent (true) or inconsistent (false).
 
 use super::shard_commitment::verify_commitment;
@@ -23,11 +24,7 @@ impl ConsistencyChecker {
     }
 
     /// Check a response against its request. Returns a binary result.
-    pub fn check(
-        &self,
-        request: &PoSPingRequest,
-        response: &PoSPingResponse,
-    ) -> PoSPingResult {
+    pub fn check(&self, request: &PoSPingRequest, response: &PoSPingResponse) -> PoSPingResult {
         let mut shards_checked: u16 = 0;
         let mut shards_passed: u16 = 0;
         let mut consistent = true;
@@ -38,9 +35,7 @@ impl ConsistencyChecker {
         }
 
         // 2. Verify shard commitment matches shard map
-        if let (Some(commitment), Some(map)) =
-            (&response.shard_commitment, &response.shard_map)
-        {
+        if let (Some(commitment), Some(map)) = (&response.shard_commitment, &response.shard_map) {
             // Check commitment in response matches map's commitment
             if map.commitment != *commitment {
                 consistent = false;
@@ -50,10 +45,7 @@ impl ConsistencyChecker {
                 consistent = false;
             }
             // Count shard checks (sample up to shard_sample_count)
-            let sample_count = self
-                .config
-                .shard_sample_count
-                .min(map.entries.len() as u8);
+            let sample_count = self.config.shard_sample_count.min(map.entries.len() as u8);
             shards_checked = sample_count as u16;
             // In a real implementation, we'd query shard holders here.
             // For now, if the commitment verifies, all sampled shards pass.
@@ -78,11 +70,7 @@ impl ConsistencyChecker {
     }
 
     /// Verify the challenge response: BLAKE3(nonce || chain_head_hash).
-    fn verify_challenge(
-        &self,
-        request: &PoSPingRequest,
-        response: &PoSPingResponse,
-    ) -> bool {
+    fn verify_challenge(&self, request: &PoSPingRequest, response: &PoSPingResponse) -> bool {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&request.challenge_nonce);
         hasher.update(&response.chain_head_hash);
@@ -150,8 +138,7 @@ mod tests {
         let chain_head = [0x01; 32];
         let (map, commitment) = make_shard_map();
         let filtered = map.to_filtered_map(true);
-        let challenge_response =
-            compute_challenge_response(&request.challenge_nonce, &chain_head);
+        let challenge_response = compute_challenge_response(&request.challenge_nonce, &chain_head);
 
         PoSPingResponse {
             chain_head_hash: chain_head,
@@ -217,8 +204,10 @@ mod tests {
 
     #[test]
     fn timeout_is_inconsistent() {
-        let mut config = VerificationConfig::default();
-        config.response_timeout_ms = 1; // 1ms timeout
+        let config = VerificationConfig {
+            response_timeout_ms: 1, // 1ms timeout
+            ..VerificationConfig::default()
+        };
         let checker = ConsistencyChecker::new(config);
         let request = make_request();
         let mut response = make_valid_response(&request);
@@ -232,8 +221,7 @@ mod tests {
         let checker = ConsistencyChecker::new(VerificationConfig::default());
         let request = make_request();
         let chain_head = [0x01; 32];
-        let challenge_response =
-            compute_challenge_response(&request.challenge_nonce, &chain_head);
+        let challenge_response = compute_challenge_response(&request.challenge_nonce, &chain_head);
         let response = PoSPingResponse {
             chain_head_hash: chain_head,
             chain_height: 50,

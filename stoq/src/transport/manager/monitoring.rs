@@ -4,16 +4,16 @@
 
 //! STOQ Transport monitoring, stats, metrics, and accessor methods
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tracing::info;
 
 use crate::transport::config::NetworkTier;
 use crate::transport::stats::ConnectionPoolStats;
 
-use crate::protocol::StoqProtocolHandler;
 use crate::protocol::pos_fast_validator::PosFastValidator;
 use crate::protocol::StoqPosIntegration;
+use crate::protocol::StoqProtocolHandler;
 
 use super::StoqTransport;
 
@@ -33,7 +33,10 @@ impl StoqTransport {
               perf_stats.memory_pool_misses.load(Ordering::Relaxed),
               perf_stats.frame_batches_sent.load(Ordering::Relaxed));
 
-        info!("Memory Pool Stats: Available buffers: {}, Allocated: {}", pool_available, pool_allocated);
+        info!(
+            "Memory Pool Stats: Available buffers: {}, Allocated: {}",
+            pool_available, pool_allocated
+        );
 
         base_stats
     }
@@ -69,7 +72,9 @@ impl StoqTransport {
             reuse_count: perf_stats.connection_reuse_count.load(Ordering::Relaxed),
             eviction_count: perf_stats.connection_pool_evictions.load(Ordering::Relaxed),
             health_check_count: perf_stats.connection_health_checks.load(Ordering::Relaxed),
-            unhealthy_removed: perf_stats.unhealthy_connections_removed.load(Ordering::Relaxed),
+            unhealthy_removed: perf_stats
+                .unhealthy_connections_removed
+                .load(Ordering::Relaxed),
         }
     }
 

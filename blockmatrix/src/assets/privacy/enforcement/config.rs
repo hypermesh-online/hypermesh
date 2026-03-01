@@ -6,14 +6,13 @@
 //!
 //! Main configuration types for privacy enforcement.
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use super::types::{
-    DataCollectionSettings, NotificationThrottling,
-    RecoveryProcedures, PatternAnalysisAlgorithm, RiskLevelThresholds,
-    AnomalyCategory, NotificationChannel, EscalationRule, AutoResponseTrigger,
-    EnforcementAction, FalsePositiveReduction,
+    AnomalyCategory, AutoResponseTrigger, DataCollectionSettings, EnforcementAction,
+    EscalationRule, FalsePositiveReduction, NotificationChannel, NotificationThrottling,
+    PatternAnalysisAlgorithm, RecoveryProcedures, RiskLevelThresholds,
 };
 
 /// Privacy enforcement configuration

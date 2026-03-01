@@ -8,20 +8,20 @@
 //! ensuring all state (matrix coordinates, every-node-blockchain data, geospatial
 //! mappings, network topology) survives node restarts with zero data loss.
 
-pub mod matrix_state;
 pub mod blockchain_storage;
-pub mod topology_backup;
-pub mod snapshots;
-pub mod recovery;
 pub mod manager;
+pub mod matrix_state;
+pub mod recovery;
+pub mod snapshots;
+pub mod topology_backup;
 
 // Re-export main types
-pub use matrix_state::{MatrixStateSerializer, MatrixState, SerializationFormat};
-pub use blockchain_storage::{BlockchainStorage, BlockQuery, ChainMetadata};
-pub use topology_backup::{TopologyBackup, BackupMode};
-pub use snapshots::{SnapshotManager, SnapshotMetadata, SnapshotSchedule};
+pub use blockchain_storage::{BlockQuery, BlockchainStorage, ChainMetadata};
+pub use manager::{PersistenceConfig, PersistenceManager, StorageStats};
+pub use matrix_state::{MatrixState, MatrixStateSerializer, SerializationFormat};
 pub use recovery::{RecoveryManager, RecoveryReport, RecoveryStatus};
-pub use manager::{PersistenceManager, PersistenceConfig, StorageStats};
+pub use snapshots::{SnapshotManager, SnapshotMetadata, SnapshotSchedule};
+pub use topology_backup::{BackupMode, TopologyBackup};
 
 use thiserror::Error;
 

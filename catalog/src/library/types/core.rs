@@ -192,7 +192,10 @@ pub(crate) mod arc_hashmap_arc_str_serde {
     use serde::de::{Deserializer, MapAccess, Visitor};
     use std::fmt;
 
-    pub fn serialize<S>(value: &Arc<HashMap<Arc<str>, Arc<str>>>, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(
+        value: &Arc<HashMap<Arc<str>, Arc<str>>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -204,7 +207,9 @@ pub(crate) mod arc_hashmap_arc_str_serde {
         map.end()
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<HashMap<Arc<str>, Arc<str>>>, D::Error>
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Arc<HashMap<Arc<str>, Arc<str>>>, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -237,4 +242,4 @@ lazy_static::lazy_static! {
 }
 
 // Import types that serde macros reference (used in macro expansion)
-use super::metadata::{PackageDependency, ContentRef, BinaryRef, TemplateParameter};
+use super::metadata::{BinaryRef, ContentRef, PackageDependency, TemplateParameter};

@@ -10,11 +10,10 @@
 //! Run with: sudo cargo run --example ebpf_demo --features ebpf
 
 use anyhow::Result;
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
 use std::time::{Duration, Instant};
-use tokio;
-use tracing::{info, warn, error};
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,20 +21,25 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed
     }
 
     info!("Starting STOQ eBPF demonstration");
 
     // Create configuration optimized for eBPF
-    let mut config = TransportConfig::default();
-    config.enable_zero_copy = true;
-    config.enable_memory_pool = true;
-    config.memory_pool_size = 2048;
-    config.frame_batch_size = 64;
-    config.enable_cpu_affinity = true;
-    config.enable_large_send_offload = true;
+    let config = TransportConfig {
+        enable_zero_copy: true,
+        enable_memory_pool: true,
+        memory_pool_size: 2048,
+        frame_batch_size: 64,
+        enable_cpu_affinity: true,
+        enable_large_send_offload: true,
+        ..Default::default()
+    };
 
     // Create transport
     let transport = StoqTransport::new(config).await?;
@@ -62,6 +66,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+#[allow(unused_variables)]
 fn check_ebpf_status(transport: &StoqTransport) {
     info!("\n=== eBPF Capability Check ===");
 
@@ -70,10 +75,30 @@ fn check_ebpf_status(transport: &StoqTransport) {
         if let Some(status) = transport.get_ebpf_status() {
             info!("eBPF Status:");
             info!("  Kernel version: {}", status.kernel_version);
-            info!("  XDP support: {}", if status.xdp_available { "✓" } else { "✗" });
-            info!("  AF_XDP support: {}", if status.af_xdp_available { "✓" } else { "✗" });
-            info!("  CAP_NET_ADMIN: {}", if status.has_cap_net_admin { "✓" } else { "✗" });
-            info!("  BPF filesystem: {}", if status.bpf_fs_mounted { "✓" } else { "✗" });
+            info!(
+                "  XDP support: {}",
+                if status.xdp_available { "✓" } else { "✗" }
+            );
+            info!(
+                "  AF_XDP support: {}",
+                if status.af_xdp_available {
+                    "✓"
+                } else {
+                    "✗"
+                }
+            );
+            info!(
+                "  CAP_NET_ADMIN: {}",
+                if status.has_cap_net_admin {
+                    "✓"
+                } else {
+                    "✗"
+                }
+            );
+            info!(
+                "  BPF filesystem: {}",
+                if status.bpf_fs_mounted { "✓" } else { "✗" }
+            );
 
             if !status.has_cap_net_admin {
                 warn!("CAP_NET_ADMIN not available!");
@@ -137,23 +162,15 @@ async fn run_performance_test(transport: StoqTransport) -> Result<()> {
         info!("Starting server on [::1]:9300");
 
         for _ in 0..10 {
-            match tokio::time::timeout(
-                Duration::from_secs(1),
-                server_transport.accept()
-            ).await {
+            match tokio::time::timeout(Duration::from_secs(1), server_transport.accept()).await {
                 Ok(Ok(conn)) => {
                     info!("Server accepted connection: {}", conn.id());
 
                     // Echo server
-                    let transport = server_transport.clone();
+                    let echo_transport = server_transport.clone();
                     tokio::spawn(async move {
-                        loop {
-                            match transport.receive(&conn).await {
-                                Ok(data) => {
-                                    let _ = transport.send(&conn, &data).await;
-                                }
-                                Err(_) => break,
-                            }
+                        while let Ok(data) = echo_transport.receive(&conn).await {
+                            let _ = echo_transport.send(&conn, &data).await;
                         }
                     });
                 }
@@ -194,14 +211,18 @@ async fn run_performance_test(transport: StoqTransport) -> Result<()> {
 
                 let duration = start.elapsed();
                 let total_bytes = size * iterations;
-                let throughput_mbps = (total_bytes as f64 * 8.0) / duration.as_secs_f64() / 1_000_000.0;
+                let throughput_mbps =
+                    (total_bytes as f64 * 8.0) / duration.as_secs_f64() / 1_000_000.0;
 
-                info!("  {} bytes: {:.2} Mbps ({} packets in {:?})",
-                    size, throughput_mbps, iterations, duration);
+                info!(
+                    "  {} bytes: {:.2} Mbps ({} packets in {:?})",
+                    size, throughput_mbps, iterations, duration
+                );
             }
 
             // Get performance statistics
-            let (peak_gbps, zero_copy_ops, pool_hits, frame_batches) = transport.performance_stats();
+            let (peak_gbps, zero_copy_ops, pool_hits, frame_batches) =
+                transport.performance_stats();
 
             info!("\n=== Performance Statistics ===");
             info!("  Peak throughput: {:.2} Gbps", peak_gbps);
@@ -237,45 +258,80 @@ async fn monitor_ebpf_metrics(transport: &StoqTransport) -> Result<()> {
 
             // Proof of State metrics
             println!("Proof of State:");
-            println!("  Total validations: {}", metrics.pos_metrics.total_validations);
+            println!(
+                "  Total validations: {}",
+                metrics.pos_metrics.total_validations
+            );
             println!("  Successful: {}", metrics.pos_metrics.successful);
             println!("  Failed: {}", metrics.pos_metrics.failed);
             println!("  Success rate: {:.2}%", metrics.pos_metrics.success_rate());
 
             // Asset hash metrics
             println!("\nAsset Hash:");
-            println!("  Total validations: {}", metrics.asset_metrics.total_validations);
+            println!(
+                "  Total validations: {}",
+                metrics.asset_metrics.total_validations
+            );
             println!("  Successful: {}", metrics.asset_metrics.successful);
-            println!("  Hash mismatches: {}", metrics.asset_metrics.hash_mismatches);
+            println!(
+                "  Hash mismatches: {}",
+                metrics.asset_metrics.hash_mismatches
+            );
             println!("  Shard failures: {}", metrics.asset_metrics.shard_failures);
 
             // Matrix routing metrics
             println!("\nMatrix Routing:");
-            println!("  Total validations: {}", metrics.routing_metrics.total_validations);
+            println!(
+                "  Total validations: {}",
+                metrics.routing_metrics.total_validations
+            );
             println!("  Successful: {}", metrics.routing_metrics.successful);
             println!("  Path failures: {}", metrics.routing_metrics.path_failures);
-            println!("  Avg path length: {:.1}", metrics.routing_metrics.avg_path_length);
+            println!(
+                "  Avg path length: {:.1}",
+                metrics.routing_metrics.avg_path_length
+            );
 
             // Privacy tier metrics
             println!("\nPrivacy Tiers:");
-            println!("  Anonymous: {}", metrics.privacy_metrics.anonymous_connections);
+            println!(
+                "  Anonymous: {}",
+                metrics.privacy_metrics.anonymous_connections
+            );
             println!("  Private: {}", metrics.privacy_metrics.private_connections);
             println!("  Public: {}", metrics.privacy_metrics.public_connections);
             println!("  Violations: {}", metrics.privacy_metrics.tier_violations);
 
             // Transport metrics
             println!("\nTransport:");
-            println!("  Total packets: {}", metrics.transport_metrics.total_packets);
-            println!("  Packets/sec: {:.2}", metrics.transport_metrics.packets_per_second);
-            println!("  Throughput: {:.2} Gbps", metrics.transport_metrics.throughput_gbps());
+            println!(
+                "  Total packets: {}",
+                metrics.transport_metrics.total_packets
+            );
+            println!(
+                "  Packets/sec: {:.2}",
+                metrics.transport_metrics.packets_per_second
+            );
+            println!(
+                "  Throughput: {:.2} Gbps",
+                metrics.transport_metrics.throughput_gbps()
+            );
             println!("  Kernel drops: {}", metrics.transport_metrics.kernel_drops);
-            println!("  AF_XDP redirects: {}", metrics.transport_metrics.af_xdp_redirects);
-            println!("  Zero-copy ops: {}", metrics.transport_metrics.zero_copy_ops);
+            println!(
+                "  AF_XDP redirects: {}",
+                metrics.transport_metrics.af_xdp_redirects
+            );
+            println!(
+                "  Zero-copy ops: {}",
+                metrics.transport_metrics.zero_copy_ops
+            );
             println!("  Memcpy ops: {}", metrics.transport_metrics.memcpy_ops);
-            println!("  Latency: min={} avg={} max={} us",
+            println!(
+                "  Latency: min={} avg={} max={} us",
                 metrics.transport_metrics.latency_min_us,
                 metrics.transport_metrics.latency_avg_us,
-                metrics.transport_metrics.latency_max_us);
+                metrics.transport_metrics.latency_max_us
+            );
 
             println!("\nPress Ctrl+C to stop monitoring...");
         } else {
@@ -290,6 +346,7 @@ async fn monitor_ebpf_metrics(transport: &StoqTransport) -> Result<()> {
 }
 
 #[cfg(not(feature = "ebpf"))]
+#[allow(dead_code)]
 async fn monitor_ebpf_metrics(_transport: &StoqTransport) -> Result<()> {
     warn!("eBPF metrics not available (feature not compiled)");
     Ok(())

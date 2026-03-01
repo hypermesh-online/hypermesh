@@ -11,20 +11,20 @@
 //! - DNSSEC support with proper key management
 //! - Real DNS resolution replacing localhost stubs
 
+use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
-use serde::{Serialize, Deserialize};
-use anyhow::anyhow;
+use tracing::{debug, error, info, warn};
 
 use hickory_proto::op::ResponseCode;
-use hickory_proto::rr::{Name, RecordType, Record, RData};
+use hickory_proto::rr::{Name, RData, Record, RecordType};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Authoritative DNS zone for trust.hypermesh.online
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,11 +56,11 @@ impl Default for DnsZone {
             primary_address: Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1), // Placeholder IPv6
             secondary_addresses: vec![],
             default_ttl: 300, // 5 minutes
-            serial: 1, // Start with serial 1
-            refresh: 7200, // 2 hours
-            retry: 3600, // 1 hour
-            expire: 604800, // 1 week
-            minimum: 86400, // 1 day
+            serial: 1,        // Start with serial 1
+            refresh: 7200,    // 2 hours
+            retry: 3600,      // 1 hour
+            expire: 604800,   // 1 week
+            minimum: 86400,   // 1 day
         }
     }
 }
@@ -152,7 +152,10 @@ impl AuthoritativeDnsServer {
     /// Create new authoritative DNS server for trust.hypermesh.online
     pub async fn new(config: AuthoritativeDnsConfig) -> TrustChainResult<Self> {
         info!("Initializing authoritative DNS server for trust.hypermesh.online");
-        info!("DNS server will bind to [{}]:{}", config.bind_address, config.dns_port);
+        info!(
+            "DNS server will bind to [{}]:{}",
+            config.bind_address, config.dns_port
+        );
 
         let primary_zone = Arc::new(RwLock::new(config.primary_zone.clone()));
         let federated_networks = Arc::new(RwLock::new(HashMap::new()));
@@ -167,7 +170,9 @@ impl AuthoritativeDnsServer {
         trust_record.set_name(Name::from_ascii("trust.hypermesh.online").map_err(|e| anyhow!(e))?);
         trust_record.set_record_type(RecordType::AAAA);
         trust_record.set_ttl(config.primary_zone.default_ttl);
-        trust_record.set_data(Some(RData::AAAA(config.primary_zone.primary_address.into())));
+        trust_record.set_data(Some(RData::AAAA(
+            config.primary_zone.primary_address.into(),
+        )));
         cache.insert("trust.hypermesh.online.AAAA".to_string(), trust_record);
 
         // Add SOA record for trust.hypermesh.online
@@ -202,13 +207,18 @@ impl AuthoritativeDnsServer {
         info!("🌐 Starting authoritative DNS server for trust.hypermesh.online");
         info!("🌐 Binding to {} (IPv6-only)", socket_addr);
 
-        let socket = UdpSocket::bind(socket_addr).await
-            .map_err(|e| TrustChainError::NetworkError {
-                operation: "dns_server_bind".to_string(),
-                reason: format!("Failed to bind to {}: {}", socket_addr, e),
-            })?;
+        let socket =
+            UdpSocket::bind(socket_addr)
+                .await
+                .map_err(|e| TrustChainError::NetworkError {
+                    operation: "dns_server_bind".to_string(),
+                    reason: format!("Failed to bind to {socket_addr}: {e}"),
+                })?;
 
-        info!("✅ Authoritative DNS server started successfully on {}", socket_addr);
+        info!(
+            "✅ Authoritative DNS server started successfully on {}",
+            socket_addr
+        );
         info!("🔍 Ready to serve DNS queries for trust.hypermesh.online domain");
 
         // Start health check task for federated networks
@@ -237,7 +247,10 @@ impl AuthoritativeDnsServer {
         loop {
             match socket.recv_from(&mut buffer).await {
                 Ok((size, source_addr)) => {
-                    debug!("Received DNS query from {}, size: {} bytes", source_addr, size);
+                    debug!(
+                        "Received DNS query from {}, size: {} bytes",
+                        source_addr, size
+                    );
 
                     // Update statistics
                     {
@@ -264,7 +277,9 @@ impl AuthoritativeDnsServer {
                             stats.failed_responses += 1;
 
                             // Send error response
-                            if let Ok(error_response) = self.create_error_response(ResponseCode::ServFail).await {
+                            if let Ok(error_response) =
+                                self.create_error_response(ResponseCode::ServFail).await
+                            {
                                 let _ = socket.send_to(&error_response, source_addr).await;
                             }
                         }
@@ -279,7 +294,11 @@ impl AuthoritativeDnsServer {
     }
 
     /// Process a DNS query and generate response
-    async fn process_dns_query(&self, _query_data: &[u8], _source: SocketAddr) -> TrustChainResult<Vec<u8>> {
+    async fn process_dns_query(
+        &self,
+        _query_data: &[u8],
+        _source: SocketAddr,
+    ) -> TrustChainResult<Vec<u8>> {
         // Parse the DNS query (simplified implementation)
         // In production, this would use proper DNS parsing library
 
@@ -343,7 +362,10 @@ impl AuthoritativeDnsServer {
         // IPv6 address
         response.extend_from_slice(&zone.primary_address.octets());
 
-        info!("Created DNS response for trust.hypermesh.online -> [{}]", zone.primary_address);
+        info!(
+            "Created DNS response for trust.hypermesh.online -> [{}]",
+            zone.primary_address
+        );
         Ok(response)
     }
 
@@ -363,20 +385,32 @@ impl AuthoritativeDnsServer {
             _ => 2, // Default to ServFail for unknown codes
         };
         response.extend_from_slice(&[
-            0x00, 0x01, // ID = 1
-            0x81, error_code_value, // Flags with error code
-            0x00, 0x00, // Questions = 0
-            0x00, 0x00, // Answers = 0
-            0x00, 0x00, // Authority RRs = 0
-            0x00, 0x00, // Additional RRs = 0
+            0x00,
+            0x01, // ID = 1
+            0x81,
+            error_code_value, // Flags with error code
+            0x00,
+            0x00, // Questions = 0
+            0x00,
+            0x00, // Answers = 0
+            0x00,
+            0x00, // Authority RRs = 0
+            0x00,
+            0x00, // Additional RRs = 0
         ]);
 
         Ok(response)
     }
 
     /// Register a new federated network
-    pub async fn register_federated_network(&self, network: FederatedNetwork) -> TrustChainResult<()> {
-        info!("Registering federated network: {} -> {}", network.domain, network.primary_address);
+    pub async fn register_federated_network(
+        &self,
+        network: FederatedNetwork,
+    ) -> TrustChainResult<()> {
+        info!(
+            "Registering federated network: {} -> {}",
+            network.domain, network.primary_address
+        );
 
         let mut networks = self.federated_networks.write().await;
         let mut stats = self.stats.write().await;
@@ -396,7 +430,10 @@ impl AuthoritativeDnsServer {
 
         cache.insert(cache_key, record);
 
-        info!("✅ Federated network {} registered successfully", network.domain);
+        info!(
+            "✅ Federated network {} registered successfully",
+            network.domain
+        );
         Ok(())
     }
 
@@ -481,7 +518,8 @@ mod tests {
     #[tokio::test]
     async fn test_federated_network_registration() {
         let config = AuthoritativeDnsConfig::default();
-        let server = AuthoritativeDnsServer::new(config).await
+        let server = AuthoritativeDnsServer::new(config)
+            .await
             .expect("Failed to create authoritative DNS server");
 
         let network = FederatedNetwork {

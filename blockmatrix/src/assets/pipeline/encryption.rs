@@ -17,10 +17,10 @@ use aes_gcm::{
     aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
+use blake3;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use rand::RngCore;
-use blake3;
 
 // ── Configuration ────────────────────────────────────────────────────────────
 
@@ -147,6 +147,7 @@ impl Encryptor {
     }
 
     /// Create encryptor with default (quantum-resistant) configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(EncryptionConfig::default())
     }
@@ -198,10 +199,7 @@ impl Encryptor {
 
         // Reconstruct Kyber public key
         let pk = kyber1024::PublicKey::from_bytes(public_key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!(
-                "Invalid Kyber-1024 public key: {}",
-                e
-            ))
+            PipelineError::EncryptionFailed(format!("Invalid Kyber-1024 public key: {e}"))
         })?;
 
         // KEM encapsulation
@@ -215,21 +213,15 @@ impl Encryptor {
         rand::thread_rng().fill_bytes(&mut nonce_bytes);
 
         // AES-256-GCM encrypt entire blob
-        let cipher = Aes256Gcm::new_from_slice(&aes_key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("AES key init failed: {}", e))
-        })?;
+        let cipher = Aes256Gcm::new_from_slice(&aes_key)
+            .map_err(|e| PipelineError::EncryptionFailed(format!("AES key init failed: {e}")))?;
         let nonce = Nonce::from_slice(&nonce_bytes);
         let ciphertext = cipher.encrypt(nonce, data).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("AES-GCM encryption failed: {}", e))
+            PipelineError::EncryptionFailed(format!("AES-GCM encryption failed: {e}"))
         })?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
-        let stats = EncryptionStats::calculate(
-            data.len(),
-            ciphertext.len(),
-            duration_ms,
-            true,
-        );
+        let stats = EncryptionStats::calculate(data.len(), ciphertext.len(), duration_ms, true);
 
         let result = KyberEncryptionResult {
             ciphertext_kem: kem_ct.as_bytes().to_vec(),
@@ -255,18 +247,12 @@ impl Encryptor {
     ) -> PipelineResult<Vec<u8>> {
         // Reconstruct Kyber secret key
         let sk = kyber1024::SecretKey::from_bytes(secret_key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!(
-                "Invalid Kyber-1024 secret key: {}",
-                e
-            ))
+            PipelineError::EncryptionFailed(format!("Invalid Kyber-1024 secret key: {e}"))
         })?;
 
         // Reconstruct KEM ciphertext
         let kem_ct = kyber1024::Ciphertext::from_bytes(&encrypted.ciphertext_kem).map_err(|e| {
-            PipelineError::EncryptionFailed(format!(
-                "Invalid Kyber-1024 KEM ciphertext: {}",
-                e
-            ))
+            PipelineError::EncryptionFailed(format!("Invalid Kyber-1024 KEM ciphertext: {e}"))
         })?;
 
         // KEM decapsulation
@@ -276,14 +262,13 @@ impl Encryptor {
         let aes_key = derive_aes_key(shared_secret.as_bytes());
 
         // AES-256-GCM decrypt
-        let cipher = Aes256Gcm::new_from_slice(&aes_key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("AES key init failed: {}", e))
-        })?;
+        let cipher = Aes256Gcm::new_from_slice(&aes_key)
+            .map_err(|e| PipelineError::EncryptionFailed(format!("AES key init failed: {e}")))?;
         let nonce = Nonce::from_slice(&encrypted.nonce);
         let plaintext = cipher
             .decrypt(nonce, encrypted.encrypted_data.as_ref())
             .map_err(|e| {
-                PipelineError::EncryptionFailed(format!("AES-GCM decryption failed: {}", e))
+                PipelineError::EncryptionFailed(format!("AES-GCM decryption failed: {e}"))
             })?;
 
         Ok(plaintext)
@@ -308,13 +293,12 @@ impl Encryptor {
     ) -> PipelineResult<(EncryptedData, EncryptionStats)> {
         let start = std::time::Instant::now();
 
-        let cipher = Aes256Gcm::new_from_slice(&key.key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("Invalid AES key: {}", e))
-        })?;
+        let cipher = Aes256Gcm::new_from_slice(&key.key)
+            .map_err(|e| PipelineError::EncryptionFailed(format!("Invalid AES key: {e}")))?;
         let nonce = Nonce::from_slice(&key.nonce);
-        let ciphertext = cipher.encrypt(nonce, data).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("AES encryption failed: {}", e))
-        })?;
+        let ciphertext = cipher
+            .encrypt(nonce, data)
+            .map_err(|e| PipelineError::EncryptionFailed(format!("AES encryption failed: {e}")))?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
         let stats = EncryptionStats::calculate(data.len(), ciphertext.len(), duration_ms, false);
@@ -329,20 +313,13 @@ impl Encryptor {
     }
 
     /// Decrypt data with plain AES-256-GCM (non-quantum fallback).
-    pub fn decrypt_aes(
-        &self,
-        encrypted: &EncryptedData,
-        key: &AesKey,
-    ) -> PipelineResult<Vec<u8>> {
-        let cipher = Aes256Gcm::new_from_slice(&key.key).map_err(|e| {
-            PipelineError::EncryptionFailed(format!("Invalid AES key: {}", e))
-        })?;
+    pub fn decrypt_aes(&self, encrypted: &EncryptedData, key: &AesKey) -> PipelineResult<Vec<u8>> {
+        let cipher = Aes256Gcm::new_from_slice(&key.key)
+            .map_err(|e| PipelineError::EncryptionFailed(format!("Invalid AES key: {e}")))?;
         let nonce = Nonce::from_slice(&encrypted.nonce);
         let plaintext = cipher
             .decrypt(nonce, encrypted.ciphertext.as_ref())
-            .map_err(|e| {
-                PipelineError::EncryptionFailed(format!("AES decryption failed: {}", e))
-            })?;
+            .map_err(|e| PipelineError::EncryptionFailed(format!("AES decryption failed: {e}")))?;
         Ok(plaintext)
     }
 
@@ -402,7 +379,10 @@ mod tests {
 
         assert!(stats.quantum_resistant);
         assert_eq!(stats.original_size, data.len());
-        assert!(stats.encrypted_size > data.len(), "ciphertext includes auth tag");
+        assert!(
+            stats.encrypted_size > data.len(),
+            "ciphertext includes auth tag"
+        );
         assert!(stats.throughput_mbps > 0.0);
         assert_eq!(encrypted.original_size, data.len());
         assert!(!encrypted.ciphertext_kem.is_empty());
@@ -417,12 +397,8 @@ mod tests {
     #[test]
     fn test_wrong_secret_key_fails() {
         let encryptor = Encryptor::default();
-        let kp1 = encryptor
-            .generate_keypair()
-            .expect("test: keypair 1");
-        let kp2 = encryptor
-            .generate_keypair()
-            .expect("test: keypair 2");
+        let kp1 = encryptor.generate_keypair().expect("test: keypair 1");
+        let kp2 = encryptor.generate_keypair().expect("test: keypair 2");
         let data = b"Secret message";
 
         let (encrypted, _) = encryptor

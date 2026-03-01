@@ -224,54 +224,49 @@ pub mod transfer;
 
 // Re-export main asset types for easy access
 pub use assets::core::{
-    AssetManager, AssetRegistration, AssetType, AssetStatus, AssetState,
-    AssetAllocation, PrivacyMode, AssetError, AssetResult,
-    ConsensusProof, ConsensusRequirements,
+    AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,
+    AssetStatus, AssetType, ConsensusProof, ConsensusRequirements, PrivacyMode,
 };
 
 pub use assets::adapters::{
-    CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
-    NetworkAssetAdapter, ContainerAssetAdapter, AdapterRegistry,
+    AdapterRegistry, ContainerAssetAdapter, CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter,
+    NetworkAssetAdapter, StorageAssetAdapter,
 };
 
 pub use extensions::UnifiedExtensionManager;
 
 // Re-export OS integration types for easy access
 pub use os_integration::{
-    OsAbstraction,
     create_os_abstraction,
     types::{
-        CpuInfo, GpuInfo, MemoryInfo, StorageInfo, ResourceUsage,
-        EbpfHandle, EbpfAttachType, EbpfMetrics, EbpfMetricType,
-        GpuType, StorageType,
+        CpuInfo, EbpfAttachType, EbpfHandle, EbpfMetricType, EbpfMetrics, GpuInfo, GpuType,
+        MemoryInfo, ResourceUsage, StorageInfo, StorageType,
     },
+    OsAbstraction,
 };
 
 // Re-export persistence types for easy access
 pub use persistence::{
-    PersistenceManager, PersistenceConfig, StorageStats,
-    MatrixState, MatrixStateSerializer, SerializationFormat,
-    BlockchainStorage, BlockQuery, ChainMetadata,
-    TopologyBackup, BackupMode,
-    SnapshotManager, SnapshotMetadata, SnapshotSchedule,
-    RecoveryManager, RecoveryReport, RecoveryStatus,
+    BackupMode, BlockQuery, BlockchainStorage, ChainMetadata, MatrixState, MatrixStateSerializer,
+    PersistenceConfig, PersistenceManager, RecoveryManager, RecoveryReport, RecoveryStatus,
+    SerializationFormat, SnapshotManager, SnapshotMetadata, SnapshotSchedule, StorageStats,
+    TopologyBackup,
 };
 
 // Re-export privacy types for easy access
 pub use privacy::{
-    PrivacySystem, PrivacyConfig, TrustLevel,
-    PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,
-    TierSwitcher, PolicyManager, PolicyAction, PolicyDecision,
-    ValidationRequirements, PrivacyPresets,
+    AssetSharing, NetworkVisibility, PolicyAction, PolicyDecision, PolicyManager, PrivacyConfig,
+    PrivacyFlexibilityMatrix, PrivacyPresets, PrivacySystem, TierSwitcher, TrustLevel,
+    ValidationRequirements,
 };
 
 // CLI module - matrix topology queries, node management, asset operations
 pub mod cli;
 
 // Module stubs - some enabled for Gate 2
-pub mod transport;
 pub mod catalog;
 pub mod container;
+pub mod transport;
 // consensus module already imported above
 pub mod extensions;
 pub mod orchestration;
@@ -280,15 +275,15 @@ pub mod security;
 // pub mod http3; // temporarily disabled
 
 // Export container types at root for backwards compatibility
-pub use container::{ContainerId, ContainerSpec, ContainerConfig, NetworkConfig};
+pub use container::{ContainerConfig, ContainerId, ContainerSpec, NetworkConfig};
 // Export error module
 pub mod error {
-    pub use anyhow::{Result, Error};
+    pub use anyhow::{Error, Result};
 }
 
 // Integration types - re-export from integration module
-pub use integration::IntegrationError;
 pub use integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
+pub use integration::IntegrationError;
 pub type IntegrationResult<T> = Result<T, IntegrationError>;
 // Export config module
 pub mod config {
@@ -322,7 +317,9 @@ pub mod test_utils;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof_of_state_integration::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+    use crate::consensus::proof_of_state_integration::{
+        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    };
     use std::time::Duration;
 
     #[tokio::test]
@@ -333,7 +330,7 @@ mod tests {
         let system = initialize_hypermesh().await;
         assert!(system.is_ok(), "Gate 2: System initialization failed");
 
-        let system = system.unwrap();
+        let system = system.expect("test: expected success");
 
         // Verify asset manager exists
         let asset_manager = system.asset_manager();
@@ -382,16 +379,12 @@ mod tests {
     #[test]
     fn test_consensus_proof_creation() {
         // Test Proof of State Four-Proof System integration
-        let stake_proof = StakeProof::new(
-            "test-holder".to_string(),
-            "holder-id".to_string(),
-            1000
-        );
+        let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
 
         let space_proof = SpaceProof::new(
             "test-node".to_string(),
             "/test/storage".to_string(),
-            1024 * 1024 // 1MB
+            1024 * 1024, // 1MB
         );
 
         let work_proof = WorkProof::new(
@@ -405,12 +398,7 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
-        let consensus_proof = ConsensusProof::new(
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof
-        );
+        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         // Basic validation should pass
         assert!(consensus_proof.validate());

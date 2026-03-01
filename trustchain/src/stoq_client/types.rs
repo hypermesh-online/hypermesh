@@ -4,10 +4,10 @@
 
 //! STOQ Client types, configuration, and data structures
 
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 use std::time::{Duration, SystemTime};
-use serde::{Serialize, Deserialize};
-use bytes::Bytes;
 
 /// STOQ client configuration for TrustChain
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,32 +196,27 @@ impl Default for TrustChainStoqConfig {
             dns_query_timeout: Duration::from_secs(5),
             ct_submission_timeout: Duration::from_secs(30),
             service_discovery: ServiceDiscoveryConfig {
-                dns_resolvers: vec![
-                    ServiceEndpoint {
-                        service_type: ServiceType::Dns,
-                        // Safe: hardcoded valid IPv6 address
-                        address: "2001:4860:4860::8888".parse()
-                            .expect("hardcoded valid IPv6 address"), // Google DNS
-                        port: 853, // DNS-over-QUIC port
-                        service_name: Some("dns.google".to_string()),
-                    },
-                ],
-                ct_logs: vec![
-                    ServiceEndpoint {
-                        service_type: ServiceType::CertificateTransparency,
-                        address: Ipv6Addr::LOCALHOST, // Placeholder
-                        port: 6962,
-                        service_name: Some("ct.trustchain.local".to_string()),
-                    },
-                ],
-                ca_endpoints: vec![
-                    ServiceEndpoint {
-                        service_type: ServiceType::CertificateAuthority,
-                        address: Ipv6Addr::LOCALHOST,
-                        port: 8443,
-                        service_name: Some("ca.trustchain.local".to_string()),
-                    },
-                ],
+                dns_resolvers: vec![ServiceEndpoint {
+                    service_type: ServiceType::Dns,
+                    // Safe: hardcoded valid IPv6 address
+                    address: "2001:4860:4860::8888"
+                        .parse()
+                        .expect("hardcoded valid IPv6 address"), // Google DNS
+                    port: 853, // DNS-over-QUIC port
+                    service_name: Some("dns.google".to_string()),
+                }],
+                ct_logs: vec![ServiceEndpoint {
+                    service_type: ServiceType::CertificateTransparency,
+                    address: Ipv6Addr::LOCALHOST, // Placeholder
+                    port: 6962,
+                    service_name: Some("ct.trustchain.local".to_string()),
+                }],
+                ca_endpoints: vec![ServiceEndpoint {
+                    service_type: ServiceType::CertificateAuthority,
+                    address: Ipv6Addr::LOCALHOST,
+                    port: 8443,
+                    service_name: Some("ca.trustchain.local".to_string()),
+                }],
                 health_check_interval: Duration::from_secs(60),
             },
         }

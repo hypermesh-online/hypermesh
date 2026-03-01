@@ -27,10 +27,19 @@ items = [
 
 [features.in_development]
 items = [
+    "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
 ]
 
 [features.planned]
 items = [
     "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
     "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
+    "Real jitter benchmarking under controlled partitions",
+    "Partition recovery timing measurements",
+    "Identity-aware connection establishment (cert identity extraction)",
+    "Permission enforcement at protocol layer",
+    "Real transport metrics (bandwidth, latency, jitter, loss measurement)",
+    "MetricsFrame protocol wiring to engauge",
+    "Certificate store persistence across restarts",
+    "Graceful degradation with expired certificates",
 ]

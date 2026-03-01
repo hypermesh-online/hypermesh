@@ -9,13 +9,12 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
 use std::net::Ipv6Addr;
-use tracing::{info, warn, error};
-use tracing_subscriber;
-use trustchain::dns::TrustChainBootstrap;
-use trustchain::dns::bootstrap::DnsRecord;
+use std::path::PathBuf;
 use tokio::signal;
+use tracing::{error, info, warn};
+use trustchain::dns::bootstrap::DnsRecord;
+use trustchain::dns::TrustChainBootstrap;
 
 #[derive(Parser, Debug)]
 #[clap(name = "trustchain-bootstrap")]
@@ -72,9 +71,7 @@ async fn main() -> Result<()> {
 
     // Initialize logging
     let log_level = if cli.debug { "debug" } else { "info" };
-    tracing_subscriber::fmt()
-        .with_env_filter(log_level)
-        .init();
+    tracing_subscriber::fmt().with_env_filter(log_level).init();
 
     match cli.command {
         Some(Commands::Test { endpoint }) => {
@@ -140,9 +137,18 @@ async fn run_bootstrap(cli: &Cli) -> Result<()> {
         info!("===========================================");
         info!("");
         info!("Services ready:");
-        info!("  • CA:  https://[{}]:{} (pending implementation)", cli.bind, cli.ca_port);
-        info!("  • DNS: dns://[{}]:{} (in-memory storage)", cli.bind, cli.dns_port);
-        info!("  • CT:  https://[{}]:{} (pending implementation)", cli.bind, cli.ct_port);
+        info!(
+            "  • CA:  https://[{}]:{} (pending implementation)",
+            cli.bind, cli.ca_port
+        );
+        info!(
+            "  • DNS: dns://[{}]:{} (in-memory storage)",
+            cli.bind, cli.dns_port
+        );
+        info!(
+            "  • CT:  https://[{}]:{} (pending implementation)",
+            cli.bind, cli.ct_port
+        );
         info!("");
         info!("BlockMatrix can now connect to TrustChain at:");
         info!("  TRUSTCHAIN_CA_URL=https://[{}]:{}", cli.bind, cli.ca_port);
@@ -168,56 +174,68 @@ async fn add_service_records(
     info!("Adding service DNS records...");
 
     // CA service
-    bootstrap.add_dns_record(DnsRecord {
-        name: "ca.trustchain.local".to_string(),
-        record_type: "AAAA".to_string(),
-        value: bind.to_string(),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "ca.trustchain.local".to_string(),
+            record_type: "AAAA".to_string(),
+            value: bind.to_string(),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
     // DNS service
-    bootstrap.add_dns_record(DnsRecord {
-        name: "dns.trustchain.local".to_string(),
-        record_type: "AAAA".to_string(),
-        value: bind.to_string(),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "dns.trustchain.local".to_string(),
+            record_type: "AAAA".to_string(),
+            value: bind.to_string(),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
     // CT log service
-    bootstrap.add_dns_record(DnsRecord {
-        name: "ct.trustchain.local".to_string(),
-        record_type: "AAAA".to_string(),
-        value: bind.to_string(),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "ct.trustchain.local".to_string(),
+            record_type: "AAAA".to_string(),
+            value: bind.to_string(),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
     // Add SRV records for service discovery
-    bootstrap.add_dns_record(DnsRecord {
-        name: "_ca._tcp.trustchain.local".to_string(),
-        record_type: "SRV".to_string(),
-        value: format!("0 0 {} ca.trustchain.local", cli.ca_port),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "_ca._tcp.trustchain.local".to_string(),
+            record_type: "SRV".to_string(),
+            value: format!("0 0 {} ca.trustchain.local", cli.ca_port),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
-    bootstrap.add_dns_record(DnsRecord {
-        name: "_dns._udp.trustchain.local".to_string(),
-        record_type: "SRV".to_string(),
-        value: format!("0 0 {} dns.trustchain.local", cli.dns_port),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "_dns._udp.trustchain.local".to_string(),
+            record_type: "SRV".to_string(),
+            value: format!("0 0 {} dns.trustchain.local", cli.dns_port),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
-    bootstrap.add_dns_record(DnsRecord {
-        name: "_ct._tcp.trustchain.local".to_string(),
-        record_type: "SRV".to_string(),
-        value: format!("0 0 {} ct.trustchain.local", cli.ct_port),
-        ttl: 3600,
-        timestamp: 0,
-    }).await?;
+    bootstrap
+        .add_dns_record(DnsRecord {
+            name: "_ct._tcp.trustchain.local".to_string(),
+            record_type: "SRV".to_string(),
+            value: format!("0 0 {} ct.trustchain.local", cli.ct_port),
+            ttl: 3600,
+            timestamp: 0,
+        })
+        .await?;
 
     info!("✓ Service DNS records added");
     Ok(())
@@ -228,14 +246,14 @@ async fn test_connectivity(endpoint: &str) -> Result<()> {
 
     // Parse endpoint
     let url = if !endpoint.starts_with("http") {
-        format!("https://{}", endpoint)
+        format!("https://{endpoint}")
     } else {
         endpoint.to_string()
     };
 
     // Test CA endpoint
     info!("Testing CA endpoint...");
-    match reqwest::get(&format!("{}/ca/status", url)).await {
+    match reqwest::get(&format!("{url}/ca/status")).await {
         Ok(response) => {
             if response.status().is_success() {
                 info!("✓ CA is reachable and operational");
@@ -250,7 +268,7 @@ async fn test_connectivity(endpoint: &str) -> Result<()> {
 
     // Test CT endpoint
     info!("Testing CT endpoint...");
-    match reqwest::get(&format!("{}/ct/status", url)).await {
+    match reqwest::get(&format!("{url}/ct/status")).await {
         Ok(response) => {
             if response.status().is_success() {
                 info!("✓ CT log is reachable and operational");
@@ -277,12 +295,12 @@ async fn show_status(cli: &Cli) -> Result<()> {
 
     info!("Checking services...");
 
-    match reqwest::get(&format!("{}/status", ca_url)).await {
+    match reqwest::get(&format!("{ca_url}/status")).await {
         Ok(_) => info!("✓ CA: Running at [{}]:{}", cli.bind, cli.ca_port),
         Err(_) => info!("✗ CA: Not running"),
     }
 
-    match reqwest::get(&format!("{}/status", ct_url)).await {
+    match reqwest::get(&format!("{ct_url}/status")).await {
         Ok(_) => info!("✓ CT: Running at [{}]:{}", cli.bind, cli.ct_port),
         Err(_) => info!("✗ CT: Not running"),
     }

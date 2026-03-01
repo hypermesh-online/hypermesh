@@ -13,8 +13,8 @@
 //! - RemoteMemoryTransport (RDMA-style operations)
 //! - ProxyRouter (trust-based routing)
 
-use blockmatrix::assets::proxy::*;
 use blockmatrix::assets::core::{AssetRegistration, AssetType, PrivacyMode};
+use blockmatrix::assets::proxy::*;
 
 #[tokio::test]
 async fn test_gate3_global_addressing() {
@@ -72,15 +72,23 @@ async fn test_gate3_nat_translation() {
     };
 
     // Create NAT translation
-    let mapping = translator.create_translation(
-        global_addr.clone(),
-        4096, // 4KB page
-        permissions,
-    ).await.unwrap();
+    let mapping = translator
+        .create_translation(
+            global_addr.clone(),
+            4096, // 4KB page
+            permissions,
+        )
+        .await
+        .unwrap();
 
-    println!("Global: {} -> Local: 0x{:x}", global_addr.to_string(), mapping.local_address);
+    println!(
+        "Global: {} -> Local: 0x{:x}",
+        global_addr.to_string(),
+        mapping.local_address
+    );
     println!("Region size: {} bytes", mapping.region_size);
-    println!("Permissions: Read={}, Write={}, Share={}",
+    println!(
+        "Permissions: Read={}, Write={}, Share={}",
         mapping.access_permissions.read,
         mapping.access_permissions.write,
         mapping.access_permissions.share
@@ -96,9 +104,9 @@ async fn test_gate3_nat_translation() {
 
     // Get statistics
     let stats = translator.get_stats().await.unwrap();
-    println!("Translation stats: {} total, {} active",
-        stats.total_translations,
-        stats.active_translations
+    println!(
+        "Translation stats: {} total, {} active",
+        stats.total_translations, stats.active_translations
     );
 
     assert_eq!(stats.total_translations, 1);
@@ -132,7 +140,10 @@ async fn test_gate3_memory_permissions() {
         prefetch: false,
     };
 
-    let ro_mapping = translator.create_translation(ro_addr, 1024, ro_perms).await.unwrap();
+    let ro_mapping = translator
+        .create_translation(ro_addr, 1024, ro_perms)
+        .await
+        .unwrap();
     assert!(ro_mapping.access_permissions.read);
     assert!(!ro_mapping.access_permissions.write);
     println!("✓ Read-only permissions: OK");
@@ -155,7 +166,10 @@ async fn test_gate3_memory_permissions() {
         prefetch: true,
     };
 
-    let rw_mapping = translator.create_translation(rw_addr, 2048, rw_perms).await.unwrap();
+    let rw_mapping = translator
+        .create_translation(rw_addr, 2048, rw_perms)
+        .await
+        .unwrap();
     assert!(rw_mapping.access_permissions.read);
     assert!(rw_mapping.access_permissions.write);
     assert!(rw_mapping.access_permissions.share);
@@ -168,7 +182,7 @@ async fn test_gate3_memory_permissions() {
 async fn test_gate3_proxy_routing() {
     println!("\n=== Gate 3: Proxy Routing Test ===");
 
-    use blockmatrix::assets::core::{ProxyNodeInfo, ProxyCapabilities};
+    use blockmatrix::assets::core::{ProxyCapabilities, ProxyNodeInfo};
     use std::time::SystemTime;
 
     // Create proxy router
@@ -213,8 +227,14 @@ async fn test_gate3_proxy_routing() {
     router.add_proxy_node(&node2).await.unwrap();
 
     println!("Added proxy nodes:");
-    println!("  - {:?} (authenticated: {}, bandwidth: {} Mbps)", node1.node_id, node1.is_authenticated, node1.capabilities.bandwidth_mbps);
-    println!("  - {:?} (authenticated: {}, bandwidth: {} Mbps)", node2.node_id, node2.is_authenticated, node2.capabilities.bandwidth_mbps);
+    println!(
+        "  - {:?} (authenticated: {}, bandwidth: {} Mbps)",
+        node1.node_id, node1.is_authenticated, node1.capabilities.bandwidth_mbps
+    );
+    println!(
+        "  - {:?} (authenticated: {}, bandwidth: {} Mbps)",
+        node2.node_id, node2.is_authenticated, node2.capabilities.bandwidth_mbps
+    );
 
     println!("✓ Proxy routing working correctly");
 }
@@ -265,20 +285,29 @@ async fn test_gate3_address_allocation() {
             prefetch: false,
         };
 
-        let mapping = translator.create_translation(
-            global_addr.clone(),
-            4096 * (i as u64 + 1), // Variable sizes
-            permissions,
-        ).await.unwrap();
+        let mapping = translator
+            .create_translation(
+                global_addr.clone(),
+                4096 * (i as u64 + 1), // Variable sizes
+                permissions,
+            )
+            .await
+            .unwrap();
 
         addresses.push((global_addr, mapping.local_address));
-        println!("  Allocated: 0x{:x} ({} bytes)", mapping.local_address, mapping.region_size);
+        println!(
+            "  Allocated: 0x{:x} ({} bytes)",
+            mapping.local_address, mapping.region_size
+        );
     }
 
     // Verify all addresses are different
     let mut seen = std::collections::HashSet::new();
     for (_, local_addr) in &addresses {
-        assert!(seen.insert(*local_addr), "Duplicate local address allocated");
+        assert!(
+            seen.insert(*local_addr),
+            "Duplicate local address allocated"
+        );
     }
 
     let stats = translator.get_stats().await.unwrap();

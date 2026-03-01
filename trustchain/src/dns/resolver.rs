@@ -3,22 +3,22 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! TrustChain DNS Resolver
-//! 
+//!
 //! Upstream DNS resolution with IPv6-only networking and TrustChain domain handling.
 
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::SystemTime;
-use std::net::Ipv6Addr;
-use tokio::sync::{RwLock, Mutex};
-use serde::{Serialize, Deserialize};
+use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, warn};
 
 use trust_dns_client::client::{AsyncClient, ClientHandle};
 use trust_dns_proto::op::Message;
 use trust_dns_proto::rr::{Name, RData, Record};
 
+use super::{DnsQuery, DnsRecord, DnsRecordData, DnsResponse};
 use crate::errors::{DnsError, Result as TrustChainResult};
-use super::{DnsQuery, DnsResponse, DnsRecord, DnsRecordData};
 
 /// TrustChain DNS resolver
 pub struct TrustChainResolver {
@@ -62,7 +62,10 @@ impl TrustChainResolver {
         upstream_resolvers: Vec<Ipv6Addr>,
         trustchain_domains: Vec<String>,
     ) -> TrustChainResult<Self> {
-        debug!("Initializing TrustChain resolver with {} upstream resolvers", upstream_resolvers.len());
+        debug!(
+            "Initializing TrustChain resolver with {} upstream resolvers",
+            upstream_resolvers.len()
+        );
 
         // Initialize client pool
         let client_pool = Arc::new(Mutex::new(Vec::new()));
@@ -83,13 +86,16 @@ impl TrustChainResolver {
 
     /// Resolve query using upstream resolvers
     pub async fn resolve_upstream(&self, query: &DnsQuery) -> TrustChainResult<DnsResponse> {
-        debug!("Resolving upstream query: {} ({:?})", query.name, query.record_type);
+        debug!(
+            "Resolving upstream query: {} ({:?})",
+            query.name, query.record_type
+        );
 
         let start_time = std::time::Instant::now();
 
         // Try each upstream resolver
         let mut last_error = None;
-        
+
         for resolver_addr in &self.upstream_resolvers {
             match self.query_upstream_resolver(*resolver_addr, query).await {
                 Ok(response) => {
@@ -106,10 +112,13 @@ impl TrustChainResolver {
 
         // All upstream resolvers failed
         self.update_stats_failure().await;
-        Err(last_error.unwrap_or_else(|| DnsError::QueryFailed {
-            query: query.name.clone(),
-            reason: "All upstream resolvers failed".to_string(),
-        }.into()))
+        Err(last_error.unwrap_or_else(|| {
+            DnsError::QueryFailed {
+                query: query.name.clone(),
+                reason: "All upstream resolvers failed".to_string(),
+            }
+            .into()
+        }))
     }
 
     /// Get resolver statistics
@@ -121,7 +130,7 @@ impl TrustChainResolver {
 
     async fn initialize_clients(&self) -> TrustChainResult<()> {
         let mut client_pool = self.client_pool.lock().await;
-        
+
         for resolver_addr in &self.upstream_resolvers {
             match self.create_client(*resolver_addr).await {
                 Ok(client) => client_pool.push(client),
@@ -133,7 +142,8 @@ impl TrustChainResolver {
             return Err(DnsError::UpstreamResolver {
                 resolver: "all".to_string(),
                 reason: "Failed to create any upstream clients".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         debug!("Initialized {} DNS clients", client_pool.len());
@@ -156,10 +166,11 @@ impl TrustChainResolver {
         let stream = UdpClientStream::<tokio::net::UdpSocket>::new(socket_addr);
 
         // Create async client
-        let (client, bg) = AsyncClient::connect(stream).await
-            .map_err(|e| crate::errors::TrustChainError::Internal {
-                message: format!("Failed to create DNS client: {}", e),
-            })?;
+        let (client, bg) = AsyncClient::connect(stream).await.map_err(|e| {
+            crate::errors::TrustChainError::Internal {
+                message: format!("Failed to create DNS client: {e}"),
+            }
+        })?;
 
         // Spawn background task for client
         tokio::spawn(bg);
@@ -174,16 +185,17 @@ impl TrustChainResolver {
     ) -> TrustChainResult<DnsResponse> {
         // Create a fresh client for this query
         let mut client = self.create_client(resolver_addr).await?;
-        
+
         // Convert query to trust-dns format
-        let name = Name::from_utf8(&query.name)
-            .map_err(|e| DnsError::QueryFailed {
-                query: query.name.clone(),
-                reason: format!("Invalid domain name: {}", e),
-            })?;
+        let name = Name::from_utf8(&query.name).map_err(|e| DnsError::QueryFailed {
+            query: query.name.clone(),
+            reason: format!("Invalid domain name: {e}"),
+        })?;
 
         // Perform query
-        let response = client.query(name, query.class, query.record_type).await
+        let response = client
+            .query(name, query.class, query.record_type)
+            .await
             .map_err(|e| DnsError::QueryFailed {
                 query: query.name.clone(),
                 reason: e.to_string(),
@@ -247,10 +259,11 @@ impl TrustChainResolver {
                 exchange: mx.exchange().to_string(),
             },
             RData::TXT(txt) => DnsRecordData::TXT(
-                txt.txt_data().iter()
+                txt.txt_data()
+                    .iter()
                     .map(|bytes| String::from_utf8_lossy(bytes).to_string())
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join(" "),
             ),
             RData::NS(ns) => DnsRecordData::NS(ns.to_string()),
             RData::SOA(soa) => DnsRecordData::SOA {
@@ -277,7 +290,7 @@ impl TrustChainResolver {
     async fn update_stats(&self, is_trustchain: bool, response_time_ms: f64) {
         let mut stats = self.stats.write().await;
         stats.queries_processed += 1;
-        
+
         if is_trustchain {
             stats.trustchain_queries += 1;
         } else {
@@ -288,7 +301,8 @@ impl TrustChainResolver {
         if stats.average_response_time_ms == 0.0 {
             stats.average_response_time_ms = response_time_ms;
         } else {
-            stats.average_response_time_ms = 0.9 * stats.average_response_time_ms + 0.1 * response_time_ms;
+            stats.average_response_time_ms =
+                0.9 * stats.average_response_time_ms + 0.1 * response_time_ms;
         }
 
         stats.last_update = SystemTime::now();
@@ -308,6 +322,7 @@ mod tests {
     use std::net::Ipv6Addr;
     use trust_dns_proto::rr::RecordType;
 
+    #[allow(dead_code)]
     fn create_test_query() -> DnsQuery {
         DnsQuery {
             id: 1234,
@@ -322,9 +337,11 @@ mod tests {
     #[tokio::test]
     async fn test_resolver_creation() {
         let upstream_resolvers = vec![
-            "2001:4860:4860::8888".parse()
+            "2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address"),
-            "2606:4700:4700::1111".parse()
+            "2606:4700:4700::1111"
+                .parse()
                 .expect("Failed to parse Cloudflare IPv6 address"),
         ];
         let trustchain_domains = vec!["hypermesh".to_string(), "caesar".to_string()];
@@ -336,10 +353,13 @@ mod tests {
     #[tokio::test]
     async fn test_stats_initialization() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
         let stats = resolver.get_stats().await;
         assert_eq!(stats.queries_processed, 0);
@@ -350,10 +370,13 @@ mod tests {
     #[tokio::test]
     async fn test_stats_update() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
         resolver.update_stats(false, 150.0).await;
         resolver.update_stats(true, 50.0).await;
@@ -363,17 +386,23 @@ mod tests {
         assert_eq!(stats.upstream_queries, 1);
         assert_eq!(stats.trustchain_queries, 1);
         // Average should be (150 + 50) / 2 = 100, but allow some variance
-        assert!((stats.average_response_time_ms - 100.0).abs() < 50.0,
-                "Expected average ~100ms, got {}", stats.average_response_time_ms);
+        assert!(
+            (stats.average_response_time_ms - 100.0).abs() < 50.0,
+            "Expected average ~100ms, got {}",
+            stats.average_response_time_ms
+        );
     }
 
     #[tokio::test]
     async fn test_failure_stats_update() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
         resolver.update_stats_failure().await;
 
@@ -385,18 +414,21 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_ipv6() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("test.example.com")
-            .expect("Failed to parse domain name");
+        let name = Name::from_utf8("test.example.com").expect("Failed to parse domain name");
         let ipv6_addr = Ipv6Addr::LOCALHOST;
         use trust_dns_proto::rr::rdata::AAAA;
         let trust_dns_record = Record::from_rdata(name, 300, RData::AAAA(AAAA::from(ipv6_addr)));
 
-        let dns_record = resolver.convert_record(&trust_dns_record)
+        let dns_record = resolver
+            .convert_record(&trust_dns_record)
             .expect("Failed to convert AAAA record");
         assert_eq!(dns_record.name, "test.example.com");
         assert_eq!(dns_record.record_type, RecordType::AAAA);
@@ -412,19 +444,21 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_cname() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("alias.example.com")
-            .expect("Failed to parse alias domain");
-        let target = Name::from_utf8("target.example.com")
-            .expect("Failed to parse target domain");
+        let name = Name::from_utf8("alias.example.com").expect("Failed to parse alias domain");
+        let target = Name::from_utf8("target.example.com").expect("Failed to parse target domain");
         use trust_dns_proto::rr::rdata::CNAME;
         let trust_dns_record = Record::from_rdata(name, 300, RData::CNAME(CNAME(target)));
 
-        let dns_record = resolver.convert_record(&trust_dns_record)
+        let dns_record = resolver
+            .convert_record(&trust_dns_record)
             .expect("Failed to convert CNAME record");
         assert_eq!(dns_record.record_type, RecordType::CNAME);
 
@@ -438,19 +472,22 @@ mod tests {
     #[tokio::test]
     async fn test_record_conversion_mx() {
         let resolver = TrustChainResolver::new(
-            vec!["2001:4860:4860::8888".parse()
+            vec!["2001:4860:4860::8888"
+                .parse()
                 .expect("Failed to parse Google IPv6 address")],
             vec!["hypermesh".to_string()],
-        ).await.expect("Failed to create test resolver");
+        )
+        .await
+        .expect("Failed to create test resolver");
 
-        let name = Name::from_utf8("example.com")
-            .expect("Failed to parse domain name");
-        let exchange = Name::from_utf8("mail.example.com")
-            .expect("Failed to parse mail exchange domain");
+        let name = Name::from_utf8("example.com").expect("Failed to parse domain name");
+        let exchange =
+            Name::from_utf8("mail.example.com").expect("Failed to parse mail exchange domain");
         let mx_data = trust_dns_proto::rr::rdata::MX::new(10, exchange);
         let trust_dns_record = Record::from_rdata(name, 300, RData::MX(mx_data));
 
-        let dns_record = resolver.convert_record(&trust_dns_record)
+        let dns_record = resolver
+            .convert_record(&trust_dns_record)
             .expect("Failed to convert MX record");
         assert_eq!(dns_record.record_type, RecordType::MX);
 

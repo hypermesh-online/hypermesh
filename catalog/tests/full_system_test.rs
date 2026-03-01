@@ -17,22 +17,20 @@ use std::time::Duration;
 use serde_json::json;
 
 use catalog::registry::{
-    CatalogRegistry, RegistryConfig, TrustPolicy, SearchQuery,
-    AssetTypeDefinition,
-    ValidationRule, ValidationRuleType,
+    AssetTypeDefinition, CatalogRegistry, RegistryConfig, SearchQuery, TrustPolicy, ValidationRule,
+    ValidationRuleType,
 };
 
 use catalog::distribution::content_addressing::{
-    ContentAddress, MerkleTree, ContentChunker, CompressionType,
+    CompressionType, ContentAddress, ContentChunker, MerkleTree,
 };
 
 use catalog::distribution::dht::DhtNodeId;
 
-use blockmatrix::consensus::proof_of_state_integration::{
-    SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState,
-};
 use blockmatrix::assets::ConsensusProof;
+use blockmatrix::consensus::proof_of_state_integration::{
+    SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+};
 use hypermesh_lib::PrivacyMode;
 
 // ---------------------------------------------------------------------------
@@ -74,11 +72,7 @@ async fn test_registry_register_and_find_type() {
         "required": ["vin", "make"]
     });
 
-    let type_def = AssetTypeDefinition::new(
-        "Vehicle".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_consensus_proof());
 
     let asset_id = registry.register_type(type_def).await.unwrap();
     let found_id = registry.find_type("Vehicle").await.unwrap();
@@ -94,8 +88,13 @@ async fn test_registry_duplicate_type_fails() {
     );
 
     let schema = json!({"type": "object"});
-    let type1 = AssetTypeDefinition::new("DuplicateType".to_string(), schema.clone(), test_consensus_proof());
-    let type2 = AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_consensus_proof());
+    let type1 = AssetTypeDefinition::new(
+        "DuplicateType".to_string(),
+        schema.clone(),
+        test_consensus_proof(),
+    );
+    let type2 =
+        AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_consensus_proof());
 
     registry.register_type(type1).await.unwrap();
     let result = registry.register_type(type2).await;
@@ -113,11 +112,7 @@ async fn test_registry_search_types_with_scoring() {
     // Register multiple types
     for name in &["Vehicle", "VehicleInsurance", "Driver", "DriverLicense"] {
         let schema = json!({"type": "object"});
-        let type_def = AssetTypeDefinition::new(
-            name.to_string(),
-            schema,
-            test_consensus_proof(),
-        );
+        let type_def = AssetTypeDefinition::new(name.to_string(), schema, test_consensus_proof());
         registry.register_type(type_def).await.unwrap();
     }
 
@@ -127,7 +122,11 @@ async fn test_registry_search_types_with_scoring() {
         ..Default::default()
     };
     let results = registry.search_types(&query).await.unwrap();
-    assert_eq!(results.results.len(), 2, "Should find Vehicle and VehicleInsurance");
+    assert_eq!(
+        results.results.len(),
+        2,
+        "Should find Vehicle and VehicleInsurance"
+    );
 
     // Search for "Driver" should match 2 types
     let query = SearchQuery {
@@ -135,7 +134,11 @@ async fn test_registry_search_types_with_scoring() {
         ..Default::default()
     };
     let results = registry.search_types(&query).await.unwrap();
-    assert_eq!(results.results.len(), 2, "Should find Driver and DriverLicense");
+    assert_eq!(
+        results.results.len(),
+        2,
+        "Should find Driver and DriverLicense"
+    );
 
     // Empty query should return all
     let query = SearchQuery {
@@ -143,7 +146,10 @@ async fn test_registry_search_types_with_scoring() {
         ..Default::default()
     };
     let results = registry.search_types(&query).await.unwrap();
-    assert_eq!(results.total_count, 4, "Empty query should return all types");
+    assert_eq!(
+        results.total_count, 4,
+        "Empty query should return all types"
+    );
 }
 
 #[tokio::test]
@@ -160,7 +166,10 @@ async fn test_registry_resolve_dependencies() {
 
     // resolve_dependencies returns empty for now (stub)
     let deps = registry.resolve_dependencies("DepTest").await.unwrap();
-    assert!(deps.is_empty(), "resolve_dependencies currently returns empty");
+    assert!(
+        deps.is_empty(),
+        "resolve_dependencies currently returns empty"
+    );
 }
 
 #[tokio::test]
@@ -196,11 +205,15 @@ async fn test_registry_statistics() {
     let stats = registry.get_statistics().await;
     assert_eq!(stats.total_types, 0);
     // PrivacyMode::PUBLIC Debug format includes "Unbounded" and "tracked: true"
-    assert!(stats.privacy_level.contains("Unbounded") && stats.privacy_level.contains("true"),
-        "Privacy level should represent PUBLIC mode, got: {}", stats.privacy_level);
+    assert!(
+        stats.privacy_level.contains("Unbounded") && stats.privacy_level.contains("true"),
+        "Privacy level should represent PUBLIC mode, got: {}",
+        stats.privacy_level
+    );
 
     let schema = json!({"type": "object"});
-    let type_def = AssetTypeDefinition::new("StatsTest".to_string(), schema, test_consensus_proof());
+    let type_def =
+        AssetTypeDefinition::new("StatsTest".to_string(), schema, test_consensus_proof());
     registry.register_type(type_def).await.unwrap();
 
     let stats = registry.get_statistics().await;
@@ -221,11 +234,7 @@ fn test_type_definition_validate_valid_instance() {
         }
     });
 
-    let type_def = AssetTypeDefinition::new(
-        "Vehicle".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_consensus_proof());
 
     let instance = json!({"vin": "1HGBH41JXMN109186", "make": "Honda"});
     let result = type_def.validate_instance(&instance).unwrap();
@@ -236,27 +245,24 @@ fn test_type_definition_validate_valid_instance() {
 #[test]
 fn test_type_definition_validate_invalid_instance() {
     let schema = json!({"type": "object"});
-    let type_def = AssetTypeDefinition::new(
-        "StrictType".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let type_def =
+        AssetTypeDefinition::new("StrictType".to_string(), schema, test_consensus_proof());
 
     // A string is not an object, so validation should fail
     let instance = json!("not an object");
     let result = type_def.validate_instance(&instance).unwrap();
-    assert!(!result.valid, "Non-object instance should fail schema validation");
+    assert!(
+        !result.valid,
+        "Non-object instance should fail schema validation"
+    );
     assert!(!result.errors.is_empty());
 }
 
 #[test]
 fn test_type_definition_with_validation_rules() {
     let schema = json!({"type": "object"});
-    let mut type_def = AssetTypeDefinition::new(
-        "RuledType".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let mut type_def =
+        AssetTypeDefinition::new("RuledType".to_string(), schema, test_consensus_proof());
 
     // Add Schema validation rule
     type_def.add_validation_rule(ValidationRule {
@@ -290,11 +296,8 @@ fn test_type_definition_with_validation_rules() {
 #[test]
 fn test_type_definition_add_dependency() {
     let schema = json!({"type": "object"});
-    let mut type_def = AssetTypeDefinition::new(
-        "WithDeps".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let mut type_def =
+        AssetTypeDefinition::new("WithDeps".to_string(), schema, test_consensus_proof());
 
     type_def.add_dependency("BaseType".to_string());
     type_def.add_dependency("MixinType".to_string());
@@ -304,11 +307,7 @@ fn test_type_definition_add_dependency() {
 #[test]
 fn test_type_definition_serialization_roundtrip() {
     let schema = json!({"type": "object", "properties": {"name": {"type": "string"}}});
-    let type_def = AssetTypeDefinition::new(
-        "SerTest".to_string(),
-        schema,
-        test_consensus_proof(),
-    );
+    let type_def = AssetTypeDefinition::new("SerTest".to_string(), schema, test_consensus_proof());
 
     let bytes = type_def.to_storage_format().unwrap();
     let restored = AssetTypeDefinition::from_storage_format(&bytes).unwrap();
@@ -324,14 +323,20 @@ fn test_content_address_from_data_deterministic() {
     let data = b"hello hypermesh world";
     let addr1 = ContentAddress::from_data(data);
     let addr2 = ContentAddress::from_data(data);
-    assert_eq!(addr1, addr2, "Same data should produce same content address");
+    assert_eq!(
+        addr1, addr2,
+        "Same data should produce same content address"
+    );
 }
 
 #[test]
 fn test_content_address_different_data_different_hash() {
     let addr1 = ContentAddress::from_data(b"data-a");
     let addr2 = ContentAddress::from_data(b"data-b");
-    assert_ne!(addr1, addr2, "Different data should produce different addresses");
+    assert_ne!(
+        addr1, addr2,
+        "Different data should produce different addresses"
+    );
 }
 
 #[test]
@@ -367,13 +372,16 @@ fn test_merkle_tree_from_chunks_single() {
 
 #[test]
 fn test_merkle_tree_from_chunks_multiple() {
-    let chunks: Vec<Vec<u8>> = (0..4).map(|i| format!("chunk-{}", i).into_bytes()).collect();
+    let chunks: Vec<Vec<u8>> = (0..4).map(|i| format!("chunk-{i}").into_bytes()).collect();
     let tree = MerkleTree::from_chunks(&chunks).unwrap();
     assert_eq!(tree.chunk_count(), 4);
 
     // Verify each chunk
     for (i, chunk) in chunks.iter().enumerate() {
-        assert!(tree.verify_chunk(i, chunk).unwrap(), "Chunk {} should verify", i);
+        assert!(
+            tree.verify_chunk(i, chunk).unwrap(),
+            "Chunk {i} should verify"
+        );
     }
 }
 
@@ -388,15 +396,23 @@ fn test_merkle_tree_tampered_chunk_fails() {
 
 #[test]
 fn test_merkle_tree_proof_generation_and_verification() {
-    let chunks: Vec<Vec<u8>> = (0..8).map(|i| format!("data-block-{}", i).into_bytes()).collect();
+    let chunks: Vec<Vec<u8>> = (0..8)
+        .map(|i| format!("data-block-{i}").into_bytes())
+        .collect();
     let tree = MerkleTree::from_chunks(&chunks).unwrap();
 
     // Get and verify proof for chunk 3
     let proof = tree.get_proof(3).unwrap();
-    assert!(MerkleTree::verify_proof(&proof, &chunks[3]), "Proof should verify for correct data");
+    assert!(
+        MerkleTree::verify_proof(&proof, &chunks[3]),
+        "Proof should verify for correct data"
+    );
 
     // Proof should fail for wrong data
-    assert!(!MerkleTree::verify_proof(&proof, b"wrong data"), "Proof should fail for tampered data");
+    assert!(
+        !MerkleTree::verify_proof(&proof, b"wrong data"),
+        "Proof should fail for tampered data"
+    );
 }
 
 #[test]
@@ -411,7 +427,11 @@ fn test_merkle_tree_root_hash_consistency() {
     let chunks: Vec<Vec<u8>> = vec![b"a".to_vec(), b"b".to_vec()];
     let tree1 = MerkleTree::from_chunks(&chunks).unwrap();
     let tree2 = MerkleTree::from_chunks(&chunks).unwrap();
-    assert_eq!(tree1.root_hash(), tree2.root_hash(), "Same chunks should produce same root");
+    assert_eq!(
+        tree1.root_hash(),
+        tree2.root_hash(),
+        "Same chunks should produce same root"
+    );
 }
 
 // ===========================================================================
@@ -424,10 +444,17 @@ fn test_content_chunker_split_and_reassemble() {
     let chunker = ContentChunker::new(16, CompressionType::None);
 
     let chunks = chunker.chunk_data(data).unwrap();
-    assert!(chunks.len() > 1, "Data should be split into multiple chunks");
+    assert!(
+        chunks.len() > 1,
+        "Data should be split into multiple chunks"
+    );
 
     let reassembled = chunker.reassemble(&chunks).unwrap();
-    assert_eq!(reassembled.as_slice(), data.as_slice(), "Reassembled data should match original");
+    assert_eq!(
+        reassembled.as_slice(),
+        data.as_slice(),
+        "Reassembled data should match original"
+    );
 }
 
 #[test]
@@ -457,7 +484,11 @@ fn test_dht_node_id_random_uniqueness() {
 fn test_dht_node_id_xor_distance_self_is_zero() {
     let id = DhtNodeId::random();
     let dist = id.distance(&id);
-    assert_eq!(dist.bucket_index(), 0, "Distance to self should have bucket 0");
+    assert_eq!(
+        dist.bucket_index(),
+        0,
+        "Distance to self should have bucket 0"
+    );
 }
 
 #[test]
@@ -475,7 +506,7 @@ fn test_dht_node_id_hex_display() {
     let hex = id.to_hex();
     assert_eq!(hex.len(), 64, "DHT node ID hex should be 64 characters");
     // Display shows first 8 chars
-    let display = format!("{}", id);
+    let display = format!("{id}");
     assert_eq!(display.len(), 8);
     assert_eq!(&display, &hex[..8]);
 }
@@ -486,22 +517,22 @@ fn test_dht_node_id_hex_display() {
 
 #[cfg(feature = "future-tests")]
 mod future_full_system_tests {
-    use catalog::{
-        CatalogExtension, CatalogConfig, AssetLibrary, Package, PackageVersion,
-        DistributionConfig, P2PNode, SecurityConfig, ValidationReport,
-    };
-    use blockmatrix::assets::core::{AssetManager, AssetType, AssetId};
-    use hypermesh_lib::PrivacyMode;
-    use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
+    use blockmatrix::assets::core::{AssetId, AssetManager, AssetType};
     use blockmatrix::consensus::{ConsensusProof, ProofType};
-    use stoq::transport::{QuicTransport, TransportConfig};
-    use trustchain::{CertificateChain, TrustChainClient, VerificationResult};
+    use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
+    use catalog::{
+        AssetLibrary, CatalogConfig, CatalogExtension, DistributionConfig, P2PNode, Package,
+        PackageVersion, SecurityConfig, ValidationReport,
+    };
+    use hypermesh_lib::PrivacyMode;
     use std::collections::{HashMap, HashSet};
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::{Duration, Instant, SystemTime};
+    use stoq::transport::{QuicTransport, TransportConfig};
     use tokio::time::sleep;
-    use tracing::{info, debug, warn, error};
+    use tracing::{debug, error, info, warn};
+    use trustchain::{CertificateChain, TrustChainClient, VerificationResult};
 
     mod common {
         pub use crate::common::*;

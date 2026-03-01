@@ -69,20 +69,23 @@ pub enum ErrorCode {
 
 impl ProofValidation {
     /// Create a new validation result
-    pub fn new(
-        space_valid: bool,
-        stake_valid: bool,
-        work_valid: bool,
-        time_valid: bool,
-    ) -> Self {
+    pub fn new(space_valid: bool, stake_valid: bool, work_valid: bool, time_valid: bool) -> Self {
         let all_valid = space_valid && stake_valid && work_valid && time_valid;
 
         // Calculate confidence score based on which proofs passed
         let mut confidence_score = 0.0;
-        if space_valid { confidence_score += 0.25; }
-        if stake_valid { confidence_score += 0.25; }
-        if work_valid { confidence_score += 0.25; }
-        if time_valid { confidence_score += 0.25; }
+        if space_valid {
+            confidence_score += 0.25;
+        }
+        if stake_valid {
+            confidence_score += 0.25;
+        }
+        if work_valid {
+            confidence_score += 0.25;
+        }
+        if time_valid {
+            confidence_score += 0.25;
+        }
 
         Self {
             space_valid,
@@ -97,7 +100,12 @@ impl ProofValidation {
     }
 
     /// Add validation error
-    pub fn add_error(&mut self, proof_type: ProofType, error_message: String, error_code: ErrorCode) {
+    pub fn add_error(
+        &mut self,
+        proof_type: ProofType,
+        error_message: String,
+        error_code: ErrorCode,
+    ) {
         self.errors.push(ValidationError {
             proof_type,
             error_message,
@@ -116,7 +124,8 @@ impl ProofValidation {
             return "All proofs valid".to_string();
         }
 
-        self.errors.iter()
+        self.errors
+            .iter()
             .map(|e| format!("{:?}: {}", e.proof_type, e.error_message))
             .collect::<Vec<_>>()
             .join(", ")
@@ -155,9 +164,10 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Space,
-                format!("Storage size {} exceeds capacity {}",
-                    self.space_proof.total_size,
-                    self.space_proof.total_storage),
+                format!(
+                    "Storage size {} exceeds capacity {}",
+                    self.space_proof.total_size, self.space_proof.total_storage
+                ),
                 ErrorCode::StorageCommitmentInvalid,
             );
         }
@@ -186,12 +196,13 @@ impl ConsensusProof {
 
         // Check stake age (not too old)
         if let Ok(elapsed) = self.stake_proof.stake_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(60 * 60 * 24 * 30) { // 30 days max
+            if elapsed > Duration::from_secs(60 * 60 * 24 * 30) {
+                // 30 days max
                 validation.stake_valid = false;
                 validation.all_valid = false;
                 validation.add_error(
                     ProofType::Stake,
-                    format!("Stake proof expired (age: {:?})", elapsed),
+                    format!("Stake proof expired (age: {elapsed:?})"),
                     ErrorCode::ProofExpired,
                 );
             }
@@ -236,18 +247,28 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Time,
-                format!("Time offset too large: {:?} > 5 minutes",
-                    self.time_proof.network_time_offset),
+                format!(
+                    "Time offset too large: {:?} > 5 minutes",
+                    self.time_proof.network_time_offset
+                ),
                 ErrorCode::TimeOffsetExceeded,
             );
         }
 
         // Recalculate confidence score
         validation.confidence_score = 0.0;
-        if validation.space_valid { validation.confidence_score += 0.25; }
-        if validation.stake_valid { validation.confidence_score += 0.25; }
-        if validation.work_valid { validation.confidence_score += 0.25; }
-        if validation.time_valid { validation.confidence_score += 0.25; }
+        if validation.space_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.stake_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.work_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.time_valid {
+            validation.confidence_score += 0.25;
+        }
 
         Ok(validation)
     }
@@ -268,8 +289,10 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Stake,
-                format!("Stake {} below minimum {}",
-                    self.stake_proof.stake_amount, min_stake),
+                format!(
+                    "Stake {} below minimum {}",
+                    self.stake_proof.stake_amount, min_stake
+                ),
                 ErrorCode::InsufficientStake,
             );
         }
@@ -280,8 +303,10 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Time,
-                format!("Time offset {:?} exceeds maximum {:?}",
-                    self.time_proof.network_time_offset, max_time_offset),
+                format!(
+                    "Time offset {:?} exceeds maximum {:?}",
+                    self.time_proof.network_time_offset, max_time_offset
+                ),
                 ErrorCode::TimeOffsetExceeded,
             );
         }
@@ -292,8 +317,10 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Space,
-                format!("Storage {} below minimum {}",
-                    self.space_proof.total_storage, min_storage),
+                format!(
+                    "Storage {} below minimum {}",
+                    self.space_proof.total_storage, min_storage
+                ),
                 ErrorCode::StorageCommitmentInvalid,
             );
         }
@@ -304,18 +331,28 @@ impl ConsensusProof {
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Work,
-                format!("Compute power {} below minimum {}",
-                    self.work_proof.computational_power, min_compute),
+                format!(
+                    "Compute power {} below minimum {}",
+                    self.work_proof.computational_power, min_compute
+                ),
                 ErrorCode::InsufficientWork,
             );
         }
 
         // Recalculate confidence score
         validation.confidence_score = 0.0;
-        if validation.space_valid { validation.confidence_score += 0.25; }
-        if validation.stake_valid { validation.confidence_score += 0.25; }
-        if validation.work_valid { validation.confidence_score += 0.25; }
-        if validation.time_valid { validation.confidence_score += 0.25; }
+        if validation.space_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.stake_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.work_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.time_valid {
+            validation.confidence_score += 0.25;
+        }
 
         Ok(validation)
     }
@@ -324,12 +361,11 @@ impl ConsensusProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_proof_validation_all_valid() {
         let proof = ConsensusProof::new_for_testing();
-        let validation = proof.verify_all().unwrap();
+        let validation = proof.verify_all().expect("test: expected success");
 
         assert!(validation.space_valid, "Space proof should be valid");
         assert!(validation.stake_valid, "Stake proof should be valid");
@@ -345,11 +381,14 @@ mod tests {
         let mut proof = ConsensusProof::new_for_testing();
         proof.space_proof.total_storage = 0; // Invalid
 
-        let validation = proof.verify_all().unwrap();
+        let validation = proof.verify_all().expect("test: expected success");
 
         assert!(!validation.space_valid);
         assert!(!validation.all_valid);
-        assert!(validation.errors.iter().any(|e| e.proof_type == ProofType::Space));
+        assert!(validation
+            .errors
+            .iter()
+            .any(|e| e.proof_type == ProofType::Space));
     }
 
     #[test]
@@ -357,11 +396,14 @@ mod tests {
         let mut proof = ConsensusProof::new_for_testing();
         proof.stake_proof.stake_amount = 0; // Invalid
 
-        let validation = proof.verify_all().unwrap();
+        let validation = proof.verify_all().expect("test: expected success");
 
         assert!(!validation.stake_valid);
         assert!(!validation.all_valid);
-        assert!(validation.errors.iter().any(|e| e.proof_type == ProofType::Stake));
+        assert!(validation
+            .errors
+            .iter()
+            .any(|e| e.proof_type == ProofType::Stake));
     }
 
     #[test]
@@ -369,12 +411,14 @@ mod tests {
         let proof = ConsensusProof::new_for_testing();
 
         // Should pass with reasonable requirements
-        let validation = proof.verify_with_requirements(
-            5000,                          // min_stake
-            Duration::from_secs(60),       // max_time_offset
-            10 * 1024 * 1024,             // min_storage (10MB)
-            100,                           // min_compute
-        ).unwrap();
+        let validation = proof
+            .verify_with_requirements(
+                5000,                    // min_stake
+                Duration::from_secs(60), // max_time_offset
+                10 * 1024 * 1024,        // min_storage (10MB)
+                100,                     // min_compute
+            )
+            .expect("test: expected success");
 
         assert!(validation.all_valid);
     }
@@ -384,12 +428,14 @@ mod tests {
         let proof = ConsensusProof::new_for_testing();
 
         // Should fail with excessive requirements
-        let validation = proof.verify_with_requirements(
-            1_000_000,                     // min_stake (too high)
-            Duration::from_millis(1),      // max_time_offset (too strict)
-            1024 * 1024 * 1024 * 1024,    // min_storage (1TB - too high)
-            1_000_000,                     // min_compute (too high)
-        ).unwrap();
+        let validation = proof
+            .verify_with_requirements(
+                1_000_000,                 // min_stake (too high)
+                Duration::from_millis(1),  // max_time_offset (too strict)
+                1024 * 1024 * 1024 * 1024, // min_storage (1TB - too high)
+                1_000_000,                 // min_compute (too high)
+            )
+            .expect("test: expected success");
 
         assert!(!validation.all_valid);
         assert!(!validation.errors.is_empty());
@@ -401,7 +447,7 @@ mod tests {
         proof.stake_proof.stake_amount = 0;
         proof.space_proof.total_storage = 0;
 
-        let validation = proof.verify_all().unwrap();
+        let validation = proof.verify_all().expect("test: expected success");
         let summary = validation.error_summary();
 
         assert!(summary.contains("Stake") || summary.contains("Space"));

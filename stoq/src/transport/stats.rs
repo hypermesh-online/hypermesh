@@ -45,7 +45,8 @@ impl PerformanceStats {
         let throughput_u64 = (throughput_gbps * 1000.0) as u64;
         let current_peak = self.peak_throughput_gbps.load(Ordering::Relaxed);
         if throughput_u64 > current_peak {
-            self.peak_throughput_gbps.store(throughput_u64, Ordering::Relaxed);
+            self.peak_throughput_gbps
+                .store(throughput_u64, Ordering::Relaxed);
         }
     }
 
@@ -56,17 +57,20 @@ impl PerformanceStats {
 
     /// Increment pool eviction count
     pub fn record_pool_eviction(&self) {
-        self.connection_pool_evictions.fetch_add(1, Ordering::Relaxed);
+        self.connection_pool_evictions
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Increment health check count
     pub fn record_health_check(&self) {
-        self.connection_health_checks.fetch_add(1, Ordering::Relaxed);
+        self.connection_health_checks
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record unhealthy connections removed
     pub fn record_unhealthy_removed(&self, count: usize) {
-        self.unhealthy_connections_removed.fetch_add(count as u64, Ordering::Relaxed);
+        self.unhealthy_connections_removed
+            .fetch_add(count as u64, Ordering::Relaxed);
     }
 
     /// Increment zero-copy operations

@@ -4,10 +4,10 @@
 
 //! Metrics collection and management
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tracing::debug;
 
@@ -74,6 +74,12 @@ pub struct TimingStats {
     pub count: usize,
 }
 
+impl Default for Metrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Metrics {
     /// Create new metrics collection
     pub fn new() -> Self {
@@ -86,14 +92,17 @@ impl Metrics {
 
     /// Record certificate issuance
     pub async fn record_cert_issuance(&self, duration_ms: u64, success: bool) {
-        self.record_component_operation("ca", duration_ms, success).await;
+        self.record_component_operation("ca", duration_ms, success)
+            .await;
 
         // Record specific CA metrics
         let mut components = self.components.write().await;
-        let ca_metrics = components.entry("ca".to_string())
+        let ca_metrics = components
+            .entry("ca".to_string())
             .or_insert_with(|| ComponentMetrics::new("ca"));
 
-        ca_metrics.additional_metrics
+        ca_metrics
+            .additional_metrics
             .entry("avg_issuance_time_ms".to_string())
             .and_modify(|avg| {
                 *avg = (*avg + duration_ms as f64) / 2.0;
@@ -103,23 +112,27 @@ impl Metrics {
 
     /// Record DNS resolution
     pub async fn record_dns_resolution(&self, duration_ms: u64, success: bool) {
-        self.record_component_operation("dns", duration_ms, success).await;
+        self.record_component_operation("dns", duration_ms, success)
+            .await;
     }
 
     /// Record CT log entry
     pub async fn record_ct_log_entry(&self, duration_ms: u64, success: bool) {
-        self.record_component_operation("ct", duration_ms, success).await;
+        self.record_component_operation("ct", duration_ms, success)
+            .await;
     }
 
     /// Record consensus validation
     pub async fn record_consensus_validation(&self, duration_ms: u64, success: bool) {
-        self.record_component_operation("consensus", duration_ms, success).await;
+        self.record_component_operation("consensus", duration_ms, success)
+            .await;
     }
 
     /// Record component operation
     async fn record_component_operation(&self, component: &str, duration_ms: u64, success: bool) {
         let mut components = self.components.write().await;
-        let metrics = components.entry(component.to_string())
+        let metrics = components
+            .entry(component.to_string())
             .or_insert_with(|| ComponentMetrics::new(component));
 
         metrics.total_operations += 1;
@@ -130,7 +143,8 @@ impl Metrics {
         }
 
         // Update success rate
-        metrics.success_rate = metrics.successful_operations as f64 / metrics.total_operations as f64;
+        metrics.success_rate =
+            metrics.successful_operations as f64 / metrics.total_operations as f64;
 
         // Update average time
         let current_avg = metrics.avg_operation_time_ms;
@@ -142,11 +156,15 @@ impl Metrics {
 
         // Record timing
         let mut timings = self.timings.write().await;
-        timings.entry(component.to_string())
+        timings
+            .entry(component.to_string())
             .or_insert_with(Vec::new)
             .push(duration_ms);
 
-        debug!("Recorded {} operation: {}ms, success: {}", component, duration_ms, success);
+        debug!(
+            "Recorded {} operation: {}ms, success: {}",
+            component, duration_ms, success
+        );
     }
 
     /// Increment counter
@@ -198,15 +216,18 @@ impl Metrics {
                 let p95 = sorted[p95_idx];
                 let p99 = sorted[p99_idx];
 
-                timing_stats.insert(name.clone(), TimingStats {
-                    min_ms: min,
-                    max_ms: max,
-                    avg_ms: avg,
-                    median_ms: median,
-                    p95_ms: p95,
-                    p99_ms: p99,
-                    count: samples.len(),
-                });
+                timing_stats.insert(
+                    name.clone(),
+                    TimingStats {
+                        min_ms: min,
+                        max_ms: max,
+                        avg_ms: avg,
+                        median_ms: median,
+                        p95_ms: p95,
+                        p99_ms: p99,
+                        count: samples.len(),
+                    },
+                );
             }
         }
 
@@ -249,7 +270,7 @@ mod tests {
         metrics.record_cert_issuance(30, false).await;
 
         let snapshot = metrics.snapshot().await;
-        let ca_metrics = snapshot.components.get("ca").unwrap();
+        let ca_metrics = snapshot.components.get("ca").expect("test: map lookup");
 
         assert_eq!(ca_metrics.total_operations, 3);
         assert_eq!(ca_metrics.successful_operations, 2);
@@ -267,12 +288,18 @@ mod tests {
         }
 
         let snapshot = metrics.snapshot().await;
-        let timing = snapshot.timing_stats.get("dns")
+        let timing = snapshot
+            .timing_stats
+            .get("dns")
             .expect("DNS timing stats not found");
 
         assert_eq!(timing.min_ms, 1);
         assert_eq!(timing.max_ms, 100);
-        assert!(timing.median_ms >= 50 && timing.median_ms <= 51, "Expected median ~50-51, got {}", timing.median_ms);
+        assert!(
+            timing.median_ms >= 50 && timing.median_ms <= 51,
+            "Expected median ~50-51, got {}",
+            timing.median_ms
+        );
         assert_eq!(timing.count, 100);
     }
 

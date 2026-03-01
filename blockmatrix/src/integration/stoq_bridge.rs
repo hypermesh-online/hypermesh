@@ -7,17 +7,17 @@
 //! Provides inter-component communication over STOQ protocol instead of HTTP REST APIs.
 //! Connects HyperMesh, TrustChain, STOQ, Catalog, and Caesar via native STOQ messaging.
 
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
 use tracing::{info, instrument};
 
-use stoq::{StoqApiServer, StoqApiClient, ApiHandler, ApiError};
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::{ApiError, ApiHandler, StoqApiClient, StoqApiServer};
 
 // Re-export for compatibility (types moved from api_bridge to stoq_bridge)
-pub use UnifiedStoqBridge as UnifiedApiBridge;
 pub use StoqBridgeConfig as ApiConfig;
+pub use UnifiedStoqBridge as UnifiedApiBridge;
 
 /// Service information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,15 +138,22 @@ impl UnifiedStoqBridge {
     /// Create new STOQ bridge
     #[instrument(skip(config))]
     pub async fn new(config: StoqBridgeConfig) -> Result<Self> {
-        info!("Creating STOQ Integration Bridge for {}", config.service_name);
+        info!(
+            "Creating STOQ Integration Bridge for {}",
+            config.service_name
+        );
 
         // Parse bind address
-        let bind_addr: std::net::Ipv6Addr = config.bind_address.split(':')
+        let bind_addr: std::net::Ipv6Addr = config
+            .bind_address
+            .split(':')
             .next()
             .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
             .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
 
-        let port: u16 = config.bind_address.split(':')
+        let port: u16 = config
+            .bind_address
+            .split(':')
             .nth(1)
             .and_then(|p| p.parse().ok())
             .ok_or_else(|| anyhow!("Invalid port"))?;
@@ -187,7 +194,10 @@ impl UnifiedStoqBridge {
     /// Start the bridge server
     #[instrument(skip(self))]
     pub async fn serve(&self) -> Result<()> {
-        info!("Starting STOQ bridge server for {}", self.config.service_name);
+        info!(
+            "Starting STOQ bridge server for {}",
+            self.config.service_name
+        );
         self.server.listen().await
     }
 
@@ -258,7 +268,6 @@ pub struct AssetRegistrationResponse {
 ///     Ok(())
 /// }
 /// ```
-
 #[cfg(test)]
 mod tests {
     // TODO: Add STOQ bridge integration tests

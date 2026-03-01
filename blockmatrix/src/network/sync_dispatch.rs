@@ -60,43 +60,31 @@ impl<'a> SyncDispatcher<'a> {
                 network_id,
                 from_height,
                 max_blocks,
-            } => {
-                self.handle_sync_request(
-                    network_id,
-                    from_height,
-                    max_blocks,
-                )
-            }
+            } => self.handle_sync_request(network_id, from_height, max_blocks),
 
             MatrixMessage::SyncResponse {
                 network_id,
                 block_hashes,
                 peer_height,
-            } => {
-                self.handle_sync_response(network_id, block_hashes, peer_height)
-            }
+            } => self.handle_sync_response(network_id, block_hashes, peer_height),
 
             MatrixMessage::SyncAnnounce {
                 network_id,
                 block_height,
                 block_hash,
-            } => {
-                self.handle_sync_announce(network_id, block_height, block_hash)
-            }
+            } => self.handle_sync_announce(network_id, block_height, block_hash),
 
             MatrixMessage::ReflectorHeartbeat {
                 network_id,
                 block_height,
                 health_score,
-            } => {
-                self.handle_reflector_heartbeat(
-                    &network_id,
-                    sender_node_id,
-                    sender_position,
-                    block_height,
-                    health_score,
-                )
-            }
+            } => self.handle_reflector_heartbeat(
+                &network_id,
+                sender_node_id,
+                sender_position,
+                block_height,
+                health_score,
+            ),
 
             other => {
                 debug!("SyncDispatcher ignoring non-sync message: {:?}", other);
@@ -193,7 +181,8 @@ impl<'a> SyncDispatcher<'a> {
             privacy_mode: PrivacyMode::PUBLIC,
         };
 
-        self.reflector_pool.register_reflector(network_id, reflector);
+        self.reflector_pool
+            .register_reflector(network_id, reflector);
 
         debug!(
             network = %network_id,
@@ -219,15 +208,9 @@ mod tests {
     }
 
     impl BlockProvider for FakeBlockProvider {
-        fn get_block_hashes(
-            &self,
-            from_height: u64,
-            max_blocks: u32,
-        ) -> (Vec<String>, u64) {
+        fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64) {
             let end = (from_height + max_blocks as u64).min(self.chain_height);
-            let hashes: Vec<String> = (from_height..end)
-                .map(|h| format!("hash_{}", h))
-                .collect();
+            let hashes: Vec<String> = (from_height..end).map(|h| format!("hash_{h}")).collect();
             (hashes, self.chain_height)
         }
     }
@@ -531,8 +514,8 @@ mod tests {
 
     #[test]
     fn test_sync_observer_notified_on_completion() {
-        use std::sync::{Arc, Mutex};
         use crate::blockchain::sync_manager::SyncObserver;
+        use std::sync::{Arc, Mutex};
 
         struct TestObserver {
             events: Arc<Mutex<Vec<(String, u64)>>>,

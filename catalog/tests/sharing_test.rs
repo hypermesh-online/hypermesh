@@ -11,18 +11,14 @@ mod common;
 use std::sync::Arc;
 use std::time::Duration;
 
-use catalog::sharing::{
-    SharingManager, SharingConfig, SharingStats,
-    SyncManager, SyncStrategy, MirrorManager,
-    DiscoveryService,
-    SharingProtocol, SharePermission,
-    NetworkTopology,
-    PeerInfo,
-};
-use catalog::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
-use catalog::assets::AssetMetadata;
 use blockmatrix::assets::core::{
-    AssetRegistration, AssetData, NetworkScope, AssetCategory, BaseSystemType,
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
+use catalog::assets::AssetMetadata;
+use catalog::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+use catalog::sharing::{
+    DiscoveryService, MirrorManager, NetworkTopology, PeerInfo, SharePermission, SharingConfig,
+    SharingManager, SharingProtocol, SharingStats, SyncManager, SyncStrategy,
 };
 use hypermesh_lib::PrivacyMode;
 
@@ -57,7 +53,7 @@ fn test_asset_metadata(name: &str, version: &str) -> AssetMetadata {
         name: name.to_string(),
         version: version.to_string(),
         tags: vec!["test".to_string()],
-        description: Some(format!("Test asset {}", name)),
+        description: Some(format!("Test asset {name}")),
         author: Some("test-author".to_string()),
         license: Some("MIT".to_string()),
         homepage: None,
@@ -108,26 +104,39 @@ async fn test_sharing_manager_initial_stats_are_zero() {
 
 #[tokio::test]
 async fn test_discovery_service_register_and_search() {
-    let discovery = DiscoveryService::new(Duration::from_secs(3600)).await.unwrap();
+    let discovery = DiscoveryService::new(Duration::from_secs(3600))
+        .await
+        .unwrap();
 
     let asset_id = test_asset_registration("pkg-abc-123");
     let metadata = test_asset_metadata("test-package", "1.0.0");
-    discovery.register_package(&asset_id, &metadata, SharePermission::Public).await.unwrap();
+    discovery
+        .register_package(&asset_id, &metadata, SharePermission::Public)
+        .await
+        .unwrap();
 
     let results = discovery.search_local("test-package").await.unwrap();
-    assert!(!results.is_empty(), "search_local should find the registered package");
+    assert!(
+        !results.is_empty(),
+        "search_local should find the registered package"
+    );
 }
 
 #[tokio::test]
 async fn test_discovery_service_has_package() {
-    let discovery = DiscoveryService::new(Duration::from_secs(60)).await.unwrap();
+    let discovery = DiscoveryService::new(Duration::from_secs(60))
+        .await
+        .unwrap();
 
     let asset_id = test_asset_registration("pkg-has-check");
     let has_before = discovery.has_package(&asset_id).await.unwrap();
     assert!(!has_before, "Package should not exist yet");
 
     let metadata = test_asset_metadata("has-check", "1.0.0");
-    discovery.register_package(&asset_id, &metadata, SharePermission::Public).await.unwrap();
+    discovery
+        .register_package(&asset_id, &metadata, SharePermission::Public)
+        .await
+        .unwrap();
 
     let has_after = discovery.has_package(&asset_id).await.unwrap();
     assert!(has_after, "Package should exist after registration");
@@ -135,12 +144,17 @@ async fn test_discovery_service_has_package() {
 
 #[tokio::test]
 async fn test_discovery_service_popular_packages() {
-    let discovery = DiscoveryService::new(Duration::from_secs(3600)).await.unwrap();
+    let discovery = DiscoveryService::new(Duration::from_secs(3600))
+        .await
+        .unwrap();
 
     for i in 0..5 {
-        let id = test_asset_registration(&format!("pop-pkg-{}", i));
-        let metadata = test_asset_metadata(&format!("popular-{}", i), "1.0.0");
-        discovery.register_package(&id, &metadata, SharePermission::Public).await.unwrap();
+        let id = test_asset_registration(&format!("pop-pkg-{i}"));
+        let metadata = test_asset_metadata(&format!("popular-{i}"), "1.0.0");
+        discovery
+            .register_package(&id, &metadata, SharePermission::Public)
+            .await
+            .unwrap();
     }
 
     let popular = discovery.get_popular_packages(0.0).await.unwrap();
@@ -149,27 +163,46 @@ async fn test_discovery_service_popular_packages() {
 
 #[tokio::test]
 async fn test_discovery_service_fuzzy_search() {
-    let discovery = DiscoveryService::new(Duration::from_secs(3600)).await.unwrap();
+    let discovery = DiscoveryService::new(Duration::from_secs(3600))
+        .await
+        .unwrap();
 
     let id = test_asset_registration("calc-001");
     let metadata = test_asset_metadata("calculator", "1.0.0");
-    discovery.register_package(&id, &metadata, SharePermission::Public).await.unwrap();
+    discovery
+        .register_package(&id, &metadata, SharePermission::Public)
+        .await
+        .unwrap();
 
     let results = discovery.fuzzy_search("calculatr", 2).await.unwrap();
-    assert!(!results.is_empty(), "Fuzzy search should find 'calculator' with distance 2");
+    assert!(
+        !results.is_empty(),
+        "Fuzzy search should find 'calculator' with distance 2"
+    );
 }
 
 #[tokio::test]
 async fn test_discovery_service_full_text_search() {
-    let discovery = DiscoveryService::new(Duration::from_secs(3600)).await.unwrap();
+    let discovery = DiscoveryService::new(Duration::from_secs(3600))
+        .await
+        .unwrap();
 
     let id = test_asset_registration("ml-toolkit");
     let mut metadata = test_asset_metadata("machine-learning-toolkit", "1.0.0");
     metadata.description = Some("A comprehensive ML toolkit for machine learning".to_string());
-    discovery.register_package(&id, &metadata, SharePermission::Public).await.unwrap();
+    discovery
+        .register_package(&id, &metadata, SharePermission::Public)
+        .await
+        .unwrap();
 
-    let results = discovery.full_text_search("machine learning").await.unwrap();
-    assert!(!results.is_empty(), "Full text search should find the ML toolkit");
+    let results = discovery
+        .full_text_search("machine learning")
+        .await
+        .unwrap();
+    assert!(
+        !results.is_empty(),
+        "Full text search should find the ML toolkit"
+    );
 }
 
 // ===========================================================================
@@ -178,10 +211,9 @@ async fn test_discovery_service_full_text_search() {
 
 #[tokio::test]
 async fn test_sharing_protocol_connect_returns_peer_info() {
-    let protocol = SharingProtocol::new(
-        10 * 1024 * 1024,
-        1024 * 1024,
-    ).await.unwrap();
+    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024)
+        .await
+        .unwrap();
 
     let peer = protocol.connect("192.168.1.100:9000").await.unwrap();
     assert!(!peer.node_id.is_empty(), "Peer should have a node_id");
@@ -190,35 +222,53 @@ async fn test_sharing_protocol_connect_returns_peer_info() {
 
 #[tokio::test]
 async fn test_sharing_protocol_connect_deterministic_peer_id() {
-    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024).await.unwrap();
+    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024)
+        .await
+        .unwrap();
 
     let peer1 = protocol.connect("192.168.1.100:9000").await.unwrap();
     let peer2 = protocol.connect("192.168.1.100:9000").await.unwrap();
-    assert_eq!(peer1.node_id, peer2.node_id, "Same address should yield same peer ID");
+    assert_eq!(
+        peer1.node_id, peer2.node_id,
+        "Same address should yield same peer ID"
+    );
 }
 
 #[tokio::test]
 async fn test_sharing_protocol_set_permission() {
-    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024).await.unwrap();
+    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024)
+        .await
+        .unwrap();
 
     let asset_id = test_asset_registration("asset-perm-test");
-    protocol.set_permission(&asset_id, SharePermission::Public).await.unwrap();
+    protocol
+        .set_permission(&asset_id, SharePermission::Public)
+        .await
+        .unwrap();
 
     let private_id = test_asset_registration("asset-private");
-    protocol.set_permission(&private_id, SharePermission::Private).await.unwrap();
+    protocol
+        .set_permission(&private_id, SharePermission::Private)
+        .await
+        .unwrap();
     // No panic = success
 }
 
 #[tokio::test]
 async fn test_sharing_protocol_bandwidth_negotiation() {
-    let protocol = SharingProtocol::new(
-        10 * 1024 * 1024,
-        1024 * 1024,
-    ).await.unwrap();
+    let protocol = SharingProtocol::new(10 * 1024 * 1024, 1024 * 1024)
+        .await
+        .unwrap();
 
     let peer = protocol.connect("peer-bw:9001").await.unwrap();
-    let allocated = protocol.negotiate_bandwidth(&peer.node_id, 2 * 1024 * 1024).await.unwrap();
-    assert!(allocated <= 1024 * 1024, "Allocated bandwidth should be capped by fair_use_limit");
+    let allocated = protocol
+        .negotiate_bandwidth(&peer.node_id, 2 * 1024 * 1024)
+        .await
+        .unwrap();
+    assert!(
+        allocated <= 1024 * 1024,
+        "Allocated bandwidth should be capped by fair_use_limit"
+    );
     assert!(allocated > 0, "Allocated bandwidth should be positive");
 }
 
@@ -247,7 +297,10 @@ async fn test_topology_measure_link_creates_metrics() {
     topology.add_peer("link-1", "10.0.3.1:9000").await.unwrap();
 
     let link = topology.measure_link("link-0", "link-1").await.unwrap();
-    assert!(link.latency > 0 || link.bandwidth > 0, "Link should have metrics");
+    assert!(
+        link.latency > 0 || link.bandwidth > 0,
+        "Link should have metrics"
+    );
 }
 
 #[tokio::test]
@@ -265,7 +318,10 @@ async fn test_topology_find_route_no_stored_links() {
 
     let route = topology.find_route("node-0", "node-2").await;
     // Without stored links, routing has no edges to traverse
-    assert!(route.is_err(), "find_route should fail without stored links");
+    assert!(
+        route.is_err(),
+        "find_route should fail without stored links"
+    );
 }
 
 #[tokio::test]
@@ -276,14 +332,20 @@ async fn test_topology_distance_score() {
     topology.measure_link("dist-0", "dist-1").await.unwrap();
 
     let score = topology.get_distance_score("dist-0", "dist-1");
-    assert!(score >= 0.0 && score <= 1.0, "Distance score should be in [0.0, 1.0]");
+    assert!(
+        (0.0..=1.0).contains(&score),
+        "Distance score should be in [0.0, 1.0]"
+    );
 }
 
 #[tokio::test]
 async fn test_topology_self_distance_score() {
     let topology = NetworkTopology::new("self-node".to_string());
     let score = topology.get_distance_score("self-node", "self-node");
-    assert!((score - 1.0).abs() < f64::EPSILON, "Distance to self should be 1.0");
+    assert!(
+        (score - 1.0).abs() < f64::EPSILON,
+        "Distance to self should be 1.0"
+    );
 }
 
 // ===========================================================================
@@ -297,7 +359,8 @@ async fn test_sync_manager_creation() {
         "sync-node-1".to_string(),
         Duration::from_secs(300),
         registry,
-    ).await;
+    )
+    .await;
     assert!(sync.is_ok(), "SyncManager::new should succeed");
 }
 
@@ -308,7 +371,9 @@ async fn test_sync_manager_selective_sync() {
         "sync-node-sel".to_string(),
         Duration::from_secs(300),
         registry,
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
 
     // Build a PeerInfo to sync with
     let peer = PeerInfo {
@@ -324,10 +389,14 @@ async fn test_sync_manager_selective_sync() {
     };
 
     // selective_sync with Selective strategy for library category
-    let result = sync.selective_sync(
-        &peer,
-        SyncStrategy::Selective { categories: vec!["library".to_string()] },
-    ).await;
+    let result = sync
+        .selective_sync(
+            &peer,
+            SyncStrategy::Selective {
+                categories: vec!["library".to_string()],
+            },
+        )
+        .await;
     assert!(result.is_ok(), "selective_sync should succeed");
 }
 
@@ -338,22 +407,16 @@ async fn test_sync_manager_selective_sync() {
 #[tokio::test]
 async fn test_mirror_manager_creation() {
     let registry = create_test_registry();
-    let mirror = MirrorManager::new(
-        10 * 1024 * 1024 * 1024,
-        3,
-        registry,
-    ).await;
+    let mirror = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry).await;
     assert!(mirror.is_ok(), "MirrorManager::new should succeed");
 }
 
 #[tokio::test]
 async fn test_mirror_manager_get_storage_usage() {
     let registry = create_test_registry();
-    let mirror = MirrorManager::new(
-        10 * 1024 * 1024 * 1024,
-        3,
-        registry,
-    ).await.unwrap();
+    let mirror = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry)
+        .await
+        .unwrap();
 
     let usage = mirror.get_storage_usage().await.unwrap();
     assert_eq!(usage, 0, "Initial storage usage should be 0");
@@ -362,31 +425,28 @@ async fn test_mirror_manager_get_storage_usage() {
 #[tokio::test]
 async fn test_mirror_manager_health_check() {
     let registry = create_test_registry();
-    let mirror = MirrorManager::new(
-        10 * 1024 * 1024 * 1024,
-        3,
-        registry,
-    ).await.unwrap();
+    let mirror = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry)
+        .await
+        .unwrap();
 
     let result = mirror.health_check().await;
-    assert!(result.is_ok(), "health_check should succeed on empty manager");
+    assert!(
+        result.is_ok(),
+        "health_check should succeed on empty manager"
+    );
 }
 
 #[tokio::test]
 async fn test_mirror_manager_update_popularity() {
     let registry = create_test_registry();
-    let mirror = MirrorManager::new(
-        10 * 1024 * 1024 * 1024,
-        3,
-        registry,
-    ).await.unwrap();
+    let mirror = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry)
+        .await
+        .unwrap();
 
     let asset_id = test_asset_registration("pkg-popular-001");
-    let result = mirror.update_popularity(
-        &asset_id,
-        true,
-        Some("user-abc".to_string()),
-    ).await;
+    let result = mirror
+        .update_popularity(&asset_id, true, Some("user-abc".to_string()))
+        .await;
     assert!(result.is_ok(), "update_popularity should succeed");
 }
 
@@ -396,10 +456,8 @@ async fn test_mirror_manager_update_popularity() {
 
 #[cfg(feature = "future-tests")]
 mod future_sharing_tests {
-    use catalog::sharing::{
-        SharingManager, SharingConfig, SharePermission,
-    };
     use catalog::assets::AssetPackage;
+    use catalog::sharing::{SharePermission, SharingConfig, SharingManager};
     use std::time::Duration;
 
     mod common {
@@ -421,7 +479,9 @@ mod future_sharing_tests {
         let manager = SharingManager::new(config).await.unwrap();
 
         let package = create_test_package("workflow-test", "1.0.0");
-        let result = manager.share_package(&package, SharePermission::Public).await;
+        let result = manager
+            .share_package(&package, SharePermission::Public)
+            .await;
         assert!(result.is_ok(), "Failed to share package");
 
         let stats = manager.get_stats().await;

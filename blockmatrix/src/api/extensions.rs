@@ -7,18 +7,18 @@
 //! This module provides STOQ API handlers for managing extensions
 //! in the HyperMesh ecosystem.
 
-use std::sync::Arc;
-use std::collections::HashMap;
 use anyhow::Result;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::{debug, error, info};
 
-use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError};
+use stoq::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 
 use crate::extensions::{
-    manager::{UnifiedExtensionManager, ExtensionInfo},
+    manager::{ExtensionInfo, UnifiedExtensionManager},
     ExtensionRequest,
 };
 
@@ -46,20 +46,42 @@ fn success_response(request_id: String) -> ApiResponse {
 
 /// Create extension handlers for STOQ API
 pub fn create_extension_handlers(
-    manager: Arc<UnifiedExtensionManager>
+    manager: Arc<UnifiedExtensionManager>,
 ) -> Vec<Arc<dyn ApiHandler>> {
     vec![
-        Arc::new(ListExtensionsHandler { manager: Arc::clone(&manager) }),
-        Arc::new(GetExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(LoadExtensionHandler { _manager: Arc::clone(&manager) }),
-        Arc::new(UnloadExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(ReloadExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(PauseExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(ResumeExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(HandleExtensionRequestHandler { manager: Arc::clone(&manager) }),
-        Arc::new(ValidateExtensionHandler { manager: Arc::clone(&manager) }),
-        Arc::new(ExtensionStatusHandler { manager: Arc::clone(&manager) }),
-        Arc::new(ExtensionMetricsHandler { manager: Arc::clone(&manager) }),
+        Arc::new(ListExtensionsHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(GetExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(LoadExtensionHandler {
+            _manager: Arc::clone(&manager),
+        }),
+        Arc::new(UnloadExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(ReloadExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(PauseExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(ResumeExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(HandleExtensionRequestHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(ValidateExtensionHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(ExtensionStatusHandler {
+            manager: Arc::clone(&manager),
+        }),
+        Arc::new(ExtensionMetricsHandler {
+            manager: Arc::clone(&manager),
+        }),
         Arc::new(HealthCheckHandler),
     ]
 }
@@ -82,12 +104,14 @@ impl ApiHandler for ListExtensionsHandler {
 
         // Parse query parameters from metadata if provided
         let category = req.metadata.get("category");
-        let page = req.metadata
+        let page = req
+            .metadata
             .get("page")
             .and_then(|p| p.parse::<u32>().ok())
             .unwrap_or(1)
             .max(1);
-        let page_size = req.metadata
+        let page_size = req
+            .metadata
             .get("page_size")
             .and_then(|p| p.parse::<u32>().ok())
             .unwrap_or(20)
@@ -112,12 +136,15 @@ impl ApiHandler for ListExtensionsHandler {
         let end = (start + page_size as usize).min(filtered.len());
         let paginated = filtered[start..end].to_vec();
 
-        Ok(json_response(req.id, json!({
-            "extensions": paginated,
-            "total": filtered.len(),
-            "page": page,
-            "page_size": page_size,
-        })))
+        Ok(json_response(
+            req.id,
+            json!({
+                "extensions": paginated,
+                "total": filtered.len(),
+                "page": page,
+                "page_size": page_size,
+            }),
+        ))
     }
 }
 
@@ -133,18 +160,22 @@ impl ApiHandler for GetExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         debug!("Getting extension info for: {}", id);
 
-        let info = self.manager
+        let info = self
+            .manager
             .get_extension_info(id)
             .await
-            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {id}")))?;
 
-        let value = serde_json::to_value(info)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize extension info: {}", e)))?;
+        let value = serde_json::to_value(info).map_err(|e| {
+            ApiError::SerializationError(format!("Failed to serialize extension info: {e}"))
+        })?;
 
         Ok(json_response(req.id, value))
     }
@@ -173,11 +204,13 @@ impl ApiHandler for LoadExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         let load_req: LoadExtensionRequest = serde_json::from_slice(&req.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid request: {e}")))?;
 
         info!("Loading extension: {} from {}", id, load_req.source);
 
@@ -198,18 +231,17 @@ impl ApiHandler for UnloadExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         info!("Unloading extension: {}", id);
 
-        self.manager
-            .unload_extension(id)
-            .await
-            .map_err(|e| {
-                error!("Failed to unload extension {}: {}", id, e);
-                ApiError::HandlerError(format!("Failed to unload extension: {}", e))
-            })?;
+        self.manager.unload_extension(id).await.map_err(|e| {
+            error!("Failed to unload extension {}: {}", id, e);
+            ApiError::HandlerError(format!("Failed to unload extension: {e}"))
+        })?;
 
         Ok(success_response(req.id))
     }
@@ -227,18 +259,17 @@ impl ApiHandler for ReloadExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         info!("Reloading extension: {}", id);
 
-        self.manager
-            .reload_extension(id)
-            .await
-            .map_err(|e| {
-                error!("Failed to reload extension {}: {}", id, e);
-                ApiError::HandlerError(format!("Failed to reload extension: {}", e))
-            })?;
+        self.manager.reload_extension(id).await.map_err(|e| {
+            error!("Failed to reload extension {}: {}", id, e);
+            ApiError::HandlerError(format!("Failed to reload extension: {e}"))
+        })?;
 
         Ok(success_response(req.id))
     }
@@ -256,18 +287,17 @@ impl ApiHandler for PauseExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         info!("Pausing extension: {}", id);
 
-        self.manager
-            .pause_extension(id)
-            .await
-            .map_err(|e| {
-                error!("Failed to pause extension {}: {}", id, e);
-                ApiError::HandlerError(format!("Failed to pause extension: {}", e))
-            })?;
+        self.manager.pause_extension(id).await.map_err(|e| {
+            error!("Failed to pause extension {}: {}", id, e);
+            ApiError::HandlerError(format!("Failed to pause extension: {e}"))
+        })?;
 
         Ok(success_response(req.id))
     }
@@ -285,18 +315,17 @@ impl ApiHandler for ResumeExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         info!("Resuming extension: {}", id);
 
-        self.manager
-            .resume_extension(id)
-            .await
-            .map_err(|e| {
-                error!("Failed to resume extension {}: {}", id, e);
-                ApiError::HandlerError(format!("Failed to resume extension: {}", e))
-            })?;
+        self.manager.resume_extension(id).await.map_err(|e| {
+            error!("Failed to resume extension {}: {}", id, e);
+            ApiError::HandlerError(format!("Failed to resume extension: {e}"))
+        })?;
 
         Ok(success_response(req.id))
     }
@@ -314,24 +343,28 @@ impl ApiHandler for HandleExtensionRequestHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         let ext_request: ExtensionRequest = serde_json::from_slice(&req.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid request: {e}")))?;
 
         debug!("Handling request for extension {}: {:?}", id, ext_request);
 
-        let response = self.manager
+        let response = self
+            .manager
             .handle_request(id, ext_request)
             .await
             .map_err(|e| {
                 error!("Failed to handle extension request: {}", e);
-                ApiError::HandlerError(format!("Failed to handle request: {}", e))
+                ApiError::HandlerError(format!("Failed to handle request: {e}"))
             })?;
 
-        let value = serde_json::to_value(response)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize response: {}", e)))?;
+        let value = serde_json::to_value(response).map_err(|e| {
+            ApiError::SerializationError(format!("Failed to serialize response: {e}"))
+        })?;
 
         Ok(json_response(req.id, value))
     }
@@ -349,7 +382,9 @@ impl ApiHandler for ValidateExtensionHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         info!("Validating extension: {}", id);
@@ -359,19 +394,22 @@ impl ApiHandler for ValidateExtensionHandler {
         let report = reports
             .get(id)
             .cloned()
-            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {id}")))?;
 
-        Ok(json_response(req.id, json!({
-            "valid": report.valid,
-            "errors": report.errors
-                .into_iter()
-                .map(|e| format!("{}: {}", e.code, e.message))
-                .collect::<Vec<_>>(),
-            "warnings": report.warnings
-                .into_iter()
-                .map(|w| format!("{}: {}", w.code, w.message))
-                .collect::<Vec<_>>(),
-        })))
+        Ok(json_response(
+            req.id,
+            json!({
+                "valid": report.valid,
+                "errors": report.errors
+                    .into_iter()
+                    .map(|e| format!("{}: {}", e.code, e.message))
+                    .collect::<Vec<_>>(),
+                "warnings": report.warnings
+                    .into_iter()
+                    .map(|w| format!("{}: {}", w.code, w.message))
+                    .collect::<Vec<_>>(),
+            }),
+        ))
     }
 }
 
@@ -387,27 +425,33 @@ impl ApiHandler for ExtensionStatusHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        let id = req.metadata.get("id")
+        let id = req
+            .metadata
+            .get("id")
             .ok_or_else(|| ApiError::InvalidRequest("Missing extension ID".to_string()))?;
 
         debug!("Getting status for extension: {}", id);
 
-        let info = self.manager
+        let info = self
+            .manager
             .get_extension_info(id)
             .await
-            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {}", id)))?;
+            .ok_or_else(|| ApiError::NotFound(format!("Extension not found: {id}")))?;
 
-        Ok(json_response(req.id, json!({
-            "id": info.metadata.id,
-            "name": info.metadata.name,
-            "version": info.metadata.version.to_string(),
-            "state": format!("{:?}", info.state.state),
-            "health": format!("{:?}", info.state.health),
-            "request_count": info.state.request_count,
-            "error_count": info.state.error_count,
-            "cpu_usage": info.state.resource_usage.cpu_percent,
-            "memory_usage": info.state.resource_usage.memory_bytes,
-        })))
+        Ok(json_response(
+            req.id,
+            json!({
+                "id": info.metadata.id,
+                "name": info.metadata.name,
+                "version": info.metadata.version.to_string(),
+                "state": format!("{:?}", info.state.state),
+                "health": format!("{:?}", info.state.health),
+                "request_count": info.state.request_count,
+                "error_count": info.state.error_count,
+                "cpu_usage": info.state.resource_usage.cpu_percent,
+                "memory_usage": info.state.resource_usage.memory_bytes,
+            }),
+        ))
     }
 }
 
@@ -425,15 +469,18 @@ impl ApiHandler for ExtensionMetricsHandler {
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
         let metrics = self.manager.get_metrics().await;
 
-        Ok(json_response(req.id, json!({
-            "total_loaded": metrics.total_loaded,
-            "total_failed": metrics.total_failed,
-            "total_requests": metrics.total_requests,
-            "total_errors": metrics.total_errors,
-            "avg_request_duration_ms": metrics.avg_request_duration.as_millis() as u64,
-            "peak_memory_mb": metrics.peak_memory / 1024 / 1024,
-            "peak_cpu_percent": metrics.peak_cpu,
-        })))
+        Ok(json_response(
+            req.id,
+            json!({
+                "total_loaded": metrics.total_loaded,
+                "total_failed": metrics.total_failed,
+                "total_requests": metrics.total_requests,
+                "total_errors": metrics.total_errors,
+                "avg_request_duration_ms": metrics.avg_request_duration.as_millis() as u64,
+                "peak_memory_mb": metrics.peak_memory / 1024 / 1024,
+                "peak_cpu_percent": metrics.peak_cpu,
+            }),
+        ))
     }
 }
 
@@ -447,27 +494,42 @@ impl ApiHandler for HealthCheckHandler {
     }
 
     async fn handle(&self, req: ApiRequest) -> Result<ApiResponse, ApiError> {
-        Ok(json_response(req.id, json!({
-            "status": "healthy",
-            "service": "extension-api",
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-        })))
+        Ok(json_response(
+            req.id,
+            json!({
+                "status": "healthy",
+                "service": "extension-api",
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            }),
+        ))
     }
 }
 
 /// Real-time event streaming support using STOQ streaming
 pub mod streaming {
     use super::*;
-    use tokio::sync::mpsc;
     use futures::stream::Stream;
+    use tokio::sync::mpsc;
 
     /// Extension events
     #[derive(Debug, Serialize, Deserialize)]
     pub enum ExtensionEvent {
-        StateChanged { extension_id: String, new_state: String },
-        HealthChanged { extension_id: String, new_health: String },
-        RequestCompleted { extension_id: String, request_id: String },
-        Error { extension_id: String, error: String },
+        StateChanged {
+            extension_id: String,
+            new_state: String,
+        },
+        HealthChanged {
+            extension_id: String,
+            new_health: String,
+        },
+        RequestCompleted {
+            extension_id: String,
+            request_id: String,
+        },
+        Error {
+            extension_id: String,
+            error: String,
+        },
     }
 
     /// Event stream handler for real-time extension events
@@ -483,7 +545,7 @@ pub mod streaming {
         /// Create an event stream for a specific extension
         pub async fn create_event_stream(
             &self,
-            _extension_id: String
+            _extension_id: String,
         ) -> impl Stream<Item = ExtensionEvent> {
             let (_tx, rx) = mpsc::channel(100);
 
@@ -508,7 +570,7 @@ mod tests {
             new_state: "loaded".to_string(),
         };
 
-        let json = serde_json::to_value(&event).unwrap();
+        let json = serde_json::to_value(&event).expect("test: serialization");
         assert!(json["StateChanged"].is_object());
         assert_eq!(json["StateChanged"]["extension_id"], "test-ext");
         assert_eq!(json["StateChanged"]["new_state"], "loaded");

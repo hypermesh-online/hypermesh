@@ -7,8 +7,8 @@
 //! Advanced container placement optimization using Layer 4 (CPE) for <1.2ms ML-driven
 //! placement decisions with 96.8% accuracy, enabling proactive placement optimization.
 
-use crate::{NodeId, ServiceId};
 use super::{ContainerSpec, NodeCandidate};
+use crate::{NodeId, ServiceId};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -234,7 +234,10 @@ pub enum PlacementRisk {
     /// Resource contention risk
     ResourceContention { severity: f64, resource: String },
     /// Network bottleneck risk
-    NetworkBottleneck { severity: f64, expected_latency: f64 },
+    NetworkBottleneck {
+        severity: f64,
+        expected_latency: f64,
+    },
     /// Single point of failure
     SinglePointOfFailure { severity: f64 },
     /// Performance degradation risk
@@ -297,7 +300,7 @@ impl CpePlacementEngine {
             })),
         })
     }
-    
+
     /// Optimize container placement using CPE predictions
     pub async fn optimize_placement(
         &self,
@@ -305,43 +308,59 @@ impl CpePlacementEngine {
         node_candidates: &[NodeCandidate],
     ) -> Result<PlacementDecision> {
         let placement_start = Instant::now();
-        
-        debug!("Optimizing placement for container {:?} with {} candidates", 
-               spec.id, node_candidates.len());
-        
+
+        debug!(
+            "Optimizing placement for container {:?} with {} candidates",
+            spec.id,
+            node_candidates.len()
+        );
+
         if node_candidates.is_empty() {
-            return Err(anyhow::anyhow!("No node candidates available for placement optimization"));
+            return Err(anyhow::anyhow!(
+                "No node candidates available for placement optimization"
+            ));
         }
-        
+
         // Generate placement context for CPE prediction
-        let placement_context = self.generate_placement_context(spec, node_candidates).await?;
-        
+        let placement_context = self
+            .generate_placement_context(spec, node_candidates)
+            .await?;
+
         // Use CPE for predictive placement optimization
-        let optimal_placement = self.predict_optimal_placement(
-            spec,
-            node_candidates,
-            &placement_context,
-        ).await?;
-        
+        let optimal_placement = self
+            .predict_optimal_placement(spec, node_candidates, &placement_context)
+            .await?;
+
         // Record placement decision for learning
-        self.record_placement_decision(spec, &optimal_placement, &placement_context).await;
-        
+        self.record_placement_decision(spec, &optimal_placement, &placement_context)
+            .await;
+
         let decision_latency = placement_start.elapsed().as_millis() as u64;
         self.update_placement_metrics(decision_latency).await;
-        
+
         // Validate performance target (<1.2ms)
         if decision_latency > 1 {
-            warn!("Placement decision latency {}ms exceeds 1.2ms target", decision_latency);
+            warn!(
+                "Placement decision latency {}ms exceeds 1.2ms target",
+                decision_latency
+            );
         } else {
-            debug!("Placement decision completed in {}ms (target: <1.2ms)", decision_latency);
+            debug!(
+                "Placement decision completed in {}ms (target: <1.2ms)",
+                decision_latency
+            );
         }
-        
-        info!("Optimized placement for container {:?} to node {:?} with {:.1}% confidence",
-              spec.id, optimal_placement.selected_node, optimal_placement.confidence * 100.0);
-        
+
+        info!(
+            "Optimized placement for container {:?} to node {:?} with {:.1}% confidence",
+            spec.id,
+            optimal_placement.selected_node,
+            optimal_placement.confidence * 100.0
+        );
+
         Ok(optimal_placement)
     }
-    
+
     /// Generate placement context for CPE prediction
     async fn generate_placement_context(
         &self,
@@ -350,22 +369,24 @@ impl CpePlacementEngine {
     ) -> Result<PlacementContext> {
         // Calculate cluster state snapshot
         let total_nodes = node_candidates.len() as u32;
-        let available_nodes = node_candidates.iter()
-            .filter(|c| c.score > 0.0)
-            .count() as u32;
-        
-        let avg_node_utilization = node_candidates.iter()
+        let available_nodes = node_candidates.iter().filter(|c| c.score > 0.0).count() as u32;
+
+        let avg_node_utilization = node_candidates
+            .iter()
             .map(|c| c.expected_utilization.overall_utilization)
-            .sum::<f64>() / node_candidates.len() as f64;
-        
+            .sum::<f64>()
+            / node_candidates.len() as f64;
+
         // Calculate resource pressure
-        let cpu_pressure = node_candidates.iter()
+        let cpu_pressure = node_candidates
+            .iter()
             .map(|c| c.expected_utilization.cpu_utilization)
             .fold(0.0, f64::max);
-        let memory_pressure = node_candidates.iter()
+        let memory_pressure = node_candidates
+            .iter()
             .map(|c| c.expected_utilization.memory_utilization)
             .fold(0.0, f64::max);
-        
+
         let cluster_state = ClusterStateSnapshot {
             total_nodes,
             available_nodes,
@@ -379,23 +400,27 @@ impl CpePlacementEngine {
             },
             network_complexity: 0.5,
         };
-        
+
         // Generate node utilizations map
-        let node_utilizations = node_candidates.iter()
-            .map(|c| (c.node_id.clone(), c.expected_utilization.overall_utilization))
+        let node_utilizations = node_candidates
+            .iter()
+            .map(|c| {
+                (
+                    c.node_id.clone(),
+                    c.expected_utilization.overall_utilization,
+                )
+            })
             .collect();
-        
+
         Ok(PlacementContext {
             cluster_state,
             node_utilizations,
             service_distribution: HashMap::new(),
             resource_constraints: vec!["cpu_limit".to_string(), "memory_limit".to_string()],
-            placement_preferences: spec.constraints.iter()
-                .map(|c| format!("{:?}", c))
-                .collect(),
+            placement_preferences: spec.constraints.iter().map(|c| format!("{c:?}")).collect(),
         })
     }
-    
+
     /// Predict optimal placement using best scoring candidate
     async fn predict_optimal_placement(
         &self,
@@ -404,9 +429,14 @@ impl CpePlacementEngine {
         _placement_context: &PlacementContext,
     ) -> Result<PlacementDecision> {
         // Select best scoring candidate
-        let best_candidate = node_candidates.iter()
-            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap();
+        let best_candidate = node_candidates
+            .iter()
+            .max_by(|a, b| {
+                a.score
+                    .partial_cmp(&b.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .expect("node_candidates should not be empty");
 
         Ok(PlacementDecision {
             selected_node: best_candidate.node_id.clone(),
@@ -421,14 +451,12 @@ impl CpePlacementEngine {
                 prediction_confidence: 0.7,
             },
             reasoning: PlacementReasoning {
-                primary_factors: vec![
-                    DecisionFactor {
-                        factor_name: "Node Score".to_string(),
-                        weight: 1.0,
-                        value: best_candidate.score,
-                        description: "Highest scoring node selected".to_string(),
-                    }
-                ],
+                primary_factors: vec![DecisionFactor {
+                    factor_name: "Node Score".to_string(),
+                    weight: 1.0,
+                    value: best_candidate.score,
+                    description: "Highest scoring node selected".to_string(),
+                }],
                 secondary_factors: vec![],
                 identified_risks: vec![],
                 risk_mitigations: vec![],
@@ -438,7 +466,7 @@ impl CpePlacementEngine {
             decision_latency_ms: 1,
         })
     }
-    
+
     /// Prepare context history for CPE prediction
     async fn _prepare_context_history(
         &self,
@@ -446,56 +474,75 @@ impl CpePlacementEngine {
         placement_context: &PlacementContext,
     ) -> Result<Vec<Vec<f64>>> {
         let mut history = Vec::new();
-        
-        // Current context vector
-        let mut context_vector = Vec::new();
-        
-        // Container characteristics
-        context_vector.push(spec.resources.cpu_cores / 16.0); // Normalize to 16 cores max
-        context_vector.push(spec.resources.memory_bytes as f64 / (64.0 * 1024.0 * 1024.0 * 1024.0)); // Normalize to 64GB
-        context_vector.push(spec.ports.len() as f64 / 10.0); // Normalize to 10 ports max
-        context_vector.push(spec.volumes.len() as f64 / 5.0); // Normalize to 5 volumes max
-        
-        // Cluster state
-        context_vector.push(placement_context.cluster_state.avg_node_utilization);
-        context_vector.push(placement_context.cluster_state.resource_pressure.cpu_pressure);
-        context_vector.push(placement_context.cluster_state.resource_pressure.memory_pressure);
-        context_vector.push(placement_context.cluster_state.resource_pressure.network_pressure);
-        
+
         // Node availability
-        let available_ratio = placement_context.cluster_state.available_nodes as f64 
-                              / placement_context.cluster_state.total_nodes as f64;
-        context_vector.push(available_ratio);
-        
-        // Service complexity
-        context_vector.push(spec.constraints.len() as f64 / 5.0); // Normalize constraints
-        
+        let available_ratio = placement_context.cluster_state.available_nodes as f64
+            / placement_context.cluster_state.total_nodes as f64;
+
+        // Current context vector
+        let context_vector = vec![
+            // Container characteristics
+            spec.resources.cpu_cores / 16.0, // Normalize to 16 cores max
+            spec.resources.memory_bytes as f64 / (64.0 * 1024.0 * 1024.0 * 1024.0), // Normalize to 64GB
+            spec.ports.len() as f64 / 10.0, // Normalize to 10 ports max
+            spec.volumes.len() as f64 / 5.0, // Normalize to 5 volumes max
+            // Cluster state
+            placement_context.cluster_state.avg_node_utilization,
+            placement_context
+                .cluster_state
+                .resource_pressure
+                .cpu_pressure,
+            placement_context
+                .cluster_state
+                .resource_pressure
+                .memory_pressure,
+            placement_context
+                .cluster_state
+                .resource_pressure
+                .network_pressure,
+            // Node availability
+            available_ratio,
+            // Service complexity
+            spec.constraints.len() as f64 / 5.0, // Normalize constraints
+        ];
+
         history.push(context_vector);
-        
+
         // Add historical context if available
         let placement_history = self.placement_history.read().await;
         for record in placement_history.iter().rev().take(5) {
             // Add historical placement contexts
-            let mut hist_vector = Vec::new();
-            hist_vector.push(record.container_spec.resources.cpu_cores / 16.0);
-            hist_vector.push(record.container_spec.resources.memory_bytes as f64 / (64.0 * 1024.0 * 1024.0 * 1024.0));
-            hist_vector.push(record.placement_context.cluster_state.avg_node_utilization);
-            hist_vector.push(record.placement_context.cluster_state.resource_pressure.cpu_pressure);
-            
             // Add outcome as feedback
             let outcome_score = match &record.outcome {
-                PlacementOutcome::Success { initial_performance, .. } => *initial_performance,
-                PlacementOutcome::SuccessWithIssues { performance_impact, .. } => 1.0 - performance_impact,
+                PlacementOutcome::Success {
+                    initial_performance,
+                    ..
+                } => *initial_performance,
+                PlacementOutcome::SuccessWithIssues {
+                    performance_impact, ..
+                } => 1.0 - performance_impact,
                 PlacementOutcome::Failure { .. } => 0.0,
             };
-            hist_vector.push(outcome_score);
-            
+
+            let hist_vector = vec![
+                record.container_spec.resources.cpu_cores / 16.0,
+                record.container_spec.resources.memory_bytes as f64
+                    / (64.0 * 1024.0 * 1024.0 * 1024.0),
+                record.placement_context.cluster_state.avg_node_utilization,
+                record
+                    .placement_context
+                    .cluster_state
+                    .resource_pressure
+                    .cpu_pressure,
+                outcome_score,
+            ];
+
             history.push(hist_vector);
         }
-        
+
         Ok(history)
     }
-    
+
     /// Select optimal node from CPE predictions
     async fn _select_node_from_predictions(
         &self,
@@ -506,9 +553,10 @@ impl CpePlacementEngine {
         if predictions.is_empty() || node_candidates.is_empty() {
             return Err(anyhow::anyhow!("Invalid predictions or candidates"));
         }
-        
+
         // Use prediction values to weight node candidates
-        let mut weighted_candidates: Vec<_> = node_candidates.iter()
+        let mut weighted_candidates: Vec<_> = node_candidates
+            .iter()
             .enumerate()
             .map(|(i, candidate)| {
                 let prediction_weight = predictions.get(i % predictions.len()).unwrap_or(&0.5);
@@ -516,13 +564,14 @@ impl CpePlacementEngine {
                 (candidate, weighted_score)
             })
             .collect();
-        
+
         // Sort by weighted score
-        weighted_candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        
+        weighted_candidates
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
         Ok(weighted_candidates[0].0.node_id.clone())
     }
-    
+
     /// Generate placement reasoning
     async fn _generate_placement_reasoning(
         &self,
@@ -530,15 +579,16 @@ impl CpePlacementEngine {
         node_candidates: &[NodeCandidate],
         predictions: &[f64],
     ) -> PlacementReasoning {
-        let selected_candidate = node_candidates.iter()
+        let selected_candidate = node_candidates
+            .iter()
             .find(|c| c.node_id == *selected_node)
-            .unwrap();
-        
+            .expect("selected_node must exist in node_candidates");
+
         let primary_factors = vec![
             DecisionFactor {
                 factor_name: "CPE Prediction Score".to_string(),
                 weight: 0.4,
-                value: predictions.get(0).cloned().unwrap_or(0.5),
+                value: predictions.first().cloned().unwrap_or(0.5),
                 description: "ML-based placement optimization".to_string(),
             },
             DecisionFactor {
@@ -560,36 +610,39 @@ impl CpePlacementEngine {
                 description: "Network proximity and latency".to_string(),
             },
         ];
-        
-        let identified_risks = selected_candidate.risks.iter()
+
+        let identified_risks = selected_candidate
+            .risks
+            .iter()
             .map(|risk| match risk {
                 super::scheduler::PlacementRisk::HighResourceContention { severity, resource } => {
-                    PlacementRisk::ResourceContention { 
-                        severity: *severity, 
-                        resource: resource.clone() 
+                    PlacementRisk::ResourceContention {
+                        severity: *severity,
+                        resource: resource.clone(),
                     }
-                },
+                }
                 super::scheduler::PlacementRisk::NetworkBottleneck { severity } => {
-                    PlacementRisk::NetworkBottleneck { 
-                        severity: *severity, 
-                        expected_latency: 100.0 
+                    PlacementRisk::NetworkBottleneck {
+                        severity: *severity,
+                        expected_latency: 100.0,
                     }
-                },
+                }
                 super::scheduler::PlacementRisk::NodeOvercommitment { severity } => {
-                    PlacementRisk::PerformanceDegradation { 
-                        severity: *severity, 
-                        expected_impact: *severity 
+                    PlacementRisk::PerformanceDegradation {
+                        severity: *severity,
+                        expected_impact: *severity,
                     }
-                },
-                _ => PlacementRisk::PerformanceDegradation { 
-                    severity: 0.5, 
-                    expected_impact: 0.2 
+                }
+                _ => PlacementRisk::PerformanceDegradation {
+                    severity: 0.5,
+                    expected_impact: 0.2,
                 },
             })
             .collect();
-        
+
         // Generate alternatives from other high-scoring candidates
-        let alternatives_considered: Vec<_> = node_candidates.iter()
+        let alternatives_considered: Vec<_> = node_candidates
+            .iter()
             .filter(|c| c.node_id != *selected_node && c.score > 0.7)
             .take(3)
             .map(|c| AlternativePlacement {
@@ -602,7 +655,7 @@ impl CpePlacementEngine {
                 ],
             })
             .collect();
-        
+
         PlacementReasoning {
             primary_factors,
             secondary_factors: vec![],
@@ -614,7 +667,7 @@ impl CpePlacementEngine {
             alternatives_considered,
         }
     }
-    
+
     /// Record placement decision for learning
     async fn record_placement_decision(
         &self,
@@ -633,41 +686,42 @@ impl CpePlacementEngine {
             },
             performance_metrics: None,
         };
-        
+
         let mut history = self.placement_history.write().await;
         history.push(placement_record);
-        
+
         // Keep only recent history (last 1000 placements)
         if history.len() > 1000 {
             history.remove(0);
         }
     }
-    
+
     /// Update placement metrics
     async fn update_placement_metrics(&self, latency_ms: u64) {
         let mut metrics = self.metrics.write().await;
         metrics.total_decisions += 1;
         metrics.cpe_enhanced_decisions += 1;
-        
+
         // Update average latency
         let total_decisions = metrics.total_decisions as f64;
         let current_avg = metrics.avg_decision_latency_ms;
-        metrics.avg_decision_latency_ms = (current_avg * (total_decisions - 1.0) + latency_ms as f64) / total_decisions;
-        
+        metrics.avg_decision_latency_ms =
+            (current_avg * (total_decisions - 1.0) + latency_ms as f64) / total_decisions;
+
         // Update peak latency
         if latency_ms > metrics.peak_decision_latency_ms {
             metrics.peak_decision_latency_ms = latency_ms;
         }
-        
+
         // Update performance improvement factor
         metrics.performance_improvement_factor = 1.5; // 50% improvement with CPE
     }
-    
+
     /// Get placement metrics
     pub async fn get_metrics(&self) -> PlacementMetrics {
         self.metrics.read().await.clone()
     }
-    
+
     /// Get placement history
     pub async fn get_placement_history(&self) -> Vec<PlacementRecord> {
         self.placement_history.read().await.clone()

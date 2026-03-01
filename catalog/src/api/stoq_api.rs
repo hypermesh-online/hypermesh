@@ -10,16 +10,16 @@
 //! All handlers hold a shared [`CatalogAppState`] wrapping the catalog's
 //! registry and reputation system behind async-aware locks.
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use tracing::{info, debug, instrument};
+use std::sync::Arc;
+use tracing::{debug, info, instrument};
 
-use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
-use stoq::StoqApiServer;
+use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::StoqApiServer;
 
 // ---------------------------------------------------------------------------
 // Shared application state
@@ -262,7 +262,7 @@ impl ApiHandler for BrowseHandler {
         debug!("Handling catalog/browse: {}", request.id);
 
         let req: BrowseRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid browse request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid browse request: {e}")))?;
 
         // Return empty results — real data comes from wiring to CatalogRegistry
         let response = BrowseResponse {
@@ -303,7 +303,7 @@ impl ApiHandler for SearchHandler {
         debug!("Handling catalog/search: {}", request.id);
 
         let req: SearchRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid search request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid search request: {e}")))?;
 
         // Return empty results — real data comes from wiring to CatalogRegistry
         let response = SearchResponse {
@@ -340,7 +340,7 @@ impl ApiHandler for GetPackageHandler {
         debug!("Handling catalog/package: {}", request.id);
 
         let req: GetPackageRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid package request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid package request: {e}")))?;
 
         // Package not found — real lookup via CatalogRegistry
         Err(ApiError::NotFound(format!(
@@ -364,9 +364,8 @@ impl ApiHandler for GetPublisherHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
         debug!("Handling catalog/publisher: {}", request.id);
 
-        let req: GetPublisherRequest = serde_json::from_slice(&request.payload).map_err(|e| {
-            ApiError::InvalidRequest(format!("Invalid publisher request: {}", e))
-        })?;
+        let req: GetPublisherRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid publisher request: {e}")))?;
 
         // Publisher not found — real lookup via PublisherAuthenticator
         Err(ApiError::NotFound(format!(
@@ -475,10 +474,7 @@ pub struct CatalogStoqApi {
 impl CatalogStoqApi {
     /// Create new Catalog API server over STOQ with shared application state.
     #[instrument(skip(config, app_state))]
-    pub async fn new(
-        config: CatalogStoqConfig,
-        app_state: Arc<CatalogAppState>,
-    ) -> Result<Self> {
+    pub async fn new(config: CatalogStoqConfig, app_state: Arc<CatalogAppState>) -> Result<Self> {
         info!(
             "Creating Catalog STOQ API server on {}",
             config.bind_address
@@ -489,11 +485,7 @@ impl CatalogStoqApi {
             .bind_address
             .split(':')
             .next()
-            .and_then(|addr| {
-                addr.trim_matches(|c| c == '[' || c == ']')
-                    .parse()
-                    .ok()
-            })
+            .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
             .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
 
         let port: u16 = config
@@ -539,7 +531,10 @@ impl CatalogStoqApi {
 
         info!("Catalog STOQ API handlers registered (6 endpoints)");
 
-        Ok(Self { server, _config: config })
+        Ok(Self {
+            server,
+            _config: config,
+        })
     }
 
     /// Start the API server
@@ -570,8 +565,7 @@ mod tests {
             page_size: 20,
             featured_only: false,
         };
-        let json =
-            serde_json::to_string(&req).expect("test: serialization should succeed");
+        let json = serde_json::to_string(&req).expect("test: serialization should succeed");
         assert!(json.contains("compute"));
     }
 
@@ -584,8 +578,7 @@ mod tests {
             limit: 10,
             offset: 0,
         };
-        let json =
-            serde_json::to_string(&req).expect("test: serialization should succeed");
+        let json = serde_json::to_string(&req).expect("test: serialization should succeed");
         assert!(json.contains("gpu compute"));
     }
 
@@ -598,8 +591,7 @@ mod tests {
             package_count: 42,
             uptime_secs: 3600,
         };
-        let json =
-            serde_json::to_string(&resp).expect("test: serialization should succeed");
+        let json = serde_json::to_string(&resp).expect("test: serialization should succeed");
         assert!(json.contains("healthy"));
         assert!(json.contains("42"));
     }
@@ -666,9 +658,7 @@ mod tests {
             id: "test-browse-1".to_string(),
             service: "catalog".to_string(),
             method: "browse".to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(&req_body).expect("test: serialize request"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize request")),
             metadata: HashMap::new(),
         };
 
@@ -678,8 +668,8 @@ mod tests {
             .expect("test: browse handler should succeed");
         assert!(resp.success);
 
-        let body: BrowseResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize response");
+        let body: BrowseResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize response");
         assert_eq!(body.total_count, 50);
         assert_eq!(body.page, 0);
     }
@@ -701,9 +691,7 @@ mod tests {
             id: "test-search-1".to_string(),
             service: "catalog".to_string(),
             method: "search".to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(&req_body).expect("test: serialize request"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize request")),
             metadata: HashMap::new(),
         };
 
@@ -713,8 +701,8 @@ mod tests {
             .expect("test: search handler should succeed");
         assert!(resp.success);
 
-        let body: SearchResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize response");
+        let body: SearchResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize response");
         assert_eq!(body.query, "gpu compute");
     }
 
@@ -740,8 +728,8 @@ mod tests {
             .expect("test: stats handler should succeed");
         assert!(resp.success);
 
-        let body: RegistryStatsResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize response");
+        let body: RegistryStatsResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize response");
         assert_eq!(body.total_packages, 100);
         assert_eq!(body.total_publishers, 25);
     }
@@ -768,8 +756,8 @@ mod tests {
             .expect("test: health handler should succeed");
         assert!(resp.success);
 
-        let body: HealthResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize response");
+        let body: HealthResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize response");
         assert_eq!(body.status, "healthy");
         assert_eq!(body.service, "catalog");
     }
@@ -788,9 +776,7 @@ mod tests {
             id: "test-pkg-1".to_string(),
             service: "catalog".to_string(),
             method: "package".to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(&req_body).expect("test: serialize request"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize request")),
             metadata: HashMap::new(),
         };
 
@@ -817,9 +803,7 @@ mod tests {
             id: "test-pub-1".to_string(),
             service: "catalog".to_string(),
             method: "publisher".to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(&req_body).expect("test: serialize request"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize request")),
             metadata: HashMap::new(),
         };
 

@@ -47,8 +47,8 @@ fn simple_hash_benchmark(c: &mut Criterion) {
 }
 
 fn simple_concurrency_benchmark(c: &mut Criterion) {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
 
     c.bench_function("atomic_counter_single_thread", |b| {
         let counter = Arc::new(AtomicU64::new(0));
@@ -68,7 +68,7 @@ fn simple_concurrency_benchmark(c: &mut Criterion) {
 }
 
 fn simple_serialization_benchmark(c: &mut Criterion) {
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     struct TestData {

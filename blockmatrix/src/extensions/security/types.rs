@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
-use super::super::{
-    ExtensionCapability, ExtensionResult,
-    ResourceLimits,
-};
+use super::super::{ExtensionCapability, ExtensionResult, ResourceLimits};
 
 /// Security context for an extension
 #[derive(Debug, Clone)]

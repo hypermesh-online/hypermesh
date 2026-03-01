@@ -5,40 +5,34 @@
 // Privacy module for Block-MATRIX
 // Uses hypermesh_lib::PrivacyMode as canonical type
 
-pub mod tiers;
-pub mod flexibility_matrix;
-pub mod switching;
-pub mod policies;
 pub mod ebpf_integration;
+pub mod flexibility_matrix;
+pub mod policies;
+pub mod switching;
+pub mod tiers;
 
 pub use tiers::{
-    AnonymousTier, FederatedTier, NodeId, NetworkId,
-    PrivateP2PTier, PublicTier, TrustLevel, ValidationRequirements,
-    PeerValidator, FederationValidator, ProofOfStateValidator,
-    validation_requirements_for,
+    validation_requirements_for, AnonymousTier, FederatedTier, FederationValidator, NetworkId,
+    NodeId, PeerValidator, PrivateP2PTier, ProofOfStateValidator, PublicTier, TrustLevel,
+    ValidationRequirements,
 };
 
 pub use flexibility_matrix::{
-    PrivacyFlexibilityMatrix, NetworkVisibility, AssetSharing,
-    ValidationError, PrivacyPresets,
+    AssetSharing, NetworkVisibility, PrivacyFlexibilityMatrix, PrivacyPresets, ValidationError,
 };
 
 pub use switching::{
-    TierSwitcher, TransitionResult, TransitionError, TransitionRecord,
-    MigrationState, ConnectionInfo, ConnectionType, TransactionInfo,
-    TransactionState, AssetState, AuthenticationData,
+    AssetState, AuthenticationData, ConnectionInfo, ConnectionType, MigrationState, TierSwitcher,
+    TransactionInfo, TransactionState, TransitionError, TransitionRecord, TransitionResult,
 };
 
 pub use policies::{
-    PolicyManager, TierPolicy, PolicyAction, PolicyDecision,
-    PolicyViolation, PolicyCondition, ConditionType, ViolationType,
-    Severity, ActionType, ValidationType, AccessRules, RetentionPolicy,
-    RateLimits, RateLimit, EnforcementStats,
+    AccessRules, ActionType, ConditionType, EnforcementStats, PolicyAction, PolicyCondition,
+    PolicyDecision, PolicyManager, PolicyViolation, RateLimit, RateLimits, RetentionPolicy,
+    Severity, TierPolicy, ValidationType, ViolationType,
 };
 
-pub use ebpf_integration::{
-    PrivacyEbpfBridge, PrivacyEbpfMetrics, EbpfEventType,
-};
+pub use ebpf_integration::{EbpfEventType, PrivacyEbpfBridge, PrivacyEbpfMetrics};
 
 // Re-export PrivacyMode from hypermesh_lib for convenience
 pub use hypermesh_lib::PrivacyMode;
@@ -121,28 +115,35 @@ impl PrivacySystem {
     /// When an eBPF bridge is available, this also pushes the new tier
     /// to the kernel-level eBPF policy layer via
     /// [`PrivacyEbpfBridge::update_ebpf_for_tier`].
-    pub fn switch_tier(&mut self, new_tier: PrivacyMode) -> Result<TransitionResult, TransitionError> {
+    pub fn switch_tier(
+        &mut self,
+        new_tier: PrivacyMode,
+    ) -> Result<TransitionResult, TransitionError> {
         if !self.config.allow_switching {
-            return Err(TransitionError::InvalidTransition("Tier switching disabled".into()));
+            return Err(TransitionError::InvalidTransition(
+                "Tier switching disabled".into(),
+            ));
         }
 
         // Check daily switch limit
-        let today_switches = self.tier_switcher
+        let today_switches = self
+            .tier_switcher
             .transition_history()
             .iter()
             .filter(|r| {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .expect("system time should be after UNIX epoch")
                     .as_secs();
                 now - r.timestamp < 86400 // 24 hours
             })
             .count();
 
         if today_switches >= self.config.max_switches_per_day as usize {
-            return Err(TransitionError::InvalidTransition(
-                format!("Daily switch limit ({}) reached", self.config.max_switches_per_day)
-            ));
+            return Err(TransitionError::InvalidTransition(format!(
+                "Daily switch limit ({}) reached",
+                self.config.max_switches_per_day
+            )));
         }
 
         // Perform the switch
@@ -159,7 +160,8 @@ impl PrivacySystem {
             bridge.set_default_ebpf_tier(new_tier);
             tracing::debug!(
                 "eBPF tier updated: mode={:?}, connection_id={}",
-                new_tier, conn_id
+                new_tier,
+                conn_id
             );
         }
 
@@ -170,7 +172,10 @@ impl PrivacySystem {
     ///
     /// When an eBPF bridge is available, also pushes the matrix
     /// configuration to the kernel-level policy layer.
-    pub fn update_flexibility_matrix(&mut self, matrix: PrivacyFlexibilityMatrix) -> Result<(), ValidationError> {
+    pub fn update_flexibility_matrix(
+        &mut self,
+        matrix: PrivacyFlexibilityMatrix,
+    ) -> Result<(), ValidationError> {
         matrix.validate_configuration()?;
 
         // Push matrix to eBPF layer if bridge is available
@@ -190,7 +195,10 @@ impl PrivacySystem {
     }
 
     /// Enforce policy for an action
-    pub fn enforce_policy(&mut self, action: PolicyAction) -> Result<PolicyDecision, PolicyViolation> {
+    pub fn enforce_policy(
+        &mut self,
+        action: PolicyAction,
+    ) -> Result<PolicyDecision, PolicyViolation> {
         let tier = self.current_tier();
 
         if self.config.strict_enforcement {
@@ -258,8 +266,10 @@ mod tests {
 
     #[test]
     fn test_daily_switch_limit() {
-        let mut config = PrivacyConfig::default();
-        config.max_switches_per_day = 1;
+        let config = PrivacyConfig {
+            max_switches_per_day: 1,
+            ..PrivacyConfig::default()
+        };
         let mut system = PrivacySystem::with_config(config);
 
         // First switch should succeed
@@ -273,10 +283,7 @@ mod tests {
     #[test]
     fn test_flexibility_matrix_update() {
         let mut system = PrivacySystem::new();
-        let matrix = PrivacyFlexibilityMatrix::new(
-            PrivacyMode::ANONYMOUS,
-            PrivacyMode::PUBLIC,
-        );
+        let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
 
         assert!(system.update_flexibility_matrix(matrix).is_ok());
         assert!(system.flexibility_matrix.is_anonymous_public());
@@ -306,7 +313,7 @@ mod tests {
     #[test]
     fn test_caesar_multiplier() {
         let mut system = PrivacySystem::new();
-        system.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        system.switch_tier(PrivacyMode::PUBLIC).expect("test: mode switch");
         system.flexibility_matrix.asset_tier = PrivacyMode::PUBLIC;
 
         assert_eq!(system.caesar_multiplier(), 1.0);
@@ -315,7 +322,7 @@ mod tests {
     #[test]
     fn test_privacy_scores() {
         let mut system = PrivacySystem::new();
-        system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
+        system.switch_tier(PrivacyMode::ANONYMOUS).expect("test: mode switch");
         system.flexibility_matrix.asset_tier = PrivacyMode::ANONYMOUS;
 
         assert_eq!(system.privacy_score(), 1.0);
@@ -325,8 +332,10 @@ mod tests {
 
     #[test]
     fn test_lenient_enforcement_mode() {
-        let mut config = PrivacyConfig::default();
-        config.strict_enforcement = false;
+        let config = PrivacyConfig {
+            strict_enforcement: false,
+            ..PrivacyConfig::default()
+        };
         let mut system = PrivacySystem::with_config(config);
 
         // Action that would normally be denied
@@ -340,7 +349,7 @@ mod tests {
             high_value: true,
         };
 
-        system.switch_tier(PrivacyMode::ANONYMOUS).unwrap();
+        system.switch_tier(PrivacyMode::ANONYMOUS).expect("test: mode switch");
 
         // Should allow in lenient mode
         let result = system.enforce_policy(action);
@@ -349,8 +358,10 @@ mod tests {
 
     #[test]
     fn test_switching_disabled() {
-        let mut config = PrivacyConfig::default();
-        config.allow_switching = false;
+        let config = PrivacyConfig {
+            allow_switching: false,
+            ..PrivacyConfig::default()
+        };
         let mut system = PrivacySystem::with_config(config);
 
         let result = system.switch_tier(PrivacyMode::PUBLIC);

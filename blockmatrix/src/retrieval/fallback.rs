@@ -8,8 +8,8 @@
 
 use std::collections::HashSet;
 
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::matrix::MatrixCoordinate;
 
 use super::{ShardLocation, ShardMapEntry};
 
@@ -37,7 +37,10 @@ impl FallbackStrategy {
 
     /// Determine if this strategy uses parallel fetching
     pub fn uses_parallel(&self) -> bool {
-        matches!(self, FallbackStrategy::Parallel | FallbackStrategy::Adaptive)
+        matches!(
+            self,
+            FallbackStrategy::Parallel | FallbackStrategy::Adaptive
+        )
     }
 }
 
@@ -136,7 +139,8 @@ impl ReplicaSelector {
         max_replicas: usize,
     ) -> Vec<ShardLocation> {
         // Filter by criteria
-        let mut suitable: Vec<ShardLocation> = locations.iter()
+        let mut suitable: Vec<ShardLocation> = locations
+            .iter()
             .filter(|loc| self.criteria.meets_criteria(loc))
             .filter(|loc| !self.failed_positions.contains(&loc.position))
             .cloned()
@@ -244,21 +248,13 @@ impl FallbackManager {
     }
 
     /// Handle a failed shard fetch
-    pub fn handle_failure(
-        &mut self,
-        shard_hash: Hash,
-        failed_position: MatrixCoordinate,
-    ) {
+    pub fn handle_failure(&mut self, shard_hash: Hash, failed_position: MatrixCoordinate) {
         self.selector.mark_failed(failed_position);
         self.missing_shards.insert(shard_hash);
     }
 
     /// Handle a successful shard fetch
-    pub fn handle_success(
-        &mut self,
-        shard_hash: Hash,
-        successful_position: MatrixCoordinate,
-    ) {
+    pub fn handle_success(&mut self, shard_hash: Hash, successful_position: MatrixCoordinate) {
         self.selector.mark_successful(successful_position);
         self.retrieved_shards.insert(shard_hash);
         self.missing_shards.remove(&shard_hash);
@@ -270,7 +266,8 @@ impl FallbackManager {
         entry: &ShardMapEntry,
         max_alternatives: usize,
     ) -> Vec<ShardLocation> {
-        self.selector.select_replicas(&entry.locations, max_alternatives)
+        self.selector
+            .select_replicas(&entry.locations, max_alternatives)
     }
 
     /// Check if retrieval can succeed with current state
@@ -321,15 +318,8 @@ pub struct FallbackStatus {
 mod tests {
     use super::*;
 
-    fn create_test_location(
-        x: i64,
-        health: f64,
-        latency: u64,
-    ) -> ShardLocation {
-        let mut location = ShardLocation::new(
-            MatrixCoordinate::new(x, 0, 0).unwrap(),
-            health,
-        );
+    fn create_test_location(x: i64, health: f64, latency: u64) -> ShardLocation {
+        let mut location = ShardLocation::new(MatrixCoordinate::new(x, 0, 0).expect("test: valid coordinate"), health);
         location.estimated_latency_ms = latency;
         location
     }
@@ -371,11 +361,11 @@ mod tests {
         let criteria = SelectionCriteria::default();
         let mut selector = ReplicaSelector::new(criteria, FallbackStrategy::Adaptive);
 
-        let pos1 = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let pos2 = MatrixCoordinate::new(1, 0, 0).unwrap();
+        let pos1 = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let pos2 = MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate");
 
-        selector.mark_failed(pos1.clone());
-        selector.mark_successful(pos2.clone());
+        selector.mark_failed(pos1);
+        selector.mark_successful(pos2);
 
         assert!(selector.failed_positions.contains(&pos1));
         assert!(selector.successful_positions.contains(&pos2));
@@ -421,9 +411,9 @@ mod tests {
         let mut manager = FallbackManager::with_defaults();
 
         let shard_hash = [1u8; 32];
-        let pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let pos = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
-        manager.handle_failure(shard_hash, pos.clone());
+        manager.handle_failure(shard_hash, pos);
 
         let status = manager.get_status();
         assert_eq!(status.missing_shards, 1);
@@ -435,9 +425,9 @@ mod tests {
         let mut manager = FallbackManager::with_defaults();
 
         let shard_hash = [1u8; 32];
-        let pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let pos = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
-        manager.handle_success(shard_hash, pos.clone());
+        manager.handle_success(shard_hash, pos);
 
         let status = manager.get_status();
         assert_eq!(status.retrieved_shards, 1);
@@ -457,13 +447,13 @@ mod tests {
 
         // Mark 3 as missing (11 available)
         for i in 0..3 {
-            manager.handle_failure([i as u8; 32], MatrixCoordinate::new(i, 0, 0).unwrap());
+            manager.handle_failure([i as u8; 32], MatrixCoordinate::new(i, 0, 0).expect("test: valid coordinate"));
         }
         assert!(manager.can_succeed(min_required, total_shards));
 
         // Mark 2 more as missing (9 available)
         for i in 3..5 {
-            manager.handle_failure([i as u8; 32], MatrixCoordinate::new(i, 0, 0).unwrap());
+            manager.handle_failure([i as u8; 32], MatrixCoordinate::new(i, 0, 0).expect("test: valid coordinate"));
         }
         assert!(!manager.can_succeed(min_required, total_shards));
     }
@@ -490,7 +480,7 @@ mod tests {
         let mut manager = FallbackManager::with_defaults();
 
         let shard_hash = [1u8; 32];
-        let pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let pos = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
         manager.handle_failure(shard_hash, pos);
         assert_eq!(manager.missing_shards.len(), 1);

@@ -4,12 +4,10 @@
 
 //! Memory adapter types - allocation records, pools, proxy mappings, and permissions
 
-use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
-use crate::assets::core::{
-    AssetRegistration, PrivacyMode, ProxyAddress,
-};
+use crate::assets::core::{AssetRegistration, PrivacyMode, ProxyAddress};
 
 /// Memory allocation record with NAT-like addressing
 #[derive(Clone, Debug, Serialize, Deserialize)]

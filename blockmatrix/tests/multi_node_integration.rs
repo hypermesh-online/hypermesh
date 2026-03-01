@@ -7,20 +7,16 @@
 //! Gated: references non-existent exports (MultiNodeCoordinator, NodeInfo, etc.).
 #![cfg(feature = "future-tests")]
 
-use blockmatrix::assets::{
-    AssetManager, AssetRegistration, AssetType, ConsensusProof,
-    MultiNodeCoordinator, NodeInfo, NodeCapabilities,
-    ConsensusManager, NetworkTopology,
-};
 use blockmatrix::assets::multi_node::{
-    NodeId, AllocationDecision, ResourceSharingRequest,
-    ResourceAmount, PrivacyMode, MultiNodeEvent,
-    ConsensusProposal, ProposalType, ProposalData,
-    MigrationPlan, MigrationPriority,
+    AllocationDecision, ConsensusProposal, MigrationPlan, MigrationPriority, MultiNodeEvent,
+    NodeId, PrivacyMode, ProposalData, ProposalType, ResourceAmount, ResourceSharingRequest,
 };
 use blockmatrix::assets::proxy::{
-    RemoteMemoryTransport, TransportConfig, GlobalAddress,
-    MemoryOperationType, MemoryPermissions,
+    GlobalAddress, MemoryOperationType, MemoryPermissions, RemoteMemoryTransport, TransportConfig,
+};
+use blockmatrix::assets::{
+    AssetManager, AssetRegistration, AssetType, ConsensusManager, ConsensusProof,
+    MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo,
 };
 use std::time::{Duration, SystemTime};
 use tokio;
@@ -29,7 +25,7 @@ use tokio;
 fn create_test_node(id: u8) -> NodeId {
     NodeId {
         id: [id; 32],
-        ipv6_address: format!("2001:db8::{}",id).parse().unwrap(),
+        ipv6_address: format!("2001:db8::{}", id).parse().unwrap(),
         public_key: vec![id; 64],
         is_authenticated: true,
     }
@@ -37,9 +33,7 @@ fn create_test_node(id: u8) -> NodeId {
 
 #[tokio::test]
 async fn test_multi_node_coordinator_initialization() {
-    use blockmatrix::assets::multi_node::coordinator::{
-        MultiNodeCoordinator, CoordinatorConfig,
-    };
+    use blockmatrix::assets::multi_node::coordinator::{CoordinatorConfig, MultiNodeCoordinator};
 
     let config = CoordinatorConfig::default();
     let mut coordinator = MultiNodeCoordinator::new(config);
@@ -58,8 +52,8 @@ async fn test_multi_node_coordinator_initialization() {
 #[tokio::test]
 async fn test_consensus_manager() {
     use blockmatrix::assets::multi_node::consensus::{
-        ConsensusManager, ConsensusConfig, ConsensusProposal,
-        ProposalType, ProposalData, Vote, VoteValue,
+        ConsensusConfig, ConsensusManager, ConsensusProposal, ProposalData, ProposalType, Vote,
+        VoteValue,
     };
 
     let node = create_test_node(1);
@@ -109,12 +103,10 @@ async fn test_asset_migration() {
     let target = create_test_node(2);
 
     // Plan migration
-    let plan = migrator.plan_migration(
-        asset_id.clone(),
-        source,
-        target,
-        MigrationPriority::Normal,
-    ).await.unwrap();
+    let plan = migrator
+        .plan_migration(asset_id.clone(), source, target, MigrationPriority::Normal)
+        .await
+        .unwrap();
 
     assert_eq!(plan.asset_id, asset_id);
     assert!(plan.estimated_duration > Duration::from_secs(0));
@@ -127,17 +119,12 @@ async fn test_asset_migration() {
 #[tokio::test]
 async fn test_node_discovery() {
     use blockmatrix::assets::multi_node::discovery::{
-        NodeDiscovery, DiscoveryProtocol, DiscoveryConfig,
-        ServiceAnnouncement, DiscoveredNode,
+        DiscoveredNode, DiscoveryConfig, DiscoveryProtocol, NodeDiscovery, ServiceAnnouncement,
     };
 
     let local_node = create_test_node(1);
     let config = DiscoveryConfig::default();
-    let discovery = NodeDiscovery::new(
-        local_node.clone(),
-        DiscoveryProtocol::Hybrid,
-        config,
-    );
+    let discovery = NodeDiscovery::new(local_node.clone(), DiscoveryProtocol::Hybrid, config);
 
     // Start discovery
     discovery.start().await.unwrap();
@@ -164,8 +151,7 @@ async fn test_node_discovery() {
 #[tokio::test]
 async fn test_load_balancer() {
     use blockmatrix::assets::multi_node::load_balancer::{
-        LoadBalancer, BalancingStrategy, LoadBalancerConfig,
-        ResourceMetrics,
+        BalancingStrategy, LoadBalancer, LoadBalancerConfig, ResourceMetrics,
     };
 
     let config = LoadBalancerConfig::default();
@@ -195,7 +181,7 @@ async fn test_load_balancer() {
 #[tokio::test]
 async fn test_byzantine_detection() {
     use blockmatrix::assets::multi_node::fault_tolerance::{
-        ByzantineDetector, ByzantineConfig, SuspiciousEvent,
+        ByzantineConfig, ByzantineDetector, SuspiciousEvent,
     };
 
     let config = ByzantineConfig::default();
@@ -208,7 +194,9 @@ async fn test_byzantine_detection() {
         let event = SuspiciousEvent::ExcessiveFailures {
             failure_rate: 0.8 + (i as f64 * 0.02),
         };
-        detector.report_suspicious_behavior(byzantine_node.clone(), event).await;
+        detector
+            .report_suspicious_behavior(byzantine_node.clone(), event)
+            .await;
     }
 
     // Check if node is marked as Byzantine
@@ -223,17 +211,12 @@ async fn test_byzantine_detection() {
 #[tokio::test]
 async fn test_resource_sharing() {
     use blockmatrix::assets::multi_node::resource_sharing::{
-        ResourceSharing, SharingProtocol, PricingModel,
-        SharingConfig, ResourceOffer, ResourceRequest,
-        ServiceLevelAgreement, DataLocalityRequirement,
+        DataLocalityRequirement, PricingModel, ResourceOffer, ResourceRequest, ResourceSharing,
+        ServiceLevelAgreement, SharingConfig, SharingProtocol,
     };
 
     let config = SharingConfig::default();
-    let sharing = ResourceSharing::new(
-        SharingProtocol::Market,
-        PricingModel::Dynamic,
-        config,
-    );
+    let sharing = ResourceSharing::new(SharingProtocol::Market, PricingModel::Dynamic, config);
 
     let provider = create_test_node(1);
     let consumer = create_test_node(2);
@@ -290,9 +273,9 @@ async fn test_resource_sharing() {
 
 #[tokio::test]
 async fn test_remote_memory_transport() {
-    use quinn::{Endpoint, ServerConfig, ClientConfig};
-    use std::sync::Arc;
     use bytes::Bytes;
+    use quinn::{ClientConfig, Endpoint, ServerConfig};
+    use std::sync::Arc;
 
     // Create dummy endpoint for testing
     let server_config = ServerConfig::with_crypto(Arc::new(
@@ -300,13 +283,10 @@ async fn test_remote_memory_transport() {
             .with_safe_defaults()
             .with_no_client_auth()
             .with_single_cert(vec![], rustls::PrivateKey(vec![]))
-            .unwrap()
+            .unwrap(),
     ));
 
-    let endpoint = Endpoint::server(
-        server_config,
-        "127.0.0.1:0".parse().unwrap(),
-    ).unwrap();
+    let endpoint = Endpoint::server(server_config, "127.0.0.1:0".parse().unwrap()).unwrap();
 
     let config = TransportConfig::default();
     let transport = RemoteMemoryTransport::new(endpoint, config).await.unwrap();
@@ -338,10 +318,8 @@ async fn test_remote_memory_transport() {
 
 #[tokio::test]
 async fn test_end_to_end_multi_node_flow() {
-    use blockmatrix::assets::multi_node::coordinator::{
-        MultiNodeCoordinator, CoordinatorConfig,
-    };
-    use blockmatrix::assets::multi_node::{MultiNodeCoordinatorTrait};
+    use blockmatrix::assets::multi_node::coordinator::{CoordinatorConfig, MultiNodeCoordinator};
+    use blockmatrix::assets::multi_node::MultiNodeCoordinatorTrait;
 
     // Create coordinator
     let config = CoordinatorConfig::default();

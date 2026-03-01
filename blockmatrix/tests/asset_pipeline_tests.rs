@@ -8,11 +8,9 @@
 //! Reed-Solomon sharding, and matrix-aware distribution.
 
 use blockmatrix::assets::pipeline::{
-    Asset, AssetMetadata, orchestrator::AssetPipeline, PipelineConfig,
-    CompressionAlgorithm, CompressionConfig,
-    EncryptionConfig, Encryptor,
+    orchestrator::AssetPipeline, Asset, AssetMetadata, CompressionAlgorithm, CompressionConfig,
+    DistributionConfig, EncryptionConfig, Encryptor, MatrixDistributor, PipelineConfig,
     ShardingConfig,
-    DistributionConfig, MatrixDistributor,
 };
 use blockmatrix::matrix::MatrixCoordinate;
 use std::time::Instant;
@@ -72,7 +70,9 @@ fn test_brotli_streaming_compression() {
     let mut reader = std::io::Cursor::new(&test_data);
     let mut output = Vec::new();
 
-    let stats = compressor.compress_stream(&mut reader, &mut output).unwrap();
+    let stats = compressor
+        .compress_stream(&mut reader, &mut output)
+        .unwrap();
 
     println!("\n=== Brotli Streaming Test ===");
     println!("Original: {} bytes", stats.original_size);
@@ -98,10 +98,13 @@ fn test_quantum_resistant_encryption() {
     let test_data = b"Quantum-resistant encryption test data!".repeat(100);
 
     // Generate Kyber-1024 keypair
-    let keypair = encryptor.generate_keypair().expect("test: keypair generation");
+    let keypair = encryptor
+        .generate_keypair()
+        .expect("test: keypair generation");
 
     // Encrypt with public key (Kyber-1024 KEM + AES-256-GCM)
-    let (encrypted, stats) = encryptor.encrypt(&test_data, &keypair.public_key)
+    let (encrypted, stats) = encryptor
+        .encrypt(&test_data, &keypair.public_key)
         .expect("test: encryption");
 
     println!("\n=== Quantum-Resistant Encryption Test ===");
@@ -112,7 +115,8 @@ fn test_quantum_resistant_encryption() {
     assert_ne!(encrypted.encrypted_data, test_data.to_vec());
 
     // Decrypt with secret key
-    let decrypted = encryptor.decrypt(&encrypted, &keypair.secret_key)
+    let decrypted = encryptor
+        .decrypt(&encrypted, &keypair.secret_key)
         .expect("test: decryption");
     assert_eq!(decrypted, test_data);
 }
@@ -178,7 +182,8 @@ fn test_shard_recovery_scenarios() {
     println!("✓ Recovered from losing all parity shards");
 
     // Scenario 3: Lose random 4 shards
-    let scenario3: Vec<_> = shards.iter()
+    let scenario3: Vec<_> = shards
+        .iter()
         .enumerate()
         .filter(|(i, _)| !matches!(i, 1 | 4 | 7 | 12))
         .map(|(_, s)| s.clone())
@@ -206,7 +211,7 @@ fn test_matrix_aware_distribution() {
         let y = ((i / 10) % 10) as i64;
         let z = (i / 100) as i64;
         let position = MatrixCoordinate::new(x, y, z).unwrap();
-        distributor.register_node(format!("node-{}", i), position);
+        distributor.register_node(format!("node-{i}"), position);
     }
 
     // Create shards
@@ -228,11 +233,11 @@ fn test_matrix_aware_distribution() {
     for (i, pos) in optimal_positions.iter().enumerate() {
         placements.push(blockmatrix::assets::pipeline::ShardPlacement {
             shard_index: i,
-            position: pos.clone(),
+            position: *pos,
             network_id: "default".to_string(),
-            node_id: Some(format!("node-{}", i)),
+            node_id: Some(format!("node-{i}")),
             distance_from_origin: pos.euclidean_distance(&MatrixCoordinate::origin()),
-            routing_path: vec![MatrixCoordinate::origin(), pos.clone()],
+            routing_path: vec![MatrixCoordinate::origin(), *pos],
         });
     }
 
@@ -243,7 +248,7 @@ fn test_matrix_aware_distribution() {
     let mut count = 0;
 
     for i in 0..placements.len() {
-        for j in i+1..placements.len() {
+        for j in i + 1..placements.len() {
             let dist = placements[i].distance_to(&placements[j]);
             min_distance = min_distance.min(dist);
             max_distance = max_distance.max(dist);
@@ -252,11 +257,15 @@ fn test_matrix_aware_distribution() {
         }
     }
 
-    let avg_distance = if count > 0 { total_distance / count as f64 } else { 0.0 };
+    let avg_distance = if count > 0 {
+        total_distance / count as f64
+    } else {
+        0.0
+    };
 
-    println!("Average distance between shards: {:.2}", avg_distance);
-    println!("Min distance: {:.2}", min_distance);
-    println!("Max distance: {:.2}", max_distance);
+    println!("Average distance between shards: {avg_distance:.2}");
+    println!("Min distance: {min_distance:.2}");
+    println!("Max distance: {max_distance:.2}");
 
     // Verify placements - positions are valid matrix coordinates
     for placement in &placements {
@@ -299,15 +308,20 @@ async fn test_end_to_end_pipeline() {
     let duration = start.elapsed();
 
     // Calculate throughput
-    let throughput_mbps = (test_data.len() as f64 / (1024.0 * 1024.0))
-        / duration.as_secs_f64();
+    let throughput_mbps = (test_data.len() as f64 / (1024.0 * 1024.0)) / duration.as_secs_f64();
 
     println!("Original size: {} bytes", test_data.len());
-    println!("Compressed size: {} bytes", processed.stats.compression.compressed_size);
-    println!("Compression ratio: {:.2}%", processed.stats.compression.ratio * 100.0);
+    println!(
+        "Compressed size: {} bytes",
+        processed.stats.compression.compressed_size
+    );
+    println!(
+        "Compression ratio: {:.2}%",
+        processed.stats.compression.ratio * 100.0
+    );
     println!("Shards: {}", processed.shards.len());
     println!("Total time: {:.2} ms", duration.as_secs_f64() * 1000.0);
-    println!("Throughput: {:.2} MB/s", throughput_mbps);
+    println!("Throughput: {throughput_mbps:.2} MB/s");
 
     // Verify we can reconstruct
     let reconstructed = pipeline.reconstruct_asset(&processed).await.unwrap();
@@ -320,7 +334,10 @@ async fn test_end_to_end_pipeline() {
     let mut partial_processed = processed.clone();
     partial_processed.shards.truncate(10);
 
-    let reconstructed = pipeline.reconstruct_asset(&partial_processed).await.unwrap();
+    let reconstructed = pipeline
+        .reconstruct_asset(&partial_processed)
+        .await
+        .unwrap();
     assert_eq!(reconstructed, test_data);
 
     println!("✓ Successfully reconstructed from partial shards");
@@ -348,10 +365,10 @@ async fn test_pipeline_performance_benchmark() {
     for (size, label) in sizes {
         let test_data = vec![0xAB; size];
         let asset = Asset {
-            id: format!("benchmark-{}", size),
+            id: format!("benchmark-{size}"),
             data: test_data.clone(),
             metadata: AssetMetadata {
-                name: format!("{}.bin", label),
+                name: format!("{label}.bin"),
                 content_type: "application/octet-stream".to_string(),
                 size,
                 created_at: 1234567890,
@@ -417,19 +434,34 @@ async fn test_pipeline_1gb_throughput() {
 
     println!("Data size: {} MB", test_size / (1024 * 1024));
     println!("Processing time: {:.2} seconds", duration.as_secs_f64());
-    println!("Throughput: {:.2} MB/s ({:.3} GB/s)", throughput_mbps, throughput_gbps);
+    println!("Throughput: {throughput_mbps:.2} MB/s ({throughput_gbps:.3} GB/s)");
 
     println!("\nBreakdown:");
-    println!("  Compression: {:.2} MB/s", processed.stats.compression.throughput_mbps);
-    println!("  Encryption: {:.2} MB/s", processed.stats.encryption.throughput_mbps);
-    println!("  Sharding: {:.2} MB/s", processed.stats.sharding.throughput_mbps);
-    println!("  Distribution: {} ms total", processed.stats.distribution.duration_ms);
+    println!(
+        "  Compression: {:.2} MB/s",
+        processed.stats.compression.throughput_mbps
+    );
+    println!(
+        "  Encryption: {:.2} MB/s",
+        processed.stats.encryption.throughput_mbps
+    );
+    println!(
+        "  Sharding: {:.2} MB/s",
+        processed.stats.sharding.throughput_mbps
+    );
+    println!(
+        "  Distribution: {} ms total",
+        processed.stats.distribution.duration_ms
+    );
 
     // Check if we meet the 1GB/s target (allowing some margin)
     if throughput_gbps >= 0.5 {
         println!("✓ Achieved {:.1}% of 1GB/s target", throughput_gbps * 100.0);
     } else {
-        println!("⚠ Only achieved {:.1}% of 1GB/s target", throughput_gbps * 100.0);
+        println!(
+            "⚠ Only achieved {:.1}% of 1GB/s target",
+            throughput_gbps * 100.0
+        );
     }
 
     // Verify reconstruction
@@ -449,9 +481,9 @@ fn test_integration_with_phase1_tensor_ops() {
     let pos2 = MatrixCoordinate::new(10, 10, 10).unwrap();
     let distance = pos1.euclidean_distance(&pos2);
 
-    println!("Node position 1: {:?}", pos1);
-    println!("Node position 2: {:?}", pos2);
-    println!("Distance: {:.2}", distance);
+    println!("Node position 1: {pos1:?}");
+    println!("Node position 2: {pos2:?}");
+    println!("Distance: {distance:.2}");
 
     // Create and distribute shards
     let dist_config = DistributionConfig::default();
@@ -463,7 +495,7 @@ fn test_integration_with_phase1_tensor_ops() {
         let y = ((i / 10) % 10) as i64;
         let z = 0i64;
         let position = MatrixCoordinate::new(x, y, z).unwrap();
-        distributor.register_node(format!("node-{}", i), position);
+        distributor.register_node(format!("node-{i}"), position);
     }
 
     let sharder = Sharder::default().unwrap();
@@ -524,7 +556,10 @@ async fn test_integration_with_sprint_2_3_multi_network() {
     let mut partial_processed = processed.clone();
     partial_processed.shards.truncate(10);
 
-    let reconstructed = pipeline.reconstruct_asset(&partial_processed).await.unwrap();
+    let reconstructed = pipeline
+        .reconstruct_asset(&partial_processed)
+        .await
+        .unwrap();
     assert_eq!(reconstructed, test_data);
 
     println!("✓ Successfully reconstructed from multi-network shards");

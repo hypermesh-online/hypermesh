@@ -6,9 +6,9 @@
 //!
 //! Complete mapping of content → shards → matrix positions with replica tracking.
 
-use serde::{Serialize, Deserialize};
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::matrix::MatrixCoordinate;
+use serde::{Deserialize, Serialize};
 
 /// Location of a shard in the matrix
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -108,7 +108,8 @@ impl ShardMapEntry {
 
     /// Get best location based on suitability score
     pub fn get_best_location(&self) -> Option<&ShardLocation> {
-        self.locations.iter()
+        self.locations
+            .iter()
             .filter(|loc| loc.is_suitable())
             .max_by(|a, b| {
                 a.suitability_score()
@@ -119,7 +120,9 @@ impl ShardMapEntry {
 
     /// Get all suitable locations sorted by suitability
     pub fn get_sorted_locations(&self) -> Vec<&ShardLocation> {
-        let mut suitable: Vec<&ShardLocation> = self.locations.iter()
+        let mut suitable: Vec<&ShardLocation> = self
+            .locations
+            .iter()
             .filter(|loc| loc.is_suitable())
             .collect();
 
@@ -208,10 +211,9 @@ impl CompleteShardMap {
         for entry in &self.entries {
             total_replicas += entry.locations.len();
             for location in &entry.locations {
-                positions.insert(format!("{},{},{}",
-                    location.position.x,
-                    location.position.y,
-                    location.position.z
+                positions.insert(format!(
+                    "{},{},{}",
+                    location.position.x, location.position.y, location.position.z
                 ));
             }
         }
@@ -239,12 +241,15 @@ impl CompleteShardMap {
 
     /// Check if all shards have sufficient replicas
     pub fn has_sufficient_replicas(&self, min_replicas: usize) -> bool {
-        self.entries.iter().all(|entry| entry.locations.len() >= min_replicas)
+        self.entries
+            .iter()
+            .all(|entry| entry.locations.len() >= min_replicas)
     }
 
     /// Get shards with insufficient replicas
     pub fn get_weak_shards(&self, min_replicas: usize) -> Vec<usize> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .enumerate()
             .filter(|(_, entry)| entry.locations.len() < min_replicas)
             .map(|(idx, _)| idx)
@@ -287,8 +292,8 @@ mod tests {
 
     #[test]
     fn test_shard_location_creation() {
-        let pos = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let location = ShardLocation::new(pos.clone(), 0.95);
+        let pos = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let location = ShardLocation::new(pos, 0.95);
 
         assert_eq!(location.position, pos);
         assert_eq!(location.health_score, 0.95);
@@ -297,8 +302,8 @@ mod tests {
 
     #[test]
     fn test_distance_calculation() {
-        let pos1 = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let pos2 = MatrixCoordinate::new(3, 4, 0).unwrap();
+        let pos1 = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let pos2 = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
 
         let location = ShardLocation::new(pos1, 1.0);
         let distance = location.distance_to(&pos2);
@@ -308,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_suitability_score() {
-        let pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let pos = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let mut location = ShardLocation::new(pos, 0.9);
         location.distance = 5.0;
         location.priority = 80;
@@ -321,12 +326,13 @@ mod tests {
     fn test_shard_map_entry() {
         let shard_hash = [1u8; 32];
         let positions = vec![
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
-            MatrixCoordinate::new(1, 0, 0).unwrap(),
-            MatrixCoordinate::new(2, 0, 0).unwrap(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"),
         ];
 
-        let locations: Vec<ShardLocation> = positions.into_iter()
+        let locations: Vec<ShardLocation> = positions
+            .into_iter()
             .map(|pos| ShardLocation::new(pos, 0.9))
             .collect();
 
@@ -339,23 +345,24 @@ mod tests {
     fn test_optimize_for_target() {
         let shard_hash = [1u8; 32];
         let positions = vec![
-            MatrixCoordinate::new(10, 0, 0).unwrap(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(), // Nearest
-            MatrixCoordinate::new(5, 0, 0).unwrap(),
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), // Nearest
+            MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate"),
         ];
 
-        let locations: Vec<ShardLocation> = positions.into_iter()
+        let locations: Vec<ShardLocation> = positions
+            .into_iter()
             .map(|pos| ShardLocation::new(pos, 1.0))
             .collect();
 
         let mut entry = ShardMapEntry::new(shard_hash, locations);
 
         // Optimize for origin
-        let target = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let target = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         entry.optimize_for_target(&target);
 
         // First location should be nearest
-        let best = entry.get_best_location().unwrap();
+        let best = entry.get_best_location().expect("test: expected success");
         assert_eq!(best.position.x, 0);
     }
 
@@ -367,8 +374,8 @@ mod tests {
         for i in 0..3 {
             let shard_hash = [i as u8; 32];
             let locations = vec![
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).unwrap(), 1.0),
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).unwrap(), 1.0),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate"), 1.0),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).expect("test: valid coordinate"), 1.0),
             ];
             let entry = ShardMapEntry::new(shard_hash, locations);
             map.add_entry(entry);
@@ -388,16 +395,16 @@ mod tests {
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
             let locations = vec![
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).unwrap(), 1.0),
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).unwrap(), 0.9),
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 2, 0).unwrap(), 0.85),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate"), 1.0),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).expect("test: valid coordinate"), 0.9),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 2, 0).expect("test: valid coordinate"), 0.85),
             ];
             let entry = ShardMapEntry::new(shard_hash, locations);
             map.add_entry(entry);
         }
 
         let size = map.estimate_size();
-        println!("Shard map estimated size: {} bytes", size);
+        println!("Shard map estimated size: {size} bytes");
 
         // Should be reasonable for 14 shards × 3 replicas
         assert!(size < 10000); // Less than 10KB

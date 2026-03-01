@@ -6,11 +6,11 @@
 //!
 //! Provides security abstractions and policies for the HyperMesh system.
 
-pub mod config;
-pub mod error;
-pub mod certificates;
 pub mod capabilities;
+pub mod certificates;
+pub mod config;
 pub mod ebpf;
+pub mod error;
 pub mod intrusion;
 pub mod monitoring;
 pub mod policies;
@@ -21,20 +21,18 @@ pub mod tests;
 
 // Re-export main types from config module
 pub use config::{
-    SecurityConfig, EBPFConfig, CertificateConfig, CapabilityConfig,
-    IntrusionDetectionConfig, PolicyConfig, MonitoringConfig,
+    CapabilityConfig, CertificateConfig, EBPFConfig, IntrusionDetectionConfig, MonitoringConfig,
+    PolicyConfig, SecurityConfig,
 };
 
 // Re-export error types
-pub use error::{SecurityError, Result};
+pub use error::{Result, SecurityError};
 
 // Re-export core security types
 pub use types::{
-    HyperMeshSecurity, SecurityContext, Principal, Resource, Operation,
-    AccessDecision, SeverityLevel, NetworkPacket, SystemCall, ProcessContext,
-    SecurityEvent,
+    AccessDecision, HyperMeshSecurity, NetworkPacket, Operation, Principal, ProcessContext,
+    Resource, SecurityContext, SecurityEvent, SeverityLevel, SystemCall,
 };
-
 
 /// Security manager for HyperMesh
 pub struct SecurityManager {
@@ -69,13 +67,20 @@ impl SecurityManager {
             });
         }
 
-        if self.config.certificates.lifecycle.maximum_certificate_age_days
+        if self
+            .config
+            .certificates
+            .lifecycle
+            .maximum_certificate_age_days
             < self.config.certificates.lifecycle.default_validity_days
         {
             return Err(SecurityError::ConfigurationError {
                 message: format!(
                     "maximum_certificate_age_days ({}) < default_validity_days ({})",
-                    self.config.certificates.lifecycle.maximum_certificate_age_days,
+                    self.config
+                        .certificates
+                        .lifecycle
+                        .maximum_certificate_age_days,
                     self.config.certificates.lifecycle.default_validity_days,
                 ),
             });

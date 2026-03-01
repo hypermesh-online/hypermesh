@@ -4,8 +4,8 @@
 
 //! Capability-based security system
 
-use super::{Principal, Resource, Operation, error::Result};
-use serde::{Serialize, Deserialize};
+use super::{error::Result, Operation, Principal, Resource};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 pub type CapabilityId = String;
 
 /// Permission set for capabilities
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PermissionSet {
     pub read: bool,
     pub write: bool,
@@ -41,6 +41,12 @@ pub struct CapabilitySystem {
     capability_store: RwLock<HashMap<CapabilityId, Capability>>,
 }
 
+impl Default for CapabilitySystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CapabilitySystem {
     pub fn new() -> Self {
         Self {
@@ -48,20 +54,32 @@ impl CapabilitySystem {
             capability_store: RwLock::new(HashMap::new()),
         }
     }
-    
-    pub async fn grant_capability(&self, principal: Principal, capability: Capability) -> Result<()> {
+
+    pub async fn grant_capability(
+        &self,
+        principal: Principal,
+        capability: Capability,
+    ) -> Result<()> {
         let mut capabilities = self.capabilities.write().await;
         let mut store = self.capability_store.write().await;
-        
+
         store.insert(capability.id.clone(), capability.clone());
-        capabilities.entry(principal).or_insert_with(Vec::new).push(capability);
-        
+        capabilities
+            .entry(principal)
+            .or_insert_with(Vec::new)
+            .push(capability);
+
         Ok(())
     }
-    
-    pub async fn check_permission(&self, principal: &Principal, resource: &Resource, operation: &Operation) -> Result<bool> {
+
+    pub async fn check_permission(
+        &self,
+        principal: &Principal,
+        resource: &Resource,
+        operation: &Operation,
+    ) -> Result<bool> {
         let capabilities = self.capabilities.read().await;
-        
+
         if let Some(caps) = capabilities.get(principal) {
             for cap in caps {
                 if self.capability_matches(cap, resource, operation) && !self.is_expired(cap) {
@@ -69,11 +87,16 @@ impl CapabilitySystem {
                 }
             }
         }
-        
+
         Ok(false)
     }
-    
-    fn capability_matches(&self, cap: &Capability, _resource: &Resource, operation: &Operation) -> bool {
+
+    fn capability_matches(
+        &self,
+        cap: &Capability,
+        _resource: &Resource,
+        operation: &Operation,
+    ) -> bool {
         // Simplified matching logic
         match operation {
             Operation::Read => cap.permissions.read,
@@ -83,21 +106,8 @@ impl CapabilitySystem {
             _ => false,
         }
     }
-    
-    fn is_expired(&self, cap: &Capability) -> bool {
-        cap.expiry.map_or(false, |expiry| SystemTime::now() > expiry)
-    }
-}
 
-impl Default for PermissionSet {
-    fn default() -> Self {
-        Self {
-            read: false,
-            write: false,
-            execute: false,
-            delete: false,
-            modify_permissions: false,
-            delegate: false,
-        }
+    fn is_expired(&self, cap: &Capability) -> bool {
+        cap.expiry.is_some_and(|expiry| SystemTime::now() > expiry)
     }
 }

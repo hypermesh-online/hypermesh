@@ -14,16 +14,15 @@
 //! - Full 4-proof PoS validation via STOQ integration
 //! - NO external trust.hypermesh.online dependency
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
-    StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate,
-    ProofOfState, new_random_network_id,
+    new_random_network_id, AssetRequest, AssetResponse, Certificate, NetworkConfig,
+    NetworkConnection, NetworkHandler, NetworkType, PeerInfo, ProofOfState, StoqTransport,
 };
 
 /// Public network handler - BlockMatrix blockchain-registered certificates
@@ -92,14 +91,19 @@ impl PublicNetworkHandler {
     }
 
     /// Submit Proof of State to LOCAL BlockMatrix blockchain
-    async fn submit_proof_of_state(&self, proof: &ProofOfState, stoq: &Arc<StoqTransport>) -> Result<Certificate> {
+    async fn submit_proof_of_state(
+        &self,
+        proof: &ProofOfState,
+        stoq: &Arc<StoqTransport>,
+    ) -> Result<Certificate> {
         info!("Submitting Proof of State to LOCAL BlockMatrix blockchain");
 
         // Validate all four proofs are present
-        if proof.proof_of_space.is_empty() ||
-           proof.proof_of_stake.is_empty() ||
-           proof.proof_of_work.is_empty() ||
-           proof.proof_of_time.is_empty() {
+        if proof.proof_of_space.is_empty()
+            || proof.proof_of_stake.is_empty()
+            || proof.proof_of_work.is_empty()
+            || proof.proof_of_time.is_empty()
+        {
             return Err(anyhow!("All four proofs required for public network"));
         }
 
@@ -129,7 +133,11 @@ impl PublicNetworkHandler {
     }
 
     /// Register certificate on LOCAL BlockMatrix blockchain
-    async fn register_on_local_blockchain(&self, _stoq: &Arc<StoqTransport>, proof: &ProofOfState) -> Result<Certificate> {
+    async fn register_on_local_blockchain(
+        &self,
+        _stoq: &Arc<StoqTransport>,
+        proof: &ProofOfState,
+    ) -> Result<Certificate> {
         info!("Registering certificate on LOCAL BlockMatrix blockchain");
 
         // In production, this would:
@@ -142,32 +150,40 @@ impl PublicNetworkHandler {
         let cert = Certificate {
             subject: format!("blockmatrix-node-{}", uuid::Uuid::new_v4()),
             issuer: "blockmatrix-local-blockchain".to_string(), // LOCAL blockchain, not trust.hypermesh.online
-            public_key: proof.proof_of_stake.clone(), // Placeholder
-            signature: proof.proof_of_work.clone(), // Placeholder
+            public_key: proof.proof_of_stake.clone(),           // Placeholder
+            signature: proof.proof_of_work.clone(),             // Placeholder
             fingerprint: format!("blockchain:local:{}", blake3::hash(&proof.proof_of_stake)),
             expires_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs() + (365 * 24 * 60 * 60), // 1 year
+                .expect("system time should be after UNIX epoch")
+                .as_secs()
+                + (365 * 24 * 60 * 60), // 1 year
             network_type: super::NetworkType::Public,
             blockchain_registered: true, // Registered on LOCAL blockchain
         };
 
-        info!("Certificate registered on LOCAL BlockMatrix blockchain: {}", cert.fingerprint);
+        info!(
+            "Certificate registered on LOCAL BlockMatrix blockchain: {}",
+            cert.fingerprint
+        );
         Ok(cert)
     }
 
     /// Register DNS name as blockchain asset on LOCAL blockchain
     async fn register_dns(&self, dns_name: &str, cert: &Certificate) -> Result<()> {
-        info!("Registering DNS-as-Asset on LOCAL BlockMatrix blockchain: {}", dns_name);
+        info!(
+            "Registering DNS-as-Asset on LOCAL BlockMatrix blockchain: {}",
+            dns_name
+        );
 
         // Register on LOCAL BlockMatrix blockchain (not external registry)
-        self.register_dns_on_local_blockchain(dns_name, cert).await?;
+        self.register_dns_on_local_blockchain(dns_name, cert)
+            .await?;
 
         // Store DNS asset info
         let dns_asset = DnsAsset {
             dns_name: dns_name.to_string(),
-            asset_id: format!("dns:{}", dns_name), // Placeholder
+            asset_id: format!("dns:{dns_name}"), // Placeholder
             _registered_at_block: self.blockchain_state.read().await.current_block_height,
             _registered_at_time: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -177,12 +193,19 @@ impl PublicNetworkHandler {
 
         *self.dns_asset.write().await = Some(dns_asset.clone());
 
-        info!("DNS-as-Asset registered on LOCAL blockchain: {} -> {}", dns_name, dns_asset.asset_id);
+        info!(
+            "DNS-as-Asset registered on LOCAL blockchain: {} -> {}",
+            dns_name, dns_asset.asset_id
+        );
         Ok(())
     }
 
     /// Register DNS asset on LOCAL BlockMatrix blockchain
-    async fn register_dns_on_local_blockchain(&self, dns_name: &str, cert: &Certificate) -> Result<()> {
+    async fn register_dns_on_local_blockchain(
+        &self,
+        dns_name: &str,
+        cert: &Certificate,
+    ) -> Result<()> {
         info!("Adding DNS asset to LOCAL BlockMatrix blockchain");
 
         // In production, this would:
@@ -216,7 +239,8 @@ impl NetworkHandler for PublicNetworkHandler {
         info!("Bootstrapping public network connection via LOCAL BlockMatrix blockchain");
 
         // Public mode REQUIRES Proof of State
-        let proof = config.proof_of_state
+        let proof = config
+            .proof_of_state
             .ok_or_else(|| anyhow!("Proof of State required for public network"))?;
 
         // Create STOQ transport for public network with PoS validation
@@ -260,7 +284,8 @@ impl NetworkHandler for PublicNetworkHandler {
 
         // Verify we have a valid blockchain certificate
         let cert_opt = self.blockchain_cert.read().await;
-        let cert = cert_opt.as_ref()
+        let cert = cert_opt
+            .as_ref()
             .ok_or_else(|| anyhow!("No blockchain certificate - bootstrap first"))?;
 
         if !cert.is_blockchain_registered() {
@@ -291,7 +316,10 @@ impl NetworkHandler for PublicNetworkHandler {
         match &peer.certificate {
             Some(cert) => {
                 if !cert.is_blockchain_registered() {
-                    warn!("Peer {} certificate not blockchain-registered", peer.peer_id);
+                    warn!(
+                        "Peer {} certificate not blockchain-registered",
+                        peer.peer_id
+                    );
                     return Ok(false);
                 }
 
@@ -317,7 +345,10 @@ impl NetworkHandler for PublicNetworkHandler {
     }
 
     async fn handle_asset_request(&self, request: AssetRequest) -> Result<AssetResponse> {
-        debug!("Handling public network asset request: {}", request.asset_id);
+        debug!(
+            "Handling public network asset request: {}",
+            request.asset_id
+        );
 
         // In public mode, authorization is based on blockchain validation
         let authorized = if let Some(_peer_id) = &request.peer_id {
@@ -335,17 +366,19 @@ impl NetworkHandler for PublicNetworkHandler {
 
         let response = AssetResponse {
             asset_id: request.asset_id.clone(),
-            data: if authorized {
-                None // Would fetch actual data
-            } else {
-                None
-            },
+            data: None, // Would fetch actual data when authorized
             authorized,
             metadata: {
                 let mut meta = std::collections::HashMap::new();
                 meta.insert("network".to_string(), "public".to_string());
-                meta.insert("blockchain_height".to_string(),
-                    self.blockchain_state.read().await.current_block_height.to_string());
+                meta.insert(
+                    "blockchain_height".to_string(),
+                    self.blockchain_state
+                        .read()
+                        .await
+                        .current_block_height
+                        .to_string(),
+                );
                 if let Some(dns) = &*self.dns_asset.read().await {
                     meta.insert("dns_name".to_string(), dns.dns_name.clone());
                 }
@@ -372,7 +405,10 @@ impl NetworkHandler for PublicNetworkHandler {
         );
 
         if let Some(dns) = &*self.dns_asset.read().await {
-            info!("DNS-as-Asset {} remains registered on blockchain", dns.dns_name);
+            info!(
+                "DNS-as-Asset {} remains registered on blockchain",
+                dns.dns_name
+            );
         }
 
         // Clear connection but keep blockchain certificate
@@ -411,7 +447,10 @@ mod tests {
 
         let result = handler.bootstrap(config).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Proof of State required"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Proof of State required"));
     }
 
     #[tokio::test]
@@ -432,10 +471,10 @@ mod tests {
             proof_of_state: Some(proof),
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
         assert_eq!(connection.network_type, NetworkType::Public);
         assert!(connection.certificate.is_some());
-        assert!(connection.certificate.unwrap().is_blockchain_registered());
+        assert!(connection.certificate.expect("test: registration").is_blockchain_registered());
     }
 
     #[tokio::test]
@@ -460,7 +499,7 @@ mod tests {
             certificate: Some(valid_cert),
             network_type: NetworkType::Public,
         };
-        assert!(handler.validate_peer(&valid_peer).await.unwrap());
+        assert!(handler.validate_peer(&valid_peer).await.expect("test: async operation"));
 
         // Non-blockchain-registered peer
         let invalid_cert = Certificate {
@@ -480,7 +519,7 @@ mod tests {
             certificate: Some(invalid_cert),
             network_type: NetworkType::Public,
         };
-        assert!(!handler.validate_peer(&invalid_peer).await.unwrap());
+        assert!(!handler.validate_peer(&invalid_peer).await.expect("test: async operation"));
     }
 
     #[tokio::test]
@@ -494,9 +533,12 @@ mod tests {
         };
 
         let handler = PublicNetworkHandler::new();
-        let stoq = StoqTransport::new_for_network(NetworkType::Public).unwrap();
+        let stoq = StoqTransport::new_for_network(NetworkType::Public).expect("test: expected success");
         let result = handler.submit_proof_of_state(&empty_proof, &stoq).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("All four proofs required"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("All four proofs required"));
     }
 }

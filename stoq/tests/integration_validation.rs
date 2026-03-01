@@ -4,12 +4,14 @@
 
 //! Integration validation test for STOQ transport with PoS validation
 
-use stoq::api::service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata};
-use stoq::protocol::pos_validator::{PosToken, PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
+use anyhow::Result;
 use std::net::Ipv6Addr;
 use std::time::{Duration, SystemTime};
-use anyhow::Result;
+use stoq::api::service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata};
+use stoq::protocol::pos_validator::{
+    PosToken, PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
+};
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::test]
 async fn test_full_integration() -> Result<()> {
@@ -29,7 +31,10 @@ async fn test_full_integration() -> Result<()> {
     // Resolve service
     let endpoint = discovery.resolve("caesar")?;
     assert_eq!(endpoint.port, 8001);
-    println!("✅ Service discovery working: resolved to {}:{}", endpoint.address, endpoint.port);
+    println!(
+        "✅ Service discovery working: resolved to {}:{}",
+        endpoint.address, endpoint.port
+    );
 
     // Test 2: PoS Token Validation
     let validator = PosTokenValidator::new(Duration::from_secs(300));
@@ -73,15 +78,17 @@ async fn test_full_integration() -> Result<()> {
     println!("✅ PoS token validation working");
 
     // Test 3: Transport Creation with Config
-    let mut config = TransportConfig::default();
-    config.bind_address = Ipv6Addr::LOCALHOST;
-    config.port = 0; // Let OS assign port
+    let config = TransportConfig {
+        bind_address: Ipv6Addr::LOCALHOST,
+        port: 0, // Let OS assign port
+        ..Default::default()
+    };
 
-    let transport = StoqTransport::new(config.clone()).await?;
+    let _transport = StoqTransport::new(config.clone()).await?;
     println!("✅ Transport creation working");
 
     // Test 4: Endpoint Creation
-    let endpoint = Endpoint {
+    let _endpoint = Endpoint {
         address: Ipv6Addr::LOCALHOST,
         port: 9292,
         server_name: None,
@@ -138,7 +145,7 @@ fn test_pos_validation_overhead() {
     let elapsed = start.elapsed();
 
     let per_validation = elapsed / 100;
-    println!("PoS validation overhead: {:?} per validation", per_validation);
+    println!("PoS validation overhead: {per_validation:?} per validation");
 
     // Should be under 10ms per validation (relaxed for real crypto)
     assert!(per_validation < Duration::from_millis(10));

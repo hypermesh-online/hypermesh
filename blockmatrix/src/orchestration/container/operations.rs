@@ -4,7 +4,7 @@
 
 //! Container orchestration operations and implementation
 
-use crate::{ContainerConfig, NodeId, ContainerId};
+use crate::{ContainerConfig, ContainerId, NodeId};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,11 +13,11 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use super::scheduler::DsrScheduler;
-use super::placement::CpePlacementEngine;
-use super::scaling::{PredictiveScaler, ScalingDecision};
-use super::resource_manager::IfrResourceManager;
 use super::migration::{ContainerMigrator, MigrationDecision, MigrationReason};
+use super::placement::CpePlacementEngine;
+use super::resource_manager::IfrResourceManager;
+use super::scaling::{PredictiveScaler, ScalingDecision};
+use super::scheduler::{DsrScheduler, ExpectedUtilization, NodeCandidate, ScoringRationale};
 use super::types::*;
 
 /// Container orchestration engine with MFN integration
@@ -106,38 +106,100 @@ impl ContainerOrchestrator {
         let scheduling_start = Instant::now();
         let decision_id = Uuid::new_v4();
 
-        info!("Scheduling container {:?} for service {:?}", spec.id, spec.service_id);
+        info!(
+            "Scheduling container {:?} for service {:?}",
+            spec.id, spec.service_id
+        );
 
-        // Step 1: Use IFR for ultra-fast resource discovery
-        let available_nodes = if self.ifr_resource_lookup_enabled {
-            self.resource_manager.find_suitable_nodes(&spec.resources).await?
+        // Step 1: Use IFR for resource discovery, augmented with node registry
+        let mut available_nodes = if self.ifr_resource_lookup_enabled {
+            self.resource_manager
+                .find_suitable_nodes(&spec.resources)
+                .await
+                .unwrap_or_default()
         } else {
-            self.get_all_available_nodes().await
+            Vec::new()
         };
 
-        if available_nodes.is_empty() {
-            return Err(anyhow::anyhow!("No available nodes found for container {:?}", spec.id));
+        // Always include nodes from the registry (deduplicated)
+        let registry_nodes = self.get_all_available_nodes().await;
+        for node_id in registry_nodes {
+            if !available_nodes.contains(&node_id) {
+                available_nodes.push(node_id);
+            }
         }
 
-        debug!("Found {} candidate nodes for scheduling", available_nodes.len());
+        if available_nodes.is_empty() {
+            return Err(anyhow::anyhow!(
+                "No available nodes found for container {:?}",
+                spec.id
+            ));
+        }
+
+        debug!(
+            "Found {} candidate nodes for scheduling",
+            available_nodes.len()
+        );
 
         // Step 2: Use DSR pattern-based scheduling for intelligent node selection
         let node_registry = self.node_registry.read().await;
-        let node_candidates = self.scheduler.evaluate_node_candidates(
-            &spec,
-            available_nodes,
-            &*node_registry,
-        ).await?;
+        let node_candidates = match self
+            .scheduler
+            .evaluate_node_candidates(&spec, available_nodes.clone(), &node_registry)
+            .await
+        {
+            Ok(candidates) => candidates,
+            Err(e) => {
+                debug!("DSR evaluation error: {e}, falling back to basic candidates");
+                Vec::new()
+            }
+        };
+
+        // Fall back to basic candidates if DSR evaluation yields none
+        let node_candidates: Vec<NodeCandidate> = if node_candidates.is_empty() {
+            debug!("DSR evaluation yielded no candidates; using basic scoring fallback");
+            available_nodes
+                .into_iter()
+                .filter_map(|node_id| {
+                    node_registry.get(&node_id).map(|_| NodeCandidate {
+                        node_id,
+                        score: 0.5,
+                        rationale: ScoringRationale {
+                            resource_fit: 0.5,
+                            affinity_score: 0.5,
+                            anti_affinity_score: 0.5,
+                            load_balancing_score: 0.5,
+                            network_locality_score: 0.5,
+                            pattern_match_score: 0.0,
+                            confidence: 0.5,
+                        },
+                        expected_utilization: ExpectedUtilization {
+                            cpu_utilization: 0.5,
+                            memory_utilization: 0.5,
+                            storage_utilization: 0.5,
+                            network_utilization: 0.5,
+                            overall_utilization: 0.5,
+                        },
+                        risks: vec![],
+                        pattern_match: None,
+                    })
+                })
+                .collect()
+        } else {
+            node_candidates
+        };
 
         if node_candidates.is_empty() {
-            return Err(anyhow::anyhow!("No suitable nodes found after DSR evaluation"));
+            return Err(anyhow::anyhow!(
+                "No suitable nodes found after DSR evaluation"
+            ));
         }
 
         // Step 3: Use CPE for predictive placement optimization
-        let placement_decision = self.placement_engine.optimize_placement(
-            &spec,
-            &node_candidates,
-        ).await?;
+        let placement_decision = self
+            .placement_engine
+            .optimize_placement(&spec, &node_candidates)
+            .await?;
 
         let selected_node = placement_decision.selected_node;
 
@@ -163,10 +225,12 @@ impl ContainerOrchestrator {
 
         // Step 5: Register container instance
         let mut containers = self.active_containers.write().await;
-        containers.insert(spec.id.clone(), container_instance);
+        containers.insert(spec.id, container_instance);
 
         // Step 6: Update node resources
-        self.resource_manager.allocate_resources(&selected_node, &spec.resources).await?;
+        self.resource_manager
+            .allocate_resources(&selected_node, &spec.resources)
+            .await?;
 
         // Step 7: Create scheduling decision
         let decision_latency_ms = scheduling_start.elapsed().as_millis() as u64;
@@ -180,23 +244,37 @@ impl ContainerOrchestrator {
             dsr_enhanced: self.dsr_scheduling_enabled,
             cpe_enhanced: true,
             ifr_enhanced: self.ifr_resource_lookup_enabled,
-            improvement_factor: if self.dsr_scheduling_enabled { 25.0 } else { 1.0 },
+            improvement_factor: if self.dsr_scheduling_enabled {
+                25.0
+            } else {
+                1.0
+            },
             timestamp: SystemTime::now(),
         };
 
         // Record decision and update metrics
-        self.record_scheduling_decision(scheduling_decision.clone()).await;
+        self.record_scheduling_decision(scheduling_decision.clone())
+            .await;
         self.update_scheduling_metrics(decision_latency_ms).await;
 
         if decision_latency_ms > 100 {
-            warn!("Scheduling decision latency {}ms exceeds 100ms target", decision_latency_ms);
+            warn!(
+                "Scheduling decision latency {}ms exceeds 100ms target",
+                decision_latency_ms
+            );
         } else {
-            debug!("Scheduling decision completed in {}ms (target: <100ms)", decision_latency_ms);
+            debug!(
+                "Scheduling decision completed in {}ms (target: <100ms)",
+                decision_latency_ms
+            );
         }
 
-        info!("Container {:?} scheduled to node {:?} with {:.1}% confidence",
-              scheduling_decision.container_id, scheduling_decision.selected_node,
-              scheduling_decision.confidence * 100.0);
+        info!(
+            "Container {:?} scheduled to node {:?} with {:.1}% confidence",
+            scheduling_decision.container_id,
+            scheduling_decision.selected_node,
+            scheduling_decision.confidence * 100.0
+        );
 
         Ok(scheduling_decision)
     }
@@ -239,9 +317,12 @@ impl ContainerOrchestrator {
             }
 
             if old_state != new_state {
-                self.update_container_state_metrics(&old_state, &new_state).await;
-                debug!("Container {:?} state changed: {:?} -> {:?}",
-                       container_id, old_state, new_state);
+                self.update_container_state_metrics(&old_state, &new_state)
+                    .await;
+                debug!(
+                    "Container {:?} state changed: {:?} -> {:?}",
+                    container_id, old_state, new_state
+                );
             }
         }
         Ok(())
@@ -254,14 +335,18 @@ impl ContainerOrchestrator {
         target_node: NodeId,
         reason: MigrationReason,
     ) -> Result<MigrationDecision> {
-        info!("Migrating container {:?} to node {:?} (reason: {:?})",
-              container_id, target_node, reason);
+        info!(
+            "Migrating container {:?} to node {:?} (reason: {:?})",
+            container_id, target_node, reason
+        );
 
-        let migration_decision = self.migrator.plan_migration(
-            container_id, &target_node, reason,
-        ).await?;
+        let migration_decision = self
+            .migrator
+            .plan_migration(container_id, &target_node, reason)
+            .await?;
 
-        self.update_container_state(container_id, ContainerState::Migrating, None).await?;
+        self.update_container_state(container_id, ContainerState::Migrating, None)
+            .await?;
         self.migrator.execute_migration(&migration_decision).await?;
 
         let mut metrics = self.performance_metrics.write().await;
@@ -271,30 +356,41 @@ impl ContainerOrchestrator {
     }
 
     /// Scale service based on CPE predictions
-    pub async fn auto_scale_service(&self, service_id: &crate::ServiceId) -> Result<Vec<ScalingDecision>> {
+    pub async fn auto_scale_service(
+        &self,
+        service_id: &crate::ServiceId,
+    ) -> Result<Vec<ScalingDecision>> {
         debug!("Evaluating auto-scaling for service {:?}", service_id);
 
         let containers = self.active_containers.read().await;
-        let service_containers: Vec<_> = containers.values()
+        let service_containers: Vec<_> = containers
+            .values()
             .filter(|c| c.spec.service_id == *service_id)
             .collect();
 
-        let scaling_decisions = self.predictive_scaler.evaluate_scaling(
-            service_id, &service_containers,
-        ).await?;
+        let scaling_decisions = self
+            .predictive_scaler
+            .evaluate_scaling(service_id, &service_containers)
+            .await?;
 
         for decision in &scaling_decisions {
             match &decision.scaling_action {
                 ScalingAction::ScaleUp(count) => {
-                    info!("Scaling up service {:?} by {} containers", service_id, count);
-                },
+                    info!(
+                        "Scaling up service {:?} by {} containers",
+                        service_id, count
+                    );
+                }
                 ScalingAction::ScaleDown(containers_to_remove) => {
-                    info!("Scaling down service {:?}, removing {} containers",
-                          service_id, containers_to_remove.len());
-                },
+                    info!(
+                        "Scaling down service {:?}, removing {} containers",
+                        service_id,
+                        containers_to_remove.len()
+                    );
+                }
                 ScalingAction::NoAction => {
                     debug!("No scaling action needed for service {:?}", service_id);
-                },
+                }
             }
         }
 
@@ -307,34 +403,49 @@ impl ContainerOrchestrator {
         let containers = self.active_containers.read().await;
         let metrics = self.performance_metrics.read().await;
 
-        let available_nodes = nodes.values()
+        let available_nodes = nodes
+            .values()
             .filter(|n| n.available && n.health == NodeHealth::Healthy)
             .count();
 
-        let running_containers = containers.values()
+        let running_containers = containers
+            .values()
             .filter(|c| c.state == ContainerState::Running)
             .count();
 
-        let pending_containers = containers.values()
+        let pending_containers = containers
+            .values()
             .filter(|c| c.state == ContainerState::Pending)
             .count();
 
-        let failed_containers = containers.values()
+        let failed_containers = containers
+            .values()
             .filter(|c| c.state == ContainerState::Failed)
             .count();
 
-        let (total_cpu, used_cpu, total_memory, used_memory) = nodes.values()
-            .fold((0.0, 0.0, 0, 0), |(tc, uc, tm, um), node| {
-                (
-                    tc + node.total_resources.cpu_cores,
-                    uc + (node.total_resources.cpu_cores - node.available_resources.cpu_cores),
-                    tm + node.total_resources.memory_bytes,
-                    um + (node.total_resources.memory_bytes - node.available_resources.memory_bytes),
-                )
-            });
+        let (total_cpu, used_cpu, total_memory, used_memory) =
+            nodes
+                .values()
+                .fold((0.0, 0.0, 0, 0), |(tc, uc, tm, um), node| {
+                    (
+                        tc + node.total_resources.cpu_cores,
+                        uc + (node.total_resources.cpu_cores - node.available_resources.cpu_cores),
+                        tm + node.total_resources.memory_bytes,
+                        um + (node.total_resources.memory_bytes
+                            - node.available_resources.memory_bytes),
+                    )
+                });
 
-        let cluster_cpu_utilization = if total_cpu > 0.0 { used_cpu / total_cpu } else { 0.0 };
-        let cluster_memory_utilization = if total_memory > 0 { used_memory as f64 / total_memory as f64 } else { 0.0 };
+        let cluster_cpu_utilization = if total_cpu > 0.0 {
+            used_cpu / total_cpu
+        } else {
+            0.0
+        };
+        let cluster_memory_utilization = if total_memory > 0 {
+            used_memory as f64 / total_memory as f64
+        } else {
+            0.0
+        };
 
         ContainerStats {
             total_nodes: nodes.len(),
@@ -379,7 +490,8 @@ impl ContainerOrchestrator {
 
     async fn get_all_available_nodes(&self) -> Vec<NodeId> {
         let nodes = self.node_registry.read().await;
-        nodes.values()
+        nodes
+            .values()
             .filter(|node| node.available && node.health == NodeHealth::Healthy)
             .map(|node| node.node_id.clone())
             .collect()
@@ -392,7 +504,10 @@ impl ContainerOrchestrator {
         if decisions.len() > 1000 {
             let mut keys: Vec<_> = decisions.keys().cloned().collect();
             keys.sort_by_key(|id| {
-                decisions.get(id).map(|d| d.timestamp).unwrap_or(SystemTime::UNIX_EPOCH)
+                decisions
+                    .get(id)
+                    .map(|d| d.timestamp)
+                    .unwrap_or(SystemTime::UNIX_EPOCH)
             });
             for key in keys.into_iter().take(100) {
                 decisions.remove(&key);
@@ -405,18 +520,25 @@ impl ContainerOrchestrator {
         metrics.scheduling_decisions += 1;
 
         if self.dsr_scheduling_enabled {
-            let dsr_decisions = (metrics.dsr_scheduling_percentage / 100.0 * (metrics.scheduling_decisions - 1) as f64) + 1.0;
-            metrics.dsr_scheduling_percentage = (dsr_decisions / metrics.scheduling_decisions as f64) * 100.0;
+            let dsr_decisions = (metrics.dsr_scheduling_percentage / 100.0
+                * (metrics.scheduling_decisions - 1) as f64)
+                + 1.0;
+            metrics.dsr_scheduling_percentage =
+                (dsr_decisions / metrics.scheduling_decisions as f64) * 100.0;
         }
 
         if self.ifr_resource_lookup_enabled {
-            let ifr_decisions = (metrics.ifr_lookup_percentage / 100.0 * (metrics.scheduling_decisions - 1) as f64) + 1.0;
-            metrics.ifr_lookup_percentage = (ifr_decisions / metrics.scheduling_decisions as f64) * 100.0;
+            let ifr_decisions = (metrics.ifr_lookup_percentage / 100.0
+                * (metrics.scheduling_decisions - 1) as f64)
+                + 1.0;
+            metrics.ifr_lookup_percentage =
+                (ifr_decisions / metrics.scheduling_decisions as f64) * 100.0;
         }
 
         let total_decisions = metrics.scheduling_decisions as f64;
         let current_avg = metrics.avg_scheduling_latency_ms;
-        metrics.avg_scheduling_latency_ms = (current_avg * (total_decisions - 1.0) + latency_ms as f64) / total_decisions;
+        metrics.avg_scheduling_latency_ms =
+            (current_avg * (total_decisions - 1.0) + latency_ms as f64) / total_decisions;
 
         if latency_ms > metrics.peak_scheduling_latency_ms {
             metrics.peak_scheduling_latency_ms = latency_ms;
@@ -427,22 +549,26 @@ impl ContainerOrchestrator {
         }
     }
 
-    async fn update_container_state_metrics(&self, old_state: &ContainerState, new_state: &ContainerState) {
+    async fn update_container_state_metrics(
+        &self,
+        old_state: &ContainerState,
+        new_state: &ContainerState,
+    ) {
         let mut metrics = self.performance_metrics.write().await;
 
         match (old_state, new_state) {
             (_, ContainerState::Running) => {
                 metrics.running_containers += 1;
-            },
+            }
             (ContainerState::Running, _) => {
                 if metrics.running_containers > 0 {
                     metrics.running_containers -= 1;
                 }
-            },
+            }
             (_, ContainerState::Failed) => {
                 metrics.failed_containers += 1;
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         metrics.total_containers = metrics.running_containers + metrics.failed_containers;

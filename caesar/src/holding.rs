@@ -101,7 +101,7 @@ impl HoldingBuffer {
         let entry = self
             .held
             .get_mut(packet_id)
-            .ok_or_else(|| HoldingError::NotFound(*packet_id))?;
+            .ok_or(HoldingError::NotFound(*packet_id))?;
 
         if entry.retry_count >= entry.max_retries {
             return Err(HoldingError::MaxRetriesExceeded {
@@ -195,7 +195,10 @@ mod tests {
     fn release_not_found() {
         let mut buf = HoldingBuffer::new(3);
         let result = buf.release(&test_packet_id(99));
-        assert!(result.is_none(), "releasing non-existent should return None");
+        assert!(
+            result.is_none(),
+            "releasing non-existent should return None"
+        );
     }
 
     #[test]

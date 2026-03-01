@@ -12,20 +12,18 @@ pub mod types;
 
 pub use types::*;
 
-use std::sync::Arc;
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
-use tokio::sync::{RwLock, Mutex};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::{Mutex, RwLock};
 
-use crate::container::{
-    ContainerRuntime, ContainerSpec, CreateOptions, ContainerId,
+use crate::assets::core::{
+    AssetAllocation, AssetAllocationRequest, AssetManager, AssetRegistration, AssetType,
+    ConsensusProof, PrivacyMode, ResourceRequirements,
 };
 use crate::container::runtime::ContainerHandle;
-use crate::assets::core::{
-    AssetManager, AssetRegistration, AssetType, AssetAllocationRequest,
-    AssetAllocation, ConsensusProof, ResourceRequirements, PrivacyMode,
-};
+use crate::container::{ContainerId, ContainerRuntime, ContainerSpec, CreateOptions};
 /// HyperMesh-integrated container orchestrator
 pub struct HyperMeshContainerOrchestrator {
     /// Core container runtime
@@ -67,23 +65,23 @@ impl HyperMeshContainerOrchestrator {
         let deployment_start = SystemTime::now();
 
         if self.config.enable_consensus_validation {
-            self.validate_deployment_consensus(&spec.consensus_proof).await?;
+            self.validate_deployment_consensus(&spec.consensus_proof)
+                .await?;
         }
 
         let allocation_start = SystemTime::now();
         let allocated_assets = if self.config.auto_asset_allocation {
-            self.allocate_container_assets(
-                &spec.required_assets, &spec.consensus_proof,
-            ).await?
+            self.allocate_container_assets(&spec.required_assets, &spec.consensus_proof)
+                .await?
         } else {
             HashMap::new()
         };
         let allocation_time = allocation_start.elapsed().unwrap_or_default();
 
         let creation_start = SystemTime::now();
-        let container_spec = self.adapt_container_spec_for_assets(
-            &spec.container_spec, &allocated_assets,
-        ).await?;
+        let container_spec = self
+            .adapt_container_spec_for_assets(&spec.container_spec, &allocated_assets)
+            .await?;
 
         let create_options = CreateOptions {
             name: container_spec.name.clone(),
@@ -92,14 +90,14 @@ impl HyperMeshContainerOrchestrator {
             resources: container_spec.resources.clone(),
         };
 
-        let container_handle = self.container_runtime.create(
-            container_spec, create_options,
-        ).await?;
+        let container_handle = self
+            .container_runtime
+            .create(container_spec, create_options)
+            .await?;
         let creation_time = creation_start.elapsed().unwrap_or_default();
 
-        self.bind_assets_to_container(
-            container_handle.id, &allocated_assets,
-        ).await?;
+        self.bind_assets_to_container(container_handle.id, &allocated_assets)
+            .await?;
 
         let startup_start = SystemTime::now();
         container_handle.start().await?;
@@ -107,9 +105,9 @@ impl HyperMeshContainerOrchestrator {
 
         let total_deployment_time = deployment_start.elapsed().unwrap_or_default();
 
-        let resource_efficiency = self.calculate_resource_efficiency(
-            &allocated_assets, &container_handle,
-        ).await?;
+        let resource_efficiency = self
+            .calculate_resource_efficiency(&allocated_assets, &container_handle)
+            .await?;
 
         {
             let mut metrics = self.metrics.lock().await;
@@ -118,9 +116,8 @@ impl HyperMeshContainerOrchestrator {
             let total_time = metrics.average_deployment_time.as_micros() as u64
                 * (metrics.total_deployments - 1)
                 + total_deployment_time.as_micros() as u64;
-            metrics.average_deployment_time = Duration::from_micros(
-                total_time / metrics.total_deployments,
-            );
+            metrics.average_deployment_time =
+                Duration::from_micros(total_time / metrics.total_deployments);
             metrics.active_containers += 1;
             metrics.resource_efficiency =
                 (metrics.resource_efficiency * 0.9) + (resource_efficiency * 0.1);
@@ -141,10 +138,7 @@ impl HyperMeshContainerOrchestrator {
     }
 
     /// Validate deployment consensus proof
-    async fn validate_deployment_consensus(
-        &self,
-        consensus_proof: &ConsensusProof,
-    ) -> Result<()> {
+    async fn validate_deployment_consensus(&self, consensus_proof: &ConsensusProof) -> Result<()> {
         if !consensus_proof.validate() {
             return Err(anyhow!("Invalid consensus proof for container deployment"));
         }
@@ -187,9 +181,10 @@ impl HyperMeshContainerOrchestrator {
                 tags: HashMap::new(),
             };
 
-            let allocation = self.asset_manager.allocate_asset(
-                allocation_request,
-            ).await?;
+            let allocation = self
+                .asset_manager
+                .allocate_asset(allocation_request)
+                .await?;
             allocated_assets.insert(asset_type.clone(), allocation);
         }
 
@@ -197,10 +192,7 @@ impl HyperMeshContainerOrchestrator {
     }
 
     /// Map asset priority to internal priority system
-    fn _map_asset_priority(
-        &self,
-        priority: &AssetPriority,
-    ) -> crate::assets::core::AssetPriority {
+    fn _map_asset_priority(&self, priority: &AssetPriority) -> crate::assets::core::AssetPriority {
         match priority {
             AssetPriority::Low => crate::assets::core::AssetPriority::Low,
             AssetPriority::Normal => crate::assets::core::AssetPriority::Normal,
@@ -225,27 +217,26 @@ impl HyperMeshContainerOrchestrator {
                 AssetType::Cpu => {
                     let cpu_factor = alloc_config.cpu_allocation;
                     adapted_spec.resources.cpu_millicores =
-                        (adapted_spec.resources.cpu_millicores as f32
-                            * cpu_factor.max(0.1)) as u64;
-                },
+                        (adapted_spec.resources.cpu_millicores as f32 * cpu_factor.max(0.1)) as u64;
+                }
                 AssetType::Memory => {
                     let memory_factor = alloc_config.memory_allocation;
                     adapted_spec.resources.memory_bytes =
-                        (adapted_spec.resources.memory_bytes as f32
-                            * memory_factor.max(0.1)) as u64;
-                },
+                        (adapted_spec.resources.memory_bytes as f32 * memory_factor.max(0.1))
+                            as u64;
+                }
                 AssetType::Storage => {
                     let storage_factor = alloc_config.storage_allocation;
                     adapted_spec.resources.storage_bytes =
-                        (adapted_spec.resources.storage_bytes as f32
-                            * storage_factor.max(0.1)) as u64;
-                },
+                        (adapted_spec.resources.storage_bytes as f32 * storage_factor.max(0.1))
+                            as u64;
+                }
                 AssetType::Network => {
                     tracing::debug!(
                         "Network allocation: {}%",
                         alloc_config.network_allocation * 100.0,
                     );
-                },
+                }
                 _ => {}
             }
         }
@@ -267,10 +258,10 @@ impl HyperMeshContainerOrchestrator {
             .map(|allocation| allocation.asset_id.clone())
             .collect();
 
-        container_assets.insert(container_id.clone(), asset_ids.clone());
+        container_assets.insert(container_id, asset_ids.clone());
 
         for asset_id in asset_ids {
-            asset_containers.insert(asset_id, container_id.clone());
+            asset_containers.insert(asset_id, container_id);
         }
 
         Ok(())
@@ -304,8 +295,7 @@ impl HyperMeshContainerOrchestrator {
             };
 
             if allocation_percentage > 0.0 && actual_usage > 0 {
-                let efficiency = (actual_usage as f64 / 100.0)
-                    / allocation_percentage as f64;
+                let efficiency = (actual_usage as f64 / 100.0) / allocation_percentage as f64;
                 efficiency_scores.push(efficiency.min(1.0));
             }
         }
@@ -324,7 +314,10 @@ impl HyperMeshContainerOrchestrator {
 
         let asset_ids = {
             let container_assets = self.container_assets.read().await;
-            container_assets.get(container_id).cloned().unwrap_or_default()
+            container_assets
+                .get(container_id)
+                .cloned()
+                .unwrap_or_default()
         };
 
         for asset_id in &asset_ids {
@@ -335,7 +328,7 @@ impl HyperMeshContainerOrchestrator {
             let mut container_assets = self.container_assets.write().await;
             let mut asset_containers = self.asset_containers.write().await;
 
-            container_assets.remove(&container_id);
+            container_assets.remove(container_id);
             for asset_id in &asset_ids {
                 asset_containers.remove(asset_id);
             }
@@ -360,23 +353,27 @@ impl HyperMeshContainerOrchestrator {
 
         let current_asset_ids = {
             let container_assets = self.container_assets.read().await;
-            container_assets.get(&container_id).cloned().unwrap_or_default()
+            container_assets
+                .get(&container_id)
+                .cloned()
+                .unwrap_or_default()
         };
 
         for asset_id in &current_asset_ids {
             self.asset_manager.deallocate_asset(asset_id).await?;
         }
 
-        let new_allocated_assets = self.allocate_container_assets(
-            &new_requirements, &consensus_proof,
-        ).await?;
+        let new_allocated_assets = self
+            .allocate_container_assets(&new_requirements, &consensus_proof)
+            .await?;
 
         let container_handle = self.container_runtime.get_handle(&container_id).await?;
-        let _updated_spec = self.adapt_container_spec_for_assets(
-            &container_handle.spec, &new_allocated_assets,
-        ).await?;
+        let _updated_spec = self
+            .adapt_container_spec_for_assets(&container_handle.spec, &new_allocated_assets)
+            .await?;
 
-        self.bind_assets_to_container(container_id, &new_allocated_assets).await?;
+        self.bind_assets_to_container(container_id, &new_allocated_assets)
+            .await?;
 
         Ok(())
     }
@@ -403,7 +400,7 @@ impl HyperMeshContainerOrchestrator {
             }
 
             managed_containers.push(ManagedContainer {
-                container_id: container_id.clone(),
+                container_id: *container_id,
                 container_status: status,
                 allocated_assets: asset_info,
                 deployment_time: container_handle.created_at,
@@ -424,7 +421,8 @@ impl HyperMeshContainerOrchestrator {
             if let Err(e) = self.stop_container(&container_id).await {
                 tracing::warn!(
                     "Failed to stop container {} during shutdown: {}",
-                    container_id, e,
+                    container_id,
+                    e,
                 );
             }
         }
@@ -440,11 +438,24 @@ mod tests {
     use super::*;
     use crate::container::ContainerConfig;
 
+    fn test_container_config() -> ContainerConfig {
+        let tmp = std::env::temp_dir().join("hypermesh_test_orchestrator");
+        let mut config = ContainerConfig::default();
+        config.runtime.data_dir = tmp.join("data");
+        config.storage_usage.root = tmp.join("storage");
+        config.storage_usage.images = tmp.join("images");
+        config.storage_usage.containers = tmp.join("containers");
+        config.storage_usage.tmp_dir = tmp.join("tmp");
+        config
+    }
+
     #[tokio::test]
     async fn test_orchestrator_creation() {
-        let container_config = ContainerConfig::default();
+        let container_config = test_container_config();
         let container_runtime = Arc::new(
-            ContainerRuntime::new(container_config).await.expect("test: runtime"),
+            ContainerRuntime::new(container_config)
+                .await
+                .expect("test: runtime"),
         );
         let asset_manager = Arc::new(AssetManager::new());
         let integration_config = HyperMeshIntegrationConfig::default();
@@ -453,14 +464,16 @@ mod tests {
             container_runtime,
             asset_manager,
             integration_config,
-        ).await;
+        )
+        .await;
 
         assert!(orchestrator.is_ok());
     }
 
     #[tokio::test]
     async fn test_asset_priority_mapping() {
-        let orchestrator = create_test_orchestrator().await
+        let orchestrator = create_test_orchestrator()
+            .await
             .expect("test: orchestrator");
 
         assert!(matches!(
@@ -475,15 +488,12 @@ mod tests {
     }
 
     async fn create_test_orchestrator() -> Result<HyperMeshContainerOrchestrator> {
-        let container_config = ContainerConfig::default();
+        let container_config = test_container_config();
         let container_runtime = Arc::new(ContainerRuntime::new(container_config).await?);
         let asset_manager = Arc::new(AssetManager::new());
         let integration_config = HyperMeshIntegrationConfig::default();
 
-        HyperMeshContainerOrchestrator::new(
-            container_runtime,
-            asset_manager,
-            integration_config,
-        ).await
+        HyperMeshContainerOrchestrator::new(container_runtime, asset_manager, integration_config)
+            .await
     }
 }

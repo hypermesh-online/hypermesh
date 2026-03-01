@@ -5,14 +5,16 @@
 //! eBPF integration tests for STOQ transport layer
 
 use anyhow::Result;
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
-use tokio;
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::test]
 async fn test_ebpf_capability_detection() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
@@ -50,7 +52,10 @@ async fn test_ebpf_capability_detection() -> Result<()> {
 #[tokio::test]
 async fn test_ebpf_metrics_collection() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
@@ -87,17 +92,20 @@ async fn test_ebpf_metrics_collection() -> Result<()> {
 #[ignore] // Requires root or CAP_NET_ADMIN
 async fn test_xdp_attachment() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
     let config = TransportConfig::default();
-    let transport = StoqTransport::new(config).await?;
+    let _transport = StoqTransport::new(config).await?;
 
     // Try to attach XDP to loopback interface
     #[cfg(feature = "ebpf")]
     {
-        match transport.attach_xdp_to_interface("lo") {
+        match _transport.attach_xdp_to_interface("lo") {
             Ok(_) => println!("XDP attached successfully to loopback"),
             Err(e) => println!("Failed to attach XDP (expected without privileges): {}", e),
         }
@@ -110,19 +118,25 @@ async fn test_xdp_attachment() -> Result<()> {
 #[ignore] // Requires root or CAP_NET_ADMIN
 async fn test_af_xdp_socket_creation() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
     let config = TransportConfig::default();
-    let transport = StoqTransport::new(config).await?;
+    let _transport = StoqTransport::new(config).await?;
 
     // Try to create AF_XDP socket
     #[cfg(feature = "ebpf")]
     {
-        match transport.create_zero_copy_socket("lo", 0) {
+        match _transport.create_zero_copy_socket("lo", 0) {
             Ok(_) => println!("AF_XDP socket created successfully"),
-            Err(e) => println!("Failed to create AF_XDP socket (expected without privileges): {}", e),
+            Err(e) => println!(
+                "Failed to create AF_XDP socket (expected without privileges): {}",
+                e
+            ),
         }
     }
 
@@ -132,7 +146,10 @@ async fn test_af_xdp_socket_creation() -> Result<()> {
 #[tokio::test]
 async fn test_fallback_without_ebpf() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
@@ -148,7 +165,7 @@ async fn test_fallback_without_ebpf() -> Result<()> {
     let accept_task = tokio::spawn(async move {
         match transport_clone.accept().await {
             Ok(conn) => println!("Accepted connection: {}", conn.id()),
-            Err(e) => println!("Accept error (expected in test): {}", e),
+            Err(e) => println!("Accept error (expected in test): {e}"),
         }
     });
 
@@ -163,11 +180,11 @@ async fn test_fallback_without_ebpf() -> Result<()> {
             // Try to send some data
             let data = b"Hello, eBPF!";
             if let Err(e) = transport.send(&conn, data).await {
-                println!("Send error (expected in test): {}", e);
+                println!("Send error (expected in test): {e}");
             }
         }
         Err(e) => {
-            println!("Connection failed (expected in test environment): {}", e);
+            println!("Connection failed (expected in test environment): {e}");
         }
     }
 
@@ -181,14 +198,19 @@ async fn test_fallback_without_ebpf() -> Result<()> {
 #[tokio::test]
 async fn test_performance_with_ebpf() -> Result<()> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore
     }
 
-    let mut config = TransportConfig::default();
-    config.enable_zero_copy = true;
-    config.enable_memory_pool = true;
-    config.frame_batch_size = 64;
+    let config = TransportConfig {
+        enable_zero_copy: true,
+        enable_memory_pool: true,
+        frame_batch_size: 64,
+        ..Default::default()
+    };
 
     let transport = StoqTransport::new(config).await?;
 
@@ -196,10 +218,10 @@ async fn test_performance_with_ebpf() -> Result<()> {
     let (peak_gbps, zero_copy_ops, pool_hits, frame_batches) = transport.performance_stats();
 
     println!("Performance Stats:");
-    println!("  Peak throughput: {:.2} Gbps", peak_gbps);
-    println!("  Zero-copy operations: {}", zero_copy_ops);
-    println!("  Memory pool hits: {}", pool_hits);
-    println!("  Frame batches: {}", frame_batches);
+    println!("  Peak throughput: {peak_gbps:.2} Gbps");
+    println!("  Zero-copy operations: {zero_copy_ops}");
+    println!("  Memory pool hits: {pool_hits}");
+    println!("  Frame batches: {frame_batches}");
 
     // Check if eBPF improved performance
     #[cfg(feature = "ebpf")]

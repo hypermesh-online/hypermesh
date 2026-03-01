@@ -8,29 +8,28 @@
 //! privacy mode enforcement, and matrix-aware shard addressing.
 
 use anyhow::Result;
-use std::time::{Duration, SystemTime};
 use hypermesh_lib::PrivacyMode;
-use stoq::transport::{StoqTransport, TransportConfig};
-use stoq::transport::certificate_strategy::NetworkType;
+use std::time::{Duration, SystemTime};
 use stoq::protocol::{
-    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake,
-    ProofOfWork, ProofOfTime,
+    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake, ProofOfTime,
+    ProofOfWork,
 };
+use stoq::transport::certificate_strategy::NetworkType;
+use stoq::transport::{StoqTransport, TransportConfig};
 use tracing::{info, Level};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    tracing_subscriber::fmt()
-        .with_max_level(Level::INFO)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 
     info!("=== STOQ + Proof of State Integration Demo ===\n");
 
     // Create STOQ transport with random port for testing
-    let mut config = TransportConfig::default();
-    config.port = 0; // OS assigns random available port
+    let config = TransportConfig {
+        port: 0, // OS assigns random available port
+        ..Default::default()
+    };
     let transport = StoqTransport::new(config).await?;
 
     info!("STOQ transport initialized\n");
@@ -72,8 +71,10 @@ async fn main() -> Result<()> {
     info!("  Public: {}", stats.public_connections);
     info!("Cached assets: {}", stats.cached_assets);
     info!("Registered shards: {}", stats.registered_shards);
-    info!("PoS validations: {} (cache hits: {}, failures: {})",
-        stats.pos_validations, stats.pos_cache_hits, stats.pos_failures);
+    info!(
+        "PoS validations: {} (cache hits: {}, failures: {})",
+        stats.pos_validations, stats.pos_cache_hits, stats.pos_failures
+    );
 
     info!("\n=== Demo Complete ===");
 
@@ -83,11 +84,13 @@ async fn main() -> Result<()> {
 async fn demo_anonymous_network(transport: &StoqTransport) -> Result<()> {
     info!("Connecting to Anonymous network...");
 
-    let result = transport.validate_connection_with_pos(
-        "anon_conn_1".to_string(),
-        &NetworkType::Anonymous,
-        None, // No PoS token needed
-    ).await?;
+    let result = transport
+        .validate_connection_with_pos(
+            "anon_conn_1".to_string(),
+            &NetworkType::Anonymous,
+            None, // No PoS token needed
+        )
+        .await?;
 
     if result {
         info!("Anonymous connection established (no validation required)");
@@ -102,11 +105,13 @@ async fn demo_anonymous_network(transport: &StoqTransport) -> Result<()> {
 async fn demo_p2p_network(transport: &StoqTransport) -> Result<()> {
     info!("Connecting to P2P network...");
 
-    let result = transport.validate_connection_with_pos(
-        "p2p_conn_1".to_string(),
-        &NetworkType::P2P,
-        None, // Certificate-based validation
-    ).await?;
+    let result = transport
+        .validate_connection_with_pos(
+            "p2p_conn_1".to_string(),
+            &NetworkType::P2P,
+            None, // Certificate-based validation
+        )
+        .await?;
 
     if result {
         info!("P2P connection established (peer-based validation)");
@@ -121,13 +126,15 @@ async fn demo_p2p_network(transport: &StoqTransport) -> Result<()> {
 async fn demo_federated_network(transport: &StoqTransport) -> Result<()> {
     info!("Connecting to Federated network...");
 
-    let result = transport.validate_connection_with_pos(
-        "fed_conn_1".to_string(),
-        &NetworkType::Federated {
-            gateway_url: "gateway.example.internal".to_string(),
-        },
-        None, // Federation gateway validates
-    ).await?;
+    let result = transport
+        .validate_connection_with_pos(
+            "fed_conn_1".to_string(),
+            &NetworkType::Federated {
+                gateway_url: "gateway.example.internal".to_string(),
+            },
+            None, // Federation gateway validates
+        )
+        .await?;
 
     if result {
         info!("Federated connection established (gateway-based validation)");
@@ -146,22 +153,32 @@ async fn demo_public_network(transport: &StoqTransport) -> Result<()> {
     let pos_token = create_demo_pos_token();
 
     info!("Created PoS token with 4 proofs:");
-    info!("  Proof of Space (WHERE): Matrix position ({}, {}, {})",
+    info!(
+        "  Proof of Space (WHERE): Matrix position ({}, {}, {})",
         pos_token.proof_of_space.matrix_position.0,
         pos_token.proof_of_space.matrix_position.1,
-        pos_token.proof_of_space.matrix_position.2);
-    info!("  Proof of Stake (WHO): {} tokens staked",
-        pos_token.proof_of_stake.stake_amount);
-    info!("  Proof of Work (WHAT): Difficulty {}",
-        pos_token.proof_of_work.difficulty);
-    info!("  Proof of Time (WHEN): Sequence {}",
-        pos_token.proof_of_time.sequence);
+        pos_token.proof_of_space.matrix_position.2
+    );
+    info!(
+        "  Proof of Stake (WHO): {} tokens staked",
+        pos_token.proof_of_stake.stake_amount
+    );
+    info!(
+        "  Proof of Work (WHAT): Difficulty {}",
+        pos_token.proof_of_work.difficulty
+    );
+    info!(
+        "  Proof of Time (WHEN): Sequence {}",
+        pos_token.proof_of_time.sequence
+    );
 
-    let result = transport.validate_connection_with_pos(
-        "pub_conn_1".to_string(),
-        &NetworkType::Public,
-        Some(&pos_token),
-    ).await?;
+    let result = transport
+        .validate_connection_with_pos(
+            "pub_conn_1".to_string(),
+            &NetworkType::Public,
+            Some(&pos_token),
+        )
+        .await?;
 
     if result {
         info!("Public connection established (full PoS validation)");
@@ -178,11 +195,13 @@ async fn demo_asset_verification(transport: &StoqTransport) -> Result<()> {
 
     // First establish a connection
     let pos_token = create_demo_pos_token();
-    transport.validate_connection_with_pos(
-        "asset_conn".to_string(),
-        &NetworkType::Public,
-        Some(&pos_token),
-    ).await?;
+    transport
+        .validate_connection_with_pos(
+            "asset_conn".to_string(),
+            &NetworkType::Public,
+            Some(&pos_token),
+        )
+        .await?;
 
     // Create test asset
     let asset_data = b"Example asset data for verification";
@@ -196,12 +215,8 @@ async fn demo_asset_verification(transport: &StoqTransport) -> Result<()> {
     info!("Content hash: {:02x?}...", &content_hash[..8]);
 
     // Validate at protocol level
-    let is_valid = transport.validate_asset_hash(
-        "asset_conn",
-        asset_id,
-        &content_hash,
-        asset_data,
-    )?;
+    let is_valid =
+        transport.validate_asset_hash("asset_conn", asset_id, &content_hash, asset_data)?;
 
     if is_valid {
         info!("Asset hash verified at protocol level");
@@ -223,17 +238,18 @@ async fn demo_shard_distribution(transport: &StoqTransport) -> Result<()> {
     info!("Calculating optimal shard positions:");
     info!("  - Number of shards: {}", num_shards);
     info!("  - Origin: ({}, {}, {})", origin.x, origin.y, origin.z);
-    info!("  - Distance range: {:.1} - {:.1}", min_distance, max_distance);
-
-    let positions = transport.calculate_shard_positions(
-        num_shards,
-        origin,
-        min_distance,
-        max_distance,
+    info!(
+        "  - Distance range: {:.1} - {:.1}",
+        min_distance, max_distance
     );
 
-    info!("Generated {} shard positions using golden ratio sphere packing",
-        positions.len());
+    let positions =
+        transport.calculate_shard_positions(num_shards, origin, min_distance, max_distance);
+
+    info!(
+        "Generated {} shard positions using golden ratio sphere packing",
+        positions.len()
+    );
 
     // Register shard addresses
     for (i, position) in positions.iter().enumerate().take(5) {
@@ -242,19 +258,27 @@ async fn demo_shard_distribution(transport: &StoqTransport) -> Result<()> {
             shard_id,
             *position,
             format!("network_{}", i % 3),
-            Some(format!("node_{}", i)),
+            Some(format!("node_{i}")),
         );
 
-        info!("  Shard {}: position ({:3}, {:3}, {:3}) on network_{}",
-            shard_id, position.x, position.y, position.z, i % 3);
+        info!(
+            "  Shard {}: position ({:3}, {:3}, {:3}) on network_{}",
+            shard_id,
+            position.x,
+            position.y,
+            position.z,
+            i % 3
+        );
     }
 
     // Retrieve shard addresses
     let shard_ids: Vec<u32> = (0..5).collect();
     let addresses = transport.get_shard_addresses(&shard_ids);
 
-    info!("Retrieved {} shard addresses for instruction-based retrieval",
-        addresses.len());
+    info!(
+        "Retrieved {} shard addresses for instruction-based retrieval",
+        addresses.len()
+    );
     info!("  - Receiver uses addresses to query matrix positions");
     info!("  - Bandwidth efficiency (send addresses not data)");
     info!("  - Distributed load across matrix nodes");
@@ -270,19 +294,46 @@ async fn demo_privacy_enforcement(transport: &StoqTransport) -> Result<()> {
     info!("Privacy Mode Comparison:");
 
     info!("\n  Anonymous:");
-    info!("    - Requires identity: {}", PrivacyMode::ANONYMOUS.requires_identity());
-    info!("    - Allows logging: {}", PrivacyMode::ANONYMOUS.allows_logging());
-    info!("    - Connection timeout: {}s", PrivacyMode::ANONYMOUS.connection_timeout_secs());
+    info!(
+        "    - Requires identity: {}",
+        PrivacyMode::ANONYMOUS.requires_identity()
+    );
+    info!(
+        "    - Allows logging: {}",
+        PrivacyMode::ANONYMOUS.allows_logging()
+    );
+    info!(
+        "    - Connection timeout: {}s",
+        PrivacyMode::ANONYMOUS.connection_timeout_secs()
+    );
 
     info!("\n  Private (covers P2P and Federated networks):");
-    info!("    - Requires identity: {}", PrivacyMode::PRIVATE.requires_identity());
-    info!("    - Allows logging: {}", PrivacyMode::PRIVATE.allows_logging());
-    info!("    - Connection timeout: {}s", PrivacyMode::PRIVATE.connection_timeout_secs());
+    info!(
+        "    - Requires identity: {}",
+        PrivacyMode::PRIVATE.requires_identity()
+    );
+    info!(
+        "    - Allows logging: {}",
+        PrivacyMode::PRIVATE.allows_logging()
+    );
+    info!(
+        "    - Connection timeout: {}s",
+        PrivacyMode::PRIVATE.connection_timeout_secs()
+    );
 
     info!("\n  Public:");
-    info!("    - Requires identity: {}", PrivacyMode::PUBLIC.requires_identity());
-    info!("    - Allows logging: {}", PrivacyMode::PUBLIC.allows_logging());
-    info!("    - Connection timeout: {}s", PrivacyMode::PUBLIC.connection_timeout_secs());
+    info!(
+        "    - Requires identity: {}",
+        PrivacyMode::PUBLIC.requires_identity()
+    );
+    info!(
+        "    - Allows logging: {}",
+        PrivacyMode::PUBLIC.allows_logging()
+    );
+    info!(
+        "    - Connection timeout: {}s",
+        PrivacyMode::PUBLIC.connection_timeout_secs()
+    );
 
     info!("\nPrivacy mode enforcement ensures protocol behavior matches network type");
 
@@ -295,7 +346,7 @@ fn create_demo_pos_token() -> PosToken {
         proof_of_space: ProofOfSpace {
             commitment_hash: vec![10, 20, 30, 40, 50, 60, 70, 80],
             matrix_position: (100, 200, 300), // Matrix coordinates
-            capacity: 1024 * 1024 * 1024, // 1 GB
+            capacity: 1024 * 1024 * 1024,     // 1 GB
         },
         proof_of_stake: ProofOfStake {
             owner_pubkey: vec![11, 22, 33, 44, 55, 66, 77, 88],

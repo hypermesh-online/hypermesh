@@ -4,9 +4,8 @@
 
 //! Type definitions for the NAT-like Address Translation System
 
-use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
-
+use std::time::SystemTime;
 
 // Re-export PrivacyMode from hypermesh_lib via core
 pub use crate::assets::core::PrivacyMode;

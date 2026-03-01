@@ -4,9 +4,9 @@
 
 //! HyperMesh Trust Integration types and data structures
 
-use std::time::{Duration, SystemTime};
+use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
 /// Universal asset type enumeration
@@ -220,7 +220,6 @@ pub(crate) struct NodeBehavior {
     pub(crate) is_byzantine: bool,
     pub(crate) last_seen: SystemTime,
 }
-
 
 // Supporting type stubs
 pub(crate) struct HyperMeshNetworkClient;

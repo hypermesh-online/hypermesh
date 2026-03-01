@@ -74,8 +74,7 @@ fn detect_cpu_bsd() -> Result<CpuInfo> {
     let cores = sysctl_u64("hw.ncpu").unwrap_or(num_cpus::get() as u64) as usize;
 
     // hw.model is available on FreeBSD/OpenBSD/NetBSD
-    let model = sysctl_value("hw.model")
-        .unwrap_or_else(|_| "Unknown BSD CPU".to_string());
+    let model = sysctl_value("hw.model").unwrap_or_else(|_| "Unknown BSD CPU".to_string());
 
     // FreeBSD: hw.clockrate (MHz integer)
     // OpenBSD: hw.cpuspeed (MHz integer)
@@ -142,7 +141,9 @@ fn parse_pciconf_gpus(output: &str) -> Vec<GpuInfo> {
         // Only match VGA/Display on these header lines, not on key-value lines
         let is_device_header = trimmed.contains("@pci") || trimmed.contains("@isa");
         let is_vga_header = is_device_header
-            && (trimmed.contains("vgapci") || trimmed.contains("VGA") || trimmed.contains("Display"));
+            && (trimmed.contains("vgapci")
+                || trimmed.contains("VGA")
+                || trimmed.contains("Display"));
 
         if is_vga_header {
             // Flush previous if needed
@@ -197,7 +198,11 @@ fn parse_pci_kv(line: &str) -> Option<(&str, String)> {
     // pciconf uses "    vendor     = 'NVIDIA Corporation'"
     if let Some((key, value)) = line.split_once('=') {
         let key = key.trim();
-        let value = value.trim().trim_matches('\'').trim_matches('"').to_string();
+        let value = value
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"')
+            .to_string();
         return Some((key, value));
     }
     None
@@ -217,11 +222,7 @@ fn extract_pci_address(line: &str) -> Option<String> {
 }
 
 /// Build a GpuInfo entry from parsed PCI fields.
-fn build_gpu_entry(
-    device: &str,
-    vendor: &str,
-    pci_address: Option<String>,
-) -> GpuInfo {
+fn build_gpu_entry(device: &str, vendor: &str, pci_address: Option<String>) -> GpuInfo {
     let gpu_type = if vendor.to_lowercase().contains("intel") {
         GpuType::Integrated
     } else {
@@ -260,8 +261,7 @@ fn detect_memory_bsd() -> Result<MemoryInfo> {
         .context("failed to read hw.physmem or hw.realmem")?;
 
     // hw.usermem gives user-available memory on some BSDs
-    let available_bytes = sysctl_u64("hw.usermem")
-        .unwrap_or(total_bytes);
+    let available_bytes = sysctl_u64("hw.usermem").unwrap_or(total_bytes);
 
     let used_bytes = total_bytes.saturating_sub(available_bytes);
     let usage_percent = if total_bytes > 0 {
@@ -310,10 +310,8 @@ fn parse_swap_output(output: &str) -> Option<(u64, u64)> {
         if let Ok(val) = part.parse::<u64>() {
             if total.is_none() {
                 total = Some(val * 1024); // 1k-blocks to bytes
-            } else if used.is_none() {
-                if parts.get(i + 1).map_or(false, |p| p.starts_with("used")) {
-                    used = Some(val * 1024);
-                }
+            } else if used.is_none() && parts.get(i + 1).is_some_and(|p| p.starts_with("used")) {
+                used = Some(val * 1024);
             }
         }
     }
@@ -448,8 +446,7 @@ fn get_resource_usage_bsd() -> Result<ResourceUsage> {
 /// Read load average via `sysctl vm.loadavg` on BSD.
 fn parse_load_average_bsd() -> Option<[f64; 3]> {
     let raw = sysctl_value("vm.loadavg").ok()?;
-    let cleaned = raw
-        .trim_matches(|c: char| c == '{' || c == '}' || c.is_whitespace());
+    let cleaned = raw.trim_matches(|c: char| c == '{' || c == '}' || c.is_whitespace());
     let parts: Vec<&str> = cleaned.split_whitespace().collect();
     if parts.len() >= 3 {
         let l1 = parts[0].parse::<f64>().ok()?;
@@ -496,11 +493,7 @@ impl OsAbstraction for BsdAbstraction {
         ))
     }
 
-    fn attach_ebpf_monitor(
-        &self,
-        _handle: EbpfHandle,
-        _attach_type: EbpfAttachType,
-    ) -> Result<()> {
+    fn attach_ebpf_monitor(&self, _handle: EbpfHandle, _attach_type: EbpfAttachType) -> Result<()> {
         Err(anyhow::anyhow!(
             "eBPF is not supported on BSD. HyperMesh eBPF requires Linux kernel >= 4.4"
         ))
@@ -549,7 +542,10 @@ mod tests {
         let result = bsd.load_ebpf_program(&[0x95, 0, 0, 0, 0, 0, 0, 0]);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("not supported"), "error should mention not supported: {msg}");
+        assert!(
+            msg.contains("not supported"),
+            "error should mention not supported: {msg}"
+        );
     }
 
     #[test]
@@ -579,7 +575,9 @@ mod tests {
     #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
     fn test_bsd_cpu_detection_live() {
         let bsd = BsdAbstraction::new().expect("test: BSD abstraction");
-        let cpu = bsd.detect_cpu().expect("test: CPU detection should succeed");
+        let cpu = bsd
+            .detect_cpu()
+            .expect("test: CPU detection should succeed");
         assert!(cpu.cores > 0, "should detect at least one CPU core");
         assert!(!cpu.model.is_empty(), "should have a CPU model string");
     }
@@ -590,7 +588,9 @@ mod tests {
     #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
     fn test_bsd_memory_detection_live() {
         let bsd = BsdAbstraction::new().expect("test: BSD abstraction");
-        let mem = bsd.detect_memory().expect("test: memory detection should succeed");
+        let mem = bsd
+            .detect_memory()
+            .expect("test: memory detection should succeed");
         assert!(mem.total_bytes > 0, "should detect non-zero total memory");
     }
 
@@ -600,8 +600,13 @@ mod tests {
     #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))]
     fn test_bsd_storage_detection_live() {
         let bsd = BsdAbstraction::new().expect("test: BSD abstraction");
-        let storage = bsd.detect_storage().expect("test: storage detection should succeed");
-        assert!(!storage.is_empty(), "should detect at least one storage device");
+        let storage = bsd
+            .detect_storage()
+            .expect("test: storage detection should succeed");
+        assert!(
+            !storage.is_empty(),
+            "should detect at least one storage device"
+        );
     }
 
     // --- Parser unit tests (run on any platform) ---

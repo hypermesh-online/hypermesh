@@ -16,36 +16,36 @@ pub async fn test_stoq_trustchain_integration() -> (bool, Vec<String>) {
 
     // Test 1: STOQ transport with TrustChain certificates
     match test_stoq_with_trustchain_certs().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("STOQ certificate integration failed: {}", e));
+            errors.push(format!("STOQ certificate integration failed: {e}"));
             passed = false;
         }
     }
 
     // Test 2: DNS over STOQ
     match test_dns_over_stoq_transport().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("DNS over STOQ failed: {}", e));
+            errors.push(format!("DNS over STOQ failed: {e}"));
             passed = false;
         }
     }
 
     // Test 3: Certificate transparency over STOQ
     match test_ct_over_stoq().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("CT over STOQ failed: {}", e));
+            errors.push(format!("CT over STOQ failed: {e}"));
             passed = false;
         }
     }
 
     // Test 4: STOQ connection with TrustChain validation
     match test_connection_validation().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Connection validation failed: {}", e));
+            errors.push(format!("Connection validation failed: {e}"));
             passed = false;
         }
     }
@@ -60,36 +60,36 @@ pub async fn test_hypermesh_caesar_integration() -> (bool, Vec<String>) {
 
     // Test 1: Asset creation with Caesar rewards
     match test_asset_creation_rewards().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Asset reward integration failed: {}", e));
+            errors.push(format!("Asset reward integration failed: {e}"));
             passed = false;
         }
     }
 
     // Test 2: Resource sharing economics
     match test_resource_sharing_economics().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Resource economics failed: {}", e));
+            errors.push(format!("Resource economics failed: {e}"));
             passed = false;
         }
     }
 
     // Test 3: Caesar token transfers for assets
     match test_caesar_token_transfers().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Token transfer failed: {}", e));
+            errors.push(format!("Token transfer failed: {e}"));
             passed = false;
         }
     }
 
     // Test 4: Privacy-aware allocation with rewards
     match test_privacy_allocation_rewards().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Privacy allocation rewards failed: {}", e));
+            errors.push(format!("Privacy allocation rewards failed: {e}"));
             passed = false;
         }
     }
@@ -104,36 +104,36 @@ pub async fn test_catalog_hypermesh_integration() -> (bool, Vec<String>) {
 
     // Test 1: VM execution through HyperMesh
     match test_vm_execution_integration().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("VM execution integration failed: {}", e));
+            errors.push(format!("VM execution integration failed: {e}"));
             passed = false;
         }
     }
 
     // Test 2: Asset-aware VM operations
     match test_asset_aware_vm().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Asset-aware VM failed: {}", e));
+            errors.push(format!("Asset-aware VM failed: {e}"));
             passed = false;
         }
     }
 
     // Test 3: Remote code execution with consensus
     match test_remote_code_execution().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Remote execution failed: {}", e));
+            errors.push(format!("Remote execution failed: {e}"));
             passed = false;
         }
     }
 
     // Test 4: NAT-like memory addressing for VM
     match test_nat_memory_addressing().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("NAT memory addressing failed: {}", e));
+            errors.push(format!("NAT memory addressing failed: {e}"));
             passed = false;
         }
     }
@@ -148,45 +148,45 @@ pub async fn test_full_stack_integration() -> (bool, Vec<String>) {
 
     // Test 1: Complete asset lifecycle
     match test_complete_asset_lifecycle().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Asset lifecycle failed: {}", e));
+            errors.push(format!("Asset lifecycle failed: {e}"));
             passed = false;
         }
     }
 
     // Test 2: End-to-end consensus validation
     match test_end_to_end_consensus().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("E2E consensus failed: {}", e));
+            errors.push(format!("E2E consensus failed: {e}"));
             passed = false;
         }
     }
 
     // Test 3: Multi-node resource sharing
     match test_multi_node_sharing().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Multi-node sharing failed: {}", e));
+            errors.push(format!("Multi-node sharing failed: {e}"));
             passed = false;
         }
     }
 
     // Test 4: Cross-component communication
     match test_cross_component_communication().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Cross-component comm failed: {}", e));
+            errors.push(format!("Cross-component comm failed: {e}"));
             passed = false;
         }
     }
 
     // Test 5: Bootstrap sequence validation
     match test_bootstrap_sequence().await {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
-            errors.push(format!("Bootstrap sequence failed: {}", e));
+            errors.push(format!("Bootstrap sequence failed: {e}"));
             passed = false;
         }
     }
@@ -320,12 +320,12 @@ mod tests {
     #[tokio::test]
     async fn test_stoq_trustchain() {
         let (passed, errors) = test_stoq_trustchain_integration().await;
-        assert!(passed, "Integration test failed: {:?}", errors);
+        assert!(passed, "Integration test failed: {errors:?}");
     }
 
     #[tokio::test]
     async fn test_full_stack() {
         let (passed, errors) = test_full_stack_integration().await;
-        assert!(passed, "Full stack test failed: {:?}", errors);
+        assert!(passed, "Full stack test failed: {errors:?}");
     }
 }

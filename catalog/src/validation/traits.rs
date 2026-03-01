@@ -7,10 +7,10 @@
 //! Trait definitions for extensible validation system.
 //! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
+use super::results::{SecurityValidationResult, SyntaxValidationResult};
+use crate::assets::AssetPackage;
 use anyhow::Result;
 use async_trait::async_trait;
-use crate::assets::AssetPackage;
-use super::results::{SecurityValidationResult, SyntaxValidationResult};
 
 /// Type-specific validator trait
 #[async_trait]

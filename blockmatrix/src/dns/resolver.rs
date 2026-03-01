@@ -11,11 +11,11 @@
 //! 4. Fully Federated - Zero public access
 
 use super::{
-    DnsRecord, DnsError, DnsResult, Domain, DnsPoolManager, DnsValidator, DnsCache,
-    TrustChainDnsClient, DnsRecordType,
+    DnsCache, DnsError, DnsPoolManager, DnsRecord, DnsRecordType, DnsResult, DnsValidator, Domain,
+    TrustChainDnsClient,
 };
 use crate::consensus::ConsensusProof;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, info};
@@ -124,12 +124,8 @@ impl DnsResolver {
 
         // Resolve based on tier
         let records = match &tier {
-            DnsResolutionTier::P2PDirect => {
-                self.resolve_p2p_direct(&query).await?
-            }
-            DnsResolutionTier::Public => {
-                self.resolve_public(&query).await?
-            }
+            DnsResolutionTier::P2PDirect => self.resolve_p2p_direct(&query).await?,
+            DnsResolutionTier::Public => self.resolve_public(&query).await?,
             DnsResolutionTier::Federated { network_id } => {
                 self.resolve_federated(&query, network_id).await?
             }
@@ -242,7 +238,7 @@ impl DnsResolver {
             .validate_network_access(&query.domain, query.requester_network.as_deref())?
         {
             return Err(DnsError::AccessDenied {
-                reason: format!("Not a member of network: {}", network_id),
+                reason: format!("Not a member of network: {network_id}"),
             });
         }
 
@@ -286,7 +282,7 @@ impl DnsResolver {
             });
         }
 
-        let proof = query.proof.as_ref().unwrap();
+        let proof = query.proof.as_ref().expect("proof required for federated domain resolution");
 
         // Validate access with proof
         let validation = self
@@ -296,7 +292,9 @@ impl DnsResolver {
 
         if !validation.valid {
             return Err(DnsError::AccessDenied {
-                reason: validation.reason.unwrap_or_else(|| "Validation failed".to_string()),
+                reason: validation
+                    .reason
+                    .unwrap_or_else(|| "Validation failed".to_string()),
             });
         }
 
@@ -306,7 +304,9 @@ impl DnsResolver {
             .validate_network_access(&query.domain, query.requester_network.as_deref())?
         {
             return Err(DnsError::PrivacyViolation {
-                reason: format!("Cannot access fully federated domain outside network: {}", network_id),
+                reason: format!(
+                    "Cannot access fully federated domain outside network: {network_id}"
+                ),
             });
         }
 
@@ -329,10 +329,10 @@ impl DnsResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dns::{DnsRecordData};
     use crate::consensus::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
+    use crate::dns::DnsRecordData;
     use std::net::Ipv6Addr;
     use std::time::Duration;
 
@@ -376,18 +376,18 @@ mod tests {
 
         // Register public record
         let record = create_test_record("nike");
-        pool_manager.register_public(record).await.unwrap();
+        pool_manager.register_public(record).await.expect("test: async operation");
 
         // Query
         let query = DnsQuery {
-            domain: Domain::parse("nike").unwrap(),
+            domain: Domain::parse("nike").expect("test: expected success"),
             record_type: DnsRecordType::AAAA,
             requester_network: None,
             proof: None,
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.unwrap();
+        let response = resolver.resolve(query).await.expect("test: async operation");
         assert_eq!(response.tier, DnsResolutionTier::Public);
         assert_eq!(response.records.len(), 1);
     }
@@ -401,22 +401,19 @@ mod tests {
         pool_manager
             .register_federated("nike-internal".to_string(), record)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         // Query with network membership
         let query = DnsQuery {
-            domain: Domain::parse("admin.nike").unwrap(),
+            domain: Domain::parse("admin.nike").expect("test: expected success"),
             record_type: DnsRecordType::AAAA,
             requester_network: Some("nike-internal".to_string()),
             proof: None,
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.unwrap();
-        assert!(matches!(
-            response.tier,
-            DnsResolutionTier::Federated { .. }
-        ));
+        let response = resolver.resolve(query).await.expect("test: async operation");
+        assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
         assert_eq!(response.records.len(), 1);
     }
 
@@ -425,14 +422,14 @@ mod tests {
         let (resolver, _) = setup_resolver().await;
 
         let query = DnsQuery {
-            domain: Domain::parse("peer-12345").unwrap(),
+            domain: Domain::parse("peer-12345").expect("test: expected success"),
             record_type: DnsRecordType::AAAA,
             requester_network: None,
             proof: None,
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.unwrap();
+        let response = resolver.resolve(query).await.expect("test: async operation");
         assert_eq!(response.tier, DnsResolutionTier::P2PDirect);
         assert_eq!(response.records.len(), 0); // P2P returns empty
     }
@@ -443,21 +440,21 @@ mod tests {
 
         // Register and query once
         let record = create_test_record("nike");
-        pool_manager.register_public(record).await.unwrap();
+        pool_manager.register_public(record).await.expect("test: async operation");
 
         let query = DnsQuery {
-            domain: Domain::parse("nike").unwrap(),
+            domain: Domain::parse("nike").expect("test: expected success"),
             record_type: DnsRecordType::AAAA,
             requester_network: None,
             proof: None,
             timestamp: SystemTime::now(),
         };
 
-        let response1 = resolver.resolve(query.clone()).await.unwrap();
+        let response1 = resolver.resolve(query.clone()).await.expect("test: async operation");
         assert!(!response1.from_cache);
 
         // Second query should hit cache
-        let response2 = resolver.resolve(query).await.unwrap();
+        let response2 = resolver.resolve(query).await.expect("test: async operation");
         assert!(response2.from_cache);
     }
 }

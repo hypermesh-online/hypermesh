@@ -20,8 +20,8 @@ use tracing::{debug, info, warn};
 
 use hypermesh_lib::{BlockchainScope, NetworkId, PrivacyMode};
 
-use crate::protocol::pos_fast_validator::PosFastValidator;
 use crate::network_isolation::NetworkIsolationManager;
+use crate::protocol::pos_fast_validator::PosFastValidator;
 use crate::transport::connection::Endpoint;
 
 use super::policy::{
@@ -196,11 +196,10 @@ impl MultiPathConnection {
         );
 
         if let PathValidation::Rejected(reason) = validation {
-            warn!(
-                "Path rejected for peer {}: {}",
-                self.peer_id, reason
-            );
-            self.metrics.policy_rejections.fetch_add(1, Ordering::Relaxed);
+            warn!("Path rejected for peer {}: {}", self.peer_id, reason);
+            self.metrics
+                .policy_rejections
+                .fetch_add(1, Ordering::Relaxed);
             return Err(reason);
         }
 
@@ -370,7 +369,9 @@ impl MultiPathConnection {
             entry.value().bytes_sent.fetch_add(bytes, Ordering::Relaxed);
             *entry.value().last_active.write() = Instant::now();
         }
-        self.metrics.total_bytes_sent.fetch_add(bytes, Ordering::Relaxed);
+        self.metrics
+            .total_bytes_sent
+            .fetch_add(bytes, Ordering::Relaxed);
         self.metrics.sends_completed.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -538,8 +539,7 @@ mod tests {
         if let Err(reason) = result {
             assert!(
                 matches!(reason, PathRejectionReason::DeviceScopeRemoteNotAllowed),
-                "Expected DeviceScopeRemoteNotAllowed, got: {}",
-                reason
+                "Expected DeviceScopeRemoteNotAllowed, got: {reason}"
             );
         }
 
@@ -629,10 +629,7 @@ mod tests {
             conn.metrics().total_bytes_received.load(Ordering::Relaxed),
             500
         );
-        assert_eq!(
-            conn.metrics().sends_completed.load(Ordering::Relaxed),
-            2
-        );
+        assert_eq!(conn.metrics().sends_completed.load(Ordering::Relaxed), 2);
     }
 
     #[test]
@@ -675,9 +672,7 @@ mod tests {
         assert!(
             matches!(
                 result,
-                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation {
-                    ..
-                })
+                PathValidation::Rejected(PathRejectionReason::FederationBoundaryViolation { .. })
             ),
             "Send outside federation should be rejected"
         );

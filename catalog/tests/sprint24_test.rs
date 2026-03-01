@@ -12,10 +12,10 @@
 // Common helpers
 // ============================================================================
 
+use blockmatrix::assets::ConsensusProof;
 use blockmatrix::consensus::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
-use blockmatrix::assets::ConsensusProof;
 
 fn create_test_proof() -> ConsensusProof {
     let stake = StakeProof::new("test-holder".into(), "test-id".into(), 1000);
@@ -78,9 +78,15 @@ async fn search_exact_name_scores_higher_than_partial() {
     let results = reg.search_types(&query).await.expect("test: search");
     assert_eq!(results.results.len(), 2, "both should match");
 
-    let exact = results.results.iter().find(|r| r.type_name == "Vehicle")
+    let exact = results
+        .results
+        .iter()
+        .find(|r| r.type_name == "Vehicle")
         .expect("test: Vehicle should be in results");
-    let partial = results.results.iter().find(|r| r.type_name == "VehicleInsurance")
+    let partial = results
+        .results
+        .iter()
+        .find(|r| r.type_name == "VehicleInsurance")
         .expect("test: VehicleInsurance should be in results");
     assert!(
         exact.score > partial.score,
@@ -124,7 +130,7 @@ async fn search_tag_filter_boosts_matching_entries() {
         ..Default::default()
     };
     let results = reg.search_types(&query).await.expect("test: search");
-    assert!(results.results.len() >= 1);
+    assert!(!results.results.is_empty());
 
     // ComputeNode should appear first because its tag matches the filter
     let first = &results.results[0];
@@ -148,7 +154,11 @@ async fn search_with_author_filter() {
         ..Default::default()
     };
     let results = reg.search_types(&query).await.expect("test: search");
-    assert_eq!(results.results.len(), 2, "both match name, but alice should rank higher");
+    assert_eq!(
+        results.results.len(),
+        2,
+        "both match name, but alice should rank higher"
+    );
     assert_eq!(results.results[0].type_name, "StorageA");
 }
 
@@ -156,7 +166,7 @@ async fn search_with_author_filter() {
 async fn search_pagination_offset_and_limit() {
     let reg = test_registry();
     for i in 0..10 {
-        let name = format!("Type{:02}", i);
+        let name = format!("Type{i:02}");
         reg.register_type(make_typedef(&name, None, &[], 1))
             .await
             .expect("test: register type");
@@ -195,7 +205,10 @@ async fn sort_by_name_vs_relevance_differs() {
         ..Default::default()
     };
 
-    let res_rel = reg.search_types(&by_relevance).await.expect("test: relevance");
+    let res_rel = reg
+        .search_types(&by_relevance)
+        .await
+        .expect("test: relevance");
     let res_name = reg.search_types(&by_name).await.expect("test: name");
 
     // Both return 2 results
@@ -257,10 +270,10 @@ async fn search_version_count_affects_scoring() {
 // Track 2 -- Contribution Rewards (8 tests)
 // ============================================================================
 
+use caesar::upi::EgressAdapter;
 use catalog::settlement::{
     CatalogRewardAdapter, ContributionMetrics, ContributionTracker, RewardService,
 };
-use caesar::upi::EgressAdapter;
 use hypermesh_lib::{GoldGrams, NodeId};
 use rust_decimal::Decimal;
 
@@ -282,7 +295,10 @@ async fn tracker_records_all_four_event_types() {
     tracker.record_validation("pub-1", false).await;
     tracker.record_maintenance("pub-1", 0.1).await;
 
-    let m = tracker.get_metrics("pub-1").await.expect("test: metrics should exist");
+    let m = tracker
+        .get_metrics("pub-1")
+        .await
+        .expect("test: metrics should exist");
     assert_eq!(m.typedefs_published, 1);
     assert_eq!(m.typedef_references, 1);
     assert_eq!(m.successful_validations, 1);
@@ -308,11 +324,14 @@ fn contribution_score_known_inputs() {
     };
 
     let score = m.contribution_score();
-    assert!(score > 0.0 && score <= 1.0, "score {} out of range", score);
+    assert!(score > 0.0 && score <= 1.0, "score {score} out of range");
 
     // Rough expected: ln(6)/5*0.3 + 200/1000*0.3 + 0.9*0.25 + 0.8*0.15
     //              ~ 0.107 + 0.06 + 0.225 + 0.12 = 0.512
-    assert!(score > 0.40 && score < 0.65, "score {} not in expected range", score);
+    assert!(
+        score > 0.40 && score < 0.65,
+        "score {score} not in expected range"
+    );
 
     // Increase references -> score should go up
     m.typedef_references = 500;
@@ -411,10 +430,7 @@ async fn reward_service_single_contributor_gets_all() {
 async fn reward_adapter_settle_and_balance_tracking() {
     let adapter = CatalogRewardAdapter::new(test_node(), test_pool());
     assert_eq!(adapter.adapter_id(), "catalog_contribution_rewards");
-    assert_eq!(
-        adapter.supported_denominations(),
-        vec!["CAES".to_string()]
-    );
+    assert_eq!(adapter.supported_denominations(), vec!["CAES".to_string()]);
 
     // Settle 50 CAES to pub-1
     let value = GoldGrams::from_decimal(Decimal::new(50, 0));
@@ -471,9 +487,9 @@ async fn empty_distribution_returns_empty_vec() {
 // ============================================================================
 
 use catalog::api::stoq_api::*;
-use stoq::api::{ApiError, ApiHandler, ApiRequest};
 use std::collections::HashMap;
 use std::sync::Arc;
+use stoq::api::{ApiError, ApiHandler, ApiRequest};
 
 fn make_api_request(id: &str, method: &str, payload: &impl serde::Serialize) -> ApiRequest {
     ApiRequest {
@@ -559,7 +575,7 @@ async fn get_package_handler_returns_not_found_for_nonexistent() {
             );
         }
         other => {
-            assert!(false, "expected NotFound, got {:?}", other);
+            panic!("expected NotFound, got {other:?}");
         }
     }
 }
@@ -584,7 +600,7 @@ async fn get_publisher_handler_returns_not_found_for_unknown() {
             );
         }
         other => {
-            assert!(false, "expected NotFound, got {:?}", other);
+            panic!("expected NotFound, got {other:?}");
         }
     }
 }
@@ -628,7 +644,11 @@ async fn catalog_health_handler_returns_healthy_with_uptime() {
     };
 
     let resp = handler
-        .handle(make_api_request("health-1", "health", &serde_json::json!({})))
+        .handle(make_api_request(
+            "health-1",
+            "health",
+            &serde_json::json!({}),
+        ))
         .await
         .expect("test: health handler should succeed");
     assert!(resp.success);
@@ -699,7 +719,7 @@ async fn browse_handler_rejects_invalid_payload() {
             );
         }
         other => {
-            assert!(false, "expected InvalidRequest, got {:?}", other);
+            panic!("expected InvalidRequest, got {other:?}");
         }
     }
 }

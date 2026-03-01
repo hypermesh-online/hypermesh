@@ -221,7 +221,9 @@ mod tests {
         );
 
         // Complete from Proposed should fail (must be Active first).
-        let err = contract.complete().expect_err("test: complete from proposed");
+        let err = contract
+            .complete()
+            .expect_err("test: complete from proposed");
         match err {
             LeaseError::InvalidTransition { from, to } => {
                 assert_eq!(from, LeaseState::Proposed);

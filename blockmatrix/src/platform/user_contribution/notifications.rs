@@ -4,9 +4,9 @@
 
 //! Notification preferences and configuration
 
-use serde::{Deserialize, Serialize};
 use super::hardware::VerificationStatus;
 use super::sharing::TimeRange;
+use serde::{Deserialize, Serialize};
 
 /// Notification preferences
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,12 +82,10 @@ impl Default for NotificationPreferences {
                 urgent_alerts: true,
                 resource_requests: false,
                 earning_milestones: true,
-                quiet_hours: vec![
-                    TimeRange {
-                        start: "22:00".to_string(),
-                        end: "08:00".to_string(),
-                    }
-                ],
+                quiet_hours: vec![TimeRange {
+                    start: "22:00".to_string(),
+                    end: "08:00".to_string(),
+                }],
             },
             sms_notifications: SmsNotifications {
                 enabled: false,

@@ -129,7 +129,7 @@ pub async fn handle_issue_certificate(
     let consensus_proof = ConsensusProof::generate_from_network("http3-handler")
         .await
         .map_err(|e| TrustChainError::ConsensusValidationFailed {
-            reason: format!("Failed to generate consensus proof: {}", e),
+            reason: format!("Failed to generate consensus proof: {e}"),
         })?;
 
     let cert_request = CertificateRequest {
@@ -141,11 +141,13 @@ pub async fn handle_issue_certificate(
         timestamp: SystemTime::now(),
     };
 
-    let issued = ctx.ca.issue_certificate(cert_request).await.map_err(|e| {
-        TrustChainError::Internal {
-            message: format!("Certificate issuance failed: {}", e),
-        }
-    })?;
+    let issued =
+        ctx.ca
+            .issue_certificate(cert_request)
+            .await
+            .map_err(|e| TrustChainError::Internal {
+                message: format!("Certificate issuance failed: {e}"),
+            })?;
 
     Ok(IssueCertificateResponse {
         serial_number: issued.serial_number,
@@ -294,7 +296,7 @@ fn format_system_time(t: SystemTime) -> String {
 fn issued_to_summary(cert: &IssuedCertificate) -> CertificateSummary {
     let status = match &cert.status {
         CertificateStatus::Valid => "valid".to_string(),
-        CertificateStatus::Revoked { reason, .. } => format!("revoked: {}", reason),
+        CertificateStatus::Revoked { reason, .. } => format!("revoked: {reason}"),
         CertificateStatus::Expired => "expired".to_string(),
     };
 
@@ -326,7 +328,7 @@ fn pem_to_der(pem: &str) -> TrustChainResult<Vec<u8>> {
     base64::engine::general_purpose::STANDARD
         .decode(body.as_bytes())
         .map_err(|e| TrustChainError::CertificateParsingFailed {
-            reason: format!("Base64 decode failed: {}", e),
+            reason: format!("Base64 decode failed: {e}"),
         })
 }
 
@@ -359,7 +361,8 @@ mod tests {
     fn test_issue_response_serialization() {
         let resp = IssueCertificateResponse {
             serial_number: "abc123".to_string(),
-            certificate_pem: "-----BEGIN CERTIFICATE-----\ndata\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\ndata\n-----END CERTIFICATE-----"
+                .to_string(),
             chain_pem: "chain".to_string(),
             fingerprint: "deadbeef".to_string(),
             issued_at: "2026-01-01T00:00:00Z".to_string(),
@@ -377,7 +380,8 @@ mod tests {
     #[test]
     fn test_validate_request_serialization() {
         let req = ValidateCertificateRequest {
-            certificate_pem: "-----BEGIN CERTIFICATE-----\ndata\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\ndata\n-----END CERTIFICATE-----"
+                .to_string(),
             check_revocation: true,
         };
 

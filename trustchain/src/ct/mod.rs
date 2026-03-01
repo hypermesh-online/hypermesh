@@ -3,44 +3,43 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Certificate Transparency Implementation
-//! 
+//!
 //! TrustChain Certificate Transparency logs with merkle tree proofs,
 //! real-time certificate fingerprinting, and consensus validation.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
 use anyhow::anyhow;
-use tokio::sync::{RwLock, Mutex};
-use tracing::{info, debug, warn, error};
-use sha2::{Sha256, Digest};
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::sync::{Mutex, RwLock};
+use tracing::{debug, error, info, warn};
 // use merkletree::{MerkleTree, Proof, Hashable}; // Temporarily commented due to API changes
 
 #[allow(hidden_glob_reexports)]
 use crate::config::CTConfig;
-use crate::consensus::{ConsensusProof, ConsensusContext};
-use crate::errors::{CTError, TrustChainError, Result as TrustChainResult};
+use crate::consensus::{ConsensusContext, ConsensusProof};
+use crate::errors::{CTError, Result as TrustChainResult, TrustChainError};
 
+pub mod fingerprint_tracker;
 pub mod merkle_log;
 pub mod sct_manager;
-pub mod fingerprint_tracker;
 // pub mod storage; // Temporarily disabled due to SQLx compile-time check issues
-pub mod simple_storage;
 pub mod certificate_transparency;
-pub mod stoq_ct_client;
 pub mod federation_sync;
+pub mod simple_storage;
+pub mod stoq_ct_client;
 
+pub use certificate_transparency::*;
+pub use federation_sync::{
+    CtFederationSync, CtLogEntry, CtSyncMessage, CtSyncMetrics, FederationSyncStatus, SyncResult,
+};
+pub use fingerprint_tracker::*;
 pub use merkle_log::*;
 pub use sct_manager::*;
-pub use fingerprint_tracker::*;
 pub use simple_storage::{SimpleCTStorage as CTStorage, StorageStats};
-pub use certificate_transparency::*;
 pub use stoq_ct_client::*;
-pub use federation_sync::{
-    CtFederationSync, CtSyncMessage, CtLogEntry, CtSyncMetrics,
-    SyncResult, FederationSyncStatus,
-};
 
 /// Certificate Transparency service
 pub struct CertificateTransparency {
@@ -88,15 +87,16 @@ pub struct LogEntry {
 impl LogEntry {
     pub fn hash(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&self.sequence_number.to_be_bytes());
+        hasher.update(self.sequence_number.to_be_bytes());
         hasher.update(&self.certificate_der);
-        hasher.update(&self.fingerprint);
+        hasher.update(self.fingerprint);
         // Use 0 if timestamp is before UNIX_EPOCH (should never happen in practice)
-        let timestamp_secs = self.timestamp
+        let timestamp_secs = self
+            .timestamp
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        hasher.update(&timestamp_secs.to_be_bytes());
+        hasher.update(timestamp_secs.to_be_bytes());
         hasher.update(self.common_name.as_bytes());
         hasher.update(self.issuer_ca_id.as_bytes());
         hasher.finalize().into()
@@ -138,7 +138,10 @@ pub struct CTProof {
 impl CertificateTransparency {
     /// Create new Certificate Transparency service
     pub async fn new(config: CTConfig) -> TrustChainResult<Self> {
-        info!("Initializing Certificate Transparency service: {}", config.log_id);
+        info!(
+            "Initializing Certificate Transparency service: {}",
+            config.log_id
+        );
 
         // Initialize storage backend
         let storage = Arc::new(CTStorage::new(&config.storage_path).await?);
@@ -147,16 +150,14 @@ impl CertificateTransparency {
         let sct_manager = Arc::new(SCTManager::new(config.log_id.clone()).await?);
 
         // Initialize fingerprint tracker
-        let fingerprint_tracker = Arc::new(FingerprintTracker::new(
-            config.enable_realtime_fingerprinting,
-        ).await?);
+        let fingerprint_tracker =
+            Arc::new(FingerprintTracker::new(config.enable_realtime_fingerprinting).await?);
 
         // Initialize merkle logs (start with single log, will auto-shard)
         let logs = Arc::new(DashMap::new());
-        let initial_log = Arc::new(RwLock::new(MerkleLog::new(
-            format!("{}-0", config.log_id),
-            config.max_entries_per_shard,
-        ).await?));
+        let initial_log = Arc::new(RwLock::new(
+            MerkleLog::new(format!("{}-0", config.log_id), config.max_entries_per_shard).await?,
+        ));
         logs.insert("0".to_string(), initial_log);
 
         // Initialize consensus context
@@ -184,12 +185,15 @@ impl CertificateTransparency {
     }
 
     /// Log a certificate with CT entry and SCT generation
-    pub async fn log_certificate(&self, cert_der: &[u8]) -> TrustChainResult<SignedCertificateTimestamp> {
+    pub async fn log_certificate(
+        &self,
+        cert_der: &[u8],
+    ) -> TrustChainResult<SignedCertificateTimestamp> {
         debug!("Logging certificate in CT logs");
 
         // Parse certificate for metadata
         let (common_name, issuer_ca_id) = self.parse_certificate_metadata(cert_der)?;
-        
+
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(cert_der);
 
@@ -198,14 +202,15 @@ impl CertificateTransparency {
             return Err(CTError::FingerprintMismatch {
                 expected: hex::encode(fingerprint),
                 actual: "already_exists".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Reserve the next sequence number (atomically reads and increments)
         let sequence_number = self.storage.reserve_sequence_number().await?;
         let timestamp = SystemTime::now();
         let entry_id = self.calculate_entry_id(sequence_number, cert_der, &timestamp);
-        
+
         let log_entry = LogEntry {
             sequence_number,
             certificate_der: cert_der.to_vec(),
@@ -213,9 +218,10 @@ impl CertificateTransparency {
             timestamp,
             common_name,
             issuer_ca_id,
-            consensus_proof: ConsensusProof::generate_from_network(&self.log_id).await
+            consensus_proof: ConsensusProof::generate_from_network(&self.log_id)
+                .await
                 .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {}", e)
+                    reason: format!("Failed to generate consensus proof: {e}"),
                 })?, // TODO: Use actual proof
             entry_id,
             leaf_hash: [0u8; 32], // Will be set by merkle log
@@ -224,7 +230,7 @@ impl CertificateTransparency {
         // Add to appropriate merkle log (auto-sharding)
         let shard_id = self.get_shard_for_entry(sequence_number).await;
         let merkle_log = self.get_or_create_log_shard(&shard_id).await?;
-        
+
         let updated_entry = {
             let mut log = merkle_log.write().await;
             log.add_entry(log_entry).await?
@@ -234,21 +240,22 @@ impl CertificateTransparency {
         self.storage.store_entry(&updated_entry).await?;
 
         // Generate SCT
-        let sct = self.sct_manager.generate_sct(
-            &updated_entry,
-            &self.log_id,
-        ).await?;
+        let sct = self
+            .sct_manager
+            .generate_sct(&updated_entry, &self.log_id)
+            .await?;
 
         // Track fingerprint for real-time monitoring
         if self.config.enable_realtime_fingerprinting {
-            self.fingerprint_tracker.track_certificate(
-                fingerprint,
-                updated_entry.common_name.clone(),
-                timestamp,
-            ).await?;
+            self.fingerprint_tracker
+                .track_certificate(fingerprint, updated_entry.common_name.clone(), timestamp)
+                .await?;
         }
 
-        debug!("Certificate logged successfully with sequence number: {}", sequence_number);
+        debug!(
+            "Certificate logged successfully with sequence number: {}",
+            sequence_number
+        );
         Ok(sct)
     }
 
@@ -257,7 +264,7 @@ impl CertificateTransparency {
         debug!("Verifying certificate in CT logs");
 
         let fingerprint = self.calculate_fingerprint(cert_der);
-        
+
         match self.storage.get_entry_by_fingerprint(&fingerprint).await? {
             Some(entry) => {
                 // Verify merkle proof
@@ -282,15 +289,20 @@ impl CertificateTransparency {
         debug!("Generating inclusion proof for certificate");
 
         let fingerprint = self.calculate_fingerprint(cert_der);
-        
-        let entry = self.storage.get_entry_by_fingerprint(&fingerprint).await?
+
+        let entry = self
+            .storage
+            .get_entry_by_fingerprint(&fingerprint)
+            .await?
             .ok_or_else(|| CTError::EntryNotFound {
                 entry_id: hex::encode(fingerprint),
             })?;
 
         // Get merkle proof from appropriate shard
         let shard_id = self.get_shard_for_entry(entry.sequence_number).await;
-        let merkle_log = self.logs.get(&shard_id)
+        let merkle_log = self
+            .logs
+            .get(&shard_id)
             .ok_or_else(|| CTError::LogNotFound {
                 log_id: shard_id.clone(),
             })?;
@@ -314,12 +326,18 @@ impl CertificateTransparency {
     }
 
     /// Get consistency proof between two tree sizes
-    pub async fn get_consistency_proof(&self, old_size: u64, new_size: u64) -> TrustChainResult<Vec<[u8; 32]>> {
+    pub async fn get_consistency_proof(
+        &self,
+        old_size: u64,
+        new_size: u64,
+    ) -> TrustChainResult<Vec<[u8; 32]>> {
         debug!("Generating consistency proof: {} -> {}", old_size, new_size);
 
         // Find the appropriate shard for the new size
         let shard_id = self.get_shard_for_entry(new_size - 1).await;
-        let merkle_log = self.logs.get(&shard_id)
+        let merkle_log = self
+            .logs
+            .get(&shard_id)
             .ok_or_else(|| CTError::LogNotFound {
                 log_id: shard_id.clone(),
             })?;
@@ -337,7 +355,7 @@ impl CertificateTransparency {
         }
 
         let mut entries = Vec::new();
-        
+
         // Collect entries from storage (more efficient than traversing merkle trees)
         for seq_num in start..end {
             if let Some(entry) = self.storage.get_entry_by_sequence(seq_num).await? {
@@ -353,7 +371,7 @@ impl CertificateTransparency {
         let next_seq = self.get_next_sequence_number().await?;
         let total_entries = next_seq; // next_seq equals count of entries (0-indexed sequence)
         let shard_count = self.logs.len() as u64;
-        
+
         let mut shard_stats = Vec::new();
         for item in self.logs.iter() {
             let shard_id = item.key().clone();
@@ -444,16 +462,21 @@ impl CertificateTransparency {
         hasher.finalize().into()
     }
 
-    fn calculate_entry_id(&self, seq_num: u64, cert_der: &[u8], timestamp: &SystemTime) -> [u8; 32] {
+    fn calculate_entry_id(
+        &self,
+        seq_num: u64,
+        cert_der: &[u8],
+        timestamp: &SystemTime,
+    ) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(&seq_num.to_be_bytes());
+        hasher.update(seq_num.to_be_bytes());
         hasher.update(cert_der);
         // Use 0 if timestamp is before UNIX_EPOCH (should never happen in practice)
         let timestamp_secs = timestamp
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        hasher.update(&timestamp_secs.to_be_bytes());
+        hasher.update(timestamp_secs.to_be_bytes());
         hasher.finalize().into()
     }
 
@@ -462,15 +485,21 @@ impl CertificateTransparency {
         shard_id.to_string()
     }
 
-    async fn get_or_create_log_shard(&self, shard_id: &str) -> TrustChainResult<Arc<RwLock<MerkleLog>>> {
+    async fn get_or_create_log_shard(
+        &self,
+        shard_id: &str,
+    ) -> TrustChainResult<Arc<RwLock<MerkleLog>>> {
         if let Some(log) = self.logs.get(shard_id) {
             Ok(log.clone())
         } else {
             info!("Creating new CT log shard: {}", shard_id);
-            let new_log = Arc::new(RwLock::new(MerkleLog::new(
-                format!("{}-{}", self.log_id, shard_id),
-                self.config.max_entries_per_shard,
-            ).await?));
+            let new_log = Arc::new(RwLock::new(
+                MerkleLog::new(
+                    format!("{}-{}", self.log_id, shard_id),
+                    self.config.max_entries_per_shard,
+                )
+                .await?,
+            ));
             self.logs.insert(shard_id.to_string(), new_log.clone());
             Ok(new_log)
         }
@@ -536,21 +565,21 @@ mod tests {
     use tempfile::TempDir;
 
     async fn create_test_ct() -> (CertificateTransparency, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let mut config = CTConfig::testing(); // Use testing config with port 0
-        config.storage_path = temp_dir.path().to_str().unwrap().to_string();
+        config.storage_path = temp_dir.path().to_str().expect("test: expected success").to_string();
 
-        let ct = CertificateTransparency::new(config).await.unwrap();
+        let ct = CertificateTransparency::new(config).await.expect("test: async operation");
         (ct, temp_dir)
     }
 
     #[tokio::test]
     async fn test_certificate_logging() {
         let (ct, _temp_dir) = create_test_ct().await;
-        
+
         let test_cert = b"test certificate data";
-        let sct = ct.log_certificate(test_cert).await.unwrap();
-        
+        let sct = ct.log_certificate(test_cert).await.expect("test: async operation");
+
         assert_eq!(sct.version, 1);
         assert!(!sct.signature.is_empty());
     }
@@ -558,26 +587,29 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_verification() {
         let (ct, _temp_dir) = create_test_ct().await;
-        
+
         let test_cert = b"test certificate data";
-        ct.log_certificate(test_cert).await.unwrap();
-        
-        let is_verified = ct.verify_certificate_in_logs(test_cert).await.unwrap();
+        ct.log_certificate(test_cert).await.expect("test: async operation");
+
+        let is_verified = ct.verify_certificate_in_logs(test_cert).await.expect("test: async operation");
         assert!(is_verified);
-        
+
         let not_logged_cert = b"not logged certificate";
-        let is_not_verified = ct.verify_certificate_in_logs(not_logged_cert).await.unwrap();
+        let is_not_verified = ct
+            .verify_certificate_in_logs(not_logged_cert)
+            .await
+            .expect("test: expected success");
         assert!(!is_not_verified);
     }
 
     #[tokio::test]
     async fn test_inclusion_proof() {
         let (ct, _temp_dir) = create_test_ct().await;
-        
+
         let test_cert = b"test certificate for inclusion proof";
-        ct.log_certificate(test_cert).await.unwrap();
-        
-        let proof = ct.get_inclusion_proof(test_cert).await.unwrap();
+        ct.log_certificate(test_cert).await.expect("test: async operation");
+
+        let proof = ct.get_inclusion_proof(test_cert).await.expect("test: async operation");
         assert_eq!(proof.log_id, ct.log_id);
         assert_eq!(proof.sequence_number, 0); // First entry
     }
@@ -585,11 +617,11 @@ mod tests {
     #[tokio::test]
     async fn test_log_stats() {
         let (ct, _temp_dir) = create_test_ct().await;
-        
+
         let test_cert = b"test certificate for stats";
-        ct.log_certificate(test_cert).await.unwrap();
-        
-        let stats = ct.get_log_stats().await.unwrap();
+        ct.log_certificate(test_cert).await.expect("test: async operation");
+
+        let stats = ct.get_log_stats().await.expect("test: async operation");
         assert_eq!(stats.total_entries, 1);
         assert_eq!(stats.shard_count, 1);
     }
@@ -597,14 +629,14 @@ mod tests {
     #[tokio::test]
     async fn test_get_entries_range() {
         let (ct, _temp_dir) = create_test_ct().await;
-        
+
         // Log multiple certificates
         for i in 0..5 {
-            let cert_data = format!("test certificate {}", i);
-            ct.log_certificate(cert_data.as_bytes()).await.unwrap();
+            let cert_data = format!("test certificate {i}");
+            ct.log_certificate(cert_data.as_bytes()).await.expect("test: async operation");
         }
-        
-        let entries = ct.get_entries(0, 3).await.unwrap();
+
+        let entries = ct.get_entries(0, 3).await.expect("test: async operation");
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].sequence_number, 0);
         assert_eq!(entries[2].sequence_number, 2);

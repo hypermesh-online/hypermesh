@@ -16,13 +16,13 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use hypermesh_lib::{AssetAddress, ContentHash, AddressError};
-use crate::consensus::validation::StateAuthenticator;
-use crate::blockchain::node_chain::NodeBlockchain;
 use crate::assets::core::asset_id::{
-    AssetRegistration, AssetData, AssetCategory, BaseSystemType, NetworkScope,
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
 };
+use crate::blockchain::node_chain::NodeBlockchain;
+use crate::consensus::validation::StateAuthenticator;
 use crate::matrix::coordinate::MatrixCoordinate;
+use hypermesh_lib::{AddressError, AssetAddress, ContentHash};
 
 /// Opaque Proof of State bytes.
 ///
@@ -136,17 +136,17 @@ impl std::fmt::Display for TransferValidation {
         match self {
             TransferValidation::Valid => write!(f, "Valid"),
             TransferValidation::InvalidSourceProof(s) => {
-                write!(f, "InvalidSourceProof: {}", s)
+                write!(f, "InvalidSourceProof: {s}")
             }
             TransferValidation::InvalidTargetProof(s) => {
-                write!(f, "InvalidTargetProof: {}", s)
+                write!(f, "InvalidTargetProof: {s}")
             }
             TransferValidation::AssetNotFound => write!(f, "AssetNotFound"),
             TransferValidation::ShardMapMismatch(s) => {
-                write!(f, "ShardMapMismatch: {}", s)
+                write!(f, "ShardMapMismatch: {s}")
             }
             TransferValidation::AddressMismatch(s) => {
-                write!(f, "AddressMismatch: {}", s)
+                write!(f, "AddressMismatch: {s}")
             }
         }
     }
@@ -186,12 +186,10 @@ impl TransferEngine {
             .validator
             .validate(intent.source_proof.as_bytes())
             .await
-            .map_err(|e| TransferError::AuthenticationFailed(format!("source: {}", e)))?;
+            .map_err(|e| TransferError::AuthenticationFailed(format!("source: {e}")))?;
         if !source_valid {
             return Err(TransferError::ValidationFailed(
-                TransferValidation::InvalidSourceProof(
-                    "Source PoS authentication failed".into(),
-                ),
+                TransferValidation::InvalidSourceProof("Source PoS authentication failed".into()),
             ));
         }
 
@@ -200,12 +198,10 @@ impl TransferEngine {
             .validator
             .validate(target_proof.as_bytes())
             .await
-            .map_err(|e| TransferError::AuthenticationFailed(format!("target: {}", e)))?;
+            .map_err(|e| TransferError::AuthenticationFailed(format!("target: {e}")))?;
         if !target_valid {
             return Err(TransferError::ValidationFailed(
-                TransferValidation::InvalidTargetProof(
-                    "Target PoS authentication failed".into(),
-                ),
+                TransferValidation::InvalidTargetProof("Target PoS authentication failed".into()),
             ));
         }
 
@@ -226,7 +222,7 @@ impl TransferEngine {
         let source_block = source_chain
             .add_block(vec![transfer_out_asset])
             .await
-            .map_err(|e| TransferError::Blockchain(format!("source chain: {}", e)))?;
+            .map_err(|e| TransferError::Blockchain(format!("source chain: {e}")))?;
 
         // 6. Record "transfer-in" block on target chain
         let transfer_in_asset = build_transfer_record(
@@ -238,7 +234,7 @@ impl TransferEngine {
         let target_block = target_chain
             .add_block(vec![transfer_in_asset])
             .await
-            .map_err(|e| TransferError::Blockchain(format!("target chain: {}", e)))?;
+            .map_err(|e| TransferError::Blockchain(format!("target chain: {e}")))?;
 
         // 7. Compute receipt hash
         let receipt_hash = compute_receipt_hash(
@@ -269,12 +265,14 @@ impl TransferEngine {
         target_proof: &StateProofBytes,
     ) -> TransferValidation {
         // Validate source proof
-        match self.validator.validate(intent.source_proof.as_bytes()).await {
+        match self
+            .validator
+            .validate(intent.source_proof.as_bytes())
+            .await
+        {
             Ok(true) => {}
             Ok(false) => {
-                return TransferValidation::InvalidSourceProof(
-                    "PoS authentication failed".into(),
-                )
+                return TransferValidation::InvalidSourceProof("PoS authentication failed".into())
             }
             Err(e) => return TransferValidation::InvalidSourceProof(e.to_string()),
         }
@@ -283,9 +281,7 @@ impl TransferEngine {
         match self.validator.validate(target_proof.as_bytes()).await {
             Ok(true) => {}
             Ok(false) => {
-                return TransferValidation::InvalidTargetProof(
-                    "PoS authentication failed".into(),
-                )
+                return TransferValidation::InvalidTargetProof("PoS authentication failed".into())
             }
             Err(e) => return TransferValidation::InvalidTargetProof(e.to_string()),
         }
@@ -299,8 +295,7 @@ impl TransferEngine {
         );
         if ax != sx || ay != sy || az != sz {
             return TransferValidation::AddressMismatch(format!(
-                "({},{},{}) != ({},{},{})",
-                ax, ay, az, sx, sy, sz,
+                "({ax},{ay},{az}) != ({sx},{sy},{sz})",
             ));
         }
 
@@ -341,8 +336,7 @@ impl TransferEngine {
         reconstructed[5] = fingerprint[5] & 0xF0;
         let content_hash = ContentHash::from_bytes(reconstructed);
 
-        AssetAddress::new(target.x, target.y, target.z, &content_hash)
-            .map_err(TransferError::from)
+        AssetAddress::new(target.x, target.y, target.z, &content_hash).map_err(TransferError::from)
     }
 }
 
@@ -423,7 +417,9 @@ pub fn create_transfer_intent(
 
 /// Helper: serialize a trustchain proof into opaque StateProofBytes.
 /// This is the ONLY place that touches trustchain's proof type.
-pub fn proof_to_bytes(proof: &trustchain::consensus::ConsensusProof) -> Result<StateProofBytes, String> {
+pub fn proof_to_bytes(
+    proof: &trustchain::consensus::ConsensusProof,
+) -> Result<StateProofBytes, String> {
     let bytes = proof.to_bytes().map_err(|e| e.to_string())?;
     Ok(StateProofBytes::new(bytes))
 }
@@ -449,15 +445,11 @@ mod tests {
     #[tokio::test]
     async fn test_create_transfer_intent() {
         let hash = ContentHash::from_bytes([0xAB; 32]);
-        let addr =
-            AssetAddress::new(10, 20, 30, &hash).expect("test: valid address");
-        let source =
-            MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
-        let target =
-            MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
+        let addr = AssetAddress::new(10, 20, 30, &hash).expect("test: valid address");
+        let source = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
+        let target = MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
 
-        let intent =
-            create_transfer_intent(addr, source, target, test_proof_bytes(), vec![]);
+        let intent = create_transfer_intent(addr, source, target, test_proof_bytes(), vec![]);
         assert_eq!(intent.asset_address, addr);
         assert_eq!(intent.source_coord, source);
         assert_eq!(intent.target_coord, target);
@@ -468,38 +460,21 @@ mod tests {
         let validator = Arc::new(DefaultStateAuthenticator::for_testing());
         let engine = TransferEngine::new(validator);
 
-        let source_coord =
-            MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
-        let target_coord =
-            MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
+        let source_coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
+        let target_coord = MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
 
         let hash = ContentHash::from_bytes([0xAB; 32]);
-        let addr = AssetAddress::new(
-            source_coord.x,
-            source_coord.y,
-            source_coord.z,
-            &hash,
-        )
-        .expect("test: valid address");
+        let addr = AssetAddress::new(source_coord.x, source_coord.y, source_coord.z, &hash)
+            .expect("test: valid address");
 
-        let intent = create_transfer_intent(
-            addr,
-            source_coord,
-            target_coord,
-            test_proof_bytes(),
-            vec![],
-        );
+        let intent =
+            create_transfer_intent(addr, source_coord, target_coord, test_proof_bytes(), vec![]);
 
         let source_chain = NodeBlockchain::new(source_coord);
         let target_chain = NodeBlockchain::new(target_coord);
 
         let receipt = engine
-            .execute_transfer(
-                &intent,
-                &test_proof_bytes(),
-                &source_chain,
-                &target_chain,
-            )
+            .execute_transfer(&intent, &test_proof_bytes(), &source_chain, &target_chain)
             .await
             .expect("test: transfer should succeed");
 
@@ -513,13 +488,7 @@ mod tests {
         assert_eq!(receipt.target_block_index, 1);
 
         // Verify receipt hash is deterministic
-        let expected = compute_receipt_hash(
-            &intent.transfer_id,
-            &addr,
-            &receipt.new_address,
-            1,
-            1,
-        );
+        let expected = compute_receipt_hash(&intent.transfer_id, &addr, &receipt.new_address, 1, 1);
         assert_eq!(receipt.receipt_hash, expected);
     }
 
@@ -528,26 +497,14 @@ mod tests {
         let validator = Arc::new(DefaultStateAuthenticator::for_testing());
         let engine = TransferEngine::new(validator);
 
-        let source_coord =
-            MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
-        let target_coord =
-            MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
+        let source_coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
+        let target_coord = MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
         let hash = ContentHash::from_bytes([0xAB; 32]);
-        let addr = AssetAddress::new(
-            source_coord.x,
-            source_coord.y,
-            source_coord.z,
-            &hash,
-        )
-        .expect("test: valid address");
+        let addr = AssetAddress::new(source_coord.x, source_coord.y, source_coord.z, &hash)
+            .expect("test: valid address");
 
-        let intent = create_transfer_intent(
-            addr,
-            source_coord,
-            target_coord,
-            test_proof_bytes(),
-            vec![],
-        );
+        let intent =
+            create_transfer_intent(addr, source_coord, target_coord, test_proof_bytes(), vec![]);
 
         let result = engine.validate_transfer(&intent, &test_proof_bytes()).await;
         assert!(matches!(result, TransferValidation::Valid));
@@ -558,40 +515,22 @@ mod tests {
         let validator = Arc::new(DefaultStateAuthenticator::for_testing());
         let engine = TransferEngine::new(validator);
 
-        let source_coord =
-            MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
-        let target_coord =
-            MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
+        let source_coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
+        let target_coord = MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
         let hash = ContentHash::from_bytes([0xAB; 32]);
-        let addr = AssetAddress::new(
-            source_coord.x,
-            source_coord.y,
-            source_coord.z,
-            &hash,
-        )
-        .expect("test: valid address");
+        let addr = AssetAddress::new(source_coord.x, source_coord.y, source_coord.z, &hash)
+            .expect("test: valid address");
 
         // Empty proof bytes — will always fail authentication
         let bad_proof = StateProofBytes::new(vec![]);
 
-        let intent = create_transfer_intent(
-            addr,
-            source_coord,
-            target_coord,
-            bad_proof,
-            vec![],
-        );
+        let intent = create_transfer_intent(addr, source_coord, target_coord, bad_proof, vec![]);
 
         let source_chain = NodeBlockchain::new(source_coord);
         let target_chain = NodeBlockchain::new(target_coord);
 
         let result = engine
-            .execute_transfer(
-                &intent,
-                &test_proof_bytes(),
-                &source_chain,
-                &target_chain,
-            )
+            .execute_transfer(&intent, &test_proof_bytes(), &source_chain, &target_chain)
             .await;
         assert!(result.is_err());
     }
@@ -601,15 +540,12 @@ mod tests {
         let validator = Arc::new(DefaultStateAuthenticator::for_testing());
         let engine = TransferEngine::new(validator);
 
-        let source_coord =
-            MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
-        let target_coord =
-            MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
+        let source_coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coord");
+        let target_coord = MatrixCoordinate::new(40, 50, 60).expect("test: valid coord");
         let hash = ContentHash::from_bytes([0xAB; 32]);
 
         // Build address with DIFFERENT coords than source_coord
-        let wrong_addr = AssetAddress::new(99, 99, 99, &hash)
-            .expect("test: valid address");
+        let wrong_addr = AssetAddress::new(99, 99, 99, &hash).expect("test: valid address");
 
         let intent = create_transfer_intent(
             wrong_addr,
@@ -623,21 +559,17 @@ mod tests {
         let target_chain = NodeBlockchain::new(target_coord);
 
         let result = engine
-            .execute_transfer(
-                &intent,
-                &test_proof_bytes(),
-                &source_chain,
-                &target_chain,
-            )
+            .execute_transfer(&intent, &test_proof_bytes(), &source_chain, &target_chain)
             .await;
 
         assert!(
             matches!(
                 result,
-                Err(TransferError::ValidationFailed(TransferValidation::AddressMismatch(_)))
+                Err(TransferError::ValidationFailed(
+                    TransferValidation::AddressMismatch(_)
+                ))
             ),
-            "Expected AddressMismatch, got: {:?}",
-            result,
+            "Expected AddressMismatch, got: {result:?}",
         );
     }
 
@@ -645,10 +577,8 @@ mod tests {
     async fn test_receipt_hash_deterministic() {
         let tid = ContentHash::from_bytes([0x01; 32]);
         let hash = ContentHash::from_bytes([0xAB; 32]);
-        let old_addr =
-            AssetAddress::new(1, 2, 3, &hash).expect("test: valid address");
-        let new_addr =
-            AssetAddress::new(4, 5, 6, &hash).expect("test: valid address");
+        let old_addr = AssetAddress::new(1, 2, 3, &hash).expect("test: valid address");
+        let new_addr = AssetAddress::new(4, 5, 6, &hash).expect("test: valid address");
 
         let h1 = compute_receipt_hash(&tid, &old_addr, &new_addr, 10, 20);
         let h2 = compute_receipt_hash(&tid, &old_addr, &new_addr, 10, 20);

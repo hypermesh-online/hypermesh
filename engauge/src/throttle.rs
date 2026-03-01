@@ -138,8 +138,16 @@ mod tests {
         let signal = throttle.generate_signal(&snap, &class);
 
         assert!((signal.organic_ratio - 1.0).abs() < 1e-9);
-        assert!((signal.band_modifier - 0.5).abs() < 1e-9, "band: {}", signal.band_modifier);
-        assert!((signal.demurrage_modifier - 0.8).abs() < 1e-9, "demurrage: {}", signal.demurrage_modifier);
+        assert!(
+            (signal.band_modifier - 0.5).abs() < 1e-9,
+            "band: {}",
+            signal.band_modifier
+        );
+        assert!(
+            (signal.demurrage_modifier - 0.8).abs() < 1e-9,
+            "demurrage: {}",
+            signal.demurrage_modifier
+        );
         assert!((signal.activity_score - 0.8).abs() < 1e-9);
     }
 
@@ -168,7 +176,11 @@ mod tests {
         let signal = throttle.generate_signal(&snap, &class);
 
         // band = 0.5 * 0.5 + 2.0 * 0.5 = 0.25 + 1.0 = 1.25
-        assert!((signal.band_modifier - 1.25).abs() < 1e-9, "band: {}", signal.band_modifier);
+        assert!(
+            (signal.band_modifier - 1.25).abs() < 1e-9,
+            "band: {}",
+            signal.band_modifier
+        );
         // demurrage = 0.8 * 0.5 + 1.2 * 0.5 = 0.4 + 0.6 = 1.0
         assert!((signal.demurrage_modifier - 1.0).abs() < 1e-9);
         assert!((signal.organic_ratio - 0.5).abs() < 1e-9);
@@ -231,8 +243,7 @@ mod tests {
             organic_ratio: 0.6,
         };
         let json = serde_json::to_string(&signal).expect("test: serialize signal");
-        let back: ThrottleSignal =
-            serde_json::from_str(&json).expect("test: deserialize signal");
+        let back: ThrottleSignal = serde_json::from_str(&json).expect("test: deserialize signal");
         assert!((signal.activity_score - back.activity_score).abs() < 1e-9);
         assert!((signal.band_modifier - back.band_modifier).abs() < 1e-9);
         assert!((signal.demurrage_modifier - back.demurrage_modifier).abs() < 1e-9);

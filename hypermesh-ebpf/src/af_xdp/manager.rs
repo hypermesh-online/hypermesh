@@ -7,10 +7,10 @@
 //! Contains `AfXdpSocket`, `AfXdpStats`, `UmemConfig`, `RingConfig`,
 //! and `AfXdpManager`. Kernel helper functions are in `helpers.rs`.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
 #[cfg(feature = "kernel-attach")]
 use super::kernel_types::*;
@@ -140,19 +140,11 @@ impl AfXdpManager {
     /// AF_XDP socket with UMEM shared memory, ring buffers, and zero-copy
     /// I/O capability. Without the feature or when the kernel probe fails,
     /// creates a tracking socket that falls back to standard I/O.
-    pub fn create_socket(
-        &mut self,
-        interface: &str,
-        queue_id: u32,
-    ) -> Result<AfXdpSocket> {
-        let socket_key = format!("{}:{}", interface, queue_id);
+    pub fn create_socket(&mut self, interface: &str, queue_id: u32) -> Result<AfXdpSocket> {
+        let socket_key = format!("{interface}:{queue_id}");
 
         if self.sockets.read().contains_key(&socket_key) {
-            return Err(anyhow!(
-                "Socket already exists for {}:{}",
-                interface,
-                queue_id
-            ));
+            return Err(anyhow!("Socket already exists for {interface}:{queue_id}"));
         }
 
         // With kernel-attach: attempt full UMEM setup.
@@ -186,9 +178,7 @@ impl AfXdpManager {
             kernel_state,
         };
 
-        self.sockets
-            .write()
-            .insert(socket_key, socket.clone());
+        self.sockets.write().insert(socket_key, socket.clone());
 
         Ok(socket)
     }
@@ -219,11 +209,7 @@ impl AfXdpManager {
     /// Full kernel AF_XDP socket setup: UMEM allocation, socket creation,
     /// UMEM registration, ring setup, mmap, bind, fill ring population.
     #[cfg(feature = "kernel-attach")]
-    fn setup_kernel_state(
-        &self,
-        interface: &str,
-        queue_id: u32,
-    ) -> Result<KernelState> {
+    fn setup_kernel_state(&self, interface: &str, queue_id: u32) -> Result<KernelState> {
         use xdp_consts::*;
 
         let umem_cfg = &self.umem_config;
@@ -262,7 +248,9 @@ impl AfXdpManager {
         let fd = unsafe { libc::socket(AF_XDP, libc::SOCK_RAW, 0) };
         if fd < 0 {
             // Clean up UMEM
-            unsafe { libc::munmap(umem_area as *mut libc::c_void, umem_len); }
+            unsafe {
+                libc::munmap(umem_area as *mut libc::c_void, umem_len);
+            }
             return Err(anyhow!(
                 "Failed to create AF_XDP socket: {}",
                 std::io::Error::last_os_error()
@@ -318,18 +306,8 @@ impl AfXdpManager {
                 &offsets.cr,
                 ring_cfg.comp_size,
             )?;
-            let rx_ring = mmap_ring(
-                fd,
-                XDP_PGOFF_RX_RING,
-                &offsets.rx,
-                ring_cfg.rx_size,
-            )?;
-            let tx_ring = mmap_ring(
-                fd,
-                XDP_PGOFF_TX_RING,
-                &offsets.tx,
-                ring_cfg.tx_size,
-            )?;
+            let rx_ring = mmap_ring(fd, XDP_PGOFF_RX_RING, &offsets.rx, ring_cfg.rx_size)?;
+            let tx_ring = mmap_ring(fd, XDP_PGOFF_TX_RING, &offsets.tx, ring_cfg.tx_size)?;
 
             // Step 7: Bind socket to interface + queue
             let ifindex = get_ifindex(interface)?;
@@ -414,22 +392,14 @@ impl AfXdpManager {
     }
 
     /// Close an AF_XDP socket
-    pub fn close_socket(
-        &mut self,
-        interface: &str,
-        queue_id: u32,
-    ) -> Result<()> {
-        let socket_key = format!("{}:{}", interface, queue_id);
+    pub fn close_socket(&mut self, interface: &str, queue_id: u32) -> Result<()> {
+        let socket_key = format!("{interface}:{queue_id}");
 
         if self.sockets.write().remove(&socket_key).is_some() {
             tracing::info!("Closed AF_XDP socket for {}:{}", interface, queue_id);
             Ok(())
         } else {
-            Err(anyhow!(
-                "Socket not found for {}:{}",
-                interface,
-                queue_id
-            ))
+            Err(anyhow!("Socket not found for {interface}:{queue_id}"))
         }
     }
 
@@ -441,12 +411,8 @@ impl AfXdpManager {
     }
 
     /// Get statistics for a specific socket
-    pub fn get_stats(
-        &self,
-        interface: &str,
-        queue_id: u32,
-    ) -> Option<AfXdpStats> {
-        let socket_key = format!("{}:{}", interface, queue_id);
+    pub fn get_stats(&self, interface: &str, queue_id: u32) -> Option<AfXdpStats> {
+        let socket_key = format!("{interface}:{queue_id}");
         self.sockets
             .read()
             .get(&socket_key)

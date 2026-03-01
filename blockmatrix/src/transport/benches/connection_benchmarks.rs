@@ -14,7 +14,7 @@ use tokio::runtime::Runtime;
 
 /// Benchmark connection establishment
 fn bench_connection_establishment(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("connection_establishment", |b| {
         b.to_async(&rt).iter_batched(
@@ -24,7 +24,7 @@ fn bench_connection_establishment(c: &mut Criterion) {
                 (config, endpoint)
             },
             |(config, endpoint)| async move {
-                let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                 let node_id = NodeId::new("benchmark-node".to_string());
                 
                 // This would fail in practice without a server, but we're measuring setup time
@@ -38,7 +38,7 @@ fn bench_connection_establishment(c: &mut Criterion) {
 
 /// Benchmark data sending
 fn bench_data_sending(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     let data_sizes = [64, 1024, 8192, 65536]; // Different message sizes
     
     for &size in &data_sizes {
@@ -50,7 +50,7 @@ fn bench_data_sending(c: &mut Criterion) {
                     (config, data)
                 },
                 |(config, data)| async move {
-                    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                    let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                     let node_id = NodeId::new("benchmark-node".to_string());
                     
                     // This would fail without connection, but measures serialization overhead
@@ -65,7 +65,7 @@ fn bench_data_sending(c: &mut Criterion) {
 
 /// Benchmark connection pool operations
 fn bench_connection_pool(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("connection_pool_lookup", |b| {
         b.to_async(&rt).iter_batched(
@@ -74,7 +74,7 @@ fn bench_connection_pool(c: &mut Criterion) {
                 (config, NodeId::new("test-node".to_string()))
             },
             |(config, node_id)| async move {
-                let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                 
                 // Benchmark connection lookup (will return None, but measures lookup time)
                 let result = transport.connection_pool.get_connection(&node_id).await;
@@ -87,13 +87,13 @@ fn bench_connection_pool(c: &mut Criterion) {
 
 /// Benchmark metrics collection
 fn bench_metrics_collection(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("metrics_collection", |b| {
         b.to_async(&rt).iter_batched(
             || HyperMeshTransportConfig::default(),
             |config| async move {
-                let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                 let stats = transport.stats().await;
                 black_box(stats);
             },
@@ -104,7 +104,7 @@ fn bench_metrics_collection(c: &mut Criterion) {
 
 /// Benchmark certificate validation
 fn bench_certificate_validation(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("certificate_validation", |b| {
         b.to_async(&rt).iter_batched(
@@ -115,7 +115,7 @@ fn bench_certificate_validation(c: &mut Criterion) {
                 (config, node_id, endpoint)
             },
             |(config, node_id, endpoint)| async move {
-                let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                 let result = transport.authenticator.verify_node(&node_id, &endpoint).await;
                 black_box(result);
             },
@@ -126,7 +126,7 @@ fn bench_certificate_validation(c: &mut Criterion) {
 
 /// Benchmark concurrent connections
 fn bench_concurrent_connections(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     let concurrent_counts = [1, 10, 100];
     
     for &count in &concurrent_counts {
@@ -134,7 +134,7 @@ fn bench_concurrent_connections(c: &mut Criterion) {
             b.to_async(&rt).iter_batched(
                 || HyperMeshTransportConfig::default(),
                 |config| async move {
-                    let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                    let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                     
                     let mut handles = Vec::new();
                     for i in 0..count {
@@ -162,14 +162,14 @@ fn bench_concurrent_connections(c: &mut Criterion) {
 
 /// Benchmark memory usage patterns
 fn bench_memory_usage(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("memory_allocation", |b| {
         b.to_async(&rt).iter_batched(
             || HyperMeshTransportConfig::default(),
             |config| async move {
                 // Measure memory allocation patterns
-                let transport = HyperMeshTransport::new_async(config).await.unwrap();
+                let transport = HyperMeshTransport::new_async(config).await.expect("operation should succeed");
                 
                 // Simulate typical usage patterns
                 for i in 0..10 {

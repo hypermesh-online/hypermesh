@@ -4,7 +4,7 @@
 
 //! Core shared type definitions
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Unique node identifier in the Block-MATRIX topology
@@ -18,11 +18,15 @@ impl fmt::Display for NodeId {
 }
 
 impl From<String> for NodeId {
-    fn from(s: String) -> Self { NodeId(s) }
+    fn from(s: String) -> Self {
+        NodeId(s)
+    }
 }
 
 impl From<&str> for NodeId {
-    fn from(s: &str) -> Self { NodeId(s.to_string()) }
+    fn from(s: &str) -> Self {
+        NodeId(s.to_string())
+    }
 }
 
 /// Unique asset identifier
@@ -36,11 +40,15 @@ impl fmt::Display for AssetId {
 }
 
 impl From<String> for AssetId {
-    fn from(s: String) -> Self { AssetId(s) }
+    fn from(s: String) -> Self {
+        AssetId(s)
+    }
 }
 
 impl From<&str> for AssetId {
-    fn from(s: &str) -> Self { AssetId(s.to_string()) }
+    fn from(s: &str) -> Self {
+        AssetId(s.to_string())
+    }
 }
 
 /// Unique network identifier (128-bit, compatible with UUID bytes)
@@ -50,7 +58,7 @@ pub struct NetworkId(pub [u8; 16]);
 impl fmt::Display for NetworkId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in &self.0 {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         Ok(())
     }
@@ -80,7 +88,7 @@ impl ContentHash {
 impl fmt::Display for ContentHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in &self.0[..8] {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         write!(f, "...")
     }
@@ -119,18 +127,27 @@ pub struct PrivacyMode {
 
 impl PrivacyMode {
     /// Unbounded scope, no tracking — maximum privacy
-    pub const ANONYMOUS: Self = Self { scope: AccessScope::Unbounded, tracked: false };
+    pub const ANONYMOUS: Self = Self {
+        scope: AccessScope::Unbounded,
+        tracked: false,
+    };
     /// Bounded scope, tracked — known group with identity
-    pub const PRIVATE: Self = Self { scope: AccessScope::Bounded, tracked: true };
+    pub const PRIVATE: Self = Self {
+        scope: AccessScope::Bounded,
+        tracked: true,
+    };
     /// Unbounded scope, tracked — open participation, full transparency
-    pub const PUBLIC: Self = Self { scope: AccessScope::Unbounded, tracked: true };
+    pub const PUBLIC: Self = Self {
+        scope: AccessScope::Unbounded,
+        tracked: true,
+    };
 
     /// CAESAR reward multiplier for this privacy mode
     pub fn caesar_multiplier(&self) -> f64 {
         match (self.scope, self.tracked) {
-            (AccessScope::Unbounded, false) => 0.0,   // Anonymous: no rewards
-            (AccessScope::Bounded, _) => 0.5,          // Private: medium rewards
-            (AccessScope::Unbounded, true) => 1.0,     // Public: maximum rewards
+            (AccessScope::Unbounded, false) => 0.0, // Anonymous: no rewards
+            (AccessScope::Bounded, _) => 0.5,       // Private: medium rewards
+            (AccessScope::Unbounded, true) => 1.0,  // Public: maximum rewards
         }
     }
 
@@ -157,9 +174,9 @@ impl PrivacyMode {
     /// Graduated timeout for connections with this privacy mode
     pub fn connection_timeout_secs(&self) -> u64 {
         match (self.scope, self.tracked) {
-            (AccessScope::Unbounded, false) => 30,  // Anonymous: short
-            (AccessScope::Bounded, _) => 90,         // Private: medium
-            (AccessScope::Unbounded, true) => 300,   // Public: long
+            (AccessScope::Unbounded, false) => 30, // Anonymous: short
+            (AccessScope::Bounded, _) => 90,       // Private: medium
+            (AccessScope::Unbounded, true) => 300, // Public: long
         }
     }
 }
@@ -230,7 +247,9 @@ impl<'de> Deserialize<'de> for PrivacyMode {
                     match key.as_str() {
                         "scope" => scope = Some(map.next_value()?),
                         "tracked" => tracked = Some(map.next_value()?),
-                        _ => { let _ = map.next_value::<de::IgnoredAny>()?; }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
                     }
                 }
                 Ok(PrivacyMode {
@@ -361,12 +380,7 @@ pub struct AssetAddress([u8; 16]);
 impl AssetAddress {
     /// Create address for whole asset (shard=0) at given matrix position.
     /// x, y, z are i64 but must fit in i16 range [-32768, 32767].
-    pub fn new(
-        x: i64,
-        y: i64,
-        z: i64,
-        content_hash: &ContentHash,
-    ) -> Result<Self, AddressError> {
+    pub fn new(x: i64, y: i64, z: i64, content_hash: &ContentHash) -> Result<Self, AddressError> {
         Self::with_shard(x, y, z, content_hash, 0)
     }
 
@@ -403,10 +417,7 @@ impl AssetAddress {
     }
 
     fn check_coord(val: i64, axis: &'static str) -> Result<i16, AddressError> {
-        i16::try_from(val).map_err(|_| AddressError::CoordinateOverflow {
-            axis,
-            value: val,
-        })
+        i16::try_from(val).map_err(|_| AddressError::CoordinateOverflow { axis, value: val })
     }
 
     /// Convert to std::net::Ipv6Addr

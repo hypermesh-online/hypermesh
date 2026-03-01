@@ -4,15 +4,12 @@
 
 //! Container monitoring and metrics collection
 
-use super::{
-    types::ContainerId,
-    error::Result,
-};
+use super::{error::Result, types::ContainerId};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, Instant};
-use tracing::{info, debug};
+use std::time::{Duration, Instant, SystemTime};
+use tracing::{debug, info};
 
 /// Container metrics
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,15 +43,25 @@ pub trait ContainerMonitor: Send + Sync {
     async fn start_monitoring(&self, id: &ContainerId) -> Result<()>;
     async fn stop_monitoring(&self, id: &ContainerId) -> Result<()>;
     async fn get_metrics(&self, id: &ContainerId) -> Result<ContainerMetrics>;
-    async fn get_metrics_history(&self, id: &ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>>;
+    async fn get_metrics_history(
+        &self,
+        id: &ContainerId,
+        duration: Duration,
+    ) -> Result<Vec<ContainerMetrics>>;
     async fn get_performance_counters(&self, id: &ContainerId) -> Result<PerformanceCounters>;
-    async fn set_alert_threshold(&self, id: &ContainerId, metric: String, threshold: f64) -> Result<()>;
+    async fn set_alert_threshold(
+        &self,
+        id: &ContainerId,
+        metric: String,
+        threshold: f64,
+    ) -> Result<()>;
 }
 
 /// Default container monitor implementation
 pub struct DefaultContainerMonitor {
     monitoring: std::sync::Arc<tokio::sync::RwLock<HashMap<ContainerId, MonitoringSession>>>,
-    metrics_history: std::sync::Arc<tokio::sync::RwLock<HashMap<ContainerId, Vec<ContainerMetrics>>>>,
+    metrics_history:
+        std::sync::Arc<tokio::sync::RwLock<HashMap<ContainerId, Vec<ContainerMetrics>>>>,
 }
 
 /// Monitoring session
@@ -73,11 +80,12 @@ impl DefaultContainerMonitor {
             metrics_history: std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// Simulate collecting metrics from cgroups/proc filesystem
     async fn collect_metrics(&self, id: &ContainerId) -> ContainerMetrics {
         let monitoring = self.monitoring.read().await;
-        let uptime = monitoring.get(id)
+        let uptime = monitoring
+            .get(id)
             .map(|session| session.started_at.elapsed().as_secs())
             .unwrap_or(0);
 
@@ -87,24 +95,24 @@ impl DefaultContainerMonitor {
             timestamp: SystemTime::now(),
             cpu_usage_percent: 25.0 + ((rand::random::<u64>() % 100) as f64 / 10.0),
             memory_usage_bytes: 100 * 1024 * 1024 + (rand::random::<u64>() % (50 * 1024 * 1024)),
-            memory_limit_bytes: 1024 * 1024 * 1024, // 1GB
-            network_rx_bytes: uptime * 1024 * 10, // ~10KB/s
-            network_tx_bytes: uptime * 1024 * 5,  // ~5KB/s
-            filesystem_read_bytes: uptime * 1024 * 20, // ~20KB/s
+            memory_limit_bytes: 1024 * 1024 * 1024,     // 1GB
+            network_rx_bytes: uptime * 1024 * 10,       // ~10KB/s
+            network_tx_bytes: uptime * 1024 * 5,        // ~5KB/s
+            filesystem_read_bytes: uptime * 1024 * 20,  // ~20KB/s
             filesystem_write_bytes: uptime * 1024 * 10, // ~10KB/s
             processes: 3 + ((rand::random::<u64>() % 5) as u32),
             file_descriptors: 50 + ((rand::random::<u64>() % 100) as u32),
             uptime_seconds: uptime,
         }
     }
-    
+
     /// Store metrics in history
     async fn store_metrics(&self, metrics: ContainerMetrics) {
         let mut history = self.metrics_history.write().await;
         let container_history = history.entry(metrics.container_id).or_insert_with(Vec::new);
-        
+
         container_history.push(metrics);
-        
+
         // Keep only last 1000 entries to prevent unbounded growth
         if container_history.len() > 1000 {
             container_history.remove(0);
@@ -166,11 +174,16 @@ impl ContainerMonitor for DefaultContainerMonitor {
         Ok(self.collect_metrics(id).await)
     }
 
-    async fn get_metrics_history(&self, id: &ContainerId, duration: Duration) -> Result<Vec<ContainerMetrics>> {
+    async fn get_metrics_history(
+        &self,
+        id: &ContainerId,
+        duration: Duration,
+    ) -> Result<Vec<ContainerMetrics>> {
         let history = self.metrics_history.read().await;
         if let Some(container_history) = history.get(id) {
             let cutoff_time = SystemTime::now() - duration;
-            let filtered: Vec<_> = container_history.iter()
+            let filtered: Vec<_> = container_history
+                .iter()
                 .filter(|metrics| metrics.timestamp >= cutoff_time)
                 .cloned()
                 .collect();
@@ -179,7 +192,7 @@ impl ContainerMonitor for DefaultContainerMonitor {
             Ok(Vec::new())
         }
     }
-    
+
     async fn get_performance_counters(&self, _id: &ContainerId) -> Result<PerformanceCounters> {
         // Simulate performance counter data
         Ok(PerformanceCounters {
@@ -190,11 +203,19 @@ impl ContainerMonitor for DefaultContainerMonitor {
         })
     }
 
-    async fn set_alert_threshold(&self, id: &ContainerId, metric: String, threshold: f64) -> Result<()> {
+    async fn set_alert_threshold(
+        &self,
+        id: &ContainerId,
+        metric: String,
+        threshold: f64,
+    ) -> Result<()> {
         let mut monitoring = self.monitoring.write().await;
         if let Some(session) = monitoring.get_mut(id) {
             session.alert_thresholds.insert(metric.clone(), threshold);
-            debug!("Set alert threshold for container {} metric {}: {}", id, metric, threshold);
+            debug!(
+                "Set alert threshold for container {} metric {}: {}",
+                id, metric, threshold
+            );
         }
         Ok(())
     }
@@ -218,12 +239,12 @@ impl Clone for DefaultContainerMonitor {
 // Simple random number generation for simulation
 mod rand {
     use std::sync::atomic::{AtomicU64, Ordering};
-    
+
     static SEED: AtomicU64 = AtomicU64::new(1);
-    
-    pub fn random<T>() -> T 
-    where 
-        T: From<u64>
+
+    pub fn random<T>() -> T
+    where
+        T: From<u64>,
     {
         let seed = SEED.load(Ordering::Relaxed);
         let new_seed = seed.wrapping_mul(1103515245).wrapping_add(12345);

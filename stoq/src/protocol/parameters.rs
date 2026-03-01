@@ -7,9 +7,9 @@
 //! This module handles custom transport parameters for STOQ protocol extensions
 //! that are negotiated during the QUIC handshake.
 
+use anyhow::{anyhow, Result};
 use bytes::{BufMut, BytesMut};
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
 use tracing::{debug, trace};
 
 use super::transport_params;
@@ -134,10 +134,7 @@ impl StoqParameters {
 
         // FALCON public key
         if let Some(ref key) = self.falcon_public_key {
-            params.push((
-                transport_params::FALCON_PUBLIC_KEY,
-                key.clone(),
-            ));
+            params.push((transport_params::FALCON_PUBLIC_KEY, key.clone()));
         }
 
         // Maximum shard size
@@ -192,9 +189,8 @@ impl StoqParameters {
                     if value.len() != 4 {
                         return Err(anyhow!("Invalid MAX_SHARD_SIZE parameter"));
                     }
-                    result.max_shard_size = u32::from_be_bytes([
-                        value[0], value[1], value[2], value[3]
-                    ]);
+                    result.max_shard_size =
+                        u32::from_be_bytes([value[0], value[1], value[2], value[3]]);
                     debug!("Max shard size: {}", result.max_shard_size);
                 }
                 transport_params::TOKEN_ALGORITHM => {
@@ -205,7 +201,7 @@ impl StoqParameters {
                         .ok_or_else(|| anyhow!("Unknown token algorithm: {}", value[0]))?;
                     debug!("Token algorithm: {:?}", result.token_algorithm);
                 }
-                id if id >= 0xfe00 && id <= 0xfeff => {
+                id if (0xfe00..=0xfeff).contains(&id) => {
                     // Custom STOQ parameter range
                     result.custom.insert(id, value.clone());
                     trace!("Custom parameter 0x{:04x}: {} bytes", id, value.len());
@@ -255,8 +251,9 @@ impl StoqParameters {
         }
 
         // If FALCON is required by either, both must support
-        if (self.falcon_enabled && !other.falcon_enabled) ||
-           (!self.falcon_enabled && other.falcon_enabled && other.falcon_public_key.is_some()) {
+        if (self.falcon_enabled && !other.falcon_enabled)
+            || (!self.falcon_enabled && other.falcon_enabled && other.falcon_public_key.is_some())
+        {
             return false;
         }
 
@@ -267,6 +264,12 @@ impl StoqParameters {
 /// Parameter encoder for building transport parameters
 pub struct ParameterEncoder {
     buffer: BytesMut,
+}
+
+impl Default for ParameterEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ParameterEncoder {
@@ -327,7 +330,7 @@ mod tests {
         assert!(!encoded.is_empty());
 
         // Decode and verify
-        let decoded = StoqParameters::decode(&encoded).unwrap();
+        let decoded = StoqParameters::decode(&encoded).expect("test: expected success");
         assert_eq!(decoded.extensions_enabled, params.extensions_enabled);
         assert_eq!(decoded.falcon_enabled, params.falcon_enabled);
         assert_eq!(decoded.falcon_public_key, params.falcon_public_key);

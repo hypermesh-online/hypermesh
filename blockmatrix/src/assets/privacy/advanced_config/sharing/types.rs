@@ -4,11 +4,11 @@
 
 //! Core sharing types - policies, workflows, anonymization, and risk management.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
-use super::reporting::{RiskReportingRequirements, ReportingFrequency, ReportDetailLevel};
+use super::reporting::{ReportDetailLevel, ReportingFrequency, RiskReportingRequirements};
 
 /// Data sharing minimization settings
 #[derive(Clone, Debug, Serialize, Deserialize)]

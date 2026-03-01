@@ -7,19 +7,19 @@
 //! Provides global asset discovery, federated indexing, and
 //! recommendation services across the HyperMesh network.
 
-mod types;
 mod search;
+mod types;
 
 pub use types::*;
 
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 
-use crate::{AssetRegistration, AssetPackage, AssetMetadata};
 use super::{PeerInfo, SharePermission};
+use crate::{AssetMetadata, AssetPackage, AssetRegistration};
 
 /// Discovery service for asset search and indexing
 pub struct DiscoveryService {
@@ -90,12 +90,15 @@ impl DiscoveryService {
     }
 
     /// Search local index
-    pub async fn search_local(&self, query: &str) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    pub async fn search_local(
+        &self,
+        query: &str,
+    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         let index = self.local_index.read().await;
         let mut results = Vec::new();
 
         for (asset_id, entry) in index.iter() {
-            if self.matches_query(&entry, query) {
+            if self.matches_query(entry, query) {
                 results.push((asset_id.clone(), entry.metadata.clone()));
             }
         }
@@ -105,7 +108,7 @@ impl DiscoveryService {
             results.sort_by(|a, b| {
                 let score_a = self.calculate_relevance(&a.1, query);
                 let score_b = self.calculate_relevance(&b.1, query);
-                score_b.partial_cmp(&score_a).unwrap()
+                score_b.partial_cmp(&score_a).expect("relevance scores should be valid for comparison")
             });
         }
 
@@ -121,7 +124,10 @@ impl DiscoveryService {
     }
 
     /// Get package from local index
-    pub async fn get_local_package(&self, asset_id: &AssetRegistration) -> Result<Option<AssetPackage>> {
+    pub async fn get_local_package(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> Result<Option<AssetPackage>> {
         let index = self.local_index.read().await;
         let entry = match index.get(asset_id) {
             Some(e) => e.clone(),
@@ -155,41 +161,58 @@ impl DiscoveryService {
         crate::assets::types::AssetSpecification {
             asset_type: "package".to_string(),
             content: crate::AssetContent {
-                main: String::new(), files: vec![], inline: None,
-                binary: vec![], templates: vec![],
+                main: String::new(),
+                files: vec![],
+                inline: None,
+                binary: vec![],
+                templates: vec![],
             },
             security: crate::AssetSecurity {
-                consensus_required: false, certificate_pinning: false,
+                consensus_required: false,
+                certificate_pinning: false,
                 hash_validation: "blake3".to_string(),
-                sandbox_level: "standard".to_string(), allowed_syscalls: vec![],
+                sandbox_level: "standard".to_string(),
+                allowed_syscalls: vec![],
                 network_access: crate::assets::types::NetworkAccess {
-                    enabled: false, allowed_domains: vec![],
-                    allowed_ports: vec![], require_tls: true,
+                    enabled: false,
+                    allowed_domains: vec![],
+                    allowed_ports: vec![],
+                    require_tls: true,
                 },
                 file_access: crate::assets::types::FileAccess {
-                    level: "read".to_string(), allowed_paths: vec![],
-                    denied_paths: vec![], allow_temp: false,
+                    level: "read".to_string(),
+                    allowed_paths: vec![],
+                    denied_paths: vec![],
+                    allow_temp: false,
                 },
                 permissions: vec![],
             },
             resources: crate::AssetResources {
-                cpu_limit: "1".to_string(), memory_limit: "128M".to_string(),
-                execution_timeout: "60s".to_string(), storage_required: None,
-                network_bandwidth: None, gpu_required: false,
+                cpu_limit: "1".to_string(),
+                memory_limit: "128M".to_string(),
+                execution_timeout: "60s".to_string(),
+                storage_required: None,
+                network_bandwidth: None,
+                gpu_required: false,
                 hardware_requirements: vec![],
             },
             execution: crate::AssetExecution {
-                delegation_strategy: "any".to_string(), minimum_consensus: 1,
-                retry_policy: "none".to_string(), max_concurrent: None,
+                delegation_strategy: "any".to_string(),
+                minimum_consensus: 1,
+                retry_policy: "none".to_string(),
+                max_concurrent: None,
                 priority: "normal".to_string(),
                 timeout_config: crate::assets::types::TimeoutConfig {
-                    execution: "60s".to_string(), network: "30s".to_string(),
-                    io: "30s".to_string(), compilation: None,
+                    execution: "60s".to_string(),
+                    network: "30s".to_string(),
+                    io: "30s".to_string(),
+                    compilation: None,
                 },
                 scheduling: crate::assets::types::SchedulingConfig {
                     timing: "immediate".to_string(),
                     allocation_strategy: "best-fit".to_string(),
-                    node_affinity: vec![], anti_affinity: vec![],
+                    node_affinity: vec![],
+                    anti_affinity: vec![],
                 },
             },
             dependencies: vec![],
@@ -231,7 +254,10 @@ impl DiscoveryService {
     }
 
     /// Get popular packages
-    pub async fn get_popular_packages(&self, threshold: f64) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    pub async fn get_popular_packages(
+        &self,
+        threshold: f64,
+    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
         let index = self.local_index.read().await;
         let mut popular = Vec::new();
 
@@ -246,7 +272,7 @@ impl DiscoveryService {
         popular.sort_by(|a, b| {
             let pop_a = self.get_cached_popularity(&a.0);
             let pop_b = self.get_cached_popularity(&b.0);
-            pop_b.partial_cmp(&pop_a).unwrap()
+            pop_b.partial_cmp(&pop_a).expect("popularity scores should be valid for comparison")
         });
 
         Ok(popular)
@@ -289,7 +315,7 @@ impl DiscoveryService {
         }
 
         // Sort by score and limit
-        recommendations.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
+        recommendations.sort_by(|a, b| b.score.partial_cmp(&a.score).expect("recommendation scores should be valid for comparison"));
         recommendations.truncate(count);
 
         Ok(recommendations)
@@ -298,7 +324,9 @@ impl DiscoveryService {
     /// Update index with peer information
     pub async fn update_from_peer(&self, peer: &PeerInfo) -> Result<()> {
         // Request peer's index
-        let peer_index = self.request_peer_index(&peer.node_id, &peer.address).await?;
+        let peer_index = self
+            .request_peer_index(&peer.node_id, &peer.address)
+            .await?;
 
         // Update federated cache
         let mut cache = self.federated_cache.write().await;
@@ -331,10 +359,12 @@ impl DiscoveryService {
 
         // Extract from description
         if let Some(desc) = &metadata.description {
-            keywords.extend(desc.split_whitespace()
-                .filter(|s| s.len() > 3)
-                .map(|s| s.to_lowercase())
-                .take(20));
+            keywords.extend(
+                desc.split_whitespace()
+                    .filter(|s| s.len() > 3)
+                    .map(|s| s.to_lowercase())
+                    .take(20),
+            );
         }
 
         // Add tags
@@ -360,7 +390,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_local_search() {
-        let service = DiscoveryService::new(Duration::from_secs(3600)).await.unwrap();
+        let service = DiscoveryService::new(Duration::from_secs(3600))
+            .await
+            .expect("test: expected success");
         let results = service.search_local("test").await;
         assert!(results.is_ok());
     }

@@ -65,36 +65,23 @@ impl GatewayRouter {
         .await?;
 
         // Create proxies
-        let trustchain_proxy = Http3Proxy::new(
-            trustchain_pool.clone(),
-            config.pool.connect_timeout,
-        );
+        let trustchain_proxy =
+            Http3Proxy::new(trustchain_pool.clone(), config.pool.connect_timeout);
 
-        let blockmatrix_proxy = Http3Proxy::new(
-            blockmatrix_pool.clone(),
-            config.pool.connect_timeout,
-        );
+        let blockmatrix_proxy =
+            Http3Proxy::new(blockmatrix_pool.clone(), config.pool.connect_timeout);
 
-        let caesar_proxy = Http3Proxy::new(
-            caesar_pool.clone(),
-            config.pool.connect_timeout,
-        );
+        let caesar_proxy = Http3Proxy::new(caesar_pool.clone(), config.pool.connect_timeout);
 
         // Create circuit breakers
         let trustchain_breaker = Arc::new(CircuitBreaker::new(
-            5, // 5 failures before opening
+            5,                       // 5 failures before opening
             Duration::from_secs(30), // 30 second timeout
         ));
 
-        let blockmatrix_breaker = Arc::new(CircuitBreaker::new(
-            5,
-            Duration::from_secs(30),
-        ));
+        let blockmatrix_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
-        let caesar_breaker = Arc::new(CircuitBreaker::new(
-            5,
-            Duration::from_secs(30),
-        ));
+        let caesar_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
         Ok(Self {
             trustchain_pool,
@@ -127,10 +114,7 @@ impl GatewayRouter {
         logger.log_request(&req);
 
         // Add request ID if not present
-        RequestIdMiddleware::add_request_id(
-            req.headers_mut(),
-            logger.request_id(),
-        );
+        RequestIdMiddleware::add_request_id(req.headers_mut(), logger.request_id());
 
         // Handle CORS preflight
         if req.method() == Method::OPTIONS {
@@ -161,7 +145,7 @@ impl GatewayRouter {
             // Update request path
             let mut parts = req.uri().clone().into_parts();
             let path_and_query = if let Some(q) = query {
-                format!("{}?{}", transformed_path, q)
+                format!("{transformed_path}?{q}")
             } else {
                 transformed_path.clone()
             };
@@ -169,12 +153,15 @@ impl GatewayRouter {
             *req.uri_mut() = http::Uri::from_parts(parts)?;
 
             // Forward request with retry
-            match proxy.forward_with_retry(
-                req,
-                body,
-                self.retry_config.max_attempts,
-                self.retry_config.base_delay,
-            ).await {
+            match proxy
+                .forward_with_retry(
+                    req,
+                    body,
+                    self.retry_config.max_attempts,
+                    self.retry_config.base_delay,
+                )
+                .await
+            {
                 Ok(resp) => {
                     breaker.record_success();
                     resp
@@ -199,17 +186,33 @@ impl GatewayRouter {
     /// Select backend based on request path
     fn select_backend(&self, path: &str) -> Result<(&Http3Proxy, &Arc<CircuitBreaker>, &str)> {
         if path.starts_with("/api/v1/trustchain") {
-            Ok((&self.trustchain_proxy, &self.trustchain_breaker, "/api/v1/trustchain"))
+            Ok((
+                &self.trustchain_proxy,
+                &self.trustchain_breaker,
+                "/api/v1/trustchain",
+            ))
         } else if path.starts_with("/api/v1/blockmatrix") {
-            Ok((&self.blockmatrix_proxy, &self.blockmatrix_breaker, "/api/v1/blockmatrix"))
+            Ok((
+                &self.blockmatrix_proxy,
+                &self.blockmatrix_breaker,
+                "/api/v1/blockmatrix",
+            ))
         } else if path.starts_with("/api/v1/hypermesh") {
-            Ok((&self.blockmatrix_proxy, &self.blockmatrix_breaker, "/api/v1/hypermesh"))
+            Ok((
+                &self.blockmatrix_proxy,
+                &self.blockmatrix_breaker,
+                "/api/v1/hypermesh",
+            ))
         } else if path.starts_with("/api/v1/stoq") {
-            Ok((&self.blockmatrix_proxy, &self.blockmatrix_breaker, "/api/v1/stoq"))
+            Ok((
+                &self.blockmatrix_proxy,
+                &self.blockmatrix_breaker,
+                "/api/v1/stoq",
+            ))
         } else if path.starts_with("/api/v1/caesar") {
             Ok((&self.caesar_proxy, &self.caesar_breaker, "/api/v1/caesar"))
         } else {
-            Err(anyhow!("No backend found for path: {}", path))
+            Err(anyhow!("No backend found for path: {path}"))
         }
     }
 
@@ -314,7 +317,7 @@ impl GatewayRouter {
             .status(StatusCode::SERVICE_UNAVAILABLE)
             .header("content-type", "application/json")
             .body(Bytes::from(serde_json::to_vec(&body).unwrap_or_default()))
-            .unwrap()
+            .expect("response builder with valid status and headers should not fail")
     }
 
     /// Create gateway error response
@@ -328,6 +331,6 @@ impl GatewayRouter {
             .status(StatusCode::BAD_GATEWAY)
             .header("content-type", "application/json")
             .body(Bytes::from(serde_json::to_vec(&body).unwrap_or_default()))
-            .unwrap()
+            .expect("response builder with valid status and headers should not fail")
     }
 }

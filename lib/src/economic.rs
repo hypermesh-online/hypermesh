@@ -7,8 +7,8 @@
 //! Gold-gram denominated value packets that decay over time via demurrage.
 //! These types are shared across all HyperMesh crates (Caesar, BlockMatrix, etc.).
 
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::{Add, Sub};
@@ -32,7 +32,7 @@ impl PacketId {
 impl fmt::Display for PacketId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in &self.0[..8] {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         write!(f, "...")
     }
@@ -108,10 +108,22 @@ impl MarketTier {
     /// Default demurrage parameters for this tier
     pub fn default_demurrage_rate(&self) -> DemurrageRate {
         match self {
-            Self::L0 => DemurrageRate { lambda: 1.39e-5, max_ttl_secs: 86_400 },       // ~5%/hr, TTL 1 day
-            Self::L1 => DemurrageRate { lambda: 1.157e-8, max_ttl_secs: 1_209_600 },   // ~0.1%/day, TTL 14 days
-            Self::L2 => DemurrageRate { lambda: 1.157e-9, max_ttl_secs: 7_776_000 },   // ~0.01%/day, TTL 90 days
-            Self::L3 => DemurrageRate { lambda: 1.157e-10, max_ttl_secs: 15_552_000 }, // ~0.001%/day, TTL 180 days
+            Self::L0 => DemurrageRate {
+                lambda: 1.39e-5,
+                max_ttl_secs: 86_400,
+            }, // ~5%/hr, TTL 1 day
+            Self::L1 => DemurrageRate {
+                lambda: 1.157e-8,
+                max_ttl_secs: 1_209_600,
+            }, // ~0.1%/day, TTL 14 days
+            Self::L2 => DemurrageRate {
+                lambda: 1.157e-9,
+                max_ttl_secs: 7_776_000,
+            }, // ~0.01%/day, TTL 90 days
+            Self::L3 => DemurrageRate {
+                lambda: 1.157e-10,
+                max_ttl_secs: 15_552_000,
+            }, // ~0.001%/day, TTL 180 days
         }
     }
 }
@@ -238,15 +250,23 @@ mod tests {
     #[test]
     fn packet_state_terminal_and_active_are_disjoint() {
         let all = [
-            PacketState::Minted, PacketState::InTransit, PacketState::Delivered,
-            PacketState::Settling, PacketState::Settled, PacketState::Held,
-            PacketState::Stalled, PacketState::Dispersed, PacketState::Expired,
-            PacketState::Refunded, PacketState::Dissolved,
+            PacketState::Minted,
+            PacketState::InTransit,
+            PacketState::Delivered,
+            PacketState::Settling,
+            PacketState::Settled,
+            PacketState::Held,
+            PacketState::Stalled,
+            PacketState::Dispersed,
+            PacketState::Expired,
+            PacketState::Refunded,
+            PacketState::Dissolved,
         ];
         for state in &all {
             assert_ne!(
-                state.is_terminal(), state.is_active(),
-                "{:?} must be exactly one of terminal or active", state
+                state.is_terminal(),
+                state.is_active(),
+                "{state:?} must be exactly one of terminal or active"
             );
         }
     }
@@ -277,7 +297,7 @@ mod tests {
     #[test]
     fn gold_grams_display() {
         let g = GoldGrams::from_decimal(Decimal::new(12345, 2)); // 123.45
-        let s = format!("{}", g);
+        let s = format!("{g}");
         assert_eq!(s, "123.45g");
     }
 
@@ -294,7 +314,7 @@ mod tests {
         let ratio = remaining.0 / initial.0;
         assert!(
             ratio > Decimal::new(40, 2) && ratio < Decimal::new(70, 2),
-            "L0 decay ratio after half-day: {}", ratio
+            "L0 decay ratio after half-day: {ratio}"
         );
     }
 
@@ -355,8 +375,8 @@ mod tests {
         data[0] = 0xAB;
         data[1] = 0xCD;
         let id = PacketId::new(data);
-        let s = format!("{}", id);
-        assert!(s.starts_with("abcd"), "got: {}", s);
+        let s = format!("{id}");
+        assert!(s.starts_with("abcd"), "got: {s}");
         assert!(s.ends_with("..."));
     }
 
@@ -377,7 +397,7 @@ mod tests {
         let ratio = remaining.0 / initial.0;
         assert!(
             ratio > Decimal::new(999, 3),
-            "L1 should retain >99.9% after 1 day, got ratio: {}", ratio
+            "L1 should retain >99.9% after 1 day, got ratio: {ratio}"
         );
     }
 }

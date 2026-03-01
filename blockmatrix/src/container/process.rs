@@ -117,9 +117,20 @@ impl ProcessIsolation {
         *total_mem += memory_bytes;
         *total_cpu += cpu_millicores;
 
-        budgets.insert(id, ResourceBudget { memory_bytes, cpu_millicores, storage_bytes });
-        debug!("Registered container {} with budget: {}MB mem, {}m cpu",
-               id, memory_bytes / (1024 * 1024), cpu_millicores);
+        budgets.insert(
+            id,
+            ResourceBudget {
+                memory_bytes,
+                cpu_millicores,
+                storage_bytes,
+            },
+        );
+        debug!(
+            "Registered container {} with budget: {}MB mem, {}m cpu",
+            id,
+            memory_bytes / (1024 * 1024),
+            cpu_millicores
+        );
         Ok(())
     }
 
@@ -136,7 +147,8 @@ impl ProcessIsolation {
     ) -> Result<u32> {
         // Must be registered
         let budgets = self.budgets.read().await;
-        let budget = budgets.get(id)
+        let budget = budgets
+            .get(id)
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
         let memory_budget = budget.memory_bytes;
         let cpu_budget = budget.cpu_millicores;
@@ -152,8 +164,9 @@ impl ProcessIsolation {
         }
         drop(processes);
 
-        let program = command.first()
-            .ok_or_else(|| ContainerError::Config { message: "empty command".to_string() })?;
+        let program = command.first().ok_or_else(|| ContainerError::Config {
+            message: "empty command".to_string(),
+        })?;
 
         let mut cmd = std::process::Command::new(program);
         if command.len() > 1 {
@@ -177,7 +190,7 @@ impl ProcessIsolation {
         }
 
         let child = cmd.spawn().map_err(|e| ContainerError::Runtime {
-            message: format!("failed to spawn process: {}", e),
+            message: format!("failed to spawn process: {e}"),
         })?;
 
         let pid = child.id();
@@ -207,7 +220,8 @@ impl ProcessIsolation {
         timeout: std::time::Duration,
     ) -> Result<Option<i32>> {
         let mut processes = self.processes.write().await;
-        let managed = processes.get_mut(id)
+        let managed = processes
+            .get_mut(id)
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
 
         // Send graceful termination signal
@@ -218,7 +232,10 @@ impl ProcessIsolation {
 
         let pid = managed.pid;
         processes.remove(id);
-        info!("Stopped container {} (PID {}), exit code: {:?}", id, pid, exit_code);
+        info!(
+            "Stopped container {} (PID {}), exit code: {:?}",
+            id, pid, exit_code
+        );
         Ok(exit_code)
     }
 
@@ -265,8 +282,12 @@ impl ProcessIsolation {
             let mut total_cpu = self.total_cpu_budget.write().await;
             *total_mem = total_mem.saturating_sub(budget.memory_bytes);
             *total_cpu = total_cpu.saturating_sub(budget.cpu_millicores);
-            debug!("Unregistered container {}, released {}MB mem, {}m cpu",
-                   id, budget.memory_bytes / (1024 * 1024), budget.cpu_millicores);
+            debug!(
+                "Unregistered container {}, released {}MB mem, {}m cpu",
+                id,
+                budget.memory_bytes / (1024 * 1024),
+                budget.cpu_millicores
+            );
         }
         Ok(())
     }
@@ -320,7 +341,7 @@ impl ProcessIsolation {
             if ret != 0 {
                 // Fallback: try direct kill on the child
                 managed.child.kill().map_err(|e| ContainerError::Runtime {
-                    message: format!("failed to kill process: {}", e),
+                    message: format!("failed to kill process: {e}"),
                 })?;
             }
             Ok(())
@@ -378,8 +399,8 @@ impl ProcessIsolation {
     fn read_linux_proc_usage(pid: u32, managed: &ManagedProcess) -> Result<ResourceUsage> {
         use std::fs;
 
-        let stat_path = format!("/proc/{}/stat", pid);
-        let status_path = format!("/proc/{}/status", pid);
+        let stat_path = format!("/proc/{pid}/stat");
+        let status_path = format!("/proc/{pid}/status");
 
         let cpu_time_ns = match fs::read_to_string(&stat_path) {
             Ok(contents) => Self::parse_cpu_time_from_stat(&contents),
@@ -515,7 +536,9 @@ mod tests {
         assert_eq!(iso.total_memory_allocated().await, 1024 * 1024 * 100);
         assert_eq!(iso.total_cpu_allocated().await, 1000);
 
-        iso.unregister(&id).await.expect("test: unregister should succeed");
+        iso.unregister(&id)
+            .await
+            .expect("test: unregister should succeed");
         assert!(!iso.is_registered(&id).await);
         assert_eq!(iso.total_memory_allocated().await, 0);
     }
@@ -525,7 +548,9 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 10, 500, 0).await.expect("test: first register");
+        iso.register(id, 1024 * 1024 * 10, 500, 0)
+            .await
+            .expect("test: first register");
         let err = iso.register(id, 1024 * 1024 * 10, 500, 0).await;
         assert!(err.is_err(), "duplicate register should fail");
     }
@@ -548,15 +573,22 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
 
         let cmd = vec!["sleep".to_string(), "10".to_string()];
-        let pid = iso.start(&id, &cmd, &[], &HashMap::new()).await.expect("test: start");
+        let pid = iso
+            .start(&id, &cmd, &[], &HashMap::new())
+            .await
+            .expect("test: start");
         assert!(pid > 0, "PID should be positive");
         assert!(iso.is_running(&id).await, "should be running after start");
 
         // Cleanup
-        iso.stop(&id, std::time::Duration::from_secs(2)).await.expect("test: stop");
+        iso.stop(&id, std::time::Duration::from_secs(2))
+            .await
+            .expect("test: stop");
     }
 
     #[tokio::test]
@@ -564,14 +596,20 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
         let cmd = vec!["sleep".to_string(), "10".to_string()];
-        iso.start(&id, &cmd, &[], &HashMap::new()).await.expect("test: start");
+        iso.start(&id, &cmd, &[], &HashMap::new())
+            .await
+            .expect("test: start");
 
         let err = iso.start(&id, &cmd, &[], &HashMap::new()).await;
         assert!(err.is_err(), "double start should be rejected");
 
-        iso.stop(&id, std::time::Duration::from_secs(2)).await.expect("test: stop");
+        iso.stop(&id, std::time::Duration::from_secs(2))
+            .await
+            .expect("test: stop");
     }
 
     #[tokio::test]
@@ -579,16 +617,26 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
 
         // Start a process that sleeps
         let cmd = vec!["sleep".to_string(), "60".to_string()];
-        iso.start(&id, &cmd, &[], &HashMap::new()).await.expect("test: start");
+        iso.start(&id, &cmd, &[], &HashMap::new())
+            .await
+            .expect("test: start");
 
         // Stop it
-        let exit_code = iso.stop(&id, std::time::Duration::from_secs(3)).await.expect("test: stop");
+        let exit_code = iso
+            .stop(&id, std::time::Duration::from_secs(3))
+            .await
+            .expect("test: stop");
         // Terminated by signal -- exit code may be None or signal-based
-        assert!(!iso.is_running(&id).await, "should not be running after stop");
+        assert!(
+            !iso.is_running(&id).await,
+            "should not be running after stop"
+        );
         // exit_code is platform-dependent when killed by signal, just verify no panic
         let _ = exit_code;
     }
@@ -607,15 +655,23 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
         let cmd = vec!["sleep".to_string(), "60".to_string()];
-        iso.start(&id, &cmd, &[], &HashMap::new()).await.expect("test: start");
+        iso.start(&id, &cmd, &[], &HashMap::new())
+            .await
+            .expect("test: start");
 
         let err = iso.unregister(&id).await;
         assert!(err.is_err(), "unregister while running should fail");
 
-        iso.stop(&id, std::time::Duration::from_secs(2)).await.expect("test: stop");
-        iso.unregister(&id).await.expect("test: unregister after stop");
+        iso.stop(&id, std::time::Duration::from_secs(2))
+            .await
+            .expect("test: stop");
+        iso.unregister(&id)
+            .await
+            .expect("test: unregister after stop");
     }
 
     #[tokio::test]
@@ -623,9 +679,13 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
         let cmd = vec!["sleep".to_string(), "10".to_string()];
-        iso.start(&id, &cmd, &[], &HashMap::new()).await.expect("test: start");
+        iso.start(&id, &cmd, &[], &HashMap::new())
+            .await
+            .expect("test: start");
 
         // Brief sleep to let process settle
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -633,7 +693,9 @@ mod tests {
         let usage = iso.get_usage(&id).await.expect("test: get_usage");
         assert_eq!(usage.processes_current, 1);
 
-        iso.stop(&id, std::time::Duration::from_secs(2)).await.expect("test: stop");
+        iso.stop(&id, std::time::Duration::from_secs(2))
+            .await
+            .expect("test: stop");
     }
 
     #[tokio::test]
@@ -641,7 +703,9 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 100, 1000, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 100, 1000, 0)
+            .await
+            .expect("test: register");
 
         // Usage for registered but not-running container should be zero
         let usage = iso.get_usage(&id).await.expect("test: get_usage");
@@ -671,7 +735,8 @@ mod tests {
 
         // Start
         let cmd = vec!["sleep".to_string(), "10".to_string()];
-        let pid = iso.start(&id, &cmd, &[], &HashMap::new())
+        let pid = iso
+            .start(&id, &cmd, &[], &HashMap::new())
             .await
             .expect("test: start");
         assert!(pid > 0);
@@ -700,8 +765,12 @@ mod tests {
         let id1 = make_id();
         let id2 = make_id();
 
-        iso.register(id1, 1024 * 1024 * 80, 1500, 0).await.expect("test: register id1");
-        iso.register(id2, 1024 * 1024 * 80, 1500, 0).await.expect("test: register id2");
+        iso.register(id1, 1024 * 1024 * 80, 1500, 0)
+            .await
+            .expect("test: register id1");
+        iso.register(id2, 1024 * 1024 * 80, 1500, 0)
+            .await
+            .expect("test: register id2");
 
         assert_eq!(iso.total_memory_allocated().await, 1024 * 1024 * 160);
         assert_eq!(iso.total_cpu_allocated().await, 3000);
@@ -715,7 +784,9 @@ mod tests {
         assert_eq!(iso.total_memory_allocated().await, 1024 * 1024 * 80);
 
         // Now id3 should fit
-        iso.register(id3, 1024 * 1024 * 80, 500, 0).await.expect("test: register id3 after release");
+        iso.register(id3, 1024 * 1024 * 80, 500, 0)
+            .await
+            .expect("test: register id3 after release");
     }
 
     #[tokio::test]
@@ -733,18 +804,30 @@ mod tests {
         let iso = ProcessIsolation::new(1024 * 1024 * 512, 4000);
         let id = make_id();
 
-        iso.register(id, 1024 * 1024 * 50, 500, 0).await.expect("test: register");
+        iso.register(id, 1024 * 1024 * 50, 500, 0)
+            .await
+            .expect("test: register");
 
         let mut env = HashMap::new();
         env.insert("TEST_VAR".to_string(), "test_value".to_string());
 
         // Use /bin/sh -c to echo and exit immediately
-        let cmd = vec!["sh".to_string(), "-c".to_string(), "echo $TEST_VAR".to_string()];
-        let pid = iso.start(&id, &cmd, &[], &env).await.expect("test: start with env");
+        let cmd = vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "echo $TEST_VAR".to_string(),
+        ];
+        let pid = iso
+            .start(&id, &cmd, &[], &env)
+            .await
+            .expect("test: start with env");
         assert!(pid > 0);
 
         // Wait for short-lived process to exit
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert!(!iso.is_running(&id).await, "short process should have exited");
+        assert!(
+            !iso.is_running(&id).await,
+            "short process should have exited"
+        );
     }
 }

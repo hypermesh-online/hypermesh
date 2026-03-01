@@ -7,20 +7,20 @@
 //! Manages the phased bootstrap process to resolve circular dependencies
 //! between HyperMesh, TrustChain, STOQ, Catalog, and Caesar components.
 
-mod providers;
 pub mod metrics;
+mod providers;
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::time::{Duration, SystemTime, Instant};
+use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use tokio::sync::{RwLock, Notify};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
+use tokio::sync::{Notify, RwLock};
 use tracing::{info, instrument};
-use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use dashmap::DashMap;
-use async_trait::async_trait;
 pub use trustchain::consensus::ConsensusProof;
 
 pub use metrics::{BootstrapMetrics, HealthMonitor, HealthState};
@@ -142,7 +142,13 @@ pub struct ServiceEndpoint {
 /// Service types in the ecosystem
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ServiceType {
-    STOQ, TrustChain, HyperMesh, Catalog, Caesar, DNS, ConsensusNode,
+    STOQ,
+    TrustChain,
+    HyperMesh,
+    Catalog,
+    Caesar,
+    DNS,
+    ConsensusNode,
 }
 
 /// Service registration information
@@ -200,7 +206,9 @@ impl BootstrapManager {
         Self {
             current_phase: Arc::new(AtomicU8::new(0)),
             components: Arc::new(DashMap::new()),
-            discovery: Arc::new(RwLock::new(Box::new(TraditionalDNS::new(config.network_usage.traditional_dns.clone())))),
+            discovery: Arc::new(RwLock::new(Box::new(TraditionalDNS::new(
+                config.network_usage.traditional_dns.clone(),
+            )))),
             certificates: Arc::new(RwLock::new(Box::new(SelfSignedProvider::new()))),
             _transport: Arc::new(RwLock::new(Box::new(BasicTransport::new()))),
             consensus: Arc::new(RwLock::new(Box::new(NoOpConsensus::new()))),
@@ -216,9 +224,15 @@ impl BootstrapManager {
         info!("Starting Web3 ecosystem bootstrap sequence");
         self.metrics.set_start_time();
         self.execute_phase_0().await?;
-        if self.should_transition_to_phase_1().await { self.execute_phase_1().await?; }
-        if self.should_transition_to_phase_2().await { self.execute_phase_2().await?; }
-        if self.should_transition_to_phase_3().await { self.execute_phase_3().await?; }
+        if self.should_transition_to_phase_1().await {
+            self.execute_phase_1().await?;
+        }
+        if self.should_transition_to_phase_2().await {
+            self.execute_phase_2().await?;
+        }
+        if self.should_transition_to_phase_3().await {
+            self.execute_phase_3().await?;
+        }
         info!("Bootstrap sequence completed successfully");
         Ok(())
     }
@@ -229,10 +243,12 @@ impl BootstrapManager {
         self.metrics.mark_phase_start(BootstrapPhase::Traditional);
         self.start_component("stoq", vec![]).await?;
         self.start_component("trustchain", vec!["stoq"]).await?;
-        self.start_component("hypermesh", vec!["stoq", "trustchain"]).await?;
+        self.start_component("hypermesh", vec!["stoq", "trustchain"])
+            .await?;
         self.start_component("catalog", vec!["hypermesh"]).await?;
         self.start_component("caesar", vec!["hypermesh"]).await?;
-        self.metrics.mark_phase_complete(BootstrapPhase::Traditional);
+        self.metrics
+            .mark_phase_complete(BootstrapPhase::Traditional);
         info!("Phase 0 completed in {:?}", phase_start.elapsed());
         if let Some(notify) = self.phase_notifications.get(&BootstrapPhase::Traditional) {
             notify.notify_waiters();
@@ -245,11 +261,16 @@ impl BootstrapManager {
         let phase_start = Instant::now();
         self.metrics.mark_phase_start(BootstrapPhase::Hybrid);
         *self.discovery.write().await = Box::new(HybridDiscovery::new(
-            self.config.network_usage.traditional_dns.clone(), self.config.network_usage.trustchain_bind,
+            self.config.network_usage.traditional_dns.clone(),
+            self.config.network_usage.trustchain_bind,
         ));
-        *self.certificates.write().await = Box::new(TrustChainProvider::new(self.config.network_usage.trustchain_bind));
+        *self.certificates.write().await = Box::new(TrustChainProvider::new(
+            self.config.network_usage.trustchain_bind,
+        ));
         self.update_component_phases(BootstrapPhase::Hybrid).await;
-        *self.consensus.write().await = Box::new(OptionalConsensus::new(self.config.network_usage.hypermesh_bind));
+        *self.consensus.write().await = Box::new(OptionalConsensus::new(
+            self.config.network_usage.hypermesh_bind,
+        ));
         self.current_phase.store(1, Ordering::SeqCst);
         self.metrics.mark_phase_complete(BootstrapPhase::Hybrid);
         info!("Phase 1 completed in {:?}", phase_start.elapsed());
@@ -262,17 +283,26 @@ impl BootstrapManager {
     async fn execute_phase_2(&self) -> Result<()> {
         info!("Executing Phase 2: Partial federation");
         let phase_start = Instant::now();
-        self.metrics.mark_phase_start(BootstrapPhase::PartialFederation);
+        self.metrics
+            .mark_phase_start(BootstrapPhase::PartialFederation);
         *self.discovery.write().await = Box::new(FederatedDiscovery::new(
-            self.config.network_usage.hypermesh_bind, Some(self.config.network_usage.traditional_dns.clone()),
+            self.config.network_usage.hypermesh_bind,
+            Some(self.config.network_usage.traditional_dns.clone()),
         ));
-        *self.consensus.write().await = Box::new(RequiredConsensus::new(self.config.network_usage.hypermesh_bind));
-        self.update_component_phases(BootstrapPhase::PartialFederation).await;
+        *self.consensus.write().await = Box::new(RequiredConsensus::new(
+            self.config.network_usage.hypermesh_bind,
+        ));
+        self.update_component_phases(BootstrapPhase::PartialFederation)
+            .await;
         self.enable_byzantine_detection().await?;
         self.current_phase.store(2, Ordering::SeqCst);
-        self.metrics.mark_phase_complete(BootstrapPhase::PartialFederation);
+        self.metrics
+            .mark_phase_complete(BootstrapPhase::PartialFederation);
         info!("Phase 2 completed in {:?}", phase_start.elapsed());
-        if let Some(notify) = self.phase_notifications.get(&BootstrapPhase::PartialFederation) {
+        if let Some(notify) = self
+            .phase_notifications
+            .get(&BootstrapPhase::PartialFederation)
+        {
             notify.notify_waiters();
         }
         Ok(())
@@ -281,15 +311,25 @@ impl BootstrapManager {
     async fn execute_phase_3(&self) -> Result<()> {
         info!("Executing Phase 3: Full federation");
         let phase_start = Instant::now();
-        self.metrics.mark_phase_start(BootstrapPhase::FullFederation);
-        *self.discovery.write().await = Box::new(FederatedDiscovery::new(self.config.network_usage.hypermesh_bind, None));
-        *self.consensus.write().await = Box::new(FullConsensus::new(self.config.network_usage.hypermesh_bind));
-        self.update_component_phases(BootstrapPhase::FullFederation).await;
+        self.metrics
+            .mark_phase_start(BootstrapPhase::FullFederation);
+        *self.discovery.write().await = Box::new(FederatedDiscovery::new(
+            self.config.network_usage.hypermesh_bind,
+            None,
+        ));
+        *self.consensus.write().await =
+            Box::new(FullConsensus::new(self.config.network_usage.hypermesh_bind));
+        self.update_component_phases(BootstrapPhase::FullFederation)
+            .await;
         self.enable_advanced_features().await?;
         self.current_phase.store(3, Ordering::SeqCst);
-        self.metrics.mark_phase_complete(BootstrapPhase::FullFederation);
+        self.metrics
+            .mark_phase_complete(BootstrapPhase::FullFederation);
         info!("Phase 3 completed in {:?}", phase_start.elapsed());
-        if let Some(notify) = self.phase_notifications.get(&BootstrapPhase::FullFederation) {
+        if let Some(notify) = self
+            .phase_notifications
+            .get(&BootstrapPhase::FullFederation)
+        {
             notify.notify_waiters();
         }
         Ok(())
@@ -297,7 +337,9 @@ impl BootstrapManager {
 
     async fn start_component(&self, name: &str, dependencies: Vec<&str>) -> Result<()> {
         info!("Starting component: {}", name);
-        for dep in &dependencies { self.wait_for_component(dep).await?; }
+        for dep in &dependencies {
+            self.wait_for_component(dep).await?;
+        }
         let state = ComponentState {
             name: name.to_string(),
             status: ComponentStatus::Starting,
@@ -309,7 +351,9 @@ impl BootstrapManager {
         };
         self.components.insert(name.to_string(), state);
         tokio::time::sleep(Duration::from_millis(500)).await;
-        if let Some(mut state) = self.components.get_mut(name) { state.status = ComponentStatus::Running; }
+        if let Some(mut state) = self.components.get_mut(name) {
+            state.status = ComponentStatus::Running;
+        }
         self.health_monitor.start_monitoring(name.to_string()).await;
         info!("Component {} started successfully", name);
         Ok(())
@@ -322,21 +366,31 @@ impl BootstrapManager {
             if let Some(state) = self.components.get(name) {
                 match state.status {
                     ComponentStatus::Running => return Ok(()),
-                    ComponentStatus::Failed(ref err) => return Err(anyhow!("Component {} failed: {}", name, err)),
+                    ComponentStatus::Failed(ref err) => {
+                        return Err(anyhow!("Component {name} failed: {err}"))
+                    }
                     _ => {}
                 }
             }
-            if start.elapsed() > timeout { return Err(anyhow!("Timeout waiting for component {}", name)); }
+            if start.elapsed() > timeout {
+                return Err(anyhow!("Timeout waiting for component {name}"));
+            }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
     async fn should_transition_to_phase_1(&self) -> bool {
-        if !self.config.auto_transition { return false; }
+        if !self.config.auto_transition {
+            return false;
+        }
         for component in &["stoq", "trustchain", "hypermesh", "catalog", "caesar"] {
             if let Some(state) = self.components.get(*component) {
-                if state.status != ComponentStatus::Running { return false; }
-            } else { return false; }
+                if state.status != ComponentStatus::Running {
+                    return false;
+                }
+            } else {
+                return false;
+            }
         }
         true
     }
@@ -350,7 +404,9 @@ impl BootstrapManager {
     }
 
     async fn update_component_phases(&self, phase: BootstrapPhase) {
-        for mut entry in self.components.iter_mut() { entry.phase = phase; }
+        for mut entry in self.components.iter_mut() {
+            entry.phase = phase;
+        }
     }
 
     async fn enable_byzantine_detection(&self) -> Result<()> {
@@ -368,7 +424,9 @@ impl BootstrapManager {
     }
 
     pub async fn wait_for_phase(&self, phase: BootstrapPhase) -> Result<()> {
-        if self.get_current_phase() >= phase { return Ok(()); }
+        if self.get_current_phase() >= phase {
+            return Ok(());
+        }
         if let Some(notify) = self.phase_notifications.get(&phase) {
             let notify_clone = notify.clone();
             notify_clone.notified().await;
@@ -376,7 +434,9 @@ impl BootstrapManager {
         Ok(())
     }
 
-    pub fn get_metrics(&self) -> &BootstrapMetrics { &self.metrics }
+    pub fn get_metrics(&self) -> &BootstrapMetrics {
+        &self.metrics
+    }
 
     pub async fn get_component_states(&self) -> HashMap<String, ComponentState> {
         let mut states = HashMap::new();
@@ -403,8 +463,11 @@ mod tests {
                 m
             },
             startup_order: vec![
-                "stoq".to_string(), "trustchain".to_string(), "hypermesh".to_string(),
-                "catalog".to_string(), "caesar".to_string(),
+                "stoq".to_string(),
+                "trustchain".to_string(),
+                "hypermesh".to_string(),
+                "catalog".to_string(),
+                "caesar".to_string(),
             ],
             max_retries: 3,
             health_check_interval: Duration::from_secs(5),

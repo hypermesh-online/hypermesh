@@ -4,9 +4,9 @@
 
 //! Predictive container scaling with CPE-enhanced decisions.
 
-pub mod types;
 pub mod engine;
+pub mod types;
 
 // Re-export all public types
-pub use types::*;
 pub use engine::PredictiveScaler;
+pub use types::*;

@@ -98,15 +98,8 @@ impl ReflectorPool {
     /// If the reflector already exists, its fields are updated.
     /// If the network has reached max_reflectors, the lowest-health
     /// reflector is evicted to make room (only if the new one is better).
-    pub fn register_reflector(
-        &mut self,
-        network_id: &str,
-        reflector: Reflector,
-    ) {
-        let network_pool = self
-            .reflectors
-            .entry(network_id.to_string())
-            .or_default();
+    pub fn register_reflector(&mut self, network_id: &str, reflector: Reflector) {
+        let network_pool = self.reflectors.entry(network_id.to_string()).or_default();
 
         // If already registered, just update
         if network_pool.contains_key(&reflector.node_id) {
@@ -164,11 +157,7 @@ impl ReflectorPool {
     /// Remove a reflector from a network
     ///
     /// Returns true if the reflector was found and removed.
-    pub fn remove_reflector(
-        &mut self,
-        network_id: &str,
-        node_id: &str,
-    ) -> bool {
+    pub fn remove_reflector(&mut self, network_id: &str, node_id: &str) -> bool {
         if let Some(network_pool) = self.reflectors.get_mut(network_id) {
             let removed = network_pool.remove(node_id).is_some();
             if removed {
@@ -186,11 +175,7 @@ impl ReflectorPool {
 
     /// Get the best reflectors for a network, sorted by health score
     /// (highest first), limited to `count`.
-    pub fn get_best_reflectors(
-        &self,
-        network_id: &str,
-        count: usize,
-    ) -> Vec<&Reflector> {
+    pub fn get_best_reflectors(&self, network_id: &str, count: usize) -> Vec<&Reflector> {
         let Some(network_pool) = self.reflectors.get(network_id) else {
             return Vec::new();
         };
@@ -232,9 +217,7 @@ impl ReflectorPool {
 
     /// Total reflector count for a network (regardless of health)
     pub fn total_count(&self, network_id: &str) -> usize {
-        self.reflectors
-            .get(network_id)
-            .map_or(0, |pool| pool.len())
+        self.reflectors.get(network_id).map_or(0, |pool| pool.len())
     }
 
     /// Update the health score for a specific reflector node.
@@ -286,12 +269,7 @@ mod tests {
     use super::*;
     use hypermesh_lib::MatrixPosition;
 
-    fn make_reflector(
-        node_id: &str,
-        health: f64,
-        height: u64,
-        last_seen: u64,
-    ) -> Reflector {
+    fn make_reflector(node_id: &str, health: f64, height: u64, last_seen: u64) -> Reflector {
         Reflector {
             node_id: node_id.to_string(),
             position: MatrixPosition {

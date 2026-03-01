@@ -7,13 +7,13 @@
 //! Provides standalone bootstrap capability for TrustChain DNS without BlockMatrix dependency.
 //! This enables TrustChain to start independently and optionally upgrade to BlockMatrix assets later.
 
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// DNS backend storage options
 #[derive(Clone, Debug)]
@@ -39,7 +39,7 @@ pub enum DnsBackend {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DnsRecord {
     pub name: String,
-    pub record_type: String,  // "A", "AAAA", "CNAME", etc.
+    pub record_type: String, // "A", "AAAA", "CNAME", etc.
     pub value: String,
     pub ttl: u32,
     pub timestamp: u64,
@@ -86,7 +86,7 @@ impl BootstrapConfig {
             DnsRecord {
                 name: "trust.hypermesh.local".to_string(),
                 record_type: "AAAA".to_string(),
-                value: "::1".to_string(),  // localhost IPv6
+                value: "::1".to_string(), // localhost IPv6
                 ttl: 3600,
                 timestamp: 0,
             },
@@ -187,7 +187,9 @@ impl TrustChainBootstrap {
             .context("Failed to create persistence directory")?;
 
         // Load existing records from disk if available
-        let records = Self::load_from_disk(&persistence_dir).await.unwrap_or_default();
+        let records = Self::load_from_disk(&persistence_dir)
+            .await
+            .unwrap_or_default();
         let cache = Arc::new(RwLock::new(records));
 
         let dns_backend = DnsBackend::FileSystem {
@@ -195,9 +197,11 @@ impl TrustChainBootstrap {
             cache: cache.clone(),
         };
 
-        let mut config = BootstrapConfig::default();
-        config.enable_persistence = true;
-        config.persistence_dir = Some(persistence_dir);
+        let config = BootstrapConfig {
+            enable_persistence: true,
+            persistence_dir: Some(persistence_dir),
+            ..Default::default()
+        };
 
         let state = Arc::new(RwLock::new(BootstrapState {
             phase: BootstrapPhase::StandalonePersistent,
@@ -240,7 +244,10 @@ impl TrustChainBootstrap {
                 cache.write().await.insert(record.name.clone(), record);
             }
             DnsBackend::FileSystem { cache, path } => {
-                cache.write().await.insert(record.name.clone(), record.clone());
+                cache
+                    .write()
+                    .await
+                    .insert(record.name.clone(), record.clone());
                 // Persist to disk
                 self.persist_to_disk(path).await?;
             }
@@ -255,12 +262,8 @@ impl TrustChainBootstrap {
     /// Query DNS record from backend
     pub async fn query_dns_record(&self, name: &str) -> Result<Option<DnsRecord>> {
         match &self.dns_backend {
-            DnsBackend::InMemory(cache) => {
-                Ok(cache.read().await.get(name).cloned())
-            }
-            DnsBackend::FileSystem { cache, .. } => {
-                Ok(cache.read().await.get(name).cloned())
-            }
+            DnsBackend::InMemory(cache) => Ok(cache.read().await.get(name).cloned()),
+            DnsBackend::FileSystem { cache, .. } => Ok(cache.read().await.get(name).cloned()),
             DnsBackend::_BlockMatrixAsset { .. } => {
                 // Not implemented yet
                 Err(anyhow::anyhow!("BlockMatrix backend not yet implemented"))
@@ -271,9 +274,7 @@ impl TrustChainBootstrap {
     /// Get all DNS records
     pub async fn get_all_records(&self) -> Result<Vec<DnsRecord>> {
         match &self.dns_backend {
-            DnsBackend::InMemory(cache) => {
-                Ok(cache.read().await.values().cloned().collect())
-            }
+            DnsBackend::InMemory(cache) => Ok(cache.read().await.values().cloned().collect()),
             DnsBackend::FileSystem { cache, .. } => {
                 Ok(cache.read().await.values().cloned().collect())
             }
@@ -284,7 +285,7 @@ impl TrustChainBootstrap {
     }
 
     /// Load DNS records from disk
-    async fn load_from_disk(path: &PathBuf) -> Result<HashMap<String, DnsRecord>> {
+    async fn load_from_disk(path: &Path) -> Result<HashMap<String, DnsRecord>> {
         let file_path = path.join("dns_records.json");
 
         if !file_path.exists() {
@@ -295,8 +296,8 @@ impl TrustChainBootstrap {
             .await
             .context("Failed to read DNS records from disk")?;
 
-        let records: Vec<DnsRecord> = serde_json::from_str(&content)
-            .context("Failed to parse DNS records")?;
+        let records: Vec<DnsRecord> =
+            serde_json::from_str(&content).context("Failed to parse DNS records")?;
 
         let mut map = HashMap::new();
         for record in records {
@@ -307,7 +308,7 @@ impl TrustChainBootstrap {
     }
 
     /// Persist DNS records to disk
-    async fn persist_to_disk(&self, path: &PathBuf) -> Result<()> {
+    async fn persist_to_disk(&self, path: &Path) -> Result<()> {
         if let DnsBackend::FileSystem { cache, .. } = &self.dns_backend {
             let records: Vec<DnsRecord> = cache.read().await.values().cloned().collect();
             let content = serde_json::to_string_pretty(&records)?;
@@ -367,7 +368,9 @@ impl TrustChainBootstrap {
         // 3. Update backend to use BlockMatrix
         // 4. Update state to BlockMatrixIntegrated phase
 
-        Err(anyhow::anyhow!("BlockMatrix integration not yet implemented"))
+        Err(anyhow::anyhow!(
+            "BlockMatrix integration not yet implemented"
+        ))
     }
 
     /// Test connectivity to localhost
@@ -412,23 +415,28 @@ mod tests {
             .await
             .expect("Failed to bootstrap");
 
-        assert_eq!(bootstrap.get_phase().await, BootstrapPhase::StandaloneMemory);
+        assert_eq!(
+            bootstrap.get_phase().await,
+            BootstrapPhase::StandaloneMemory
+        );
 
         // Should have default seed records
-        let records = bootstrap.get_all_records().await.unwrap();
-        assert!(records.len() > 0);
+        let records = bootstrap.get_all_records().await.expect("test: async operation");
+        assert!(!records.is_empty());
     }
 
     #[tokio::test]
     async fn test_bootstrap_with_persistence() {
-        let temp_dir = tempdir().unwrap();
-        let bootstrap = TrustChainBootstrap::bootstrap_with_persistence(
-            temp_dir.path().to_path_buf()
-        )
-        .await
-        .expect("Failed to bootstrap with persistence");
+        let temp_dir = tempdir().expect("test: expected success");
+        let bootstrap =
+            TrustChainBootstrap::bootstrap_with_persistence(temp_dir.path().to_path_buf())
+                .await
+                .expect("Failed to bootstrap with persistence");
 
-        assert_eq!(bootstrap.get_phase().await, BootstrapPhase::StandalonePersistent);
+        assert_eq!(
+            bootstrap.get_phase().await,
+            BootstrapPhase::StandalonePersistent
+        );
     }
 
     #[tokio::test]
@@ -446,12 +454,15 @@ mod tests {
             timestamp: 0,
         };
 
-        bootstrap.add_dns_record(record.clone()).await.unwrap();
+        bootstrap.add_dns_record(record.clone()).await.expect("test: async operation");
 
         // Query the record
-        let result = bootstrap.query_dns_record("test.example.com").await.unwrap();
+        let result = bootstrap
+            .query_dns_record("test.example.com")
+            .await
+            .expect("test: expected success");
         assert!(result.is_some());
-        assert_eq!(result.unwrap().value, "2001:db8::1");
+        assert_eq!(result.expect("test: expected result").value, "2001:db8::1");
     }
 
     #[tokio::test]
@@ -464,9 +475,9 @@ mod tests {
         assert!(!bootstrap.is_operational().await);
 
         // Mark components as ready
-        bootstrap.mark_ca_ready().await.unwrap();
-        bootstrap.mark_ct_ready().await.unwrap();
-        bootstrap.mark_dns_ready().await.unwrap();
+        bootstrap.mark_ca_ready().await.expect("test: async operation");
+        bootstrap.mark_ct_ready().await.expect("test: async operation");
+        bootstrap.mark_dns_ready().await.expect("test: async operation");
 
         // Now should be operational
         assert!(bootstrap.is_operational().await);

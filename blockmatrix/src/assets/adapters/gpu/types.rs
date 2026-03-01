@@ -4,15 +4,13 @@
 
 //! GPU type definitions - allocation records, device info, and status types.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{
-    AssetRegistration, PrivacyMode, ProxyAddress,
-};
+use crate::assets::core::{AssetRegistration, PrivacyMode, ProxyAddress};
 
 /// GPU allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]

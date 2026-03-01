@@ -9,6 +9,7 @@ use chrono::Utc;
 use std::collections::HashMap;
 
 /// Create a test AssetPackage with proper structure
+#[allow(dead_code)]
 pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
     AssetPackage {
         spec: AssetSpec {
@@ -18,7 +19,7 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
                 name: name.to_string(),
                 version: version.to_string(),
                 tags: vec!["test".to_string()],
-                description: Some(format!("Test package {}", name)),
+                description: Some(format!("Test package {name}")),
                 author: Some("Test Author".to_string()),
                 license: Some("MIT".to_string()),
                 homepage: None,

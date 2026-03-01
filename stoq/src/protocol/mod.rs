@@ -7,40 +7,39 @@
 //! This module integrates STOQ protocol extensions directly into QUIC packet flow
 //! using Quinn's extension points for custom frames and transport parameters.
 
-use bytes::{Bytes, Buf};
-use quinn::{VarInt, TransportConfig};
-use std::sync::Arc;
+use anyhow::{anyhow, Result};
+use bytes::{Buf, Bytes};
+use quinn::{TransportConfig, VarInt};
 use std::collections::HashMap;
-use anyhow::{Result, anyhow};
+use std::sync::Arc;
 use tracing::{debug, trace};
 
+pub mod falcon_trustchain;
 pub mod frame_codec;
 pub mod frames;
-pub mod parameters;
-pub mod handshake;
-pub mod falcon_trustchain;
-pub mod pos_validator;
-pub mod pos_integration;
-pub mod pos_fast_validator;
 mod handler_ops;
+pub mod handshake;
+pub mod parameters;
+pub mod pos_fast_validator;
+pub mod pos_integration;
+pub mod pos_validator;
 
 #[cfg(feature = "engauge")]
 pub mod metrics_frame;
 
 // Re-exports for backward compatibility
 pub use pos_validator::{
-    PosToken, PosTokenValidator, ProofData,
-    ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
-    ValidationResult, TrustChainClient
+    PosToken, PosTokenValidator, ProofData, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
+    TrustChainClient, ValidationResult,
 };
 
 // Re-export integration types
 pub use pos_integration::{
-    StoqPosIntegration, MatrixPosition, MatrixPositionExt, ShardAddress,
-    AssetVerification, ConnectionStats, IntegrationStats,
+    AssetVerification, ConnectionStats, IntegrationStats, MatrixPosition, MatrixPositionExt,
+    ShardAddress, StoqPosIntegration,
 };
 
-use crate::extensions::{PacketToken, PacketShard, StoqProtocolExtension};
+use crate::extensions::{PacketShard, PacketToken, StoqProtocolExtension};
 use crate::transport::falcon::FalconSignature;
 
 /// STOQ protocol version for QUIC ALPN
@@ -92,7 +91,7 @@ pub mod transport_params {
     pub const TOKEN_ALGORITHM: u64 = 0xfe04;
 }
 
-use handler_ops::{ShardStorage, ConnectionState};
+use handler_ops::{ConnectionState, ShardStorage};
 
 /// STOQ protocol handler for QUIC integration
 pub struct StoqProtocolHandler {
@@ -128,7 +127,9 @@ impl StoqProtocolHandler {
     /// to change it after construction.
     pub fn new(
         extensions: Arc<dyn StoqProtocolExtension + Send + Sync>,
-        falcon_transport: Option<Arc<parking_lot::RwLock<crate::transport::falcon::FalconTransport>>>,
+        falcon_transport: Option<
+            Arc<parking_lot::RwLock<crate::transport::falcon::FalconTransport>>,
+        >,
         max_shard_size: usize,
     ) -> Self {
         Self {
@@ -162,7 +163,8 @@ impl StoqProtocolHandler {
 
     /// Decode a STOQ token frame
     pub fn decode_token_frame(&self, mut data: Bytes) -> Result<PacketToken> {
-        if data.len() < 48 { // 32 (hash) + 8 (seq) + 8 (timestamp)
+        if data.len() < 48 {
+            // 32 (hash) + 8 (seq) + 8 (timestamp)
             return Err(anyhow!("Token frame too short: {} bytes", data.len()));
         }
 
@@ -180,7 +182,7 @@ impl StoqProtocolHandler {
 
     /// Encode a STOQ shard metadata frame
     pub fn encode_shard_frame(&self, shard: &PacketShard) -> Result<Bytes> {
-        use crate::protocol::frames::{StoqFrame, ShardFrame};
+        use crate::protocol::frames::{ShardFrame, StoqFrame};
 
         let frame = StoqFrame::Shard(ShardFrame {
             shard: shard.clone(),
@@ -192,7 +194,8 @@ impl StoqProtocolHandler {
 
     /// Decode a STOQ shard metadata frame
     pub fn decode_shard_frame(&self, mut data: Bytes) -> Result<PacketShard> {
-        if data.len() < 48 { // Minimum metadata size
+        if data.len() < 48 {
+            // Minimum metadata size
             return Err(anyhow!("Shard frame too short: {} bytes", data.len()));
         }
 
@@ -221,7 +224,7 @@ impl StoqProtocolHandler {
 
     /// Encode a FALCON signature frame
     pub fn encode_falcon_frame(&self, signature: &FalconSignature) -> Result<Bytes> {
-        use crate::protocol::frames::{StoqFrame, FalconSigFrame};
+        use crate::protocol::frames::{FalconSigFrame, StoqFrame};
 
         if let Some(falcon) = &self.falcon_transport {
             let falcon_guard = falcon.read();
@@ -279,9 +282,11 @@ impl StoqProtocolHandler {
                 Ok(())
             }
             StoqFrame::Shard(shard_frame) => {
-                debug!("Received STOQ shard: {}/{}",
-                       shard_frame.shard.sequence + 1,
-                       shard_frame.shard.total_shards);
+                debug!(
+                    "Received STOQ shard: {}/{}",
+                    shard_frame.shard.sequence + 1,
+                    shard_frame.shard.total_shards
+                );
 
                 // Store shard for reassembly
                 self.store_shard_for_reassembly(shard_frame.shard)?;
@@ -349,7 +354,6 @@ impl StoqProtocolHandler {
     // verify_falcon_signature are implemented in handler_ops module.
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,11 +368,11 @@ mod tests {
         let data = b"test data";
         let token = extensions.tokenize_packet(data);
 
-        let encoded = handler.encode_token_frame(&token).unwrap();
+        let encoded = handler.encode_token_frame(&token).expect("test: expected success");
         assert!(!encoded.is_empty());
 
         // Decode the entire frame
-        let decoded_frame = frames::StoqFrame::decode(encoded).unwrap();
+        let decoded_frame = frames::StoqFrame::decode(encoded).expect("test: expected success");
         if let frames::StoqFrame::Token(decoded) = decoded_frame {
             assert_eq!(decoded.token.hash, token.hash);
             assert_eq!(decoded.token.sequence, token.sequence);
@@ -384,14 +388,14 @@ mod tests {
         let handler = StoqProtocolHandler::new(extensions.clone(), None, 10);
 
         let data = b"this is test data for sharding";
-        let shards = extensions.shard_packet(data, 10).unwrap();
+        let shards = extensions.shard_packet(data, 10).expect("test: shard operation");
 
         for shard in shards {
-            let encoded = handler.encode_shard_frame(&shard).unwrap();
+            let encoded = handler.encode_shard_frame(&shard).expect("test: shard operation");
             assert!(!encoded.is_empty());
 
             // Decode the entire frame
-            let decoded_frame = frames::StoqFrame::decode(encoded).unwrap();
+            let decoded_frame = frames::StoqFrame::decode(encoded).expect("test: expected success");
             if let frames::StoqFrame::Shard(decoded) = decoded_frame {
                 assert_eq!(decoded.shard.shard_id, shard.shard_id);
                 assert_eq!(decoded.shard.total_shards, shard.total_shards);
@@ -403,5 +407,4 @@ mod tests {
             }
         }
     }
-
 }

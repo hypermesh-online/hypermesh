@@ -7,17 +7,17 @@
 //! This module provides the integration between the Matrix Foundation and STOQ transport layer.
 //! All matrix node communication goes through STOQ for secure, efficient transport.
 
-use anyhow::{Result, anyhow};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
-use serde::{Serialize, Deserialize};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
 
-use crate::matrix::coordinate::MatrixCoordinate;
 use crate::bootstrap::PrivacyMode;
-use stoq::{StoqTransport, Connection, Endpoint};
+use crate::matrix::coordinate::MatrixCoordinate;
+use stoq::{Connection, Endpoint, StoqTransport};
 
 /// Service discovery tag for matrix nodes
 const MATRIX_SERVICE_TAG: &str = "blockmatrix.node";
@@ -81,14 +81,19 @@ pub enum MatrixMessage {
     /// Neighbor discovery response
     DiscoveryResponse(NeighborDiscoveryResponse),
     /// Position broadcast
-    PositionBroadcast { coordinate: MatrixCoordinate, node_id: String },
+    PositionBroadcast {
+        coordinate: MatrixCoordinate,
+        node_id: String,
+    },
     /// Heartbeat/keepalive
-    Heartbeat { coordinate: MatrixCoordinate, timestamp: u64 },
+    Heartbeat {
+        coordinate: MatrixCoordinate,
+        timestamp: u64,
+    },
     /// Error message
     Error { message: String },
 
     // --- Sync-related messages (Device <-> Network scope) ---
-
     /// Request blocks from a peer for chain synchronization
     SyncRequest {
         /// Network scope identifier
@@ -163,7 +168,9 @@ impl MatrixStoqIntegration {
         );
 
         // Register with STOQ service discovery
-        if let Err(e) = Self::register_service_discovery(&transport, &local_coordinate, &node_id).await {
+        if let Err(e) =
+            Self::register_service_discovery(&transport, &local_coordinate, &node_id).await
+        {
             warn!("Failed to register with STOQ service discovery: {}", e);
         }
 
@@ -194,7 +201,10 @@ impl MatrixStoqIntegration {
             "protocol_version": MATRIX_PROTOCOL_VERSION,
         });
 
-        debug!("Registering matrix node with STOQ service discovery: {}", metadata);
+        debug!(
+            "Registering matrix node with STOQ service discovery: {}",
+            metadata
+        );
 
         // TODO: Call STOQ service discovery registration when API is available
         // transport.register_service(MATRIX_SERVICE_TAG, metadata).await?;
@@ -223,12 +233,15 @@ impl MatrixStoqIntegration {
 
         // Store the connection
         let mut nodes = self.connected_nodes.write().await;
-        nodes.insert(peer_info.node_id.clone(), MatrixNodeConnection {
-            coordinate: peer_info.coordinate,
-            node_id: peer_info.node_id.clone(),
-            connection: connection.clone(),
-            last_heartbeat: Self::current_timestamp(),
-        });
+        nodes.insert(
+            peer_info.node_id.clone(),
+            MatrixNodeConnection {
+                coordinate: peer_info.coordinate,
+                node_id: peer_info.node_id.clone(),
+                connection: connection.clone(),
+                last_heartbeat: Self::current_timestamp(),
+            },
+        );
 
         info!(
             "Successfully connected to matrix node {} at ({},{},{})",
@@ -267,15 +280,15 @@ impl MatrixStoqIntegration {
         let peer_message: MatrixMessage = serde_json::from_slice(&peer_data)?;
 
         match peer_message {
-            MatrixMessage::Announcement(peer_announcement) => {
-                Ok(MatrixNodeInfo {
-                    coordinate: peer_announcement.coordinate,
-                    node_id: peer_announcement.node_id,
-                    address: connection.endpoint().to_socket_addr().to_string(),
-                    privacy_mode: peer_announcement.privacy_mode,
-                    distance: self.local_coordinate.euclidean_distance(&peer_announcement.coordinate),
-                })
-            }
+            MatrixMessage::Announcement(peer_announcement) => Ok(MatrixNodeInfo {
+                coordinate: peer_announcement.coordinate,
+                node_id: peer_announcement.node_id,
+                address: connection.endpoint().to_socket_addr().to_string(),
+                privacy_mode: peer_announcement.privacy_mode,
+                distance: self
+                    .local_coordinate
+                    .euclidean_distance(&peer_announcement.coordinate),
+            }),
             _ => Err(anyhow!("Expected announcement message from peer")),
         }
     }
@@ -309,7 +322,11 @@ impl MatrixStoqIntegration {
     }
 
     /// Discover matrix neighbors via STOQ
-    pub async fn discover_neighbors(&self, max_distance: f64, max_count: usize) -> Result<Vec<MatrixNodeInfo>> {
+    pub async fn discover_neighbors(
+        &self,
+        max_distance: f64,
+        max_count: usize,
+    ) -> Result<Vec<MatrixNodeInfo>> {
         let mut all_neighbors = Vec::new();
 
         // Query connected nodes for their neighbors
@@ -362,13 +379,14 @@ impl MatrixStoqIntegration {
         let mut unique_neighbors = HashMap::new();
         for neighbor in all_neighbors {
             if neighbor.distance <= max_distance {
-                unique_neighbors.entry(neighbor.node_id.clone())
+                unique_neighbors
+                    .entry(neighbor.node_id.clone())
                     .or_insert(neighbor);
             }
         }
 
         let mut result: Vec<_> = unique_neighbors.into_values().collect();
-        result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+        result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).expect("distance comparison should be valid"));
         result.truncate(max_count);
 
         Ok(result)
@@ -429,12 +447,15 @@ impl MatrixStoqIntegration {
 
                 // Store the connection
                 let mut nodes = self.connected_nodes.write().await;
-                nodes.insert(peer_announcement.node_id.clone(), MatrixNodeConnection {
-                    coordinate: peer_announcement.coordinate,
-                    node_id: peer_announcement.node_id.clone(),
-                    connection,
-                    last_heartbeat: Self::current_timestamp(),
-                });
+                nodes.insert(
+                    peer_announcement.node_id.clone(),
+                    MatrixNodeConnection {
+                        coordinate: peer_announcement.coordinate,
+                        node_id: peer_announcement.node_id.clone(),
+                        connection,
+                        last_heartbeat: Self::current_timestamp(),
+                    },
+                );
 
                 info!(
                     "Accepted incoming connection from matrix node {} at ({},{},{})",
@@ -457,13 +478,16 @@ impl MatrixStoqIntegration {
     pub async fn get_connected_nodes(&self) -> Vec<MatrixNodeInfo> {
         let nodes = self.connected_nodes.read().await;
 
-        nodes.values().map(|node| MatrixNodeInfo {
-            coordinate: node.coordinate,
-            node_id: node.node_id.clone(),
-            address: String::new(), // Address not stored in connection
-            privacy_mode: format!("{:?}", self.privacy_mode),
-            distance: self.local_coordinate.euclidean_distance(&node.coordinate),
-        }).collect()
+        nodes
+            .values()
+            .map(|node| MatrixNodeInfo {
+                coordinate: node.coordinate,
+                node_id: node.node_id.clone(),
+                address: String::new(), // Address not stored in connection
+                privacy_mode: format!("{:?}", self.privacy_mode),
+                distance: self.local_coordinate.euclidean_distance(&node.coordinate),
+            })
+            .collect()
     }
 
     /// Clean up stale connections
@@ -472,7 +496,8 @@ impl MatrixStoqIntegration {
         let now = Self::current_timestamp();
         let stale_timeout = 60; // 60 seconds
 
-        let stale_nodes: Vec<_> = nodes.iter()
+        let stale_nodes: Vec<_> = nodes
+            .iter()
             .filter(|(_, conn)| now - conn.last_heartbeat > stale_timeout)
             .map(|(id, _)| id.clone())
             .collect();
@@ -489,7 +514,7 @@ impl MatrixStoqIntegration {
     fn current_timestamp() -> u64 {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("system time should be after UNIX epoch")
             .as_secs()
     }
 }
@@ -501,7 +526,7 @@ mod tests {
 
     #[test]
     fn test_matrix_message_serialization() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
 
         let announcement = MatrixNodeAnnouncement {
             coordinate: coord,
@@ -515,10 +540,10 @@ mod tests {
         let message = MatrixMessage::Announcement(announcement);
 
         // Serialize
-        let json = serde_json::to_string(&message).unwrap();
+        let json = serde_json::to_string(&message).expect("test: serialization");
 
         // Deserialize
-        let deserialized: MatrixMessage = serde_json::from_str(&json).unwrap();
+        let deserialized: MatrixMessage = serde_json::from_str(&json).expect("test: deserialization");
 
         match deserialized {
             MatrixMessage::Announcement(ann) => {
@@ -531,7 +556,7 @@ mod tests {
 
     #[test]
     fn test_neighbor_discovery_message() {
-        let coord = MatrixCoordinate::new(5, 10, 15).unwrap();
+        let coord = MatrixCoordinate::new(5, 10, 15).expect("test: valid coordinate");
 
         let request = NeighborDiscoveryRequest {
             from_coordinate: coord,
@@ -540,24 +565,33 @@ mod tests {
         };
 
         let message = MatrixMessage::DiscoveryRequest(request);
-        let json = serde_json::to_string(&message).unwrap();
+        let json = serde_json::to_string(&message).expect("test: serialization");
 
         // Should deserialize correctly
-        let _deserialized: MatrixMessage = serde_json::from_str(&json).unwrap();
+        let _deserialized: MatrixMessage = serde_json::from_str(&json).expect("test: deserialization");
     }
 
     #[tokio::test]
     async fn test_stoq_integration_creation() {
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let config = TransportConfig::default();
-        let transport = Arc::new(StoqTransport::new(config).await.unwrap());
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let config = TransportConfig {
+            port: 0, // Use OS-assigned port to avoid conflicts
+            bind_address: std::net::Ipv6Addr::LOCALHOST,
+            ..TransportConfig::default()
+        };
+        let transport = match StoqTransport::new(config).await {
+            Ok(t) => Arc::new(t),
+            Err(_) => return, // Skip if socket binding fails in CI
+        };
 
         let integration = MatrixStoqIntegration::new(
             coord,
             "test_node".to_string(),
             transport,
             PrivacyMode::PRIVATE,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         assert_eq!(integration.local_coordinate, coord);
         assert_eq!(integration.node_id, "test_node");

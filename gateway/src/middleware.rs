@@ -29,7 +29,7 @@ impl CorsMiddleware {
             // For simplicity, we're using the first origin. In production, check against request origin
             headers.insert(
                 "access-control-allow-origin",
-                HeaderValue::from_str(&self.config.allowed_origins[0]).unwrap(),
+                HeaderValue::from_str(&self.config.allowed_origins[0]).expect("CORS origin should be a valid header value"),
             );
         }
 
@@ -37,14 +37,14 @@ impl CorsMiddleware {
         let methods = self.config.allowed_methods.join(", ");
         headers.insert(
             "access-control-allow-methods",
-            HeaderValue::from_str(&methods).unwrap(),
+            HeaderValue::from_str(&methods).expect("HTTP methods should be a valid header value"),
         );
 
         // Set allowed headers
         let allowed_headers = self.config.allowed_headers.join(", ");
         headers.insert(
             "access-control-allow-headers",
-            HeaderValue::from_str(&allowed_headers).unwrap(),
+            HeaderValue::from_str(&allowed_headers).expect("header names should be a valid header value"),
         );
 
         // Set credentials flag
@@ -58,7 +58,7 @@ impl CorsMiddleware {
         // Set max age
         headers.insert(
             "access-control-max-age",
-            HeaderValue::from_str(&self.config.max_age.to_string()).unwrap(),
+            HeaderValue::from_str(&self.config.max_age.to_string()).expect("numeric max_age should be a valid header value"),
         );
     }
 
@@ -67,7 +67,7 @@ impl CorsMiddleware {
         let mut response = Response::builder()
             .status(StatusCode::NO_CONTENT)
             .body(Bytes::new())
-            .unwrap();
+            .expect("response builder with valid status should not fail");
 
         self.apply_cors(&mut response);
         response
@@ -78,6 +78,12 @@ impl CorsMiddleware {
 pub struct LoggingMiddleware {
     start_time: Instant,
     request_id: Uuid,
+}
+
+impl Default for LoggingMiddleware {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LoggingMiddleware {
@@ -136,7 +142,7 @@ impl RequestIdMiddleware {
     pub fn add_request_id(headers: &mut HeaderMap, request_id: Uuid) {
         headers.insert(
             "x-request-id",
-            HeaderValue::from_str(&request_id.to_string()).unwrap(),
+            HeaderValue::from_str(&request_id.to_string()).expect("UUID string should be a valid header value"),
         );
     }
 
@@ -170,7 +176,9 @@ impl CircuitBreaker {
 
     /// Check if circuit is open (failing)
     pub fn is_open(&self) -> bool {
-        let count = self.failure_count.load(std::sync::atomic::Ordering::Relaxed);
+        let count = self
+            .failure_count
+            .load(std::sync::atomic::Ordering::Relaxed);
         if count >= self.threshold {
             // Check if we should reset based on timeout
             if let Ok(last) = self.last_failure.read() {

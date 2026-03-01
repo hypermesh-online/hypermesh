@@ -7,24 +7,31 @@
 //! High-performance certificate transparency logging with Merkle tree validation,
 //! Byzantine fault tolerance, and <1s per certificate logging performance.
 
-pub mod types;
 pub mod operations;
+pub mod types;
 
 // Re-export all public types for backward compatibility
-pub use types::*;
 pub use operations::CertificateTransparencyLog;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ca::{IssuedCertificate, CertificateMetadata, CertificateStatus};
+    use crate::ca::{CertificateMetadata, CertificateStatus, IssuedCertificate};
     use crate::consensus::ConsensusProof;
-    use std::time::{SystemTime, Duration};
+    use std::time::{Duration, SystemTime};
 
     #[tokio::test]
     async fn test_ct_log_creation() {
         let ct_log = CertificateTransparencyLog::new().await.expect("test");
-        assert_eq!(ct_log.get_metrics().await.current_tree_size.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(
+            ct_log
+                .get_metrics()
+                .await
+                .current_tree_size
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
     }
 
     #[tokio::test]
@@ -44,7 +51,7 @@ mod tests {
             consensus_proof: match ConsensusProof::generate_from_network("test-node").await {
                 Ok(p) => p,
                 Err(_) => {
-                    use crate::consensus::proof::{StakeProof, TimeProof, SpaceProof, WorkProof};
+                    use crate::consensus::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
                     ConsensusProof::new(
                         StakeProof::default(),
                         TimeProof::default(),
@@ -59,7 +66,14 @@ mod tests {
 
         let entry = ct_log.add_certificate(&certificate).await.expect("test");
         assert_eq!(entry.issuer_ca_id, "test-ca");
-        assert_eq!(ct_log.get_metrics().await.current_tree_size.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(
+            ct_log
+                .get_metrics()
+                .await
+                .current_tree_size
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1
+        );
     }
 
     #[tokio::test]

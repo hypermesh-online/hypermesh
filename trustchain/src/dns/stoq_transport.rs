@@ -8,15 +8,17 @@
 //! with IPv6-only networking and sub-100ms performance targets.
 //! ARCHITECTURAL ENFORCEMENT: Uses actual STOQ protocol, not direct QUIC
 
+use dashmap::DashMap;
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use dashmap::DashMap;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 // ARCHITECTURAL ENFORCEMENT: Use STOQ transport instead of direct QUIC
-use crate::stoq_client::{TrustChainStoqClient, TrustChainStoqConfig, ServiceEndpoint, ServiceType};
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::stoq_client::{
+    ServiceEndpoint, ServiceType, TrustChainStoqClient, TrustChainStoqConfig,
+};
 
 /// STOQ transport client for DNS-over-STOQ connections (architectural compliance)
 pub struct STOQTransport {
@@ -108,7 +110,7 @@ fn parse_dns_question_section(query_data: &[u8]) -> TrustChainResult<(String, u1
         if label_len > 63 {
             return Err(TrustChainError::DNSError {
                 operation: "parse_dns_question".to_string(),
-                reason: format!("Invalid DNS label length: {} (max 63)", label_len),
+                reason: format!("Invalid DNS label length: {label_len} (max 63)"),
             });
         }
 
@@ -119,11 +121,12 @@ fn parse_dns_question_section(query_data: &[u8]) -> TrustChainResult<(String, u1
             });
         }
 
-        let label = std::str::from_utf8(&query_data[offset..offset + label_len])
-            .map_err(|_| TrustChainError::DNSError {
+        let label = std::str::from_utf8(&query_data[offset..offset + label_len]).map_err(|_| {
+            TrustChainError::DNSError {
                 operation: "parse_dns_question".to_string(),
                 reason: "DNS label contains invalid UTF-8".to_string(),
-            })?;
+            }
+        })?;
 
         labels.push(label.to_string());
         offset += label_len;
@@ -165,11 +168,12 @@ impl STOQTransport {
         };
 
         // Initialize STOQ client (proper transport layer)
-        let stoq_client = Arc::new(TrustChainStoqClient::new(stoq_config).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let stoq_client = Arc::new(TrustChainStoqClient::new(stoq_config).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "stoq_client_init".to_string(),
                 reason: e.to_string(),
-            })?);
+            }
+        })?);
 
         let transport_config = STOQTransportConfig {
             bind_address: config.bind_address,
@@ -189,7 +193,10 @@ impl STOQTransport {
     }
 
     /// Connect to DNS server over STOQ
-    pub async fn connect_to_dns_server(&self, server_addr: Ipv6Addr) -> TrustChainResult<Arc<DNSConnection>> {
+    pub async fn connect_to_dns_server(
+        &self,
+        server_addr: Ipv6Addr,
+    ) -> TrustChainResult<Arc<DNSConnection>> {
         debug!("Connecting to DNS server over STOQ: {}", server_addr);
 
         // Check if we have a cached connection
@@ -205,11 +212,8 @@ impl STOQTransport {
         }
 
         // Create service endpoint for DNS
-        let dns_endpoint = ServiceEndpoint::new(
-            ServiceType::Dns,
-            server_addr,
-            self.config.port,
-        ).with_service_name(format!("dns.{}", server_addr));
+        let dns_endpoint = ServiceEndpoint::new(ServiceType::Dns, server_addr, self.config.port)
+            .with_service_name(format!("dns.{server_addr}"));
 
         // Create connection info
         let connection_info = ConnectionInfo {
@@ -225,10 +229,15 @@ impl STOQTransport {
         }
 
         // Update metrics
-        self.metrics.connections_created.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .connections_created
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         debug!("DNS connection established over STOQ: {}", server_addr);
-        Ok(Arc::new(DNSConnection::new(dns_endpoint, self.stoq_client.clone())))
+        Ok(Arc::new(DNSConnection::new(
+            dns_endpoint,
+            self.stoq_client.clone(),
+        )))
     }
 
     /// Send DNS query over STOQ transport
@@ -238,7 +247,7 @@ impl STOQTransport {
         query_data: &[u8],
     ) -> TrustChainResult<Vec<u8>> {
         let start_time = std::time::Instant::now();
-        
+
         debug!("Sending DNS query over STOQ: {} bytes", query_data.len());
 
         // Create STOQ DNS query from raw data
@@ -252,17 +261,32 @@ impl STOQTransport {
 
         // Update metrics
         let latency = start_time.elapsed().as_millis() as u64;
-        self.metrics.dns_queries_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_sent.fetch_add(query_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_received.fetch_add(response_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .dns_queries_processed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics.bytes_sent.fetch_add(
+            query_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.metrics.bytes_received.fetch_add(
+            response_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         self.update_average_latency(latency);
 
-        debug!("DNS query completed over STOQ: {} bytes response ({}ms)", response_data.len(), latency);
+        debug!(
+            "DNS query completed over STOQ: {} bytes response ({}ms)",
+            response_data.len(),
+            latency
+        );
         Ok(response_data)
     }
 
     /// Parse raw DNS query into STOQ format
-    fn parse_dns_query(&self, query_data: &[u8]) -> TrustChainResult<crate::stoq_client::StoqDnsQuery> {
+    fn parse_dns_query(
+        &self,
+        query_data: &[u8],
+    ) -> TrustChainResult<crate::stoq_client::StoqDnsQuery> {
         // Basic DNS query parsing for STOQ integration
         if query_data.len() < 12 {
             return Err(TrustChainError::DNSError {
@@ -293,7 +317,7 @@ impl STOQTransport {
     ) -> TrustChainResult<Vec<u8>> {
         // Basic DNS response serialization
         let mut response = Vec::new();
-        
+
         // Header (12 bytes)
         response.extend_from_slice(&stoq_response.query_id.to_be_bytes()); // ID
         response.extend_from_slice(&stoq_response.flags.to_be_bytes()); // Flags
@@ -310,38 +334,57 @@ impl STOQTransport {
 
     /// Update average latency metric
     fn update_average_latency(&self, latency_ms: u64) {
-        let current_avg = self.metrics.average_latency_ms.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .average_latency_ms
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = if current_avg == 0 {
             latency_ms
         } else {
             (current_avg * 9 + latency_ms) / 10 // 90% old, 10% new
         };
-        self.metrics.average_latency_ms.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .average_latency_ms
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get transport metrics
     pub fn get_metrics(&self) -> STOQMetrics {
         STOQMetrics {
             connections_created: std::sync::atomic::AtomicU64::new(
-                self.metrics.connections_created.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .connections_created
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             connection_errors: std::sync::atomic::AtomicU64::new(
-                self.metrics.connection_errors.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .connection_errors
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             bytes_sent: std::sync::atomic::AtomicU64::new(
-                self.metrics.bytes_sent.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .bytes_sent
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             bytes_received: std::sync::atomic::AtomicU64::new(
-                self.metrics.bytes_received.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .bytes_received
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             average_latency_ms: std::sync::atomic::AtomicU64::new(
-                self.metrics.average_latency_ms.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .average_latency_ms
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             certificate_validations: std::sync::atomic::AtomicU64::new(
-                self.metrics.certificate_validations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .certificate_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             dns_queries_processed: std::sync::atomic::AtomicU64::new(
-                self.metrics.dns_queries_processed.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .dns_queries_processed
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -355,9 +398,13 @@ impl STOQTransport {
 
         for entry in self.server_connections.iter() {
             let connection_info = entry.value();
-            
+
             // Remove connections unused for more than 5 minutes
-            if now.duration_since(connection_info.last_used).unwrap_or_default() > Duration::from_secs(300) {
+            if now
+                .duration_since(connection_info.last_used)
+                .unwrap_or_default()
+                > Duration::from_secs(300)
+            {
                 expired_connections.push(*entry.key());
             }
         }
@@ -449,13 +496,18 @@ mod tests {
     #[tokio::test]
     async fn test_stoq_transport_creation() {
         let config = create_test_dns_config();
-        
+
         // Note: This test requires proper STOQ setup
         // In integration tests, we would mock the STOQ client
         match STOQTransport::new(&config).await {
             Ok(transport) => {
                 let metrics = transport.get_metrics();
-                assert_eq!(metrics.connections_created.load(std::sync::atomic::Ordering::Relaxed), 0);
+                assert_eq!(
+                    metrics
+                        .connections_created
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    0
+                );
             }
             Err(_) => {
                 // Expected in unit tests without full STOQ setup
@@ -466,11 +518,7 @@ mod tests {
 
     #[test]
     fn test_dns_connection_creation() {
-        let endpoint = ServiceEndpoint::new(
-            ServiceType::Dns,
-            Ipv6Addr::LOCALHOST,
-            853,
-        );
+        let endpoint = ServiceEndpoint::new(ServiceType::Dns, Ipv6Addr::LOCALHOST, 853);
 
         // Cannot create actual connection without STOQ client
         // This tests the structure
@@ -481,7 +529,7 @@ mod tests {
     #[test]
     fn test_transport_config() {
         let config = STOQTransportConfig::default();
-        
+
         assert_eq!(config.port, 853);
         assert!(config.enable_connection_pooling);
         assert_eq!(config.max_connections_per_server, 10);

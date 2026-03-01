@@ -51,31 +51,46 @@ impl ResourceMonitor {
 
         if usage.cpu_percent > self.quotas.cpu_percent {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("CPU: {:.1}% > {:.1}%", usage.cpu_percent, self.quotas.cpu_percent),
+                resource: format!(
+                    "CPU: {:.1}% > {:.1}%",
+                    usage.cpu_percent, self.quotas.cpu_percent
+                ),
             });
         }
 
         if usage.memory_bytes > self.quotas.memory_bytes {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("Memory: {} > {}", usage.memory_bytes, self.quotas.memory_bytes),
+                resource: format!(
+                    "Memory: {} > {}",
+                    usage.memory_bytes, self.quotas.memory_bytes
+                ),
             });
         }
 
         if usage.storage_bytes > self.quotas.storage_bytes {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("Storage: {} > {}", usage.storage_bytes, self.quotas.storage_bytes),
+                resource: format!(
+                    "Storage: {} > {}",
+                    usage.storage_bytes, self.quotas.storage_bytes
+                ),
             });
         }
 
         if usage.file_descriptors > self.quotas.file_descriptors {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("FDs: {} > {}", usage.file_descriptors, self.quotas.file_descriptors),
+                resource: format!(
+                    "FDs: {} > {}",
+                    usage.file_descriptors, self.quotas.file_descriptors
+                ),
             });
         }
 
         if usage.thread_count > self.quotas.max_threads {
             return Err(ExtensionError::ResourceLimitExceeded {
-                resource: format!("Threads: {} > {}", usage.thread_count, self.quotas.max_threads),
+                resource: format!(
+                    "Threads: {} > {}",
+                    usage.thread_count, self.quotas.max_threads
+                ),
             });
         }
 
@@ -83,7 +98,10 @@ impl ResourceMonitor {
     }
 
     /// Update resource usage
-    pub async fn update_usage(&self, new_usage: ResourceUsage) -> super::super::ExtensionResult<()> {
+    pub async fn update_usage(
+        &self,
+        new_usage: ResourceUsage,
+    ) -> super::super::ExtensionResult<()> {
         let mut usage = self.usage.write().await;
         *usage = new_usage;
         usage.last_update = Some(SystemTime::now());
@@ -94,7 +112,10 @@ impl ResourceMonitor {
     pub async fn record_violation(&self, violation_type: &str, _details: &str) {
         let mut violations = self.violations.write().await;
         violations.total += 1;
-        *violations.by_type.entry(violation_type.to_string()).or_insert(0) += 1;
+        *violations
+            .by_type
+            .entry(violation_type.to_string())
+            .or_insert(0) += 1;
         violations.last_violation = Some(SystemTime::now());
     }
 
@@ -126,11 +147,9 @@ impl ResourceMonitor {
                 drop(permit);
                 Ok(())
             }
-            Err(_) => {
-                Err(ExtensionError::ResourceLimitExceeded {
-                    resource: format!("Rate limit: {} ops/sec", self.quotas.ops_per_second),
-                })
-            }
+            Err(_) => Err(ExtensionError::ResourceLimitExceeded {
+                resource: format!("Rate limit: {} ops/sec", self.quotas.ops_per_second),
+            }),
         }
     }
 }
@@ -145,6 +164,12 @@ pub struct AnomalyDetector {
 
     /// Alert threshold
     pub(crate) alert_threshold: f32,
+}
+
+impl Default for AnomalyDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AnomalyDetector {
@@ -217,18 +242,24 @@ impl AnomalyRule for CPUAnomalyRule {
         }
 
         let mean: f32 = history.cpu_history.iter().sum::<f32>() / history.cpu_history.len() as f32;
-        let variance: f32 = history.cpu_history.iter()
+        let variance: f32 = history
+            .cpu_history
+            .iter()
             .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / history.cpu_history.len() as f32;
+            .sum::<f32>()
+            / history.cpu_history.len() as f32;
         let std_dev = variance.sqrt();
 
         if (current.cpu_percent - mean).abs() > self.threshold * std_dev {
             return Some(Anomaly {
                 anomaly_type: "CPU Usage Spike".to_string(),
-                severity: ((current.cpu_percent - mean).abs() / (self.threshold * std_dev)).min(1.0),
+                severity: ((current.cpu_percent - mean).abs() / (self.threshold * std_dev))
+                    .min(1.0),
                 description: format!(
                     "CPU usage {:.1}% deviates from mean {:.1}% by {:.1} std devs",
-                    current.cpu_percent, mean, (current.cpu_percent - mean).abs() / std_dev
+                    current.cpu_percent,
+                    mean,
+                    (current.cpu_percent - mean).abs() / std_dev
                 ),
                 action: AnomalyAction::Alert,
             });
@@ -275,7 +306,9 @@ impl AnomalyRule for MemoryAnomalyRule {
                 severity: (growth_rate / threshold_f64).min(1.0) as f32,
                 description: format!(
                     "Memory usage grew by {:.1}% (from {} to {})",
-                    growth_rate * 100.0, prev, current.memory_bytes
+                    growth_rate * 100.0,
+                    prev,
+                    current.memory_bytes
                 ),
                 action: if growth_rate > threshold_f64 * 2.0 {
                     AnomalyAction::Throttle
@@ -320,7 +353,9 @@ impl AnomalyRule for RateAnomalyRule {
                 severity: ((current.ops_per_second / mean) / self.threshold).min(1.0),
                 description: format!(
                     "Operation rate {:.1} ops/sec is {:.1}x normal rate {:.1} ops/sec",
-                    current.ops_per_second, current.ops_per_second / mean, mean
+                    current.ops_per_second,
+                    current.ops_per_second / mean,
+                    mean
                 ),
                 action: AnomalyAction::Throttle,
             });

@@ -9,15 +9,15 @@
 
 mod gates;
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
-use tracing::{info, error};
+use tracing::{error, info};
 
 use gates::{
-    SecurityTheaterGate, ConsensusValidationGate, HSMDependencyGate,
-    MockResponseGate, ProductionReadinessGate, DNSInfrastructureGate,
+    ConsensusValidationGate, DNSInfrastructureGate, HSMDependencyGate, MockResponseGate,
+    ProductionReadinessGate, SecurityTheaterGate,
 };
 
 /// Quality gate validation results
@@ -106,10 +106,7 @@ impl QualityGateValidator {
             Box::new(DNSInfrastructureGate),
         ];
 
-        Self {
-            source_path,
-            gates,
-        }
+        Self { source_path, gates }
     }
 
     /// Run all quality gates
@@ -136,14 +133,22 @@ impl QualityGateValidator {
                                 severity: determine_severity(&result.status),
                                 location: "source_code".to_string(),
                                 description: detail.clone(),
-                                remediation: format!("Fix {} in {}", gate.name(), gate.description()),
+                                remediation: format!(
+                                    "Fix {} in {}",
+                                    gate.name(),
+                                    gate.description()
+                                ),
                             });
                         }
                     }
 
                     if gate.is_blocking() && result.status == QualityGateStatus::Fail {
                         blocking_failures += 1;
-                        error!("BLOCKING failure in gate: {} - {}", gate.name(), result.message);
+                        error!(
+                            "BLOCKING failure in gate: {} - {}",
+                            gate.name(),
+                            result.message
+                        );
                     }
 
                     if result.status == QualityGateStatus::Warning {
@@ -158,7 +163,7 @@ impl QualityGateValidator {
                     let error_result = GateResult {
                         status: QualityGateStatus::Fail,
                         score: 0.0,
-                        message: format!("Gate execution failed: {}", e),
+                        message: format!("Gate execution failed: {e}"),
                         details: vec![format!("ERROR: {}", e)],
                     };
 
@@ -182,7 +187,8 @@ impl QualityGateValidator {
             QualityGateStatus::Pass
         };
 
-        let deployment_approved = overall_status == QualityGateStatus::Pass && violations.is_empty();
+        let deployment_approved =
+            overall_status == QualityGateStatus::Pass && violations.is_empty();
 
         let results = QualityGateResults {
             overall_status,

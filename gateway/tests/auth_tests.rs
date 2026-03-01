@@ -80,11 +80,7 @@ fn http3_invalid_bearer_token_rejected() {
 #[test]
 fn http3_session_token_authenticates() {
     let mgr = AuthManager::new(None);
-    mgr.register_session(
-        "tok-123".into(),
-        "alice".into(),
-        PrivacyMode::PUBLIC,
-    );
+    mgr.register_session("tok-123".into(), "alice".into(), PrivacyMode::PUBLIC);
 
     let mut headers = http::HeaderMap::new();
     headers.insert(
@@ -114,7 +110,7 @@ fn http3_bootstrap_token_authenticates() {
 
     let mgr = AuthManager::new(Some(handler));
     let mut headers = http::HeaderMap::new();
-    let val = format!("Bearer {}", token);
+    let val = format!("Bearer {token}");
     headers.insert(
         "authorization",
         http::HeaderValue::from_str(&val).expect("test: valid header"),
@@ -180,11 +176,7 @@ fn stoq_public_returns_authenticated() {
 #[test]
 fn register_and_lookup_session() {
     let mgr = AuthManager::new(None);
-    mgr.register_session(
-        "s-1".into(),
-        "bob".into(),
-        PrivacyMode::PRIVATE,
-    );
+    mgr.register_session("s-1".into(), "bob".into(), PrivacyMode::PRIVATE);
 
     let mut headers = http::HeaderMap::new();
     headers.insert(
@@ -198,11 +190,7 @@ fn register_and_lookup_session() {
 #[test]
 fn cleanup_removes_expired_sessions() {
     let mgr = AuthManager::new(None);
-    mgr.register_session(
-        "old-tok".into(),
-        "eve".into(),
-        PrivacyMode::PUBLIC,
-    );
+    mgr.register_session("old-tok".into(), "eve".into(), PrivacyMode::PUBLIC);
 
     // Sleep briefly so the session ages past 0ms
     std::thread::sleep(Duration::from_millis(10));
@@ -214,11 +202,7 @@ fn cleanup_removes_expired_sessions() {
 #[test]
 fn cleanup_retains_fresh_sessions() {
     let mgr = AuthManager::new(None);
-    mgr.register_session(
-        "fresh-tok".into(),
-        "carol".into(),
-        PrivacyMode::PUBLIC,
-    );
+    mgr.register_session("fresh-tok".into(), "carol".into(), PrivacyMode::PUBLIC);
 
     let removed = mgr.cleanup_sessions(Duration::from_secs(3600));
     assert_eq!(removed, 0, "fresh session should be retained");

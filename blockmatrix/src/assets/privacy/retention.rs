@@ -6,21 +6,21 @@
 //!
 //! Settings for how long data is kept and when it's deleted.
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Auto-deletion settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AutoDeletionSettings {
     /// Enable automatic deletion based on criteria
     pub enabled: bool,
-    
+
     /// Deletion criteria to apply
     pub deletion_criteria: Vec<DeletionCriterion>,
-    
+
     /// Confirmation settings for deletion
     pub confirmation_settings: DeletionConfirmationSettings,
-    
+
     /// Secure deletion method
     pub secure_deletion_method: SecureDeletionMethod,
 }
@@ -30,13 +30,13 @@ pub struct AutoDeletionSettings {
 pub struct DeletionCriterion {
     /// Type of criterion
     pub criterion_type: DeletionCriterionType,
-    
+
     /// Threshold value
     pub threshold: String,
-    
+
     /// Whether this criterion is active
     pub active: bool,
-    
+
     /// Resources this criterion applies to
     pub applicable_resources: Vec<String>,
 }
@@ -61,10 +61,10 @@ pub enum DeletionCriterionType {
 pub struct DeletionConfirmationSettings {
     /// Require confirmation before deletion
     pub require_confirmation: bool,
-    
+
     /// Warning period before deletion
     pub warning_period: Duration,
-    
+
     /// Number of confirmation prompts
     pub confirmation_prompts: u32,
 }
@@ -87,13 +87,13 @@ pub enum SecureDeletionMethod {
 pub struct ArchivePreferences {
     /// Enable automatic archiving
     pub enabled: bool,
-    
+
     /// Archive after this duration
     pub archive_after: Duration,
-    
+
     /// Archive location preference
     pub archive_location: ArchiveLocation,
-    
+
     /// Archive encryption settings
     pub encryption_settings: ArchiveEncryptionSettings,
 }
@@ -116,13 +116,13 @@ pub enum ArchiveLocation {
 pub struct ArchiveEncryptionSettings {
     /// Enable encryption for archives
     pub enabled: bool,
-    
+
     /// Encryption algorithm to use
     pub algorithm: String,
-    
+
     /// Key derivation settings
     pub key_derivation: KeyDerivationSettings,
-    
+
     /// Compression before encryption
     pub compress_before_encrypt: bool,
 }
@@ -132,10 +132,10 @@ pub struct ArchiveEncryptionSettings {
 pub struct KeyDerivationSettings {
     /// Key derivation method
     pub method: String,
-    
+
     /// Number of iterations (for PBKDF2, etc.)
     pub iterations: u32,
-    
+
     /// Salt length in bytes
     pub salt_length: u32,
 }

@@ -7,8 +7,8 @@
 //! Real production DNS zones replacing localhost stubs with actual
 //! IPv6 addresses for the HyperMesh ecosystem infrastructure.
 
-use std::net::Ipv6Addr;
 use std::collections::HashMap;
+use std::net::Ipv6Addr;
 
 use super::authoritative_server::{DnsZone, FederatedNetwork, NetworkStatus};
 
@@ -56,12 +56,12 @@ impl ProductionZoneFactory {
                 Ipv6Addr::new(0x2001, 0xdb8, 0x1, 0, 0, 0, 0, 0x2),
                 Ipv6Addr::new(0x2001, 0xdb8, 0x1, 0, 0, 0, 0, 0x3),
             ],
-            default_ttl: 300, // 5 minutes
+            default_ttl: 300,   // 5 minutes
             serial: 2025092501, // YYYYMMDDNN format
-            refresh: 7200, // 2 hours
-            retry: 3600, // 1 hour
-            expire: 604800, // 1 week
-            minimum: 86400, // 1 day
+            refresh: 7200,      // 2 hours
+            retry: 3600,        // 1 hour
+            expire: 604800,     // 1 week
+            minimum: 86400,     // 1 day
         }
     }
 
@@ -70,19 +70,46 @@ impl ProductionZoneFactory {
         let mut domains = HashMap::new();
 
         // Core HyperMesh services
-        domains.insert("hypermesh.hypermesh.online".to_string(), ProductionAddresses::HYPERMESH_DASHBOARD);
-        domains.insert("caesar.hypermesh.online".to_string(), ProductionAddresses::CAESAR_EXCHANGE);
-        domains.insert("assets.hypermesh.online".to_string(), ProductionAddresses::ASSETS_MANAGEMENT);
-        domains.insert("stoq.hypermesh.online".to_string(), ProductionAddresses::STOQ_ENDPOINT);
+        domains.insert(
+            "hypermesh.hypermesh.online".to_string(),
+            ProductionAddresses::HYPERMESH_DASHBOARD,
+        );
+        domains.insert(
+            "caesar.hypermesh.online".to_string(),
+            ProductionAddresses::CAESAR_EXCHANGE,
+        );
+        domains.insert(
+            "assets.hypermesh.online".to_string(),
+            ProductionAddresses::ASSETS_MANAGEMENT,
+        );
+        domains.insert(
+            "stoq.hypermesh.online".to_string(),
+            ProductionAddresses::STOQ_ENDPOINT,
+        );
 
         // Infrastructure services
-        domains.insert("ct.hypermesh.online".to_string(), ProductionAddresses::CT_LOGS);
-        domains.insert("dns.hypermesh.online".to_string(), ProductionAddresses::DNS_ENDPOINT);
-        domains.insert("api.hypermesh.online".to_string(), ProductionAddresses::API_GATEWAY);
+        domains.insert(
+            "ct.hypermesh.online".to_string(),
+            ProductionAddresses::CT_LOGS,
+        );
+        domains.insert(
+            "dns.hypermesh.online".to_string(),
+            ProductionAddresses::DNS_ENDPOINT,
+        );
+        domains.insert(
+            "api.hypermesh.online".to_string(),
+            ProductionAddresses::API_GATEWAY,
+        );
 
         // Service aliases
-        domains.insert("ca.hypermesh.online".to_string(), ProductionAddresses::TRUST_HYPERMESH_ONLINE);
-        domains.insert("trust.hypermesh.online".to_string(), ProductionAddresses::TRUST_HYPERMESH_ONLINE);
+        domains.insert(
+            "ca.hypermesh.online".to_string(),
+            ProductionAddresses::TRUST_HYPERMESH_ONLINE,
+        );
+        domains.insert(
+            "trust.hypermesh.online".to_string(),
+            ProductionAddresses::TRUST_HYPERMESH_ONLINE,
+        );
 
         domains
     }
@@ -123,7 +150,8 @@ pub struct ProductionDnsBuilder;
 
 impl ProductionDnsBuilder {
     /// Build complete production DNS configuration
-    pub fn build_production_config() -> (DnsZone, HashMap<String, Ipv6Addr>, Vec<FederatedNetwork>) {
+    pub fn build_production_config() -> (DnsZone, HashMap<String, Ipv6Addr>, Vec<FederatedNetwork>)
+    {
         let primary_zone = ProductionZoneFactory::create_trust_hypermesh_zone();
         let subdomains = ProductionZoneFactory::create_hypermesh_subdomains();
         let federated_networks = ProductionZoneFactory::create_federated_networks();
@@ -148,7 +176,7 @@ impl ProductionDomainResolver {
     pub fn resolve_domain(&self, domain: &str) -> Option<Ipv6Addr> {
         // Handle TrustChain short names by adding .hypermesh.online suffix
         let full_domain = if !domain.contains('.') {
-            format!("{}.hypermesh.online", domain)
+            format!("{domain}.hypermesh.online")
         } else {
             domain.to_string()
         };
@@ -159,7 +187,7 @@ impl ProductionDomainResolver {
     /// Check if domain is managed by this resolver
     pub fn is_managed_domain(&self, domain: &str) -> bool {
         let full_domain = if !domain.contains('.') {
-            format!("{}.hypermesh.online", domain)
+            format!("{domain}.hypermesh.online")
         } else {
             domain.to_string()
         };
@@ -185,8 +213,14 @@ mod tests {
 
     #[test]
     fn test_production_addresses() {
-        assert_ne!(ProductionAddresses::TRUST_HYPERMESH_ONLINE, Ipv6Addr::LOCALHOST);
-        assert_ne!(ProductionAddresses::HYPERMESH_DASHBOARD, Ipv6Addr::LOCALHOST);
+        assert_ne!(
+            ProductionAddresses::TRUST_HYPERMESH_ONLINE,
+            Ipv6Addr::LOCALHOST
+        );
+        assert_ne!(
+            ProductionAddresses::HYPERMESH_DASHBOARD,
+            Ipv6Addr::LOCALHOST
+        );
         assert_ne!(ProductionAddresses::CAESAR_EXCHANGE, Ipv6Addr::LOCALHOST);
     }
 
@@ -220,13 +254,13 @@ mod tests {
         let zone = ProductionZoneFactory::create_trust_hypermesh_zone();
         assert_eq!(zone.zone_name, "trust.hypermesh.online");
         assert_ne!(zone.primary_address, Ipv6Addr::LOCALHOST);
-        assert!(zone.secondary_addresses.len() > 0);
+        assert!(!zone.secondary_addresses.is_empty());
     }
 
     #[test]
     fn test_federated_networks() {
         let networks = ProductionZoneFactory::create_federated_networks();
-        assert!(networks.len() > 0);
+        assert!(!networks.is_empty());
 
         for network in &networks {
             assert!(network.domain.ends_with(".hypermesh.online"));

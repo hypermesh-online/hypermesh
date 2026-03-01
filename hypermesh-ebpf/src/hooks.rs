@@ -30,11 +30,7 @@ pub trait CertificateValidator: Send + Sync {
     /// # Arguments
     /// * `cert_der` - DER-encoded certificate bytes
     /// * `context` - Optional application-defined validation context
-    async fn validate(
-        &self,
-        cert_der: &[u8],
-        context: Option<&[u8]>,
-    ) -> Result<()>;
+    async fn validate(&self, cert_der: &[u8], context: Option<&[u8]>) -> Result<()>;
 
     /// Validate a certificate chain (optional override).
     /// Default: validates each certificate individually.
@@ -66,11 +62,7 @@ pub trait PacketValidator: Send + Sync {
     /// # Arguments
     /// * `packet_data` - Raw packet data
     /// * `connection_id` - Connection identifier
-    async fn validate(
-        &self,
-        packet_data: &[u8],
-        connection_id: u64,
-    ) -> Result<()>;
+    async fn validate(&self, packet_data: &[u8], connection_id: u64) -> Result<()>;
 
     /// Validator name for logging
     fn name(&self) -> &str {
@@ -94,11 +86,7 @@ pub trait ExtensionValidator: Send + Sync {
     /// # Arguments
     /// * `extension_type` - Extension type identifier (e.g., 0x1000 for PoS)
     /// * `extension_data` - Raw extension data
-    async fn validate(
-        &self,
-        extension_type: u16,
-        extension_data: &[u8],
-    ) -> Result<()>;
+    async fn validate(&self, extension_type: u16, extension_data: &[u8]) -> Result<()>;
 
     /// Get the extension types this validator handles
     fn supported_extensions(&self) -> Vec<u16>;
@@ -117,6 +105,7 @@ pub trait ExtensionValidator: Send + Sync {
 ///
 /// Consumers (STOQ, blockmatrix) register their validators here.
 /// The eBPF subsystem calls them during packet processing.
+#[derive(Default)]
 pub struct ValidationHooks {
     /// Certificate validator (optional)
     pub certificate_validator: Option<Box<dyn CertificateValidator>>,
@@ -126,16 +115,6 @@ pub struct ValidationHooks {
     pub extension_validator: Option<Box<dyn ExtensionValidator>>,
 }
 
-impl Default for ValidationHooks {
-    fn default() -> Self {
-        Self {
-            certificate_validator: None,
-            packet_validator: None,
-            extension_validator: None,
-        }
-    }
-}
-
 impl ValidationHooks {
     /// Create empty validation hooks (no validators)
     pub fn new() -> Self {
@@ -143,58 +122,36 @@ impl ValidationHooks {
     }
 
     /// Set certificate validator (builder pattern)
-    pub fn with_certificate_validator(
-        mut self,
-        validator: Box<dyn CertificateValidator>,
-    ) -> Self {
+    pub fn with_certificate_validator(mut self, validator: Box<dyn CertificateValidator>) -> Self {
         self.certificate_validator = Some(validator);
         self
     }
 
     /// Set packet validator (builder pattern)
-    pub fn with_packet_validator(
-        mut self,
-        validator: Box<dyn PacketValidator>,
-    ) -> Self {
+    pub fn with_packet_validator(mut self, validator: Box<dyn PacketValidator>) -> Self {
         self.packet_validator = Some(validator);
         self
     }
 
     /// Set extension validator (builder pattern)
-    pub fn with_extension_validator(
-        mut self,
-        validator: Box<dyn ExtensionValidator>,
-    ) -> Self {
+    pub fn with_extension_validator(mut self, validator: Box<dyn ExtensionValidator>) -> Self {
         self.extension_validator = Some(validator);
         self
     }
 
     /// Validate certificate if a validator is configured
-    pub async fn validate_certificate(
-        &self,
-        cert_der: &[u8],
-    ) -> Result<()> {
+    pub async fn validate_certificate(&self, cert_der: &[u8]) -> Result<()> {
         if let Some(validator) = &self.certificate_validator {
-            tracing::debug!(
-                "Validating certificate with {}",
-                validator.name()
-            );
+            tracing::debug!("Validating certificate with {}", validator.name());
             validator.validate(cert_der, None).await?;
         }
         Ok(())
     }
 
     /// Validate packet if a validator is configured
-    pub async fn validate_packet(
-        &self,
-        packet_data: &[u8],
-        connection_id: u64,
-    ) -> Result<()> {
+    pub async fn validate_packet(&self, packet_data: &[u8], connection_id: u64) -> Result<()> {
         if let Some(validator) = &self.packet_validator {
-            tracing::trace!(
-                "Validating packet with {}",
-                validator.name()
-            );
+            tracing::trace!("Validating packet with {}", validator.name());
             validator.validate(packet_data, connection_id).await?;
         }
         Ok(())
@@ -207,18 +164,13 @@ impl ValidationHooks {
         extension_data: &[u8],
     ) -> Result<()> {
         if let Some(validator) = &self.extension_validator {
-            if validator
-                .supported_extensions()
-                .contains(&extension_type)
-            {
+            if validator.supported_extensions().contains(&extension_type) {
                 tracing::trace!(
                     "Validating extension {:04x} with {}",
                     extension_type,
                     validator.name()
                 );
-                validator
-                    .validate(extension_type, extension_data)
-                    .await?;
+                validator.validate(extension_type, extension_data).await?;
             }
         }
         Ok(())
@@ -242,11 +194,7 @@ pub struct PassThroughValidator;
 
 #[async_trait]
 impl CertificateValidator for PassThroughValidator {
-    async fn validate(
-        &self,
-        _cert_der: &[u8],
-        _context: Option<&[u8]>,
-    ) -> Result<()> {
+    async fn validate(&self, _cert_der: &[u8], _context: Option<&[u8]>) -> Result<()> {
         Ok(())
     }
 
@@ -261,8 +209,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_hooks_with_validator() {
-        let hooks = ValidationHooks::new()
-            .with_certificate_validator(Box::new(PassThroughValidator));
+        let hooks =
+            ValidationHooks::new().with_certificate_validator(Box::new(PassThroughValidator));
 
         assert!(hooks.certificate_validator.is_some());
         assert!(hooks.packet_validator.is_none());
@@ -280,11 +228,6 @@ mod tests {
         // Should succeed when no validators configured (pass-through)
         assert!(hooks.validate_certificate(&[1, 2, 3]).await.is_ok());
         assert!(hooks.validate_packet(&[1, 2, 3], 123).await.is_ok());
-        assert!(
-            hooks
-                .validate_extension(0x1000, &[1, 2, 3])
-                .await
-                .is_ok()
-        );
+        assert!(hooks.validate_extension(0x1000, &[1, 2, 3]).await.is_ok());
     }
 }

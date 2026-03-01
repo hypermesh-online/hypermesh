@@ -86,8 +86,7 @@ impl CapacityScore {
     /// Calculate a score from raw metrics.
     pub fn calculate(metrics: &CapacityMetrics) -> Self {
         let bytes = (metrics.bytes_served as f64 / Self::BYTES_BASELINE).clamp(0.0, 1.0);
-        let compute =
-            (metrics.compute_delivered as f64 / Self::COMPUTE_BASELINE).clamp(0.0, 1.0);
+        let compute = (metrics.compute_delivered as f64 / Self::COMPUTE_BASELINE).clamp(0.0, 1.0);
         let storage =
             (metrics.storage_maintained_bytes as f64 / Self::STORAGE_BASELINE).clamp(0.0, 1.0);
         let bandwidth =
@@ -151,11 +150,11 @@ mod tests {
 
     fn full_metrics() -> CapacityMetrics {
         CapacityMetrics::new(
-            1_073_741_824,    // 1 GiB served
-            1_000_000,        // full compute
-            10_737_418_240,   // 10 GiB storage
-            1_000_000_000,    // 1 Gbps
-            1.0,              // 100% uptime
+            1_073_741_824,  // 1 GiB served
+            1_000_000,      // full compute
+            10_737_418_240, // 10 GiB storage
+            1_000_000_000,  // 1 Gbps
+            1.0,            // 100% uptime
         )
     }
 
@@ -186,16 +185,20 @@ mod tests {
     #[test]
     fn partial_metrics_score() {
         let metrics = CapacityMetrics::new(
-            536_870_912,    // 0.5 GiB
-            500_000,        // half compute
-            5_368_709_120,  // 5 GiB storage
-            500_000_000,    // 500 Mbps
+            536_870_912,   // 0.5 GiB
+            500_000,       // half compute
+            5_368_709_120, // 5 GiB storage
+            500_000_000,   // 500 Mbps
             0.9,
         );
         let score = CapacityScore::calculate(&metrics);
         // bytes: 0.5*0.25=0.125, compute: 0.5*0.25=0.125, storage: 0.5*0.20=0.10,
         // bandwidth: 0.5*0.20=0.10, uptime: 0.9*0.10=0.09 => ~0.54
-        assert!(score.value() > 0.4 && score.value() < 0.7, "score: {}", score.value());
+        assert!(
+            score.value() > 0.4 && score.value() < 0.7,
+            "score: {}",
+            score.value()
+        );
     }
 
     #[test]
@@ -209,13 +212,7 @@ mod tests {
 
     #[test]
     fn above_baseline_clamped_to_one() {
-        let metrics = CapacityMetrics::new(
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
-            u64::MAX,
-            1.0,
-        );
+        let metrics = CapacityMetrics::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, 1.0);
         let score = CapacityScore::calculate(&metrics);
         assert!(
             (score.value() - 1.0).abs() < 1e-6,
@@ -237,8 +234,7 @@ mod tests {
     fn report_serde_roundtrip() {
         let report = CapacityReport::new(test_node(), full_metrics(), 7);
         let json = serde_json::to_string(&report).expect("test: serialize report");
-        let back: CapacityReport =
-            serde_json::from_str(&json).expect("test: deserialize report");
+        let back: CapacityReport = serde_json::from_str(&json).expect("test: deserialize report");
         assert_eq!(back.epoch, 7);
         assert_eq!(back.node_id, test_node());
         assert!((back.score.value() - 1.0).abs() < 1e-6);

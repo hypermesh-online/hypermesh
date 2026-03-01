@@ -45,7 +45,9 @@ impl MeshCreditAdapter {
     /// Credit an account with the given amount.
     pub async fn credit(&self, account: &str, amount: GoldGrams) {
         let mut balances = self.balances.write().await;
-        let entry = balances.entry(account.to_string()).or_insert(GoldGrams::zero());
+        let entry = balances
+            .entry(account.to_string())
+            .or_insert(GoldGrams::zero());
         *entry = *entry + amount;
     }
 
@@ -115,10 +117,7 @@ impl EgressAdapter for MeshCreditAdapter {
         self.credit(destination, value).await;
 
         let now = Utc::now();
-        let settlement_id = format!(
-            "mesh-{}",
-            now.timestamp_nanos_opt().unwrap_or(0),
-        );
+        let settlement_id = format!("mesh-{}", now.timestamp_nanos_opt().unwrap_or(0),);
 
         Ok(SettlementReceipt {
             settlement_id,
@@ -162,15 +161,12 @@ impl IngressAdapter for MeshCreditAdapter {
         Self::check_denomination(denomination)?;
 
         let value = GoldGrams::from_decimal(amount); // 1:1 for CAES
-        // Debit the node's own account as the "source"
-        let source = format!("{}", self.node_id.0);
+                                                     // Debit the node's own account as the "source"
+        let source = self.node_id.0.to_string();
         self.debit(&source, value).await?;
 
         let now = Utc::now();
-        let lock_id = format!(
-            "mesh-lock-{}",
-            now.timestamp_nanos_opt().unwrap_or(0),
-        );
+        let lock_id = format!("mesh-lock-{}", now.timestamp_nanos_opt().unwrap_or(0),);
 
         Ok(IngressLockProof {
             lock_id,
@@ -263,7 +259,8 @@ mod tests {
     async fn mesh_credit_lock_and_verify() {
         let a = adapter();
         // Fund the node's account first
-        a.credit("test-node", GoldGrams::from_decimal(dec!(100))).await;
+        a.credit("test-node", GoldGrams::from_decimal(dec!(100)))
+            .await;
 
         let proof = a
             .lock_external_value(dec!(50), "CAES", dec!(75))

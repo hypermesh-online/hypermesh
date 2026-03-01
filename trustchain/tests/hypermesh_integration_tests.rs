@@ -7,27 +7,29 @@
 //! End-to-end integration tests verifying TrustChain can successfully issue
 //! certificates via HyperMesh consensus validation over STOQ protocol.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 // TrustChain imports
-use trustchain::ca::{TrustChainCA, CAConfig, CertificateRequest, CertificateStatus};
+use trustchain::ca::{CAConfig, CertificateRequest, CertificateStatus, TrustChainCA};
 use trustchain::consensus::{
-    ConsensusProof, ConsensusRequirements,
     hypermesh_client::{
-        HyperMeshConsensusClient, HyperMeshClientConfig, FourProofSet,
-        SpaceProofData, StakeProofData, WorkProofData, TimeProofData,
-        ConsensusValidationStatus,
+        ConsensusValidationStatus, FourProofSet, HyperMeshClientConfig, HyperMeshConsensusClient,
+        SpaceProofData, StakeProofData, TimeProofData, WorkProofData,
     },
+    ConsensusProof, ConsensusRequirements,
 };
 
 // STOQ imports
-use stoq::{StoqApiServer, StoqApiClient, transport::{StoqTransport, TransportConfig}};
-use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
+use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
+use stoq::{
+    transport::{StoqTransport, TransportConfig},
+    StoqApiClient, StoqApiServer,
+};
 
 // Test utilities
 use tempfile::TempDir;
@@ -42,9 +44,8 @@ fn init_test_tracing() {
 
 /// Create test HyperMesh consensus server
 async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
-    
-    use serde::{Serialize, Deserialize};
     use async_trait::async_trait;
+    use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
     // Mock validation handler that always returns Valid
@@ -106,7 +107,10 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     #[async_trait]
     impl ApiHandler for MockValidateCertificateHandler {
         async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-            debug!("Mock handler received certificate validation request: {}", request.id);
+            debug!(
+                "Mock handler received certificate validation request: {}",
+                request.id
+            );
 
             // Return successful validation
             let result = MockValidationResult {
@@ -163,7 +167,10 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     #[async_trait]
     impl ApiHandler for MockValidateProofsHandler {
         async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-            debug!("Mock handler received four-proof validation request: {}", request.id);
+            debug!(
+                "Mock handler received four-proof validation request: {}",
+                request.id
+            );
 
             let result = MockValidationResult {
                 result: "Valid".to_string(),
@@ -371,7 +378,12 @@ async fn test_four_proof_validation() -> Result<()> {
 
     // Validate four-proof set
     let result = hypermesh_client
-        .validate_four_proofs(&proof_set, "certificate_issuance", "cert-001", "test_node_001")
+        .validate_four_proofs(
+            &proof_set,
+            "certificate_issuance",
+            "cert-001",
+            "test_node_001",
+        )
         .await?;
 
     // Verify all four proofs validated
@@ -403,7 +415,7 @@ async fn test_invalid_proof_rejection() -> Result<()> {
     // Create invalid proof set (missing required fields)
     let proof_set = FourProofSet {
         space_proof: SpaceProofData {
-            storage_commitment: 0, // Invalid: zero commitment
+            storage_commitment: 0,            // Invalid: zero commitment
             network_position: "".to_string(), // Invalid: empty
             allocation_proof: vec![],
         },
@@ -547,9 +559,9 @@ async fn test_concurrent_validations() -> Result<()> {
         let client = hypermesh_client.clone();
         let handle = tokio::spawn(async move {
             let cert_request = CertificateRequest {
-                common_name: format!("concurrent-{}.hypermesh.online", i),
+                common_name: format!("concurrent-{i}.hypermesh.online"),
                 san_entries: vec![format!("concurrent-{}.hypermesh.online", i)],
-                node_id: format!("test_node_{:03}", i),
+                node_id: format!("test_node_{i:03}"),
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
@@ -572,7 +584,10 @@ async fn test_concurrent_validations() -> Result<()> {
     for (i, result) in results.iter().enumerate() {
         match result {
             Ok(Ok(validation_result)) => {
-                assert!(matches!(validation_result.result, ConsensusValidationStatus::Valid));
+                assert!(matches!(
+                    validation_result.result,
+                    ConsensusValidationStatus::Valid
+                ));
                 success_count += 1;
             }
             Ok(Err(e)) => {
@@ -584,7 +599,11 @@ async fn test_concurrent_validations() -> Result<()> {
         }
     }
 
-    info!("Concurrent validations: {}/{} succeeded", success_count, results.len());
+    info!(
+        "Concurrent validations: {}/{} succeeded",
+        success_count,
+        results.len()
+    );
     assert!(success_count >= 8, "At least 80% should succeed"); // Allow some failures
 
     info!("✅ Concurrent validation test completed");
@@ -657,9 +676,15 @@ async fn test_retry_logic() -> Result<()> {
 
     assert!(result.is_err());
     // Should have retried multiple times
-    assert!(elapsed > Duration::from_millis(100), "Should have taken time for retries");
+    assert!(
+        elapsed > Duration::from_millis(100),
+        "Should have taken time for retries"
+    );
 
-    info!("Retry test completed in {:?} (expected failure after retries)", elapsed);
+    info!(
+        "Retry test completed in {:?} (expected failure after retries)",
+        elapsed
+    );
     info!("✅ Retry logic works correctly");
     Ok(())
 }

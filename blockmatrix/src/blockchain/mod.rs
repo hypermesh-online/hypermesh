@@ -19,22 +19,26 @@
 //! all nodes share a single chain and use consensus mechanisms like PoW or PoS.
 
 pub mod block;
-pub mod node_chain;
-pub mod validation;
-pub mod propagation;
-pub mod state;
 pub mod errors;
 pub mod genesis_auth;
+pub mod node_chain;
+pub mod propagation;
+pub mod state;
 pub mod sync_manager;
+pub mod validation;
 
 pub use block::Block;
-pub use node_chain::{NodeBlockchain, ChainStats};
-pub use validation::{ChainValidator, ValidationRules};
-pub use propagation::{BlockPropagator, PropagationStrategy, PropagationResult, BlockTransport, SimulatedTransport};
-pub use state::{ChainStateManager, ChainSnapshot, BlockQuery, SortOrder, StorageStats};
-pub use errors::{BlockchainError, StateError, PropagationError, Result};
+pub use errors::{BlockchainError, PropagationError, Result, StateError};
 pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
-pub use sync_manager::{SyncManager, SyncConfig, SyncState, SyncMessage, NetworkMembership, BlockProvider, SyncObserver};
+pub use node_chain::{ChainStats, NodeBlockchain};
+pub use propagation::{
+    BlockPropagator, BlockTransport, PropagationResult, PropagationStrategy, SimulatedTransport,
+};
+pub use state::{BlockQuery, ChainSnapshot, ChainStateManager, SortOrder, StorageStats};
+pub use sync_manager::{
+    BlockProvider, NetworkMembership, SyncConfig, SyncManager, SyncMessage, SyncObserver, SyncState,
+};
+pub use validation::{ChainValidator, ValidationRules};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use std::path::Path;
@@ -45,20 +49,14 @@ pub async fn create_node_blockchain(
     storage_path: impl AsRef<Path>,
 ) -> std::result::Result<(NodeBlockchain, ChainStateManager, BlockPropagator), String> {
     // Create the blockchain
-    let blockchain = NodeBlockchain::new(node_coordinate.clone());
+    let blockchain = NodeBlockchain::new(node_coordinate);
 
     // Create state manager
-    let state_manager = ChainStateManager::new(
-        node_coordinate.clone(),
-        storage_path,
-    );
+    let state_manager = ChainStateManager::new(node_coordinate, storage_path);
     state_manager.initialize().await?;
 
     // Create propagator with default broadcast strategy
-    let propagator = BlockPropagator::new(
-        node_coordinate,
-        PropagationStrategy::Broadcast,
-    );
+    let propagator = BlockPropagator::new(node_coordinate, PropagationStrategy::Broadcast);
 
     Ok((blockchain, state_manager, propagator))
 }
@@ -73,10 +71,7 @@ mod tests {
         let temp_dir = TempDir::new().expect("test: create temp dir");
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: create coordinate");
 
-        let result = create_node_blockchain(
-            coord.clone(),
-            temp_dir.path(),
-        ).await;
+        let result = create_node_blockchain(coord, temp_dir.path()).await;
 
         assert!(result.is_ok());
         let (blockchain, _state_manager, _propagator) = result.expect("test: create blockchain");

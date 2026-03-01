@@ -10,17 +10,16 @@
 //! - Cross-chain bridge operations
 //! - Economic consensus validation
 
-use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetResult, AssetError, AssetRegistration, AssetStatus, AssetState,
-    ResourceUsage, ResourceLimits, PrivacyMode, ProxyAddress,
-    AdapterHealth, AdapterCapabilities, AssetType,
-    NetworkScope, AssetCategory, BaseSystemType, AssetData,
-};
-use crate::assets::core::privacy::{
-    AllocationConfig, AccessConfig, ResourceAllocationConfig, ConcurrencyLimits,
-    DurationConfig, AccessPermissions, RateLimits, AuthRequirements,
-};
 use crate::assets::core::privacy::ConsensusRequirements as PrivacyConsensusRequirements;
+use crate::assets::core::privacy::{
+    AccessConfig, AccessPermissions, AllocationConfig, AuthRequirements, ConcurrencyLimits,
+    DurationConfig, RateLimits, ResourceAllocationConfig,
+};
+use crate::assets::core::{
+    AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocationRequest, AssetCategory,
+    AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus, AssetType,
+    BaseSystemType, NetworkScope, PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage,
+};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -154,7 +153,10 @@ impl EconomicAssetAdapter {
     }
 
     /// Validate economic consensus proof
-    async fn validate_economic_consensus(&self, proof: &crate::assets::core::ConsensusProof) -> AssetResult<()> {
+    async fn validate_economic_consensus(
+        &self,
+        proof: &crate::assets::core::ConsensusProof,
+    ) -> AssetResult<()> {
         // Validate that economic operations meet consensus requirements
         if self.consensus_requirements.require_full_consensus {
             // Check stake proof for economic validation rights
@@ -163,30 +165,30 @@ impl EconomicAssetAdapter {
                 return Err(AssetError::ConsensusValidationFailed {
                     reason: format!(
                         "Insufficient economic validation stake: {} < required {}",
-                        stake_amount,
-                        self.consensus_requirements.min_validation_stake
-                    )
+                        stake_amount, self.consensus_requirements.min_validation_stake
+                    ),
                 });
             }
 
             // Validate space proof for economic asset storage
             if proof.space_proof.total_storage == 0 {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Economic assets require storage space commitment".to_string()
+                    reason: "Economic assets require storage space commitment".to_string(),
                 });
             }
 
             // Validate work proof for transaction processing capability
             if proof.work_proof.computational_power < 50 {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Insufficient computational power for economic operations".to_string()
+                    reason: "Insufficient computational power for economic operations".to_string(),
                 });
             }
 
             // Validate time proof for economic operation ordering
-            if proof.time_proof.network_time_offset > self.consensus_requirements.validation_timeout {
+            if proof.time_proof.network_time_offset > self.consensus_requirements.validation_timeout
+            {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Time synchronization required for economic consensus".to_string()
+                    reason: "Time synchronization required for economic consensus".to_string(),
                 });
             }
         }
@@ -209,15 +211,21 @@ impl EconomicAssetAdapter {
 
 #[async_trait]
 impl AssetAdapter for EconomicAssetAdapter {
-    async fn allocate_asset(&self, request: &AssetAllocationRequest) -> AssetResult<crate::assets::core::AssetAllocation> {
+    async fn allocate_asset(
+        &self,
+        request: &AssetAllocationRequest,
+    ) -> AssetResult<crate::assets::core::AssetAllocation> {
         // Validate consensus proof for economic operations
-        self.validate_economic_consensus(&request.consensus_proof).await?;
+        self.validate_economic_consensus(&request.consensus_proof)
+            .await?;
 
         // Extract economic requirements
-        let requirements = request.requested_resources.economic
+        let requirements = request
+            .requested_resources
+            .economic
             .as_ref()
             .ok_or_else(|| AssetError::AllocationFailed {
-                reason: "Economic requirements not specified".to_string()
+                reason: "Economic requirements not specified".to_string(),
             })?;
 
         // Generate asset ID with real content-based hash
@@ -234,7 +242,10 @@ impl AssetAdapter for EconomicAssetAdapter {
 
         // Create economic asset state
         let usage = EconomicUsage {
-            balance: requirements.min_stake.map(|s| Decimal::from(s)).unwrap_or(Decimal::ZERO),
+            balance: requirements
+                .min_stake
+                .map(Decimal::from)
+                .unwrap_or(Decimal::ZERO),
             staked_amount: Decimal::ZERO,
             pending_rewards: Decimal::ZERO,
             tx_volume_24h: Decimal::ZERO,
@@ -245,14 +256,14 @@ impl AssetAdapter for EconomicAssetAdapter {
             max_transaction: Decimal::new(100000, 0), // 100k tokens default
             daily_limit: Decimal::new(1000000, 0),    // 1M tokens daily
             max_stake: Decimal::new(10000000, 0),     // 10M tokens max stake
-            cross_chain_limit: 1000,                   // 1000 cross-chain ops daily
+            cross_chain_limit: 1000,                  // 1000 cross-chain ops daily
         };
 
         let asset_state = EconomicAssetState {
             _asset_id: asset_id.clone(),
             _usage: usage.clone(),
             _limits: limits,
-            privacy: Self::map_privacy_level(request.privacy_level.clone()),
+            privacy: Self::map_privacy_level(request.privacy_level),
             proxy_address: None, // Will be assigned if needed
             status: AssetStatus {
                 asset_id: asset_id.clone(),
@@ -260,7 +271,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 allocated_at: std::time::SystemTime::now(),
                 last_accessed: std::time::SystemTime::now(),
                 resource_usage: Default::default(),
-                privacy_level: request.privacy_level.clone(),
+                privacy_level: request.privacy_level,
                 proxy_address: None,
                 consensus_proofs: Vec::new(),
                 owner_certificate_fingerprint: String::new(),
@@ -344,7 +355,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             Ok(())
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
@@ -356,7 +367,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             Ok(asset_state.status.clone())
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
@@ -375,27 +386,38 @@ impl AssetAdapter for EconomicAssetAdapter {
             })
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
 
-    async fn set_resource_limits(&self, asset_id: &AssetRegistration, _limits: ResourceLimits) -> AssetResult<()> {
+    async fn set_resource_limits(
+        &self,
+        asset_id: &AssetRegistration,
+        _limits: ResourceLimits,
+    ) -> AssetResult<()> {
         let assets = self.assets.read().await;
 
         if assets.contains_key(asset_id) {
             // Economic limits are managed separately through economic-specific APIs
             // Generic resource limits don't directly map to economic constraints
-            tracing::info!("Resource limits update requested for economic asset: {}", asset_id);
+            tracing::info!(
+                "Resource limits update requested for economic asset: {}",
+                asset_id
+            );
             Ok(())
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
 
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy_level: PrivacyMode) -> AssetResult<()> {
+    async fn configure_privacy_level(
+        &self,
+        asset_id: &AssetRegistration,
+        privacy_level: PrivacyMode,
+    ) -> AssetResult<()> {
         let mut assets = self.assets.write().await;
 
         if let Some(asset_state) = assets.get_mut(asset_id) {
@@ -404,20 +426,23 @@ impl AssetAdapter for EconomicAssetAdapter {
             Ok(())
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
 
-    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
+    async fn assign_proxy_address(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> AssetResult<ProxyAddress> {
         let mut assets = self.assets.write().await;
 
         if let Some(asset_state) = assets.get_mut(asset_id) {
             // Generate proxy address for economic asset
             let proxy_address = ProxyAddress {
-                network_id: [0u8; 16], // Economic network ID
-                node_id: [0u8; 8], // Caesar node ID
-                asset_port: 8545, // Standard JSON-RPC port for economic operations
+                network_id: [0u8; 16],   // Economic network ID
+                node_id: [0u8; 8],       // Caesar node ID
+                asset_port: 8545,        // Standard JSON-RPC port for economic operations
                 access_token: [0u8; 32], // Would be generated with proper credentials
             };
 
@@ -427,7 +452,7 @@ impl AssetAdapter for EconomicAssetAdapter {
             Ok(proxy_address)
         } else {
             Err(AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })
         }
     }
@@ -437,8 +462,13 @@ impl AssetAdapter for EconomicAssetAdapter {
 
         let mut metrics = HashMap::new();
         metrics.insert("total_assets".to_string(), assets.len() as f64);
-        metrics.insert("active_assets".to_string(),
-            assets.values().filter(|a| a.status.state == AssetState::InUse).count() as f64);
+        metrics.insert(
+            "active_assets".to_string(),
+            assets
+                .values()
+                .filter(|a| a.status.state == AssetState::InUse)
+                .count() as f64,
+        );
         metrics.insert("error_rate".to_string(), 0.0);
 
         Ok(AdapterHealth {
@@ -477,13 +507,15 @@ impl AssetAdapter for EconomicAssetAdapter {
         Ok(true)
     }
 
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
+    async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration> {
         // NAT-like proxy addressing for economic assets requires dedicated design (Phase 11).
         // Economic assets need proxy addressing for cross-chain operations.
         Err(AssetError::AdapterError {
             message: format!(
-                "Proxy address resolution for economic assets not yet implemented (address: {:?})",
-                proxy_addr
+                "Proxy address resolution for economic assets not yet implemented (address: {proxy_addr:?})"
             ),
         })
     }

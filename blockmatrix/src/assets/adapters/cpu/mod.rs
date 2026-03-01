@@ -12,23 +12,25 @@
 //! - PoWork computational proof validation
 //! - Time-based scheduling with PoTime integration
 
-pub mod types;
 mod adapter;
+pub mod types;
 
-pub use types::*;
 pub use adapter::CpuAssetAdapter;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::assets::core::{
-        AssetAdapter, AssetType, AssetAllocationRequest,
-        ConsensusProof, PrivacyMode, CpuRequirements,
+        AssetAdapter, AssetAllocationRequest, AssetType, ConsensusProof, CpuRequirements,
+        PrivacyMode,
     };
     #[allow(unused_imports)]
-    use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
-    use std::time::Duration;
+    use crate::assets::core::{
+        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    };
     use std::collections::HashMap;
+    use std::time::Duration;
 
     fn _create_test_cpu_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
@@ -60,14 +62,20 @@ mod tests {
     #[tokio::test]
     async fn test_cpu_allocation() {
         let test_proof = ConsensusProof::new_for_testing();
-        assert!(test_proof.stake_proof.stake_amount >= 50, "Stake amount should be >= 50");
-        assert!(test_proof.work_proof.computational_power >= 16, "Computational power should be >= 16");
+        assert!(
+            test_proof.stake_proof.stake_amount >= 50,
+            "Stake amount should be >= 50"
+        );
+        assert!(
+            test_proof.work_proof.computational_power >= 16,
+            "Computational power should be >= 16"
+        );
     }
 
     #[tokio::test]
     async fn test_cpu_health_check() {
         let adapter = CpuAssetAdapter::new().await;
-        let health = adapter.health_check().await.unwrap();
+        let health = adapter.health_check().await.expect("test: async operation");
 
         assert!(health.healthy);
         assert!(health.performance_metrics.contains_key("total_cores"));
@@ -81,8 +89,12 @@ mod tests {
 
         assert_eq!(capabilities.asset_type, AssetType::Cpu);
         assert!(capabilities.supports_proxy_addressing);
-        assert!(capabilities.features.contains(&"frequency_scaling".to_string()));
-        assert!(capabilities.features.contains(&"process_isolation".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"frequency_scaling".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"process_isolation".to_string()));
     }
 
     #[test]

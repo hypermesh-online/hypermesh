@@ -170,7 +170,8 @@ pub struct DependencyGraph {
 impl DependencyGraph {
     /// Add extension with dependencies
     pub fn add_extension(&mut self, id: String, deps: Vec<String>) {
-        self.forward.insert(id.clone(), deps.iter().cloned().collect());
+        self.forward
+            .insert(id.clone(), deps.iter().cloned().collect());
 
         for dep in deps {
             self.reverse.entry(dep).or_default().insert(id.clone());

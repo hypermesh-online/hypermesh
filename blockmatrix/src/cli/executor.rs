@@ -19,9 +19,7 @@ use crate::matrix::tensor::routing::{
     calculate_routing_path, calculate_routing_vector, score_route_quality,
 };
 
-use super::commands::{
-    AssetCommand, CliCommand, NodeCommand, PipelineAction, TopologyCommand,
-};
+use super::commands::{AssetCommand, CliCommand, NodeCommand, PipelineAction, TopologyCommand};
 use super::output::{CliError, CliOutput, CliTable};
 
 // ---------------------------------------------------------------------------
@@ -79,12 +77,20 @@ impl CommandExecutor {
                 self.topology_query_neighbors(x, y, z, radius)
             }
             TopologyCommand::RoutingCost {
-                from_x, from_y, from_z,
-                to_x, to_y, to_z,
+                from_x,
+                from_y,
+                from_z,
+                to_x,
+                to_y,
+                to_z,
             } => self.topology_routing_cost(from_x, from_y, from_z, to_x, to_y, to_z),
             TopologyCommand::ShowPath {
-                from_x, from_y, from_z,
-                to_x, to_y, to_z,
+                from_x,
+                from_y,
+                from_z,
+                to_x,
+                to_y,
+                to_z,
             } => self.topology_show_path(from_x, from_y, from_z, to_x, to_y, to_z),
             TopologyCommand::MatrixInfo => self.topology_matrix_info(),
         }
@@ -104,24 +110,21 @@ impl CommandExecutor {
         }
 
         let center = make_coordinate(x, y, z)?;
-        let candidates: Vec<MatrixCoordinate> =
-            self.nodes.values().map(|n| n.position).collect();
+        let candidates: Vec<MatrixCoordinate> = self.nodes.values().map(|n| n.position).collect();
         let neighbors = find_neighbors(&center, &candidates, radius);
 
-        let mut table = CliTable::new(vec![
-            "Node".into(),
-            "Position".into(),
-            "Distance".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Node".into(), "Position".into(), "Distance".into()]);
 
         for pos in &neighbors {
             if let Some(record) = self.find_node_at(pos) {
                 let dist = center.euclidean_distance(pos);
-                table.add_row(vec![
-                    record.node_id.clone(),
-                    format!("{}", pos),
-                    format!("{:.2}", dist),
-                ]).map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
+                table
+                    .add_row(vec![
+                        record.node_id.clone(),
+                        format!("{}", pos),
+                        format!("{:.2}", dist),
+                    ])
+                    .map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
             }
         }
 
@@ -173,11 +176,7 @@ impl CommandExecutor {
 
         let path = calculate_routing_path(&from, &to, 50.0);
 
-        let mut table = CliTable::new(vec![
-            "Hop".into(),
-            "Position".into(),
-            "Hop Distance".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Hop".into(), "Position".into(), "Hop Distance".into()]);
 
         for (i, coord) in path.iter().enumerate() {
             let hop_dist = if i == 0 {
@@ -185,11 +184,13 @@ impl CommandExecutor {
             } else {
                 path[i - 1].euclidean_distance(coord)
             };
-            table.add_row(vec![
-                format!("{}", i),
-                format!("{}", coord),
-                format!("{:.2}", hop_dist),
-            ]).map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
+            table
+                .add_row(vec![
+                    format!("{}", i),
+                    format!("{}", coord),
+                    format!("{:.2}", hop_dist),
+                ])
+                .map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
         }
 
         Ok(CliOutput::Table(table))
@@ -205,17 +206,19 @@ impl CommandExecutor {
                 (i64::MAX, i64::MIN, i64::MAX, i64::MIN, i64::MAX, i64::MIN),
                 |(mnx, mxx, mny, mxy, mnz, mxz), n| {
                     (
-                        mnx.min(n.position.x), mxx.max(n.position.x),
-                        mny.min(n.position.y), mxy.max(n.position.y),
-                        mnz.min(n.position.z), mxz.max(n.position.z),
+                        mnx.min(n.position.x),
+                        mxx.max(n.position.x),
+                        mny.min(n.position.y),
+                        mxy.max(n.position.y),
+                        mnz.min(n.position.z),
+                        mxz.max(n.position.z),
                     )
                 },
             )
         };
 
         let text = format!(
-            "Matrix Info:\n  Total nodes: {}\n  X range:     [{}, {}]\n  Y range:     [{}, {}]\n  Z range:     [{}, {}]",
-            node_count, min_x, max_x, min_y, max_y, min_z, max_z,
+            "Matrix Info:\n  Total nodes: {node_count}\n  X range:     [{min_x}, {max_x}]\n  Y range:     [{min_y}, {max_y}]\n  Z range:     [{min_z}, {max_z}]",
         );
         Ok(CliOutput::Text(text))
     }
@@ -228,9 +231,7 @@ impl CommandExecutor {
         match cmd {
             NodeCommand::Status { node_id } => self.node_status(&node_id),
             NodeCommand::List { scope } => self.node_list(scope),
-            NodeCommand::Register { x, y, z, scope } => {
-                self.node_register(x, y, z, scope)
-            }
+            NodeCommand::Register { x, y, z, scope } => self.node_register(x, y, z, scope),
         }
     }
 
@@ -238,7 +239,7 @@ impl CommandExecutor {
         let record = self
             .nodes
             .get(node_id)
-            .ok_or_else(|| CliError::NotFound(format!("Node '{}'", node_id)))?;
+            .ok_or_else(|| CliError::NotFound(format!("Node '{node_id}'")))?;
 
         let text = format!(
             "Node: {}\n  Position: {}\n  Scope:    {}",
@@ -248,25 +249,23 @@ impl CommandExecutor {
     }
 
     fn node_list(&self, scope: Option<BlockchainScope>) -> Result<CliOutput, CliError> {
-        let mut table = CliTable::new(vec![
-            "Node ID".into(),
-            "Position".into(),
-            "Scope".into(),
-        ]);
+        let mut table = CliTable::new(vec!["Node ID".into(), "Position".into(), "Scope".into()]);
 
         let mut entries: Vec<&NodeRecord> = self
             .nodes
             .values()
-            .filter(|n| scope.map_or(true, |s| n.scope == s))
+            .filter(|n| scope.is_none_or(|s| n.scope == s))
             .collect();
         entries.sort_by(|a, b| a.node_id.cmp(&b.node_id));
 
         for record in entries {
-            table.add_row(vec![
-                record.node_id.clone(),
-                format!("{}", record.position),
-                format!("{}", record.scope),
-            ]).map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
+            table
+                .add_row(vec![
+                    record.node_id.clone(),
+                    format!("{}", record.position),
+                    format!("{}", record.scope),
+                ])
+                .map_err(|e| CliError::ExecutionFailed(e.to_string()))?;
         }
 
         Ok(CliOutput::Table(table))
@@ -293,10 +292,7 @@ impl CommandExecutor {
             },
         );
 
-        let text = format!(
-            "Registered node '{}' at {} (scope: {})",
-            node_id, position, scope,
-        );
+        let text = format!("Registered node '{node_id}' at {position} (scope: {scope})",);
         Ok(CliOutput::Text(text))
     }
 
@@ -312,9 +308,7 @@ impl CommandExecutor {
                 from_scope,
                 to_scope,
             } => self.asset_transfer(&asset_id, from_scope, to_scope),
-            AssetCommand::Pipeline { action, path } => {
-                self.asset_pipeline(action, &path)
-            }
+            AssetCommand::Pipeline { action, path } => self.asset_pipeline(action, &path),
         }
     }
 
@@ -328,8 +322,7 @@ impl CommandExecutor {
         // In a real implementation this would query the AssetManager.
         // For now return a structured placeholder showing the query was valid.
         let text = format!(
-            "Asset: {}\n  Status: not found in local registry\n  Hint:   use 'asset transfer' to move assets between scopes",
-            asset_id,
+            "Asset: {asset_id}\n  Status: not found in local registry\n  Hint:   use 'asset transfer' to move assets between scopes",
         );
         Ok(CliOutput::Text(text))
     }
@@ -348,27 +341,19 @@ impl CommandExecutor {
 
         if from_scope == to_scope {
             return Err(CliError::InvalidArgument(format!(
-                "Source and target scopes are identical: {}",
-                from_scope,
+                "Source and target scopes are identical: {from_scope}",
             )));
         }
 
         let text = format!(
-            "Transfer queued:\n  Asset:      {}\n  From scope: {}\n  To scope:   {}\n  Status:     Pending",
-            asset_id, from_scope, to_scope,
+            "Transfer queued:\n  Asset:      {asset_id}\n  From scope: {from_scope}\n  To scope:   {to_scope}\n  Status:     Pending",
         );
         Ok(CliOutput::Text(text))
     }
 
-    fn asset_pipeline(
-        &self,
-        action: PipelineAction,
-        path: &str,
-    ) -> Result<CliOutput, CliError> {
+    fn asset_pipeline(&self, action: PipelineAction, path: &str) -> Result<CliOutput, CliError> {
         if path.is_empty() {
-            return Err(CliError::InvalidArgument(
-                "Path must not be empty".into(),
-            ));
+            return Err(CliError::InvalidArgument("Path must not be empty".into()));
         }
 
         let action_name = match action {
@@ -377,10 +362,7 @@ impl CommandExecutor {
             PipelineAction::Shard => "Shard (Reed-Solomon)",
         };
 
-        let text = format!(
-            "Pipeline action queued:\n  Action: {}\n  Path:   {}",
-            action_name, path,
-        );
+        let text = format!("Pipeline action queued:\n  Action: {action_name}\n  Path:   {path}",);
         Ok(CliOutput::Text(text))
     }
 
@@ -426,17 +408,28 @@ mod tests {
 
         // Register nodes
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 5, y: 5, z: 5,
+            x: 5,
+            y: 5,
+            z: 5,
             scope: BlockchainScope::Device,
-        })).expect("test: register node");
+        }))
+        .expect("test: register node");
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 100, y: 100, z: 100,
+            x: 100,
+            y: 100,
+            z: 100,
             scope: BlockchainScope::Device,
-        })).expect("test: register far node");
+        }))
+        .expect("test: register far node");
 
-        let result = exec.execute(CliCommand::Topology(
-            TopologyCommand::QueryNeighbors { x: 0, y: 0, z: 0, radius: 20.0 },
-        )).expect("test: query neighbors");
+        let result = exec
+            .execute(CliCommand::Topology(TopologyCommand::QueryNeighbors {
+                x: 0,
+                y: 0,
+                z: 0,
+                radius: 20.0,
+            }))
+            .expect("test: query neighbors");
 
         match result {
             CliOutput::Table(table) => {
@@ -450,7 +443,10 @@ mod tests {
     fn test_topology_query_neighbors_negative_radius() {
         let exec = CommandExecutor::new();
         let result = exec.execute_topology(TopologyCommand::QueryNeighbors {
-            x: 0, y: 0, z: 0, radius: -1.0,
+            x: 0,
+            y: 0,
+            z: 0,
+            radius: -1.0,
         });
         assert!(result.is_err());
     }
@@ -458,10 +454,16 @@ mod tests {
     #[test]
     fn test_topology_routing_cost() {
         let exec = CommandExecutor::new();
-        let result = exec.execute_topology(TopologyCommand::RoutingCost {
-            from_x: 0, from_y: 0, from_z: 0,
-            to_x: 100, to_y: 0, to_z: 0,
-        }).expect("test: routing cost");
+        let result = exec
+            .execute_topology(TopologyCommand::RoutingCost {
+                from_x: 0,
+                from_y: 0,
+                from_z: 0,
+                to_x: 100,
+                to_y: 0,
+                to_z: 0,
+            })
+            .expect("test: routing cost");
 
         match result {
             CliOutput::Text(text) => {
@@ -476,14 +478,23 @@ mod tests {
     #[test]
     fn test_topology_show_path() {
         let exec = CommandExecutor::new();
-        let result = exec.execute_topology(TopologyCommand::ShowPath {
-            from_x: 0, from_y: 0, from_z: 0,
-            to_x: 200, to_y: 0, to_z: 0,
-        }).expect("test: show path");
+        let result = exec
+            .execute_topology(TopologyCommand::ShowPath {
+                from_x: 0,
+                from_y: 0,
+                from_z: 0,
+                to_x: 200,
+                to_y: 0,
+                to_z: 0,
+            })
+            .expect("test: show path");
 
         match result {
             CliOutput::Table(table) => {
-                assert!(table.row_count() >= 3, "Should have multiple hops for distance 200");
+                assert!(
+                    table.row_count() >= 3,
+                    "Should have multiple hops for distance 200"
+                );
                 assert_eq!(table.headers[0], "Hop");
             }
             other => unreachable!("test: expected Table, got {:?}", other),
@@ -494,11 +505,15 @@ mod tests {
     fn test_topology_matrix_info() {
         let mut exec = CommandExecutor::new();
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: -10, y: 20, z: 0,
+            x: -10,
+            y: 20,
+            z: 0,
             scope: BlockchainScope::Device,
-        })).expect("test: register");
+        }))
+        .expect("test: register");
 
-        let result = exec.execute_topology(TopologyCommand::MatrixInfo)
+        let result = exec
+            .execute_topology(TopologyCommand::MatrixInfo)
             .expect("test: matrix info");
 
         match result {
@@ -516,7 +531,8 @@ mod tests {
     #[test]
     fn test_node_list_empty() {
         let mut exec = CommandExecutor::new();
-        let result = exec.execute(CliCommand::Node(NodeCommand::List { scope: None }))
+        let result = exec
+            .execute(CliCommand::Node(NodeCommand::List { scope: None }))
             .expect("test: list nodes");
 
         match result {
@@ -531,15 +547,22 @@ mod tests {
     fn test_node_list_populated() {
         let mut exec = CommandExecutor::new();
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 1, y: 2, z: 3,
+            x: 1,
+            y: 2,
+            z: 3,
             scope: BlockchainScope::Device,
-        })).expect("test: register");
+        }))
+        .expect("test: register");
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 4, y: 5, z: 6,
+            x: 4,
+            y: 5,
+            z: 6,
             scope: BlockchainScope::Network,
-        })).expect("test: register");
+        }))
+        .expect("test: register");
 
-        let result = exec.execute(CliCommand::Node(NodeCommand::List { scope: None }))
+        let result = exec
+            .execute(CliCommand::Node(NodeCommand::List { scope: None }))
             .expect("test: list all");
         match &result {
             CliOutput::Table(table) => assert_eq!(table.row_count(), 2),
@@ -547,9 +570,11 @@ mod tests {
         }
 
         // Filter by scope
-        let result = exec.execute(CliCommand::Node(NodeCommand::List {
-            scope: Some(BlockchainScope::Device),
-        })).expect("test: list filtered");
+        let result = exec
+            .execute(CliCommand::Node(NodeCommand::List {
+                scope: Some(BlockchainScope::Device),
+            }))
+            .expect("test: list filtered");
         match result {
             CliOutput::Table(table) => assert_eq!(table.row_count(), 1),
             other => unreachable!("test: expected Table, got {:?}", other),
@@ -559,10 +584,14 @@ mod tests {
     #[test]
     fn test_node_register() {
         let mut exec = CommandExecutor::new();
-        let result = exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 10, y: 20, z: 30,
-            scope: BlockchainScope::Device,
-        })).expect("test: register node");
+        let result = exec
+            .execute(CliCommand::Node(NodeCommand::Register {
+                x: 10,
+                y: 20,
+                z: 30,
+                scope: BlockchainScope::Device,
+            }))
+            .expect("test: register node");
 
         match result {
             CliOutput::Text(text) => {
@@ -577,13 +606,18 @@ mod tests {
     fn test_node_status_found() {
         let mut exec = CommandExecutor::new();
         exec.execute(CliCommand::Node(NodeCommand::Register {
-            x: 0, y: 0, z: 0,
+            x: 0,
+            y: 0,
+            z: 0,
             scope: BlockchainScope::Device,
-        })).expect("test: register");
+        }))
+        .expect("test: register");
 
-        let result = exec.execute(CliCommand::Node(NodeCommand::Status {
-            node_id: "node-1".into(),
-        })).expect("test: status");
+        let result = exec
+            .execute(CliCommand::Node(NodeCommand::Status {
+                node_id: "node-1".into(),
+            }))
+            .expect("test: status");
 
         match result {
             CliOutput::Text(text) => {
@@ -606,11 +640,13 @@ mod tests {
     #[test]
     fn test_asset_transfer_valid_scopes() {
         let exec = CommandExecutor::new();
-        let result = exec.execute_asset(AssetCommand::Transfer {
-            asset_id: "cpu-001".into(),
-            from_scope: BlockchainScope::Device,
-            to_scope: BlockchainScope::Network,
-        }).expect("test: transfer");
+        let result = exec
+            .execute_asset(AssetCommand::Transfer {
+                asset_id: "cpu-001".into(),
+                from_scope: BlockchainScope::Device,
+                to_scope: BlockchainScope::Network,
+            })
+            .expect("test: transfer");
 
         match result {
             CliOutput::Text(text) => {
@@ -647,10 +683,12 @@ mod tests {
     #[test]
     fn test_asset_pipeline() {
         let exec = CommandExecutor::new();
-        let result = exec.execute_asset(AssetCommand::Pipeline {
-            action: PipelineAction::Compress,
-            path: "/data/file.bin".into(),
-        }).expect("test: pipeline");
+        let result = exec
+            .execute_asset(AssetCommand::Pipeline {
+                action: PipelineAction::Compress,
+                path: "/data/file.bin".into(),
+            })
+            .expect("test: pipeline");
 
         match result {
             CliOutput::Text(text) => {

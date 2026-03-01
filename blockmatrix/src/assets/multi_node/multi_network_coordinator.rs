@@ -14,19 +14,19 @@
 //!
 //! Example: Car purchase validation across Bank->Dealer->Insurance->DMV
 
+use super::PeerIdentity;
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, ConsensusProof};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ConsensusProof};
-use super::PeerIdentity;
 
 // Import network membership from our implementation
 pub use super::network_membership::{
-    NetworkId, NetworkMembership, MultiNetworkMembership, TrustChainClient,
-    PrivacyMode, NetworkDiscovery, MembershipStatus, NetworkCredentials,
-    JoinRequirements, ApprovalProcess,
+    ApprovalProcess, JoinRequirements, MembershipStatus, MultiNetworkMembership,
+    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkMembership, PrivacyMode,
+    TrustChainClient,
 };
 
 /// Multi-network coordinator - PRIMARY component for Sprint 2.3
@@ -66,6 +66,12 @@ pub struct IsolationStack {
     pub violations: u64,
 }
 
+impl Default for StoqIsolationManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StoqIsolationManager {
     pub fn new() -> Self {
         Self {
@@ -74,7 +80,11 @@ impl StoqIsolationManager {
     }
 
     /// Create isolated stack for network
-    pub async fn create_stack(&self, network_id: NetworkId, privacy_tier: PrivacyMode) -> AssetResult<()> {
+    pub async fn create_stack(
+        &self,
+        network_id: NetworkId,
+        privacy_tier: PrivacyMode,
+    ) -> AssetResult<()> {
         let mut stacks = self.isolation_stacks.write().await;
 
         let stack = IsolationStack {
@@ -176,7 +186,11 @@ impl NetworkAssetRouter {
     }
 
     /// Calculate route to asset (tensor-based pathfinding)
-    pub fn calculate_route(&self, from: &IntegerMatrixPosition, to_asset: &AssetRegistration) -> Option<Vec<IntegerMatrixPosition>> {
+    pub fn calculate_route(
+        &self,
+        from: &IntegerMatrixPosition,
+        to_asset: &AssetRegistration,
+    ) -> Option<Vec<IntegerMatrixPosition>> {
         let to_position = self.asset_positions.get(to_asset)?;
 
         // Simple linear path (production would use A* with matrix operations)
@@ -216,6 +230,12 @@ pub struct ValidationResult {
     pub valid: bool,
 }
 
+impl Default for CrossNetworkValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CrossNetworkValidator {
     pub fn new() -> Self {
         Self {
@@ -236,8 +256,12 @@ impl CrossNetworkValidator {
         {
             let cache = self.validation_cache.read().await;
             if let Some(result) = cache.get(&cache_key) {
-                if result.validated_at.elapsed().unwrap_or(std::time::Duration::MAX)
-                    < std::time::Duration::from_secs(300) {
+                if result
+                    .validated_at
+                    .elapsed()
+                    .unwrap_or(std::time::Duration::MAX)
+                    < std::time::Duration::from_secs(300)
+                {
                     return Ok(result.valid);
                 }
             }
@@ -311,6 +335,12 @@ impl Default for NetworkEngagementMetrics {
     }
 }
 
+impl Default for EngagementMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EngagementMonitor {
     pub fn new() -> Self {
         Self {
@@ -319,23 +349,22 @@ impl EngagementMonitor {
     }
 
     /// Record engagement event
-    pub async fn record_event(
-        &self,
-        network_id: NetworkId,
-        event_type: EngagementEventType,
-    ) {
+    pub async fn record_event(&self, network_id: NetworkId, event_type: EngagementEventType) {
         let mut metrics = self.network_metrics.write().await;
-        let network_metrics = metrics.entry(network_id).or_insert_with(|| {
-            NetworkEngagementMetrics {
-                network_id,
-                ..Default::default()
-            }
-        });
+        let network_metrics =
+            metrics
+                .entry(network_id)
+                .or_insert_with(|| NetworkEngagementMetrics {
+                    network_id,
+                    ..Default::default()
+                });
 
         match event_type {
             EngagementEventType::AssetUsed => network_metrics.assets_used += 1,
             EngagementEventType::Transaction => network_metrics.transactions += 1,
-            EngagementEventType::DataTransferred(bytes) => network_metrics.data_transferred += bytes,
+            EngagementEventType::DataTransferred(bytes) => {
+                network_metrics.data_transferred += bytes
+            }
         }
 
         network_metrics.last_activity = Some(SystemTime::now());
@@ -393,7 +422,10 @@ impl MultiNetworkCoordinator {
         trustchain_client: Arc<dyn TrustChainClient>,
         config: MultiNetworkConfig,
     ) -> Self {
-        let membership = Arc::new(MultiNetworkMembership::new(local_node.clone(), trustchain_client));
+        let membership = Arc::new(MultiNetworkMembership::new(
+            local_node.clone(),
+            trustchain_client,
+        ));
         let stoq_isolation = Arc::new(StoqIsolationManager::new());
         let cross_network_validator = Arc::new(CrossNetworkValidator::new());
         let engagement_monitor = Arc::new(EngagementMonitor::new());
@@ -424,15 +456,22 @@ impl MultiNetworkCoordinator {
         let active = self.membership.active_memberships().await;
         if active.len() >= self.config.max_networks {
             return Err(AssetError::NetworkError {
-                message: format!("Maximum networks limit ({}) reached", self.config.max_networks),
+                message: format!(
+                    "Maximum networks limit ({}) reached",
+                    self.config.max_networks
+                ),
             });
         }
 
         // Join via TrustChain
-        self.membership.join_network(network_id, privacy_tier.clone()).await?;
+        self.membership
+            .join_network(network_id, privacy_tier)
+            .await?;
 
         // Create STOQ isolation stack
-        self.stoq_isolation.create_stack(network_id, privacy_tier).await?;
+        self.stoq_isolation
+            .create_stack(network_id, privacy_tier)
+            .await?;
 
         // Create asset router
         let router = NetworkAssetRouter::new(network_id);
@@ -478,7 +517,9 @@ impl MultiNetworkCoordinator {
         matrix_position: IntegerMatrixPosition,
     ) -> AssetResult<()> {
         // Add to membership visibility
-        self.membership.add_asset_to_network(network_id, asset_id.clone()).await?;
+        self.membership
+            .add_asset_to_network(network_id, asset_id.clone())
+            .await?;
 
         // Add to router
         let mut routing = self.asset_routing.write().await;
@@ -513,7 +554,10 @@ impl MultiNetworkCoordinator {
 
     /// Verify isolation (zero packet leakage)
     pub async fn verify_isolation(&self) -> AssetResult<IsolationReport> {
-        let networks: Vec<NetworkId> = self.membership.active_memberships().await
+        let networks: Vec<NetworkId> = self
+            .membership
+            .active_memberships()
+            .await
             .iter()
             .map(|m| m.network_id)
             .collect();
@@ -541,13 +585,11 @@ impl MultiNetworkCoordinator {
     }
 
     /// Record engagement event
-    pub async fn record_engagement(
-        &self,
-        network_id: NetworkId,
-        event_type: EngagementEventType,
-    ) {
+    pub async fn record_engagement(&self, network_id: NetworkId, event_type: EngagementEventType) {
         if self.config.engagement_monitoring {
-            self.engagement_monitor.record_event(network_id, event_type).await;
+            self.engagement_monitor
+                .record_event(network_id, event_type)
+                .await;
         }
     }
 }
@@ -568,15 +610,18 @@ pub struct IsolationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::assets::core::AssetType;
     use crate::test_utils::test_asset_id;
+    use async_trait::async_trait;
 
     struct MockTrustChainClient;
 
     #[async_trait]
     impl TrustChainClient for MockTrustChainClient {
-        async fn request_credentials(&self, _network_id: NetworkId) -> AssetResult<NetworkCredentials> {
+        async fn request_credentials(
+            &self,
+            _network_id: NetworkId,
+        ) -> AssetResult<NetworkCredentials> {
             use std::time::Duration;
             Ok(NetworkCredentials {
                 certificate: vec![1, 2, 3],
@@ -643,27 +688,38 @@ mod tests {
         };
 
         let client = Arc::new(MockTrustChainClient);
-        let coordinator = MultiNetworkCoordinator::new(
-            node_id,
-            client.clone(),
-            MultiNetworkConfig::default(),
-        );
+        let coordinator =
+            MultiNetworkCoordinator::new(node_id, client.clone(), MultiNetworkConfig::default());
 
         // Discover networks
-        coordinator.membership.discover_networks().await.expect("test: discover");
+        coordinator
+            .membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
 
         // Join bank network
         let bank_network = NetworkId([1u8; 16]);
-        coordinator.join_network(bank_network, PrivacyMode::PUBLIC).await.expect("test: join bank");
+        coordinator
+            .join_network(bank_network, PrivacyMode::PUBLIC)
+            .await
+            .expect("test: join bank");
 
         // Join dealer network
         let dealer_network = NetworkId([2u8; 16]);
-        coordinator.membership.discover_networks().await.expect("test: discover");
-        coordinator.join_network(dealer_network, PrivacyMode::PRIVATE).await.expect("test: join dealer");
+        coordinator
+            .membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
+        coordinator
+            .join_network(dealer_network, PrivacyMode::PRIVATE)
+            .await
+            .expect("test: join dealer");
 
         // Verify both active
         let active = coordinator.active_networks().await;
-        assert!(active.len() >= 1); // At least bank network
+        assert!(!active.is_empty()); // At least bank network
     }
 
     #[tokio::test]
@@ -676,17 +732,16 @@ mod tests {
         };
 
         let client = Arc::new(MockTrustChainClient);
-        let coordinator = MultiNetworkCoordinator::new(
-            node_id,
-            client,
-            MultiNetworkConfig::default(),
-        );
+        let coordinator =
+            MultiNetworkCoordinator::new(node_id, client, MultiNetworkConfig::default());
 
         let asset_id = test_asset_id(AssetType::Storage);
         let bank_network = NetworkId([1u8; 16]);
         let dealer_network = NetworkId([2u8; 16]);
 
-        use crate::consensus::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+        use crate::consensus::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
         use std::time::SystemTime;
 
         let proof = ConsensusProof {
@@ -722,12 +777,10 @@ mod tests {
             },
         };
 
-        let valid = coordinator.validate_asset_cross_network(
-            asset_id,
-            bank_network,
-            dealer_network,
-            proof,
-        ).await.expect("test: validate");
+        let valid = coordinator
+            .validate_asset_cross_network(asset_id, bank_network, dealer_network, proof)
+            .await
+            .expect("test: validate");
 
         assert!(valid);
     }
@@ -742,18 +795,25 @@ mod tests {
         };
 
         let client = Arc::new(MockTrustChainClient);
-        let coordinator = MultiNetworkCoordinator::new(
-            node_id,
-            client,
-            MultiNetworkConfig::default(),
-        );
+        let coordinator =
+            MultiNetworkCoordinator::new(node_id, client, MultiNetworkConfig::default());
 
-        coordinator.membership.discover_networks().await.expect("test: discover");
+        coordinator
+            .membership
+            .discover_networks()
+            .await
+            .expect("test: discover");
         let network1 = NetworkId([1u8; 16]);
-        coordinator.join_network(network1, PrivacyMode::PUBLIC).await.expect("test: join");
+        coordinator
+            .join_network(network1, PrivacyMode::PUBLIC)
+            .await
+            .expect("test: join");
 
         // Get isolation report
-        let report = coordinator.verify_isolation().await.expect("test: verify isolation");
+        let report = coordinator
+            .verify_isolation()
+            .await
+            .expect("test: verify isolation");
         assert!(report.total_networks >= 1);
         assert_eq!(report.total_violations, 0); // No violations yet
     }

@@ -6,11 +6,11 @@
 //!
 //! Configuration for data sharing policies, approval workflows, and anonymization preferences.
 
-mod types;
-mod reporting;
-mod validation;
 mod defaults;
+mod reporting;
+mod types;
+mod validation;
 
-pub use types::*;
 pub use reporting::*;
+pub use types::*;
 // validation and defaults only provide impl blocks, no additional exports needed

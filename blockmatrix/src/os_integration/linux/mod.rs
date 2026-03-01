@@ -20,8 +20,8 @@
 
 #![allow(unsafe_code)]
 
-mod hardware;
 mod ebpf;
+mod hardware;
 
 use super::types::*;
 use super::OsAbstraction;
@@ -67,17 +67,15 @@ impl LinuxAbstraction {
     /// Detect Linux kernel version from uname
     fn detect_kernel_version() -> Result<(u32, u32, u32)> {
         let version_str = fs::read_to_string("/proc/version")
-            .or_else(|_| {
-                unsafe {
-                    let mut buf: libc::utsname = std::mem::zeroed();
-                    if libc::uname(&mut buf) == 0 {
-                        let release = std::ffi::CStr::from_ptr(buf.release.as_ptr())
-                            .to_string_lossy()
-                            .into_owned();
-                        Ok(release)
-                    } else {
-                        Err(std::io::Error::last_os_error())
-                    }
+            .or_else(|_| unsafe {
+                let mut buf: libc::utsname = std::mem::zeroed();
+                if libc::uname(&mut buf) == 0 {
+                    let release = std::ffi::CStr::from_ptr(buf.release.as_ptr())
+                        .to_string_lossy()
+                        .into_owned();
+                    Ok(release)
+                } else {
+                    Err(std::io::Error::last_os_error())
                 }
             })
             .context("Failed to read kernel version")?;
@@ -89,9 +87,18 @@ impl LinuxAbstraction {
             .split(&['.', '-'][..])
             .collect();
 
-        let major = version_parts.get(0).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let minor = version_parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let patch = version_parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let major = version_parts
+            .first()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let minor = version_parts
+            .get(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let patch = version_parts
+            .get(2)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
 
         Ok((major, minor, patch))
     }
@@ -186,10 +193,16 @@ mod tests {
         let linux = LinuxAbstraction::new().expect("Failed to create Linux abstraction");
         let storage = linux.detect_storage().expect("Failed to detect storage");
 
-        assert!(!storage.is_empty(), "Should detect at least one storage device");
+        assert!(
+            !storage.is_empty(),
+            "Should detect at least one storage device"
+        );
 
         for device in &storage {
-            assert!(device.total_bytes > 0, "Storage should have non-zero capacity");
+            assert!(
+                device.total_bytes > 0,
+                "Storage should have non-zero capacity"
+            );
         }
     }
 
@@ -199,7 +212,7 @@ mod tests {
         let linux = LinuxAbstraction::new().expect("Failed to create Linux abstraction");
         let supported = linux.is_ebpf_supported();
 
-        println!("eBPF supported: {}", supported);
+        println!("eBPF supported: {supported}");
         println!("Kernel version: {:?}", linux.kernel_version);
         println!("BPF FS exists: {}", linux.check_bpf_fs());
         println!("BPF permissions: {}", linux.check_bpf_permissions());
@@ -218,7 +231,7 @@ mod tests {
         let linux = LinuxAbstraction::new().expect("Failed to create Linux abstraction");
         let (major, minor, patch) = linux.kernel_version;
 
-        println!("Detected kernel version: {}.{}.{}", major, minor, patch);
+        println!("Detected kernel version: {major}.{minor}.{patch}");
 
         assert!(major > 0, "Kernel major version should be > 0");
         assert!(major < 100, "Kernel major version should be reasonable");
@@ -257,7 +270,7 @@ mod tests {
         }
 
         let handle = handle.expect("test: load ebpf program");
-        println!("Loaded eBPF program: {:?}", handle);
+        println!("Loaded eBPF program: {handle:?}");
 
         let attach_result = linux.attach_ebpf_monitor(
             handle,
@@ -273,7 +286,7 @@ mod tests {
             println!("Attached eBPF program successfully");
 
             if let Ok(metrics) = linux.read_ebpf_metrics(handle) {
-                println!("eBPF metrics: {:?}", metrics);
+                println!("eBPF metrics: {metrics:?}");
                 assert_eq!(metrics.metric_type, EbpfMetricType::Counter);
             }
         }
@@ -320,7 +333,10 @@ mod tests {
                 name: "sched_switch".to_string(),
             };
 
-            if linux.attach_ebpf_monitor(handle, attach_type.clone()).is_ok() {
+            if linux
+                .attach_ebpf_monitor(handle, attach_type.clone())
+                .is_ok()
+            {
                 assert!(linux.attach_ebpf_monitor(handle, attach_type).is_err());
             }
 

@@ -8,10 +8,10 @@ phase = "alpha"
 items = [
     "Refactor / consolidation — removed Docker/Terraform/K8s/CloudFormation (system-level daemon model), fixed CI workflows, workspace lint config",
     "Documentation 100% correct — all 11 crate READMEs, ARCHITECTURE.md, root README accurate with correct stats, models, and IPv6 coverage",
-    "Benchmarks — Criterion benchmarks for blockmatrix (phase1, retrieval, transfer), stoq (throughput), trustchain (certificates)",
+    "Benchmarks — Criterion benchmarks for blockmatrix (5: phase1, retrieval, transfer, tensor, basic), stoq (3: throughput, real_throughput, ebpf), trustchain (certificates)",
     "Full development/contributions pipeline — CONTRIBUTING.md, SECURITY.md, CHANGELOG.md, pre-commit hooks, PR workflow documented",
     "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
-    "Integrations and end-to-end tests — 17 cross-crate integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
+    "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
 ]
 
 [features.in_development]
@@ -25,4 +25,6 @@ items = [
     "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
     "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
+    "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
+    "Real partition/chaos testing framework",
 ]

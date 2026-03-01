@@ -7,20 +7,20 @@
 //! Handles backing up and restoring the network topology including
 //! geographic zones, clusters, and load balancing state.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::matrix::geospatial::topology::{TopologyNode, TopologyEdge};
-use crate::matrix::geospatial::hierarchy::GeographicZone;
 use super::{PersistenceError, PersistenceResult};
+use crate::matrix::geospatial::hierarchy::GeographicZone;
+use crate::matrix::geospatial::topology::{TopologyEdge, TopologyNode};
 
 /// Placeholder for clustering results until Sprint 1.4 integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusteringResult {
     pub algorithm: String,
-    pub clusters: Vec<Vec<String>>,  // Node IDs in each cluster
+    pub clusters: Vec<Vec<String>>, // Node IDs in each cluster
     pub metadata: HashMap<String, String>,
 }
 
@@ -32,6 +32,12 @@ pub struct NetworkTopology {
     zones: Vec<GeographicZone>,
     clusters: Option<Vec<ClusteringResult>>,
     load_balancing_state: Option<LoadBalancingState>,
+}
+
+impl Default for NetworkTopology {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NetworkTopology {
@@ -119,7 +125,7 @@ impl TopologyBackupData {
         Self {
             version: 1,
             timestamp: chrono::Utc::now(),
-            mode: format!("{:?}", mode),
+            mode: format!("{mode:?}"),
             nodes: HashMap::new(),
             edges: Vec::new(),
             zones: HashMap::new(),
@@ -131,8 +137,10 @@ impl TopologyBackupData {
 
     /// Get size estimate
     pub fn size_estimate(&self) -> usize {
-        let nodes_size: usize = self.nodes.iter()
-            .map(|(k, _v)| k.len() + 100) // Rough estimate per node
+        let nodes_size: usize = self
+            .nodes
+            .keys()
+            .map(|k| k.len() + 100) // Rough estimate per node
             .sum();
         let edges_size = self.edges.len() * 50;
         let zones_size = self.zones.len() * 200;
@@ -168,7 +176,7 @@ impl TopologyBackup {
     /// Create a full backup
     pub async fn create_full_backup(
         &self,
-        topology: &NetworkTopology
+        topology: &NetworkTopology,
     ) -> PersistenceResult<PathBuf> {
         info!("Creating full topology backup");
 
@@ -198,9 +206,15 @@ impl TopologyBackup {
         }
 
         // Add metadata
-        backup.metadata.insert("node_count".to_string(), backup.nodes.len().to_string());
-        backup.metadata.insert("edge_count".to_string(), backup.edges.len().to_string());
-        backup.metadata.insert("zone_count".to_string(), backup.zones.len().to_string());
+        backup
+            .metadata
+            .insert("node_count".to_string(), backup.nodes.len().to_string());
+        backup
+            .metadata
+            .insert("edge_count".to_string(), backup.edges.len().to_string());
+        backup
+            .metadata
+            .insert("zone_count".to_string(), backup.zones.len().to_string());
 
         self.save_backup(&backup, "full").await
     }
@@ -228,10 +242,13 @@ impl TopologyBackup {
         }
 
         // Find changed edges
-        let _current_edges: HashSet<_> = topology.edges()
+        let _current_edges: HashSet<_> = topology
+            .edges()
             .map(|e| (e.source.clone(), e.target.clone()))
             .collect();
-        let previous_edges: HashSet<_> = previous_backup.edges.iter()
+        let previous_edges: HashSet<_> = previous_backup
+            .edges
+            .iter()
             .map(|e| (e.source.clone(), e.target.clone()))
             .collect();
 
@@ -252,9 +269,16 @@ impl TopologyBackup {
         }
 
         // Add metadata
-        backup.metadata.insert("changed_nodes".to_string(), backup.nodes.len().to_string());
-        backup.metadata.insert("changed_edges".to_string(), backup.edges.len().to_string());
-        backup.metadata.insert("base_backup".to_string(), previous_backup.timestamp.to_rfc3339());
+        backup
+            .metadata
+            .insert("changed_nodes".to_string(), backup.nodes.len().to_string());
+        backup
+            .metadata
+            .insert("changed_edges".to_string(), backup.edges.len().to_string());
+        backup.metadata.insert(
+            "base_backup".to_string(),
+            previous_backup.timestamp.to_rfc3339(),
+        );
 
         self.save_backup(&backup, "incremental").await
     }
@@ -262,7 +286,7 @@ impl TopologyBackup {
     /// Create an essential backup (minimal critical state)
     pub async fn create_essential_backup(
         &self,
-        topology: &NetworkTopology
+        topology: &NetworkTopology,
     ) -> PersistenceResult<PathBuf> {
         info!("Creating essential topology backup");
 
@@ -270,8 +294,8 @@ impl TopologyBackup {
 
         // Only include zone leaders and critical nodes
         for (id, node) in topology.nodes() {
-            if node.metadata.get("role") == Some(&"leader".to_string()) ||
-               node.peer_count() > 10 {  // High connectivity nodes
+            if node.metadata.get("role") == Some(&"leader".to_string()) || node.peer_count() > 10 {
+                // High connectivity nodes
                 backup.nodes.insert(id.clone(), node.clone());
             }
         }
@@ -286,7 +310,10 @@ impl TopologyBackup {
             backup.clusters = clusters.clone();
         }
 
-        backup.metadata.insert("essential_nodes".to_string(), backup.nodes.len().to_string());
+        backup.metadata.insert(
+            "essential_nodes".to_string(),
+            backup.nodes.len().to_string(),
+        );
 
         self.save_backup(&backup, "essential").await
     }
@@ -294,7 +321,7 @@ impl TopologyBackup {
     /// Restore topology from backup
     pub async fn restore_backup(
         &self,
-        backup_path: &Path
+        backup_path: &Path,
     ) -> PersistenceResult<TopologyBackupData> {
         info!("Restoring topology from {:?}", backup_path);
 
@@ -310,8 +337,12 @@ impl TopologyBackup {
                 .map_err(|e| PersistenceError::Deserialization(e.to_string()))?
         };
 
-        info!("Restored topology with {} nodes, {} edges, {} zones",
-              backup.nodes.len(), backup.edges.len(), backup.zones.len());
+        info!(
+            "Restored topology with {} nodes, {} edges, {} zones",
+            backup.nodes.len(),
+            backup.edges.len(),
+            backup.zones.len()
+        );
 
         Ok(backup)
     }
@@ -326,7 +357,8 @@ impl TopologyBackup {
 
             if path.extension().and_then(|s| s.to_str()) == Some("backup") {
                 if let Ok(metadata) = std::fs::metadata(&path) {
-                    let name = path.file_name()
+                    let name = path
+                        .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("unknown")
                         .to_string();
@@ -335,10 +367,13 @@ impl TopologyBackup {
                         name,
                         path,
                         size: metadata.len(),
-                        created: metadata.modified()
+                        created: metadata
+                            .modified()
                             .ok()
                             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                            .map(|d| chrono::Utc::now() - chrono::Duration::seconds(d.as_secs() as i64))
+                            .map(|d| {
+                                chrono::Utc::now() - chrono::Duration::seconds(d.as_secs() as i64)
+                            })
                             .unwrap_or_else(chrono::Utc::now),
                     });
                 }
@@ -368,10 +403,10 @@ impl TopologyBackup {
     async fn save_backup(
         &self,
         backup: &TopologyBackupData,
-        prefix: &str
+        prefix: &str,
     ) -> PersistenceResult<PathBuf> {
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-        let filename = format!("{}_{}.backup", prefix, timestamp);
+        let filename = format!("{prefix}_{timestamp}.backup");
         let path = self.storage_dir.join(filename);
 
         let serialized = bincode::serialize(backup)
@@ -386,18 +421,22 @@ impl TopologyBackup {
 
         std::fs::write(&path, data)?;
 
-        info!("Saved {} backup to {:?} ({} bytes)",
-              prefix, path, backup.size_estimate());
+        info!(
+            "Saved {} backup to {:?} ({} bytes)",
+            prefix,
+            path,
+            backup.size_estimate()
+        );
 
         Ok(path)
     }
 
     /// Check if two nodes are equal
     fn nodes_equal(a: &TopologyNode, b: &TopologyNode) -> bool {
-        a.matrix_coord == b.matrix_coord &&
-        a.gps_coord == b.gps_coord &&
-        a.zone_id == b.zone_id &&
-        a.peers == b.peers
+        a.matrix_coord == b.matrix_coord
+            && a.gps_coord == b.gps_coord
+            && a.zone_id == b.zone_id
+            && a.peers == b.peers
     }
 }
 
@@ -433,41 +472,38 @@ mod tests {
 
     #[tokio::test]
     async fn test_backup_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let backup = TopologyBackup::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let backup =
+            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
 
         // Create test topology
         let mut topology = NetworkTopology::new();
 
-        let mut node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).unwrap());
+        let mut node1 =
+            TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         node1.add_peer("node2".to_string());
         topology.add_node(node1);
 
-        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).unwrap());
+        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
         topology.add_node(node2);
 
         topology.add_edge("node1".to_string(), "node2".to_string(), 1.0);
 
         // Create full backup
-        let backup_path = backup.create_full_backup(&topology).await.unwrap();
+        let backup_path = backup.create_full_backup(&topology).await.expect("test: async operation");
         assert!(backup_path.exists());
     }
 
     #[tokio::test]
     async fn test_backup_restore() {
-        let temp_dir = TempDir::new().unwrap();
-        let backup = TopologyBackup::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let backup =
+            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
 
         // Create backup data
         let mut data = TopologyBackupData::new(BackupMode::Full);
 
-        let node = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(5, 5, 5).unwrap());
+        let node = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"));
         data.nodes.insert("node1".to_string(), node);
 
         let edge = TopologyEdge {
@@ -479,8 +515,8 @@ mod tests {
         data.edges.push(edge);
 
         // Save and restore
-        let path = backup.save_backup(&data, "test").await.unwrap();
-        let restored = backup.restore_backup(&path).await.unwrap();
+        let path = backup.save_backup(&data, "test").await.expect("test: async operation");
+        let restored = backup.restore_backup(&path).await.expect("test: async operation");
 
         assert_eq!(restored.nodes.len(), 1);
         assert_eq!(restored.edges.len(), 1);
@@ -489,28 +525,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_incremental_backup() {
-        let temp_dir = TempDir::new().unwrap();
-        let backup = TopologyBackup::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let backup =
+            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
 
         // Create initial topology
         let mut topology = NetworkTopology::new();
-        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).unwrap());
+        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         topology.add_node(node1);
 
         // Create full backup
-        let full_path = backup.create_full_backup(&topology).await.unwrap();
-        let full_data = backup.restore_backup(&full_path).await.unwrap();
+        let full_path = backup.create_full_backup(&topology).await.expect("test: async operation");
+        let full_data = backup.restore_backup(&full_path).await.expect("test: async operation");
 
         // Modify topology
-        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).unwrap());
+        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
         topology.add_node(node2);
 
         // Create incremental backup
-        let inc_path = backup.create_incremental_backup(&topology, &full_data).await.unwrap();
-        let inc_data = backup.restore_backup(&inc_path).await.unwrap();
+        let inc_path = backup
+            .create_incremental_backup(&topology, &full_data)
+            .await
+            .expect("test: expected success");
+        let inc_data = backup.restore_backup(&inc_path).await.expect("test: async operation");
 
         // Incremental should only contain the new node
         assert_eq!(inc_data.nodes.len(), 1);
@@ -519,28 +556,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_essential_backup() {
-        let temp_dir = TempDir::new().unwrap();
-        let backup = TopologyBackup::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let backup =
+            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
 
         let mut topology = NetworkTopology::new();
 
         // Add leader node
-        let mut leader = TopologyNode::new("leader".to_string(), MatrixCoordinate::new(0, 0, 0).unwrap());
-        leader.metadata.insert("role".to_string(), "leader".to_string());
+        let mut leader = TopologyNode::new(
+            "leader".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
+        leader
+            .metadata
+            .insert("role".to_string(), "leader".to_string());
         topology.add_node(leader);
 
         // Add regular nodes
         for i in 1..5 {
-            let node = TopologyNode::new(format!("node{}", i), MatrixCoordinate::new(i, i, i).unwrap());
+            let node =
+                TopologyNode::new(format!("node{i}"), MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"));
             topology.add_node(node);
         }
 
         // Create essential backup
-        let path = backup.create_essential_backup(&topology).await.unwrap();
-        let data = backup.restore_backup(&path).await.unwrap();
+        let path = backup.create_essential_backup(&topology).await.expect("test: async operation");
+        let data = backup.restore_backup(&path).await.expect("test: async operation");
 
         // Should only contain the leader
         assert_eq!(data.nodes.len(), 1);
@@ -549,29 +590,30 @@ mod tests {
 
     #[tokio::test]
     async fn test_backup_cleanup() {
-        let temp_dir = TempDir::new().unwrap();
-        let backup = TopologyBackup::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let backup =
+            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
 
         // Create multiple backups
         for i in 0..5 {
             let data = TopologyBackupData::new(BackupMode::Full);
-            backup.save_backup(&data, &format!("test{}", i)).await.unwrap();
+            backup
+                .save_backup(&data, &format!("test{i}"))
+                .await
+                .expect("test: expected success");
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 
         // List backups
-        let list = backup.list_backups().unwrap();
+        let list = backup.list_backups().expect("test: expected success");
         assert_eq!(list.len(), 5);
 
         // Cleanup keeping only 2
-        let deleted = backup.cleanup_old_backups(2).unwrap();
+        let deleted = backup.cleanup_old_backups(2).expect("test: cleanup");
         assert_eq!(deleted, 3);
 
         // Verify only 2 remain
-        let list = backup.list_backups().unwrap();
+        let list = backup.list_backups().expect("test: expected success");
         assert_eq!(list.len(), 2);
     }
 
@@ -580,13 +622,14 @@ mod tests {
         let mut data = TopologyBackupData::new(BackupMode::Full);
 
         for i in 0..10 {
-            let node = TopologyNode::new(format!("node{}", i), MatrixCoordinate::new(i, i, i).unwrap());
-            data.nodes.insert(format!("node{}", i), node);
+            let node =
+                TopologyNode::new(format!("node{i}"), MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"));
+            data.nodes.insert(format!("node{i}"), node);
         }
 
         for i in 0..5 {
             data.edges.push(TopologyEdge {
-                source: format!("node{}", i),
+                source: format!("node{i}"),
                 target: format!("node{}", i + 1),
                 weight: 1.0,
                 metadata: HashMap::new(),
@@ -600,9 +643,9 @@ mod tests {
 
     #[test]
     fn test_nodes_equal() {
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let mut node1 = TopologyNode::new("test".to_string(), coord.clone());
-        let mut node2 = TopologyNode::new("test".to_string(), coord.clone());
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let mut node1 = TopologyNode::new("test".to_string(), coord);
+        let mut node2 = TopologyNode::new("test".to_string(), coord);
 
         assert!(TopologyBackup::nodes_equal(&node1, &node2));
 

@@ -14,23 +14,23 @@
 //! - Multi-tier caching (L1/L2/L3) for optimal performance
 
 pub mod asset_library;
-pub mod package_manager;
-pub mod index;
 pub mod cache;
+pub mod index;
+pub mod package_manager;
 pub mod resolver;
 pub mod types;
 
 // Re-export core types for convenience
 pub use asset_library::AssetLibrary;
-pub use package_manager::AssetPackageManager;
+pub use cache::{CacheLayer, PackageCache};
 pub use index::LibraryIndex;
-pub use cache::{PackageCache, CacheLayer};
+pub use package_manager::AssetPackageManager;
 pub use resolver::DependencyResolver;
 pub use types::*;
 
 use anyhow::Result;
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 /// Library configuration for HyperMesh integration
 #[derive(Debug, Clone)]
@@ -84,7 +84,10 @@ pub trait LibraryInterface: Send + Sync {
     async fn validate_package(&self, package: &LibraryAssetPackage) -> Result<ValidationResult>;
 
     /// Resolve dependencies for a package
-    async fn resolve_dependencies(&self, package: &LibraryAssetPackage) -> Result<DependencyResolution>;
+    async fn resolve_dependencies(
+        &self,
+        package: &LibraryAssetPackage,
+    ) -> Result<DependencyResolution>;
 
     /// Get library statistics
     async fn get_stats(&self) -> Result<LibraryStats>;
@@ -242,6 +245,12 @@ pub struct LibraryMetrics {
     total_latency_us: Arc<std::sync::atomic::AtomicU64>,
 }
 
+impl Default for LibraryMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LibraryMetrics {
     /// Create new metrics instance
     pub fn new() -> Self {
@@ -258,7 +267,8 @@ impl LibraryMetrics {
     pub fn record_operation(&self, latency_us: u64) {
         use std::sync::atomic::Ordering;
         self.operations.fetch_add(1, Ordering::Relaxed);
-        self.total_latency_us.fetch_add(latency_us, Ordering::Relaxed);
+        self.total_latency_us
+            .fetch_add(latency_us, Ordering::Relaxed);
     }
 
     /// Record a cache hit
@@ -287,11 +297,7 @@ impl LibraryMetrics {
             0.0
         };
 
-        let avg_latency = if ops > 0 {
-            total_latency / ops
-        } else {
-            0
-        };
+        let avg_latency = if ops > 0 { total_latency / ops } else { 0 };
 
         LibraryStats {
             total_packages: 0, // Will be filled by implementation

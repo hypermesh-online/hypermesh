@@ -121,10 +121,7 @@ pub enum UpiError {
     LockExpired { expired_at: DateTime<Utc> },
 
     #[error("adapter unavailable: {adapter_id} -- {reason}")]
-    AdapterUnavailable {
-        adapter_id: String,
-        reason: String,
-    },
+    AdapterUnavailable { adapter_id: String, reason: String },
 
     #[error("settlement failed: {reason}")]
     SettlementFailed { reason: String },

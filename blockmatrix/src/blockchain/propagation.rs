@@ -14,12 +14,12 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
-use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::neighbors::{find_neighbors, find_k_nearest};
-use crate::matrix::tensor::routing::calculate_routing_path;
 use super::block::Block;
+use crate::matrix::coordinate::MatrixCoordinate;
+use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
+use crate::matrix::tensor::routing::calculate_routing_path;
 
 /// Abstraction over the network transport used for block propagation.
 ///
@@ -99,15 +99,8 @@ use std::collections::HashMap;
 
 impl BlockPropagator {
     /// Create a new block propagator with the default simulated transport.
-    pub fn new(
-        node_coordinate: MatrixCoordinate,
-        strategy: PropagationStrategy,
-    ) -> Self {
-        Self::with_transport(
-            node_coordinate,
-            strategy,
-            Arc::new(SimulatedTransport),
-        )
+    pub fn new(node_coordinate: MatrixCoordinate, strategy: PropagationStrategy) -> Self {
+        Self::with_transport(node_coordinate, strategy, Arc::new(SimulatedTransport))
     }
 
     /// Create a block propagator backed by a real transport implementation.
@@ -147,16 +140,21 @@ impl BlockPropagator {
         );
 
         // Mark this block as seen by this node
-        self.mark_block_seen(&block.hash, &self.node_coordinate).await;
+        self.mark_block_seen(&block.hash, &self.node_coordinate)
+            .await;
 
         // Propagate to each target via the wired transport
         for target in &targets {
             if self.should_propagate_to(&block.hash, target).await {
-                if self.transport.send_block(block, target, &self.node_coordinate).await {
-                    reached_nodes.push(target.clone());
+                if self
+                    .transport
+                    .send_block(block, target, &self.node_coordinate)
+                    .await
+                {
+                    reached_nodes.push(*target);
                     self.mark_block_seen(&block.hash, target).await;
                 } else {
-                    failed_nodes.push(target.clone());
+                    failed_nodes.push(*target);
                 }
             }
         }
@@ -219,8 +217,9 @@ impl BlockPropagator {
             // Find nodes close to the path (within distance 2)
             for node in network_nodes {
                 let dist_to_relay = node.euclidean_distance(&relay);
-                if dist_to_relay <= 2.0 && !targets.contains(node) && *node != self.node_coordinate {
-                    targets.push(node.clone());
+                if dist_to_relay <= 2.0 && !targets.contains(node) && *node != self.node_coordinate
+                {
+                    targets.push(*node);
                     if targets.len() >= 6 {
                         break;
                     }
@@ -292,11 +291,7 @@ impl BlockPropagator {
     }
 
     /// Check if we should propagate to a specific node
-    async fn should_propagate_to(
-        &self,
-        block_hash: &str,
-        target: &MatrixCoordinate,
-    ) -> bool {
+    async fn should_propagate_to(&self, block_hash: &str, target: &MatrixCoordinate) -> bool {
         // Don't propagate to self
         if *target == self.node_coordinate {
             return false;
@@ -322,7 +317,7 @@ impl BlockPropagator {
         let mut seen = self.seen_blocks.write().await;
         seen.entry(block_hash.to_string())
             .or_insert_with(HashSet::new)
-            .insert(node.clone());
+            .insert(*node);
     }
 
     /// Flood propagation for critical blocks
@@ -338,8 +333,8 @@ impl BlockPropagator {
         let mut queue = VecDeque::new();
 
         // Start with this node
-        queue.push_back((self.node_coordinate.clone(), 0));
-        reached_nodes.insert(self.node_coordinate.clone());
+        queue.push_back((self.node_coordinate, 0));
+        reached_nodes.insert(self.node_coordinate);
 
         while let Some((current, hops)) = queue.pop_front() {
             if hops >= max_hops {
@@ -351,8 +346,12 @@ impl BlockPropagator {
 
             for neighbor in neighbors {
                 if !reached_nodes.contains(&neighbor) {
-                    if self.transport.send_block(block, &neighbor, &self.node_coordinate).await {
-                        reached_nodes.insert(neighbor.clone());
+                    if self
+                        .transport
+                        .send_block(block, &neighbor, &self.node_coordinate)
+                        .await
+                    {
+                        reached_nodes.insert(neighbor);
                         queue.push_back((neighbor, hops + 1));
                     } else {
                         failed_nodes.push(neighbor);
@@ -382,7 +381,7 @@ mod tests {
         for x in 0..3 {
             for y in 0..3 {
                 for z in 0..3 {
-                    nodes.push(MatrixCoordinate::new(x, y, z).unwrap());
+                    nodes.push(MatrixCoordinate::new(x, y, z).expect("test: valid coordinate"));
                 }
             }
         }
@@ -391,8 +390,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_broadcast_propagation() {
-        let origin = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let propagator = BlockPropagator::new(origin.clone(), PropagationStrategy::Broadcast);
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
 
         let network = create_test_network();
         let block = Block::genesis(origin);
@@ -407,11 +406,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_nearest_n_propagation() {
-        let origin = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::NearestN(3),
-        );
+        let origin = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::NearestN(3));
 
         let network = create_test_network();
         let block = Block::genesis(origin);
@@ -424,14 +420,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_distance_threshold_propagation() {
-        let origin = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::DistanceThreshold(2.0),
-        );
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::DistanceThreshold(2.0));
 
         let network = create_test_network();
-        let block = Block::genesis(origin.clone());
+        let block = Block::genesis(origin);
 
         let result = propagator.propagate_block(&block, &network).await;
 
@@ -444,11 +437,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_routed_propagation() {
-        let origin = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::RoutedPath,
-        );
+        let origin = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::RoutedPath);
 
         let network = create_test_network();
         let block = Block::genesis(origin);
@@ -461,11 +451,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_prevention() {
-        let origin = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::Broadcast,
-        );
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
 
         let network = create_test_network();
         let block = Block::genesis(origin);
@@ -478,17 +465,13 @@ mod tests {
         let result2 = propagator.propagate_block(&block, &network).await;
 
         // Should not propagate to nodes that already have it
-        assert!(result2.reached_nodes.is_empty() ||
-                result2.reached_nodes.len() < reached_count_1);
+        assert!(result2.reached_nodes.is_empty() || result2.reached_nodes.len() < reached_count_1);
     }
 
     #[tokio::test]
     async fn test_flood_propagation() {
-        let origin = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::Broadcast,
-        );
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
 
         let network = create_test_network();
         let block = Block::genesis(origin);
@@ -502,11 +485,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_relay_node_selection() {
-        let origin = MatrixCoordinate::new(1, 1, 1).unwrap();
-        let propagator = BlockPropagator::new(
-            origin,
-            PropagationStrategy::RoutedPath,
-        );
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::RoutedPath);
 
         let network = create_test_network();
         let relays = propagator.find_relay_nodes(&network);
@@ -516,21 +496,17 @@ mod tests {
 
         // Verify relays are at boundaries
         for relay in relays {
-            let is_boundary =
-                (relay.x == 0 || relay.x == 2) ||
-                (relay.y == 0 || relay.y == 2) ||
-                (relay.z == 0 || relay.z == 2);
+            let is_boundary = (relay.x == 0 || relay.x == 2)
+                || (relay.y == 0 || relay.y == 2)
+                || (relay.z == 0 || relay.z == 2);
             assert!(is_boundary);
         }
     }
 
     #[tokio::test]
     async fn test_propagation_metrics() {
-        let origin = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let propagator = BlockPropagator::new(
-            origin.clone(),
-            PropagationStrategy::Broadcast,
-        );
+        let origin = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
 
         let network = create_test_network();
         let block = Block::genesis(origin);

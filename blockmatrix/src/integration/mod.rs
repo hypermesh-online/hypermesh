@@ -9,50 +9,31 @@
 
 // REMOVED: HTTP API bridge (replaced with STOQ)
 // pub mod api_bridge;
-pub mod stoq_bridge;
 pub mod bootstrap;
 pub mod config;
 pub mod coordinator;
 pub mod lifecycle;
 pub mod metrics;
 pub mod services;
+pub mod stoq_bridge;
 
 pub mod phase1_foundation;
 
 // Re-export main types from stoq_bridge instead
 pub use stoq_bridge::{
-    UnifiedApiBridge,
-    ApiConfig,
-    ServiceInfo,
-    EndpointInfo,
-    AssetRequest,
-    AssetResponse,
-    CertificateRequest,
-    CertificateResponse,
-    TransactionRequest,
-    TransactionResponse,
+    ApiConfig, AssetRequest, AssetResponse, CertificateRequest, CertificateResponse, EndpointInfo,
+    ServiceInfo, TransactionRequest, TransactionResponse, UnifiedApiBridge,
 };
 
-pub use bootstrap::{
-    BootstrapManager,
-    BootstrapConfig,
-    BootstrapPhase,
-    ComponentState,
-    ComponentStatus,
-    ServiceDiscovery,
-    CertificateProvider,
-    TransportProvider,
-    ConsensusProvider,
-};
 use async_trait::async_trait;
-
-pub use config::{
-    IntegrationConfig,
+pub use bootstrap::{
+    BootstrapConfig, BootstrapManager, BootstrapPhase, CertificateProvider, ComponentState,
+    ComponentStatus, ConsensusProvider, ServiceDiscovery, TransportProvider,
 };
 
-pub use self::coordinator::{
-    IntegrationCoordinator,
-};
+pub use config::IntegrationConfig;
+
+pub use self::coordinator::IntegrationCoordinator;
 
 // Error types for integration layer
 #[derive(Debug, thiserror::Error)]
@@ -63,7 +44,11 @@ pub enum IntegrationError {
 
     /// Component communication failure
     #[error("Communication failure between {source_component} and {target}: {message}")]
-    ComponentCommunication { source_component: String, target: String, message: String },
+    ComponentCommunication {
+        source_component: String,
+        target: String,
+        message: String,
+    },
 
     /// Configuration validation error
     #[error("Configuration validation failed: {message}")]
@@ -111,6 +96,12 @@ pub struct IntegrationManager {
     _private: (),
 }
 
+impl Default for IntegrationManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IntegrationManager {
     /// Create new integration manager
     pub fn new() -> Self {
@@ -119,27 +110,16 @@ impl IntegrationManager {
 }
 
 // Common types for integration
-pub use hypermesh_lib::NodeId;
 pub use crate::ServiceId;
+pub use hypermesh_lib::NodeId;
 
-pub use self::lifecycle::{
-    LifecycleManager,
-};
+pub use self::lifecycle::LifecycleManager;
 
-pub use self::metrics::{
-    IntegrationMetrics,
-};
+pub use self::metrics::IntegrationMetrics;
 
-pub use self::services::{
-    ServiceRegistry,
-};
+pub use self::services::ServiceRegistry;
 
 // Phase 1 Foundation - Sprint 1.6 Integration Layer
 pub use self::phase1_foundation::{
-    MatrixFoundation,
-    MatrixFoundationConfig,
-    MatrixNode,
-    NetworkStats,
-    Phase1Error,
-    Phase1Result,
+    MatrixFoundation, MatrixFoundationConfig, MatrixNode, NetworkStats, Phase1Error, Phase1Result,
 };

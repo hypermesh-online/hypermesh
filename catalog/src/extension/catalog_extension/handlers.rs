@@ -9,23 +9,21 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use blockmatrix::extensions::{
-    HyperMeshExtension, ExtensionMetadata,
-    ExtensionConfig, ExtensionResult, ExtensionError,
-    ExtensionRequest, ExtensionResponse, ExtensionStatus, ExtensionState,
-    ExtensionHealth, ValidationReport, ValidationError, ValidationWarning,
-    AssetExtensionHandler, ExtensionStateData,
+    AssetExtensionHandler, ExtensionConfig, ExtensionError, ExtensionHealth, ExtensionMetadata,
+    ExtensionRequest, ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStateData,
+    ExtensionStatus, HyperMeshExtension, ValidationError, ValidationReport, ValidationWarning,
 };
 
 use blockmatrix::assets::core::{AssetManager, AssetType};
 
 use crate::{
-    Catalog, CatalogConfig,
-    sharing::{SharingConfig, SharePermission},
     registry::SearchQuery,
+    sharing::{SharePermission, SharingConfig},
+    Catalog, CatalogConfig,
 };
 
 use super::super::asset_handlers::{
-    VirtualMachineHandler, LibraryHandler, DatasetHandler, TemplateHandler,
+    DatasetHandler, LibraryHandler, TemplateHandler, VirtualMachineHandler,
 };
 use super::super::config::ExtensionSettings;
 use super::types::CatalogExtension;
@@ -59,7 +57,7 @@ impl HyperMeshExtension for CatalogExtension {
                 if self.config.enable_p2p {
                     let sharing_config = SharingConfig {
                         node_id: format!("catalog_{}", uuid::Uuid::new_v4()),
-                        max_mirror_storage: self.config.cache_size as u64,
+                        max_mirror_storage: self.config.cache_size,
                         max_bandwidth: 10 * 1024 * 1024,
                         replication_factor: 3,
                         default_permission: SharePermission::Public,
@@ -73,12 +71,14 @@ impl HyperMeshExtension for CatalogExtension {
                         crate::registry::TrustPolicy::default(),
                         crate::registry::RegistryConfig::default(),
                     ));
-                    match crate::sharing::SharingManager::new(sharing_config, catalog_registry).await {
+                    match crate::sharing::SharingManager::new(sharing_config, catalog_registry)
+                        .await
+                    {
                         Ok(sharing_manager) => {
                             self.sharing_manager = Some(Arc::new(sharing_manager));
                         }
                         Err(e) => {
-                            eprintln!("Warning: Failed to initialize sharing manager: {}", e);
+                            eprintln!("Warning: Failed to initialize sharing manager: {e}");
                         }
                     }
                 }
@@ -92,35 +92,37 @@ impl HyperMeshExtension for CatalogExtension {
             }
             Err(e) => {
                 let mut state = self.state.write().await;
-                state.checksum = format!("error:{}", e);
+                state.checksum = format!("error:{e}");
                 state.version = state.version.saturating_add(1);
 
                 Err(ExtensionError::InitializationFailed {
-                    reason: e.to_string()
+                    reason: e.to_string(),
                 })
             }
         }
     }
 
-    async fn register_assets(&self) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>> {
+    async fn register_assets(
+        &self,
+    ) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>> {
         self.increment_requests().await;
 
         let mut handlers = HashMap::new();
         handlers.insert(
             AssetType::VirtualMachine,
-            Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(VirtualMachineHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(
             AssetType::Library,
-            Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(LibraryHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(
             AssetType::Library,
-            Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(DatasetHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
         handlers.insert(
             AssetType::Container,
-            Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>
+            Box::new(TemplateHandler::new()) as Box<dyn AssetExtensionHandler>,
         );
 
         Ok(handlers)
@@ -131,7 +133,10 @@ impl HyperMeshExtension for CatalogExtension {
         Ok(())
     }
 
-    async fn handle_request(&self, request: ExtensionRequest) -> ExtensionResult<ExtensionResponse> {
+    async fn handle_request(
+        &self,
+        request: ExtensionRequest,
+    ) -> ExtensionResult<ExtensionResponse> {
         self.increment_requests().await;
         self.start_operation().await;
 
@@ -147,7 +152,7 @@ impl HyperMeshExtension for CatalogExtension {
                 success: false,
                 data: None,
                 error: Some(format!("Unknown method: {}", request.method)),
-            }
+            },
         };
 
         self.complete_operation().await;
@@ -190,7 +195,10 @@ impl HyperMeshExtension for CatalogExtension {
         if !self.config.library_path.exists() {
             warnings.push(ValidationWarning {
                 code: "LIBRARY_PATH_MISSING".to_string(),
-                message: format!("Library path does not exist: {:?}", self.config.library_path),
+                message: format!(
+                    "Library path does not exist: {:?}",
+                    self.config.library_path
+                ),
                 context: None,
             });
         }
@@ -199,8 +207,10 @@ impl HyperMeshExtension for CatalogExtension {
         if usage.memory_usage > self.config.max_memory_usage {
             warnings.push(ValidationWarning {
                 code: "HIGH_MEMORY_USAGE".to_string(),
-                message: format!("Memory usage exceeds limit: {} > {}",
-                    usage.memory_usage, self.config.max_memory_usage),
+                message: format!(
+                    "Memory usage exceeds limit: {} > {}",
+                    usage.memory_usage, self.config.max_memory_usage
+                ),
                 context: Some(serde_json::json!({ "current": usage.memory_usage })),
             });
         }
@@ -272,30 +282,62 @@ impl CatalogExtension {
                     Ok(results) => {
                         let data = match serde_json::to_value(results) {
                             Ok(v) => Some(v),
-                            Err(e) => return ExtensionResponse {
-                                request_id: request.id,
-                                success: false,
-                                data: None,
-                                error: Some(format!("Failed to serialize search results: {}", e)),
-                            },
+                            Err(e) => {
+                                return ExtensionResponse {
+                                    request_id: request.id,
+                                    success: false,
+                                    data: None,
+                                    error: Some(format!("Failed to serialize search results: {e}")),
+                                }
+                            }
                         };
-                        ExtensionResponse { request_id: request.id, success: true, data, error: None }
+                        ExtensionResponse {
+                            request_id: request.id,
+                            success: true,
+                            data,
+                            error: None,
+                        }
+                    }
+                    Err(e) => ExtensionResponse {
+                        request_id: request.id,
+                        success: false,
+                        data: None,
+                        error: Some(e.to_string()),
                     },
-                    Err(e) => ExtensionResponse { request_id: request.id, success: false, data: None, error: Some(e.to_string()) }
                 }
             } else {
-                ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Invalid search query".to_string()) }
+                ExtensionResponse {
+                    request_id: request.id,
+                    success: false,
+                    data: None,
+                    error: Some("Invalid search query".to_string()),
+                }
             }
         } else {
-            ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Catalog not initialized".to_string()) }
+            ExtensionResponse {
+                request_id: request.id,
+                success: false,
+                data: None,
+                error: Some("Catalog not initialized".to_string()),
+            }
         }
     }
 
     async fn handle_validate(&self, request: ExtensionRequest) -> ExtensionResponse {
         if self.catalog.is_some() {
-            ExtensionResponse { request_id: request.id, success: true, data: Some(serde_json::json!({ "valid": true })), error: None }
+            ExtensionResponse {
+                request_id: request.id,
+                success: true,
+                data: Some(serde_json::json!({ "valid": true })),
+                error: None,
+            }
         } else {
-            ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Catalog not initialized".to_string()) }
+            ExtensionResponse {
+                request_id: request.id,
+                success: false,
+                data: None,
+                error: Some("Catalog not initialized".to_string()),
+            }
         }
     }
 
@@ -306,7 +348,12 @@ impl CatalogExtension {
             "error_count": *self.error_count.read().await,
             "uptime_seconds": self.start_time.elapsed().as_secs(),
         });
-        ExtensionResponse { request_id: request.id, success: true, data: Some(stats), error: None }
+        ExtensionResponse {
+            request_id: request.id,
+            success: true,
+            data: Some(stats),
+            error: None,
+        }
     }
 
     async fn handle_sharing_connect(&self, request: ExtensionRequest) -> ExtensionResponse {
@@ -314,19 +361,33 @@ impl CatalogExtension {
             if let Some(address) = request.params.get("address").and_then(|v| v.as_str()) {
                 match sharing_manager.connect_peer(address).await {
                     Ok(peer_id) => ExtensionResponse {
-                        request_id: request.id, success: true,
-                        data: Some(serde_json::json!({ "peer_id": peer_id })), error: None,
+                        request_id: request.id,
+                        success: true,
+                        data: Some(serde_json::json!({ "peer_id": peer_id })),
+                        error: None,
                     },
                     Err(e) => ExtensionResponse {
-                        request_id: request.id, success: false, data: None,
-                        error: Some(format!("Failed to connect to peer: {}", e)),
-                    }
+                        request_id: request.id,
+                        success: false,
+                        data: None,
+                        error: Some(format!("Failed to connect to peer: {e}")),
+                    },
                 }
             } else {
-                ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Missing address parameter".to_string()) }
+                ExtensionResponse {
+                    request_id: request.id,
+                    success: false,
+                    data: None,
+                    error: Some("Missing address parameter".to_string()),
+                }
             }
         } else {
-            ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Sharing not enabled".to_string()) }
+            ExtensionResponse {
+                request_id: request.id,
+                success: false,
+                data: None,
+                error: Some("Sharing not enabled".to_string()),
+            }
         }
     }
 
@@ -337,23 +398,44 @@ impl CatalogExtension {
                     Ok(results) => {
                         let data = match serde_json::to_value(results) {
                             Ok(v) => Some(v),
-                            Err(e) => return ExtensionResponse {
-                                request_id: request.id, success: false, data: None,
-                                error: Some(format!("Failed to serialize search results: {}", e)),
-                            },
+                            Err(e) => {
+                                return ExtensionResponse {
+                                    request_id: request.id,
+                                    success: false,
+                                    data: None,
+                                    error: Some(format!("Failed to serialize search results: {e}")),
+                                }
+                            }
                         };
-                        ExtensionResponse { request_id: request.id, success: true, data, error: None }
-                    },
-                    Err(e) => ExtensionResponse {
-                        request_id: request.id, success: false, data: None,
-                        error: Some(format!("Search failed: {}", e)),
+                        ExtensionResponse {
+                            request_id: request.id,
+                            success: true,
+                            data,
+                            error: None,
+                        }
                     }
+                    Err(e) => ExtensionResponse {
+                        request_id: request.id,
+                        success: false,
+                        data: None,
+                        error: Some(format!("Search failed: {e}")),
+                    },
                 }
             } else {
-                ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Missing query parameter".to_string()) }
+                ExtensionResponse {
+                    request_id: request.id,
+                    success: false,
+                    data: None,
+                    error: Some("Missing query parameter".to_string()),
+                }
             }
         } else {
-            ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Sharing not enabled".to_string()) }
+            ExtensionResponse {
+                request_id: request.id,
+                success: false,
+                data: None,
+                error: Some("Sharing not enabled".to_string()),
+            }
         }
     }
 
@@ -362,14 +444,28 @@ impl CatalogExtension {
             let stats = sharing_manager.get_stats().await;
             let data = match serde_json::to_value(stats) {
                 Ok(v) => Some(v),
-                Err(e) => return ExtensionResponse {
-                    request_id: request.id, success: false, data: None,
-                    error: Some(format!("Failed to serialize sharing stats: {}", e)),
-                },
+                Err(e) => {
+                    return ExtensionResponse {
+                        request_id: request.id,
+                        success: false,
+                        data: None,
+                        error: Some(format!("Failed to serialize sharing stats: {e}")),
+                    }
+                }
             };
-            ExtensionResponse { request_id: request.id, success: true, data, error: None }
+            ExtensionResponse {
+                request_id: request.id,
+                success: true,
+                data,
+                error: None,
+            }
         } else {
-            ExtensionResponse { request_id: request.id, success: false, data: None, error: Some("Sharing not enabled".to_string()) }
+            ExtensionResponse {
+                request_id: request.id,
+                success: false,
+                data: None,
+                error: Some("Sharing not enabled".to_string()),
+            }
         }
     }
 }

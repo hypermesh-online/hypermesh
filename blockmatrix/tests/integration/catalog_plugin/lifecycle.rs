@@ -34,10 +34,14 @@ async fn test_plugin_discovery_multiple_paths() {
 
     // Discover all extensions
     let discovered = loader.discover_extensions().await.unwrap();
-    info!("Discovered {} extensions across all paths", discovered.len());
+    info!(
+        "Discovered {} extensions across all paths",
+        discovered.len()
+    );
 
     // Verify catalog is found
-    let catalog = discovered.iter()
+    let catalog = discovered
+        .iter()
         .find(|m| m.metadata.id == "catalog")
         .expect("Catalog extension should be discovered");
 
@@ -71,13 +75,17 @@ async fn test_manifest_validation() {
 
     // Test valid manifest
     let discovered = loader.discover_extensions().await.unwrap();
-    let catalog = discovered.iter()
+    let catalog = discovered
+        .iter()
         .find(|m| m.metadata.id == "catalog")
         .expect("Catalog should be found");
 
     // Validate required fields
     assert!(catalog.metadata.hypermesh_version.major >= 1);
-    assert!(catalog.metadata.required_capabilities.contains(&ExtensionCapability::AssetManagement));
+    assert!(catalog
+        .metadata
+        .required_capabilities
+        .contains(&ExtensionCapability::AssetManagement));
 
     // Test invalid manifest scenarios
     let invalid_path = PathBuf::from("./test-data/invalid-manifest");
@@ -140,7 +148,10 @@ async fn test_signature_verification() {
                 loader.unload_extension(&id).await.ok();
             }
             Err(e) => {
-                info!("Extension loading failed as expected without signature: {}", e);
+                info!(
+                    "Extension loading failed as expected without signature: {}",
+                    e
+                );
             }
         }
     }
@@ -238,7 +249,10 @@ async fn test_cleanup_on_unload() {
     // Register assets and handlers
     let handlers = extension.register_assets().await.unwrap();
     let handler_count = handlers.len();
-    extension.extend_manager(asset_manager.clone()).await.unwrap();
+    extension
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Create some resources
     for i in 0..5 {
@@ -259,8 +273,11 @@ async fn test_cleanup_on_unload() {
     let state_before = extension.export_state().await.unwrap();
     let status_before = extension.status().await;
 
-    info!("Extension state before unload: {} items, {} requests processed",
-          state_before.data.len(), status_before.total_requests);
+    info!(
+        "Extension state before unload: {} items, {} requests processed",
+        state_before.data.len(),
+        status_before.total_requests
+    );
 
     // Unload extension
     loader.unload_extension(&extension_id).await.unwrap();
@@ -270,7 +287,8 @@ async fn test_cleanup_on_unload() {
 
     // Verify handlers are deregistered
     let remaining_types = asset_manager.list_asset_types().await;
-    let catalog_types = remaining_types.iter()
+    let catalog_types = remaining_types
+        .iter()
         .filter(|t| t.name == "library" || t.name == "package")
         .count();
     assert_eq!(catalog_types, 0, "Asset types should be deregistered");
@@ -330,7 +348,10 @@ async fn test_state_persistence() {
     let extension2 = loader.get_extension(&extension_id2).await.unwrap();
 
     // Import state
-    extension2.import_state(exported_state.clone()).await.unwrap();
+    extension2
+        .import_state(exported_state.clone())
+        .await
+        .unwrap();
 
     // Verify state was restored
     let restored_state = extension2.export_state().await.unwrap();
@@ -359,7 +380,10 @@ async fn test_hot_reload() {
 
     // Setup extension
     extension1.register_assets().await.unwrap();
-    extension1.extend_manager(asset_manager.clone()).await.unwrap();
+    extension1
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Create some state
     let request = ExtensionRequest {
@@ -386,7 +410,10 @@ async fn test_hot_reload() {
 
     // Re-setup extension
     extension2.register_assets().await.unwrap();
-    extension2.extend_manager(asset_manager.clone()).await.unwrap();
+    extension2
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Import state
     extension2.import_state(state).await.unwrap();

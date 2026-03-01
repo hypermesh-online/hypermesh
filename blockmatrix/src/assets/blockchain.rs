@@ -7,13 +7,12 @@
 //! This module implements asset-based blockchain operations following Proof of State patterns.
 //! Assets are stored directly in blockchain blocks with ConsensusProof validation.
 
-use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
 use crate::assets::core::asset_id::{AssetRegistration, AssetType};
 use crate::consensus::{
-    ConsensusProof,
-    AsyncConsensus, ConsensusResult, DefaultConsensus, ConsensusConfig
+    AsyncConsensus, ConsensusConfig, ConsensusProof, ConsensusResult, DefaultConsensus,
 };
+use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
 /// Asset record types for blockchain operations
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -37,10 +36,11 @@ pub enum AssetRecordType {
 }
 
 impl AssetRecordType {
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         match self {
             AssetRecordType::Custom(ref s) => s.clone(),
-            _ => format!("{:?}", self),
+            _ => format!("{self:?}"),
         }
     }
 }
@@ -144,7 +144,8 @@ impl HyperMeshAssetRecord {
         if *required_level == PrivacyMode::PUBLIC {
             true
         } else if *required_level == PrivacyMode::PRIVATE {
-            self.privacy_level == PrivacyMode::PRIVATE || self.privacy_level == PrivacyMode::ANONYMOUS
+            self.privacy_level == PrivacyMode::PRIVATE
+                || self.privacy_level == PrivacyMode::ANONYMOUS
         } else {
             // ANONYMOUS required level: only exact ANONYMOUS matches
             self.privacy_level == *required_level
@@ -166,6 +167,7 @@ pub fn asset_privacy_to_u8(mode: &PrivacyMode) -> u8 {
 
 /// HyperMesh blockchain data following Proof of State patterns
 #[derive(Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum HyperMeshBlockData {
     /// Genesis block
     Genesis,
@@ -183,7 +185,7 @@ impl HyperMeshBlockData {
             HyperMeshBlockData::AssetRecord(record) => {
                 // Serialize asset record for block inclusion
                 serde_json::to_vec(record).unwrap_or_default()
-            },
+            }
             HyperMeshBlockData::Raw(data) => data.clone(),
         }
     }
@@ -239,8 +241,10 @@ impl AssetBlockchainManager {
 
         // Ensure record has proper consensus proofs if missing
         if record.consensus_proofs.is_empty() {
-            let consensus_proof = self.create_asset_consensus_proof(&record).await
-                .map_err(|e| format!("Failed to create consensus proof: {:?}", e))?;
+            let consensus_proof = self
+                .create_asset_consensus_proof(&record)
+                .await
+                .map_err(|e| format!("Failed to create consensus proof: {e:?}"))?;
             record.consensus_proofs.push(consensus_proof);
         }
 
@@ -254,7 +258,7 @@ impl AssetBlockchainManager {
 
         // Calculate final block hash
         let block_hash = record.calculate_hash();
-        
+
         Ok(block_hash)
     }
 
@@ -278,7 +282,7 @@ impl AssetBlockchainManager {
         // This would query the latest committed state for the asset
         Ok(None)
     }
-    
+
     /// Create consensus proof for asset operation
     async fn create_asset_consensus_proof(
         &self,
@@ -286,14 +290,12 @@ impl AssetBlockchainManager {
     ) -> ConsensusResult<ConsensusProof> {
         let node_id = crate::transport::PeerIdentity::from_name(self.node_authority.clone());
         let operation_type = record.record_type.to_string();
-        
-        self.consensus.create_consensus_proof(
-            &record.asset_id.to_hex_string(),
-            &node_id,
-            &operation_type,
-        ).await
+
+        self.consensus
+            .create_consensus_proof(&record.asset_id.to_hex_string(), &node_id, &operation_type)
+            .await
     }
-    
+
     /// Validate asset operation with consensus
     pub async fn validate_asset_operation(
         &self,
@@ -303,22 +305,25 @@ impl AssetBlockchainManager {
         if !self.consensus.is_leader().await {
             return Err("Asset operations require leader consensus".to_string());
         }
-        
+
         // Validate all consensus proofs
         for proof in &record.consensus_proofs {
-            let is_valid = self.consensus.validate_consensus_proof(proof).await
-                .map_err(|e| format!("Consensus proof validation failed: {:?}", e))?;
+            let is_valid = self
+                .consensus
+                .validate_consensus_proof(proof)
+                .await
+                .map_err(|e| format!("Consensus proof validation failed: {e:?}"))?;
             if !is_valid {
                 return Ok(false);
             }
         }
-        
+
         // Check asset privacy requirements
         let required_privacy = &record.privacy_level;
         if !record.validates_privacy(required_privacy) {
             return Ok(false);
         }
-        
+
         Ok(true)
     }
 }
@@ -377,18 +382,20 @@ pub struct ActualResourceUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use crate::assets::core::asset_id::AssetType;
-    use crate::consensus::proof::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+    use crate::consensus::proof::{
+        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    };
     use crate::test_utils::test_asset_id;
+    use std::time::Duration;
 
     #[tokio::test]
     async fn test_asset_record_creation() {
         let asset_id = test_asset_id(AssetType::Cpu);
-        
+
         // Create mock consensus proof (would be real in production)
         let consensus_proofs = vec![]; // TODO: Add real consensus proofs
-        
+
         let record = HyperMeshAssetRecord::new(
             asset_id,
             AssetRecordType::Creation,
@@ -406,7 +413,7 @@ mod tests {
     #[tokio::test]
     async fn test_asset_record_with_consensus_proof() {
         let asset_id = test_asset_id(AssetType::Cpu);
-        
+
         // Create real consensus proof for testing
         let space_proof = SpaceProof::new(
             "test-node".to_string(),
@@ -431,12 +438,7 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(1));
 
-        let consensus_proof = ConsensusProof::new(
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof,
-        );
+        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         let record = HyperMeshAssetRecord::new(
             asset_id,
@@ -448,8 +450,11 @@ mod tests {
         );
 
         // Validate consensus proofs
-        let is_valid = record.validate_consensus().await.unwrap();
-        assert!(is_valid, "Asset record with consensus proof should be valid");
+        let is_valid = record.validate_consensus().await.expect("test: async operation");
+        assert!(
+            is_valid,
+            "Asset record with consensus proof should be valid"
+        );
 
         assert_eq!(record.record_type, AssetRecordType::Creation);
         assert_eq!(record.issuing_authority, "test-authority");

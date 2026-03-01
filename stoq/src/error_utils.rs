@@ -128,14 +128,22 @@ impl ProtocolErrorBuilder {
         })
     }
 
-    pub fn frame_decode_failed(self, frame_type: Option<u64>, reason: impl Into<String>) -> StoqError {
+    pub fn frame_decode_failed(
+        self,
+        frame_type: Option<u64>,
+        reason: impl Into<String>,
+    ) -> StoqError {
         StoqError::Protocol(ProtocolError::FrameDecodeFailed {
             frame_type,
             reason: reason.into(),
         })
     }
 
-    pub fn frame_encode_failed(self, frame_type: impl Into<String>, reason: impl Into<String>) -> StoqError {
+    pub fn frame_encode_failed(
+        self,
+        frame_type: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> StoqError {
         StoqError::Protocol(ProtocolError::FrameEncodeFailed {
             frame_type: frame_type.into(),
             reason: reason.into(),
@@ -189,7 +197,11 @@ pub mod transport {
             .connection_closed(reason)
     }
 
-    pub fn stream_error(stream_id: Option<u64>, operation: impl Into<String>, reason: impl Into<String>) -> StoqError {
+    pub fn stream_error(
+        stream_id: Option<u64>,
+        operation: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> StoqError {
         let mut builder = TransportErrorBuilder::new().operation(operation);
         if let Some(id) = stream_id {
             builder = builder.stream_id(id);
@@ -197,7 +209,11 @@ pub mod transport {
         builder.stream_error(reason)
     }
 
-    pub fn bind_failed(address: impl Into<String>, port: u16, reason: impl Into<String>) -> StoqError {
+    pub fn bind_failed(
+        address: impl Into<String>,
+        port: u16,
+        reason: impl Into<String>,
+    ) -> StoqError {
         StoqError::Transport(TransportError::BindFailed {
             address: address.into(),
             port,
@@ -239,18 +255,18 @@ pub mod protocol {
     }
 
     pub fn invalid_proof(proof_type: ProofType, reason: impl Into<String>) -> StoqError {
-        ProtocolErrorBuilder::new()
-            .invalid_proof(proof_type, reason)
+        ProtocolErrorBuilder::new().invalid_proof(proof_type, reason)
     }
 
     pub fn frame_decode_failed(frame_type: Option<u64>, reason: impl Into<String>) -> StoqError {
-        ProtocolErrorBuilder::new()
-            .frame_decode_failed(frame_type, reason)
+        ProtocolErrorBuilder::new().frame_decode_failed(frame_type, reason)
     }
 
-    pub fn frame_encode_failed(frame_type: impl Into<String>, reason: impl Into<String>) -> StoqError {
-        ProtocolErrorBuilder::new()
-            .frame_encode_failed(frame_type, reason)
+    pub fn frame_encode_failed(
+        frame_type: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> StoqError {
+        ProtocolErrorBuilder::new().frame_encode_failed(frame_type, reason)
     }
 
     pub fn shard_reassembly_failed(shard_id: u32, reason: impl Into<String>) -> StoqError {
@@ -260,8 +276,7 @@ pub mod protocol {
     }
 
     pub fn token_replay_detected(token_hash: [u8; 32]) -> StoqError {
-        ProtocolErrorBuilder::new()
-            .token_replay_detected(token_hash)
+        ProtocolErrorBuilder::new().token_replay_detected(token_hash)
     }
 
     pub fn service_not_found(service_name: impl Into<String>) -> StoqError {

@@ -6,10 +6,7 @@
 
 use tracing::{info, warn};
 
-use super::{
-    ClusterManager, ClusterError, ClusterEvent, ClusterHealth,
-    NodeStatus, now_secs,
-};
+use super::{now_secs, ClusterError, ClusterEvent, ClusterHealth, ClusterManager, NodeStatus};
 
 impl ClusterManager {
     /// Run a health check across all nodes, updating statuses and scores.
@@ -71,10 +68,8 @@ impl ClusterManager {
 
         for (node_id, reason) in new_failures {
             warn!(node_id = %node_id, reason = %reason, "Node failed");
-            self.pending_events.push(ClusterEvent::NodeFailed {
-                node_id,
-                reason,
-            });
+            self.pending_events
+                .push(ClusterEvent::NodeFailed { node_id, reason });
         }
 
         let total = self.nodes.len();
@@ -101,11 +96,7 @@ impl ClusterManager {
     }
 
     /// Manually mark a node as degraded with a reason
-    pub fn mark_node_degraded(
-        &mut self,
-        node_id: &str,
-        reason: &str,
-    ) -> Result<(), ClusterError> {
+    pub fn mark_node_degraded(&mut self, node_id: &str, reason: &str) -> Result<(), ClusterError> {
         let node = self
             .nodes
             .get_mut(node_id)
@@ -122,10 +113,7 @@ impl ClusterManager {
     /// Recovery is only possible after [`ClusterConfig::recovery_timeout_secs`]
     /// have elapsed since the node entered Failed state. On success the node
     /// transitions to `Joining` and its heartbeat/failure counters are reset.
-    pub fn attempt_recovery(
-        &mut self,
-        node_id: &str,
-    ) -> Result<NodeStatus, ClusterError> {
+    pub fn attempt_recovery(&mut self, node_id: &str) -> Result<NodeStatus, ClusterError> {
         let now = now_secs();
         let timeout = self.config.recovery_timeout_secs;
 

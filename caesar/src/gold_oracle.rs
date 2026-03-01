@@ -165,8 +165,8 @@ impl GoldOracle {
             Decimal::ZERO
         };
 
-        let effective_rate = price_per_gram
-            * (Decimal::ONE + avg_fee_rate + speculation_index - liquidity_shadow);
+        let effective_rate =
+            price_per_gram * (Decimal::ONE + avg_fee_rate + speculation_index - liquidity_shadow);
 
         EffectivePriceComposite {
             network_fees_component: avg_fee_rate,
@@ -350,7 +350,10 @@ mod tests {
     #[tokio::test]
     async fn manual_feed_returns_price() {
         let feed = ManualFeed::new(dec!(2000));
-        let price = feed.fetch_gold_price_usd().await.expect("test: manual feed");
+        let price = feed
+            .fetch_gold_price_usd()
+            .await
+            .expect("test: manual feed");
         assert_eq!(price, dec!(2000));
         assert_eq!(feed.feed_name(), "manual");
     }
@@ -359,7 +362,10 @@ mod tests {
     async fn oracle_update_from_feed() {
         let oracle = GoldOracle::new(dec!(2000));
         let feed = ManualFeed::new(dec!(2050));
-        oracle.update_from_feed(&feed).await.expect("test: update from feed");
+        oracle
+            .update_from_feed(&feed)
+            .await
+            .expect("test: update from feed");
         assert_eq!(oracle.current_gold_price_usd().await, dec!(2050));
     }
 }

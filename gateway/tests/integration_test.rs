@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 use anyhow::Result;
-use bytes::{Bytes, Buf};
+use bytes::{Buf, Bytes};
 use http::{Method, Request, StatusCode};
 use quinn::{ClientConfig, Endpoint};
 use std::net::SocketAddr;
@@ -32,7 +32,7 @@ impl TestClient {
         tls_config.alpn_protocols = vec![b"h3".to_vec()];
 
         let client_config = ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(tls_config)?
+            quinn::crypto::rustls::QuicClientConfig::try_from(tls_config)?,
         ));
 
         // Create endpoint
@@ -58,8 +58,8 @@ impl TestClient {
             .await?;
 
         // Create HTTP/3 connection
-        let (mut driver, mut send_request) = h3::client::new(h3_quinn::Connection::new(connection))
-            .await?;
+        let (mut driver, mut send_request) =
+            h3::client::new(h3_quinn::Connection::new(connection)).await?;
 
         // Spawn driver
         tokio::spawn(async move {
@@ -129,7 +129,7 @@ async fn test_gateway_health_check() -> Result<()> {
             assert!(health_data["version"].is_string());
         }
         Ok(Err(e)) => {
-            eprintln!("Health check failed: {}", e);
+            eprintln!("Health check failed: {e}");
             // Don't fail the test if gateway is not fully configured
         }
         Err(_) => {
@@ -268,7 +268,9 @@ fn test_cors_configuration() {
 
     let cors = CorsConfig::default();
 
-    assert!(cors.allowed_origins.contains(&"http://localhost:5173".to_string()));
+    assert!(cors
+        .allowed_origins
+        .contains(&"http://localhost:5173".to_string()));
     assert!(cors.allowed_methods.contains(&"GET".to_string()));
     assert!(cors.allowed_methods.contains(&"POST".to_string()));
     assert!(cors.allowed_headers.contains(&"Content-Type".to_string()));

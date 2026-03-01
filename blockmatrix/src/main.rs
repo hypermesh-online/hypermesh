@@ -7,8 +7,8 @@ use serde_json::json;
 use std::sync::Arc;
 use tracing::info;
 
-use stoq::{ApiHandler, ApiRequest, ApiResponse, ApiError, StoqApiServer};
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::{ApiError, ApiHandler, ApiRequest, ApiResponse, StoqApiServer};
 
 /// Health check handler
 struct HealthCheckHandler;
@@ -28,7 +28,7 @@ impl ApiHandler for HealthCheckHandler {
         });
 
         let payload = serde_json::to_vec(&response)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
         Ok(ApiResponse {
             request_id: req.id.clone(),
@@ -75,7 +75,7 @@ impl ApiHandler for ListAssetsHandler {
         ]);
 
         let payload = serde_json::to_vec(&response)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
         Ok(ApiResponse {
             request_id: req.id.clone(),
@@ -122,7 +122,7 @@ impl ApiHandler for ListNodesHandler {
         ]);
 
         let payload = serde_json::to_vec(&response)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
         Ok(ApiResponse {
             request_id: req.id.clone(),
@@ -155,7 +155,7 @@ impl ApiHandler for HyperMeshStatusHandler {
         });
 
         let payload = serde_json::to_vec(&response)
-            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {}", e)))?;
+            .map_err(|e| ApiError::SerializationError(format!("Failed to serialize: {e}")))?;
 
         Ok(ApiResponse {
             request_id: req.id.clone(),
@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
 
     // Create STOQ transport configuration
     let transport_config = TransportConfig {
-        bind_address: std::net::Ipv6Addr::UNSPECIFIED,  // [::] = listen on all interfaces
+        bind_address: std::net::Ipv6Addr::UNSPECIFIED, // [::] = listen on all interfaces
         port: 8446,
         ..Default::default()
     };

@@ -6,20 +6,20 @@
 //!
 //! Migrated to use BlockMatrix instruction-based retrieval and Asset Registry
 
-mod types;
 mod helpers;
+mod types;
 
 pub use types::*;
 
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 
-use crate::{AssetRegistration, AssetPackage};
+use super::{ConflictResolution, PeerInfo};
 use crate::registry::CatalogRegistry;
-use super::{PeerInfo, ConflictResolution};
+use crate::{AssetPackage, AssetRegistration};
 
 /// Synchronization manager
 pub struct SyncManager {
@@ -57,10 +57,14 @@ impl SyncManager {
         resolution: ConflictResolution,
     ) -> Result<u32> {
         // Update sync state
-        self.update_sync_state(&peer.node_id, SyncState::Syncing {
-            started_at: SystemTime::now(),
-            progress: 0.0,
-        }).await?;
+        self.update_sync_state(
+            &peer.node_id,
+            SyncState::Syncing {
+                started_at: SystemTime::now(),
+                progress: 0.0,
+            },
+        )
+        .await?;
 
         // Record sync start
         self.record_event(SyncEvent {
@@ -69,7 +73,8 @@ impl SyncManager {
             event_type: SyncEventType::Started,
             packages_affected: 0,
             bytes_transferred: 0,
-        }).await;
+        })
+        .await;
 
         // Get peer's merkle root
         let peer_merkle = self.request_merkle_root(&peer.node_id).await?;
@@ -84,10 +89,14 @@ impl SyncManager {
         let packages_synced = self.apply_delta(resolved_delta, &peer.node_id).await?;
 
         // Update sync state
-        self.update_sync_state(&peer.node_id, SyncState::Synced {
-            last_sync: SystemTime::now(),
-            packages_synced,
-        }).await?;
+        self.update_sync_state(
+            &peer.node_id,
+            SyncState::Synced {
+                last_sync: SystemTime::now(),
+                packages_synced,
+            },
+        )
+        .await?;
 
         // Record sync completion
         self.record_event(SyncEvent {
@@ -96,30 +105,22 @@ impl SyncManager {
             event_type: SyncEventType::Completed,
             packages_affected: packages_synced,
             bytes_transferred: 0, // Would be tracked during actual transfer
-        }).await;
+        })
+        .await;
 
         Ok(packages_synced)
     }
 
     /// Perform selective synchronization
-    pub async fn selective_sync(
-        &self,
-        peer: &PeerInfo,
-        strategy: SyncStrategy,
-    ) -> Result<u32> {
+    pub async fn selective_sync(&self, peer: &PeerInfo, strategy: SyncStrategy) -> Result<u32> {
         match strategy {
             SyncStrategy::Full => {
-                self.sync_with_peer(peer, ConflictResolution::ConsensusWins).await
+                self.sync_with_peer(peer, ConflictResolution::ConsensusWins)
+                    .await
             }
-            SyncStrategy::Incremental { since } => {
-                self.incremental_sync(peer, since).await
-            }
-            SyncStrategy::Selective { categories } => {
-                self.category_sync(peer, categories).await
-            }
-            SyncStrategy::Priority { min_priority } => {
-                self.priority_sync(peer, min_priority).await
-            }
+            SyncStrategy::Incremental { since } => self.incremental_sync(peer, since).await,
+            SyncStrategy::Selective { categories } => self.category_sync(peer, categories).await,
+            SyncStrategy::Priority { min_priority } => self.priority_sync(peer, min_priority).await,
             SyncStrategy::Differential { merkle_root } => {
                 self.differential_sync(peer, merkle_root).await
             }
@@ -127,18 +128,14 @@ impl SyncManager {
     }
 
     /// Incremental synchronization since timestamp
-    async fn incremental_sync(
-        &self,
-        peer: &PeerInfo,
-        since: SystemTime,
-    ) -> Result<u32> {
+    async fn incremental_sync(&self, peer: &PeerInfo, since: SystemTime) -> Result<u32> {
         let packages = self.get_packages_since(since).await?;
         let mut synced_count = 0;
 
         for package in packages {
             if peer.available_packages.contains(package.id()) {
                 // Check if peer has older version
-                if self.needs_update(&package.id(), &peer.node_id).await? {
+                if self.needs_update(package.id(), &peer.node_id).await? {
                     self.send_package_update(&package, &peer.node_id).await?;
                     synced_count += 1;
                 }
@@ -153,11 +150,7 @@ impl SyncManager {
     }
 
     /// Category-based synchronization
-    async fn category_sync(
-        &self,
-        peer: &PeerInfo,
-        categories: Vec<String>,
-    ) -> Result<u32> {
+    async fn category_sync(&self, peer: &PeerInfo, categories: Vec<String>) -> Result<u32> {
         let packages = self.get_packages_by_category(categories).await?;
         let mut synced_count = 0;
 
@@ -172,11 +165,7 @@ impl SyncManager {
     }
 
     /// Priority-based synchronization
-    async fn priority_sync(
-        &self,
-        peer: &PeerInfo,
-        min_priority: f64,
-    ) -> Result<u32> {
+    async fn priority_sync(&self, peer: &PeerInfo, min_priority: f64) -> Result<u32> {
         let packages = self.get_high_priority_packages(min_priority).await?;
         let mut synced_count = 0;
 
@@ -191,13 +180,9 @@ impl SyncManager {
     }
 
     /// Differential synchronization using merkle trees
-    async fn differential_sync(
-        &self,
-        peer: &PeerInfo,
-        peer_merkle_root: String,
-    ) -> Result<u32> {
+    async fn differential_sync(&self, peer: &PeerInfo, peer_merkle_root: String) -> Result<u32> {
         let our_merkle = self.merkle_tree.read().await;
-        let our_root = self.calculate_merkle_root(&*our_merkle);
+        let our_root = self.calculate_merkle_root(&our_merkle);
 
         if our_root == peer_merkle_root {
             // Already in sync
@@ -244,10 +229,8 @@ impl SyncManager {
                         remote_version: remote_meta.version.clone(),
                         local_metadata: local_package.spec.metadata.clone(),
                         remote_metadata: remote_meta.clone(),
-                        suggested_resolution: self.suggest_resolution(
-                            &local_package.spec.metadata,
-                            remote_meta,
-                        ),
+                        suggested_resolution: self
+                            .suggest_resolution(&local_package.spec.metadata, remote_meta),
                     });
                 }
             } else {
@@ -282,10 +265,10 @@ impl SyncManager {
                     // Compare timestamps using updated_at field
                     if conflict.remote_metadata.updated > conflict.local_metadata.updated {
                         // Use remote version
-                        if let Ok(package) = self.request_package(
-                            &conflict.asset_id,
-                            &conflict.remote_version,
-                        ).await {
+                        if let Ok(package) = self
+                            .request_package(&conflict.asset_id, &conflict.remote_version)
+                            .await
+                        {
                             delta.updates.push(package);
                         }
                     }
@@ -293,23 +276,24 @@ impl SyncManager {
                 }
                 ConflictResolution::ConsensusWins => {
                     // Check consensus scores
-                    if self.get_consensus_score(&conflict.remote_metadata).await? >
-                       self.get_consensus_score(&conflict.local_metadata).await? {
+                    if self.get_consensus_score(&conflict.remote_metadata).await?
+                        > self.get_consensus_score(&conflict.local_metadata).await?
+                    {
                         // Use remote version
-                        if let Ok(package) = self.request_package(
-                            &conflict.asset_id,
-                            &conflict.remote_version,
-                        ).await {
+                        if let Ok(package) = self
+                            .request_package(&conflict.asset_id, &conflict.remote_version)
+                            .await
+                        {
                             delta.updates.push(package);
                         }
                     }
                 }
                 ConflictResolution::Merge => {
                     // Attempt to merge changes
-                    if let Ok(merged) = self.merge_packages(
-                        &conflict.local_metadata,
-                        &conflict.remote_metadata,
-                    ).await {
+                    if let Ok(merged) = self
+                        .merge_packages(&conflict.local_metadata, &conflict.remote_metadata)
+                        .await
+                    {
                         delta.updates.push(merged);
                     } else {
                         // Merge failed, keep as conflict
@@ -336,7 +320,8 @@ impl SyncManager {
                 },
                 packages_affected: 1,
                 bytes_transferred: 0,
-            }).await;
+            })
+            .await;
         }
 
         delta.conflicts = resolved_conflicts;
@@ -391,15 +376,15 @@ impl SyncManager {
         for (id, package) in packages.iter() {
             let hash = self.hash_package(package);
             // Parse string ID to AssetRegistration
-            let asset_id = AssetRegistration::from_hex_string(id)
-                .unwrap_or_else(|_| {
-                    // Fallback: create from package hash
-                    let mut hash_bytes = [0u8; 32];
-                    if let Ok(bytes) = hex::decode(&package.package_hash) {
-                        hash_bytes[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
-                    }
-                    AssetRegistration::new_from_hash(&hash_bytes)
-                });
+            let asset_id = AssetRegistration::from_hex_string(id).unwrap_or_else(|_| {
+                // Fallback: create from package hash
+                let mut hash_bytes = [0u8; 32];
+                if let Ok(bytes) = hex::decode(&package.package_hash) {
+                    hash_bytes[..bytes.len().min(32)]
+                        .copy_from_slice(&bytes[..bytes.len().min(32)]);
+                }
+                AssetRegistration::new_from_hash(&hash_bytes)
+            });
             let node = MerkleNode {
                 hash: hash.clone(),
                 left: None,
@@ -445,7 +430,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sync_manager_creation() {
-        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 
         let registry = Arc::new(CatalogRegistry::new(
             hypermesh_lib::PrivacyMode::PUBLIC,
@@ -453,17 +438,14 @@ mod tests {
             RegistryConfig::default(),
         ));
 
-        let manager = SyncManager::new(
-            "test-node".to_string(),
-            Duration::from_secs(300),
-            registry,
-        ).await;
+        let manager =
+            SyncManager::new("test-node".to_string(), Duration::from_secs(300), registry).await;
         assert!(manager.is_ok());
     }
 
     #[tokio::test]
     async fn test_merkle_tree_building() {
-        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 
         let registry = Arc::new(CatalogRegistry::new(
             hypermesh_lib::PrivacyMode::PUBLIC,
@@ -471,11 +453,9 @@ mod tests {
             RegistryConfig::default(),
         ));
 
-        let manager = SyncManager::new(
-            "test-node".to_string(),
-            Duration::from_secs(300),
-            registry,
-        ).await.unwrap();
+        let manager = SyncManager::new("test-node".to_string(), Duration::from_secs(300), registry)
+            .await
+            .expect("test: expected success");
 
         let result = manager.rebuild_merkle_tree().await;
         assert!(result.is_ok());

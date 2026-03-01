@@ -48,11 +48,7 @@ impl Matrix3x3 {
         let sin_a = angle_radians.sin();
 
         Self {
-            data: [
-                [1.0, 0.0, 0.0],
-                [0.0, cos_a, -sin_a],
-                [0.0, sin_a, cos_a],
-            ],
+            data: [[1.0, 0.0, 0.0], [0.0, cos_a, -sin_a], [0.0, sin_a, cos_a]],
         }
     }
 
@@ -65,11 +61,7 @@ impl Matrix3x3 {
         let sin_a = angle_radians.sin();
 
         Self {
-            data: [
-                [cos_a, 0.0, sin_a],
-                [0.0, 1.0, 0.0],
-                [-sin_a, 0.0, cos_a],
-            ],
+            data: [[cos_a, 0.0, sin_a], [0.0, 1.0, 0.0], [-sin_a, 0.0, cos_a]],
         }
     }
 
@@ -82,11 +74,7 @@ impl Matrix3x3 {
         let sin_a = angle_radians.sin();
 
         Self {
-            data: [
-                [cos_a, -sin_a, 0.0],
-                [sin_a, cos_a, 0.0],
-                [0.0, 0.0, 1.0],
-            ],
+            data: [[cos_a, -sin_a, 0.0], [sin_a, cos_a, 0.0], [0.0, 0.0, 1.0]],
         }
     }
 
@@ -114,6 +102,7 @@ impl Matrix3x3 {
     ///
     /// Multiplies this matrix by another, returning the result.
     /// Used to compose multiple transformations.
+    #[allow(clippy::needless_range_loop)]
     pub fn multiply(&self, other: &Self) -> Self {
         let mut result = [[0.0; 3]; 3];
 
@@ -142,6 +131,7 @@ impl Matrix3x3 {
     /// Transpose the matrix
     ///
     /// Returns the transpose of this matrix (rows become columns).
+    #[allow(clippy::needless_range_loop)]
     pub fn transpose(&self) -> Self {
         let mut result = [[0.0; 3]; 3];
 
@@ -238,8 +228,7 @@ impl Matrix3x3 {
             Ok(())
         } else {
             Err(TensorError::InvalidOperation(format!(
-                "Index out of bounds: ({}, {})",
-                row, col
+                "Index out of bounds: ({row}, {col})"
             )))
         }
     }
@@ -344,11 +333,12 @@ mod tests {
         let vec = Vector3D::new(1.0, 0.0, 0.0);
         let result = combined.transform_vector(&vec);
 
-        // First rotate around Y (1,0,0) -> (0,0,-1)
-        // Then rotate around X (0,0,-1) -> (0,1,0)
+        // combined = Rx * Ry, applied as: first Ry, then Rx
+        // Ry(90°) on (1,0,0) -> (0,0,-1)
+        // Rx(90°) on (0,0,-1) -> (0,1,0)
         assert!((result.x - 0.0).abs() < EPSILON);
-        assert!((result.y - 0.0).abs() < EPSILON);
-        assert!((result.z - -1.0).abs() < EPSILON);
+        assert!((result.y - 1.0).abs() < EPSILON);
+        assert!((result.z - 0.0).abs() < EPSILON);
     }
 
     #[test]
@@ -371,14 +361,14 @@ mod tests {
         assert!(mat.determinant().abs() < EPSILON); // Singular matrix
 
         let mat2 = Matrix3x3::new([[2.0, 1.0, 3.0], [1.0, 0.0, 1.0], [0.0, 2.0, 4.0]]);
-        assert!((mat2.determinant() - 2.0).abs() < EPSILON);
+        assert!((mat2.determinant() - (-2.0)).abs() < EPSILON);
     }
 
     #[test]
     fn test_matrix_inverse() {
         let mat = Matrix3x3::new([[2.0, 1.0, 3.0], [1.0, 0.0, 1.0], [0.0, 2.0, 4.0]]);
 
-        let inv = mat.inverse().unwrap();
+        let inv = mat.inverse().expect("test: expected success");
         let product = mat.multiply(&inv);
 
         // Check if product is identity
@@ -418,7 +408,7 @@ mod tests {
     fn test_rotation_axis_angle() {
         // Rotate around Z axis by 90 degrees
         let axis = Vector3D::new(0.0, 0.0, 1.0);
-        let rot = Matrix3x3::rotation_axis_angle(&axis, PI / 2.0).unwrap();
+        let rot = Matrix3x3::rotation_axis_angle(&axis, PI / 2.0).expect("test: expected success");
 
         let vec = Vector3D::new(1.0, 0.0, 0.0);
         let rotated = rot.transform_vector(&vec);

@@ -7,18 +7,18 @@
 //! Integrates TrustChain certificate authority with HyperMesh asset system,
 //! providing binary authentication, Byzantine fault detection, and remote proxy management.
 
-pub mod types;
 pub mod operations;
+pub mod types;
 
 // Re-export all public types for backward compatibility
-pub use types::*;
 pub use operations::*;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
     use std::time::SystemTime;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_trust_validator_creation() {
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_byzantine_fault_types() {
-        let fault_types = vec![
+        let fault_types = [
             ByzantineFaultType::DoubleSigning,
             ByzantineFaultType::EquivocationAttack,
             ByzantineFaultType::NothingAtStake,
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_proxy_connection_types() {
-        let proxy_types = vec![
+        let proxy_types = [
             ProxyType::Direct,
             ProxyType::Encrypted,
             ProxyType::Federated,

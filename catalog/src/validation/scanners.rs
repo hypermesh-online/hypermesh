@@ -11,17 +11,22 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 // Use local Catalog AssetPackage
-use crate::assets::AssetPackage;
-use super::traits::SecurityScanner;
-use super::results::{
-    SecurityValidationResult, Vulnerability, MalwareDetection,
-    InjectionRisk, SecurityRuleFailure, InjectionType, RiskLevel,
-    CodeLocation
-};
 use super::config::SecuritySeverity;
+use super::results::{
+    CodeLocation, InjectionRisk, InjectionType, MalwareDetection, RiskLevel, SecurityRuleFailure,
+    SecurityValidationResult, Vulnerability,
+};
+use super::traits::SecurityScanner;
+use crate::assets::AssetPackage;
 
 /// Static security scanner
 pub struct StaticSecurityScanner;
+
+impl Default for StaticSecurityScanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl StaticSecurityScanner {
     /// Create new static security scanner
@@ -136,7 +141,9 @@ impl StaticSecurityScanner {
             if let Some(deps_array) = deps.as_array() {
                 for dep in deps_array {
                     if let Some(dep_obj) = dep.as_object() {
-                        if let (Some(name), Some(version)) = (dep_obj.get("name"), dep_obj.get("version")) {
+                        if let (Some(name), Some(version)) =
+                            (dep_obj.get("name"), dep_obj.get("version"))
+                        {
                             let name_str = name.as_str().unwrap_or("");
                             let version_str = version.as_str().unwrap_or("");
 
@@ -144,7 +151,9 @@ impl StaticSecurityScanner {
                             if name_str == "vulnerable-package" {
                                 vulnerabilities.push(Vulnerability {
                                     cve: Some("CVE-2024-0001".to_string()),
-                                    description: format!("Known vulnerability in {} {}", name_str, version_str),
+                                    description: format!(
+                                        "Known vulnerability in {name_str} {version_str}"
+                                    ),
                                     severity: SecuritySeverity::High,
                                     component: name_str.to_string(),
                                     fix_available: true,
@@ -267,13 +276,15 @@ impl SecurityScanner for StaticSecurityScanner {
 
         // Generate recommendations
         if !vulnerabilities.is_empty() {
-            recommendations.push("Update vulnerable dependencies to latest secure versions".to_string());
+            recommendations
+                .push("Update vulnerable dependencies to latest secure versions".to_string());
         }
         if !injection_risks.is_empty() {
             recommendations.push("Implement input validation and sanitization".to_string());
         }
         if !rule_failures.is_empty() {
-            recommendations.push("Use environment variables or secure vaults for credentials".to_string());
+            recommendations
+                .push("Use environment variables or secure vaults for credentials".to_string());
         }
 
         let mut result = SecurityValidationResult {

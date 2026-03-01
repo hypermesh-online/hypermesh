@@ -21,10 +21,7 @@ use std::collections::HashMap;
 use hypermesh_lib::BlockchainScope;
 
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::tensor::routing::{
-    calculate_routing_vector,
-    routing_similarity,
-};
+use crate::matrix::tensor::routing::{calculate_routing_vector, routing_similarity};
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -226,13 +223,12 @@ impl TransactionRouter {
             .iter()
             .map(|t| t.transition_cost)
             .sum();
-        let same_scope_discount = if self.config.prefer_same_scope
-            && route.scope_transitions.is_empty()
-        {
-            0.9 // 10 % discount
-        } else {
-            1.0
-        };
+        let same_scope_discount =
+            if self.config.prefer_same_scope && route.scope_transitions.is_empty() {
+                0.9 // 10 % discount
+            } else {
+                1.0
+            };
 
         (hop_cost + transition_cost) * same_scope_discount
     }
@@ -491,10 +487,7 @@ mod tests {
             route.scope_transitions[0].from_scope,
             BlockchainScope::Network
         );
-        assert_eq!(
-            route.scope_transitions[0].to_scope,
-            BlockchainScope::Device
-        );
+        assert_eq!(route.scope_transitions[0].to_scope, BlockchainScope::Device);
     }
 
     // 5. Route cost calculation with and without scope penalty
@@ -577,9 +570,9 @@ mod tests {
         let to = coord(100, 0, 0);
 
         let candidates = vec![
-            ("aligned".to_string(), coord(50, 0, 0)),    // on the direct line
-            ("off-axis".to_string(), coord(50, 80, 0)),   // far off the direct line
-            ("behind".to_string(), coord(-20, 0, 0)),     // behind the source
+            ("aligned".to_string(), coord(50, 0, 0)), // on the direct line
+            ("off-axis".to_string(), coord(50, 80, 0)), // far off the direct line
+            ("behind".to_string(), coord(-20, 0, 0)), // behind the source
         ];
 
         let best = router
@@ -686,11 +679,7 @@ mod tests {
         for i in 0..12 {
             let x = (i % 4) * 10;
             let y = (i / 4) * 10;
-            router.register_node(
-                &format!("dev-{i}"),
-                coord(x, y, 0),
-                BlockchainScope::Device,
-            );
+            router.register_node(&format!("dev-{i}"), coord(x, y, 0), BlockchainScope::Device);
         }
 
         // Register 12 Network nodes in a shifted grid

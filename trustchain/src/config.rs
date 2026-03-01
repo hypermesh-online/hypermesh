@@ -3,16 +3,16 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! TrustChain Configuration Management
-//! 
+//!
 //! Central configuration for TrustChain services with IPv6-only networking
 //! and consensus validation parameters.
 
+use crate::ca::CAConfig;
+use crate::consensus::ConsensusRequirements;
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 use std::time::Duration;
-use serde::{Serialize, Deserialize};
-use anyhow::{Result, anyhow};
-use crate::consensus::ConsensusRequirements;
-use crate::ca::CAConfig;
 
 /// Main TrustChain configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -154,7 +154,7 @@ impl DnsConfig {
             server_id: "trustchain-dns-test".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
             quic_port: 0, // OS-assigned random port to avoid conflicts
-            port: 0, // OS-assigned random port to avoid conflicts
+            port: 0,      // OS-assigned random port to avoid conflicts
             dns_port: None,
             upstream_resolvers: vec![
                 Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888), // Google IPv6
@@ -223,10 +223,10 @@ impl Default for ApiConfig {
         Self {
             server_id: "trustchain-api-localhost".to_string(),
             bind_address: Ipv6Addr::LOCALHOST,
-            port: 8080, // Standard API port (use testing() method for port 0)
+            port: 8080,        // Standard API port (use testing() method for port 0)
             enable_tls: false, // Disabled for localhost testing
             rate_limit_per_minute: 60,
-            max_body_size: 1024 * 1024, // 1MB
+            max_body_size: 1024 * 1024,          // 1MB
             cors_origins: vec!["*".to_string()], // Permissive for testing
             consensus_requirements: ConsensusRequirements::localhost_testing(),
         }
@@ -435,19 +435,16 @@ impl TrustChainConfig {
     /// Load configuration from file
     pub fn from_file(path: &str) -> Result<Self> {
         let contents = std::fs::read_to_string(path)
-            .map_err(|e| anyhow!("Failed to read config file {}: {}", path, e))?;
+            .map_err(|e| anyhow!("Failed to read config file {path}: {e}"))?;
 
         if path.ends_with(".toml") {
-            toml::from_str(&contents)
-                .map_err(|e| anyhow!("Failed to parse TOML config: {}", e))
+            toml::from_str(&contents).map_err(|e| anyhow!("Failed to parse TOML config: {e}"))
         } else if path.ends_with(".yaml") || path.ends_with(".yml") {
-            serde_yaml::from_str(&contents)
-                .map_err(|e| anyhow!("Failed to parse YAML config: {}", e))
+            serde_yaml::from_str(&contents).map_err(|e| anyhow!("Failed to parse YAML config: {e}"))
         } else if path.ends_with(".json") {
-            serde_json::from_str(&contents)
-                .map_err(|e| anyhow!("Failed to parse JSON config: {}", e))
+            serde_json::from_str(&contents).map_err(|e| anyhow!("Failed to parse JSON config: {e}"))
         } else {
-            Err(anyhow!("Unsupported config file format: {}", path))
+            Err(anyhow!("Unsupported config file format: {path}"))
         }
     }
 
@@ -455,19 +452,19 @@ impl TrustChainConfig {
     pub fn to_file(&self, path: &str) -> Result<()> {
         let contents = if path.ends_with(".toml") {
             toml::to_string_pretty(self)
-                .map_err(|e| anyhow!("Failed to serialize config to TOML: {}", e))?
+                .map_err(|e| anyhow!("Failed to serialize config to TOML: {e}"))?
         } else if path.ends_with(".yaml") || path.ends_with(".yml") {
             serde_yaml::to_string(self)
-                .map_err(|e| anyhow!("Failed to serialize config to YAML: {}", e))?
+                .map_err(|e| anyhow!("Failed to serialize config to YAML: {e}"))?
         } else if path.ends_with(".json") {
             serde_json::to_string_pretty(self)
-                .map_err(|e| anyhow!("Failed to serialize config to JSON: {}", e))?
+                .map_err(|e| anyhow!("Failed to serialize config to JSON: {e}"))?
         } else {
-            return Err(anyhow!("Unsupported config file format: {}", path));
+            return Err(anyhow!("Unsupported config file format: {path}"));
         };
 
         std::fs::write(path, contents)
-            .map_err(|e| anyhow!("Failed to write config file {}: {}", path, e))?;
+            .map_err(|e| anyhow!("Failed to write config file {path}: {e}"))?;
 
         Ok(())
     }
@@ -475,10 +472,15 @@ impl TrustChainConfig {
     /// Validate configuration
     pub fn validate(&self) -> Result<()> {
         // Validate port conflicts (skip port 0 which means OS-assigned)
-        let mut ports: Vec<u16> = vec![self.ca.port, self.ct.port, self.dns.quic_port, self.api.port]
-            .into_iter()
-            .filter(|&p| p != 0)
-            .collect();
+        let mut ports: Vec<u16> = vec![
+            self.ca.port,
+            self.ct.port,
+            self.dns.quic_port,
+            self.api.port,
+        ]
+        .into_iter()
+        .filter(|&p| p != 0)
+        .collect();
         ports.sort();
         for window in ports.windows(2) {
             if window[0] == window[1] {
@@ -492,8 +494,12 @@ impl TrustChainConfig {
         }
 
         // Validate consensus requirements consistency
-        if self.ca.consensus_requirements.minimum_stake != self.ct.consensus_requirements.minimum_stake {
-            return Err(anyhow!("Consensus requirements must be consistent across services"));
+        if self.ca.consensus_requirements.minimum_stake
+            != self.ct.consensus_requirements.minimum_stake
+        {
+            return Err(anyhow!(
+                "Consensus requirements must be consistent across services"
+            ));
         }
 
         Ok(())
@@ -503,14 +509,13 @@ impl TrustChainConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_default_config() {
         let config = TrustChainConfig::default();
         match config.validate() {
-            Ok(_) => {},
-            Err(e) => panic!("Config validation failed: {}", e),
+            Ok(_) => {}
+            Err(e) => unreachable!("Config validation failed: {e}"),
         }
     }
 
@@ -523,9 +528,9 @@ mod tests {
     #[test]
     fn test_config_serialization() {
         let config = TrustChainConfig::localhost_testing();
-        let toml_str = toml::to_string(&config).unwrap();
-        let deserialized: TrustChainConfig = toml::from_str(&toml_str).unwrap();
-        
+        let toml_str = toml::to_string(&config).expect("test: expected success");
+        let deserialized: TrustChainConfig = toml::from_str(&toml_str).expect("test: expected success");
+
         assert_eq!(config.ca.ca_id, deserialized.ca.ca_id);
     }
 
@@ -534,12 +539,10 @@ mod tests {
         let config = TrustChainConfig::localhost_testing();
 
         // Test TOML (use Builder to add .toml suffix)
-        let toml_file = tempfile::Builder::new()
-            .suffix(".toml")
-            .tempfile()
-            .unwrap();
-        config.to_file(toml_file.path().to_str().unwrap()).unwrap();
-        let loaded_config = TrustChainConfig::from_file(toml_file.path().to_str().unwrap()).unwrap();
+        let toml_file = tempfile::Builder::new().suffix(".toml").tempfile().expect("test: creation");
+        config.to_file(toml_file.path().to_str().expect("test: expected success")).expect("test: expected success");
+        let loaded_config =
+            TrustChainConfig::from_file(toml_file.path().to_str().expect("test: expected success")).expect("test: expected success");
         assert_eq!(config.ca.ca_id, loaded_config.ca.ca_id);
     }
 

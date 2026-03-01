@@ -9,44 +9,43 @@
 
 use std::time::{Duration, SystemTime};
 
+use super::{allocation_types::PrivacyAllocationType, PrivacyAllocationResult};
 use crate::assets::core::{AssetResult, PrivacyMode};
-use super::{PrivacyAllocationResult, allocation_types::PrivacyAllocationType};
 
 // Module declarations
+pub mod analysis;
 pub mod config;
 pub mod types;
 pub mod violations;
-pub mod analysis;
 
 // Re-exports for convenience
 pub use config::{
-    PrivacyEnforcementConfig, RealtimeMonitoringConfig, ViolationResponseConfig,
-    PatternAnalysisConfig, RiskThresholdConfig, AnomalyDetectionConfig,
-    ViolationNotificationConfig,
+    AnomalyDetectionConfig, PatternAnalysisConfig, PrivacyEnforcementConfig,
+    RealtimeMonitoringConfig, RiskThresholdConfig, ViolationNotificationConfig,
+    ViolationResponseConfig,
 };
 
 pub use types::{
-    EnforcementAction, AccessRestriction,
-    AutoResponseTrigger, TriggerCondition, DataExposureRiskLevel, DataCollectionSettings,
-    EscalationRule, NotificationChannel, NotificationChannelType,
-    NotificationThrottling, RecoveryProcedures, AutoRecoveryConfig, RecoveryStrategy,
-    ManualRecoveryProcedure, RecoveryValidationStep, RecoveryStep, RecoveryStepType,
-    ValidationCriteria, ValidationType, PatternAnalysisAlgorithm, AlgorithmType,
-    FalsePositiveReduction, AnomalyCategory, RiskLevelThresholds,
+    AccessRestriction, AlgorithmType, AnomalyCategory, AutoRecoveryConfig, AutoResponseTrigger,
+    DataCollectionSettings, DataExposureRiskLevel, EnforcementAction, EscalationRule,
+    FalsePositiveReduction, ManualRecoveryProcedure, NotificationChannel, NotificationChannelType,
+    NotificationThrottling, PatternAnalysisAlgorithm, RecoveryProcedures, RecoveryStep,
+    RecoveryStepType, RecoveryStrategy, RecoveryValidationStep, RiskLevelThresholds,
+    TriggerCondition, ValidationCriteria, ValidationType,
 };
 
 pub use violations::{
-    ViolationTracker, PrivacyViolation, PrivacyViolationType, ViolationSeverity,
-    ViolationDetails, ViolationEvidence, EvidenceType, ViolationImpact, ImpactLevel,
-    ResolutionStatus, ViolationPattern, RiskIndicator, UserViolationHistory, ComplianceStatus,
+    ComplianceStatus, EvidenceType, ImpactLevel, PrivacyViolation, PrivacyViolationType,
+    ResolutionStatus, RiskIndicator, UserViolationHistory, ViolationDetails, ViolationEvidence,
+    ViolationImpact, ViolationPattern, ViolationSeverity, ViolationTracker,
 };
 
 pub use analysis::{
-    AccessPatternAnalyzer, AccessBaseline, AccessPatternSignature, TemporalPattern,
-    NetworkPattern, DurationStatistics, BaselineMetrics, VolumeStatistics,
-    AnomalyDetectionModel, RiskAssessmentEngine, RiskModel, RiskFactor, RiskFactorType,
-    NormalizationParameters, RiskScore, RiskLevel, AccessControlResult, AccessCondition,
-    AccessConditionType, PrivacyAuditLog, PatternAnalysisResult, DetectedAnomaly,
+    AccessBaseline, AccessCondition, AccessConditionType, AccessControlResult,
+    AccessPatternAnalyzer, AccessPatternSignature, AnomalyDetectionModel, BaselineMetrics,
+    DetectedAnomaly, DurationStatistics, NetworkPattern, NormalizationParameters,
+    PatternAnalysisResult, PrivacyAuditLog, RiskAssessmentEngine, RiskFactor, RiskFactorType,
+    RiskLevel, RiskModel, RiskScore, TemporalPattern, VolumeStatistics,
 };
 
 /// Privacy enforcement engine
@@ -90,38 +89,32 @@ impl PrivacyEnforcer {
         requester_id: &str,
         access_type: &str,
     ) -> AssetResult<AccessControlResult> {
-
         // Risk assessment
-        let risk_score = self.risk_assessor.assess_access_risk(
-            allocation,
-            requester_id,
-            access_type,
-        ).await?;
+        let risk_score = self
+            .risk_assessor
+            .assess_access_risk(allocation, requester_id, access_type)
+            .await?;
 
         // Pattern analysis
-        let pattern_analysis = self.access_analyzer.analyze_access_pattern(
-            requester_id,
-            access_type,
-        ).await?;
+        let pattern_analysis = self
+            .access_analyzer
+            .analyze_access_pattern(requester_id, access_type)
+            .await?;
 
         // Policy enforcement
-        let policy_result = self.enforce_privacy_policy(
-            allocation,
-            requester_id,
-            &risk_score,
-            &pattern_analysis,
-        ).await?;
+        let policy_result = self
+            .enforce_privacy_policy(allocation, requester_id, &risk_score, &pattern_analysis)
+            .await?;
 
         Ok(policy_result)
     }
 
     /// Record privacy violation
-    pub async fn record_violation(
-        &self,
-        violation: PrivacyViolation,
-    ) -> AssetResult<()> {
+    pub async fn record_violation(&self, violation: PrivacyViolation) -> AssetResult<()> {
         // Store violation
-        self.violation_tracker.record_violation(violation.clone()).await?;
+        self.violation_tracker
+            .record_violation(violation.clone())
+            .await?;
 
         // Trigger response actions
         self.trigger_violation_response(&violation).await?;
@@ -140,7 +133,6 @@ impl PrivacyEnforcer {
         risk_score: &RiskScore,
         _pattern_analysis: &PatternAnalysisResult,
     ) -> AssetResult<AccessControlResult> {
-
         // Check allocation expiry
         if let Some(expires_at) = allocation.expires_at {
             if SystemTime::now() >= expires_at {
@@ -181,14 +173,14 @@ impl PrivacyEnforcer {
                         conditions: vec![],
                     });
                 }
-            },
+            }
             PrivacyMode::PUBLIC => {
                 // Require consensus proof validation
                 if allocation.allocation_type == PrivacyAllocationType::Verified {
                     // Check for valid consensus proof
                     // Implementation would validate consensus proof
                 }
-            },
+            }
             _ => {
                 // Standard validation for other levels
             }
@@ -248,19 +240,26 @@ impl PrivacyEnforcer {
             EnforcementAction::LogViolation => {
                 // Log to audit system
                 tracing::warn!("Privacy violation recorded");
-            },
+            }
             EnforcementAction::SendWarning => {
                 // Send notification to user
                 tracing::info!("Warning sent to user");
-            },
-            EnforcementAction::RestrictAccess { restriction_type, duration } => {
+            }
+            EnforcementAction::RestrictAccess {
+                restriction_type,
+                duration,
+            } => {
                 // Apply access restriction
-                tracing::warn!("Access restricted: {:?} for {:?}", restriction_type, duration);
-            },
+                tracing::warn!(
+                    "Access restricted: {:?} for {:?}",
+                    restriction_type,
+                    duration
+                );
+            }
             EnforcementAction::EmergencyShutdown => {
                 // Emergency shutdown procedures
                 tracing::error!("Emergency shutdown triggered");
-            },
+            }
             _ => {
                 // Handle other action types
                 tracing::info!("Enforcement action executed: {:?}", action);

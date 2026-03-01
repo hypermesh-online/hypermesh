@@ -7,15 +7,15 @@
 //! This module integrates FALCON signatures into the QUIC handshake process
 //! for quantum-resistant authentication at the transport layer.
 
-use bytes::{Bytes, BytesMut, BufMut, Buf};
+use anyhow::{anyhow, Result};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use quinn::crypto::Session;
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use tracing::{debug, info, warn};
 
-use crate::transport::falcon::{FalconTransport, FalconPublicKey};
+use super::pos_validator::{PosToken, PosTokenValidator, ValidationResult};
 use super::transport_params;
-use super::pos_validator::{PosTokenValidator, PosToken, ValidationResult};
+use crate::transport::falcon::{FalconPublicKey, FalconTransport};
 
 /// STOQ handshake extension for QUIC
 pub struct StoqHandshakeExtension {
@@ -43,9 +43,7 @@ impl StoqHandshakeExtension {
         hybrid_mode: bool,
     ) -> Self {
         // Create PoS validator with 5-minute cache TTL
-        let pos_validator = Arc::new(PosTokenValidator::new(
-            std::time::Duration::from_secs(300)
-        ));
+        let pos_validator = Arc::new(PosTokenValidator::new(std::time::Duration::from_secs(300)));
 
         Self {
             falcon_transport,
@@ -63,7 +61,10 @@ impl StoqHandshakeExtension {
             let signature = falcon_guard.sign_handshake_data(handshake_data)?;
             let exported = falcon_guard.export_signature(&signature);
 
-            debug!("Added FALCON signature to handshake: {} bytes", exported.len());
+            debug!(
+                "Added FALCON signature to handshake: {} bytes",
+                exported.len()
+            );
             Ok(exported)
         } else if self.require_falcon {
             Err(anyhow!("FALCON required but not available"))
@@ -142,7 +143,8 @@ impl StoqHandshakeExtension {
 
     /// Import peer's FALCON public key from transport parameters
     pub fn import_peer_key(&self, peer_id: String, key_data: &[u8]) -> Result<()> {
-        if key_data.len() < 14 { // Minimum size
+        if key_data.len() < 14 {
+            // Minimum size
             return Err(anyhow!("Public key data too short"));
         }
 
@@ -151,11 +153,12 @@ impl StoqHandshakeExtension {
         let variant = match buf.get_u8() {
             0 => crate::transport::falcon::FalconVariant::Falcon512,
             1 => crate::transport::falcon::FalconVariant::Falcon1024,
-            v => return Err(anyhow!("Unknown FALCON variant: {}", v)),
+            v => return Err(anyhow!("Unknown FALCON variant: {v}")),
         };
 
         let key_len = buf.get_u32() as usize;
-        if buf.len() < key_len + 9 { // key_len + 8 (timestamp) + 1 (key_id flag)
+        if buf.len() < key_len + 9 {
+            // key_len + 8 (timestamp) + 1 (key_id flag)
             return Err(anyhow!("Public key truncated"));
         }
 
@@ -166,13 +169,11 @@ impl StoqHandshakeExtension {
         public_key.created_at = created_at;
 
         // Read optional key ID
-        if buf.has_remaining() && buf.get_u8() == 1 {
-            if buf.remaining() >= 4 {
-                let id_len = buf.get_u32() as usize;
-                if buf.len() >= id_len {
-                    let key_id = String::from_utf8_lossy(&buf.split_to(id_len)).to_string();
-                    public_key = public_key.with_key_id(key_id);
-                }
+        if buf.has_remaining() && buf.get_u8() == 1 && buf.remaining() >= 4 {
+            let id_len = buf.get_u32() as usize;
+            if buf.len() >= id_len {
+                let key_id = String::from_utf8_lossy(&buf.split_to(id_len)).to_string();
+                public_key = public_key.with_key_id(key_id);
             }
         }
 
@@ -191,7 +192,7 @@ impl StoqHandshakeExtension {
         auth.put_slice(tls_data);
 
         // Add FALCON signature if available
-        if let Some(falcon_sig) = self.add_falcon_signature(tls_data).ok() {
+        if let Ok(falcon_sig) = self.add_falcon_signature(tls_data) {
             auth.put_u8(1); // Has FALCON
             auth.put_u32(falcon_sig.len() as u32);
             auth.put_slice(&falcon_sig);
@@ -216,8 +217,7 @@ impl StoqHandshakeExtension {
         } else {
             warn!(
                 "PoS token validation failed: {:?} (took {:?})",
-                result.errors,
-                result.validation_time
+                result.errors, result.validation_time
             );
         }
 
@@ -410,12 +410,16 @@ pub struct StoqTransportParams {
     params: Vec<(u64, Vec<u8>)>,
 }
 
+impl Default for StoqTransportParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StoqTransportParams {
     /// Create new transport parameters
     pub fn new() -> Self {
-        Self {
-            params: Vec::new(),
-        }
+        Self { params: Vec::new() }
     }
 
     /// Add STOQ extensions enabled flag
@@ -438,10 +442,7 @@ impl StoqTransportParams {
 
     /// Add FALCON public key
     pub fn with_falcon_key(mut self, key: Vec<u8>) -> Self {
-        self.params.push((
-            transport_params::FALCON_PUBLIC_KEY,
-            key,
-        ));
+        self.params.push((transport_params::FALCON_PUBLIC_KEY, key));
         self
     }
 
@@ -449,10 +450,7 @@ impl StoqTransportParams {
     pub fn with_max_shard_size(mut self, size: u32) -> Self {
         let mut buf = Vec::with_capacity(4);
         buf.extend_from_slice(&size.to_be_bytes());
-        self.params.push((
-            transport_params::MAX_SHARD_SIZE,
-            buf,
-        ));
+        self.params.push((transport_params::MAX_SHARD_SIZE, buf));
         self
     }
 
@@ -491,7 +489,7 @@ mod tests {
         assert!(key.is_some());
 
         // Test importing peer key
-        extension.import_peer_key("peer1".to_string(), &key.unwrap())?;
+        extension.import_peer_key("peer1".to_string(), &key.expect("test: expected success"))?;
 
         Ok(())
     }

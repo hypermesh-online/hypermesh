@@ -227,7 +227,7 @@ impl PeerValidator {
     /// Validate with specific threshold
     pub fn with_threshold(threshold: f32) -> Self {
         Self {
-            threshold: threshold.min(1.0).max(0.0),
+            threshold: threshold.clamp(0.0, 1.0),
             timeout_ms: 5000,
         }
     }
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn test_anonymous_tier_creation() {
         let tier = AnonymousTier::new();
-        assert_eq!(tier.use_onion_routing, true);
+        assert!(tier.use_onion_routing);
         assert_eq!(tier.max_hops, 3);
     }
 

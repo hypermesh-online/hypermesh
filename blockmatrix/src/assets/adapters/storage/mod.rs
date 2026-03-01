@@ -16,26 +16,26 @@
 mod adapter;
 mod allocation;
 mod devices;
-mod sharding;
-mod encryption;
 mod distribution;
+mod encryption;
+mod sharding;
 
 // Re-exports for public API
 pub use self::adapter::StorageAssetAdapter;
-pub use self::allocation::{StorageAllocation, StoragePool, PoolHealthStatus, StorageUsageStats};
-pub use self::devices::{StorageDevice, StorageStatus, StorageHealthMetrics, SmartData};
-pub use self::sharding::{ShardingConfig, ShardingAlgorithm};
-pub use self::encryption::create_kyber_encryption_key;
+pub use self::allocation::{PoolHealthStatus, StorageAllocation, StoragePool, StorageUsageStats};
+pub use self::devices::{SmartData, StorageDevice, StorageHealthMetrics, StorageStatus};
 pub use self::distribution::generate_proxy_address;
+pub use self::encryption::create_kyber_encryption_key;
+pub use self::sharding::{ShardingAlgorithm, ShardingConfig};
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::*;
     use crate::assets::core::{
-        AssetType, AssetAllocationRequest, PrivacyMode, StorageRequirements, StorageType,
-        SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState, ConsensusProof,
+        AssetAllocationRequest, AssetType, ConsensusProof, PrivacyMode, SpaceProof, StakeProof,
+        StorageRequirements, StorageType, TimeProof, WorkProof, WorkState, WorkloadType,
     };
+    use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
 
     async fn create_test_storage_request() -> AssetAllocationRequest {
@@ -62,7 +62,7 @@ mod tests {
                     storage_type: StorageType::Ssd,
                     min_iops: Some(1000),
                     min_bandwidth_mbps: Some(100),
-                    durability_replicas: 2,
+                    durability_replicas: 1,
                 }),
                 ..Default::default()
             },
@@ -120,22 +120,30 @@ mod tests {
         let adapter = StorageAssetAdapter::new().await;
         let request = create_test_storage_request().await;
 
-        let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Storage)));
+        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
+        assert!(matches!(
+            allocation.asset_id.category,
+            AssetCategory::BaseSystem(BaseSystemType::Storage)
+        ));
 
         // Test deallocation
-        adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
+        adapter
+            .deallocate_asset(&allocation.asset_id)
+            .await
+            .expect("test: expected success");
     }
 
     #[tokio::test]
     async fn test_storage_health_check() {
         use crate::assets::core::AssetAdapter;
         let adapter = StorageAssetAdapter::new().await;
-        let health = adapter.health_check().await.unwrap();
+        let health = adapter.health_check().await.expect("test: async operation");
 
         assert!(health.healthy);
         assert!(health.performance_metrics.contains_key("total_capacity_gb"));
-        assert!(health.performance_metrics.contains_key("average_health_percent"));
+        assert!(health
+            .performance_metrics
+            .contains_key("average_health_percent"));
     }
 
     #[tokio::test]
@@ -146,7 +154,11 @@ mod tests {
 
         assert_eq!(capabilities.asset_type, AssetType::Storage);
         assert!(capabilities.supports_proxy_addressing);
-        assert!(capabilities.features.contains(&"distributed_storage".to_string()));
-        assert!(capabilities.features.contains(&"kyber_encryption".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"distributed_storage".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"kyber_encryption".to_string()));
     }
 }

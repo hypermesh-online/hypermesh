@@ -7,11 +7,11 @@
 //! Provides snapshot scheduling, creation, and cleanup with copy-on-write
 //! optimization for efficient storage.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use super::{PersistenceError, PersistenceResult};
@@ -31,7 +31,9 @@ pub enum SnapshotSchedule {
 
 impl Default for SnapshotSchedule {
     fn default() -> Self {
-        Self::TimeBased { interval_secs: 3600 } // Default: hourly
+        Self::TimeBased {
+            interval_secs: 3600,
+        } // Default: hourly
     }
 }
 
@@ -156,8 +158,8 @@ impl SnapshotManager {
         let mut counter = self.size_counter.write().await;
         if bytes > 0 {
             *counter += bytes as u64;
-        } else if *counter >= bytes.abs() as u64 {
-            *counter -= bytes.abs() as u64;
+        } else if *counter >= bytes.unsigned_abs() {
+            *counter -= bytes.unsigned_abs();
         } else {
             *counter = 0;
         }
@@ -213,9 +215,11 @@ impl SnapshotManager {
         };
 
         // Save snapshot file
-        let filename = format!("snapshot_{}_{}.tar.zst",
-                              timestamp.format("%Y%m%d_%H%M%S"),
-                              &id[..8]);
+        let filename = format!(
+            "snapshot_{}_{}.tar.zst",
+            timestamp.format("%Y%m%d_%H%M%S"),
+            &id[..8]
+        );
         let path = self.storage_dir.join(filename);
         std::fs::write(&path, compressed)?;
 
@@ -251,10 +255,11 @@ impl SnapshotManager {
 
         let metadata = {
             let snapshots = self.snapshots.read().await;
-            snapshots.get(snapshot_id)
-                .ok_or_else(|| PersistenceError::SnapshotError(
-                    format!("Snapshot {} not found", snapshot_id)
-                ))?
+            snapshots
+                .get(snapshot_id)
+                .ok_or_else(|| {
+                    PersistenceError::SnapshotError(format!("Snapshot {snapshot_id} not found"))
+                })?
                 .clone()
         };
 
@@ -274,7 +279,7 @@ impl SnapshotManager {
         }
 
         let path = snapshot_file.ok_or_else(|| {
-            PersistenceError::SnapshotError(format!("Snapshot file for {} not found", snapshot_id))
+            PersistenceError::SnapshotError(format!("Snapshot file for {snapshot_id} not found"))
         })?;
 
         // Read and decompress
@@ -313,7 +318,8 @@ impl SnapshotManager {
     /// Get latest snapshot ID
     pub async fn get_latest_snapshot_id(&self) -> Option<String> {
         let snapshots = self.snapshots.read().await;
-        snapshots.values()
+        snapshots
+            .values()
             .max_by_key(|s| s.timestamp)
             .map(|s| s.id.clone())
     }
@@ -405,22 +411,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_creation() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         let test_data = TestData {
             value: "test".to_string(),
             counter: 42,
         };
 
-        let id = manager.create_snapshot(
-            || Ok(test_data.clone()),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let id = manager
+            .create_snapshot(|| Ok(test_data.clone()), SnapshotType::Full)
+            .await
+            .expect("test: expected success");
 
         assert!(!id.is_empty());
 
@@ -432,12 +440,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_restore() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         let original = TestData {
             value: "original".to_string(),
@@ -445,34 +455,44 @@ mod tests {
         };
 
         // Create snapshot
-        let id = manager.create_snapshot(
-            || Ok(original.clone()),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let id = manager
+            .create_snapshot(|| Ok(original.clone()), SnapshotType::Full)
+            .await
+            .expect("test: expected success");
 
         // Restore
-        let restored: TestData = manager.restore_snapshot(&id).await.unwrap();
+        let restored: TestData = manager.restore_snapshot(&id).await.expect("test: async operation");
 
         assert_eq!(restored, original);
     }
 
     #[tokio::test]
     async fn test_time_based_scheduling() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::TimeBased { interval_secs: 1 },
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         // Should snapshot initially
         assert!(manager.should_snapshot().await);
 
         // Create snapshot
-        let _ = manager.create_snapshot(
-            || Ok(TestData { value: "test".to_string(), counter: 1 }),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let _ = manager
+            .create_snapshot(
+                || {
+                    Ok(TestData {
+                        value: "test".to_string(),
+                        counter: 1,
+                    })
+                },
+                SnapshotType::Full,
+            )
+            .await
+            .expect("test: expected success");
 
         // Should not snapshot immediately
         assert!(!manager.should_snapshot().await);
@@ -486,12 +506,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_event_based_scheduling() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::EventBased { event_count: 5 },
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         assert!(!manager.should_snapshot().await);
 
@@ -503,22 +525,34 @@ mod tests {
         assert!(manager.should_snapshot().await);
 
         // Create snapshot (resets counter)
-        let _ = manager.create_snapshot(
-            || Ok(TestData { value: "test".to_string(), counter: 1 }),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let _ = manager
+            .create_snapshot(
+                || {
+                    Ok(TestData {
+                        value: "test".to_string(),
+                        counter: 1,
+                    })
+                },
+                SnapshotType::Full,
+            )
+            .await
+            .expect("test: expected success");
 
         assert!(!manager.should_snapshot().await);
     }
 
     #[tokio::test]
     async fn test_size_based_scheduling() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
-            SnapshotSchedule::SizeBased { size_threshold: 1000 },
-        ).await.unwrap();
+            SnapshotSchedule::SizeBased {
+                size_threshold: 1000,
+            },
+        )
+        .await
+        .expect("test: expected success");
 
         assert!(!manager.should_snapshot().await);
 
@@ -532,25 +566,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_snapshot_cleanup() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let mut manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         manager.set_max_snapshots(2);
 
         // Create multiple snapshots
         for i in 0..5 {
             let data = TestData {
-                value: format!("test{}", i),
+                value: format!("test{i}"),
                 counter: i,
             };
-            manager.create_snapshot(
-                move || Ok(data),
-                SnapshotType::Full,
-            ).await.unwrap();
+            manager
+                .create_snapshot(move || Ok(data), SnapshotType::Full)
+                .await
+                .expect("test: expected success");
         }
 
         // Should only have 2 snapshots
@@ -560,57 +596,77 @@ mod tests {
 
     #[tokio::test]
     async fn test_incremental_snapshot() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         // Create full snapshot
-        let full_id = manager.create_snapshot(
-            || Ok(TestData { value: "full".to_string(), counter: 1 }),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let full_id = manager
+            .create_snapshot(
+                || {
+                    Ok(TestData {
+                        value: "full".to_string(),
+                        counter: 1,
+                    })
+                },
+                SnapshotType::Full,
+            )
+            .await
+            .expect("test: expected success");
 
         // Create incremental snapshot
-        let inc_id = manager.create_snapshot(
-            || Ok(TestData { value: "incremental".to_string(), counter: 2 }),
-            SnapshotType::Incremental,
-        ).await.unwrap();
+        let inc_id = manager
+            .create_snapshot(
+                || {
+                    Ok(TestData {
+                        value: "incremental".to_string(),
+                        counter: 2,
+                    })
+                },
+                SnapshotType::Incremental,
+            )
+            .await
+            .expect("test: expected success");
 
         // Verify parent relationship
         let snapshots = manager.list_snapshots().await;
-        let incremental = snapshots.iter().find(|s| s.id == inc_id).unwrap();
+        let incremental = snapshots.iter().find(|s| s.id == inc_id).expect("test: query operation");
         assert_eq!(incremental.parent_id, Some(full_id));
     }
 
     #[tokio::test]
     async fn test_checksum_validation() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         let data = TestData {
             value: "checksum_test".to_string(),
             counter: 99,
         };
 
-        let id = manager.create_snapshot(
-            || Ok(data.clone()),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let id = manager
+            .create_snapshot(|| Ok(data.clone()), SnapshotType::Full)
+            .await
+            .expect("test: expected success");
 
         // Corrupt the snapshot file
-        for entry in std::fs::read_dir(&manager.storage_dir).unwrap() {
-            let entry = entry.unwrap();
-            if entry.file_name().to_str().unwrap().contains(&id[..8]) {
-                let mut content = std::fs::read(entry.path()).unwrap();
+        for entry in std::fs::read_dir(&manager.storage_dir).expect("test: directory reading") {
+            let entry = entry.expect("test: directory entry");
+            if entry.file_name().to_str().expect("test: directory entry").contains(&id[..8]) {
+                let mut content = std::fs::read(entry.path()).expect("test: directory entry");
                 content[10] ^= 0xFF; // Flip some bits
-                std::fs::write(entry.path(), content).unwrap();
+                std::fs::write(entry.path(), content).expect("test: directory entry");
                 break;
             }
         }
@@ -628,23 +684,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_snapshot() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let manager = SnapshotManager::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
-        let id = manager.create_snapshot(
-            || Ok(TestData { value: "delete_me".to_string(), counter: 1 }),
-            SnapshotType::Full,
-        ).await.unwrap();
+        let id = manager
+            .create_snapshot(
+                || {
+                    Ok(TestData {
+                        value: "delete_me".to_string(),
+                        counter: 1,
+                    })
+                },
+                SnapshotType::Full,
+            )
+            .await
+            .expect("test: expected success");
 
         // Verify exists
         assert_eq!(manager.list_snapshots().await.len(), 1);
 
         // Delete
-        manager.delete_snapshot(&id).await.unwrap();
+        manager.delete_snapshot(&id).await.expect("test: async operation");
 
         // Verify deleted
         assert_eq!(manager.list_snapshots().await.len(), 0);

@@ -6,14 +6,14 @@
 //!
 //! Implements proxy selection based on trust levels, proximity, and performance
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
-use super::trust_integration::{TrustChainIntegration, CertificateValidator};
+use super::trust_integration::{CertificateValidator, TrustChainIntegration};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult};
 
 /// Trust level for proxy nodes
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -234,7 +234,7 @@ impl ProxySelector {
         required_trust_level: TrustLevel,
     ) -> AssetResult<ProxyNode> {
         // Check cache first
-        let cache_key = format!("{}-{:?}", target_asset, required_trust_level);
+        let cache_key = format!("{target_asset}-{required_trust_level:?}");
         if let Some(cached) = self.get_cached_selection(&cache_key).await {
             if let Some(best) = cached.first() {
                 return Ok(best.clone());
@@ -247,14 +247,19 @@ impl ProxySelector {
         // Filter by trust level
         let mut trusted_proxies = Vec::new();
         for proxy in available_proxies {
-            if self.validate_proxy_trust(&proxy, &required_trust_level).await {
+            if self
+                .validate_proxy_trust(&proxy, &required_trust_level)
+                .await
+            {
                 trusted_proxies.push(proxy);
             }
         }
 
         if trusted_proxies.is_empty() {
             return Err(AssetError::AdapterError {
-                message: format!("No proxies found with required trust level: {:?}", required_trust_level)
+                message: format!(
+                    "No proxies found with required trust level: {required_trust_level:?}"
+                ),
             });
         }
 
@@ -268,11 +273,7 @@ impl ProxySelector {
     }
 
     /// Validate proxy trust level
-    async fn validate_proxy_trust(
-        &self,
-        proxy: &ProxyNode,
-        required_level: &TrustLevel,
-    ) -> bool {
+    async fn validate_proxy_trust(&self, proxy: &ProxyNode, required_level: &TrustLevel) -> bool {
         // Quick check against current trust level
         if !proxy.trust_level.meets_requirement(required_level) {
             return false;
@@ -280,7 +281,11 @@ impl ProxySelector {
 
         // Validate certificate if high trust required
         if required_level.to_score() >= TrustLevel::High.to_score() {
-            match self.validator.validate_certificate(&proxy.certificate).await {
+            match self
+                .validator
+                .validate_certificate(&proxy.certificate)
+                .await
+            {
                 Ok(validation) => {
                     // Check if validation meets requirement
                     validation.trust_level >= required_level.to_score()
@@ -293,7 +298,10 @@ impl ProxySelector {
     }
 
     /// Discover available proxies for asset
-    async fn discover_proxies(&self, target_asset: &AssetRegistration) -> AssetResult<Vec<ProxyNode>> {
+    async fn discover_proxies(
+        &self,
+        target_asset: &AssetRegistration,
+    ) -> AssetResult<Vec<ProxyNode>> {
         let nodes = self.proxy_nodes.read().await;
 
         // Filter nodes that can handle this asset type
@@ -313,19 +321,22 @@ impl ProxySelector {
     /// Check if node supports asset type
     fn node_supports_asset(&self, node: &ProxyNode, _asset_id: &AssetRegistration) -> bool {
         // For now, check if node has at least one forwarding capability
-        node.capabilities.iter().any(|cap| matches!(cap,
-            ProxyCapability::MemoryForwarding |
-            ProxyCapability::CpuForwarding |
-            ProxyCapability::GpuForwarding |
-            ProxyCapability::StorageForwarding
-        ))
+        node.capabilities.iter().any(|cap| {
+            matches!(
+                cap,
+                ProxyCapability::MemoryForwarding
+                    | ProxyCapability::CpuForwarding
+                    | ProxyCapability::GpuForwarding
+                    | ProxyCapability::StorageForwarding
+            )
+        })
     }
 
     /// Select best proxy from trusted list
     async fn select_best_proxy(&self, proxies: Vec<ProxyNode>) -> AssetResult<ProxyNode> {
         if proxies.is_empty() {
             return Err(AssetError::AdapterError {
-                message: "No proxies available".to_string()
+                message: "No proxies available".to_string(),
             });
         }
 
@@ -340,11 +351,12 @@ impl ProxySelector {
         scored_proxies.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Return best proxy
-        scored_proxies.into_iter()
+        scored_proxies
+            .into_iter()
             .next()
             .map(|(proxy, _)| proxy)
             .ok_or_else(|| AssetError::AllocationFailed {
-                reason: "No suitable proxy nodes available for selection".to_string()
+                reason: "No suitable proxy nodes available for selection".to_string(),
             })
     }
 
@@ -417,7 +429,11 @@ impl ProxySelector {
     }
 
     /// Update proxy status
-    pub async fn update_proxy_status(&self, node_id: &str, status: ProxyNodeStatus) -> AssetResult<()> {
+    pub async fn update_proxy_status(
+        &self,
+        node_id: &str,
+        status: ProxyNodeStatus,
+    ) -> AssetResult<()> {
         let mut nodes = self.proxy_nodes.write().await;
         if let Some(node) = nodes.get_mut(node_id) {
             node.status = status;
@@ -425,7 +441,7 @@ impl ProxySelector {
             Ok(())
         } else {
             Err(AssetError::AdapterError {
-                message: format!("Proxy node not found: {}", node_id)
+                message: format!("Proxy node not found: {node_id}"),
             })
         }
     }
@@ -442,7 +458,7 @@ impl ProxySelector {
             Ok(())
         } else {
             Err(AssetError::AdapterError {
-                message: format!("Proxy node not found: {}", node_id)
+                message: format!("Proxy node not found: {node_id}"),
             })
         }
     }
@@ -471,12 +487,12 @@ mod tests {
     #[tokio::test]
     async fn test_proxy_registration() {
         let trust_chain = Arc::new(TrustChainIntegration::new());
-        let validator = Arc::new(CertificateValidator::new().unwrap());
+        let validator = Arc::new(CertificateValidator::new().expect("test: certificate operation"));
         let selector = ProxySelector::new(trust_chain, validator, ProxySelectorConfig::default());
 
         let proxy = ProxyNode {
             node_id: "test-node".to_string(),
-            address: "[::1]:8080".parse().unwrap(),
+            address: "[::1]:8080".parse().expect("test: valid parse"),
             certificate: "test-cert".to_string(),
             trust_level: TrustLevel::Medium,
             performance: ProxyPerformance {
@@ -492,7 +508,7 @@ mod tests {
             status: ProxyNodeStatus::Healthy,
         };
 
-        selector.register_proxy(proxy.clone()).await.unwrap();
+        selector.register_proxy(proxy.clone()).await.expect("test: async operation");
 
         // Verify proxy is registered
         let nodes = selector.proxy_nodes.read().await;

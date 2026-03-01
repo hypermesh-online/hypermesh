@@ -14,6 +14,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ContainerId(pub uuid::Uuid);
 
+impl Default for ContainerId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContainerId {
     /// Create a new container ID
     pub fn new() -> Self {
@@ -26,6 +32,7 @@ impl ContainerId {
     }
 
     /// Get the inner string representation
+    #[allow(clippy::inherent_to_string_shadow_display)]
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }

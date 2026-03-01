@@ -27,7 +27,7 @@ mod tests {
             let y = ((i / 3) % 3) as i32;
             let z = (i / 9) as i32;
 
-            let coord = MatrixCoordinate::new(x as i64, y as i64, z as i64).unwrap();
+            let coord = MatrixCoordinate::new(x as i64, y as i64, z as i64).expect("test: valid coordinate");
             let blockchain = NodeBlockchain::new(coord.clone());
 
             nodes.push((blockchain, coord));
@@ -44,7 +44,7 @@ mod tests {
         // Each node adds blocks to its own chain
         for (i, (blockchain, coord)) in nodes.iter().enumerate() {
             let data = format!("Node {} block 1", i);
-            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
+            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.expect("test: block addition");
 
             // Verify block belongs to this node
             assert!(block.belongs_to_node(coord));
@@ -57,9 +57,9 @@ mod tests {
         assert_eq!(nodes[2].0.get_height().await, 1);
 
         // Each chain should have different block hashes (due to different node coordinates)
-        let block0 = nodes[0].0.get_block(1).await.unwrap();
-        let block1 = nodes[1].0.get_block(1).await.unwrap();
-        let block2 = nodes[2].0.get_block(1).await.unwrap();
+        let block0 = nodes[0].0.get_block(1).await.expect("test: block retrieval");
+        let block1 = nodes[1].0.get_block(1).await.expect("test: block retrieval");
+        let block2 = nodes[2].0.get_block(1).await.expect("test: block retrieval");
 
         assert_ne!(block0.hash, block1.hash);
         assert_ne!(block1.hash, block2.hash);
@@ -74,12 +74,12 @@ mod tests {
                 let x = (i % 3) as i32;
                 let y = ((i / 3) % 3) as i32;
                 let z = (i / 9) as i32;
-                MatrixCoordinate::new(x as i64, y as i64, z as i64).unwrap()
+                MatrixCoordinate::new(x as i64, y as i64, z as i64).expect("test: valid coordinate")
             })
             .collect();
 
         // Create blockchain at center node (1,1,1)
-        let center = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let center = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(center.clone());
 
         // Create propagator with broadcast strategy
@@ -89,7 +89,7 @@ mod tests {
         );
 
         // Add a block and propagate it
-        let block = blockchain.add_block_with_data(b"Test block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Test block".to_vec()).await.expect("test: block addition");
         let result = propagator.propagate_block(&block, &network_coords).await;
 
         // Should reach immediate neighbors
@@ -110,8 +110,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_chain_state_persistence() {
-        let temp_dir = TempDir::new().unwrap();
-        let coord = MatrixCoordinate::new(5, 5, 5).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
 
         // Create blockchain and state manager
         let blockchain = NodeBlockchain::new(coord.clone());
@@ -119,21 +119,21 @@ mod tests {
             coord.clone(),
             temp_dir.path(),
         );
-        state_manager.initialize().await.unwrap();
+        state_manager.initialize().await.expect("test: initialization");
 
         // Add blocks and persist them
         for i in 0..5 {
             let data = format!("Block {}", i);
-            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
-            state_manager.store_block(&block).await.unwrap();
+            let block = blockchain.add_block_with_data(data.as_bytes().to_vec()).await.expect("test: block addition");
+            state_manager.store_block(&block).await.expect("test: block storage");
         }
 
         // Create snapshot
-        let head = blockchain.get_head().await.unwrap();
+        let head = blockchain.get_head().await.expect("test: block retrieval");
         let snapshot = state_manager.create_snapshot(
             head.index,
             head.hash.clone(),
-        ).await.unwrap();
+        ).await.expect("test: async operation");
 
         assert_eq!(snapshot.height, 5);
         assert_eq!(snapshot.total_blocks, 6); // Including genesis
@@ -145,7 +145,7 @@ mod tests {
             ..Default::default()
         };
 
-        let results = state_manager.query_blocks(query).await.unwrap();
+        let results = state_manager.query_blocks(query).await.expect("test: async operation");
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].index, 2);
         assert_eq!(results[2].index, 4);
@@ -159,12 +159,12 @@ mod tests {
                 let x = (i % 3) as i32;
                 let y = ((i / 3) % 3) as i32;
                 let z = (i / 9) as i32;
-                MatrixCoordinate::new(x as i64, y as i64, z as i64).unwrap()
+                MatrixCoordinate::new(x as i64, y as i64, z as i64).expect("test: valid coordinate")
             })
             .collect();
 
         // Start at corner (0,0,0)
-        let origin = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let origin = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(origin.clone());
 
         // Use routed propagation strategy
@@ -174,7 +174,7 @@ mod tests {
         );
 
         // Add block and propagate
-        let block = blockchain.add_block_with_data(b"Routed block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Routed block".to_vec()).await.expect("test: block addition");
         let result = propagator.propagate_block(&block, &network_coords).await;
 
         // Should reach strategic relay nodes
@@ -195,11 +195,11 @@ mod tests {
                 let x = (i % 3) as i32;
                 let y = ((i / 3) % 3) as i32;
                 let z = (i / 9) as i32;
-                MatrixCoordinate::new(x as i64, y as i64, z as i64).unwrap()
+                MatrixCoordinate::new(x as i64, y as i64, z as i64).expect("test: valid coordinate")
             })
             .collect();
 
-        let center = MatrixCoordinate::new(1, 1, 1).unwrap();
+        let center = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(center.clone());
         let propagator = BlockPropagator::new(
             center.clone(),
@@ -207,7 +207,7 @@ mod tests {
         );
 
         // Add critical block and flood propagate
-        let block = blockchain.add_block_with_data(b"Critical block".to_vec()).await.unwrap();
+        let block = blockchain.add_block_with_data(b"Critical block".to_vec()).await.expect("test: block addition");
         let result = propagator.flood_propagate(&block, &network_coords, 2).await;
 
         // Should reach many nodes within 2 hops
@@ -223,13 +223,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_chain_fork_detection() {
-        let coord = MatrixCoordinate::new(7, 7, 7).unwrap();
+        let coord = MatrixCoordinate::new(7, 7, 7).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(coord.clone());
 
         // Build main chain
         for i in 0..5 {
             let data = format!("Main chain block {}", i);
-            blockchain.add_block_with_data(data.as_bytes().to_vec()).await.unwrap();
+            blockchain.add_block_with_data(data.as_bytes().to_vec()).await.expect("test: block addition");
         }
 
         let main_chain = blockchain.get_chain().await;
@@ -249,7 +249,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_concurrent_block_addition() {
-        let coord = MatrixCoordinate::new(9, 9, 9).unwrap();
+        let coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(coord);
 
         // Spawn multiple tasks adding blocks concurrently
@@ -287,7 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_performance_thousand_blocks() {
-        let coord = MatrixCoordinate::new(10, 10, 10).unwrap();
+        let coord = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
         let blockchain = NodeBlockchain::new(coord);
 
         let start = std::time::Instant::now();
@@ -295,7 +295,7 @@ mod tests {
         // Add 1000 blocks
         for i in 0..1000 {
             let data = vec![i as u8; 100];
-            blockchain.add_block_with_data(data).await.unwrap();
+            blockchain.add_block_with_data(data).await.expect("test: block addition");
         }
 
         let elapsed = start.elapsed();
@@ -321,23 +321,23 @@ mod tests {
     #[tokio::test]
     async fn test_end_to_end_three_node_scenario() {
         // Create 3 independent nodes with their own blockchains
-        let coord1 = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let coord2 = MatrixCoordinate::new(1, 0, 0).unwrap();
-        let coord3 = MatrixCoordinate::new(0, 1, 0).unwrap();
+        let coord1 = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let coord2 = MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate");
+        let coord3 = MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate");
 
         let chain1 = NodeBlockchain::new(coord1.clone());
         let chain2 = NodeBlockchain::new(coord2.clone());
         let chain3 = NodeBlockchain::new(coord3.clone());
 
         // Each node adds its own blocks
-        chain1.add_block_with_data(b"Node 1 data A".to_vec()).await.unwrap();
-        chain1.add_block_with_data(b"Node 1 data B".to_vec()).await.unwrap();
+        chain1.add_block_with_data(b"Node 1 data A".to_vec()).await.expect("test: block addition");
+        chain1.add_block_with_data(b"Node 1 data B".to_vec()).await.expect("test: block addition");
 
-        chain2.add_block_with_data(b"Node 2 data X".to_vec()).await.unwrap();
-        chain2.add_block_with_data(b"Node 2 data Y".to_vec()).await.unwrap();
-        chain2.add_block_with_data(b"Node 2 data Z".to_vec()).await.unwrap();
+        chain2.add_block_with_data(b"Node 2 data X".to_vec()).await.expect("test: block addition");
+        chain2.add_block_with_data(b"Node 2 data Y".to_vec()).await.expect("test: block addition");
+        chain2.add_block_with_data(b"Node 2 data Z".to_vec()).await.expect("test: block addition");
 
-        chain3.add_block_with_data(b"Node 3 data 1".to_vec()).await.unwrap();
+        chain3.add_block_with_data(b"Node 3 data 1".to_vec()).await.expect("test: block addition");
 
         // Verify independence
         assert_eq!(chain1.get_height().await, 2);

@@ -4,9 +4,9 @@
 
 //! Component lifecycle management
 
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
-use serde::{Serialize, Deserialize};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::IntegrationResult;
 
@@ -15,19 +15,19 @@ use crate::IntegrationResult;
 pub trait ComponentLifecycle {
     /// Initialize the component
     async fn initialize(&self) -> IntegrationResult<()>;
-    
+
     /// Start the component
     async fn start(&self) -> IntegrationResult<()>;
-    
+
     /// Stop the component
     async fn stop(&self) -> IntegrationResult<()>;
-    
+
     /// Shutdown the component
     async fn shutdown(&self) -> IntegrationResult<()>;
-    
+
     /// Get component health status
     async fn health_check(&self) -> ComponentHealth;
-    
+
     /// Get component state
     async fn get_state(&self) -> ComponentState;
 }
@@ -147,20 +147,20 @@ impl ComponentState {
             metrics: ComponentMetrics::default(),
         }
     }
-    
+
     /// Update component status
     pub fn update_status(&mut self, status: ComponentStatus) {
         self.status = status;
         self.timestamp = SystemTime::now();
     }
-    
+
     /// Mark component as initialized
     pub fn mark_initialized(&mut self) {
         self.status = ComponentStatus::Ready;
         self.initialized_at = Some(SystemTime::now());
         self.timestamp = SystemTime::now();
     }
-    
+
     /// Set error state
     pub fn set_error(&mut self, error_message: &str) {
         self.status = ComponentStatus::Error {
@@ -169,12 +169,15 @@ impl ComponentState {
         self.error = Some(error_message.to_string());
         self.timestamp = SystemTime::now();
     }
-    
+
     /// Check if component is healthy
     pub fn is_healthy(&self) -> bool {
-        matches!(self.status, ComponentStatus::Running | ComponentStatus::Ready)
+        matches!(
+            self.status,
+            ComponentStatus::Running | ComponentStatus::Ready
+        )
     }
-    
+
     /// Check if component is operational
     pub fn is_operational(&self) -> bool {
         matches!(
@@ -182,7 +185,7 @@ impl ComponentState {
             ComponentStatus::Running | ComponentStatus::Ready | ComponentStatus::Degraded { .. }
         )
     }
-    
+
     /// Get component uptime
     pub fn uptime(&self) -> Duration {
         if let Some(init_time) = self.initialized_at {
@@ -205,7 +208,7 @@ impl ComponentHealth {
             score: 0.0,
         }
     }
-    
+
     /// Create healthy status
     pub fn healthy() -> Self {
         Self {
@@ -215,7 +218,7 @@ impl ComponentHealth {
             score: 1.0,
         }
     }
-    
+
     /// Create unhealthy status with message
     pub fn unhealthy(message: &str) -> Self {
         Self {
@@ -230,13 +233,13 @@ impl ComponentHealth {
             score: 0.0,
         }
     }
-    
+
     /// Add health check result
     pub fn add_check(&mut self, check: HealthCheck) {
         self.details.push(check);
         self.update_score();
     }
-    
+
     /// Update overall health score based on individual checks
     pub fn update_score(&mut self) {
         if self.details.is_empty() {
@@ -244,18 +247,20 @@ impl ComponentHealth {
             self.status = HealthStatus::Unknown;
             return;
         }
-        
-        let total_score: f64 = self.details.iter().map(|check| {
-            match check.status {
+
+        let total_score: f64 = self
+            .details
+            .iter()
+            .map(|check| match check.status {
                 HealthStatus::Healthy => 1.0,
                 HealthStatus::Degraded => 0.5,
                 HealthStatus::Unhealthy => 0.0,
                 HealthStatus::Unknown => 0.0,
-            }
-        }).sum();
-        
+            })
+            .sum();
+
         self.score = total_score / self.details.len() as f64;
-        
+
         // Determine overall status
         self.status = if self.score >= 0.8 {
             HealthStatus::Healthy
@@ -304,19 +309,20 @@ impl ComponentLifecycleManager {
             components: std::collections::HashMap::new(),
         }
     }
-    
+
     /// Register a component
-    pub fn register_component<T>(&mut self, name: &str, component: T) 
+    pub fn register_component<T>(&mut self, name: &str, component: T)
     where
         T: ComponentLifecycle + Send + Sync + 'static,
     {
-        self.components.insert(name.to_string(), Box::new(component));
+        self.components
+            .insert(name.to_string(), Box::new(component));
     }
-    
+
     /// Initialize all components
     pub async fn initialize_all(&self) -> IntegrationResult<()> {
         info!("Initializing all registered components");
-        
+
         for (name, component) in &self.components {
             info!("Initializing component: {}", name);
             if let Err(e) = component.initialize().await {
@@ -324,15 +330,15 @@ impl ComponentLifecycleManager {
                 return Err(e);
             }
         }
-        
+
         info!("All components initialized successfully");
         Ok(())
     }
-    
+
     /// Start all components
     pub async fn start_all(&self) -> IntegrationResult<()> {
         info!("Starting all registered components");
-        
+
         for (name, component) in &self.components {
             info!("Starting component: {}", name);
             if let Err(e) = component.start().await {
@@ -340,11 +346,11 @@ impl ComponentLifecycleManager {
                 return Err(e);
             }
         }
-        
+
         info!("All components started successfully");
         Ok(())
     }
-    
+
     /// Stop all components
     pub async fn stop_all(&self) -> IntegrationResult<()> {
         info!("Stopping all registered components");
@@ -364,7 +370,7 @@ impl ComponentLifecycleManager {
         info!("All components stop sequence completed");
         Ok(())
     }
-    
+
     /// Shutdown all components
     pub async fn shutdown_all(&self) -> IntegrationResult<()> {
         info!("Shutting down all registered components");
@@ -384,16 +390,16 @@ impl ComponentLifecycleManager {
         info!("All components shutdown sequence completed");
         Ok(())
     }
-    
+
     /// Get health status of all components
     pub async fn health_check_all(&self) -> Vec<(String, ComponentHealth)> {
         let mut results = Vec::new();
-        
+
         for (name, component) in &self.components {
             let health = component.health_check().await;
             results.push((name.clone(), health));
         }
-        
+
         results
     }
 }

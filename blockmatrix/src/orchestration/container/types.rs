@@ -4,7 +4,7 @@
 
 //! Type definitions for MFN-Enhanced Container Orchestration
 
-use crate::{ContainerId, ServiceId, NodeId};
+use crate::{ContainerId, NodeId, ServiceId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};

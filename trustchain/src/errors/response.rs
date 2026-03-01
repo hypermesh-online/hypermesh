@@ -4,8 +4,8 @@
 
 //! Error response types for API endpoints
 
-use serde::{Serialize, Deserialize};
-use super::{TrustChainError, domain::*};
+use super::{domain::*, TrustChainError};
+use serde::{Deserialize, Serialize};
 
 /// Error response for API endpoints
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,8 +62,12 @@ impl ErrorResponse {
                 _ => "CONSENSUS_ERROR".to_string(),
             },
             TrustChainError::SecurityError { .. } => "SECURITY_ERROR".to_string(),
-            TrustChainError::SecurityValidationFailed { .. } => "SECURITY_VALIDATION_FAILED".to_string(),
-            TrustChainError::ByzantineFaultDetected { .. } => "BYZANTINE_FAULT_DETECTED".to_string(),
+            TrustChainError::SecurityValidationFailed { .. } => {
+                "SECURITY_VALIDATION_FAILED".to_string()
+            }
+            TrustChainError::ByzantineFaultDetected { .. } => {
+                "BYZANTINE_FAULT_DETECTED".to_string()
+            }
             TrustChainError::Configuration(_) => "CONFIG_ERROR".to_string(),
             TrustChainError::Network(_) => "NETWORK_ERROR".to_string(),
             TrustChainError::Storage(_) => "STORAGE_ERROR".to_string(),
@@ -76,12 +80,13 @@ impl ErrorResponse {
 
     fn error_details(error: &TrustChainError) -> Option<serde_json::Value> {
         match error {
-            TrustChainError::Timeout { operation, duration } => {
-                Some(serde_json::json!({
-                    "operation": operation,
-                    "timeout_duration_secs": duration.as_secs()
-                }))
-            }
+            TrustChainError::Timeout {
+                operation,
+                duration,
+            } => Some(serde_json::json!({
+                "operation": operation,
+                "timeout_duration_secs": duration.as_secs()
+            })),
             TrustChainError::ConsensusValidation(ConsensusError::ProofOfStakeFailed {
                 stake,
                 minimum,
@@ -95,11 +100,9 @@ impl ErrorResponse {
                     "unit": "requests_per_minute"
                 }))
             }
-            TrustChainError::SecurityValidationFailed { reason } => {
-                Some(serde_json::json!({
-                    "security_failure_reason": reason
-                }))
-            }
+            TrustChainError::SecurityValidationFailed { reason } => Some(serde_json::json!({
+                "security_failure_reason": reason
+            })),
             TrustChainError::ByzantineFaultDetected { node_id, reason } => {
                 Some(serde_json::json!({
                     "byzantine_node_id": node_id,

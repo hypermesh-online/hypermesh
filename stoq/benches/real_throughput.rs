@@ -7,14 +7,14 @@
 //! This benchmark suite measures ACTUAL transport performance, replacing all fantasy metrics
 //! with real, reproducible measurements. No hardcoded values - only measured reality.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
-use tokio::runtime::Runtime;
-use std::time::{Instant, Duration};
-use std::net::Ipv6Addr;
 use bytes::Bytes;
-use std::sync::Arc;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::net::Ipv6Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
+use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
 
 /// Initialize crypto provider for Rustls
@@ -35,7 +35,7 @@ fn benchmark_real_throughput(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(size_bytes as u64));
 
         group.bench_with_input(
-            BenchmarkId::new("actual_transfer", format!("{}MB", size_mb)),
+            BenchmarkId::new("actual_transfer", format!("{size_mb}MB")),
             &size_bytes,
             |b, &size| {
                 b.to_async(&rt).iter(|| async move {
@@ -61,19 +61,19 @@ fn benchmark_real_throughput(c: &mut Criterion) {
                     // Start server
                     tokio::spawn(async move {
                         while !shutdown_clone.load(Ordering::Relaxed) {
-                            if let Ok(conn) = tokio::time::timeout(
+                            if let Ok(Ok(conn)) = tokio::time::timeout(
                                 Duration::from_millis(100),
-                                server_clone.accept()
-                            ).await {
-                                if let Ok(conn) = conn {
-                                    tokio::spawn(async move {
-                                        while let Ok(mut stream) = conn.accept_stream().await {
-                                            tokio::spawn(async move {
-                                                let _ = stream.receive().await;
-                                            });
-                                        }
-                                    });
-                                }
+                                server_clone.accept(),
+                            )
+                            .await
+                            {
+                                tokio::spawn(async move {
+                                    while let Ok(mut stream) = conn.accept_stream().await {
+                                        tokio::spawn(async move {
+                                            let _ = stream.receive().await;
+                                        });
+                                    }
+                                });
                             }
                         }
                     });
@@ -120,7 +120,7 @@ fn benchmark_real_throughput(c: &mut Criterion) {
 
                     black_box((duration, gbps, size));
                 });
-            }
+            },
         );
     }
 
@@ -153,21 +153,19 @@ fn benchmark_real_latency(c: &mut Criterion) {
             // Echo server
             tokio::spawn(async move {
                 while !shutdown_clone.load(Ordering::Relaxed) {
-                    if let Ok(conn) = tokio::time::timeout(
-                        Duration::from_millis(100),
-                        server_clone.accept()
-                    ).await {
-                        if let Ok(conn) = conn {
-                            tokio::spawn(async move {
-                                while let Ok(mut stream) = conn.accept_stream().await {
-                                    tokio::spawn(async move {
-                                        if let Ok(data) = stream.receive().await {
-                                            let _ = stream.send(&data).await;
-                                        }
-                                    });
-                                }
-                            });
-                        }
+                    if let Ok(Ok(conn)) =
+                        tokio::time::timeout(Duration::from_millis(100), server_clone.accept())
+                            .await
+                    {
+                        tokio::spawn(async move {
+                            while let Ok(mut stream) = conn.accept_stream().await {
+                                tokio::spawn(async move {
+                                    if let Ok(data) = stream.receive().await {
+                                        let _ = stream.send(&data).await;
+                                    }
+                                });
+                            }
+                        });
                     }
                 }
             });
@@ -250,19 +248,19 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
 
                     tokio::spawn(async move {
                         while !shutdown_clone.load(Ordering::Relaxed) {
-                            if let Ok(conn) = tokio::time::timeout(
+                            if let Ok(Ok(conn)) = tokio::time::timeout(
                                 Duration::from_millis(100),
-                                server_clone.accept()
-                            ).await {
-                                if let Ok(conn) = conn {
-                                    tokio::spawn(async move {
-                                        while let Ok(mut stream) = conn.accept_stream().await {
-                                            tokio::spawn(async move {
-                                                let _ = stream.receive().await;
-                                            });
-                                        }
-                                    });
-                                }
+                                server_clone.accept(),
+                            )
+                            .await
+                            {
+                                tokio::spawn(async move {
+                                    while let Ok(mut stream) = conn.accept_stream().await {
+                                        tokio::spawn(async move {
+                                            let _ = stream.receive().await;
+                                        });
+                                    }
+                                });
                             }
                         }
                     });
@@ -324,7 +322,7 @@ fn benchmark_concurrent_connections(c: &mut Criterion) {
 
                     black_box((connections_per_sec, connection_times.len(), total_duration));
                 });
-            }
+            },
         );
     }
 
@@ -395,7 +393,7 @@ fn benchmark_packet_processing(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*packet_size as u64));
 
         group.bench_with_input(
-            BenchmarkId::new("packet_rate", format!("{}B", packet_size)),
+            BenchmarkId::new("packet_rate", format!("{packet_size}B")),
             packet_size,
             |b, &size| {
                 b.to_async(&rt).iter(|| async move {
@@ -428,7 +426,7 @@ fn benchmark_packet_processing(c: &mut Criterion) {
 
                     black_box((packets_per_sec, throughput_mbps));
                 });
-            }
+            },
         );
     }
 

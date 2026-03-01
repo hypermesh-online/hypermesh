@@ -4,11 +4,11 @@
 
 //! Transport Monitoring and Metrics for HyperMesh
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::time::Instant;
 use parking_lot::RwLock;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 use tracing::{debug, info};
 
 /// Transport monitoring statistics
@@ -168,8 +168,8 @@ impl TransportMonitor {
     pub fn get_throughput_gbps(&self) -> f64 {
         let uptime = self.start_time.elapsed().as_secs_f64();
         if uptime > 0.0 {
-            let total_bytes = self.bytes_sent.load(Ordering::Relaxed) +
-                             self.bytes_received.load(Ordering::Relaxed);
+            let total_bytes = self.bytes_sent.load(Ordering::Relaxed)
+                + self.bytes_received.load(Ordering::Relaxed);
             (total_bytes as f64 * 8.0) / (uptime * 1_000_000_000.0)
         } else {
             0.0

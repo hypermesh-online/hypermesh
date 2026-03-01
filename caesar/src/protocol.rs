@@ -14,8 +14,8 @@ use tracing::info;
 use hypermesh_lib::economic::GoldGrams;
 
 use crate::{
-    conservation, evp, fee_distribution, gold_oracle, governor, holding, models,
-    packet_processor, routing, storage, CaesarConfig, CaesarProtocol,
+    conservation, evp, fee_distribution, gold_oracle, governor, holding, models, packet_processor,
+    routing, storage, CaesarConfig, CaesarProtocol,
 };
 use std::sync::Arc;
 
@@ -25,12 +25,8 @@ impl CaesarProtocol {
         info!("Initializing Caesar Ephemeral Value Protocol");
 
         let config = Arc::new(config);
-        let storage = Arc::new(
-            storage::CaesarStorage::new(config.storage.clone()).await?,
-        );
-        let processor = packet_processor::PacketProcessor::new(
-            config.processor.clone(),
-        );
+        let storage = Arc::new(storage::CaesarStorage::new(config.storage.clone()).await?);
+        let processor = packet_processor::PacketProcessor::new(config.processor.clone());
         let fee_distributor = fee_distribution::FeeDistributor::default();
         let oracle = gold_oracle::GoldOracle::new(config.gold_price_usd);
         let router = routing::PacketRouter::default();
@@ -170,7 +166,7 @@ impl CaesarProtocol {
         let selection = self
             .router
             .find_route(candidates, record.tier)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         let handoff_fee = if let Some(m) = metrics {
             let params = self.governor.recalculate(m);
@@ -188,7 +184,7 @@ impl CaesarProtocol {
         let result = self
             .processor
             .process_handoff(&mut packet, selection.next_hop.clone(), handoff_fee)
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         let updated = models::PacketRecord {
             state: packet.state,
@@ -216,7 +212,7 @@ impl CaesarProtocol {
             .ok_or_else(|| anyhow::anyhow!("packet not found"))?;
         let mut packet = models::packet_from_record(&record);
 
-        packet.hold().map_err(|e| anyhow::anyhow!("{}", e))?;
+        packet.hold().map_err(|e| anyhow::anyhow!("{e}"))?;
         self.holding_buffer.hold(*packet_id, reason);
         self.storage
             .update_packet_state(packet_id, packet.state, packet.initial_value)
@@ -241,7 +237,7 @@ impl CaesarProtocol {
 
         packet
             .retry_from_hold()
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
         self.storage
             .update_packet_state(
                 packet_id,
@@ -265,7 +261,7 @@ impl CaesarProtocol {
             .ok_or_else(|| anyhow::anyhow!("packet not found"))?;
         let mut packet = models::packet_from_record(&record);
 
-        packet.expire().map_err(|e| anyhow::anyhow!("{}", e))?;
+        packet.expire().map_err(|e| anyhow::anyhow!("{e}"))?;
         self.storage
             .update_packet_state(packet_id, packet.state, packet.initial_value)
             .await?;
@@ -285,7 +281,7 @@ impl CaesarProtocol {
             .ok_or_else(|| anyhow::anyhow!("packet not found"))?;
         let mut packet = models::packet_from_record(&record);
 
-        packet.refund().map_err(|e| anyhow::anyhow!("{}", e))?;
+        packet.refund().map_err(|e| anyhow::anyhow!("{e}"))?;
         self.storage
             .update_packet_state(packet_id, packet.state, packet.initial_value)
             .await?;
@@ -308,11 +304,7 @@ mod tests {
     fn test_config(dir: &TempDir) -> CaesarConfig {
         CaesarConfig {
             storage: storage::StorageConfig {
-                path: dir
-                    .path()
-                    .to_str()
-                    .expect("test: tempdir path")
-                    .to_string(),
+                path: dir.path().to_str().expect("test: tempdir path").to_string(),
             },
             ..CaesarConfig::default()
         }
@@ -350,10 +342,7 @@ mod tests {
             .await
             .expect("test: mint should succeed");
 
-        let count = protocol
-            .active_packet_count()
-            .await
-            .expect("test: count");
+        let count = protocol.active_packet_count().await.expect("test: count");
         assert_eq!(count, 1);
 
         let stored = protocol
@@ -362,10 +351,7 @@ mod tests {
             .await
             .expect("test: get packet")
             .expect("test: packet should exist");
-        assert_eq!(
-            stored.state,
-            hypermesh_lib::economic::PacketState::Minted
-        );
+        assert_eq!(stored.state, hypermesh_lib::economic::PacketState::Minted);
     }
 
     #[tokio::test]
@@ -458,10 +444,7 @@ mod tests {
             .await
             .expect("test: get")
             .expect("test: exists");
-        assert_eq!(
-            expired.state,
-            hypermesh_lib::economic::PacketState::Expired
-        );
+        assert_eq!(expired.state, hypermesh_lib::economic::PacketState::Expired);
 
         protocol
             .refund_packet(&packet_id)

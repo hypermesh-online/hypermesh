@@ -5,9 +5,7 @@
 // Seamless tier switching with state migration
 // Enables transitions between privacy tiers without connection drops
 
-use super::tiers::{
-    AnonymousTier, FederatedTier, NodeId, PrivateP2PTier, PublicTier,
-};
+use super::tiers::{AnonymousTier, FederatedTier, NodeId, PrivateP2PTier, PublicTier};
 use hypermesh_lib::PrivacyMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -165,29 +163,39 @@ impl TierSwitcher {
     }
 
     /// Validate if a transition is allowed
-    fn validate_transition(&self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
+    fn validate_transition(
+        &self,
+        from: PrivacyMode,
+        to: PrivacyMode,
+    ) -> Result<(), TransitionError> {
         // Anonymous to Private requires establishing identity
-        if from == PrivacyMode::ANONYMOUS && to == PrivacyMode::PRIVATE {
-            if self.migration_state.active_connections.len() > 10 {
-                return Err(TransitionError::TooManyConnections(
-                    "Cannot establish Private identity with >10 anonymous connections".into()
-                ));
-            }
+        if from == PrivacyMode::ANONYMOUS
+            && to == PrivacyMode::PRIVATE
+            && self.migration_state.active_connections.len() > 10
+        {
+            return Err(TransitionError::TooManyConnections(
+                "Cannot establish Private identity with >10 anonymous connections".into(),
+            ));
         }
         // Private to Anonymous requires dropping peer relationships
-        if from == PrivacyMode::PRIVATE && to == PrivacyMode::ANONYMOUS {
-            if !self.migration_state.pending_transactions.is_empty() {
-                return Err(TransitionError::PendingTransactions(
-                    self.migration_state.pending_transactions.len()
-                ));
-            }
+        if from == PrivacyMode::PRIVATE
+            && to == PrivacyMode::ANONYMOUS
+            && !self.migration_state.pending_transactions.is_empty()
+        {
+            return Err(TransitionError::PendingTransactions(
+                self.migration_state.pending_transactions.len(),
+            ));
         }
 
         Ok(())
     }
 
     /// Prepare the migration state
-    fn prepare_migration(&mut self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
+    fn prepare_migration(
+        &mut self,
+        from: PrivacyMode,
+        to: PrivacyMode,
+    ) -> Result<(), TransitionError> {
         // Save current connections
         self.migration_state.active_connections.clear();
 
@@ -195,23 +203,27 @@ impl TierSwitcher {
         if from == PrivacyMode::ANONYMOUS {
             // Anonymous connections don't have peer IDs
             for i in 0..3 {
-                self.migration_state.active_connections.push(ConnectionInfo {
-                    peer_id: None,
-                    connection_type: ConnectionType::Anonymous,
-                    established_at: i as u64 * 1000,
-                    last_activity: i as u64 * 1000 + 500,
-                });
+                self.migration_state
+                    .active_connections
+                    .push(ConnectionInfo {
+                        peer_id: None,
+                        connection_type: ConnectionType::Anonymous,
+                        established_at: i as u64 * 1000,
+                        last_activity: i as u64 * 1000 + 500,
+                    });
             }
         } else if from == PrivacyMode::PRIVATE {
             // Private connections have known peer IDs
             if let Some(tier) = &self.private_tier {
                 for (i, peer_id) in tier.trusted_peers.iter().enumerate() {
-                    self.migration_state.active_connections.push(ConnectionInfo {
-                        peer_id: Some(*peer_id),
-                        connection_type: ConnectionType::Peer,
-                        established_at: i as u64 * 1000,
-                        last_activity: i as u64 * 1000 + 500,
-                    });
+                    self.migration_state
+                        .active_connections
+                        .push(ConnectionInfo {
+                            peer_id: Some(*peer_id),
+                            connection_type: ConnectionType::Peer,
+                            established_at: i as u64 * 1000,
+                            last_activity: i as u64 * 1000 + 500,
+                        });
                 }
             }
         }
@@ -225,7 +237,11 @@ impl TierSwitcher {
     }
 
     /// Execute the migration
-    fn execute_migration(&mut self, from: PrivacyMode, to: PrivacyMode) -> Result<(), TransitionError> {
+    fn execute_migration(
+        &mut self,
+        from: PrivacyMode,
+        to: PrivacyMode,
+    ) -> Result<(), TransitionError> {
         // Migrate connections
         let target_conn_type = if to == PrivacyMode::ANONYMOUS {
             ConnectionType::Anonymous
@@ -267,7 +283,12 @@ impl TierSwitcher {
     }
 
     /// Finalize the transition
-    fn finalize_transition(&mut self, from: PrivacyMode, to: PrivacyMode, duration: Duration) -> TransitionResult {
+    fn finalize_transition(
+        &mut self,
+        from: PrivacyMode,
+        to: PrivacyMode,
+        duration: Duration,
+    ) -> TransitionResult {
         // Update current tier
         self.current_tier = to;
 
@@ -277,7 +298,7 @@ impl TierSwitcher {
             to,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("system time should be after UNIX epoch")
                 .as_secs(),
             // Ensure at least 1ms for tests that run very quickly
             duration_ms: duration.as_millis().max(1) as u64,
@@ -367,12 +388,16 @@ pub enum TransitionError {
 impl std::fmt::Display for TransitionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TransitionError::TransitionInProgress => write!(f, "A transition is already in progress"),
+            TransitionError::TransitionInProgress => {
+                write!(f, "A transition is already in progress")
+            }
             TransitionError::NoTransitionInProgress => write!(f, "No transition in progress"),
-            TransitionError::InvalidTransition(msg) => write!(f, "Invalid transition: {}", msg),
-            TransitionError::TooManyConnections(msg) => write!(f, "Too many connections: {}", msg),
-            TransitionError::PendingTransactions(count) => write!(f, "{} pending transactions must complete", count),
-            TransitionError::MigrationFailed(msg) => write!(f, "Migration failed: {}", msg),
+            TransitionError::InvalidTransition(msg) => write!(f, "Invalid transition: {msg}"),
+            TransitionError::TooManyConnections(msg) => write!(f, "Too many connections: {msg}"),
+            TransitionError::PendingTransactions(count) => {
+                write!(f, "{count} pending transactions must complete")
+            }
+            TransitionError::MigrationFailed(msg) => write!(f, "Migration failed: {msg}"),
         }
     }
 }
@@ -411,8 +436,8 @@ mod tests {
     #[test]
     fn test_transition_history() {
         let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
-        switcher.switch_tier(PrivacyMode::PRIVATE).unwrap();
-        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        switcher.switch_tier(PrivacyMode::PRIVATE).expect("test: mode switch");
+        switcher.switch_tier(PrivacyMode::PUBLIC).expect("test: mode switch");
 
         let history = switcher.transition_history();
         assert_eq!(history.len(), 2);
@@ -441,7 +466,7 @@ mod tests {
             tier.add_peer(NodeId([2u8; 32])).expect("test: add_peer");
         }
 
-        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).expect("test: mode switch");
 
         // Check that connections were migrated
         assert!(!switcher.migration_state().active_connections.is_empty());
@@ -465,7 +490,7 @@ mod tests {
         let mut switcher = TierSwitcher::new(PrivacyMode::ANONYMOUS);
 
         // Switch to Public
-        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).expect("test: mode switch");
 
         // Check that connections were updated
         for conn in &switcher.migration_state().active_connections {
@@ -481,7 +506,7 @@ mod tests {
         assert!(switcher.migration_state().authentication_data.is_none());
 
         // Switch to Public
-        switcher.switch_tier(PrivacyMode::PUBLIC).unwrap();
+        switcher.switch_tier(PrivacyMode::PUBLIC).expect("test: mode switch");
 
         // Authentication data should be created
         assert!(switcher.migration_state().authentication_data.is_some());
@@ -509,8 +534,8 @@ mod tests {
             last_activity: 23456,
         };
 
-        let serialized = serde_json::to_string(&conn).unwrap();
-        let deserialized: ConnectionInfo = serde_json::from_str(&serialized).unwrap();
+        let serialized = serde_json::to_string(&conn).expect("test: serialization");
+        let deserialized: ConnectionInfo = serde_json::from_str(&serialized).expect("test: deserialization");
 
         assert_eq!(conn.peer_id, deserialized.peer_id);
         assert_eq!(conn.connection_type, deserialized.connection_type);

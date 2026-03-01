@@ -10,13 +10,11 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 
-use super::super::{
-    ExtensionCapability, ExtensionError, ExtensionMetadata, ExtensionResult,
-};
+use super::super::{ExtensionCapability, ExtensionError, ExtensionMetadata, ExtensionResult};
 
-use super::types::*;
-use super::monitoring::{ResourceMonitor, AnomalyDetector};
 use super::audit::AuditLogger;
+use super::monitoring::{AnomalyDetector, ResourceMonitor};
+use super::types::*;
 
 /// Security manager for extension runtime security
 pub struct SecurityManager {
@@ -110,60 +108,67 @@ impl SecurityManager {
 
         // Get security context
         let contexts = self.contexts.read().await;
-        let context = contexts.get(extension_id)
-            .ok_or_else(|| ExtensionError::ExtensionNotFound {
-                id: extension_id.to_string(),
-            })?;
+        let context =
+            contexts
+                .get(extension_id)
+                .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                    id: extension_id.to_string(),
+                })?;
 
         // Check if capability is granted
         if !context.capabilities.contains(capability) {
-            self.audit_logger.log(AuditEntry {
-                timestamp: SystemTime::now(),
-                extension_id: extension_id.to_string(),
-                event_type: AuditEventType::CapabilityRequest,
-                operation: operation.to_string(),
-                result: AuditResult::Denied(format!("Capability not granted: {:?}", capability)),
-                details: None,
-            }).await;
+            self.audit_logger
+                .log(AuditEntry {
+                    timestamp: SystemTime::now(),
+                    extension_id: extension_id.to_string(),
+                    event_type: AuditEventType::CapabilityRequest,
+                    operation: operation.to_string(),
+                    result: AuditResult::Denied(format!("Capability not granted: {capability:?}")),
+                    details: None,
+                })
+                .await;
 
             return Err(ExtensionError::CapabilityNotGranted {
-                capability: format!("{:?}", capability),
+                capability: format!("{capability:?}"),
             });
         }
 
         // Additional validation if validator exists
         let validators = self.validators.read().await;
         if let Some(validator) = validators.get(capability) {
-            validator.validate(extension_id, capability, operation).await?;
+            validator
+                .validate(extension_id, capability, operation)
+                .await?;
         }
 
         // Audit successful check
-        self.audit_logger.log(AuditEntry {
-            timestamp: SystemTime::now(),
-            extension_id: extension_id.to_string(),
-            event_type: AuditEventType::CapabilityRequest,
-            operation: operation.to_string(),
-            result: AuditResult::Success,
-            details: None,
-        }).await;
+        self.audit_logger
+            .log(AuditEntry {
+                timestamp: SystemTime::now(),
+                extension_id: extension_id.to_string(),
+                event_type: AuditEventType::CapabilityRequest,
+                operation: operation.to_string(),
+                result: AuditResult::Success,
+                details: None,
+            })
+            .await;
 
         Ok(())
     }
 
     /// Check resource usage against quotas
-    pub async fn check_resource_usage(
-        &self,
-        extension_id: &str,
-    ) -> ExtensionResult<()> {
+    pub async fn check_resource_usage(&self, extension_id: &str) -> ExtensionResult<()> {
         if !self.config.enforcement_enabled {
             return Ok(());
         }
 
         let monitors = self.monitors.read().await;
-        let monitor = monitors.get(extension_id)
-            .ok_or_else(|| ExtensionError::ExtensionNotFound {
-                id: extension_id.to_string(),
-            })?;
+        let monitor =
+            monitors
+                .get(extension_id)
+                .ok_or_else(|| ExtensionError::ExtensionNotFound {
+                    id: extension_id.to_string(),
+                })?;
 
         monitor.check_quotas().await
     }
@@ -180,7 +185,7 @@ impl SecurityManager {
 
             // Check for anomalies if enabled
             if self.config.anomaly_detection {
-                self.anomaly_detector.check(extension_id, &monitor).await;
+                self.anomaly_detector.check(extension_id, monitor).await;
             }
         }
 
@@ -188,12 +193,7 @@ impl SecurityManager {
     }
 
     /// Record security violation
-    pub async fn record_violation(
-        &self,
-        extension_id: &str,
-        violation_type: &str,
-        details: &str,
-    ) {
+    pub async fn record_violation(&self, extension_id: &str, violation_type: &str, details: &str) {
         let monitors = self.monitors.read().await;
         if let Some(monitor) = monitors.get(extension_id) {
             monitor.record_violation(violation_type, details).await;
@@ -209,14 +209,16 @@ impl SecurityManager {
         }
 
         // Audit the violation
-        self.audit_logger.log(AuditEntry {
-            timestamp: SystemTime::now(),
-            extension_id: extension_id.to_string(),
-            event_type: AuditEventType::SecurityViolation,
-            operation: violation_type.to_string(),
-            result: AuditResult::Failure(details.to_string()),
-            details: None,
-        }).await;
+        self.audit_logger
+            .log(AuditEntry {
+                timestamp: SystemTime::now(),
+                extension_id: extension_id.to_string(),
+                event_type: AuditEventType::SecurityViolation,
+                operation: violation_type.to_string(),
+                result: AuditResult::Failure(details.to_string()),
+                details: None,
+            })
+            .await;
     }
 
     /// Get security metrics for extension

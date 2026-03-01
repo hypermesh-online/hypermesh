@@ -8,7 +8,7 @@
 //! independent of other blockmatrix modules.
 
 use blockmatrix::matrix::{
-    MatrixCoordinate, CoordinateError, find_neighbors, find_k_nearest, find_neighbors_cubic,
+    find_k_nearest, find_neighbors, find_neighbors_cubic, CoordinateError, MatrixCoordinate,
 };
 
 #[test]
@@ -132,9 +132,7 @@ fn test_coordinate_serialization() {
 #[test]
 fn test_chained_transformations() {
     let coord = MatrixCoordinate::new(10, 10, 10).unwrap();
-    let result = coord
-        .translate(5, 5, 5).unwrap()
-        .scale(2).unwrap();
+    let result = coord.translate(5, 5, 5).unwrap().scale(2).unwrap();
 
     assert_eq!(result, MatrixCoordinate::new(30, 30, 30).unwrap());
 }
@@ -221,7 +219,7 @@ fn test_k_nearest_k_zero() {
 #[test]
 fn test_coordinate_display() {
     let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-    assert_eq!(format!("{}", coord), "(10,20,30)");
+    assert_eq!(format!("{coord}"), "(10,20,30)");
 }
 
 #[test]

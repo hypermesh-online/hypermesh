@@ -7,11 +7,11 @@
 //! Instruction-based content retrieval - Revolutionary Concept #6.
 //! Send retrieval instructions (shard maps), not the actual files.
 
-use serde::{Serialize, Deserialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
-use crate::matrix::MatrixCoordinate;
 use super::Hash;
+use crate::matrix::MatrixCoordinate;
 
 /// Shard map entry (hash -> positions)
 pub type ShardMap = Vec<(Hash, Vec<MatrixCoordinate>)>;
@@ -149,17 +149,15 @@ pub struct MatrixRegion {
 
 impl ContentAddress {
     /// Create new content address
-    pub fn new(
-        content_hash: Hash,
-        shard_hashes: Vec<Hash>,
-        shard_map: ShardMap,
-    ) -> Self {
+    pub fn new(content_hash: Hash, shard_hashes: Vec<Hash>, shard_map: ShardMap) -> Self {
         let _reconstruction_order: Vec<usize> = (0..shard_hashes.len()).collect();
 
         let retrieval_instructions = RetrievalInstructions::new(shard_map);
 
-        let mut metadata = ContentMetadata::default();
-        metadata.shard_count = shard_hashes.len();
+        let metadata = ContentMetadata {
+            shard_count: shard_hashes.len(),
+            ..ContentMetadata::default()
+        };
 
         Self {
             content_hash,
@@ -205,7 +203,8 @@ impl ContentAddress {
 
     /// Get total number of matrix positions storing this content
     pub fn total_positions(&self) -> usize {
-        self.retrieval_instructions.shard_map
+        self.retrieval_instructions
+            .shard_map
             .iter()
             .map(|(_, positions)| positions.len())
             .sum()
@@ -242,23 +241,29 @@ impl ContentAddress {
         self.retrieval_instructions.shard_map.sort_by(|a, b| {
             let dist_a = Self::min_distance(&a.1, &requester);
             let dist_b = Self::min_distance(&b.1, &requester);
-            dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            dist_a
+                .partial_cmp(&dist_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Update strategy to nearest first
         self.retrieval_instructions.strategy = RetrievalStrategy::NearestFirst;
 
         // Add network hints
-        self.retrieval_instructions.network_hints.preferred_regions.push(MatrixRegion {
-            center: requester,
-            radius: 5.0,
-            priority: 100,
-        });
+        self.retrieval_instructions
+            .network_hints
+            .preferred_regions
+            .push(MatrixRegion {
+                center: requester,
+                radius: 5.0,
+                priority: 100,
+            });
     }
 
     /// Calculate minimum distance from positions to target
     fn min_distance(positions: &[MatrixCoordinate], target: &MatrixCoordinate) -> f64 {
-        positions.iter()
+        positions
+            .iter()
             .map(|pos| {
                 let dx = (pos.x - target.x) as f64;
                 let dy = (pos.y - target.y) as f64;
@@ -313,38 +318,51 @@ impl RetrievalInstructions {
             RetrievalStrategy::NearestFirst => self.plan_nearest_first(),
             RetrievalStrategy::Parallel => self.plan_parallel(),
             RetrievalStrategy::Sequential => self.plan_sequential(),
-            RetrievalStrategy::Adaptive { bandwidth_threshold, latency_threshold } => {
-                self.plan_adaptive(*bandwidth_threshold, *latency_threshold)
-            }
+            RetrievalStrategy::Adaptive {
+                bandwidth_threshold,
+                latency_threshold,
+            } => self.plan_adaptive(*bandwidth_threshold, *latency_threshold),
         }
     }
 
     fn plan_nearest_first(&self) -> RetrievalPlan {
         RetrievalPlan {
-            steps: self.shard_map.iter().enumerate().map(|(i, (hash, positions))| {
-                RetrievalStep {
+            steps: self
+                .shard_map
+                .iter()
+                .enumerate()
+                .map(|(i, (hash, positions))| RetrievalStep {
                     shard_index: i,
                     shard_hash: *hash,
-                    primary_position: positions.first().copied().unwrap_or_else(|| MatrixCoordinate::origin()),
+                    primary_position: positions
+                        .first()
+                        .copied()
+                        .unwrap_or_else(MatrixCoordinate::origin),
                     fallback_positions: positions[1..].to_vec(),
                     parallel: false,
-                }
-            }).collect(),
+                })
+                .collect(),
             estimated_time_ms: self.shard_map.len() as u64 * 10, // Rough estimate
         }
     }
 
     fn plan_parallel(&self) -> RetrievalPlan {
         RetrievalPlan {
-            steps: self.shard_map.iter().enumerate().map(|(i, (hash, positions))| {
-                RetrievalStep {
+            steps: self
+                .shard_map
+                .iter()
+                .enumerate()
+                .map(|(i, (hash, positions))| RetrievalStep {
                     shard_index: i,
                     shard_hash: *hash,
-                    primary_position: positions.first().copied().unwrap_or_else(|| MatrixCoordinate::origin()),
+                    primary_position: positions
+                        .first()
+                        .copied()
+                        .unwrap_or_else(MatrixCoordinate::origin),
                     fallback_positions: positions[1..].to_vec(),
                     parallel: true,
-                }
-            }).collect(),
+                })
+                .collect(),
             estimated_time_ms: 50, // All parallel
         }
     }
@@ -402,8 +420,8 @@ mod tests {
         let content_hash = [1u8; 32];
         let shard_hashes = vec![[2u8; 32], [3u8; 32]];
         let shard_map = vec![
-            ([2u8; 32], vec![MatrixCoordinate::new(0, 0, 0).unwrap()]),
-            ([3u8; 32], vec![MatrixCoordinate::new(1, 1, 0).unwrap()]),
+            ([2u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
+            ([3u8; 32], vec![MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate")]),
         ];
 
         let addr = ContentAddress::new(content_hash, shard_hashes, shard_map);
@@ -417,16 +435,22 @@ mod tests {
         let content_hash = [1u8; 32];
         let shard_hashes = vec![[2u8; 32], [3u8; 32]];
         let shard_map = vec![
-            ([2u8; 32], vec![
-                MatrixCoordinate::new(0, 0, 0).unwrap(),
-                MatrixCoordinate::new(1, 0, 0).unwrap(),
-                MatrixCoordinate::new(2, 0, 0).unwrap(),
-            ]),
-            ([3u8; 32], vec![
-                MatrixCoordinate::new(0, 1, 0).unwrap(),
-                MatrixCoordinate::new(1, 1, 0).unwrap(),
-                MatrixCoordinate::new(2, 1, 0).unwrap(),
-            ]),
+            (
+                [2u8; 32],
+                vec![
+                    MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+                    MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+                    MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"),
+                ],
+            ),
+            (
+                [3u8; 32],
+                vec![
+                    MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"),
+                    MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate"),
+                    MatrixCoordinate::new(2, 1, 0).expect("test: valid coordinate"),
+                ],
+            ),
         ];
 
         let addr = ContentAddress::new(content_hash, shard_hashes, shard_map);
@@ -436,19 +460,23 @@ mod tests {
     #[test]
     fn test_retrieval_plan_strategies() {
         let shard_map = vec![
-            ([1u8; 32], vec![MatrixCoordinate::new(0, 0, 0).unwrap()]),
-            ([2u8; 32], vec![MatrixCoordinate::new(1, 0, 0).unwrap()]),
+            ([1u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
+            ([2u8; 32], vec![MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")]),
         ];
 
         // Test nearest-first
         let instructions = RetrievalInstructions::new(shard_map.clone());
-        let plan = instructions.with_strategy(RetrievalStrategy::NearestFirst).get_retrieval_plan();
+        let plan = instructions
+            .with_strategy(RetrievalStrategy::NearestFirst)
+            .get_retrieval_plan();
         assert_eq!(plan.steps.len(), 2);
         assert!(!plan.steps[0].parallel);
 
         // Test parallel
         let instructions = RetrievalInstructions::new(shard_map);
-        let plan = instructions.with_strategy(RetrievalStrategy::Parallel).get_retrieval_plan();
+        let plan = instructions
+            .with_strategy(RetrievalStrategy::Parallel)
+            .get_retrieval_plan();
         assert_eq!(plan.steps.len(), 2);
         assert!(plan.steps[0].parallel);
     }
@@ -458,17 +486,23 @@ mod tests {
         let content_hash = [1u8; 32];
         let shard_hashes = vec![[2u8; 32], [3u8; 32]];
         let shard_map = vec![
-            ([2u8; 32], vec![MatrixCoordinate::new(10, 10, 0).unwrap()]),
-            ([3u8; 32], vec![MatrixCoordinate::new(0, 0, 0).unwrap()]),
+            ([2u8; 32], vec![MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate")]),
+            ([3u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
         ];
 
         let mut addr = ContentAddress::new(content_hash, shard_hashes, shard_map);
-        let requester = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let requester = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
         addr.optimize_for_position(requester);
 
         // Should reorder to put nearest shard first
         assert_eq!(addr.retrieval_instructions.shard_map[0].0, [3u8; 32]);
-        assert_eq!(addr.retrieval_instructions.network_hints.preferred_regions.len(), 1);
+        assert_eq!(
+            addr.retrieval_instructions
+                .network_hints
+                .preferred_regions
+                .len(),
+            1
+        );
     }
 }

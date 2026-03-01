@@ -4,13 +4,13 @@
 
 //! Asset package and library types
 
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
-use semver::Version;
 
-use crate::assets::core::{AssetType, AssetRegistration, ConsensusProof, ProxyAddress};
+use crate::assets::core::{AssetRegistration, AssetType, ConsensusProof, ProxyAddress};
 
 /// Asset package information
 #[derive(Debug, Clone, Serialize, Deserialize)]

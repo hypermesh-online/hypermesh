@@ -13,7 +13,7 @@
 //! - Cross-chain routing through LayerZero V2
 //! - Self-stabilizing economic mechanisms
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
@@ -186,54 +186,66 @@ impl CrossChainBridge {
         let mut networks = HashMap::new();
 
         // Initialize default network configurations
-        networks.insert(NetworkType::Ethereum, NetworkConfig {
-            network: NetworkType::Ethereum,
-            rpc_url: "https://eth-mainnet.alchemyapi.io/v2/".to_string(),
-            contract_address: Some("0x0000000000000000000000000000000000000000".to_string()),
-            min_confirmations: 12,
-            fee_rate: dec!(0.003), // 0.3%
-            gas_limit: 200000,
-            supported_tokens: vec!["CAES".to_string(), "USDC".to_string(), "WETH".to_string()],
-            is_active: true,
-        });
+        networks.insert(
+            NetworkType::Ethereum,
+            NetworkConfig {
+                network: NetworkType::Ethereum,
+                rpc_url: "https://eth-mainnet.alchemyapi.io/v2/".to_string(),
+                contract_address: Some("0x0000000000000000000000000000000000000000".to_string()),
+                min_confirmations: 12,
+                fee_rate: dec!(0.003), // 0.3%
+                gas_limit: 200000,
+                supported_tokens: vec!["CAES".to_string(), "USDC".to_string(), "WETH".to_string()],
+                is_active: true,
+            },
+        );
 
-        networks.insert(NetworkType::Solana, NetworkConfig {
-            network: NetworkType::Solana,
-            rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
-            contract_address: Some("11111111111111111111111111111111".to_string()),
-            min_confirmations: 32,
-            fee_rate: dec!(0.002), // 0.2%
-            gas_limit: 400000,
-            supported_tokens: vec!["CAES".to_string(), "USDC".to_string(), "SOL".to_string()],
-            is_active: true,
-        });
+        networks.insert(
+            NetworkType::Solana,
+            NetworkConfig {
+                network: NetworkType::Solana,
+                rpc_url: "https://api.mainnet-beta.solana.com".to_string(),
+                contract_address: Some("11111111111111111111111111111111".to_string()),
+                min_confirmations: 32,
+                fee_rate: dec!(0.002), // 0.2%
+                gas_limit: 400000,
+                supported_tokens: vec!["CAES".to_string(), "USDC".to_string(), "SOL".to_string()],
+                is_active: true,
+            },
+        );
 
-        networks.insert(NetworkType::Bitcoin, NetworkConfig {
-            network: NetworkType::Bitcoin,
-            rpc_url: "https://blockstream.info/api".to_string(),
-            contract_address: None, // Bitcoin doesn't use contract addresses
-            min_confirmations: 6,
-            fee_rate: dec!(0.005), // 0.5% (higher due to Bitcoin complexity)
-            gas_limit: 0, // Bitcoin doesn't use gas
-            supported_tokens: vec!["CAES".to_string()], // Wrapped via other protocols
-            is_active: true,
-        });
+        networks.insert(
+            NetworkType::Bitcoin,
+            NetworkConfig {
+                network: NetworkType::Bitcoin,
+                rpc_url: "https://blockstream.info/api".to_string(),
+                contract_address: None, // Bitcoin doesn't use contract addresses
+                min_confirmations: 6,
+                fee_rate: dec!(0.005), // 0.5% (higher due to Bitcoin complexity)
+                gas_limit: 0,          // Bitcoin doesn't use gas
+                supported_tokens: vec!["CAES".to_string()], // Wrapped via other protocols
+                is_active: true,
+            },
+        );
 
-        networks.insert(NetworkType::HyperMesh, NetworkConfig {
-            network: NetworkType::HyperMesh,
-            rpc_url: "http3://hypermesh".to_string(), // Native HyperMesh protocol
-            contract_address: None, // Native asset system
-            min_confirmations: 1, // Fast finality
-            fee_rate: dec!(0.001), // 0.1% (lowest fees on native network)
-            gas_limit: 100000,
-            supported_tokens: vec!["CAES".to_string()],
-            is_active: true,
-        });
+        networks.insert(
+            NetworkType::HyperMesh,
+            NetworkConfig {
+                network: NetworkType::HyperMesh,
+                rpc_url: "http3://hypermesh".to_string(), // Native HyperMesh protocol
+                contract_address: None,                   // Native asset system
+                min_confirmations: 1,                     // Fast finality
+                fee_rate: dec!(0.001),                    // 0.1% (lowest fees on native network)
+                gas_limit: 100000,
+                supported_tokens: vec!["CAES".to_string()],
+                is_active: true,
+            },
+        );
 
         let stability_config = StabilityConfig {
-            stability_threshold: dec!(0.02), // 2%
-            max_adjustment: dec!(0.01), // 1% max adjustment
-            decay_rate: dec!(0.95), // 5% decay per period
+            stability_threshold: dec!(0.02),       // 2%
+            max_adjustment: dec!(0.01),            // 1% max adjustment
+            decay_rate: dec!(0.95),                // 5% decay per period
             circuit_breaker_threshold: dec!(0.10), // 10% emergency threshold
         };
 
@@ -258,7 +270,8 @@ impl CrossChainBridge {
         let tx_id = Uuid::new_v4().to_string();
 
         // Calculate fees based on operation
-        let (base_fee, gas_fee, stability_adjustment) = self.calculate_bridge_fees(&operation).await?;
+        let (base_fee, gas_fee, stability_adjustment) =
+            self.calculate_bridge_fees(&operation).await?;
 
         // Validate operation
         self.validate_bridge_operation(&operation).await?;
@@ -295,22 +308,28 @@ impl CrossChainBridge {
     }
 
     /// Calculate dynamic fees for bridge operation
-    async fn calculate_bridge_fees(&self, operation: &BridgeOperation) -> Result<(Decimal, Decimal, Decimal)> {
+    async fn calculate_bridge_fees(
+        &self,
+        operation: &BridgeOperation,
+    ) -> Result<(Decimal, Decimal, Decimal)> {
         let networks = self.networks.read().await;
 
         let (from_network, to_network, amount) = match operation {
-            BridgeOperation::Lock { amount, from_network, to_network, .. } => {
-                (Some(from_network), Some(to_network), *amount)
-            },
-            BridgeOperation::Mint { amount, network, .. } => {
-                (None, Some(network), *amount)
-            },
-            BridgeOperation::Burn { amount, network, .. } => {
-                (Some(network), None, *amount)
-            },
-            BridgeOperation::Unlock { amount, network, .. } => {
-                (None, Some(network), *amount)
-            },
+            BridgeOperation::Lock {
+                amount,
+                from_network,
+                to_network,
+                ..
+            } => (Some(from_network), Some(to_network), *amount),
+            BridgeOperation::Mint {
+                amount, network, ..
+            } => (None, Some(network), *amount),
+            BridgeOperation::Burn {
+                amount, network, ..
+            } => (Some(network), None, *amount),
+            BridgeOperation::Unlock {
+                amount, network, ..
+            } => (None, Some(network), *amount),
         };
 
         // Base fee calculation
@@ -335,7 +354,7 @@ impl CrossChainBridge {
             Some(NetworkType::Solana) => dec!(0.001),  // ~$1 USD equivalent
             Some(NetworkType::Bitcoin) => dec!(0.005), // ~$5 USD equivalent
             Some(NetworkType::HyperMesh) => dec!(0.0001), // Minimal native fees
-            _ => dec!(0.002), // Default
+            _ => dec!(0.002),                          // Default
         };
 
         // Stability adjustment for "mostly-stable" mechanism
@@ -355,8 +374,9 @@ impl CrossChainBridge {
 
         let adjustment = dec!(0.0); // Placeholder
 
-        Ok(adjustment.max(-self.stability_config.max_adjustment)
-                    .min(self.stability_config.max_adjustment))
+        Ok(adjustment
+            .max(-self.stability_config.max_adjustment)
+            .min(self.stability_config.max_adjustment))
     }
 
     /// Validate bridge operation
@@ -364,38 +384,49 @@ impl CrossChainBridge {
         let networks = self.networks.read().await;
 
         match operation {
-            BridgeOperation::Lock { from_network, to_network, amount, .. } => {
+            BridgeOperation::Lock {
+                from_network,
+                to_network,
+                amount,
+                ..
+            } => {
                 if !networks.contains_key(from_network) || !networks.contains_key(to_network) {
                     return Err(anyhow!("Unsupported network"));
                 }
                 if *amount <= Decimal::ZERO {
                     return Err(anyhow!("Invalid amount"));
                 }
-            },
-            BridgeOperation::Mint { network, amount, .. } => {
+            }
+            BridgeOperation::Mint {
+                network, amount, ..
+            } => {
                 if !networks.contains_key(network) {
                     return Err(anyhow!("Unsupported network"));
                 }
                 if *amount <= Decimal::ZERO {
                     return Err(anyhow!("Invalid amount"));
                 }
-            },
-            BridgeOperation::Burn { network, amount, .. } => {
+            }
+            BridgeOperation::Burn {
+                network, amount, ..
+            } => {
                 if !networks.contains_key(network) {
                     return Err(anyhow!("Unsupported network"));
                 }
                 if *amount <= Decimal::ZERO {
                     return Err(anyhow!("Invalid amount"));
                 }
-            },
-            BridgeOperation::Unlock { network, amount, .. } => {
+            }
+            BridgeOperation::Unlock {
+                network, amount, ..
+            } => {
                 if !networks.contains_key(network) {
                     return Err(anyhow!("Unsupported network"));
                 }
                 if *amount <= Decimal::ZERO {
                     return Err(anyhow!("Invalid amount"));
                 }
-            },
+            }
         }
 
         Ok(())
@@ -406,18 +437,16 @@ impl CrossChainBridge {
         let networks = self.networks.read().await;
 
         match operation {
-            BridgeOperation::Lock { from_network, .. } => {
-                Ok(networks.get(from_network)
-                    .map(|config| config.min_confirmations)
-                    .unwrap_or(12))
-            },
-            BridgeOperation::Mint { network, .. } |
-            BridgeOperation::Burn { network, .. } |
-            BridgeOperation::Unlock { network, .. } => {
-                Ok(networks.get(network)
-                    .map(|config| config.min_confirmations)
-                    .unwrap_or(12))
-            },
+            BridgeOperation::Lock { from_network, .. } => Ok(networks
+                .get(from_network)
+                .map(|config| config.min_confirmations)
+                .unwrap_or(12)),
+            BridgeOperation::Mint { network, .. }
+            | BridgeOperation::Burn { network, .. }
+            | BridgeOperation::Unlock { network, .. } => Ok(networks
+                .get(network)
+                .map(|config| config.min_confirmations)
+                .unwrap_or(12)),
         }
     }
 
@@ -444,9 +473,16 @@ impl CrossChainBridge {
     /// Get supported networks
     pub async fn get_supported_networks(&self) -> Vec<NetworkType> {
         let networks = self.networks.read().await;
-        networks.keys().filter(|&k| {
-            networks.get(k).map(|config| config.is_active).unwrap_or(false)
-        }).cloned().collect()
+        networks
+            .keys()
+            .filter(|&k| {
+                networks
+                    .get(k)
+                    .map(|config| config.is_active)
+                    .unwrap_or(false)
+            })
+            .cloned()
+            .collect()
     }
 
     /// Update network configuration

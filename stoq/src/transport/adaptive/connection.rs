@@ -2,18 +2,18 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
 use parking_lot::RwLock;
 use quinn::{Connection as QuinnConnection, TransportConfig, VarInt};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tracing::{debug, info, trace};
 
-use crate::transport::{NetworkTier, CongestionControl};
 use super::bandwidth::EwmaBandwidthEstimator;
-use super::mtu::MtuDiscovery;
 use super::loss::LossBasedAdjuster;
+use super::mtu::MtuDiscovery;
 use super::tier::{congestion_control_for_tier, tier_step_down, tier_step_up, tiers_equal};
+use crate::transport::{CongestionControl, NetworkTier};
 
 #[derive(Debug, Clone)]
 pub struct AdaptationStats {
@@ -137,15 +137,20 @@ impl AdaptiveConnection {
             adaptation_count: AtomicU64::new(0),
             parameters: Arc::new(RwLock::new(ConnectionParameters::default())),
             hysteresis: Arc::new(RwLock::new(HysteresisState::default())),
-            bandwidth_estimator: Arc::new(RwLock::new(
-                EwmaBandwidthEstimator::new(ewma_alpha, ewma_max_samples),
-            )),
-            mtu_discovery: Arc::new(RwLock::new(
-                MtuDiscovery::new(1200, 9000, Duration::from_secs(mtu_probe_interval_s)),
-            )),
-            loss_adjuster: Arc::new(RwLock::new(
-                LossBasedAdjuster::new(loss_window_size, loss_downgrade_pct, loss_upgrade_pct),
-            )),
+            bandwidth_estimator: Arc::new(RwLock::new(EwmaBandwidthEstimator::new(
+                ewma_alpha,
+                ewma_max_samples,
+            ))),
+            mtu_discovery: Arc::new(RwLock::new(MtuDiscovery::new(
+                1200,
+                9000,
+                Duration::from_secs(mtu_probe_interval_s),
+            ))),
+            loss_adjuster: Arc::new(RwLock::new(LossBasedAdjuster::new(
+                loss_window_size,
+                loss_downgrade_pct,
+                loss_upgrade_pct,
+            ))),
         }
     }
 
@@ -180,7 +185,9 @@ impl AdaptiveConnection {
                 .add_sample(udp_stats.bytes, elapsed);
         }
 
-        self.loss_adjuster.write().record_loss(conditions.packet_loss);
+        self.loss_adjuster
+            .write()
+            .record_loss(conditions.packet_loss);
 
         conditions.retransmissions = udp_stats.datagrams;
 
@@ -194,10 +201,7 @@ impl AdaptiveConnection {
         debug!(
             "Updated network conditions: RTT={:.2}ms, loss={:.2}%, throughput={:.2}Mbps, \
              ewma={:.2}Mbps",
-            conditions.rtt_ms,
-            conditions.packet_loss,
-            conditions.throughput_mbps,
-            smoothed_mbps,
+            conditions.rtt_ms, conditions.packet_loss, conditions.throughput_mbps, smoothed_mbps,
         );
     }
 
@@ -241,10 +245,16 @@ impl AdaptiveConnection {
         let loss = self.loss_adjuster.read();
         if loss.should_downgrade() {
             tier = tier_step_down(&tier);
-            debug!("Loss adjuster capped tier down (avg loss {:.1}%)", loss.average_loss());
+            debug!(
+                "Loss adjuster capped tier down (avg loss {:.1}%)",
+                loss.average_loss()
+            );
         } else if loss.should_upgrade() {
             tier = tier_step_up(&tier);
-            debug!("Loss adjuster boosted tier up (avg loss {:.1}%)", loss.average_loss());
+            debug!(
+                "Loss adjuster boosted tier up (avg loss {:.1}%)",
+                loss.average_loss()
+            );
         }
 
         tier
@@ -254,7 +264,7 @@ impl AdaptiveConnection {
         let mut hysteresis = self.hysteresis.write();
         let current_tier = self.current_tier.read();
 
-        let tier_changed = !tiers_equal(&*current_tier, new_tier);
+        let tier_changed = !tiers_equal(&current_tier, new_tier);
 
         if !tier_changed {
             hysteresis.consecutive_count = 0;
@@ -275,7 +285,8 @@ impl AdaptiveConnection {
         } else {
             trace!(
                 "Hysteresis: {}/{} consecutive measurements for tier change",
-                hysteresis.consecutive_count, hysteresis.required_consecutive
+                hysteresis.consecutive_count,
+                hysteresis.required_consecutive
             );
             false
         }
@@ -416,8 +427,10 @@ impl AdaptiveConnection {
             params.congestion_control
         );
 
-        self.connection.set_max_concurrent_bi_streams(VarInt::from_u32(params.max_streams));
-        self.connection.set_max_concurrent_uni_streams(VarInt::from_u32(params.max_streams / 2));
+        self.connection
+            .set_max_concurrent_bi_streams(VarInt::from_u32(params.max_streams));
+        self.connection
+            .set_max_concurrent_uni_streams(VarInt::from_u32(params.max_streams / 2));
 
         Ok(())
     }
@@ -470,21 +483,39 @@ impl AdaptiveConnection {
     }
 
     pub async fn force_adapt(&self) -> Result<(), anyhow::Error> {
-        {
-            let mut hysteresis = self.hysteresis.write();
-            hysteresis.consecutive_count = hysteresis.required_consecutive;
+        if !self.adaptation_enabled.load(Ordering::Relaxed) {
+            return Ok(());
         }
 
-        self.adapt().await
+        self.update_conditions();
+        let detected_tier = self.detect_tier();
+
+        // Force always applies the detected tier regardless of hysteresis
+        self.apply_tier_parameters(&detected_tier)?;
+        *self.current_tier.write() = detected_tier;
+        *self.last_adaptation.write() = Instant::now();
+        self.adaptation_count.fetch_add(1, Ordering::Relaxed);
+
+        Ok(())
+    }
+
+    /// Manually set the network tier and apply its parameters immediately,
+    /// bypassing detection and hysteresis.
+    pub fn set_tier(&self, tier: NetworkTier) -> Result<(), anyhow::Error> {
+        self.apply_tier_parameters(&tier)?;
+        *self.current_tier.write() = tier;
+        *self.last_adaptation.write() = Instant::now();
+        self.adaptation_count.fetch_add(1, Ordering::Relaxed);
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::bandwidth::EwmaBandwidthEstimator;
     use super::super::loss::LossBasedAdjuster;
     use super::super::tier::tier_step_down;
+    use super::*;
 
     #[test]
     fn test_network_tier_detection() {
@@ -501,8 +532,10 @@ mod tests {
 
     #[test]
     fn test_hysteresis_prevents_thrashing() {
-        let mut hysteresis = HysteresisState::default();
-        hysteresis.required_consecutive = 3;
+        let hysteresis = HysteresisState {
+            required_consecutive: 3,
+            ..Default::default()
+        };
         assert_eq!(hysteresis.consecutive_count, 0);
     }
 

@@ -9,9 +9,9 @@
 use super::types::*;
 use super::SearchQuery;
 use anyhow::Result;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::{HashMap, HashSet, BTreeMap};
 
 /// Search index for fast package discovery
 pub struct LibraryIndex {
@@ -26,6 +26,7 @@ pub struct LibraryIndex {
     /// Keyword index (keyword -> package IDs)
     keyword_index: Arc<RwLock<HashMap<Arc<str>, HashSet<Arc<str>>>>>,
     /// Version index (name -> version -> ID)
+    #[allow(clippy::type_complexity)]
     version_index: Arc<RwLock<HashMap<Arc<str>, BTreeMap<Arc<str>, Arc<str>>>>>,
     /// Full-text search index (simplified)
     text_index: Arc<RwLock<TextSearchIndex>>,
@@ -54,7 +55,7 @@ impl TextSearchIndex {
         for word in tokenize(text) {
             self.word_to_packages
                 .entry(word.to_lowercase())
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(Arc::clone(&package_id));
         }
 
@@ -62,7 +63,7 @@ impl TextSearchIndex {
         for bigram in generate_bigrams(text) {
             self.bigram_to_packages
                 .entry(bigram)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(Arc::clone(&package_id));
         }
     }
@@ -115,6 +116,12 @@ impl TextSearchIndex {
     }
 }
 
+impl Default for LibraryIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LibraryIndex {
     /// Create a new search index
     pub fn new() -> Self {
@@ -150,7 +157,9 @@ impl LibraryIndex {
         // Index by name
         {
             let mut name_index = self.name_index.write().await;
-            let name_key = package.metadata.as_ref()
+            let name_key = package
+                .metadata
+                .as_ref()
                 .map(|m| m.name.to_lowercase())
                 .unwrap_or_else(|| package.name.to_lowercase());
             name_index
@@ -375,7 +384,12 @@ impl LibraryIndex {
             let all = self.all_packages.read().await;
             all.iter().cloned().collect()
         } else if result_sets.len() == 1 {
-            result_sets.into_iter().next().unwrap().into_iter().collect()
+            result_sets
+                .into_iter()
+                .next()
+                .expect("single result set checked by len == 1")
+                .into_iter()
+                .collect()
         } else {
             // Intersection of all result sets
             let mut combined = result_sets[0].clone();
@@ -554,7 +568,7 @@ mod tests {
         let index = LibraryIndex::new();
 
         let package = create_test_package();
-        index.index_package(&package).await.unwrap();
+        index.index_package(&package).await.expect("test: async operation");
 
         // Search by text
         let query = SearchQuery {
@@ -566,7 +580,7 @@ mod tests {
             offset: 0,
         };
 
-        let results = index.search(&query).await.unwrap();
+        let results = index.search(&query).await.expect("test: async operation");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].as_ref(), "test-pkg");
 
@@ -580,7 +594,7 @@ mod tests {
             offset: 0,
         };
 
-        let results = index.search(&query).await.unwrap();
+        let results = index.search(&query).await.expect("test: async operation");
         assert_eq!(results.len(), 1);
     }
 
@@ -591,17 +605,17 @@ mod tests {
         let package = create_test_package();
         let package_id = Arc::clone(&package.id);
 
-        index.index_package(&package).await.unwrap();
+        index.index_package(&package).await.expect("test: async operation");
 
         // Verify it's indexed
-        let stats = index.get_stats().await.unwrap();
+        let stats = index.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_packages, 1);
 
         // Remove it
-        index.remove_package(&package_id).await.unwrap();
+        index.remove_package(&package_id).await.expect("test: async operation");
 
         // Verify it's gone
-        let stats = index.get_stats().await.unwrap();
+        let stats = index.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_packages, 0);
     }
 

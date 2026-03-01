@@ -6,26 +6,25 @@
 //!
 //! Configuration for privacy monitoring, dashboards, and user interfaces.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
-
 
 /// Dashboard preferences
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DashboardPreferences {
     /// Preferred dashboard view
     pub default_view: DashboardView,
-    
+
     /// Dashboard widgets
     pub widgets: Vec<DashboardWidget>,
-    
+
     /// Refresh settings
     pub refresh_settings: DashboardRefreshSettings,
-    
+
     /// Notification preferences
     pub notification_preferences: DashboardNotificationPreferences,
-    
+
     /// Accessibility settings
     pub accessibility: DashboardAccessibilitySettings,
 }
@@ -44,19 +43,19 @@ pub enum DashboardView {
 pub struct DashboardWidget {
     /// Widget identifier
     pub id: String,
-    
+
     /// Widget type
     pub widget_type: DashboardWidgetType,
-    
+
     /// Widget position
     pub position: WidgetPosition,
-    
+
     /// Widget size
     pub size: WidgetSize,
-    
+
     /// Widget visibility
     pub visible: bool,
-    
+
     /// Widget configuration
     pub config: HashMap<String, String>,
 }
@@ -91,13 +90,13 @@ pub struct WidgetSize {
 pub struct DashboardRefreshSettings {
     /// Auto-refresh enabled
     pub auto_refresh: bool,
-    
+
     /// Refresh interval
     pub refresh_interval: Duration,
-    
+
     /// Real-time updates enabled
     pub realtime_updates: bool,
-    
+
     /// Background refresh enabled
     pub background_refresh: bool,
 }
@@ -107,16 +106,16 @@ pub struct DashboardRefreshSettings {
 pub struct DashboardNotificationPreferences {
     /// Enable notifications
     pub enabled: bool,
-    
+
     /// Notification persistence
     pub persistence: NotificationPersistence,
-    
+
     /// Notification grouping
     pub grouping: NotificationGrouping,
-    
+
     /// Sound notifications
     pub sound_enabled: bool,
-    
+
     /// Visual notifications
     pub visual_enabled: bool,
 }
@@ -134,13 +133,13 @@ pub enum NotificationPersistence {
 pub struct NotificationGrouping {
     /// Enable grouping
     pub enabled: bool,
-    
+
     /// Grouping criteria
     pub criteria: Vec<GroupingCriterion>,
-    
+
     /// Group collapse settings
     pub collapse_settings: GroupCollapseSettings,
-    
+
     /// Maximum group size
     pub max_group_size: u32,
 }
@@ -159,13 +158,13 @@ pub enum GroupingCriterion {
 pub struct GroupCollapseSettings {
     /// Auto-collapse groups
     pub auto_collapse: bool,
-    
+
     /// Collapse threshold
     pub collapse_threshold: u32,
-    
+
     /// Show count in collapsed groups
     pub show_count: bool,
-    
+
     /// Allow manual expand/collapse
     pub manual_control: bool,
 }
@@ -175,16 +174,16 @@ pub struct GroupCollapseSettings {
 pub struct DashboardAccessibilitySettings {
     /// High contrast mode
     pub high_contrast: bool,
-    
+
     /// Large text mode
     pub large_text: bool,
-    
+
     /// Screen reader support
     pub screen_reader_support: bool,
-    
+
     /// Keyboard navigation
     pub keyboard_navigation: bool,
-    
+
     /// Color blind support
     pub color_blind_support: ColorBlindSupport,
 }
@@ -194,13 +193,13 @@ pub struct DashboardAccessibilitySettings {
 pub struct ColorBlindSupport {
     /// Enable color blind support
     pub enabled: bool,
-    
+
     /// Color blind type
     pub color_blind_type: ColorBlindType,
-    
+
     /// Alternative color schemes
     pub alternative_schemes: Vec<String>,
-    
+
     /// Pattern-based indicators
     pub pattern_indicators: bool,
 }

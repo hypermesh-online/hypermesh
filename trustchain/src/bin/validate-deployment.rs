@@ -7,10 +7,10 @@
 //! Validates deployment readiness and security compliance.
 //! Prevents deployment of systems with security theater.
 
-use anyhow::{Result, anyhow};
-use clap::{Arg, ArgAction, Command, value_parser};
+use anyhow::{anyhow, Result};
+use clap::{value_parser, Arg, ArgAction, Command};
 use std::path::PathBuf;
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .value_name("PATH")
                 .required(false)
                 .default_value(".")
-                .value_parser(value_parser!(PathBuf))
+                .value_parser(value_parser!(PathBuf)),
         )
         .arg(
             Arg::new("output-format")
@@ -38,19 +38,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .help("Output format")
                 .value_name("FORMAT")
                 .value_parser(["human", "json"])
-                .default_value("human")
+                .default_value("human"),
         )
         .arg(
             Arg::new("strict")
                 .long("strict")
                 .help("Use strict validation (fail on warnings)")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .get_matches();
 
-    let source_path = matches.get_one::<PathBuf>("source-path")
+    let source_path = matches
+        .get_one::<PathBuf>("source-path")
         .ok_or_else(|| anyhow!("Source path argument missing"))?;
-    let _output_format = matches.get_one::<String>("output-format")
+    let _output_format = matches
+        .get_one::<String>("output-format")
         .ok_or_else(|| anyhow!("Output format argument missing"))?;
     let _strict_mode = matches.get_flag("strict");
 
@@ -59,7 +61,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    info!("Validating TrustChain deployment from: {}", source_path.display());
+    info!(
+        "Validating TrustChain deployment from: {}",
+        source_path.display()
+    );
 
     // Run deployment validation
     match trustchain::deployment::validate_deployment_cli(&source_path).await {

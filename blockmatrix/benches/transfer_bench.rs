@@ -8,9 +8,9 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::sync::Arc;
 use std::time::Duration;
 
+use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::consensus::validation::{DefaultStateAuthenticator, StateAuthenticator};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::transfer::{
     create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
 };
@@ -85,13 +85,7 @@ fn transfer_e2e(c: &mut Criterion) {
     let source_coord = MatrixCoordinate::new(10, 20, 30).unwrap();
     let target_coord = MatrixCoordinate::new(40, 50, 60).unwrap();
     let hash = ContentHash::from_bytes([0xAB; 32]);
-    let addr = AssetAddress::new(
-        source_coord.x,
-        source_coord.y,
-        source_coord.z,
-        &hash,
-    )
-    .unwrap();
+    let addr = AssetAddress::new(source_coord.x, source_coord.y, source_coord.z, &hash).unwrap();
 
     c.bench_function("transfer_e2e_single", |b| {
         b.to_async(&rt).iter(|| {
@@ -131,13 +125,10 @@ fn transfer_throughput(c: &mut Criterion) {
                 let source_chain = NodeBlockchain::new(sc);
                 let target_chain = NodeBlockchain::new(tc);
 
-                let mut current_addr =
-                    AssetAddress::new(sc.x, sc.y, sc.z, &h).unwrap();
+                let mut current_addr = AssetAddress::new(sc.x, sc.y, sc.z, &h).unwrap();
 
                 for _ in 0..100 {
-                    let intent = create_transfer_intent(
-                        current_addr, sc, tc, test_proof(), vec![],
-                    );
+                    let intent = create_transfer_intent(current_addr, sc, tc, test_proof(), vec![]);
                     let receipt = eng
                         .execute_transfer(&intent, &test_proof(), &source_chain, &target_chain)
                         .await

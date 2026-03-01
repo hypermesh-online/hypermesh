@@ -5,10 +5,10 @@
 // Main test runner for Web3 ecosystem
 // Orchestrates comprehensive testing and validation
 
-mod test_framework;
-mod security;
-mod performance;
 mod integration;
+mod performance;
+mod security;
+mod test_framework;
 // TODO: Re-enable when modules are implemented
 // mod chaos;
 // mod validation;
@@ -167,7 +167,7 @@ async fn run_all_tests(executor: TestExecutor, cli: &Cli) -> Result<()> {
         for result in report.results.iter().filter(|r| !r.passed) {
             println!("  ✗ {} - {}", result.name, result.component);
             for error in &result.errors {
-                println!("    └─ {}", error);
+                println!("    └─ {error}");
             }
         }
     }
@@ -184,7 +184,7 @@ async fn run_all_tests(executor: TestExecutor, cli: &Cli) -> Result<()> {
         for result in warnings {
             println!("  ⚠ {} - {}", result.name, result.component);
             for warning in &result.warnings {
-                println!("    └─ {}", warning);
+                println!("    └─ {warning}");
             }
         }
     }
@@ -220,16 +220,16 @@ async fn run_unit_tests() -> Result<()> {
     let components = vec!["stoq", "trustchain", "hypermesh", "caesar", "catalog"];
 
     for component in components {
-        println!("Testing {}...", component);
+        println!("Testing {component}...");
         let output = Command::new("cargo")
-            .args(&["test", "--package", component, "--lib"])
+            .args(["test", "--package", component, "--lib"])
             .output()
             .await?;
 
         if output.status.success() {
-            println!("  ✓ {} unit tests passed", component);
+            println!("  ✓ {component} unit tests passed");
         } else {
-            println!("  ✗ {} unit tests failed", component);
+            println!("  ✗ {component} unit tests failed");
             println!("{}", String::from_utf8_lossy(&output.stderr));
         }
     }
@@ -307,12 +307,12 @@ fn print_test_result(passed: bool, metrics: &HashMap<String, f64>, errors: &[Str
     if passed {
         println!("✓ PASSED");
         for (key, value) in metrics {
-            println!("  └─ {}: {:.2}", key, value);
+            println!("  └─ {key}: {value:.2}");
         }
     } else {
         println!("✗ FAILED");
         for error in errors {
-            println!("  └─ {}", error);
+            println!("  └─ {error}");
         }
     }
 }
@@ -324,35 +324,35 @@ async fn run_performance_tests() -> Result<()> {
     println!("Benchmarking STOQ Throughput...");
     let metrics = performance::benchmark_stoq_throughput().await;
     for (key, value) in metrics {
-        println!("  └─ {}: {:.2}", key, value);
+        println!("  └─ {key}: {value:.2}");
     }
     println!();
 
     println!("Benchmarking TrustChain Ops...");
     let metrics = performance::benchmark_trustchain_operations().await;
     for (key, value) in metrics {
-        println!("  └─ {}: {:.2}", key, value);
+        println!("  └─ {key}: {value:.2}");
     }
     println!();
 
     println!("Benchmarking Asset Operations...");
     let metrics = performance::benchmark_asset_operations().await;
     for (key, value) in metrics {
-        println!("  └─ {}: {:.2}", key, value);
+        println!("  └─ {key}: {value:.2}");
     }
     println!();
 
     println!("Benchmarking Consensus Latency...");
     let metrics = performance::benchmark_consensus_latency().await;
     for (key, value) in metrics {
-        println!("  └─ {}: {:.2}", key, value);
+        println!("  └─ {key}: {value:.2}");
     }
     println!();
 
     println!("Benchmarking Memory Usage...");
     let metrics = performance::benchmark_memory_usage().await;
     for (key, value) in metrics {
-        println!("  └─ {}: {:.2}", key, value);
+        println!("  └─ {key}: {value:.2}");
     }
     println!();
 
@@ -437,10 +437,10 @@ async fn run_validation() -> Result<()> {
 async fn run_component_tests(component: &str) -> Result<()> {
     use tokio::process::Command;
 
-    println!("Running tests for component: {}\n", component);
+    println!("Running tests for component: {component}\n");
 
     let output = Command::new("cargo")
-        .args(&["test", "--package", component, "--", "--nocapture"])
+        .args(["test", "--package", component, "--", "--nocapture"])
         .output()
         .await?;
 
@@ -465,13 +465,9 @@ async fn generate_report(output: &str, executor: TestExecutor) -> Result<()> {
 
     // Open in browser if possible
     if cfg!(target_os = "linux") {
-        let _ = std::process::Command::new("xdg-open")
-            .arg(output)
-            .spawn();
+        let _ = std::process::Command::new("xdg-open").arg(output).spawn();
     } else if cfg!(target_os = "macos") {
-        let _ = std::process::Command::new("open")
-            .arg(output)
-            .spawn();
+        let _ = std::process::Command::new("open").arg(output).spawn();
     }
 
     Ok(())

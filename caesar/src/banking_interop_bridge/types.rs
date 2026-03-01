@@ -272,20 +272,50 @@ pub struct GasEstimate {
 #[async_trait::async_trait]
 pub trait BankingApiProvider: Send + Sync {
     async fn authenticate(&self, credentials: &BankingCredentials) -> anyhow::Result<AuthToken>;
-    async fn get_account_balance(&self, auth: &AuthToken, account_id: &str) -> anyhow::Result<AccountBalance>;
-    async fn initiate_payment(&self, auth: &AuthToken, payment: &PaymentRequest) -> anyhow::Result<PaymentResponse>;
-    async fn get_transaction_history(&self, auth: &AuthToken, account_id: &str, params: &HistoryParams) -> anyhow::Result<Vec<BankTransaction>>;
-    async fn verify_account(&self, auth: &AuthToken, account_details: &AccountDetails) -> anyhow::Result<VerificationResult>;
+    async fn get_account_balance(
+        &self,
+        auth: &AuthToken,
+        account_id: &str,
+    ) -> anyhow::Result<AccountBalance>;
+    async fn initiate_payment(
+        &self,
+        auth: &AuthToken,
+        payment: &PaymentRequest,
+    ) -> anyhow::Result<PaymentResponse>;
+    async fn get_transaction_history(
+        &self,
+        auth: &AuthToken,
+        account_id: &str,
+        params: &HistoryParams,
+    ) -> anyhow::Result<Vec<BankTransaction>>;
+    async fn verify_account(
+        &self,
+        auth: &AuthToken,
+        account_details: &AccountDetails,
+    ) -> anyhow::Result<VerificationResult>;
     async fn get_supported_currencies(&self) -> anyhow::Result<Vec<String>>;
-    async fn get_exchange_rates(&self, base: &str, targets: &[String]) -> anyhow::Result<HashMap<String, Decimal>>;
+    async fn get_exchange_rates(
+        &self,
+        base: &str,
+        targets: &[String],
+    ) -> anyhow::Result<HashMap<String, Decimal>>;
 }
 
 /// Crypto Exchange Interface
 #[async_trait::async_trait]
 pub trait CryptoExchangeProvider: Send + Sync {
     async fn get_supported_pairs(&self) -> anyhow::Result<Vec<TradingPair>>;
-    async fn get_quote(&self, from: &str, to: &str, amount: Decimal) -> anyhow::Result<ExchangeQuote>;
-    async fn execute_swap(&self, auth: &CryptoCredentials, swap: &SwapRequest) -> anyhow::Result<SwapResult>;
+    async fn get_quote(
+        &self,
+        from: &str,
+        to: &str,
+        amount: Decimal,
+    ) -> anyhow::Result<ExchangeQuote>;
+    async fn execute_swap(
+        &self,
+        auth: &CryptoCredentials,
+        swap: &SwapRequest,
+    ) -> anyhow::Result<SwapResult>;
     async fn get_liquidity_info(&self, pair: &TradingPair) -> anyhow::Result<LiquidityInfo>;
     async fn estimate_gas(&self, swap: &SwapRequest) -> anyhow::Result<GasEstimate>;
 }

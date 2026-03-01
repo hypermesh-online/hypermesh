@@ -4,9 +4,9 @@
 
 //! Reward system type definitions - structs, enums, and core data types.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
 
 use crate::assets::privacy::CaesarRewardConfig;
 
@@ -374,4 +374,3 @@ pub struct SeasonalAdjustment {
     /// Affected resource types
     pub affected_resources: Vec<String>,
 }
-

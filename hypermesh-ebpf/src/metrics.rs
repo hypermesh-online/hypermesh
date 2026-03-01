@@ -8,11 +8,11 @@
 //! with transport-level metrics (packet counts, latency, throughput).
 //! This is the single metrics collection point for the eBPF subsystem.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
 use parking_lot::RwLock;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
 
 /// Unified HyperMesh metrics combining intelligence and transport layers.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -139,9 +139,7 @@ pub struct PrivacyTierMetrics {
 impl PrivacyTierMetrics {
     /// Get total connections
     pub fn total_connections(&self) -> u64 {
-        self.anonymous_connections
-            + self.private_connections
-            + self.public_connections
+        self.anonymous_connections + self.private_connections + self.public_connections
     }
 
     /// Calculate violation rate
@@ -368,7 +366,8 @@ impl HyperMeshMetricsCollector {
         metrics.pos_metrics.total_validations = self.pos_validations.load(Ordering::Relaxed);
         metrics.pos_metrics.successful = self.pos_successful.load(Ordering::Relaxed);
         metrics.pos_metrics.failed = self.pos_failed.load(Ordering::Relaxed);
-        metrics.pos_metrics.timestamp_failures = self.pos_timestamp_failures.load(Ordering::Relaxed);
+        metrics.pos_metrics.timestamp_failures =
+            self.pos_timestamp_failures.load(Ordering::Relaxed);
 
         // Update asset metrics
         metrics.asset_metrics.total_validations = self.asset_validations.load(Ordering::Relaxed);
@@ -377,12 +376,14 @@ impl HyperMeshMetricsCollector {
         metrics.asset_metrics.shard_failures = self.asset_shard_failures.load(Ordering::Relaxed);
 
         // Update routing metrics
-        metrics.routing_metrics.total_validations = self.routing_validations.load(Ordering::Relaxed);
+        metrics.routing_metrics.total_validations =
+            self.routing_validations.load(Ordering::Relaxed);
         metrics.routing_metrics.successful = self.routing_successful.load(Ordering::Relaxed);
         metrics.routing_metrics.path_failures = self.routing_path_failures.load(Ordering::Relaxed);
 
         // Update privacy metrics
-        metrics.privacy_metrics.anonymous_connections = self.privacy_anonymous.load(Ordering::Relaxed);
+        metrics.privacy_metrics.anonymous_connections =
+            self.privacy_anonymous.load(Ordering::Relaxed);
         metrics.privacy_metrics.private_connections = self.privacy_private.load(Ordering::Relaxed);
         metrics.privacy_metrics.public_connections = self.privacy_public.load(Ordering::Relaxed);
         metrics.privacy_metrics.tier_violations = self.privacy_violations.load(Ordering::Relaxed);
@@ -392,7 +393,9 @@ impl HyperMeshMetricsCollector {
         let packets = self.transport_packets.load(Ordering::Relaxed);
         let bytes = self.transport_bytes.load(Ordering::Relaxed);
 
-        let elapsed = now.duration_since(*self.last_collection.read()).as_secs_f64();
+        let elapsed = now
+            .duration_since(*self.last_collection.read())
+            .as_secs_f64();
         if elapsed > 0.0 {
             let prev_p = self.prev_packets.load(Ordering::Relaxed);
             let prev_b = self.prev_bytes.load(Ordering::Relaxed);
@@ -405,7 +408,8 @@ impl HyperMeshMetricsCollector {
         metrics.transport_metrics.total_packets = packets;
         metrics.transport_metrics.total_bytes = bytes;
         metrics.transport_metrics.kernel_drops = self.transport_drops.load(Ordering::Relaxed);
-        metrics.transport_metrics.af_xdp_redirects = self.transport_redirects.load(Ordering::Relaxed);
+        metrics.transport_metrics.af_xdp_redirects =
+            self.transport_redirects.load(Ordering::Relaxed);
         metrics.transport_metrics.zero_copy_ops = self.transport_zero_copy.load(Ordering::Relaxed);
         metrics.transport_metrics.memcpy_ops = self.transport_memcpy.load(Ordering::Relaxed);
 
@@ -464,44 +468,79 @@ impl std::fmt::Display for HyperMeshMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "HyperMesh Intelligence Metrics:")?;
         writeln!(f, "  Proof of State:")?;
-        writeln!(f, "    Total: {}, Success: {}, Failed: {}",
+        writeln!(
+            f,
+            "    Total: {}, Success: {}, Failed: {}",
             self.pos_metrics.total_validations,
             self.pos_metrics.successful,
-            self.pos_metrics.failed)?;
-        writeln!(f, "    Success Rate: {:.2}%", self.pos_metrics.success_rate())?;
+            self.pos_metrics.failed
+        )?;
+        writeln!(
+            f,
+            "    Success Rate: {:.2}%",
+            self.pos_metrics.success_rate()
+        )?;
 
         writeln!(f, "  Asset Hash:")?;
-        writeln!(f, "    Total: {}, Success: {}, Mismatches: {}",
+        writeln!(
+            f,
+            "    Total: {}, Success: {}, Mismatches: {}",
             self.asset_metrics.total_validations,
             self.asset_metrics.successful,
-            self.asset_metrics.hash_mismatches)?;
-        writeln!(f, "    Success Rate: {:.2}%", self.asset_metrics.success_rate())?;
+            self.asset_metrics.hash_mismatches
+        )?;
+        writeln!(
+            f,
+            "    Success Rate: {:.2}%",
+            self.asset_metrics.success_rate()
+        )?;
 
         writeln!(f, "  Matrix Routing:")?;
-        writeln!(f, "    Total: {}, Success: {}, Path Failures: {}",
+        writeln!(
+            f,
+            "    Total: {}, Success: {}, Path Failures: {}",
             self.routing_metrics.total_validations,
             self.routing_metrics.successful,
-            self.routing_metrics.path_failures)?;
-        writeln!(f, "    Success Rate: {:.2}%", self.routing_metrics.success_rate())?;
+            self.routing_metrics.path_failures
+        )?;
+        writeln!(
+            f,
+            "    Success Rate: {:.2}%",
+            self.routing_metrics.success_rate()
+        )?;
 
         writeln!(f, "  Privacy Modes:")?;
-        writeln!(f, "    Anonymous: {}, Private: {}, Public: {}",
+        writeln!(
+            f,
+            "    Anonymous: {}, Private: {}, Public: {}",
             self.privacy_metrics.anonymous_connections,
             self.privacy_metrics.private_connections,
-            self.privacy_metrics.public_connections)?;
-        writeln!(f, "    Violations: {}", self.privacy_metrics.tier_violations)?;
+            self.privacy_metrics.public_connections
+        )?;
+        writeln!(
+            f,
+            "    Violations: {}",
+            self.privacy_metrics.tier_violations
+        )?;
 
         writeln!(f, "  Transport:")?;
-        writeln!(f, "    Packets: {}, {:.2} pps, {:.2} Gbps",
+        writeln!(
+            f,
+            "    Packets: {}, {:.2} pps, {:.2} Gbps",
             self.transport_metrics.total_packets,
             self.transport_metrics.packets_per_second,
-            self.transport_metrics.throughput_gbps())?;
-        writeln!(f, "    Drops: {}, AF_XDP Redirects: {}",
-            self.transport_metrics.kernel_drops,
-            self.transport_metrics.af_xdp_redirects)?;
-        writeln!(f, "    Zero-copy: {}, Memcpy: {}",
-            self.transport_metrics.zero_copy_ops,
-            self.transport_metrics.memcpy_ops)?;
+            self.transport_metrics.throughput_gbps()
+        )?;
+        writeln!(
+            f,
+            "    Drops: {}, AF_XDP Redirects: {}",
+            self.transport_metrics.kernel_drops, self.transport_metrics.af_xdp_redirects
+        )?;
+        writeln!(
+            f,
+            "    Zero-copy: {}, Memcpy: {}",
+            self.transport_metrics.zero_copy_ops, self.transport_metrics.memcpy_ops
+        )?;
 
         Ok(())
     }

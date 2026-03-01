@@ -10,6 +10,6 @@
 pub mod integration;
 
 pub use integration::{
-    CatalogHyperMeshBridge, CatalogDeploymentSpec, CatalogAssetType,
-    DeploymentStrategy, BridgeConfiguration, CatalogDeploymentResult,
+    BridgeConfiguration, CatalogAssetType, CatalogDeploymentResult, CatalogDeploymentSpec,
+    CatalogHyperMeshBridge, DeploymentStrategy,
 };

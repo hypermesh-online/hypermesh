@@ -7,16 +7,16 @@
 //! This module provides STOQ protocol APIs for interacting with
 //! the HyperMesh system, including extension management.
 
-pub mod extensions;
 pub mod consensus_api;
+pub mod extensions;
 
-use std::sync::Arc;
-use std::net::Ipv6Addr;
 use anyhow::Result;
+use std::net::Ipv6Addr;
+use std::sync::Arc;
 use tracing::info;
 
-use stoq::StoqApiServer;
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::StoqApiServer;
 
 use crate::HyperMeshSystem;
 
@@ -70,10 +70,7 @@ pub async fn create_api_server(system: Arc<HyperMeshSystem>) -> Result<StoqApiSe
 }
 
 /// Start the API server
-pub async fn start_api_server(
-    system: Arc<HyperMeshSystem>,
-    config: ApiConfig,
-) -> Result<()> {
+pub async fn start_api_server(system: Arc<HyperMeshSystem>, config: ApiConfig) -> Result<()> {
     // Create STOQ transport
     let transport_config = TransportConfig {
         bind_address: config.bind_address,
@@ -94,8 +91,7 @@ pub async fn start_api_server(
 
     info!(
         "Starting STOQ API server on [{}]:{}",
-        config.bind_address,
-        config.port
+        config.bind_address, config.port
     );
 
     // Start listening

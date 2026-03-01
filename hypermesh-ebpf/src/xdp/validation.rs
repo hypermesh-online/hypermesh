@@ -7,8 +7,8 @@
 use crate::hypermesh_headers::*;
 use crate::validation::FastValidationResult;
 
-use super::types::*;
 use super::manager::XdpManager;
+use super::types::*;
 
 // -----------------------------------------------------------------------
 // Packet validation (userspace path)
@@ -25,11 +25,7 @@ impl XdpManager {
     /// - `requires_pos`: Parse and validate PoS header from packet
     /// - `validate_asset_hash`: Check asset hash header in packet
     /// - `check_matrix_routing`: Verify matrix routing header in packet
-    pub fn validate_packet(
-        &self,
-        connection_id: u64,
-        packet_data: &[u8],
-    ) -> PacketDecision {
+    pub fn validate_packet(&self, connection_id: u64, packet_data: &[u8]) -> PacketDecision {
         let policy = self.policy_manager.get_policy(connection_id);
 
         // Check packet size
@@ -62,8 +58,10 @@ impl XdpManager {
                         return PacketDecision::Drop {
                             reason: format!(
                                 "PoS validation failed: timestamp={}, stake={}, work={}, space={}",
-                                result.timestamp_ok, result.stake_ok,
-                                result.work_ok, result.space_ok
+                                result.timestamp_ok,
+                                result.stake_ok,
+                                result.work_ok,
+                                result.space_ok
                             ),
                         };
                     }
@@ -180,7 +178,10 @@ impl XdpManager {
         if !result.all_ok() {
             tracing::warn!(
                 "Proof of State fast validation failed: timestamp={}, stake={}, work={}, space={}",
-                result.timestamp_ok, result.stake_ok, result.work_ok, result.space_ok
+                result.timestamp_ok,
+                result.stake_ok,
+                result.work_ok,
+                result.space_ok
             );
             return false;
         }
@@ -196,11 +197,7 @@ impl XdpManager {
     }
 
     /// Validate Asset Hash extension header
-    pub fn validate_asset_hash(
-        &self,
-        header: &AssetHashHeader,
-        _payload: &[u8],
-    ) -> bool {
+    pub fn validate_asset_hash(&self, header: &AssetHashHeader, _payload: &[u8]) -> bool {
         if !header.validate_shard_indices() {
             tracing::warn!("Invalid shard indices in asset hash header");
             return false;
@@ -209,11 +206,7 @@ impl XdpManager {
     }
 
     /// Validate Matrix Routing extension header
-    pub fn validate_matrix_routing(
-        &self,
-        routing: &MatrixRoutingHeader,
-        matrix_size: u16,
-    ) -> bool {
+    pub fn validate_matrix_routing(&self, routing: &MatrixRoutingHeader, matrix_size: u16) -> bool {
         if !routing.validate_path(matrix_size) {
             tracing::warn!("Invalid matrix routing path");
             return false;

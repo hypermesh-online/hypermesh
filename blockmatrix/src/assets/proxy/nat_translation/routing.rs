@@ -4,12 +4,12 @@
 
 //! GlobalAddress implementation - address creation, conversion, and parsing
 
+use blake3;
 use std::net::{Ipv6Addr, SocketAddrV6};
 use std::time::SystemTime;
-use blake3;
 
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError};
 use super::types::{GlobalAddress, GlobalAddressType};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult};
 
 impl GlobalAddress {
     /// Create new global address
@@ -47,6 +47,7 @@ impl GlobalAddress {
     }
 
     /// Get string representation
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         format!(
             "hypermesh://{}/{}/{}:{}",
@@ -61,7 +62,7 @@ impl GlobalAddress {
     pub fn from_string(s: &str) -> AssetResult<Self> {
         if !s.starts_with("hypermesh://") {
             return Err(AssetError::AdapterError {
-                message: "Invalid global address scheme".to_string()
+                message: "Invalid global address scheme".to_string(),
             });
         }
 
@@ -70,29 +71,27 @@ impl GlobalAddress {
 
         if parts.len() != 3 {
             return Err(AssetError::AdapterError {
-                message: "Invalid global address format".to_string()
+                message: "Invalid global address format".to_string(),
             });
         }
 
-        let network_bytes = hex::decode(parts[0])
-            .map_err(|_| AssetError::AdapterError {
-                message: "Invalid network prefix".to_string()
-            })?;
+        let network_bytes = hex::decode(parts[0]).map_err(|_| AssetError::AdapterError {
+            message: "Invalid network prefix".to_string(),
+        })?;
         if network_bytes.len() != 8 {
             return Err(AssetError::AdapterError {
-                message: "Network prefix must be 8 bytes".to_string()
+                message: "Network prefix must be 8 bytes".to_string(),
             });
         }
         let mut network_prefix = [0u8; 8];
         network_prefix.copy_from_slice(&network_bytes);
 
-        let node_bytes = hex::decode(parts[1])
-            .map_err(|_| AssetError::AdapterError {
-                message: "Invalid node ID".to_string()
-            })?;
+        let node_bytes = hex::decode(parts[1]).map_err(|_| AssetError::AdapterError {
+            message: "Invalid node ID".to_string(),
+        })?;
         if node_bytes.len() != 8 {
             return Err(AssetError::AdapterError {
-                message: "Node ID must be 8 bytes".to_string()
+                message: "Node ID must be 8 bytes".to_string(),
             });
         }
         let mut node_id = [0u8; 8];
@@ -101,25 +100,25 @@ impl GlobalAddress {
         let asset_port: Vec<&str> = parts[2].split(':').collect();
         if asset_port.len() != 2 {
             return Err(AssetError::AdapterError {
-                message: "Invalid asset:port format".to_string()
+                message: "Invalid asset:port format".to_string(),
             });
         }
 
-        let asset_bytes = hex::decode(asset_port[0])
-            .map_err(|_| AssetError::AdapterError {
-                message: "Invalid asset ID".to_string()
-            })?;
+        let asset_bytes = hex::decode(asset_port[0]).map_err(|_| AssetError::AdapterError {
+            message: "Invalid asset ID".to_string(),
+        })?;
         if asset_bytes.len() != 16 {
             return Err(AssetError::AdapterError {
-                message: "Asset ID must be 16 bytes".to_string()
+                message: "Asset ID must be 16 bytes".to_string(),
             });
         }
         let mut asset_id = [0u8; 16];
         asset_id.copy_from_slice(&asset_bytes);
 
-        let service_port: u16 = asset_port[1].parse()
+        let service_port: u16 = asset_port[1]
+            .parse()
             .map_err(|_| AssetError::AdapterError {
-                message: "Invalid service port".to_string()
+                message: "Invalid service port".to_string(),
             })?;
 
         Ok(Self {
@@ -139,7 +138,7 @@ impl GlobalAddress {
         hasher.update(&self.node_id);
         hasher.update(&self.asset_id);
         hasher.update(&self.service_port.to_le_bytes());
-        hasher.update(&format!("{:?}", self.address_type).as_bytes());
+        hasher.update(format!("{:?}", self.address_type).as_bytes());
 
         *hasher.finalize().as_bytes()
     }

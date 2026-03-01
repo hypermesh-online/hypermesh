@@ -7,17 +7,15 @@
 //! Comprehensive end-to-end tests for all Phase 2 components working together.
 //! Tests all 5 sprints integrated through the IntelligenceLayer.
 
-use blockmatrix::intelligence::{
-    IntelligenceLayer, IntelligenceLayerConfig,
-};
-use blockmatrix::assets::pipeline::{Asset, AssetMetadata};
 use blockmatrix::assets::multi_node::{NetworkId, PrivacyMode};
+use blockmatrix::assets::pipeline::{Asset, AssetMetadata};
 use blockmatrix::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
+use blockmatrix::intelligence::{IntelligenceLayer, IntelligenceLayerConfig};
 use blockmatrix::matrix::MatrixCoordinate;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use std::collections::HashMap;
 use tokio::test;
 
 // Initialize crypto provider for all tests
@@ -42,7 +40,7 @@ fn create_test_asset(id: &str, size: usize) -> Asset {
         id: id.to_string(),
         data: vec![42u8; size],
         metadata: AssetMetadata {
-            name: format!("Test Asset {}", id),
+            name: format!("Test Asset {id}"),
             content_type: "application/octet-stream".to_string(),
             size,
             created_at: SystemTime::now()
@@ -67,7 +65,7 @@ async fn create_test_foundation() -> Arc<MatrixFoundation> {
     Arc::new(
         MatrixFoundation::new(config)
             .await
-            .expect("Failed to create matrix foundation")
+            .expect("Failed to create matrix foundation"),
     )
 }
 
@@ -90,11 +88,7 @@ async fn test_privacy_tier_to_pipeline_integration() {
         PrivacyMode::PUBLIC,
     ] {
         let handle = layer
-            .process_asset(
-                asset.clone(),
-                *tier,
-                vec![network_id("test_network")]
-            )
+            .process_asset(asset.clone(), *tier, vec![network_id("test_network")])
             .await
             .expect("Failed to process asset");
 
@@ -136,7 +130,7 @@ async fn test_stoq_to_matrix_foundation_integration() {
 
     // Add test nodes to foundation
     for i in 0..3 {
-        let node_id = format!("node_{}", i);
+        let node_id = format!("node_{i}");
         let coordinate = MatrixCoordinate::new(i as i64, 0, 0).unwrap();
 
         foundation
@@ -153,11 +147,7 @@ async fn test_stoq_to_matrix_foundation_integration() {
     // Process asset which will use STOQ for distribution
     let asset = create_test_asset("stoq_test", 1024);
     let handle = layer
-        .process_asset(
-            asset,
-            PrivacyMode::PUBLIC,
-            vec![network_id("test")]
-        )
+        .process_asset(asset, PrivacyMode::PUBLIC, vec![network_id("test")])
         .await
         .expect("Failed to process asset");
 
@@ -179,10 +169,10 @@ async fn test_pipeline_to_storage_integration() {
 
     for i in 0..3 {
         let asset = Asset {
-            id: format!("dedup_test_{}", i),
+            id: format!("dedup_test_{i}"),
             data: identical_data.clone(), // Same content for all
             metadata: AssetMetadata {
-                name: format!("Test Asset dedup_{}", i),
+                name: format!("Test Asset dedup_{i}"),
                 content_type: "application/octet-stream".to_string(),
                 size: 4096,
                 created_at: SystemTime::now()
@@ -194,11 +184,7 @@ async fn test_pipeline_to_storage_integration() {
         };
 
         let handle = layer
-            .process_asset(
-                asset,
-                PrivacyMode::PRIVATE,
-                vec![network_id("test")]
-            )
+            .process_asset(asset, PrivacyMode::PRIVATE, vec![network_id("test")])
             .await
             .expect("Failed to process asset");
         handles.push(handle);
@@ -233,18 +219,24 @@ async fn test_all_components_initialized_correctly() {
         eprintln!("Health check failures:");
         for (name, result) in &health.results {
             if !result.is_passed() {
-                eprintln!("  - {}: {:?}", name, result);
+                eprintln!("  - {name}: {result:?}");
             }
         }
         eprintln!("Component status: {:?}", health.component_status);
     }
-    assert!(health.all_healthy(), "Not all components are healthy (see stderr for details)");
+    assert!(
+        health.all_healthy(),
+        "Not all components are healthy (see stderr for details)"
+    );
 
     // We have 8 validations: stoq, privacy, network, pipeline, storage, cross_component, e2e_workflows, performance
-    assert!(health.component_status.len() >= 5, "Expected at least 5 components"); // 5+ main components
+    assert!(
+        health.component_status.len() >= 5,
+        "Expected at least 5 components"
+    ); // 5+ main components
 
     for (component, status) in &health.component_status {
-        assert!(status, "Component {} is not healthy", component);
+        assert!(status, "Component {component} is not healthy");
     }
 }
 
@@ -265,7 +257,7 @@ async fn test_e2e_asset_upload_public_tier() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PUBLIC,
-            vec![network_id("public_network")]
+            vec![network_id("public_network")],
         )
         .await
         .expect("Failed to process asset");
@@ -298,7 +290,7 @@ async fn test_e2e_asset_upload_private_tier() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PRIVATE,
-            vec![network_id("private_network")]
+            vec![network_id("private_network")],
         )
         .await
         .expect("Failed to process asset");
@@ -324,7 +316,7 @@ async fn test_e2e_asset_upload_federated_tier() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PRIVATE,
-            vec![network_id("federated_network")]
+            vec![network_id("federated_network")],
         )
         .await
         .expect("Failed to process asset");
@@ -333,7 +325,10 @@ async fn test_e2e_asset_upload_federated_tier() {
 
     // Federated tier should have balanced configuration
     // Compression ratio < 1.0 means good compression (compressed_size/original_size)
-    assert!(handle.pipeline_stats.compression.ratio < 1.0, "Compression ratio should be < 1.0 for good compression");
+    assert!(
+        handle.pipeline_stats.compression.ratio < 1.0,
+        "Compression ratio should be < 1.0 for good compression"
+    );
     assert!(handle.pipeline_stats.sharding.data_shards > 0);
 }
 
@@ -351,7 +346,7 @@ async fn test_e2e_asset_upload_anonymous_tier() {
         .process_asset(
             asset.clone(),
             PrivacyMode::ANONYMOUS,
-            vec![network_id("anonymous_network")]
+            vec![network_id("anonymous_network")],
         )
         .await
         .expect("Failed to process asset");
@@ -406,7 +401,7 @@ async fn test_e2e_deduplicated_retrieval() {
     // 10 users upload the same file (identical content)
     for i in 0..10 {
         let asset = Asset {
-            id: format!("duplicate_content_{}", i),
+            id: format!("duplicate_content_{i}"),
             data: identical_data.clone(), // SAME content for all
             metadata: AssetMetadata {
                 name: "duplicate_content".to_string(),
@@ -424,7 +419,7 @@ async fn test_e2e_deduplicated_retrieval() {
             .process_asset(
                 asset,
                 PrivacyMode::PUBLIC,
-                vec![network_id(&format!("user_{}_network", i))]
+                vec![network_id(&format!("user_{i}_network"))],
             )
             .await
             .expect("Failed to process asset");
@@ -459,7 +454,7 @@ async fn test_e2e_cross_network_retrieval() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PRIVATE,
-            vec![network_id("network_a")]
+            vec![network_id("network_a")],
         )
         .await
         .expect("Failed to process asset");
@@ -469,13 +464,16 @@ async fn test_e2e_cross_network_retrieval() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PRIVATE,
-            vec![network_id("network_b")]
+            vec![network_id("network_b")],
         )
         .await
         .expect("Failed to process asset");
 
     // Content addresses should match due to deduplication
-    assert_eq!(handle_a.content_address.content_hash, handle_b.content_address.content_hash);
+    assert_eq!(
+        handle_a.content_address.content_hash,
+        handle_b.content_address.content_hash
+    );
 }
 
 #[test]
@@ -485,7 +483,7 @@ async fn test_e2e_matrix_aware_retrieval() {
     // Setup matrix topology with multiple nodes
     for x in 0..3 {
         for y in 0..3 {
-            let node_id = format!("node_{}_{}", x, y);
+            let node_id = format!("node_{x}_{y}");
             let coordinate = MatrixCoordinate::new(x, y, 0).unwrap();
             foundation
                 .add_node(node_id.clone(), coordinate)
@@ -505,7 +503,7 @@ async fn test_e2e_matrix_aware_retrieval() {
         .process_asset(
             asset,
             PrivacyMode::PUBLIC,
-            vec![network_id("matrix_network")]
+            vec![network_id("matrix_network")],
         )
         .await
         .expect("Failed to process asset");
@@ -541,11 +539,7 @@ async fn test_performance_10mb_asset_processing() {
 
     let start = Instant::now();
     let handle = layer
-        .process_asset(
-            asset,
-            PrivacyMode::PUBLIC,
-            vec![network_id("perf_test")]
-        )
+        .process_asset(asset, PrivacyMode::PUBLIC, vec![network_id("perf_test")])
         .await
         .expect("Failed to process asset");
     let duration = start.elapsed();
@@ -553,8 +547,7 @@ async fn test_performance_10mb_asset_processing() {
     // Target: <500ms
     assert!(
         duration < Duration::from_millis(500),
-        "10MB processing took {:?}, expected <500ms",
-        duration
+        "10MB processing took {duration:?}, expected <500ms"
     );
 
     assert!(handle.pipeline_stats.sharding.data_shards > 0);
@@ -572,11 +565,7 @@ async fn test_performance_100mb_asset_processing() {
 
     let start = Instant::now();
     let handle = layer
-        .process_asset(
-            asset,
-            PrivacyMode::PRIVATE,
-            vec![network_id("perf_test")]
-        )
+        .process_asset(asset, PrivacyMode::PRIVATE, vec![network_id("perf_test")])
         .await
         .expect("Failed to process asset");
     let duration = start.elapsed();
@@ -584,12 +573,14 @@ async fn test_performance_100mb_asset_processing() {
     // Target: <2s
     assert!(
         duration < Duration::from_secs(2),
-        "100MB processing took {:?}, expected <2s",
-        duration
+        "100MB processing took {duration:?}, expected <2s"
     );
 
     // Compression ratio < 1.0 means good compression (compressed_size/original_size)
-    assert!(handle.pipeline_stats.compression.ratio < 1.0, "Compression ratio should be < 1.0 for good compression");
+    assert!(
+        handle.pipeline_stats.compression.ratio < 1.0,
+        "Compression ratio should be < 1.0 for good compression"
+    );
 }
 
 #[test]
@@ -602,7 +593,7 @@ async fn test_performance_concurrent_uploads() {
     let layer = Arc::new(
         IntelligenceLayer::new(config, foundation)
             .await
-            .expect("Failed to create intelligence layer")
+            .expect("Failed to create intelligence layer"),
     );
 
     let start = Instant::now();
@@ -612,12 +603,12 @@ async fn test_performance_concurrent_uploads() {
     for i in 0..10 {
         let layer_clone = layer.clone();
         let handle = tokio::spawn(async move {
-            let asset = create_test_asset(&format!("concurrent_{}", i), 5 * 1024 * 1024);
+            let asset = create_test_asset(&format!("concurrent_{i}"), 5 * 1024 * 1024);
             layer_clone
                 .process_asset(
                     asset,
                     PrivacyMode::PRIVATE,
-                    vec![network_id(&format!("network_{}", i))]
+                    vec![network_id(&format!("network_{i}"))],
                 )
                 .await
         });
@@ -638,8 +629,7 @@ async fn test_performance_concurrent_uploads() {
     // Should complete reasonably quickly (not blocking)
     assert!(
         duration < Duration::from_secs(5),
-        "Concurrent uploads took {:?}, expected <5s",
-        duration
+        "Concurrent uploads took {duration:?}, expected <5s"
     );
 }
 
@@ -661,7 +651,7 @@ async fn test_performance_deduplication_rate() {
         let data = base_data.clone();
 
         let asset = Asset {
-            id: format!("dedup_test_{}", i),
+            id: format!("dedup_test_{i}"),
             data,
             metadata: Default::default(),
         };
@@ -670,7 +660,7 @@ async fn test_performance_deduplication_rate() {
             .process_asset(
                 asset,
                 PrivacyMode::PUBLIC,
-                vec![network_id("dedup_network")]
+                vec![network_id("dedup_network")],
             )
             .await
             .expect("Failed to process asset");
@@ -711,7 +701,7 @@ async fn test_failure_partial_shard_loss() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PRIVATE,
-            vec![network_id("test")]
+            vec![network_id("test")],
         )
         .await
         .expect("Failed to process asset");
@@ -746,12 +736,9 @@ async fn test_failure_network_timeout() {
     // Use tokio::time::timeout to enforce timeout
     let result = tokio::time::timeout(
         Duration::from_millis(100), // 100ms overall timeout
-        layer.process_asset(
-            asset,
-            PrivacyMode::PUBLIC,
-            vec![network_id("test")]
-        )
-    ).await;
+        layer.process_asset(asset, PrivacyMode::PUBLIC, vec![network_id("test")]),
+    )
+    .await;
 
     // Should timeout
     if result.is_err() {
@@ -785,7 +772,7 @@ async fn test_failure_invalid_privacy_tier() {
         .process_asset(
             asset.clone(),
             PrivacyMode::ANONYMOUS,
-            vec![network_id("test")]
+            vec![network_id("test")],
         )
         .await
         .expect("Failed to process asset");
@@ -819,11 +806,7 @@ async fn test_complete_phase2_integration() {
         .process_asset(
             asset.clone(),
             PrivacyMode::PUBLIC,
-            vec![
-                network_id("net1"),
-                network_id("net2"),
-                network_id("net3"),
-            ]
+            vec![network_id("net1"), network_id("net2"), network_id("net3")],
         )
         .await
         .expect("Failed to process asset");

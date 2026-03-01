@@ -8,11 +8,11 @@
 //! MIGRATION: Now queries CatalogRegistry for dependency resolution.
 
 use super::types::*;
-use super::{LibraryInterface, DependencyResolution, ResolvedDependency, DependencyConflict};
+use super::{DependencyConflict, DependencyResolution, LibraryInterface, ResolvedDependency};
 
-use anyhow::{Result, Context, bail};
-use std::sync::Arc;
+use anyhow::{bail, Context, Result};
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
 // Import Asset Registry
 use crate::registry::CatalogRegistry;
@@ -43,32 +43,32 @@ impl VersionConstraintParser {
     /// Parse version constraint string
     fn parse(&self, constraint: &str) -> Result<VersionConstraint> {
         // Simple implementation - would be more complex in production
-        if constraint.starts_with("^") {
+        if let Some(rest) = constraint.strip_prefix("^") {
             // Caret constraint (compatible)
-            Ok(VersionConstraint::Compatible(constraint[1..].to_string()))
-        } else if constraint.starts_with("~") {
+            Ok(VersionConstraint::Compatible(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix("~") {
             // Tilde constraint
-            Ok(VersionConstraint::Tilde(constraint[1..].to_string()))
-        } else if constraint.starts_with(">=") {
+            Ok(VersionConstraint::Tilde(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix(">=") {
             // Greater than or equal
-            Ok(VersionConstraint::GreaterEqual(constraint[2..].to_string()))
-        } else if constraint.starts_with(">") {
+            Ok(VersionConstraint::GreaterEqual(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix(">") {
             // Greater than
-            Ok(VersionConstraint::Greater(constraint[1..].to_string()))
-        } else if constraint.starts_with("<=") {
+            Ok(VersionConstraint::Greater(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix("<=") {
             // Less than or equal
-            Ok(VersionConstraint::LessEqual(constraint[2..].to_string()))
-        } else if constraint.starts_with("<") {
+            Ok(VersionConstraint::LessEqual(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix("<") {
             // Less than
-            Ok(VersionConstraint::Less(constraint[1..].to_string()))
-        } else if constraint.starts_with("=") {
+            Ok(VersionConstraint::Less(rest.to_string()))
+        } else if let Some(rest) = constraint.strip_prefix("=") {
             // Exact
-            Ok(VersionConstraint::Exact(constraint[1..].to_string()))
+            Ok(VersionConstraint::Exact(rest.to_string()))
         } else if constraint.contains("||") {
             // OR constraint
             let parts: Vec<&str> = constraint.split("||").collect();
             Ok(VersionConstraint::Or(
-                parts.into_iter().map(|p| p.trim().to_string()).collect()
+                parts.into_iter().map(|p| p.trim().to_string()).collect(),
             ))
         } else if constraint == "*" {
             // Any version
@@ -104,22 +104,19 @@ impl VersionConstraintParser {
                     return false;
                 }
 
-                version_parts[0] == constraint_parts[0] &&
-                version_parts[1] == constraint_parts[1]
+                version_parts[0] == constraint_parts[0] && version_parts[1] == constraint_parts[1]
             }
             VersionConstraint::Greater(v) => version > v.as_str(),
             VersionConstraint::GreaterEqual(v) => version >= v.as_str(),
             VersionConstraint::Less(v) => version < v.as_str(),
             VersionConstraint::LessEqual(v) => version <= v.as_str(),
-            VersionConstraint::Or(constraints) => {
-                constraints.iter().any(|c| {
-                    if let Ok(parsed) = self.parse(c) {
-                        self.satisfies(version, &parsed)
-                    } else {
-                        false
-                    }
-                })
-            }
+            VersionConstraint::Or(constraints) => constraints.iter().any(|c| {
+                if let Ok(parsed) = self.parse(c) {
+                    self.satisfies(version, &parsed)
+                } else {
+                    false
+                }
+            }),
         }
     }
 }
@@ -173,12 +170,15 @@ impl ResolvedPackage {
     /// Get package dependencies (compatibility method - returns borrowed slice)
     pub fn _dependencies(&self) -> Vec<PackageDependency> {
         // Convert Arc<str> dependencies to PackageDependency structs
-        self.dependencies.iter().map(|name| PackageDependency {
-            name: Arc::clone(name),
-            version_constraint: Arc::from("*"),
-            optional: false,
-            platform: None,
-        }).collect()
+        self.dependencies
+            .iter()
+            .map(|name| PackageDependency {
+                name: Arc::clone(name),
+                version_constraint: Arc::from("*"),
+                optional: false,
+                platform: None,
+            })
+            .collect()
     }
 }
 
@@ -188,6 +188,12 @@ struct PendingPackage {
     constraint: Arc<str>,
     _parent: Option<Arc<str>>,
     depth: u32,
+}
+
+impl Default for DependencyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DependencyResolver {
@@ -290,7 +296,7 @@ impl DependencyResolver {
                 context.conflicts.push(DependencyConflict {
                     name: pending.name.to_string(),
                     versions: vec![pending.constraint.to_string()],
-                    reason: format!("Maximum dependency depth {} exceeded", max_depth),
+                    reason: format!("Maximum dependency depth {max_depth} exceeded"),
                 });
                 continue;
             }
@@ -300,7 +306,10 @@ impl DependencyResolver {
                 // Already processed, check for version conflict
                 if let Some(resolved) = context.resolved.get(&pending.name) {
                     let constraint = self.constraint_parser.parse(&pending.constraint)?;
-                    if !self.constraint_parser.satisfies(&resolved.version, &constraint) {
+                    if !self
+                        .constraint_parser
+                        .satisfies(&resolved.version, &constraint)
+                    {
                         context.conflicts.push(DependencyConflict {
                             name: pending.name.to_string(),
                             versions: vec![
@@ -328,7 +337,8 @@ impl DependencyResolver {
         }
 
         // Build resolution result
-        let resolved: Vec<ResolvedDependency> = context.resolved
+        let resolved: Vec<ResolvedDependency> = context
+            .resolved
             .values()
             .map(|pkg| ResolvedDependency {
                 name: pkg.name.to_string(),
@@ -358,15 +368,22 @@ impl DependencyResolver {
         context: &mut ResolutionContext,
     ) -> Result<()> {
         // Get package from library
-        let package = library.get_package(&pending.name).await?
+        let package = library
+            .get_package(&pending.name)
+            .await?
             .context(format!("Package {} not found", pending.name))?;
 
         // Check version constraint
         let constraint = self.constraint_parser.parse(&pending.constraint)?;
-        let package_version = package.metadata.as_ref()
+        let package_version = package
+            .metadata
+            .as_ref()
             .map(|m| m.version.as_ref())
             .unwrap_or(&package.version);
-        if !self.constraint_parser.satisfies(package_version, &constraint) {
+        if !self
+            .constraint_parser
+            .satisfies(package_version, &constraint)
+        {
             bail!(
                 "Version {} does not satisfy constraint {}",
                 package_version,
@@ -379,18 +396,19 @@ impl DependencyResolver {
             Arc::clone(&package.id),
             ResolvedPackage {
                 name: Arc::clone(&package.id),
-                version: package.metadata.as_ref()
+                version: package
+                    .metadata
+                    .as_ref()
                     .map(|m| Arc::clone(&m.version))
                     .unwrap_or_else(|| Arc::from(package.version.as_str())),
                 source: Arc::from("library"),
-                dependencies: package.spec.as_ref()
-                    .map(|s| s.dependencies
-                        .iter()
-                        .map(|d| Arc::clone(&d.name))
-                        .collect())
+                dependencies: package
+                    .spec
+                    .as_ref()
+                    .map(|s| s.dependencies.iter().map(|d| Arc::clone(&d.name)).collect())
                     .unwrap_or_else(Vec::new),
                 _depth: pending.depth,
-            }
+            },
         );
 
         // Add transitive dependencies to pending
@@ -411,6 +429,7 @@ impl DependencyResolver {
     }
 
     /// Build dependency tree for a package
+    #[allow(clippy::only_used_in_recursion)]
     fn build_dependency_tree(
         &self,
         package_name: &Arc<str>,
@@ -449,10 +468,15 @@ impl DependencyResolver {
         // For now, just get the package and check if it satisfies
         if let Some(package) = library.get_package(name).await? {
             let parsed_constraint = self.constraint_parser.parse(constraint)?;
-            let package_version = package.metadata.as_ref()
+            let package_version = package
+                .metadata
+                .as_ref()
                 .map(|m| m.version.as_ref())
                 .unwrap_or(&package.version);
-            if self.constraint_parser.satisfies(package_version, &parsed_constraint) {
+            if self
+                .constraint_parser
+                .satisfies(package_version, &parsed_constraint)
+            {
                 return Ok(Some(package_version.to_string()));
             }
         }
@@ -470,12 +494,27 @@ mod tests {
         let parser = VersionConstraintParser;
 
         // Test various constraint formats
-        assert!(matches!(parser.parse("^1.0.0").unwrap(), VersionConstraint::Compatible(_)));
-        assert!(matches!(parser.parse("~1.0.0").unwrap(), VersionConstraint::Tilde(_)));
-        assert!(matches!(parser.parse(">=1.0.0").unwrap(), VersionConstraint::GreaterEqual(_)));
-        assert!(matches!(parser.parse("<2.0.0").unwrap(), VersionConstraint::Less(_)));
-        assert!(matches!(parser.parse("*").unwrap(), VersionConstraint::Any));
-        assert!(matches!(parser.parse("1.0.0").unwrap(), VersionConstraint::Exact(_)));
+        assert!(matches!(
+            parser.parse("^1.0.0").expect("test: expected success"),
+            VersionConstraint::Compatible(_)
+        ));
+        assert!(matches!(
+            parser.parse("~1.0.0").expect("test: expected success"),
+            VersionConstraint::Tilde(_)
+        ));
+        assert!(matches!(
+            parser.parse(">=1.0.0").expect("test: expected success"),
+            VersionConstraint::GreaterEqual(_)
+        ));
+        assert!(matches!(
+            parser.parse("<2.0.0").expect("test: expected success"),
+            VersionConstraint::Less(_)
+        ));
+        assert!(matches!(parser.parse("*").expect("test: assertion value"), VersionConstraint::Any));
+        assert!(matches!(
+            parser.parse("1.0.0").expect("test: expected success"),
+            VersionConstraint::Exact(_)
+        ));
     }
 
     #[test]
@@ -504,8 +543,7 @@ mod tests {
         let resolver = DependencyResolver::new();
         assert!(matches!(resolver.strategy, ResolutionStrategy::Balanced));
 
-        let resolver = DependencyResolver::new()
-            .with_strategy(ResolutionStrategy::Latest);
+        let resolver = DependencyResolver::new().with_strategy(ResolutionStrategy::Latest);
         assert!(matches!(resolver.strategy, ResolutionStrategy::Latest));
     }
 }

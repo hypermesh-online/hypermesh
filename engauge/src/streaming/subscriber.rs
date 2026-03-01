@@ -26,7 +26,11 @@ pub struct MetricsSubscriber {
 impl MetricsSubscriber {
     /// Create a subscriber with the given per-source window capacity.
     pub fn new(max_window_size: usize) -> Self {
-        let max_window_size = if max_window_size == 0 { 1 } else { max_window_size };
+        let max_window_size = if max_window_size == 0 {
+            1
+        } else {
+            max_window_size
+        };
         Self {
             windows: HashMap::new(),
             max_window_size,
@@ -38,7 +42,7 @@ impl MetricsSubscriber {
     /// Automatically prunes the oldest frame when the window exceeds capacity.
     pub fn receive(&mut self, frame: MetricsFrame) {
         let key = frame.source_node.0.clone();
-        let window = self.windows.entry(key).or_insert_with(VecDeque::new);
+        let window = self.windows.entry(key).or_default();
         window.push_back(frame);
         while window.len() > self.max_window_size {
             window.pop_front();
@@ -47,9 +51,7 @@ impl MetricsSubscriber {
 
     /// Most recent frame from a given source, or `None` if not tracked.
     pub fn latest(&self, source_node: &str) -> Option<&MetricsFrame> {
-        self.windows
-            .get(source_node)
-            .and_then(|w| w.back())
+        self.windows.get(source_node).and_then(|w| w.back())
     }
 
     /// Full rolling window for a given source.
@@ -76,16 +78,12 @@ impl MetricsSubscriber {
                 // Compute a simple normalized score from the snapshot.
                 // Mirrors CapacityScore weights: bytes 0.25, compute 0.25,
                 // storage 0.20, bandwidth 0.20, uptime 0.10.
-                let bytes_norm = (cap.bytes_served as f64 / 1_073_741_824.0)
-                    .clamp(0.0, 1.0);
-                let compute_norm = (cap.compute_delivered as f64 / 1_000_000.0)
-                    .clamp(0.0, 1.0);
-                let storage_norm = (cap.storage_maintained_bytes as f64
-                    / 10_737_418_240.0)
-                    .clamp(0.0, 1.0);
-                let bw_norm = (cap.bandwidth_available_bps as f64
-                    / 1_000_000_000.0)
-                    .clamp(0.0, 1.0);
+                let bytes_norm = (cap.bytes_served as f64 / 1_073_741_824.0).clamp(0.0, 1.0);
+                let compute_norm = (cap.compute_delivered as f64 / 1_000_000.0).clamp(0.0, 1.0);
+                let storage_norm =
+                    (cap.storage_maintained_bytes as f64 / 10_737_418_240.0).clamp(0.0, 1.0);
+                let bw_norm =
+                    (cap.bandwidth_available_bps as f64 / 1_000_000_000.0).clamp(0.0, 1.0);
                 let uptime = cap.uptime_ratio.clamp(0.0, 1.0);
 
                 let score = bytes_norm * 0.25
@@ -118,9 +116,7 @@ impl MetricsSubscriber {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::streaming::protocol::{
-        CapacitySnapshot, CongestionSnapshot, MetricsPayload,
-    };
+    use crate::streaming::protocol::{CapacitySnapshot, CongestionSnapshot, MetricsPayload};
     use hypermesh_lib::{NodeId, PrivacyMode};
 
     fn cap_frame(node: &str, seq: u64, bytes: u64) -> MetricsFrame {

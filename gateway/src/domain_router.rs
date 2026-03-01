@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::net::SocketAddr;
 
 use dashmap::DashMap;
 use tracing::debug;
@@ -30,6 +30,12 @@ struct DomainRouterStats {
     exact_hits: AtomicU64,
     wildcard_hits: AtomicU64,
     misses: AtomicU64,
+}
+
+impl Default for DomainRouter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DomainRouter {
@@ -223,10 +229,8 @@ mod tests {
             backend_addr: test_addr(),
             backend_name: "wildcard-backend".into(),
         };
-        let router = DomainRouter::with_wildcards(vec![(
-            "*.hypermesh.online".into(),
-            wildcard_route,
-        )]);
+        let router =
+            DomainRouter::with_wildcards(vec![("*.hypermesh.online".into(), wildcard_route)]);
 
         // Single-label subdomain matches.
         let result = router.route_by_sni("foo.hypermesh.online");
@@ -281,10 +285,7 @@ mod tests {
 
         let bm = router.route_by_sni("hypermesh.online");
         assert!(bm.is_some());
-        assert_eq!(
-            bm.expect("test: checked above").backend_name,
-            "blockmatrix"
-        );
+        assert_eq!(bm.expect("test: checked above").backend_name, "blockmatrix");
     }
 
     #[test]
@@ -325,10 +326,7 @@ mod tests {
             backend_addr: test_addr(),
             backend_name: "wc".into(),
         };
-        let router = DomainRouter::with_wildcards(vec![(
-            "*.example.com".into(),
-            wildcard_route,
-        )]);
+        let router = DomainRouter::with_wildcards(vec![("*.example.com".into(), wildcard_route)]);
 
         let _ = router.route_by_sni("sub.example.com");
         let snap = router.stats();

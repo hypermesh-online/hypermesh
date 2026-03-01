@@ -4,8 +4,8 @@
 
 //! Type definitions for CPE-enhanced service discovery
 
-use crate::ServiceId;
 use super::super::ServiceEndpoint;
+use crate::ServiceId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime};

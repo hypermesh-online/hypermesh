@@ -19,7 +19,7 @@ pub async fn test_cryptographic_implementations() -> (bool, HashMap<String, f64>
     // Test Falcon-1024 quantum-resistant signatures
     let falcon_result = test_falcon_signatures().await;
     if let Err(e) = falcon_result {
-        errors.push(format!("Falcon-1024 test failed: {}", e));
+        errors.push(format!("Falcon-1024 test failed: {e}"));
         passed = false;
     } else {
         metrics.insert("falcon_1024_verify_ms".to_string(), falcon_result.unwrap());
@@ -28,7 +28,7 @@ pub async fn test_cryptographic_implementations() -> (bool, HashMap<String, f64>
     // Test Kyber encryption
     let kyber_result = test_kyber_encryption().await;
     if let Err(e) = kyber_result {
-        errors.push(format!("Kyber encryption test failed: {}", e));
+        errors.push(format!("Kyber encryption test failed: {e}"));
         passed = false;
     } else {
         metrics.insert("kyber_encrypt_ms".to_string(), kyber_result.unwrap());
@@ -37,7 +37,7 @@ pub async fn test_cryptographic_implementations() -> (bool, HashMap<String, f64>
     // Test certificate validation
     let cert_result = test_cert_chain_validation().await;
     if let Err(e) = cert_result {
-        errors.push(format!("Certificate validation failed: {}", e));
+        errors.push(format!("Certificate validation failed: {e}"));
         passed = false;
     } else {
         metrics.insert("cert_validation_ms".to_string(), cert_result.unwrap());
@@ -57,12 +57,14 @@ pub async fn test_quantum_resistance() -> (bool, HashMap<String, f64>, Vec<Strin
         Ok(resistance_score) => {
             metrics.insert("falcon-1024_resistance".to_string(), resistance_score);
             if resistance_score < 0.95 {
-                errors.push(format!("falcon-1024 resistance below threshold: {}", resistance_score));
+                errors.push(format!(
+                    "falcon-1024 resistance below threshold: {resistance_score}"
+                ));
                 passed = false;
             }
         }
         Err(e) => {
-            errors.push(format!("falcon-1024 test failed: {}", e));
+            errors.push(format!("falcon-1024 test failed: {e}"));
             passed = false;
         }
     }
@@ -71,12 +73,14 @@ pub async fn test_quantum_resistance() -> (bool, HashMap<String, f64>, Vec<Strin
         Ok(resistance_score) => {
             metrics.insert("kyber-1024_resistance".to_string(), resistance_score);
             if resistance_score < 0.95 {
-                errors.push(format!("kyber-1024 resistance below threshold: {}", resistance_score));
+                errors.push(format!(
+                    "kyber-1024 resistance below threshold: {resistance_score}"
+                ));
                 passed = false;
             }
         }
         Err(e) => {
-            errors.push(format!("kyber-1024 test failed: {}", e));
+            errors.push(format!("kyber-1024 test failed: {e}"));
             passed = false;
         }
     }
@@ -85,12 +89,14 @@ pub async fn test_quantum_resistance() -> (bool, HashMap<String, f64>, Vec<Strin
         Ok(resistance_score) => {
             metrics.insert("sphincs+_resistance".to_string(), resistance_score);
             if resistance_score < 0.95 {
-                errors.push(format!("sphincs+ resistance below threshold: {}", resistance_score));
+                errors.push(format!(
+                    "sphincs+ resistance below threshold: {resistance_score}"
+                ));
                 passed = false;
             }
         }
         Err(e) => {
-            errors.push(format!("sphincs+ test failed: {}", e));
+            errors.push(format!("sphincs+ test failed: {e}"));
             passed = false;
         }
     }
@@ -108,21 +114,24 @@ pub async fn test_byzantine_fault_tolerance() -> (bool, HashMap<String, f64>, Ve
     let scenarios = vec![
         ("1/3 malicious", test_one_third_byzantine().await),
         ("network_partition", test_network_partition_recovery().await),
-        ("consensus_manipulation", test_consensus_manipulation().await),
+        (
+            "consensus_manipulation",
+            test_consensus_manipulation().await,
+        ),
         ("double_spending", test_double_spending_prevention().await),
     ];
 
     for (scenario, result) in scenarios {
         match result {
             Ok(tolerance) => {
-                metrics.insert(format!("{}_tolerance", scenario), tolerance);
+                metrics.insert(format!("{scenario}_tolerance"), tolerance);
                 if tolerance < 0.99 {
-                    errors.push(format!("{} tolerance insufficient: {}", scenario, tolerance));
+                    errors.push(format!("{scenario} tolerance insufficient: {tolerance}"));
                     passed = false;
                 }
             }
             Err(e) => {
-                errors.push(format!("{} failed: {}", scenario, e));
+                errors.push(format!("{scenario} failed: {e}"));
                 passed = false;
             }
         }
@@ -149,10 +158,10 @@ pub async fn test_certificate_validation() -> (bool, HashMap<String, f64>, Vec<S
     for (test_name, result) in tests {
         match result {
             Ok(validation_time) => {
-                metrics.insert(format!("{}_validation_ms", test_name), validation_time);
+                metrics.insert(format!("{test_name}_validation_ms"), validation_time);
             }
             Err(e) => {
-                errors.push(format!("{} validation failed: {}", test_name, e));
+                errors.push(format!("{test_name} validation failed: {e}"));
                 passed = false;
             }
         }
@@ -170,7 +179,7 @@ pub async fn test_memory_safety() -> (bool, HashMap<String, f64>, Vec<String>) {
     // Run memory safety tests with sanitizers
     let output = Command::new("cargo")
         .env("RUSTFLAGS", "-Z sanitizer=address")
-        .args(&["test", "--", "--test-threads=1"])
+        .args(["test", "--", "--test-threads=1"])
         .output()
         .await
         .unwrap();
@@ -183,7 +192,7 @@ pub async fn test_memory_safety() -> (bool, HashMap<String, f64>, Vec<String>) {
     // Check for memory leaks
     let leak_check = check_memory_leaks().await;
     if let Err(e) = leak_check {
-        errors.push(format!("Memory leak detected: {}", e));
+        errors.push(format!("Memory leak detected: {e}"));
         passed = false;
     } else {
         metrics.insert("memory_leak_check".to_string(), 0.0);
@@ -192,7 +201,7 @@ pub async fn test_memory_safety() -> (bool, HashMap<String, f64>, Vec<String>) {
     // Test zero-copy safety
     let zero_copy_result = test_zero_copy_safety().await;
     if let Err(e) = zero_copy_result {
-        errors.push(format!("Zero-copy safety violation: {}", e));
+        errors.push(format!("Zero-copy safety violation: {e}"));
         passed = false;
     } else {
         metrics.insert("zero_copy_safe".to_string(), 1.0);
@@ -301,7 +310,7 @@ mod tests {
     #[tokio::test]
     async fn test_security_suite() {
         let (passed, metrics, errors) = test_cryptographic_implementations().await;
-        assert!(passed, "Security tests failed: {:?}", errors);
+        assert!(passed, "Security tests failed: {errors:?}");
         assert!(!metrics.is_empty());
     }
 }

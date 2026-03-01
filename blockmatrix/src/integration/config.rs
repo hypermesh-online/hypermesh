@@ -4,16 +4,16 @@
 
 //! Configuration management for HyperMesh platform integration
 
-use serde::{Serialize, Deserialize};
-use crate::transport::TransportConfig;
 use crate::consensus::ConsensusConfig;
 use crate::container::config::ContainerConfig as ContainerRuntimeConfig;
-use crate::security::config::SecurityConfig;
 use crate::orchestration::HyperMeshIntegrationConfig as OrchestrationConfig;
+use crate::security::config::SecurityConfig;
+use crate::transport::TransportConfig;
+use serde::{Deserialize, Serialize};
 pub use stoq::StoqConfig;
 
 /// Main HyperMesh platform configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HyperMeshConfig {
     /// STOQ protocol configuration
     pub stoq: StoqConfig,
@@ -87,20 +87,6 @@ pub struct ComponentConfig {
     pub dependencies: Vec<String>,
 }
 
-impl Default for HyperMeshConfig {
-    fn default() -> Self {
-        Self {
-            stoq: StoqConfig::default(),
-            transport: TransportConfig::default(),
-            consensus: ConsensusConfig::default(),
-            container: ContainerRuntimeConfig::default(),
-            security: SecurityConfig::default(),
-            orchestration: OrchestrationConfig::default(),
-            integration: IntegrationConfig::default(),
-        }
-    }
-}
-
 impl Default for IntegrationConfig {
     fn default() -> Self {
         Self {
@@ -116,9 +102,9 @@ impl Default for IntegrationConfig {
 impl Default for ServiceRegistryConfig {
     fn default() -> Self {
         Self {
-            registration_ttl_secs: 300,           // 5 minutes
-            discovery_refresh_interval_secs: 60,  // 1 minute
-            health_check_timeout_secs: 5,         // 5 seconds
+            registration_ttl_secs: 300,          // 5 minutes
+            discovery_refresh_interval_secs: 60, // 1 minute
+            health_check_timeout_secs: 5,        // 5 seconds
             max_retries: 3,
         }
     }
@@ -127,8 +113,8 @@ impl Default for ServiceRegistryConfig {
 impl Default for MetricsConfig {
     fn default() -> Self {
         Self {
-            collection_interval_secs: 10,    // 10 seconds
-            retention_period_secs: 86400,    // 24 hours
+            collection_interval_secs: 10, // 10 seconds
+            retention_period_secs: 86400, // 24 hours
             enable_prometheus: true,
             prometheus_port: 9090,
         }
@@ -142,72 +128,86 @@ impl HyperMeshConfig {
         let config = serde_yaml::from_str(&content)?;
         Ok(config)
     }
-    
+
     /// Save configuration to YAML file
     pub fn to_yaml_file(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
         let content = serde_yaml::to_string(self)?;
         std::fs::write(path, content)?;
         Ok(())
     }
-    
+
     /// Validate configuration consistency
     pub fn validate(&self) -> Result<(), String> {
         // Validate port conflicts
-        let mut ports = Vec::new();
-        ports.push(self.transport.network_usage.port);
-        // consensus.port does not exist - skip
-        // container.runtime_port does not exist - skip
-        ports.push(self.integration.metrics.prometheus_port);
-        
+        let mut ports = [
+            self.transport.network_usage.port,
+            // consensus.port does not exist - skip
+            // container.runtime_port does not exist - skip
+            self.integration.metrics.prometheus_port,
+        ];
+
         // Check for port duplicates
         ports.sort_unstable();
         for window in ports.windows(2) {
             if window[0] == window[1] {
-                return Err(format!("Port conflict detected: port {} is used multiple times", window[0]));
+                return Err(format!(
+                    "Port conflict detected: port {} is used multiple times",
+                    window[0]
+                ));
             }
         }
-        
+
         // Validate timeout configurations
         if self.integration.initialization_timeout_secs < 60 {
             return Err("Initialization timeout must be at least 60 seconds".to_string());
         }
-        
-        if self.integration.health_check_interval_secs > self.integration.service_registry.registration_ttl_secs / 2 {
-            return Err("Health check interval should be less than half of registration TTL".to_string());
+
+        if self.integration.health_check_interval_secs
+            > self.integration.service_registry.registration_ttl_secs / 2
+        {
+            return Err(
+                "Health check interval should be less than half of registration TTL".to_string(),
+            );
         }
-        
+
         Ok(())
     }
-    
+
     /// Get configuration optimized for high performance
     pub fn high_performance_preset() -> Self {
         let mut config = Self::default();
-        
+
         // Optimize integration settings for performance
         config.integration.health_check_interval_secs = 10; // Faster health checks
-        config.integration.communication_timeout_secs = 5;  // Faster timeouts
+        config.integration.communication_timeout_secs = 5; // Faster timeouts
         config.integration.metrics.collection_interval_secs = 5; // More frequent metrics
-        
+
         // Optimize service registry for performance
-        config.integration.service_registry.discovery_refresh_interval_secs = 30;
-        config.integration.service_registry.health_check_timeout_secs = 2;
-        
+        config
+            .integration
+            .service_registry
+            .discovery_refresh_interval_secs = 30;
+        config
+            .integration
+            .service_registry
+            .health_check_timeout_secs = 2;
+
         config
     }
-    
+
     /// Get configuration optimized for reliability
     pub fn high_reliability_preset() -> Self {
         let mut config = Self::default();
-        
+
         // Optimize for reliability
         config.integration.initialization_timeout_secs = 600; // Longer initialization
-        config.integration.health_check_interval_secs = 15;   // Conservative health checks
-        config.integration.communication_timeout_secs = 30;   // Longer timeouts
-        
+        config.integration.health_check_interval_secs = 15; // Conservative health checks
+        config.integration.communication_timeout_secs = 30; // Longer timeouts
+
         // Optimize service registry for reliability
         config.integration.service_registry.registration_ttl_secs = 600; // Longer TTL
         config.integration.service_registry.max_retries = 5; // More retries
-        
+
         config
     }
 }

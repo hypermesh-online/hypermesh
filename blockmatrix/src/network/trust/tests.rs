@@ -22,7 +22,7 @@ mod integration_tests {
 
         let federated = FederatedNetworkHandler::new();
         match federated.network_type() {
-            NetworkType::Federated { .. } => {},
+            NetworkType::Federated { .. } => {}
             _ => panic!("Wrong network type for federated"),
         }
 
@@ -42,14 +42,14 @@ mod integration_tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
 
         // Anonymous should have no certificate
         assert!(connection.certificate.is_none());
         assert_eq!(connection.network_type, NetworkType::Anonymous);
 
         // Should be able to connect
-        handler.connect().await.unwrap();
+        handler.connect().await.expect("test: async operation");
 
         // Should accept all anonymous peers
         let peer = PeerInfo {
@@ -58,10 +58,10 @@ mod integration_tests {
             certificate: None,
             network_type: NetworkType::Anonymous,
         };
-        assert!(handler.validate_peer(&peer).await.unwrap());
+        assert!(handler.validate_peer(&peer).await.expect("test: async operation"));
 
         // Disconnect should clear all data
-        handler.disconnect().await.unwrap();
+        handler.disconnect().await.expect("test: async operation");
     }
 
     /// Test P2P network with self-signed certificates
@@ -76,15 +76,15 @@ mod integration_tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
 
         // P2P should have self-signed certificate
         assert!(connection.certificate.is_some());
-        assert!(connection.certificate.as_ref().unwrap().is_self_signed());
+        assert!(connection.certificate.as_ref().expect("test: certificate operation").is_self_signed());
         assert_eq!(connection.network_type, NetworkType::P2P);
 
         // Should be able to connect
-        handler.connect().await.unwrap();
+        handler.connect().await.expect("test: async operation");
     }
 
     /// Test federated network requires gateway
@@ -93,7 +93,7 @@ mod integration_tests {
         let handler = FederatedNetworkHandler::new();
         let config = NetworkConfig {
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
             peer_addresses: vec![],
             federation_gateway: None, // Missing gateway
@@ -103,7 +103,10 @@ mod integration_tests {
 
         let result = handler.bootstrap(config).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("gateway URL required"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("gateway URL required"));
     }
 
     /// Test federated network with gateway
@@ -112,7 +115,7 @@ mod integration_tests {
         let handler = FederatedNetworkHandler::new();
         let config = NetworkConfig {
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
             peer_addresses: vec![],
             federation_gateway: Some("bank.internal".to_string()),
@@ -120,7 +123,7 @@ mod integration_tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
 
         // Federated should have certificate from gateway
         assert!(connection.certificate.is_some());
@@ -146,7 +149,10 @@ mod integration_tests {
 
         let result = handler.bootstrap(config).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Proof of State required"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Proof of State required"));
     }
 
     /// Test public network with full proof
@@ -168,11 +174,15 @@ mod integration_tests {
             proof_of_state: Some(proof),
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
 
         // Public should have blockchain-registered certificate
         assert!(connection.certificate.is_some());
-        assert!(connection.certificate.as_ref().unwrap().is_blockchain_registered());
+        assert!(connection
+            .certificate
+            .as_ref()
+            .expect("test: expected success")
+            .is_blockchain_registered());
         assert_eq!(connection.network_type, NetworkType::Public);
     }
 
@@ -201,13 +211,13 @@ mod integration_tests {
         };
 
         // Anonymous shouldn't validate public peer
-        assert!(!anonymous.validate_peer(&public_peer).await.unwrap());
+        assert!(!anonymous.validate_peer(&public_peer).await.expect("test: async operation"));
 
         // P2P shouldn't validate public peer
-        assert!(!p2p.validate_peer(&public_peer).await.unwrap());
+        assert!(!p2p.validate_peer(&public_peer).await.expect("test: async operation"));
 
         // But public should validate public peer
-        assert!(public.validate_peer(&public_peer).await.unwrap());
+        assert!(public.validate_peer(&public_peer).await.expect("test: async operation"));
     }
 
     /// Test asset request handling varies by network
@@ -224,16 +234,19 @@ mod integration_tests {
         };
 
         // Anonymous should allow access (public assets)
-        let anon_response = anonymous.handle_asset_request(request.clone()).await.unwrap();
+        let anon_response = anonymous
+            .handle_asset_request(request.clone())
+            .await
+            .expect("test: expected success");
         assert!(anon_response.authorized);
-        assert_eq!(anon_response.metadata.get("network").unwrap(), "anonymous");
+        assert_eq!(anon_response.metadata.get("network").expect("test: map lookup"), "anonymous");
 
         // P2P should deny access (no trusted peer)
         let p2p_request = AssetRequest {
             network_type: NetworkType::P2P,
             ..request
         };
-        let p2p_response = p2p.handle_asset_request(p2p_request).await.unwrap();
+        let p2p_response = p2p.handle_asset_request(p2p_request).await.expect("test: async operation");
         assert!(!p2p_response.authorized); // No trusted peers yet
     }
 
@@ -294,7 +307,7 @@ mod unit_tests {
         assert_eq!(NetworkType::Public.name(), "Public");
 
         let federated = NetworkType::Federated {
-            gateway_url: "bank.internal".to_string()
+            gateway_url: "bank.internal".to_string(),
         };
         assert_eq!(federated.name(), "Federated");
     }

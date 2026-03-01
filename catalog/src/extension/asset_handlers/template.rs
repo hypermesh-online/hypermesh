@@ -3,12 +3,10 @@
 // See the LICENSE file in the repository root for full license text.
 
 use super::{
-    async_trait, HashMap, Arc, RwLock,
-    AssetExtensionHandler, ExtensionResult, ExtensionError,
-    AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
-    AssetOperation, OperationResult,
-    AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof,
+    async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
+    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetUpdate, ConsensusProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
+    OperationResult, RwLock,
 };
 
 /// Handler for Template assets (asset generation templates)
@@ -24,6 +22,12 @@ struct Template {
     pub template_type: String,
     pub language: String,
     pub parameters: Vec<String>,
+}
+
+impl Default for TemplateHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TemplateHandler {
@@ -59,11 +63,15 @@ impl AssetExtensionHandler for TemplateHandler {
         let template = Template {
             _id: asset_id.clone(),
             name: spec.name.clone(),
-            template_type: spec.metadata.get("template_type")
+            template_type: spec
+                .metadata
+                .get("template_type")
                 .and_then(|v| v.as_str())
                 .unwrap_or("generic")
                 .to_string(),
-            language: spec.metadata.get("language")
+            language: spec
+                .metadata
+                .get("language")
                 .and_then(|v| v.as_str())
                 .unwrap_or("lua")
                 .to_string(),
@@ -76,12 +84,17 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(
+        &self,
+        id: &AssetRegistration,
+        update: AssetUpdate,
+    ) -> ExtensionResult<()> {
         let mut templates = self.templates.write().await;
 
-        let template = templates.get_mut(id)
+        let template = templates
+            .get_mut(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Template not found: {}", id)
+                message: format!("Template not found: {id}"),
             })?;
 
         if let Some(name) = update.name {
@@ -93,9 +106,10 @@ impl AssetExtensionHandler for TemplateHandler {
 
     async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut templates = self.templates.write().await;
-        templates.remove(id)
+        templates
+            .remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Template not found: {}", id)
+                message: format!("Template not found: {id}"),
             })?;
 
         Ok(())
@@ -127,22 +141,32 @@ impl AssetExtensionHandler for TemplateHandler {
     async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let templates = self.templates.read().await;
 
-        let template = templates.get(id)
+        let template = templates
+            .get(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Template not found: {}", id)
+                message: format!("Template not found: {id}"),
             })?;
 
         let mut metadata_map = HashMap::new();
-        metadata_map.insert("template_type".to_string(), serde_json::json!(template.template_type));
+        metadata_map.insert(
+            "template_type".to_string(),
+            serde_json::json!(template.template_type),
+        );
         metadata_map.insert("language".to_string(), serde_json::json!(template.language));
-        metadata_map.insert("parameters".to_string(), serde_json::json!(template.parameters));
+        metadata_map.insert(
+            "parameters".to_string(),
+            serde_json::json!(template.parameters),
+        );
 
         Ok(AssetMetadata {
             id: id.clone(),
             // STUB: Template no longer exists, using Library
             asset_type: AssetType::Library,
             name: template.name.clone(),
-            description: Some(format!("{} template for {}", template.template_type, template.language)),
+            description: Some(format!(
+                "{} template for {}",
+                template.template_type, template.language
+            )),
             created_at: std::time::SystemTime::now(),
             updated_at: std::time::SystemTime::now(),
             size_bytes: 1024, // Templates are typically small
@@ -159,7 +183,11 @@ impl AssetExtensionHandler for TemplateHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(
+        &self,
+        id: &AssetRegistration,
+        proof: ConsensusProof,
+    ) -> ExtensionResult<bool> {
         let templates = self.templates.read().await;
         if !templates.contains_key(id) {
             return Ok(false);
@@ -184,16 +212,20 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(true)
     }
 
-    async fn handle_operation(&self, _id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(
+        &self,
+        _id: &AssetRegistration,
+        operation: AssetOperation,
+    ) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Custom(value) => {
                 // Handle template generation operations
                 Ok(OperationResult::Custom(value))
-            },
+            }
 
             _ => Err(ExtensionError::RuntimeError {
-                message: "Operation not supported for Template assets".to_string()
-            })
+                message: "Operation not supported for Template assets".to_string(),
+            }),
         }
     }
 }

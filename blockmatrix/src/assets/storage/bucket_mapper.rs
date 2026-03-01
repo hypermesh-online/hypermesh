@@ -7,15 +7,15 @@
 //! Maps hash buckets to optimal matrix positions using Phase 1 tensor operations
 //! and A* pathfinding for intelligent shard placement.
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
 
+use super::BucketId;
 use crate::integration::phase1_foundation::MatrixFoundation;
 use crate::matrix::MatrixCoordinate;
-use super::BucketId;
 
 /// Distance metric for matrix calculations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,11 +101,14 @@ impl AccessPattern {
         }
 
         if total_weight > 0.0 {
-            Some(MatrixCoordinate::new(
-                (weighted_x / total_weight) as i64,
-                (weighted_y / total_weight) as i64,
-                (weighted_z / total_weight) as i64,
-            ).unwrap_or_else(|_| MatrixCoordinate::origin()))
+            Some(
+                MatrixCoordinate::new(
+                    (weighted_x / total_weight) as i64,
+                    (weighted_y / total_weight) as i64,
+                    (weighted_z / total_weight) as i64,
+                )
+                .unwrap_or_else(|_| MatrixCoordinate::origin()),
+            )
         } else {
             None
         }
@@ -122,7 +125,6 @@ pub struct BucketMapper {
 
     /// Access patterns for intelligent placement
     access_patterns: Arc<RwLock<HashMap<BucketId, AccessPattern>>>,
-
 
     /// Available matrix positions
     available_positions: Arc<RwLock<Vec<MatrixCoordinate>>>,
@@ -158,9 +160,9 @@ impl NodeCapacity {
     }
 
     fn can_accept_shard(&self, size: usize) -> bool {
-        self.current_shards < self.max_shards &&
-        self.available_storage >= size &&
-        self.load_factor < 0.9 // Don't exceed 90% load
+        self.current_shards < self.max_shards
+            && self.available_storage >= size
+            && self.load_factor <= 0.9 // Don't exceed 90% load
     }
 
     fn add_shard(&mut self, size: usize) {
@@ -179,7 +181,8 @@ impl BucketMapper {
         // Initialize node capacities
         let mut node_capacity = HashMap::new();
         for pos in &available_positions {
-            node_capacity.insert(*pos, NodeCapacity::new(1000, 100 * 1024 * 1024)); // 100MB per node
+            node_capacity.insert(*pos, NodeCapacity::new(1000, 100 * 1024 * 1024));
+            // 100MB per node
         }
 
         Ok(Self {
@@ -210,7 +213,8 @@ impl BucketMapper {
         bucket_id: &BucketId,
         count: usize,
     ) -> Result<Vec<MatrixCoordinate>> {
-        self.optimal_positions_with_constraints(bucket_id, count, &MatrixConstraints::default()).await
+        self.optimal_positions_with_constraints(bucket_id, count, &MatrixConstraints::default())
+            .await
     }
 
     /// Find optimal positions with constraints
@@ -266,7 +270,8 @@ impl BucketMapper {
             }
 
             if let Some(capacity) = capacities.get_mut(pos) {
-                if capacity.can_accept_shard(1024 * 1024) { // Assume 1MB shards
+                if capacity.can_accept_shard(1024 * 1024) {
+                    // Assume 1MB shards
                     capacity.add_shard(1024 * 1024);
                     selected.push(*pos);
                 }
@@ -276,12 +281,14 @@ impl BucketMapper {
         // Ensure minimum geographic diversity
         if selected.len() < constraints.min_geo_diversity && selected.len() < count {
             // Add more diverse positions
-            let diverse = self.select_diverse_positions(
-                &selected,
-                count - selected.len(),
-                &available,
-                &mut capacities,
-            ).await;
+            let diverse = self
+                .select_diverse_positions(
+                    &selected,
+                    count - selected.len(),
+                    &available,
+                    &mut capacities,
+                )
+                .await;
             selected.extend(diverse);
         }
 
@@ -312,14 +319,16 @@ impl BucketMapper {
             }
 
             // Check minimum distance from existing positions
-            let min_distance = existing.iter()
+            let min_distance = existing
+                .iter()
                 .chain(selected.iter())
                 .map(|existing_pos| {
                     self.calculate_distance(existing_pos, pos, &DistanceMetric::Euclidean)
                 })
                 .fold(f64::INFINITY, f64::min);
 
-            if min_distance > 5.0 { // Minimum 5 units apart
+            if min_distance > 5.0 {
+                // Minimum 5 units apart
                 if let Some(capacity) = capacities.get_mut(pos) {
                     if capacity.can_accept_shard(1024 * 1024) {
                         capacity.add_shard(1024 * 1024);
@@ -345,26 +354,32 @@ impl BucketMapper {
                 let dy = (to.y - from.y) as f64;
                 let dz = (to.z - from.z) as f64;
                 (dx * dx + dy * dy + dz * dz).sqrt()
-            },
+            }
             DistanceMetric::Manhattan => {
                 let dx = (to.x - from.x).abs() as f64;
                 let dy = (to.y - from.y).abs() as f64;
                 let dz = (to.z - from.z).abs() as f64;
                 dx + dy + dz
-            },
+            }
             DistanceMetric::Chebyshev => {
                 let dx = (to.x - from.x).abs() as f64;
                 let dy = (to.y - from.y).abs() as f64;
                 let dz = (to.z - from.z).abs() as f64;
                 dx.max(dy).max(dz)
-            },
+            }
             DistanceMetric::Hamming => {
                 let mut diff = 0.0;
-                if from.x != to.x { diff += 1.0; }
-                if from.y != to.y { diff += 1.0; }
-                if from.z != to.z { diff += 1.0; }
+                if from.x != to.x {
+                    diff += 1.0;
+                }
+                if from.y != to.y {
+                    diff += 1.0;
+                }
+                if from.z != to.z {
+                    diff += 1.0;
+                }
                 diff
-            },
+            }
         }
     }
 
@@ -394,12 +409,15 @@ impl BucketMapper {
             ..Default::default()
         };
 
-        self.optimal_positions_with_constraints(bucket_id, count, &constraints).await
+        self.optimal_positions_with_constraints(bucket_id, count, &constraints)
+            .await
     }
 
     /// Get current bucket locations
     pub async fn get_bucket_locations(&self, bucket_id: &BucketId) -> Vec<MatrixCoordinate> {
-        self.bucket_locations.read().await
+        self.bucket_locations
+            .read()
+            .await
             .get(bucket_id)
             .cloned()
             .unwrap_or_default()
@@ -438,11 +456,11 @@ mod tests {
         let mut pattern = AccessPattern::default();
 
         // Record accesses from different positions
-        pattern.record_access(MatrixCoordinate::new(0, 0, 0).unwrap());
-        pattern.record_access(MatrixCoordinate::new(0, 0, 0).unwrap());
-        pattern.record_access(MatrixCoordinate::new(10, 10, 0).unwrap());
+        pattern.record_access(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        pattern.record_access(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        pattern.record_access(MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate"));
 
-        let center = pattern.get_weighted_center().unwrap();
+        let center = pattern.get_weighted_center().expect("test: expected success");
         // Center should be closer to (0,0,0) due to more accesses
         assert!(center.x < 5);
         assert!(center.y < 5);
@@ -459,7 +477,7 @@ mod tests {
         }
 
         assert_eq!(capacity.current_shards, 9);
-        assert!(capacity.load_factor < 0.9);
+        assert!(capacity.load_factor <= 0.9);
         assert!(capacity.can_accept_shard(1024 * 1024));
 
         capacity.add_shard(1024 * 1024);
@@ -471,15 +489,19 @@ mod tests {
         use crate::integration::phase1_foundation::MatrixFoundationConfig;
 
         let mapper = BucketMapper {
-            _foundation: Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.expect("test: create matrix foundation")),
+            _foundation: Arc::new(
+                MatrixFoundation::new(MatrixFoundationConfig::default())
+                    .await
+                    .expect("test: create matrix foundation"),
+            ),
             bucket_locations: Arc::new(RwLock::new(HashMap::new())),
             access_patterns: Arc::new(RwLock::new(HashMap::new())),
             available_positions: Arc::new(RwLock::new(Vec::new())),
             node_capacity: Arc::new(RwLock::new(HashMap::new())),
         };
 
-        let from = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let to = MatrixCoordinate::new(3, 4, 0).unwrap();
+        let from = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let to = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
 
         // Euclidean: sqrt(3^2 + 4^2) = 5
         let dist = mapper.calculate_distance(&from, &to, &DistanceMetric::Euclidean);

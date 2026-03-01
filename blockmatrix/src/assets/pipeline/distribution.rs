@@ -9,7 +9,7 @@
 use crate::assets::pipeline::{PipelineError, PipelineResult};
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::tensor::routing::calculate_routing_path;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Matrix constraints for distribution
@@ -157,6 +157,7 @@ impl MatrixDistributor {
     }
 
     /// Create distributor with default configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(DistributionConfig::default())
     }
@@ -178,7 +179,7 @@ impl MatrixDistributor {
     ) -> PipelineResult<Vec<MatrixCoordinate>> {
         if num_shards == 0 {
             return Err(PipelineError::DistributionFailed(
-                "Number of shards must be > 0".to_string()
+                "Number of shards must be > 0".to_string(),
             ));
         }
 
@@ -203,32 +204,39 @@ impl MatrixDistributor {
         available.sort_by(|a, b| {
             let dist_a = a.euclidean_distance(&MatrixCoordinate::origin());
             let dist_b = b.euclidean_distance(&MatrixCoordinate::origin());
-            dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+            dist_a
+                .partial_cmp(&dist_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Select nodes with maximum distance between them
         for _ in 0..num_shards.min(available.len()) {
             if selected.is_empty() {
                 // First node - select closest to origin
-                selected.push(available[0].clone());
+                selected.push(available[0]);
             } else {
                 // Find node with maximum minimum distance to already selected
-                let best = available.iter()
+                let best = available
+                    .iter()
                     .filter(|pos| !selected.contains(pos))
                     .max_by(|a, b| {
-                        let min_dist_a = selected.iter()
+                        let min_dist_a = selected
+                            .iter()
                             .map(|s| s.euclidean_distance(a))
                             .min_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
                             .unwrap_or(0.0);
-                        let min_dist_b = selected.iter()
+                        let min_dist_b = selected
+                            .iter()
                             .map(|s| s.euclidean_distance(b))
                             .min_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal))
                             .unwrap_or(0.0);
-                        min_dist_a.partial_cmp(&min_dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                        min_dist_a
+                            .partial_cmp(&min_dist_b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     });
 
                 if let Some(node) = best {
-                    selected.push(node.clone());
+                    selected.push(*node);
                 }
             }
         }
@@ -273,9 +281,11 @@ impl MatrixDistributor {
 
         // Ensure we have exactly num_shards positions
         if positions.len() < num_shards {
-            return Err(PipelineError::DistributionFailed(
-                format!("Could not generate {} positions, only created {}", num_shards, positions.len())
-            ));
+            return Err(PipelineError::DistributionFailed(format!(
+                "Could not generate {} positions, only created {}",
+                num_shards,
+                positions.len()
+            )));
         }
 
         Ok(positions)
@@ -301,18 +311,20 @@ impl MatrixDistributor {
             let distance = origin.euclidean_distance(position);
 
             // Calculate routing path using Phase 1 tensor operations
-            let max_hop_distance = self.config.constraints.max_distance
-                / self.config.constraints.max_hops as f64;
+            let max_hop_distance =
+                self.config.constraints.max_distance / self.config.constraints.max_hops as f64;
             let routing_path = calculate_routing_path(&origin, position, max_hop_distance);
 
             // Find node ID if available
-            let node_id = self.available_nodes.iter()
+            let node_id = self
+                .available_nodes
+                .iter()
                 .find(|(_, pos)| *pos == position)
                 .map(|(id, _)| id.clone());
 
             placements.push(ShardPlacement {
                 shard_index: i,
-                position: position.clone(),
+                position: *position,
                 network_id,
                 node_id,
                 distance_from_origin: distance,
@@ -350,7 +362,11 @@ impl MatrixDistributor {
     }
 
     /// Calculate distribution statistics
-    fn calculate_stats(&self, placements: &[ShardPlacement], duration_ms: u64) -> DistributionStats {
+    fn calculate_stats(
+        &self,
+        placements: &[ShardPlacement],
+        duration_ms: u64,
+    ) -> DistributionStats {
         let mut distances = Vec::new();
 
         // Calculate all pairwise distances
@@ -371,9 +387,10 @@ impl MatrixDistributor {
         let max_distance = distances.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
         // Calculate quality score (0-100)
-        let quality_score = self.calculate_quality_score(&placements, avg_distance, min_distance);
+        let quality_score = self.calculate_quality_score(placements, avg_distance, min_distance);
 
-        let networks_used = placements.iter()
+        let networks_used = placements
+            .iter()
             .map(|p| &p.network_id)
             .collect::<std::collections::HashSet<_>>()
             .len();
@@ -419,7 +436,8 @@ impl MatrixDistributor {
         }
 
         // Network distribution (20 points)
-        let networks_used = placements.iter()
+        let networks_used = placements
+            .iter()
             .map(|p| &p.network_id)
             .collect::<std::collections::HashSet<_>>()
             .len();
@@ -447,7 +465,7 @@ mod tests {
     #[test]
     fn test_optimal_position_generation() {
         let distributor = MatrixDistributor::default();
-        let positions = distributor.find_optimal_positions(10).unwrap();
+        let positions = distributor.find_optimal_positions(10).expect("test: query operation");
 
         assert_eq!(positions.len(), 10);
 
@@ -455,7 +473,8 @@ mod tests {
         for i in 0..positions.len() {
             for j in (i + 1)..positions.len() {
                 let dist = positions[i].euclidean_distance(&positions[j]);
-                assert!(dist >= distributor.config.constraints.min_distance * 0.8); // Allow some tolerance
+                assert!(dist >= distributor.config.constraints.min_distance * 0.8);
+                // Allow some tolerance
             }
         }
     }
@@ -463,7 +482,9 @@ mod tests {
     #[test]
     fn test_distribution() {
         let distributor = MatrixDistributor::default();
-        let (distributed, stats) = distributor.distribute("test-asset".to_string(), 14).unwrap();
+        let (distributed, stats) = distributor
+            .distribute("test-asset".to_string(), 14)
+            .expect("test: expected success");
 
         assert_eq!(distributed.placements.len(), 14);
         assert_eq!(stats.shards_distributed, 14);
@@ -476,17 +497,27 @@ mod tests {
         let mut distributor = MatrixDistributor::default();
 
         // Register some nodes
-        distributor.register_node("node1".to_string(), MatrixCoordinate::new(10, 20, 30).unwrap());
-        distributor.register_node("node2".to_string(), MatrixCoordinate::new(50, 60, 70).unwrap());
+        distributor.register_node(
+            "node1".to_string(),
+            MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate"),
+        );
+        distributor.register_node(
+            "node2".to_string(),
+            MatrixCoordinate::new(50, 60, 70).expect("test: valid coordinate"),
+        );
 
         assert_eq!(distributor.node_count(), 2);
 
         // Distribution should prefer registered nodes
-        let (distributed, _) = distributor.distribute("test".to_string(), 2).unwrap();
+        let (distributed, _) = distributor.distribute("test".to_string(), 2).expect("test: expected success");
         assert_eq!(distributed.placements.len(), 2);
 
         // At least some placements should have node IDs
-        let with_nodes = distributed.placements.iter().filter(|p| p.node_id.is_some()).count();
+        let with_nodes = distributed
+            .placements
+            .iter()
+            .filter(|p| p.node_id.is_some())
+            .count();
         assert!(with_nodes > 0);
     }
 
@@ -498,10 +529,12 @@ mod tests {
         };
 
         let distributor = MatrixDistributor::new(config);
-        let (distributed, stats) = distributor.distribute("test".to_string(), 6).unwrap();
+        let (distributed, stats) = distributor.distribute("test".to_string(), 6).expect("test: expected success");
 
         // Should use multiple networks
-        let networks: std::collections::HashSet<_> = distributed.placements.iter()
+        let networks: std::collections::HashSet<_> = distributed
+            .placements
+            .iter()
             .map(|p| &p.network_id)
             .collect();
 
@@ -512,20 +545,23 @@ mod tests {
     #[test]
     fn test_routing_paths() {
         let distributor = MatrixDistributor::default();
-        let (distributed, _) = distributor.distribute("test".to_string(), 5).unwrap();
+        let (distributed, _) = distributor.distribute("test".to_string(), 5).expect("test: expected success");
 
         // All placements should have routing paths
         for placement in &distributed.placements {
             assert!(!placement.routing_path.is_empty());
-            assert_eq!(placement.routing_path.first().unwrap(), &MatrixCoordinate::origin());
-            assert_eq!(placement.routing_path.last().unwrap(), &placement.position);
+            assert_eq!(
+                placement.routing_path.first().expect("test: expected success"),
+                &MatrixCoordinate::origin()
+            );
+            assert_eq!(placement.routing_path.last().expect("test: assertion value"), &placement.position);
         }
     }
 
     #[test]
     fn test_quality_score() {
         let distributor = MatrixDistributor::default();
-        let (_, stats) = distributor.distribute("test".to_string(), 10).unwrap();
+        let (_, stats) = distributor.distribute("test".to_string(), 10).expect("test: expected success");
 
         // Quality score should be in range [0, 100]
         assert!(stats.quality_score >= 0.0);

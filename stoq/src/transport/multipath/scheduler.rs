@@ -64,9 +64,7 @@ impl PathSelector {
 
         match &self.strategy {
             PathScheduler::RoundRobin => {
-                let idx = self
-                    .round_robin_index
-                    .fetch_add(1, Ordering::Relaxed) as usize;
+                let idx = self.round_robin_index.fetch_add(1, Ordering::Relaxed) as usize;
                 let chosen = idx % candidates.len();
                 Some(candidates[chosen].path_id)
             }
@@ -90,9 +88,7 @@ impl PathSelector {
                     return Some(candidates[0].path_id);
                 }
 
-                let idx = self
-                    .round_robin_index
-                    .fetch_add(1, Ordering::Relaxed) as u64;
+                let idx = self.round_robin_index.fetch_add(1, Ordering::Relaxed) as u64;
                 let position = idx % total_slots;
 
                 let mut cumulative: u64 = 0;
@@ -116,7 +112,9 @@ impl PathSelector {
                     .min_by(|a, b| {
                         let eff_a = a.rtt_ms / a.health_score;
                         let eff_b = b.rtt_ms / b.health_score;
-                        eff_a.partial_cmp(&eff_b).unwrap_or(std::cmp::Ordering::Equal)
+                        eff_a
+                            .partial_cmp(&eff_b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     })
                     .map(|c| c.path_id)
             }
@@ -138,14 +136,8 @@ impl PathSelector {
         }
 
         match &self.strategy {
-            PathScheduler::Redundant => {
-                candidates.iter().map(|c| c.path_id).collect()
-            }
-            _ => {
-                self.select(candidates)
-                    .into_iter()
-                    .collect()
-            }
+            PathScheduler::Redundant => candidates.iter().map(|c| c.path_id).collect(),
+            _ => self.select(candidates).into_iter().collect(),
         }
     }
 
@@ -192,8 +184,7 @@ mod tests {
         for (i, count) in counts.iter().enumerate() {
             assert_eq!(
                 *count, 2,
-                "Candidate {} selected {} times, expected 2",
-                i, count
+                "Candidate {i} selected {count} times, expected 2"
             );
         }
     }

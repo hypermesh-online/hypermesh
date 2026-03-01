@@ -7,9 +7,9 @@
 //! Integrates with TrustChain DNS|CA|CT service layer.
 //! TrustChain provides DNS service similar to how UDP provides DNS transport.
 
-use super::{DnsRecord, DnsRecordType, DnsRecordData, DnsError, DnsResult};
-use std::sync::Arc;
+use super::{DnsError, DnsRecord, DnsRecordData, DnsRecordType, DnsResult};
 use std::net::Ipv6Addr;
+use std::sync::Arc;
 use tracing::{debug, warn};
 
 /// TrustChain DNS service
@@ -78,10 +78,7 @@ impl TrustChainDnsClient {
 
         // TODO: Implement actual STOQ-based query to TrustChain DNS service
         // For now, return error indicating service integration is pending
-        warn!(
-            "TrustChain DNS service integration pending for: {}",
-            domain
-        );
+        warn!("TrustChain DNS service integration pending for: {}", domain);
 
         // Placeholder: Return known TrustChain domains for testing
         if self.is_trustchain_domain(domain) {
@@ -139,7 +136,7 @@ mod tests {
         let result = client.query("hypermesh", &DnsRecordType::AAAA).await;
         assert!(result.is_ok());
 
-        let records = result.unwrap();
+        let records = result.expect("test: expected result");
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].domain, "hypermesh");
     }

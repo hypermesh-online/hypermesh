@@ -4,10 +4,10 @@
 
 //! Certificate types and configuration for STOQ transport
 
-use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
+use std::time::{Duration, SystemTime};
 
 use super::super::certificate_strategy::NetworkType;
 
@@ -70,7 +70,11 @@ impl CertificateConfig {
     }
 
     /// Localhost testing configuration with self-signed certificates
-    pub fn localhost_testing(node_id: String, common_name: String, ipv6_addresses: Vec<Ipv6Addr>) -> Self {
+    pub fn localhost_testing(
+        node_id: String,
+        common_name: String,
+        ipv6_addresses: Vec<Ipv6Addr>,
+    ) -> Self {
         Self {
             mode: CertificateMode::LocalhostTesting,
             node_id,

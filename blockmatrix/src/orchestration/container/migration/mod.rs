@@ -4,9 +4,9 @@
 
 //! Container migration with planning, execution, and rollback.
 
-pub mod types;
 pub mod engine;
+pub mod types;
 
 // Re-export all public types
-pub use types::*;
 pub use engine::ContainerMigrator;
+pub use types::*;

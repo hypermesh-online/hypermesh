@@ -36,8 +36,8 @@ pub mod output;
 
 // Re-export primary public API
 pub use commands::{
-    AssetCommand, CliCommand, NodeCommand, PipelineAction, TopologyCommand,
-    parse_scope, parse_pipeline_action,
+    parse_pipeline_action, parse_scope, AssetCommand, CliCommand, NodeCommand, PipelineAction,
+    TopologyCommand,
 };
 pub use executor::CommandExecutor;
 pub use output::{CliError, CliOutput, CliTable};
@@ -99,7 +99,7 @@ mod tests {
         let mut runner = CliRunner::new();
         let cmd = CliCommand::Topology(TopologyCommand::MatrixInfo);
         let output = runner.execute(cmd).expect("test: execute");
-        let text = format!("{}", output);
+        let text = format!("{output}");
         assert!(text.contains("Total nodes: 0"));
     }
 
@@ -113,7 +113,7 @@ mod tests {
             scope: BlockchainScope::Device,
         });
         let output = runner.execute(cmd).expect("test: register");
-        assert!(format!("{}", output).contains("Registered"));
+        assert!(format!("{output}").contains("Registered"));
     }
 
     #[test]

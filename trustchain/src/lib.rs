@@ -8,35 +8,35 @@
 //! to provide trust services for STOQ transport security in the HyperMesh ecosystem.
 //! Core focus: trust.hypermesh.online services and STOQ certificate validation.
 
-pub mod consensus;
-pub mod validation;
-pub mod ca;
-pub mod ct;
-pub mod dns;
-pub mod trust;
 pub mod api;
+pub mod ca;
 pub mod config;
-pub mod errors;
-pub mod stoq_client;
-pub mod security; // NEW: Security monitoring and Byzantine detection
-pub mod crypto;   // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
+pub mod consensus;
+pub mod crypto; // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
+pub mod ct;
 pub mod deployment; // NEW: Quality gates and deployment validation
-pub mod monitoring; // NEW: Native monitoring system without external dependencies
+pub mod dns;
+pub mod ephemeral;
+pub mod errors;
 pub mod http3; // NEW: HTTP/3 server infrastructure
-pub mod ephemeral; // Ephemeral self-signed certs for anonymous QUIC handshakes
+pub mod monitoring; // NEW: Native monitoring system without external dependencies
+pub mod security; // NEW: Security monitoring and Byzantine detection
+pub mod stoq_client;
+pub mod trust;
+pub mod validation; // Ephemeral self-signed certs for anonymous QUIC handshakes
 
 // Re-export main types
-pub use consensus::{ConsensusProof, ConsensusContext, ConsensusRequirements};
-pub use ca::{TrustChainCA, CAConfig, CertificateRequest, IssuedCertificate};
 pub use ca::security_integration::{SecurityIntegratedCA, SecurityIntegrationConfig};
-pub use security::{SecurityMonitor, SecurityValidationResult, SecurityDashboard};
-pub use config::{TrustChainConfig, DnsConfig};
-pub use errors::{TrustChainError, Result};
-pub use stoq_client::{TrustChainStoqClient, TrustChainStoqConfig, ServiceEndpoint, ServiceType};
-pub use crypto::{PostQuantumCrypto, FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm};
+pub use ca::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
+pub use config::{DnsConfig, TrustChainConfig};
+pub use consensus::{ConsensusContext, ConsensusProof, ConsensusRequirements};
+pub use crypto::{FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm, PostQuantumCrypto};
+pub use errors::{Result, TrustChainError};
+pub use security::{SecurityDashboard, SecurityMonitor, SecurityValidationResult};
+pub use stoq_client::{ServiceEndpoint, ServiceType, TrustChainStoqClient, TrustChainStoqConfig};
 
 use std::sync::Arc;
-use tracing::{info, error, warn};
+use tracing::{error, info, warn};
 
 /// Main TrustChain service coordinator with security integration
 pub struct TrustChain {
@@ -80,7 +80,7 @@ impl TrustChain {
     /// Create new TrustChain instance with security integration
     pub async fn new_with_security(security_config: TrustChainSecurityConfig) -> Result<Self> {
         info!("Initializing TrustChain with MANDATORY SECURITY INTEGRATION");
-        
+
         if !security_config.mandatory_consensus {
             warn!("⚠️  CRITICAL SECURITY WARNING: Consensus validation is DISABLED!");
             warn!("⚠️  This reduces security and should only be used for testing!");
@@ -100,27 +100,24 @@ impl TrustChain {
             dns_query_timeout: std::time::Duration::from_secs(5),
             ct_submission_timeout: std::time::Duration::from_secs(30),
             service_discovery: stoq_client::ServiceDiscoveryConfig {
-                dns_resolvers: vec![
-                    ServiceEndpoint::new(
-                        ServiceType::Dns,
-                        config.dns.bind_address,
-                        config.dns.quic_port
-                    ).with_service_name("dns.trustchain.local".to_string()),
-                ],
-                ct_logs: vec![
-                    ServiceEndpoint::new(
-                        ServiceType::CertificateTransparency,
-                        config.dns.bind_address,
-                        config.ct.port
-                    ).with_service_name("ct.trustchain.local".to_string()),
-                ],
-                ca_endpoints: vec![
-                    ServiceEndpoint::new(
-                        ServiceType::CertificateAuthority,
-                        config.dns.bind_address,
-                        config.ca.port
-                    ).with_service_name("ca.trustchain.local".to_string()),
-                ],
+                dns_resolvers: vec![ServiceEndpoint::new(
+                    ServiceType::Dns,
+                    config.dns.bind_address,
+                    config.dns.quic_port,
+                )
+                .with_service_name("dns.trustchain.local".to_string())],
+                ct_logs: vec![ServiceEndpoint::new(
+                    ServiceType::CertificateTransparency,
+                    config.dns.bind_address,
+                    config.ct.port,
+                )
+                .with_service_name("ct.trustchain.local".to_string())],
+                ca_endpoints: vec![ServiceEndpoint::new(
+                    ServiceType::CertificateAuthority,
+                    config.dns.bind_address,
+                    config.ca.port,
+                )
+                .with_service_name("ca.trustchain.local".to_string())],
                 health_check_interval: std::time::Duration::from_secs(60),
             },
         };
@@ -130,9 +127,9 @@ impl TrustChain {
         // Initialize SECURITY-INTEGRATED Certificate Authority
         let mut security_integration_config = security_config.security_config;
         security_integration_config.mandatory_consensus = security_config.mandatory_consensus;
-        
+
         let security_ca = Arc::new(
-            SecurityIntegratedCA::new(config.ca.clone(), security_integration_config).await?
+            SecurityIntegratedCA::new(config.ca.clone(), security_integration_config).await?,
         );
 
         // Initialize Security Monitor (extracted from security_ca for direct access)
@@ -146,11 +143,14 @@ impl TrustChain {
 
         // Initialize STOQ API server (replacement for HTTP)
         let stoq_api_config = api::TrustChainStoqConfig::default();
-        let stoq_api = Arc::new(api::TrustChainStoqApi::new(
-            security_ca.get_ca(), // Get underlying TrustChainCA from SecurityIntegratedCA
-            Arc::clone(&dns),
-            stoq_api_config,
-        ).await?);
+        let stoq_api = Arc::new(
+            api::TrustChainStoqApi::new(
+                security_ca.get_ca(), // Get underlying TrustChainCA from SecurityIntegratedCA
+                Arc::clone(&dns),
+                stoq_api_config,
+            )
+            .await?,
+        );
 
         let trustchain = Self {
             security_ca,
@@ -163,7 +163,9 @@ impl TrustChain {
         };
 
         info!("✅ TrustChain service initialized with MANDATORY SECURITY INTEGRATION");
-        info!("🔐 Security features: Consensus validation, Byzantine detection, Real-time monitoring");
+        info!(
+            "🔐 Security features: Consensus validation, Byzantine detection, Real-time monitoring"
+        );
         Ok(trustchain)
     }
 
@@ -174,7 +176,7 @@ impl TrustChain {
             security_config: SecurityIntegrationConfig::default(),
             mandatory_consensus: true, // Always enable for production
         };
-        
+
         Self::new_with_security(security_config).await
     }
 
@@ -197,9 +199,12 @@ impl TrustChain {
     }
 
     /// Issue certificate with MANDATORY security validation and CT logging
-    pub async fn issue_certificate_secure(&self, request: CertificateRequest) -> Result<IssuedCertificate> {
+    pub async fn issue_certificate_secure(
+        &self,
+        request: CertificateRequest,
+    ) -> Result<IssuedCertificate> {
         info!("🔐 SECURE certificate issuance with mandatory consensus validation");
-        
+
         // Issue certificate through security-integrated CA (includes consensus validation)
         let cert = self.security_ca.issue_certificate_secure(request).await?;
 
@@ -209,17 +214,26 @@ impl TrustChain {
                 info!("✅ Certificate logged in CT: {}", cert.serial_number);
             }
             Err(e) => {
-                error!("⚠️  CT logging failed for certificate {}: {}", cert.serial_number, e);
+                error!(
+                    "⚠️  CT logging failed for certificate {}: {}",
+                    cert.serial_number, e
+                );
                 // Don't fail the entire operation, but log the issue
             }
         }
 
-        info!("✅ Secure certificate issuance completed: {}", cert.serial_number);
+        info!(
+            "✅ Secure certificate issuance completed: {}",
+            cert.serial_number
+        );
         Ok(cert)
     }
 
     /// Issue certificate with CT logging (legacy method - now with security)
-    pub async fn issue_certificate_with_ct(&self, request: CertificateRequest) -> Result<IssuedCertificate> {
+    pub async fn issue_certificate_with_ct(
+        &self,
+        request: CertificateRequest,
+    ) -> Result<IssuedCertificate> {
         warn!("⚠️  Using legacy certificate issuance method - upgrading to secure version");
         self.issue_certificate_secure(request).await
     }
@@ -227,10 +241,13 @@ impl TrustChain {
     /// Validate certificate with security monitoring and CT verification
     pub async fn validate_certificate_secure(&self, cert_der: &[u8]) -> Result<bool> {
         info!("🔐 SECURE certificate validation with security monitoring");
-        
+
         // Validate through security-integrated CA
-        let security_validation = self.security_ca.validate_certificate_secure(cert_der).await?;
-        
+        let security_validation = self
+            .security_ca
+            .validate_certificate_secure(cert_der)
+            .await?;
+
         if !security_validation.is_valid {
             warn!("❌ Security validation failed for certificate");
             return Ok(false);
@@ -246,12 +263,14 @@ impl TrustChain {
         };
 
         let overall_valid = security_validation.is_valid && ct_valid;
-        
+
         if overall_valid {
             info!("✅ Certificate validation successful (security + CT verified)");
         } else {
-            warn!("❌ Certificate validation failed: security={}, ct={}", 
-                  security_validation.is_valid, ct_valid);
+            warn!(
+                "❌ Certificate validation failed: security={}, ct={}",
+                security_validation.is_valid, ct_valid
+            );
         }
 
         Ok(overall_valid)
@@ -265,8 +284,12 @@ impl TrustChain {
 
     /// Get security monitoring dashboard
     pub async fn get_security_dashboard(&self) -> Result<SecurityDashboard> {
-        self.security_monitor.get_monitoring_dashboard().await
-            .map_err(|e| TrustChainError::SecurityError { message: e.to_string() })
+        self.security_monitor
+            .get_monitoring_dashboard()
+            .await
+            .map_err(|e| TrustChainError::SecurityError {
+                message: e.to_string(),
+            })
     }
 
     /// Get security metrics
@@ -275,9 +298,17 @@ impl TrustChain {
     }
 
     /// Validate consensus proof directly
-    pub async fn validate_consensus_proof(&self, consensus_proof: &ConsensusProof, operation: &str) -> Result<SecurityValidationResult> {
-        self.security_monitor.validate_certificate_operation(operation, consensus_proof, "direct_validation").await
-            .map_err(|e| TrustChainError::SecurityError { message: e.to_string() })
+    pub async fn validate_consensus_proof(
+        &self,
+        consensus_proof: &ConsensusProof,
+        operation: &str,
+    ) -> Result<SecurityValidationResult> {
+        self.security_monitor
+            .validate_certificate_operation(operation, consensus_proof, "direct_validation")
+            .await
+            .map_err(|e| TrustChainError::SecurityError {
+                message: e.to_string(),
+            })
     }
 
     /// Get CA certificate for trust anchor
@@ -304,21 +335,27 @@ impl TrustChain {
     }
 
     /// Get integrated CA metrics (CA + Security)
-    pub async fn get_integrated_metrics(&self) -> Result<ca::security_integration::IntegratedCAMetrics> {
-        self.security_ca.get_integrated_metrics().await
-            .map_err(|e| TrustChainError::Internal { message: e.to_string() })
+    pub async fn get_integrated_metrics(
+        &self,
+    ) -> Result<ca::security_integration::IntegratedCAMetrics> {
+        self.security_ca
+            .get_integrated_metrics()
+            .await
+            .map_err(|e| TrustChainError::Internal {
+                message: e.to_string(),
+            })
     }
 
     /// Emergency security shutdown
     pub async fn emergency_shutdown(&self, reason: &str) -> Result<()> {
         error!("🚨 EMERGENCY SECURITY SHUTDOWN: {}", reason);
-        
+
         // In production, this would:
         // 1. Stop accepting new certificate requests
         // 2. Alert all administrators
         // 3. Generate critical security alert
         // 4. Gracefully shutdown services
-        
+
         self.shutdown().await
     }
 
@@ -375,13 +412,13 @@ impl TrustChain {
     pub async fn new_for_testing() -> Result<Self> {
         warn!("⚠️  CREATING TRUSTCHAIN WITH TESTING CONFIGURATION");
         warn!("⚠️  REDUCED SECURITY - FOR DEVELOPMENT ONLY!");
-        
+
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::localhost_testing(),
             security_config: SecurityIntegrationConfig {
-                mandatory_consensus: false, // Reduced for testing
+                mandatory_consensus: false,          // Reduced for testing
                 mandatory_security_validation: true, // Keep basic validation
-                block_on_security_failure: false, // Don't block for testing
+                block_on_security_failure: false,    // Don't block for testing
                 log_all_operations: true,
                 mandatory_post_quantum: false, // Reduced for testing
                 enable_hybrid_signatures: true,
@@ -389,19 +426,19 @@ impl TrustChain {
             },
             mandatory_consensus: false, // Reduced for testing
         };
-        
+
         Self::new_with_security(security_config).await
     }
 
     pub async fn new_for_production() -> Result<Self> {
         info!("🔐 CREATING TRUSTCHAIN WITH PRODUCTION SECURITY CONFIGURATION");
-        
+
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::production(),
             security_config: SecurityIntegrationConfig {
-                mandatory_consensus: true, // MANDATORY for production
+                mandatory_consensus: true,           // MANDATORY for production
                 mandatory_security_validation: true, // MANDATORY for production
-                block_on_security_failure: true, // MANDATORY for production
+                block_on_security_failure: true,     // MANDATORY for production
                 log_all_operations: true,
                 mandatory_post_quantum: true, // MANDATORY for production
                 enable_hybrid_signatures: true,
@@ -409,7 +446,7 @@ impl TrustChain {
             },
             mandatory_consensus: true, // MANDATORY for production
         };
-        
+
         Self::new_with_security(security_config).await
     }
 }
@@ -423,17 +460,17 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_trustchain_security_initialization() {
-        let trustchain = TrustChain::new_for_testing().await.unwrap();
-        
-        let ca_cert = trustchain.get_ca_certificate().await.unwrap();
+        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+
+        let ca_cert = trustchain.get_ca_certificate().await.expect("test: async operation");
         assert!(!ca_cert.is_empty());
     }
 
     #[tokio::test]
     #[serial]
     async fn test_secure_certificate_issuance() -> anyhow::Result<()> {
-        let trustchain = TrustChain::new_for_testing().await.unwrap();
-        
+        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+
         let request = CertificateRequest {
             common_name: "test.secure.com".to_string(),
             san_entries: vec!["test.secure.com".to_string()],
@@ -442,8 +479,8 @@ mod tests {
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: std::time::SystemTime::now(),
         };
-        
-        let cert = trustchain.issue_certificate_secure(request).await.unwrap();
+
+        let cert = trustchain.issue_certificate_secure(request).await.expect("test: async operation");
         assert_eq!(cert.common_name, "test.secure.com");
         assert!(!cert.serial_number.is_empty());
         Ok(())
@@ -452,10 +489,10 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_security_dashboard() {
-        let trustchain = TrustChain::new_for_testing().await.unwrap();
-        
-        let dashboard = trustchain.get_security_dashboard().await.unwrap();
-        
+        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+
+        let dashboard = trustchain.get_security_dashboard().await.expect("test: async operation");
+
         // Should have valid dashboard data
         // Specific assertions depend on the implementation
         assert!(dashboard.timestamp <= std::time::SystemTime::now());
@@ -464,10 +501,13 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_consensus_validation() -> anyhow::Result<()> {
-        let trustchain = TrustChain::new_for_testing().await.unwrap();
+        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
 
         let consensus_proof = ConsensusProof::new_for_testing();
-        let result = trustchain.validate_consensus_proof(&consensus_proof, "test_operation").await.unwrap();
+        let result = trustchain
+            .validate_consensus_proof(&consensus_proof, "test_operation")
+            .await
+            .expect("test: expected success");
 
         // Should complete validation (result depends on proof validity)
         assert!(result.validated_at <= std::time::SystemTime::now());
@@ -482,11 +522,11 @@ mod tests {
             security_config: SecurityIntegrationConfig::default(),
             mandatory_consensus: true,
         };
-        
+
         assert!(prod_config.mandatory_consensus);
         assert!(prod_config.security_config.mandatory_consensus);
         assert!(prod_config.security_config.block_on_security_failure);
-        
+
         // Test testing config
         let test_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::localhost_testing(),
@@ -497,7 +537,7 @@ mod tests {
             },
             mandatory_consensus: false,
         };
-        
+
         assert!(!test_config.mandatory_consensus);
         assert!(!test_config.security_config.block_on_security_failure);
     }

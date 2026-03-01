@@ -4,8 +4,8 @@
 
 //! Comprehensive tests for Vector3D operations
 
-use crate::matrix::tensor::vector::{Vector3D, TensorError};
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::matrix::tensor::vector::{TensorError, Vector3D};
 use std::f64::consts::PI;
 
 #[test]
@@ -18,8 +18,8 @@ fn test_vector_creation() {
 
 #[test]
 fn test_vector_from_coordinates_positive() {
-    let from = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let to = MatrixCoordinate::new(15, 25, 35).unwrap();
+    let from = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let to = MatrixCoordinate::new(15, 25, 35).expect("test: valid coordinate");
     let vec = Vector3D::from_coordinates(&from, &to);
 
     assert_eq!(vec.x, 5.0);
@@ -29,8 +29,8 @@ fn test_vector_from_coordinates_positive() {
 
 #[test]
 fn test_vector_from_coordinates_negative() {
-    let from = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let to = MatrixCoordinate::new(5, 15, 25).unwrap();
+    let from = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let to = MatrixCoordinate::new(5, 15, 25).expect("test: valid coordinate");
     let vec = Vector3D::from_coordinates(&from, &to);
 
     assert_eq!(vec.x, -5.0);
@@ -59,7 +59,7 @@ fn test_vector_magnitude_3d() {
 #[test]
 fn test_normalize_unit_vector() {
     let vec = Vector3D::new(5.0, 0.0, 0.0);
-    let normalized = vec.normalize().unwrap();
+    let normalized = vec.normalize().expect("test: expected success");
     assert!((normalized.magnitude() - 1.0).abs() < f64::EPSILON);
     assert_eq!(normalized.x, 1.0);
     assert_eq!(normalized.y, 0.0);
@@ -138,7 +138,7 @@ fn test_angle_between_45_degrees() {
 fn test_projection() {
     let vec1 = Vector3D::new(3.0, 4.0, 0.0);
     let vec2 = Vector3D::new(1.0, 0.0, 0.0);
-    let proj = vec1.project_onto(&vec2).unwrap();
+    let proj = vec1.project_onto(&vec2).expect("test: expected success");
 
     assert_eq!(proj.x, 3.0);
     assert_eq!(proj.y, 0.0);
@@ -247,7 +247,7 @@ fn test_vector_default() {
 #[test]
 fn test_vector_display() {
     let vec = Vector3D::new(1.234, 5.678, 9.012);
-    let display = format!("{}", vec);
+    let display = format!("{vec}");
     assert!(display.contains("1.23"));
     assert!(display.contains("5.68"));
     assert!(display.contains("9.01"));
@@ -258,7 +258,7 @@ fn test_vector_display() {
 #[test]
 fn test_normalize_very_small_vector() {
     let vec = Vector3D::new(1e-10, 1e-10, 1e-10);
-    let normalized = vec.normalize().unwrap();
+    let normalized = vec.normalize().expect("test: expected success");
     assert!((normalized.magnitude() - 1.0).abs() < 1e-9);
 }
 
@@ -291,7 +291,7 @@ fn test_cross_product_parallel_vectors() {
 fn test_projection_orthogonal_vectors() {
     let vec1 = Vector3D::new(1.0, 0.0, 0.0);
     let vec2 = Vector3D::new(0.0, 1.0, 0.0);
-    let proj = vec1.project_onto(&vec2).unwrap();
+    let proj = vec1.project_onto(&vec2).expect("test: expected success");
 
     assert!(proj.magnitude() < 0.001); // Should be zero vector
 }

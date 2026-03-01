@@ -7,9 +7,9 @@
 //! Implements validation for Proof of State, Asset Hashes, and other
 //! HyperMesh intelligence components.
 
-use anyhow::{Result, anyhow};
-use blake3::Hasher;
 use crate::hypermesh_headers::*;
+use anyhow::{anyhow, Result};
+use blake3::Hasher;
 
 /// Algorithm indicator bytes for Proof of Stake identity validation.
 /// The first byte of the `who` field indicates which signing algorithm was used.
@@ -54,9 +54,9 @@ pub struct ProofOfStateValidator {
 impl Default for ProofOfStateValidator {
     fn default() -> Self {
         Self {
-            max_clock_skew: 5 * 60 * 1_000_000, // 5 minutes
+            max_clock_skew: 5 * 60 * 1_000_000,      // 5 minutes
             max_proof_age: 24 * 60 * 60 * 1_000_000, // 24 hours
-            min_pow_leading_zero_bits: 8, // first byte must be 0x00
+            min_pow_leading_zero_bits: 8,            // first byte must be 0x00
         }
     }
 }
@@ -139,9 +139,8 @@ impl ProofOfStateValidator {
             ALG_FALCON_1024 | ALG_ED25519 | ALG_ECDSA => {}
             other => {
                 return Err(anyhow!(
-                    "Proof of Stake: invalid algorithm indicator 0x{:02x} \
-                     (expected 0x01=FALCON, 0x02=Ed25519, 0x03=ECDSA)",
-                    other
+                    "Proof of Stake: invalid algorithm indicator 0x{other:02x} \
+                     (expected 0x01=FALCON, 0x02=Ed25519, 0x03=ECDSA)"
                 ));
             }
         }
@@ -150,10 +149,8 @@ impl ProofOfStateValidator {
         let nonzero_count = who[1..9].iter().filter(|&&b| b != 0).count();
         if nonzero_count < MIN_PUBKEY_PREFIX_NONZERO {
             return Err(anyhow!(
-                "Proof of Stake: public key prefix has only {} non-zero bytes \
-                 in positions 1..9 (minimum {})",
-                nonzero_count,
-                MIN_PUBKEY_PREFIX_NONZERO
+                "Proof of Stake: public key prefix has only {nonzero_count} non-zero bytes \
+                 in positions 1..9 (minimum {MIN_PUBKEY_PREFIX_NONZERO})"
             ));
         }
 
@@ -249,7 +246,10 @@ impl ProofOfStateValidator {
     /// Validate complete four-proof consensus (returns error on first failure).
     pub fn validate_consensus(&self, proof: &ProofOfStateHeader) -> Result<()> {
         self.validate(proof)?;
-        tracing::debug!("Four-proof consensus validated for timestamp {}", proof.when);
+        tracing::debug!(
+            "Four-proof consensus validated for timestamp {}",
+            proof.when
+        );
         Ok(())
     }
 }
@@ -342,10 +342,7 @@ impl AssetHashValidator {
     }
 
     /// Validate complete shard set for multi-part asset
-    pub fn validate_shard_set(
-        headers: &[AssetHashHeader],
-        payloads: &[Vec<u8>],
-    ) -> Result<()> {
+    pub fn validate_shard_set(headers: &[AssetHashHeader], payloads: &[Vec<u8>]) -> Result<()> {
         if headers.len() != payloads.len() {
             return Err(anyhow!(
                 "Header/payload count mismatch: {} != {}",
@@ -380,7 +377,7 @@ impl AssetHashValidator {
 
         for (i, &index) in shard_indices.iter().enumerate() {
             if index != i as u32 {
-                return Err(anyhow!("Missing shard index {}", i));
+                return Err(anyhow!("Missing shard index {i}"));
             }
         }
 
@@ -510,7 +507,7 @@ mod tests {
         who[0] = 0x99; // not a valid algorithm indicator
         let validator = ProofOfStateValidator::default();
         let err = validator.validate_proof_of_stake(&who).unwrap_err();
-        assert!(format!("{}", err).contains("invalid algorithm indicator"));
+        assert!(format!("{err}").contains("invalid algorithm indicator"));
     }
 
     #[test]
@@ -520,7 +517,7 @@ mod tests {
         // bytes 1..9 are all zero -> 0 non-zero bytes (need 8)
         let validator = ProofOfStateValidator::default();
         let err = validator.validate_proof_of_stake(&who).unwrap_err();
-        assert!(format!("{}", err).contains("public key prefix"));
+        assert!(format!("{err}").contains("public key prefix"));
     }
 
     // ------------------------------------------------------------------
@@ -545,7 +542,7 @@ mod tests {
         let mut what = [0xFFu8; 32];
         what[0] = 0x01; // only 7 leading zero bits
         let err = validator.validate_proof_of_work(&what).unwrap_err();
-        assert!(format!("{}", err).contains("insufficient difficulty"));
+        assert!(format!("{err}").contains("insufficient difficulty"));
     }
 
     #[test]
@@ -792,7 +789,10 @@ mod tests {
         // Missing shard
         let incomplete_headers = headers[0..2].to_vec();
         let incomplete_payloads = payloads[0..2].to_vec();
-        assert!(AssetHashValidator::validate_shard_set(&incomplete_headers, &incomplete_payloads).is_err());
+        assert!(
+            AssetHashValidator::validate_shard_set(&incomplete_headers, &incomplete_payloads)
+                .is_err()
+        );
     }
 
     // ------------------------------------------------------------------
@@ -806,16 +806,22 @@ mod tests {
         let asset_hash = [0xABu8; 32];
 
         // Not in registry
-        assert!(!AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &asset_id, &registry
+        ));
 
         // Register it
         registry.insert(hex::encode(asset_id), asset_hash);
 
         // Now found
-        assert!(AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
+        assert!(AssetHashValidator::validate_asset_in_registry(
+            &asset_id, &registry
+        ));
 
         // Zero asset ID always invalid
-        assert!(!AssetHashValidator::validate_asset_in_registry(&[0u8; 32], &registry));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &[0u8; 32], &registry
+        ));
     }
 
     #[test]
@@ -828,9 +834,15 @@ mod tests {
         registry.insert(hex::encode(id_a), [0xAAu8; 32]);
         registry.insert(hex::encode(id_b), [0xBBu8; 32]);
 
-        assert!(AssetHashValidator::validate_asset_in_registry(&id_a, &registry));
-        assert!(AssetHashValidator::validate_asset_in_registry(&id_b, &registry));
-        assert!(!AssetHashValidator::validate_asset_in_registry(&id_c, &registry));
+        assert!(AssetHashValidator::validate_asset_in_registry(
+            &id_a, &registry
+        ));
+        assert!(AssetHashValidator::validate_asset_in_registry(
+            &id_b, &registry
+        ));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &id_c, &registry
+        ));
     }
 
     #[test]
@@ -839,6 +851,8 @@ mod tests {
         let asset_id = [0xFFu8; 32];
 
         // Non-zero ID in empty registry -> not found
-        assert!(!AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &asset_id, &registry
+        ));
     }
 }

@@ -7,15 +7,15 @@
 //! Ensures secure deployment practices and validates security implementations.
 //! Prevents deployment of systems with security theater.
 
-use std::path::Path;
 use anyhow::Result;
-use tracing::{info, error};
+use std::path::Path;
+use tracing::{error, info};
 
 pub mod quality_gates;
 
 pub use quality_gates::{
-    QualityGateValidator, QualityGateResults, QualityGateStatus,
-    SecurityViolation, SecuritySeverity
+    QualityGateResults, QualityGateStatus, QualityGateValidator, SecuritySeverity,
+    SecurityViolation,
 };
 
 /// TrustChain deployment validator
@@ -50,7 +50,10 @@ impl DeploymentValidator {
                 info!("✅ DEPLOYMENT APPROVED: All quality gates passed");
             }
             DeploymentDecision::ConditionalApproval { conditions } => {
-                info!("⚠️  CONDITIONAL APPROVAL: {} conditions must be resolved", conditions.len());
+                info!(
+                    "⚠️  CONDITIONAL APPROVAL: {} conditions must be resolved",
+                    conditions.len()
+                );
             }
             DeploymentDecision::Rejected { reason } => {
                 error!("❌ DEPLOYMENT REJECTED: {}", reason);
@@ -80,16 +83,14 @@ pub enum DeploymentDecision {
 impl DeploymentDecision {
     /// Create deployment decision from quality gate results
     fn from_quality_results(results: &QualityGateResults) -> Self {
-        if !results.deployment_approved {
-            if results.overall_status == QualityGateStatus::Fail {
-                return Self::Rejected {
-                    reason: format!(
-                        "Critical security violations detected: {} violations, {:.1}% security score",
-                        results.violations.len(),
-                        results.security_score * 100.0
-                    ),
-                };
-            }
+        if !results.deployment_approved && results.overall_status == QualityGateStatus::Fail {
+            return Self::Rejected {
+                reason: format!(
+                    "Critical security violations detected: {} violations, {:.1}% security score",
+                    results.violations.len(),
+                    results.security_score * 100.0
+                ),
+            };
         }
 
         if results.violations.is_empty() && results.security_score >= 0.9 {
@@ -98,12 +99,20 @@ impl DeploymentDecision {
             let mut conditions = Vec::new();
 
             if results.security_score < 0.9 {
-                conditions.push(format!("Improve security score to 90% (currently {:.1}%)", results.security_score * 100.0));
+                conditions.push(format!(
+                    "Improve security score to 90% (currently {:.1}%)",
+                    results.security_score * 100.0
+                ));
             }
 
             for violation in &results.violations {
-                if violation.severity == SecuritySeverity::Critical || violation.severity == SecuritySeverity::High {
-                    conditions.push(format!("Resolve {} violation: {}", violation.severity, violation.description));
+                if violation.severity == SecuritySeverity::Critical
+                    || violation.severity == SecuritySeverity::High
+                {
+                    conditions.push(format!(
+                        "Resolve {} violation: {}",
+                        violation.severity, violation.description
+                    ));
                 }
             }
 
@@ -142,7 +151,7 @@ impl DeploymentSummary {
         let mut failed_gates = 0;
         let mut warning_gates = 0;
 
-        for (_, gate_result) in &results.individual_gates {
+        for gate_result in results.individual_gates.values() {
             match gate_result.status {
                 QualityGateStatus::Pass => passed_gates += 1,
                 QualityGateStatus::Fail => failed_gates += 1,
@@ -188,14 +197,17 @@ fn extract_key_improvements(results: &QualityGateResults) -> Vec<String> {
     // Security theater improvements
     if let Some(theater_gate) = results.individual_gates.get("SecurityTheaterDetection") {
         if theater_gate.status != QualityGateStatus::Pass {
-            improvements.push("🎭 Remove all security theater patterns (default_for_testing, mocks)".to_string());
+            improvements.push(
+                "🎭 Remove all security theater patterns (default_for_testing, mocks)".to_string(),
+            );
         }
     }
 
     // Consensus validation improvements
     if let Some(consensus_gate) = results.individual_gates.get("ConsensusValidation") {
         if consensus_gate.status != QualityGateStatus::Pass {
-            improvements.push("🔐 Implement proper consensus validation with network proofs".to_string());
+            improvements
+                .push("🔐 Implement proper consensus validation with network proofs".to_string());
         }
     }
 
@@ -203,21 +215,26 @@ fn extract_key_improvements(results: &QualityGateResults) -> Vec<String> {
     // HSM dependency check is now obsolete
     if let Some(hsm_gate) = results.individual_gates.get("HSMDependencyCheck") {
         if hsm_gate.status == QualityGateStatus::Pass {
-            improvements.push("✅ HSM dependencies successfully removed - software-only operation achieved".to_string());
+            improvements.push(
+                "✅ HSM dependencies successfully removed - software-only operation achieved"
+                    .to_string(),
+            );
         }
     }
 
     // Mock response improvements
     if let Some(mock_gate) = results.individual_gates.get("MockResponseDetection") {
         if mock_gate.status != QualityGateStatus::Pass {
-            improvements.push("📡 Replace mock API responses with real implementations".to_string());
+            improvements
+                .push("📡 Replace mock API responses with real implementations".to_string());
         }
     }
 
     // DNS infrastructure improvements
     if let Some(dns_gate) = results.individual_gates.get("DNSInfrastructure") {
         if dns_gate.status != QualityGateStatus::Pass {
-            improvements.push("🌐 Complete DNS infrastructure for trust.hypermesh.online".to_string());
+            improvements
+                .push("🌐 Complete DNS infrastructure for trust.hypermesh.online".to_string());
         }
     }
 
@@ -234,12 +251,17 @@ pub async fn validate_deployment_cli<P: AsRef<Path>>(source_path: P) -> Result<(
 
     // Print summary
     println!("\n📊 DEPLOYMENT SUMMARY");
-    println!("Security Score: {:.1}%", results.summary.security_score * 100.0);
-    println!("Quality Gates: {}/{} passed, {} warnings, {} failures",
-             results.summary.passed_gates,
-             results.summary.total_gates,
-             results.summary.warning_gates,
-             results.summary.failed_gates);
+    println!(
+        "Security Score: {:.1}%",
+        results.summary.security_score * 100.0
+    );
+    println!(
+        "Quality Gates: {}/{} passed, {} warnings, {} failures",
+        results.summary.passed_gates,
+        results.summary.total_gates,
+        results.summary.warning_gates,
+        results.summary.failed_gates
+    );
 
     println!("\nSecurity Violations:");
     println!("  🔴 Critical: {}", results.summary.critical_violations);
@@ -260,7 +282,7 @@ pub async fn validate_deployment_cli<P: AsRef<Path>>(source_path: P) -> Result<(
             }
         }
         DeploymentDecision::Rejected { reason } => {
-            println!("❌ REJECTED - {}", reason);
+            println!("❌ REJECTED - {reason}");
         }
     }
 
@@ -268,7 +290,7 @@ pub async fn validate_deployment_cli<P: AsRef<Path>>(source_path: P) -> Result<(
     if !results.summary.key_improvements.is_empty() {
         println!("\n💡 KEY IMPROVEMENTS NEEDED:");
         for improvement in &results.summary.key_improvements {
-            println!("  {}", improvement);
+            println!("  {improvement}");
         }
     }
 
@@ -281,13 +303,18 @@ pub async fn validate_deployment_cli<P: AsRef<Path>>(source_path: P) -> Result<(
             QualityGateStatus::Fail => "❌",
         };
 
-        println!("\n{} {} ({:.1}%)", status_emoji, gate_name, gate_result.score * 100.0);
+        println!(
+            "\n{} {} ({:.1}%)",
+            status_emoji,
+            gate_name,
+            gate_result.score * 100.0
+        );
         println!("   {}", gate_result.message);
 
         // Show details for failures and warnings
         if gate_result.status != QualityGateStatus::Pass {
             for detail in gate_result.details.iter().take(3) {
-                println!("     {}", detail);
+                println!("     {detail}");
             }
             if gate_result.details.len() > 3 {
                 println!("     ... and {} more", gate_result.details.len() - 3);

@@ -202,7 +202,9 @@ impl GeographicLoadBalancer {
 
     /// Round-robin distribution
     fn round_robin_distribution(&mut self) -> Option<MatrixCoordinate> {
-        let available: Vec<_> = self.nodes.values()
+        let available: Vec<_> = self
+            .nodes
+            .values()
             .filter(|n| n.is_available())
             .map(|n| n.coordinate)
             .collect();
@@ -218,14 +220,20 @@ impl GeographicLoadBalancer {
     }
 
     /// Nearest neighbor distribution
-    fn nearest_neighbor_distribution(&mut self, source: &MatrixCoordinate) -> Option<MatrixCoordinate> {
+    fn nearest_neighbor_distribution(
+        &mut self,
+        source: &MatrixCoordinate,
+    ) -> Option<MatrixCoordinate> {
         // Simply find the nearest available node
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.is_available())
             .min_by(|a, b| {
                 let dist_a = source.euclidean_distance(&a.coordinate);
                 let dist_b = source.euclidean_distance(&b.coordinate);
-                dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                dist_a
+                    .partial_cmp(&dist_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|n| n.coordinate)
     }
@@ -233,19 +241,25 @@ impl GeographicLoadBalancer {
     /// Zone-based distribution
     fn zone_based_distribution(&mut self, source: &MatrixCoordinate) -> Option<MatrixCoordinate> {
         // First, try to find source node's zone
-        let source_zone = self.nodes.get(source)
-            .and_then(|n| n.zone_id.as_ref());
+        let source_zone = self.nodes.get(source).and_then(|n| n.zone_id.as_ref());
 
         if let Some(zone_id) = source_zone {
             // Find available nodes in same zone
-            let zone_nodes: Vec<_> = self.nodes.values()
+            let zone_nodes: Vec<_> = self
+                .nodes
+                .values()
                 .filter(|n| n.zone_id.as_ref() == Some(zone_id) && n.is_available())
                 .collect();
 
             if !zone_nodes.is_empty() {
                 // Select least loaded node in zone
-                let selected = zone_nodes.iter()
-                    .min_by(|a, b| a.current_load.partial_cmp(&b.current_load).unwrap_or(std::cmp::Ordering::Equal))
+                let selected = zone_nodes
+                    .iter()
+                    .min_by(|a, b| {
+                        a.current_load
+                            .partial_cmp(&b.current_load)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
                     .map(|n| n.coordinate);
                 return selected;
             }
@@ -256,9 +270,13 @@ impl GeographicLoadBalancer {
     }
 
     /// Latency-aware distribution
-    fn latency_aware_distribution(&mut self, source: &MatrixCoordinate) -> Option<MatrixCoordinate> {
+    fn latency_aware_distribution(
+        &mut self,
+        source: &MatrixCoordinate,
+    ) -> Option<MatrixCoordinate> {
         // Combine distance and response time
-        self.nodes.values()
+        self.nodes
+            .values()
             .filter(|n| n.is_available())
             .min_by(|a, b| {
                 // Score = distance * (1 + response_time/1000)
@@ -268,25 +286,23 @@ impl GeographicLoadBalancer {
                 let dist_b = source.euclidean_distance(&b.coordinate);
                 let score_b = dist_b * (1.0 + b.avg_response_time / 1000.0);
 
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|n| n.coordinate)
     }
 
     /// Weighted capacity distribution
     fn weighted_capacity_distribution(&mut self) -> Option<MatrixCoordinate> {
-        let available: Vec<_> = self.nodes.values()
-            .filter(|n| n.is_available())
-            .collect();
+        let available: Vec<_> = self.nodes.values().filter(|n| n.is_available()).collect();
 
         if available.is_empty() {
             return None;
         }
 
         // Calculate total available capacity
-        let total_capacity: usize = available.iter()
-            .map(|n| n.available_capacity())
-            .sum();
+        let total_capacity: usize = available.iter().map(|n| n.available_capacity()).sum();
 
         if total_capacity == 0 {
             return None;
@@ -313,11 +329,11 @@ impl GeographicLoadBalancer {
 
         for node in self.nodes.values() {
             if let Some(zone_id) = &node.zone_id {
-                let stats = zone_stats.entry(zone_id.clone())
-                    .or_insert_with(|| {
-                        let mut s = ZoneLoadStats::default();
-                        s.zone_id = zone_id.clone();
-                        s
+                let stats = zone_stats
+                    .entry(zone_id.clone())
+                    .or_insert_with(|| ZoneLoadStats {
+                        zone_id: zone_id.clone(),
+                        ..ZoneLoadStats::default()
                     });
 
                 stats.total_nodes += 1;
@@ -347,14 +363,11 @@ impl GeographicLoadBalancer {
             return 0.0;
         }
 
-        let loads: Vec<f64> = self.nodes.values()
-            .map(|n| n.current_load)
-            .collect();
+        let loads: Vec<f64> = self.nodes.values().map(|n| n.current_load).collect();
 
         let mean = loads.iter().sum::<f64>() / loads.len() as f64;
-        let variance = loads.iter()
-            .map(|load| (load - mean).powi(2))
-            .sum::<f64>() / loads.len() as f64;
+        let variance =
+            loads.iter().map(|load| (load - mean).powi(2)).sum::<f64>() / loads.len() as f64;
 
         self.stats.load_variance = variance;
         variance
@@ -376,11 +389,13 @@ impl GeographicLoadBalancer {
         let zone_stats = self.calculate_zone_stats();
 
         // Find overloaded and underloaded zones
-        let overloaded: Vec<_> = zone_stats.values()
+        let overloaded: Vec<_> = zone_stats
+            .values()
             .filter(|s| s.load_percentage() > threshold)
             .collect();
 
-        let underloaded: Vec<_> = zone_stats.values()
+        let underloaded: Vec<_> = zone_stats
+            .values()
             .filter(|s| s.load_percentage() < threshold * 0.5)
             .collect();
 
@@ -388,12 +403,16 @@ impl GeographicLoadBalancer {
         for over_zone in &overloaded {
             for under_zone in &underloaded {
                 // Find candidate nodes for migration
-                let source_nodes: Vec<_> = self.nodes.values()
+                let source_nodes: Vec<_> = self
+                    .nodes
+                    .values()
                     .filter(|n| n.zone_id.as_ref() == Some(&over_zone.zone_id))
                     .filter(|n| n.current_load > threshold)
                     .collect();
 
-                let target_nodes: Vec<_> = self.nodes.values()
+                let target_nodes: Vec<_> = self
+                    .nodes
+                    .values()
                     .filter(|n| n.zone_id.as_ref() == Some(&under_zone.zone_id))
                     .filter(|n| n.current_load < threshold * 0.5)
                     .collect();
@@ -426,10 +445,10 @@ mod tests {
 
     fn create_test_nodes() -> Vec<NodeLoad> {
         vec![
-            NodeLoad::new(MatrixCoordinate::new(0, 0, 0).unwrap(), 100),
-            NodeLoad::new(MatrixCoordinate::new(10, 0, 0).unwrap(), 100),
-            NodeLoad::new(MatrixCoordinate::new(0, 10, 0).unwrap(), 100),
-            NodeLoad::new(MatrixCoordinate::new(100, 100, 0).unwrap(), 50),
+            NodeLoad::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), 100),
+            NodeLoad::new(MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), 100),
+            NodeLoad::new(MatrixCoordinate::new(0, 10, 0).expect("test: valid coordinate"), 100),
+            NodeLoad::new(MatrixCoordinate::new(100, 100, 0).expect("test: valid coordinate"), 50),
         ]
     }
 
@@ -482,7 +501,7 @@ mod tests {
                 LoadBalancingStrategy::RoundRobin,
             );
             assert!(target.is_some());
-            targets.push(target.unwrap());
+            targets.push(target.expect("test: expected success"));
         }
 
         // Should have visited all nodes
@@ -495,24 +514,15 @@ mod tests {
         let mut balancer = GeographicLoadBalancer::new();
 
         // Register nodes at different distances
-        balancer.register_node(NodeLoad::new(
-            MatrixCoordinate::new(5, 0, 0).unwrap(), 10
-        ));
-        balancer.register_node(NodeLoad::new(
-            MatrixCoordinate::new(50, 0, 0).unwrap(), 10
-        ));
-        balancer.register_node(NodeLoad::new(
-            MatrixCoordinate::new(100, 0, 0).unwrap(), 10
-        ));
+        balancer.register_node(NodeLoad::new(MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate"), 10));
+        balancer.register_node(NodeLoad::new(MatrixCoordinate::new(50, 0, 0).expect("test: valid coordinate"), 10));
+        balancer.register_node(NodeLoad::new(MatrixCoordinate::new(100, 0, 0).expect("test: valid coordinate"), 10));
 
         // Should select nearest node
         let source = MatrixCoordinate::origin();
-        let target = balancer.distribute(
-            &source,
-            LoadBalancingStrategy::NearestNeighbor,
-        );
+        let target = balancer.distribute(&source, LoadBalancingStrategy::NearestNeighbor);
 
-        assert_eq!(target, Some(MatrixCoordinate::new(5, 0, 0).unwrap()));
+        assert_eq!(target, Some(MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate")));
     }
 
     #[test]
@@ -520,13 +530,13 @@ mod tests {
         let mut balancer = GeographicLoadBalancer::new();
 
         // Create nodes in different zones
-        let mut node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).unwrap(), 10);
+        let mut node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), 10);
         node1.zone_id = Some("zone_a".to_string());
 
-        let mut node2 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).unwrap(), 10);
+        let mut node2 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), 10);
         node2.zone_id = Some("zone_a".to_string());
 
-        let mut node3 = NodeLoad::new(MatrixCoordinate::new(100, 100, 0).unwrap(), 10);
+        let mut node3 = NodeLoad::new(MatrixCoordinate::new(100, 100, 0).expect("test: valid coordinate"), 10);
         node3.zone_id = Some("zone_b".to_string());
 
         balancer.register_node(node1);
@@ -534,16 +544,16 @@ mod tests {
         balancer.register_node(node3);
 
         // Source in zone_a should prefer zone_a nodes
-        let mut source_node = NodeLoad::new(MatrixCoordinate::new(5, 5, 0).unwrap(), 1);
+        let mut source_node = NodeLoad::new(MatrixCoordinate::new(5, 5, 0).expect("test: valid coordinate"), 1);
         source_node.zone_id = Some("zone_a".to_string());
         balancer.register_node(source_node);
 
-        let source = MatrixCoordinate::new(5, 5, 0).unwrap();
+        let source = MatrixCoordinate::new(5, 5, 0).expect("test: valid coordinate");
         let target = balancer.distribute(&source, LoadBalancingStrategy::ZoneBased);
 
         // Should select from zone_a (not zone_b)
         assert!(target.is_some());
-        let coord = target.unwrap();
+        let coord = target.expect("test: expected success");
         assert!(coord.x < 50); // Zone A nodes are at x < 50
     }
 
@@ -552,11 +562,11 @@ mod tests {
         let mut balancer = GeographicLoadBalancer::new();
 
         // Near node with high latency
-        let mut node1 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).unwrap(), 10);
+        let mut node1 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), 10);
         node1.avg_response_time = 500.0; // High latency
 
         // Far node with low latency
-        let mut node2 = NodeLoad::new(MatrixCoordinate::new(50, 0, 0).unwrap(), 10);
+        let mut node2 = NodeLoad::new(MatrixCoordinate::new(50, 0, 0).expect("test: valid coordinate"), 10);
         node2.avg_response_time = 10.0; // Low latency
 
         balancer.register_node(node1);
@@ -575,10 +585,10 @@ mod tests {
         let mut balancer = GeographicLoadBalancer::new();
 
         // High capacity node
-        let node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).unwrap(), 100);
+        let node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), 100);
 
         // Low capacity node
-        let node2 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).unwrap(), 10);
+        let node2 = NodeLoad::new(MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), 10);
 
         balancer.register_node(node1);
         balancer.register_node(node2);
@@ -605,10 +615,7 @@ mod tests {
 
         // Create nodes in zones
         for i in 0..3 {
-            let mut node = NodeLoad::new(
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
-                100,
-            );
+            let mut node = NodeLoad::new(MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"), 100);
             node.zone_id = Some("zone_a".to_string());
             node.active_connections = i as usize * 10;
             node.update_load();
@@ -629,10 +636,7 @@ mod tests {
 
         // Create nodes with different loads
         for i in 0..4 {
-            let mut node = NodeLoad::new(
-                MatrixCoordinate::new(i * 10, 0, 0).unwrap(),
-                100,
-            );
+            let mut node = NodeLoad::new(MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate"), 100);
             node.current_load = (i as f64) * 0.25;
             balancer.register_node(node);
         }
@@ -646,13 +650,13 @@ mod tests {
         let mut balancer = GeographicLoadBalancer::new();
 
         // Overloaded zone
-        let mut node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).unwrap(), 100);
+        let mut node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), 100);
         node1.zone_id = Some("overloaded".to_string());
         node1.active_connections = 90;
         node1.update_load();
 
         // Underloaded zone
-        let mut node2 = NodeLoad::new(MatrixCoordinate::new(100, 0, 0).unwrap(), 100);
+        let mut node2 = NodeLoad::new(MatrixCoordinate::new(100, 0, 0).expect("test: valid coordinate"), 100);
         node2.zone_id = Some("underloaded".to_string());
         node2.active_connections = 10;
         node2.update_load();

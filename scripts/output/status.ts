@@ -35,7 +35,6 @@ export const crateStatuses: CrateStatus[] = [
         "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
         "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
         "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute, correct order)",
-        "Instruction-based retrieval (shard maps, client assembly, fallback strategies, <1KB instructions)",
         "Network scope sync + reflector pooling (SyncManager, ReflectorPool, BlockTransport, SyncDispatcher)",
         "Gateway architecture for cross-scope asset transfers (GatewayManager, ScopeBridge, AssetTransfer lifecycle)",
         "Dynamic shard rebalancing (RebalanceManager with join/leave/failure triggers, octant diversity, cooldown)",
@@ -52,10 +51,19 @@ export const crateStatuses: CrateStatus[] = [
         "PoSPing spatial verification (epoch-seeded bilateral probes, scope-gated, binary result)",
         "IPv6 asset addressing (AssetAddress: fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
         "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
-        "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)"
+        "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
+        "Node bootstrap lifecycle (genesis block, self-signed cert, DNS init)",
+        "Service mesh controller (circuit breaker, load balancing, health tracking)",
+        "User contribution platform (hardware sharing, resource pricing, rewards)",
+        "Intelligence layer (multi-component health, event streaming)",
+        "Performance regression detector (baseline tracking, production readiness)"
       ],
       "inDevelopment": [
-        "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)"
+        "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
+        "Instruction-based retrieval client assembly (shard maps work, fetch_from_location is 5ms sleep stub)",
+        "Asset blockchain registration (register_asset_record has TODO — consensus wiring incomplete)",
+        "Distributed shard fetch over STOQ (fetch_from_location placeholder returns zeroed bytes)",
+        "Node binary Anonymous certificate strategy fix"
       ],
       "planned": [
         "Genesis capability assessment — instantiate CPU/GPU/RAM/Storage/Network/Transmission as IPv6-addressed assets with PoS at boot (R1, R10)",
@@ -65,10 +73,14 @@ export const crateStatuses: CrateStatus[] = [
         "Shard migration — copy-then-redirect without blocking reads or causing fault intolerance (R14)",
         "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
         "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
-        "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)"
+        "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
+        "mDNS peer discovery (start_mdns_discovery is explicit stub)",
+        "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
+        "Identity-scoped asset access (workload identity → asset permissions)",
+        "Real hardware metrics collection (CPU/GPU/memory/storage/network)"
       ]
     },
-    "completion": 78
+    "completion": 67
   },
   {
     "id": "caesar",
@@ -197,16 +209,23 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
         "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Real network metrics collection (replace hardcoded stubs in tests)",
+        "Caesar in-transit/holding amount tracking integration",
+        "Collective network intelligence aggregation"
+      ],
       "planned": [
         "Swarm analytics — shard popularity tracking, consumer demand patterns, replication demand detection (R12)",
         "Replication triggers — detect when shard replicas are insufficient for demand, signal BlockMatrix to amplify (R12)",
         "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
         "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
-        "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)"
+        "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
+        "Self-node metrics vs network-wide metrics separation",
+        "Real-time routing intelligence feed to STOQ adaptive tiers",
+        "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)"
       ]
     },
-    "completion": 78
+    "completion": 62
   },
   {
     "id": "gateway",
@@ -250,10 +269,10 @@ export const crateStatuses: CrateStatus[] = [
       "working": [
         "Refactor / consolidation — removed Docker/Terraform/K8s/CloudFormation (system-level daemon model), fixed CI workflows, workspace lint config",
         "Documentation 100% correct — all 11 crate READMEs, ARCHITECTURE.md, root README accurate with correct stats, models, and IPv6 coverage",
-        "Benchmarks — Criterion benchmarks for blockmatrix (phase1, retrieval, transfer), stoq (throughput), trustchain (certificates)",
+        "Benchmarks — Criterion benchmarks for blockmatrix (5: phase1, retrieval, transfer, tensor, basic), stoq (3: throughput, real_throughput, ebpf), trustchain (certificates)",
         "Full development/contributions pipeline — CONTRIBUTING.md, SECURITY.md, CHANGELOG.md, pre-commit hooks, PR workflow documented",
         "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
-        "Integrations and end-to-end tests — 17 cross-crate integration tests (asset_pipeline, blockchain_scope, privacy_consistency)"
+        "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)"
       ],
       "inDevelopment": [],
       "planned": [
@@ -261,10 +280,12 @@ export const crateStatuses: CrateStatus[] = [
         "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
         "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
         "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
-        "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration"
+        "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
+        "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
+        "Real partition/chaos testing framework"
       ]
     },
-    "completion": 55
+    "completion": 46
   },
   {
     "id": "hypermesh-ebpf",
@@ -318,7 +339,12 @@ export const crateStatuses: CrateStatus[] = [
         "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)"
       ],
       "inDevelopment": [
-        "BlockMatrix/TrustChain migration to canonical asset types"
+        "Replace trustchain SpaceProof/StakeProof/WorkProof/TimeProof with lib canonical types",
+        "Replace trustchain NodeId/AssetId structs with lib newtypes",
+        "Remove AssetType::VirtualMachine and AssetType::Library from blockmatrix",
+        "Add Dns variant to blockmatrix BaseSystemType",
+        "Consolidate AssetMetadata duplicates across crates",
+        "Resolve PacketId type conflict (lib [u8;32] vs blockmatrix Uuid)"
       ],
       "planned": [
         "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
@@ -331,7 +357,7 @@ export const crateStatuses: CrateStatus[] = [
         "Public SDK types for third-party integration (stable API surface)"
       ]
     },
-    "completion": 59
+    "completion": 48
   },
   {
     "id": "stoq",
@@ -358,13 +384,23 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
         "BLAKE3 content hashing (whitepaper-aligned)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)"
+      ],
       "planned": [
         "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
-        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)"
+        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
+        "Real jitter benchmarking under controlled partitions",
+        "Partition recovery timing measurements",
+        "Identity-aware connection establishment (cert identity extraction)",
+        "Permission enforcement at protocol layer",
+        "Real transport metrics (bandwidth, latency, jitter, loss measurement)",
+        "MetricsFrame protocol wiring to engauge",
+        "Certificate store persistence across restarts",
+        "Graceful degradation with expired certificates"
       ]
     },
-    "completion": 89
+    "completion": 61
   },
   {
     "id": "trustchain",
@@ -373,7 +409,6 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Certificate Authority with issuance and revocation",
         "FALCON-1024 post-quantum signing",
         "Kyber-1024 key encapsulation",
         "Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead)",
@@ -385,20 +420,38 @@ export const crateStatuses: CrateStatus[] = [
         "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
         "StateAuthenticator (renamed from ConsensusValidator)",
         "BLAKE3 consensus content hashing",
-        "Certificate rotation scheduler with background task",
         "OCSP responder with FALCON-1024 signed responses",
         "CRL generator and distributor",
         "Threshold cryptography (Shamir SSS over GF(256))",
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-        "HTTP/3 server with real handler wiring (8 real endpoints, 7 stubs)",
+        "HTTP/3 server with 8 real handler functions (issue, validate, revoke, list, get, health, metrics, dns_resolve)",
         "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)"
       ],
-      "inDevelopment": [],
-      "planned": []
+      "inDevelopment": [
+        "Certificate Authority issuance (issue_certificate uses self_signed() instead of signed_by() CA root)",
+        "CA signing hierarchy (all issued certs are currently self-signed, not CA-signed)",
+        "Key rotation logic (scheduler runs, CertificateRotationManager rotates 0 certs)",
+        "Persistent revocation storage (currently in-memory only)",
+        "Canonical type migration (own SpaceProof/StakeProof/WorkProof/TimeProof conflict with lib)",
+        "DNS resolution handler (returns empty — needs STOQ transport wiring)"
+      ],
+      "planned": [
+        "Identity-typed certificates (service/agent/node distinction)",
+        "KeyUsage/EKU enforcement in issued X.509 certs",
+        "Threshold crypto integration with CA initialization",
+        "Distributed revocation propagation",
+        "Offline device grace period renewal",
+        "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
+        "Identity-scoped certificate extensions (OID-based)",
+        "Cascading revocation (parent→child identity propagation)",
+        "Real certificate operation metrics (issuance latency, validation throughput)",
+        "CRL distribution via blockchain (offline revocation)",
+        "Field device bootstrap with intermittent connectivity"
+      ]
     },
-    "completion": 100
+    "completion": 53
   },
   {
     "id": "ui",
@@ -418,13 +471,13 @@ export const crateStatuses: CrateStatus[] = [
         "Global search across ecosystem modules",
         "Storybook component documentation (5 stories)",
         "Accessibility wrappers and keyboard navigation",
-        "React Router page routing with sidebar navigation"
+        "React Router page routing with sidebar navigation",
+        "E2E test suite (Playwright, 5 specs: dashboard, navigation, module-pages, accessibility, trustchain)",
+        "Integration test harness page"
       ],
       "inDevelopment": [
-        "E2E test suite (Playwright, 2 specs)",
-        "STOQ native demo (WebAssembly integration)",
-        "Integration test harness page",
-        "Component unit tests (Vitest, 3 test files)"
+        "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
+        "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)"
       ],
       "planned": [
         "Live STOQ WebSocket data connections",
@@ -440,6 +493,6 @@ export const crateStatuses: CrateStatus[] = [
         "New node registration experience (not traditional sign-up — sovereign identity bootstrap)"
       ]
     },
-    "completion": 44
+    "completion": 52
   }
 ];

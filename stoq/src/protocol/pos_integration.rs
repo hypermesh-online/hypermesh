@@ -7,13 +7,13 @@
 //! This module implements protocol-level integration of Proof of State validation
 //! with STOQ transport, enabling intelligent protocol behavior based on network type.
 
-use anyhow::{Result, anyhow};
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use parking_lot::RwLock;
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
-use tracing::{debug, info, warn};
 use hypermesh_lib::PrivacyMode;
+use parking_lot::RwLock;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tracing::{debug, info, warn};
 
 use super::pos_validator::{PosToken, PosTokenValidator};
 use crate::transport::certificate_strategy::NetworkType;
@@ -44,11 +44,19 @@ pub trait MatrixPositionExt {
 
 impl MatrixPositionExt for MatrixPosition {
     fn from_i64(x: i64, y: i64, z: i64) -> MatrixPosition {
-        MatrixPosition { x: x as f64, y: y as f64, z: z as f64 }
+        MatrixPosition {
+            x: x as f64,
+            y: y as f64,
+            z: z as f64,
+        }
     }
 
     fn origin() -> MatrixPosition {
-        MatrixPosition { x: 0.0, y: 0.0, z: 0.0 }
+        MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        }
     }
 
     fn distance_to(&self, other: &MatrixPosition) -> f64 {
@@ -149,7 +157,10 @@ impl StoqPosIntegration {
         // Anonymous connections always succeed without validation
         if privacy_tier == PrivacyMode::ANONYMOUS {
             if privacy_tier.allows_logging() {
-                debug!("Anonymous connection {} established (no validation)", connection_id);
+                debug!(
+                    "Anonymous connection {} established (no validation)",
+                    connection_id
+                );
             }
 
             self.register_connection(connection_id, privacy_tier, None);
@@ -158,32 +169,31 @@ impl StoqPosIntegration {
 
         // Private (bounded) connections require connection-level validation (handled by certificate strategy)
         if privacy_tier == PrivacyMode::PRIVATE {
-            info!("Connection {} established for {:?} network", connection_id, privacy_tier);
+            info!(
+                "Connection {} established for {:?} network",
+                connection_id, privacy_tier
+            );
             self.register_connection(connection_id, privacy_tier, None);
             return Ok(true);
         }
 
         // Public network requires full PoS validation
         if privacy_tier == PrivacyMode::PUBLIC {
-            let token = pos_token.ok_or_else(||
-                anyhow!("Public network requires PoS token")
-            )?;
+            let token = pos_token.ok_or_else(|| anyhow!("Public network requires PoS token"))?;
 
             let validation = self.pos_validator.validate_token(token)?;
 
             if !validation.is_valid {
                 warn!(
                     "PoS validation failed for connection {}: {:?}",
-                    connection_id,
-                    validation.errors
+                    connection_id, validation.errors
                 );
                 return Ok(false);
             }
 
             info!(
                 "Connection {} validated with PoS (validation time: {:?})",
-                connection_id,
-                validation.validation_time
+                connection_id, validation.validation_time
             );
 
             self.register_connection(connection_id, privacy_tier, Some(token.clone()));
@@ -223,9 +233,10 @@ impl StoqPosIntegration {
         data: &[u8],
     ) -> Result<bool> {
         // Get connection state
-        let mut conn_state = self.connection_states
+        let mut conn_state = self
+            .connection_states
             .get_mut(connection_id)
-            .ok_or_else(|| anyhow!("Unknown connection: {}", connection_id))?;
+            .ok_or_else(|| anyhow!("Unknown connection: {connection_id}"))?;
 
         // Update activity
         conn_state.last_activity = SystemTime::now();
@@ -235,8 +246,7 @@ impl StoqPosIntegration {
         if conn_state.privacy_tier.allows_logging() {
             debug!(
                 "Validating asset hash for connection {} (tier: {:?})",
-                connection_id,
-                conn_state.privacy_tier
+                connection_id, conn_state.privacy_tier
             );
         }
 
@@ -248,9 +258,7 @@ impl StoqPosIntegration {
             if conn_state.privacy_tier.allows_logging() {
                 warn!(
                     "Asset hash mismatch for connection {}: expected {:?}, got {:?}",
-                    connection_id,
-                    content_hash,
-                    computed_hash
+                    connection_id, content_hash, computed_hash
                 );
             }
             return Ok(false);
@@ -296,10 +304,7 @@ impl StoqPosIntegration {
 
         debug!(
             "Registered shard {} at matrix position ({:.0}, {:.0}, {:.0})",
-            shard_id,
-            position.x,
-            position.y,
-            position.z
+            shard_id, position.x, position.y, position.z
         );
     }
 
@@ -351,22 +356,18 @@ impl StoqPosIntegration {
     }
 
     /// Enforce privacy tier behavior for protocol operations
-    pub fn enforce_privacy_tier(
-        &self,
-        connection_id: &str,
-        operation: &str,
-    ) -> Result<()> {
-        let conn_state = self.connection_states
+    pub fn enforce_privacy_tier(&self, connection_id: &str, operation: &str) -> Result<()> {
+        let conn_state = self
+            .connection_states
             .get(connection_id)
-            .ok_or_else(|| anyhow!("Unknown connection: {}", connection_id))?;
+            .ok_or_else(|| anyhow!("Unknown connection: {connection_id}"))?;
 
         // Anonymous tier restrictions
         if conn_state.privacy_tier == PrivacyMode::ANONYMOUS {
             // No persistent storage, no tracking
             if operation.contains("log") || operation.contains("store") {
                 return Err(anyhow!(
-                    "Operation '{}' not allowed for Anonymous connections",
-                    operation
+                    "Operation '{operation}' not allowed for Anonymous connections"
                 ));
             }
         }
@@ -376,8 +377,7 @@ impl StoqPosIntegration {
             // Require PoS token validation
             if conn_state.last_pos_token.is_none() {
                 return Err(anyhow!(
-                    "Public network operation '{}' requires PoS token",
-                    operation
+                    "Public network operation '{operation}' requires PoS token"
                 ));
             }
         }
@@ -387,16 +387,16 @@ impl StoqPosIntegration {
 
     /// Get connection statistics
     pub fn get_connection_stats(&self, connection_id: &str) -> Option<ConnectionStats> {
-        self.connection_states.get(connection_id).map(|state| {
-            ConnectionStats {
+        self.connection_states
+            .get(connection_id)
+            .map(|state| ConnectionStats {
                 connection_id: state.connection_id.clone(),
                 privacy_tier: state.privacy_tier,
                 established_at: state.established_at,
                 last_activity: state.last_activity,
                 packet_count: state.packet_count,
                 has_pos_token: state.last_pos_token.is_some(),
-            }
-        })
+            })
     }
 
     /// Get overall statistics
@@ -433,7 +433,8 @@ impl StoqPosIntegration {
 
         self.connection_states.retain(|_, state| {
             let timeout = Duration::from_secs(state.privacy_tier.connection_timeout_secs());
-            let is_active = now.duration_since(state.last_activity)
+            let is_active = now
+                .duration_since(state.last_activity)
                 .map(|d| d < timeout)
                 .unwrap_or(false);
 
@@ -454,7 +455,8 @@ impl StoqPosIntegration {
         let mut removed = 0;
 
         self.asset_cache.retain(|_, verification| {
-            let is_valid = now.duration_since(verification.verified_at)
+            let is_valid = now
+                .duration_since(verification.verified_at)
                 .map(|d| d < ttl)
                 .unwrap_or(false);
 
@@ -497,8 +499,8 @@ pub struct IntegrationStats {
 
 #[cfg(test)]
 mod tests {
+    use super::super::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork};
     use super::*;
-    use super::super::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime};
 
     fn create_test_pos_token() -> PosToken {
         PosToken {
@@ -534,11 +536,10 @@ mod tests {
     async fn test_anonymous_connection() {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
-        let result = integration.validate_connection(
-            "conn1".to_string(),
-            &NetworkType::Anonymous,
-            None,
-        ).await.unwrap();
+        let result = integration
+            .validate_connection("conn1".to_string(), &NetworkType::Anonymous, None)
+            .await
+            .expect("test: expected success");
 
         assert!(result);
         assert_eq!(integration.connection_states.len(), 1);
@@ -549,15 +550,14 @@ mod tests {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
         let token = create_test_pos_token();
 
-        let result = integration.validate_connection(
-            "conn1".to_string(),
-            &NetworkType::Public,
-            Some(&token),
-        ).await.unwrap();
+        let result = integration
+            .validate_connection("conn1".to_string(), &NetworkType::Public, Some(&token))
+            .await
+            .expect("test: expected success");
 
         assert!(result);
 
-        let stats = integration.get_connection_stats("conn1").unwrap();
+        let stats = integration.get_connection_stats("conn1").expect("test: connection");
         assert_eq!(stats.privacy_tier, PrivacyMode::PUBLIC);
         assert!(stats.has_pos_token);
     }
@@ -566,11 +566,9 @@ mod tests {
     async fn test_public_connection_without_pos_fails() {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
-        let result = integration.validate_connection(
-            "conn1".to_string(),
-            &NetworkType::Public,
-            None,
-        ).await;
+        let result = integration
+            .validate_connection("conn1".to_string(), &NetworkType::Public, None)
+            .await;
 
         assert!(result.is_err());
     }
@@ -580,23 +578,16 @@ mod tests {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
         // Register connection first
-        integration.register_connection(
-            "conn1".to_string(),
-            PrivacyMode::PUBLIC,
-            None,
-        );
+        integration.register_connection("conn1".to_string(), PrivacyMode::PUBLIC, None);
 
         let data = b"test asset data";
 
         // Compute correct BLAKE3 hash
         let hash = *blake3::hash(data).as_bytes();
 
-        let result = integration.validate_asset_hash(
-            "conn1",
-            b"asset123",
-            &hash,
-            data,
-        ).unwrap();
+        let result = integration
+            .validate_asset_hash("conn1", b"asset123", &hash, data)
+            .expect("test: expected success");
 
         assert!(result);
         assert_eq!(integration.asset_cache.len(), 1);
@@ -608,14 +599,22 @@ mod tests {
 
         integration.register_shard_address(
             1,
-            MatrixPosition { x: 10.0, y: 20.0, z: 30.0 },
+            MatrixPosition {
+                x: 10.0,
+                y: 20.0,
+                z: 30.0,
+            },
             "network1".to_string(),
             Some("node1".to_string()),
         );
 
         integration.register_shard_address(
             2,
-            MatrixPosition { x: 50.0, y: 60.0, z: 70.0 },
+            MatrixPosition {
+                x: 50.0,
+                y: 60.0,
+                z: 70.0,
+            },
             "network2".to_string(),
             None,
         );
@@ -632,18 +631,14 @@ mod tests {
 
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
-        let positions = integration.calculate_shard_positions(
-            10,
-            MatrixPosition::origin(),
-            5.0,
-            50.0,
-        );
+        let positions =
+            integration.calculate_shard_positions(10, MatrixPosition::origin(), 5.0, 50.0);
 
         assert_eq!(positions.len(), 10);
 
         // Verify positions are distributed
         for i in 0..positions.len() {
-            for j in (i+1)..positions.len() {
+            for j in (i + 1)..positions.len() {
                 let dist = positions[i].distance_to(&positions[j]);
                 assert!(dist > 0.0, "Positions should be distinct");
             }
@@ -655,22 +650,14 @@ mod tests {
         let integration = StoqPosIntegration::new(Duration::from_secs(300));
 
         // Anonymous connection
-        integration.register_connection(
-            "anon".to_string(),
-            PrivacyMode::ANONYMOUS,
-            None,
-        );
+        integration.register_connection("anon".to_string(), PrivacyMode::ANONYMOUS, None);
 
         // Should reject logging operations
         let result = integration.enforce_privacy_tier("anon", "log_data");
         assert!(result.is_err());
 
         // Public connection without PoS token
-        integration.register_connection(
-            "public".to_string(),
-            PrivacyMode::PUBLIC,
-            None,
-        );
+        integration.register_connection("public".to_string(), PrivacyMode::PUBLIC, None);
 
         // Should require PoS token
         let result = integration.enforce_privacy_tier("public", "send_data");

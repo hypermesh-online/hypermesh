@@ -12,23 +12,22 @@
 //! - Network security and isolation
 //! - Latency and packet loss monitoring
 
-pub mod types;
 mod adapter;
+pub mod types;
 
-pub use types::*;
 pub use adapter::NetworkAssetAdapter;
+pub use types::*;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::time::{Duration, SystemTime};
     use super::*;
     use crate::assets::core::{
-        AssetAdapter, AssetType, AssetAllocationRequest,
-        ConsensusProof, PrivacyMode, NetworkRequirements,
-        SpaceProof, StakeProof, WorkProof, TimeProof,
-        WorkloadType, WorkState, AssetCategory, BaseSystemType,
+        AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
+        ConsensusProof, NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, TimeProof,
+        WorkProof, WorkState, WorkloadType,
     };
+    use std::collections::HashMap;
+    use std::time::{Duration, SystemTime};
 
     async fn create_test_network_request() -> AssetAllocationRequest {
         AssetAllocationRequest {
@@ -92,19 +91,27 @@ mod tests {
         let adapter = NetworkAssetAdapter::new().await;
         let request = create_test_network_request().await;
 
-        let allocation = adapter.allocate_asset(&request).await.unwrap();
-        assert!(matches!(allocation.asset_id.category, AssetCategory::BaseSystem(BaseSystemType::Network)));
+        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
+        assert!(matches!(
+            allocation.asset_id.category,
+            AssetCategory::BaseSystem(BaseSystemType::Network)
+        ));
 
-        adapter.deallocate_asset(&allocation.asset_id).await.unwrap();
+        adapter
+            .deallocate_asset(&allocation.asset_id)
+            .await
+            .expect("test: expected success");
     }
 
     #[tokio::test]
     async fn test_network_health_check() {
         let adapter = NetworkAssetAdapter::new().await;
-        let health = adapter.health_check().await.unwrap();
+        let health = adapter.health_check().await.expect("test: async operation");
 
         assert!(health.healthy);
-        assert!(health.performance_metrics.contains_key("total_bandwidth_gbps"));
+        assert!(health
+            .performance_metrics
+            .contains_key("total_bandwidth_gbps"));
         assert!(health.performance_metrics.contains_key("total_interfaces"));
     }
 
@@ -116,6 +123,8 @@ mod tests {
         assert_eq!(capabilities.asset_type, AssetType::Network);
         assert!(capabilities.supports_proxy_addressing);
         assert!(capabilities.features.contains(&"ipv6_only".to_string()));
-        assert!(capabilities.features.contains(&"qos_management".to_string()));
+        assert!(capabilities
+            .features
+            .contains(&"qos_management".to_string()));
     }
 }

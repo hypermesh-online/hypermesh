@@ -22,10 +22,13 @@ fn test_basic_string_operations() {
 fn test_container_id_simulation() {
     // Simulate container ID without UUID dependency
     fn generate_id() -> String {
-        format!("container-{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos())
+        format!(
+            "container-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        )
     }
 
     let id1 = generate_id();
@@ -49,7 +52,7 @@ fn test_resource_type_enum() {
         Container,
     }
 
-    let resources = vec![
+    let resources = [
         ResourceType::Cpu,
         ResourceType::Gpu,
         ResourceType::Memory,
@@ -102,10 +105,10 @@ fn test_consensus_proof_structure() {
 
     impl ConsensusProof {
         fn validate(&self) -> bool {
-            self.space_size > 0 &&
-            self.stake_amount > 0 &&
-            self.work_difficulty > 0 &&
-            self.time_duration > Duration::ZERO
+            self.space_size > 0
+                && self.stake_amount > 0
+                && self.work_difficulty > 0
+                && self.time_duration > Duration::ZERO
         }
     }
 
@@ -125,7 +128,10 @@ fn test_consensus_proof_structure() {
         time_duration: Duration::from_secs(60),
     };
 
-    assert!(!invalid_proof.validate(), "Invalid proof should not validate");
+    assert!(
+        !invalid_proof.validate(),
+        "Invalid proof should not validate"
+    );
 }
 
 #[test]
@@ -203,21 +209,20 @@ fn test_network_topology() {
         }
 
         fn add_regional_node(&mut self, region: String, node: String) {
-            self.regional_nodes
-                .entry(region)
-                .or_insert_with(Vec::new)
-                .push(node);
+            self.regional_nodes.entry(region).or_default().push(node);
         }
 
         fn total_nodes(&self) -> usize {
-            self.local_cluster.len() +
-            self.regional_nodes.values().map(|v| v.len()).sum::<usize>() +
-            self.backbone_nodes.len()
+            self.local_cluster.len()
+                + self.regional_nodes.values().map(|v| v.len()).sum::<usize>()
+                + self.backbone_nodes.len()
         }
     }
 
-    let mut topology = NetworkTopology::default();
-    topology.network_diameter = 6;
+    let mut topology = NetworkTopology {
+        network_diameter: 6,
+        ..NetworkTopology::default()
+    };
     topology.add_local_node("node1".to_string());
     topology.add_local_node("node2".to_string());
     topology.add_regional_node("us-east".to_string(), "node3".to_string());
@@ -241,9 +246,9 @@ fn test_resource_quota_management() {
 
     impl ResourceQuota {
         fn can_allocate(&self, requested: &ResourceQuota) -> bool {
-            self.cpu_millicores >= requested.cpu_millicores &&
-            self.memory_bytes >= requested.memory_bytes &&
-            self.storage_bytes >= requested.storage_bytes
+            self.cpu_millicores >= requested.cpu_millicores
+                && self.memory_bytes >= requested.memory_bytes
+                && self.storage_bytes >= requested.storage_bytes
         }
 
         fn allocate(&mut self, requested: &ResourceQuota) -> Result<(), String> {
@@ -266,13 +271,13 @@ fn test_resource_quota_management() {
 
     let mut available = ResourceQuota {
         cpu_millicores: 4000,
-        memory_bytes: 8 * 1024 * 1024 * 1024, // 8GB
+        memory_bytes: 8 * 1024 * 1024 * 1024,    // 8GB
         storage_bytes: 100 * 1024 * 1024 * 1024, // 100GB
     };
 
     let request1 = ResourceQuota {
         cpu_millicores: 1000,
-        memory_bytes: 2 * 1024 * 1024 * 1024, // 2GB
+        memory_bytes: 2 * 1024 * 1024 * 1024,   // 2GB
         storage_bytes: 10 * 1024 * 1024 * 1024, // 10GB
     };
 

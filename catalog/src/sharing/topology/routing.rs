@@ -24,7 +24,8 @@ impl super::NetworkTopology {
 
         while !unvisited.is_empty() {
             // Find unvisited node with minimum distance
-            let current = unvisited.iter()
+            let current = unvisited
+                .iter()
                 .min_by_key(|&n| distances.get(n).unwrap_or(&u64::MAX))
                 .cloned();
 
@@ -89,7 +90,8 @@ impl super::NetworkTopology {
         distances.insert(from.to_string(), 0);
 
         while !unvisited.is_empty() {
-            let current = unvisited.iter()
+            let current = unvisited
+                .iter()
                 .min_by_key(|&n| distances.get(n).unwrap_or(&u64::MAX))
                 .cloned();
 
@@ -135,14 +137,19 @@ impl super::NetworkTopology {
         max_bw.insert(from.to_string(), u64::MAX);
 
         while !unvisited.is_empty() {
-            let current = unvisited.iter()
+            let current = unvisited
+                .iter()
                 .max_by_key(|n| max_bw.get(*n).unwrap_or(&0))
                 .cloned();
 
             if let Some(current_node) = current {
-                if current_node == to { break; }
+                if current_node == to {
+                    break;
+                }
                 let current_bw = max_bw[&current_node];
-                if current_bw == 0 { break; }
+                if current_bw == 0 {
+                    break;
+                }
 
                 unvisited.remove(&current_node);
 
@@ -167,7 +174,8 @@ impl super::NetworkTopology {
     pub(super) async fn geographic_routing(&self, from: &str, to: &str) -> Result<Vec<String>> {
         let nodes = self.nodes.read().await;
 
-        let target_location = nodes.get(to)
+        let target_location = nodes
+            .get(to)
             .and_then(|n| n.location.as_ref())
             .ok_or_else(|| anyhow::anyhow!("Target location unknown"))?;
 
@@ -180,7 +188,8 @@ impl super::NetworkTopology {
             visited.insert(current.clone());
 
             // Find closest neighbor to target
-            let current_node = nodes.get(&current)
+            let current_node = nodes
+                .get(&current)
                 .ok_or_else(|| anyhow::anyhow!("Node not found"))?;
 
             let mut best_next = None;
@@ -207,7 +216,9 @@ impl super::NetworkTopology {
                 current = next;
             } else {
                 // Fall back to shortest path
-                return self.dijkstra_shortest_path(&current, to).await
+                return self
+                    .dijkstra_shortest_path(&current, to)
+                    .await
                     .map(|sub_path| {
                         path.extend_from_slice(&sub_path[1..]);
                         path
@@ -226,11 +237,13 @@ impl super::NetworkTopology {
         let overloaded: HashSet<String> = path[1..path.len().saturating_sub(1)]
             .iter()
             .filter(|node_id| {
-                nodes.get(*node_id).map_or(false, |node| {
+                nodes.get(*node_id).is_some_and(|node| {
                     let conn_ratio = if node.capacity.max_connections > 0 {
                         node.capacity.current_connections as f64
                             / node.capacity.max_connections as f64
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     node.capacity.network_usage > 0.8 || conn_ratio > 0.8
                 })
             })
@@ -264,7 +277,7 @@ impl super::NetworkTopology {
             let path = self.find_disjoint_path(from, to, &excluded_nodes).await?;
 
             // Add intermediate nodes to excluded set
-            for node in &path[1..path.len()-1] {
+            for node in &path[1..path.len() - 1] {
                 excluded_nodes.insert(node.clone());
             }
 
@@ -287,7 +300,8 @@ impl super::NetworkTopology {
 
         let mut distances: HashMap<String, u64> = HashMap::new();
         let mut previous: HashMap<String, Option<String>> = HashMap::new();
-        let mut unvisited: HashSet<String> = nodes.keys()
+        let mut unvisited: HashSet<String> = nodes
+            .keys()
             .filter(|n| !excluded.contains(*n) || *n == from || *n == to)
             .cloned()
             .collect();
@@ -300,7 +314,8 @@ impl super::NetworkTopology {
         distances.insert(from.to_string(), 0);
 
         while !unvisited.is_empty() {
-            let current = unvisited.iter()
+            let current = unvisited
+                .iter()
                 .min_by_key(|&n| distances.get(n).unwrap_or(&u64::MAX))
                 .cloned();
 
@@ -312,9 +327,10 @@ impl super::NetworkTopology {
                 unvisited.remove(&current_node);
 
                 for link in links.iter() {
-                    if link.from == current_node &&
-                       unvisited.contains(&link.to) &&
-                       !excluded.contains(&link.to) {
+                    if link.from == current_node
+                        && unvisited.contains(&link.to)
+                        && !excluded.contains(&link.to)
+                    {
                         let alt = distances[&current_node].saturating_add(1);
                         if alt < distances[&link.to] {
                             distances.insert(link.to.clone(), alt);

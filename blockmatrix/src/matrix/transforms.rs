@@ -62,9 +62,18 @@ impl MatrixCoordinate {
             return Err(CoordinateError::InvalidScale(factor));
         }
 
-        let x = self.x.checked_mul(factor).ok_or(CoordinateError::Overflow)?;
-        let y = self.y.checked_mul(factor).ok_or(CoordinateError::Overflow)?;
-        let z = self.z.checked_mul(factor).ok_or(CoordinateError::Overflow)?;
+        let x = self
+            .x
+            .checked_mul(factor)
+            .ok_or(CoordinateError::Overflow)?;
+        let y = self
+            .y
+            .checked_mul(factor)
+            .ok_or(CoordinateError::Overflow)?;
+        let z = self
+            .z
+            .checked_mul(factor)
+            .ok_or(CoordinateError::Overflow)?;
 
         Self::new(x, y, z)
     }
@@ -231,50 +240,53 @@ mod tests {
 
     #[test]
     fn test_translate() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let translated = coord.translate(5, -10, 15).unwrap();
-        assert_eq!(translated, MatrixCoordinate::new(15, 10, 45).unwrap());
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let translated = coord.translate(5, -10, 15).expect("test: expected success");
+        assert_eq!(translated, MatrixCoordinate::new(15, 10, 45).expect("test: valid coordinate"));
     }
 
     #[test]
     fn test_translate_negative() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let translated = coord.translate(-20, -30, -40).unwrap();
-        assert_eq!(translated, MatrixCoordinate::new(-10, -10, -10).unwrap());
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let translated = coord.translate(-20, -30, -40).expect("test: expected success");
+        assert_eq!(translated, MatrixCoordinate::new(-10, -10, -10).expect("test: valid coordinate"));
     }
 
     #[test]
     fn test_translate_overflow() {
-        let coord = MatrixCoordinate::new(i64::MAX / 4, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(i64::MAX / 4, 0, 0).expect("test: valid coordinate");
         let result = coord.translate(i64::MAX / 4 + 1, 0, 0);
-        assert!(matches!(result, Err(CoordinateError::Overflow) | Err(CoordinateError::OutOfBounds(_, _, _))));
+        assert!(matches!(
+            result,
+            Err(CoordinateError::Overflow) | Err(CoordinateError::OutOfBounds(_, _, _))
+        ));
     }
 
     #[test]
     fn test_scale() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let scaled = coord.scale(2).unwrap();
-        assert_eq!(scaled, MatrixCoordinate::new(20, 40, 60).unwrap());
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let scaled = coord.scale(2).expect("test: expected success");
+        assert_eq!(scaled, MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate"));
     }
 
     #[test]
     fn test_scale_negative() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let scaled = coord.scale(-1).unwrap();
-        assert_eq!(scaled, MatrixCoordinate::new(-10, -20, -30).unwrap());
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let scaled = coord.scale(-1).expect("test: expected success");
+        assert_eq!(scaled, MatrixCoordinate::new(-10, -20, -30).expect("test: valid coordinate"));
     }
 
     #[test]
     fn test_scale_zero() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         let result = coord.scale(0);
         assert!(matches!(result, Err(CoordinateError::InvalidScale(0))));
     }
 
     #[test]
     fn test_rotate_x_90() {
-        let coord = MatrixCoordinate::new(10, 20, 0).unwrap();
-        let rotated = coord.rotate_x(90.0).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 0).expect("test: valid coordinate");
+        let rotated = coord.rotate_x(90.0).expect("test: expected success");
         // After 90° rotation around X: y' = 0, z' = 20
         assert_eq!(rotated.x, 10);
         assert!((rotated.y as f64).abs() < 1.0); // Close to 0
@@ -283,8 +295,8 @@ mod tests {
 
     #[test]
     fn test_rotate_y_90() {
-        let coord = MatrixCoordinate::new(20, 10, 0).unwrap();
-        let rotated = coord.rotate_y(90.0).unwrap();
+        let coord = MatrixCoordinate::new(20, 10, 0).expect("test: valid coordinate");
+        let rotated = coord.rotate_y(90.0).expect("test: expected success");
         // After 90° rotation around Y: x' = 0, z' = -20
         assert!((rotated.x as f64).abs() < 1.0); // Close to 0
         assert_eq!(rotated.y, 10);
@@ -293,8 +305,8 @@ mod tests {
 
     #[test]
     fn test_rotate_z_90() {
-        let coord = MatrixCoordinate::new(20, 0, 10).unwrap();
-        let rotated = coord.rotate_z(90.0).unwrap();
+        let coord = MatrixCoordinate::new(20, 0, 10).expect("test: valid coordinate");
+        let rotated = coord.rotate_z(90.0).expect("test: expected success");
         // After 90° rotation around Z: x' = 0, y' = 20
         assert!((rotated.x as f64).abs() < 1.0); // Close to 0
         assert!((rotated.y - 20).abs() < 1);
@@ -303,8 +315,8 @@ mod tests {
 
     #[test]
     fn test_rotate_360() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let rotated = coord.rotate_x(360.0).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let rotated = coord.rotate_x(360.0).expect("test: expected success");
         // 360° rotation should return to original position
         assert!((rotated.x - coord.x).abs() < 1);
         assert!((rotated.y - coord.y).abs() < 1);
@@ -313,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_rotate_invalid() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         assert!(matches!(
             coord.rotate_x(f64::NAN),
             Err(CoordinateError::InvalidRotation(_))
@@ -326,18 +338,16 @@ mod tests {
 
     #[test]
     fn test_chained_transformations() {
-        let coord = MatrixCoordinate::new(10, 10, 10).unwrap();
-        let result = coord
-            .translate(5, 5, 5).unwrap()
-            .scale(2).unwrap();
+        let coord = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
+        let result = coord.translate(5, 5, 5).expect("test: expected result").scale(2).expect("test: expected result");
 
-        assert_eq!(result, MatrixCoordinate::new(30, 30, 30).unwrap());
+        assert_eq!(result, MatrixCoordinate::new(30, 30, 30).expect("test: valid coordinate"));
     }
 
     #[test]
     fn test_apply_transform() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let result = coord.apply_transform(|c| c.scale(2)).unwrap();
-        assert_eq!(result, MatrixCoordinate::new(20, 40, 60).unwrap());
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let result = coord.apply_transform(|c| c.scale(2)).expect("test: expected result");
+        assert_eq!(result, MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate"));
     }
 }

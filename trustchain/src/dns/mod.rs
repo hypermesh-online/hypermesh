@@ -3,17 +3,17 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! DNS-over-QUIC Resolver Implementation  
-//! 
+//!
 //! TrustChain DNS resolver with IPv6-only networking, certificate DNS validation,
 //! and integration with TrustChain domains (hypermesh, caesar, trust, assets).
 
+use anyhow::Result as AnyhowResult;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use serde::{Serialize, Deserialize};
-use anyhow::Result as AnyhowResult;
 use tokio::sync::Mutex;
-use tracing::{info, debug, warn, error};
+use tracing::{debug, error, info, warn};
 
 // ARCHITECTURAL ENFORCEMENT: Use STOQ transport instead of direct QUIC
 use trust_dns_proto::op::ResponseCode;
@@ -25,24 +25,24 @@ use crate::errors::{DnsError, Result as TrustChainResult};
 
 pub mod bootstrap;
 pub mod cache;
-pub mod resolver;
 pub mod cert_validator;
 pub mod dns_over_stoq;
+pub mod resolver;
 pub mod stoq_transport;
 // DEPRECATED: Legacy modules to be removed after full STOQ migration
-pub mod dns_over_quic;
 pub mod authoritative_server;
+pub mod dns_over_quic;
 pub mod production_zones;
 
 pub use bootstrap::*;
 pub use cache::*;
-pub use resolver::*;
 pub use cert_validator::*;
 pub use dns_over_stoq::*;
+pub use resolver::*;
 pub use stoq_transport::*;
 // DEPRECATED: Legacy exports to be removed after full STOQ migration
-pub use dns_over_quic::*;
 pub use authoritative_server::*;
+pub use dns_over_quic::*;
 pub use production_zones::*;
 
 /// TrustChain DNS resolver with STOQ transport (architectural compliance)
@@ -131,7 +131,7 @@ mod record_type_serde {
     where
         S: Serializer,
     {
-        format!("{:?}", record_type).serialize(serializer)
+        format!("{record_type:?}").serialize(serializer)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<RecordType, D::Error>
@@ -160,7 +160,7 @@ mod dns_class_serde {
     where
         S: Serializer,
     {
-        format!("{:?}", dns_class).serialize(serializer)
+        format!("{dns_class:?}").serialize(serializer)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<DNSClass, D::Error>
@@ -185,7 +185,7 @@ mod response_code_serde {
     where
         S: Serializer,
     {
-        format!("{:?}", response_code).serialize(serializer)
+        format!("{response_code:?}").serialize(serializer)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<ResponseCode, D::Error>
@@ -241,22 +241,25 @@ impl DnsResolver {
         let cache = Arc::new(DnsCache::new(config.cache_ttl).await?);
 
         // Initialize certificate validator
-        let cert_validator = Arc::new(CertificateValidator::new(
-            config.enable_cert_validation,
-        ).await?);
+        let cert_validator =
+            Arc::new(CertificateValidator::new(config.enable_cert_validation).await?);
 
         // Initialize TrustChain resolver
-        let resolver = Arc::new(TrustChainResolver::new(
-            config.upstream_resolvers.clone(),
-            config.trustchain_domains.clone(),
-        ).await?);
+        let resolver = Arc::new(
+            TrustChainResolver::new(
+                config.upstream_resolvers.clone(),
+                config.trustchain_domains.clone(),
+            )
+            .await?,
+        );
 
         // Initialize STOQ client (architectural enforcement)
         let stoq_config = crate::stoq_client::TrustChainStoqConfig {
             bind_address: config.bind_address,
             ..Default::default()
         };
-        let stoq_client = Arc::new(crate::stoq_client::TrustChainStoqClient::new(stoq_config).await?);
+        let stoq_client =
+            Arc::new(crate::stoq_client::TrustChainStoqClient::new(stoq_config).await?);
 
         // Initialize consensus context
         let consensus_context = Arc::new(ConsensusContext::new(
@@ -289,7 +292,7 @@ impl DnsResolver {
         // Start STOQ DNS server (proper architectural separation)
         let _stoq_client_clone = Arc::clone(&self.stoq_client);
         let _resolver_clone = self.clone_for_task();
-        
+
         let handle = tokio::spawn(async move {
             loop {
                 // STOQ handles connection acceptance internally
@@ -313,7 +316,10 @@ impl DnsResolver {
 
     /// Resolve DNS query
     pub async fn resolve_query(&self, query: &DnsQuery) -> TrustChainResult<DnsResponse> {
-        debug!("Resolving DNS query: {} ({:?})", query.name, query.record_type);
+        debug!(
+            "Resolving DNS query: {} ({:?})",
+            query.name, query.record_type
+        );
 
         // Check cache first
         if let Some(cached_response) = self.cache.get(&query.name, query.record_type).await? {
@@ -338,19 +344,19 @@ impl DnsResolver {
         }
 
         // Cache the response
-        self.cache.set(
-            &query.name,
-            query.record_type,
-            &response,
-            response.ttl,
-        ).await?;
+        self.cache
+            .set(&query.name, query.record_type, &response, response.ttl)
+            .await?;
 
         debug!("Resolved DNS query successfully: {}", query.name);
         Ok(response)
     }
 
     /// Resolve TrustChain-specific domain using production addresses
-    pub async fn resolve_trustchain_domain(&self, query: &DnsQuery) -> TrustChainResult<DnsResponse> {
+    pub async fn resolve_trustchain_domain(
+        &self,
+        query: &DnsQuery,
+    ) -> TrustChainResult<DnsResponse> {
         debug!("Resolving TrustChain domain: {}", query.name);
 
         // Use production domain resolver instead of localhost stubs
@@ -359,7 +365,10 @@ impl DnsResolver {
 
         if query.record_type == RecordType::AAAA {
             if let Some(ipv6_addr) = production_resolver.resolve_domain(&query.name) {
-                info!("✅ Resolved {} to production address: [{}]", query.name, ipv6_addr);
+                info!(
+                    "✅ Resolved {} to production address: [{}]",
+                    query.name, ipv6_addr
+                );
                 answers.push(DnsRecord {
                     name: query.name.clone(),
                     record_type: RecordType::AAAA,
@@ -383,7 +392,8 @@ impl DnsResolver {
                     warn!("❌ Domain {} not found in production DNS zones", query.name);
                     return Err(DnsError::DomainNotFound {
                         domain: query.name.clone(),
-                    }.into());
+                    }
+                    .into());
                 }
             }
         }
@@ -478,13 +488,17 @@ impl DnsResolver {
     // DNS queries are processed through stoq_client.resolve_dns() method
 
     fn is_trustchain_domain(&self, domain: &str) -> bool {
-        self.config.trustchain_domains.iter()
-            .any(|td| domain == td || domain.ends_with(&format!(".{}", td)))
+        self.config
+            .trustchain_domains
+            .iter()
+            .any(|td| domain == td || domain.ends_with(&format!(".{td}")))
     }
 
     async fn validate_domain_certificate(&self, domain: &str) -> TrustChainResult<()> {
         if self.config.enable_cert_validation {
-            self.cert_validator.validate_domain_certificate(domain).await
+            self.cert_validator
+                .validate_domain_certificate(domain)
+                .await
         } else {
             Ok(())
         }
@@ -496,23 +510,35 @@ impl DnsResolver {
         let rdata = match &record.data {
             DnsRecordData::A(addr) => RData::A(trust_dns_proto::rr::rdata::A(*addr)),
             DnsRecordData::AAAA(addr) => RData::AAAA(trust_dns_proto::rr::rdata::AAAA(*addr)),
-            DnsRecordData::CNAME(name) => RData::CNAME(trust_dns_proto::rr::rdata::CNAME(Name::from_utf8(name)?)),
-            DnsRecordData::MX { priority, exchange } => {
-                RData::MX(trust_dns_proto::rr::rdata::MX::new(*priority, Name::from_utf8(exchange)?))
+            DnsRecordData::CNAME(name) => {
+                RData::CNAME(trust_dns_proto::rr::rdata::CNAME(Name::from_utf8(name)?))
             }
-            DnsRecordData::TXT(text) => RData::TXT(trust_dns_proto::rr::rdata::TXT::new(vec![text.clone()])),
-            DnsRecordData::NS(ns) => RData::NS(trust_dns_proto::rr::rdata::NS(Name::from_utf8(ns)?)),
-            DnsRecordData::SOA { mname, rname, serial, refresh, retry, expire, minimum } => {
-                RData::SOA(trust_dns_proto::rr::rdata::SOA::new(
-                    Name::from_utf8(mname)?,
-                    Name::from_utf8(rname)?,
-                    *serial,
-                    *refresh,
-                    *retry,
-                    *expire,
-                    *minimum,
-                ))
+            DnsRecordData::MX { priority, exchange } => RData::MX(
+                trust_dns_proto::rr::rdata::MX::new(*priority, Name::from_utf8(exchange)?),
+            ),
+            DnsRecordData::TXT(text) => {
+                RData::TXT(trust_dns_proto::rr::rdata::TXT::new(vec![text.clone()]))
             }
+            DnsRecordData::NS(ns) => {
+                RData::NS(trust_dns_proto::rr::rdata::NS(Name::from_utf8(ns)?))
+            }
+            DnsRecordData::SOA {
+                mname,
+                rname,
+                serial,
+                refresh,
+                retry,
+                expire,
+                minimum,
+            } => RData::SOA(trust_dns_proto::rr::rdata::SOA::new(
+                Name::from_utf8(mname)?,
+                Name::from_utf8(rname)?,
+                *serial,
+                *refresh,
+                *retry,
+                *expire,
+                *minimum,
+            )),
         };
 
         Ok(Record::from_rdata(name, record.ttl, rdata))
@@ -538,26 +564,29 @@ mod tests {
     use std::net::Ipv6Addr;
 
     async fn create_test_resolver() -> DnsResolver {
-        let mut config = DnsConfig::default();
-        config.bind_address = Ipv6Addr::LOCALHOST;
-        config.port = 0; // Use random available port for testing
-        config.enable_cert_validation = false; // Disable for testing
+        let config = DnsConfig {
+            bind_address: Ipv6Addr::LOCALHOST,
+            port: 0,                       // Use random available port for testing
+            enable_cert_validation: false, // Disable for testing
+            ..Default::default()
+        };
 
-        DnsResolver::new(config).await.expect("Failed to create test DNS resolver")
+        DnsResolver::new(config)
+            .await
+            .expect("Failed to create test DNS resolver")
     }
 
     #[tokio::test]
     async fn test_dns_resolver_creation() {
         let resolver = create_test_resolver().await;
-        let stats = resolver.get_stats().await
-            .expect("Failed to get DNS stats");
+        let stats = resolver.get_stats().await.expect("Failed to get DNS stats");
         assert_eq!(stats.server_id, "trustchain-dns-localhost");
     }
 
     #[tokio::test]
     async fn test_trustchain_domain_detection() {
         let resolver = create_test_resolver().await;
-        
+
         assert!(resolver.is_trustchain_domain("hypermesh"));
         assert!(resolver.is_trustchain_domain("caesar"));
         assert!(resolver.is_trustchain_domain("trust"));
@@ -578,7 +607,9 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve_trustchain_domain(&query).await
+        let response = resolver
+            .resolve_trustchain_domain(&query)
+            .await
             .expect("Failed to resolve trustchain domain");
         assert_eq!(response.response_code, ResponseCode::NoError);
         assert!(!response.answers.is_empty(), "Expected at least one answer");
@@ -587,9 +618,10 @@ mod tests {
             // Test resolver is bound to localhost, should return localhost fallback
             // OR production address from ProductionDomainResolver
             assert!(
-                *addr == Ipv6Addr::LOCALHOST ||
-                *addr == crate::dns::production_zones::ProductionAddresses::HYPERMESH_DASHBOARD,
-                "Expected localhost or production address, got {}", addr
+                *addr == Ipv6Addr::LOCALHOST
+                    || *addr
+                        == crate::dns::production_zones::ProductionAddresses::HYPERMESH_DASHBOARD,
+                "Expected localhost or production address, got {addr}"
             );
         } else {
             panic!("Expected AAAA record");
@@ -609,22 +641,30 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve_trustchain_domain(&query).await
+        let response = resolver
+            .resolve_trustchain_domain(&query)
+            .await
             .expect("Failed to resolve unknown domain");
         // Test resolver is bound to localhost, so unknown domains get localhost fallback
         assert_eq!(response.response_code, ResponseCode::NoError);
-        assert!(!response.answers.is_empty(), "Localhost fallback should provide an answer");
+        assert!(
+            !response.answers.is_empty(),
+            "Localhost fallback should provide an answer"
+        );
 
         if let DnsRecordData::AAAA(addr) = &response.answers[0].data {
-            assert_eq!(*addr, Ipv6Addr::LOCALHOST, "Unknown domain should resolve to localhost in test mode");
+            assert_eq!(
+                *addr,
+                Ipv6Addr::LOCALHOST,
+                "Unknown domain should resolve to localhost in test mode"
+            );
         }
     }
 
     #[tokio::test]
     async fn test_dns_stats() {
         let resolver = create_test_resolver().await;
-        let stats = resolver.get_stats().await
-            .expect("Failed to get DNS stats");
+        let stats = resolver.get_stats().await.expect("Failed to get DNS stats");
 
         assert_eq!(stats.server_id, "trustchain-dns-localhost");
         assert_eq!(stats.queries_processed, 0);
@@ -642,7 +682,8 @@ mod tests {
             data: DnsRecordData::AAAA(Ipv6Addr::LOCALHOST),
         };
 
-        let trust_dns_record = resolver._dns_record_to_trust_dns(&dns_record)
+        let trust_dns_record = resolver
+            ._dns_record_to_trust_dns(&dns_record)
             .expect("Failed to convert DNS record to trust-dns format");
         assert_eq!(trust_dns_record.record_type(), RecordType::AAAA);
         assert_eq!(trust_dns_record.ttl(), 300);

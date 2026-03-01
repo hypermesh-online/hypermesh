@@ -4,12 +4,12 @@
 
 //! Node Authentication for HyperMesh Transport
 
-use std::sync::Arc;
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use tokio::time::{Instant, Duration};
-use tracing::debug;
 use blake3;
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::time::{Duration, Instant};
+use tracing::debug;
 // X509 parsing removed for MVP simplicity
 
 use super::config::AuthenticationConfig;
@@ -84,13 +84,16 @@ impl NodeAuthenticator {
         // Cache the result
         {
             let mut cache = self.cert_cache.write();
-            cache.insert(node_id.to_string(), CachedCertInfo {
-                _node_id: node_id.to_string(),
-                _fingerprint: self.generate_fingerprint(node_id),
-                _expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
-                cached_at: Instant::now(),
-                validation_result: is_valid,
-            });
+            cache.insert(
+                node_id.to_string(),
+                CachedCertInfo {
+                    _node_id: node_id.to_string(),
+                    _fingerprint: self.generate_fingerprint(node_id),
+                    _expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+                    cached_at: Instant::now(),
+                    validation_result: is_valid,
+                },
+            );
         }
 
         Ok(is_valid)
@@ -99,11 +102,10 @@ impl NodeAuthenticator {
     /// Validate a node ID format
     fn validate_node_id(&self, node_id: &str) -> bool {
         // Basic validation: node ID should be non-empty and follow a pattern
-        !node_id.is_empty() && (
-            node_id.starts_with("node-") ||
-            node_id.starts_with("hypermesh-") ||
-            node_id.starts_with("hm-")
-        )
+        !node_id.is_empty()
+            && (node_id.starts_with("node-")
+                || node_id.starts_with("hypermesh-")
+                || node_id.starts_with("hm-"))
     }
 
     /// Generate a fingerprint for a node ID
@@ -155,12 +157,12 @@ mod tests {
         let auth = NodeAuthenticator::new(config);
 
         // Test valid node IDs
-        assert!(auth.authenticate_node("node-123").await.unwrap());
-        assert!(auth.authenticate_node("hypermesh-abc").await.unwrap());
-        assert!(auth.authenticate_node("hm-xyz").await.unwrap());
+        assert!(auth.authenticate_node("node-123").await.expect("test: async operation"));
+        assert!(auth.authenticate_node("hypermesh-abc").await.expect("test: async operation"));
+        assert!(auth.authenticate_node("hm-xyz").await.expect("test: async operation"));
 
         // Test invalid node ID
-        assert!(!auth.authenticate_node("invalid").await.unwrap());
+        assert!(!auth.authenticate_node("invalid").await.expect("test: async operation"));
     }
 
     #[test]

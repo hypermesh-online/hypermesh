@@ -4,11 +4,11 @@
 
 //! Types for Multi-Network Coordinator - node info, capabilities, and configuration
 
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::AssetType;
 use super::super::PeerIdentity;
+use crate::assets::core::AssetType;
 
 /// Node information and capabilities
 #[derive(Clone, Debug, Serialize, Deserialize)]

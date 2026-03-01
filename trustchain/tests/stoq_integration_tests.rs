@@ -6,12 +6,11 @@
 
 use std::net::Ipv6Addr;
 use std::time::Duration;
-use trustchain::stoq_client::{
-    TrustChainStoqClient, TrustChainStoqConfig,
-    CertificateValidationRequest, ValidationPolicy
-};
 use trustchain::dns::resolver::TrustChainResolver;
 use trustchain::errors::Result as TrustChainResult;
+use trustchain::stoq_client::{
+    CertificateValidationRequest, TrustChainStoqClient, TrustChainStoqConfig, ValidationPolicy,
+};
 
 /// Mock STOQ server for testing
 struct MockStoqServer {
@@ -55,7 +54,10 @@ async fn test_stoq_client_creation() {
     let client = TrustChainStoqClient::new(config).await;
 
     // We expect this to fail without a server, but it shouldn't panic
-    assert!(client.is_err(), "Client creation should fail without server");
+    assert!(
+        client.is_err(),
+        "Client creation should fail without server"
+    );
 }
 
 /// Test DNS resolution over STOQ
@@ -68,17 +70,18 @@ async fn test_dns_over_stoq() {
     if port.is_ok() {
         // Create resolver with standard constructor
         let resolver = TrustChainResolver::new(
-            vec![Ipv6Addr::LOCALHOST],  // upstream resolvers
-            vec!["hypermesh.local".to_string()],  // trustchain domains
-        ).await;
+            vec![Ipv6Addr::LOCALHOST],           // upstream resolvers
+            vec!["hypermesh.local".to_string()], // trustchain domains
+        )
+        .await;
 
         // Resolver creation might fail without full STOQ implementation
         if resolver.is_ok() {
             let resolver = resolver.unwrap();
 
             // Test DNS query
+            use trust_dns_proto::rr::{DNSClass, RecordType};
             use trustchain::dns::DnsQuery;
-            use trust_dns_proto::rr::{RecordType, DNSClass};
 
             let query = DnsQuery {
                 id: 1234,
@@ -145,7 +148,7 @@ async fn test_connection_pooling() {
                 let cert_request = CertificateValidationRequest {
                     certificate_der: bytes::Bytes::from(vec![0u8; 100]),
                     chain: None,
-                    hostname: Some(format!("test{}.hypermesh.local", i)),
+                    hostname: Some(format!("test{i}.hypermesh.local")),
                     policy: ValidationPolicy::Standard,
                 };
 

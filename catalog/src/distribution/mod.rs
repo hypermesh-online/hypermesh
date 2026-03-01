@@ -6,25 +6,25 @@
 //!
 //! Provides decentralized package distribution using STOQ protocol and DHT-based discovery
 
-pub mod stoq_transport;
-pub mod dht;
 pub mod content_addressing;
+pub mod dht;
 pub mod package_manager;
 pub mod peer_discovery;
+pub mod stoq_transport;
 
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use std::collections::HashMap;
-use std::path::PathBuf;
 use crate::assets::{AssetPackage, AssetPackageId};
-use crate::security::{SecurityManager, SecurityConfig};
-use stoq_transport::StoqTransportLayer;
-use dht::{DhtNetwork, DhtNodeId};
+use crate::security::{SecurityConfig, SecurityManager};
+use anyhow::{Context, Result};
 use content_addressing::{ContentAddress, MerkleTree};
+use dht::{DhtNetwork, DhtNodeId};
 use package_manager::PackageManager;
 use peer_discovery::PeerDiscovery;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use stoq_transport::StoqTransportLayer;
+use tokio::sync::RwLock;
 
 /// P2P Distribution system for Catalog assets
 pub struct P2PDistribution {
@@ -255,30 +255,27 @@ impl P2PDistribution {
     /// Create a new P2P distribution system
     pub async fn new(
         registry: Arc<crate::registry::CatalogRegistry>,
-        config: DistributionConfig
+        config: DistributionConfig,
     ) -> Result<Self> {
         // Initialize security manager
         let security_manager = Arc::new(
             SecurityManager::new(config.security.clone())
                 .await
-                .context("Failed to initialize security manager")?
+                .context("Failed to initialize security manager")?,
         );
 
         // Initialize STOQ transport layer
         let transport = Arc::new(
             StoqTransportLayer::new(config.clone())
                 .await
-                .context("Failed to initialize STOQ transport")?
+                .context("Failed to initialize STOQ transport")?,
         );
 
         // Initialize DHT network
         let dht = Arc::new(
-            DhtNetwork::new(
-                transport.clone(),
-                config.bootstrap_nodes.clone(),
-            )
-            .await
-            .context("Failed to initialize DHT network")?
+            DhtNetwork::new(transport.clone(), config.bootstrap_nodes.clone())
+                .await
+                .context("Failed to initialize DHT network")?,
         );
 
         // Initialize content store
@@ -296,17 +293,11 @@ impl P2PDistribution {
                 content_store.clone(),
                 config.storage_dir.clone(),
             )
-            .await?
+            .await?,
         );
 
         // Initialize peer discovery
-        let peer_discovery = Arc::new(
-            PeerDiscovery::new(
-                transport.clone(),
-                dht.clone(),
-            )
-            .await?
-        );
+        let peer_discovery = Arc::new(PeerDiscovery::new(transport.clone(), dht.clone()).await?);
 
         Ok(Self {
             _registry: registry,
@@ -327,7 +318,8 @@ impl P2PDistribution {
         let package_id = package.get_package_id();
 
         // Store package locally
-        let content_addresses = self.package_manager
+        let content_addresses = self
+            .package_manager
             .store_package(&package)
             .await
             .context("Failed to store package locally")?;
@@ -362,13 +354,14 @@ impl P2PDistribution {
     /// Download a package from the P2P network
     pub async fn download(&self, package_id: &AssetPackageId) -> Result<AssetPackage> {
         // Discover peers with the package
-        let peers = self.dht
+        let peers = self
+            .dht
             .find_package_peers(package_id)
             .await
             .context("Failed to find package peers")?;
 
         if peers.is_empty() {
-            return Err(anyhow::anyhow!("No peers found with package {}", package_id));
+            return Err(anyhow::anyhow!("No peers found with package {package_id}"));
         }
 
         // Create transfer state
@@ -389,7 +382,8 @@ impl P2PDistribution {
         }
 
         // Download package chunks from peers
-        let package = self.package_manager
+        let package = self
+            .package_manager
             .download_from_peers(package_id, &peers, self.transport.clone())
             .await
             .context("Failed to download package from peers")?;
@@ -399,7 +393,8 @@ impl P2PDistribution {
 
         // Verify package signature and security
         if self.config.require_signatures {
-            let verification_result = self.security_manager
+            let verification_result = self
+                .security_manager
                 .verify_package(&package)
                 .await
                 .context("Failed to verify package security")?;
@@ -410,12 +405,14 @@ impl P2PDistribution {
                     let mut transfers = self.active_transfers.write().await;
                     if let Some(state) = transfers.get_mut(package_id) {
                         state.status = TransferStatus::Failed(
-                            "Package signature verification failed".to_string()
+                            "Package signature verification failed".to_string(),
                         );
                     }
                 }
 
-                self.metrics.failed_transfers.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .failed_transfers
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 return Err(anyhow::anyhow!(
                     "Package verification failed: {:?}",
@@ -425,7 +422,9 @@ impl P2PDistribution {
 
             // Check if publisher is allowed
             if !self.config.allow_unverified_publishers && verification_result.publisher.is_none() {
-                return Err(anyhow::anyhow!("Package from unverified publisher not allowed"));
+                return Err(anyhow::anyhow!(
+                    "Package from unverified publisher not allowed"
+                ));
             }
 
             // Publisher authentication already verified above; no reputation to update.
@@ -451,7 +450,9 @@ impl P2PDistribution {
             package.calculate_size() as u64,
             std::sync::atomic::Ordering::Relaxed,
         );
-        self.metrics.successful_transfers.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .successful_transfers
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         Ok(package)
     }
@@ -478,7 +479,9 @@ impl P2PDistribution {
             // TODO: Clean up active connections
             Ok(())
         } else {
-            Err(anyhow::anyhow!("No active transfer for package {}", package_id))
+            Err(anyhow::anyhow!(
+                "No active transfer for package {package_id}"
+            ))
         }
     }
 
@@ -506,7 +509,9 @@ impl P2PDistribution {
         if let Some(merkle_tree) = trees.get(&package_id) {
             merkle_tree.verify_package(package)?;
         } else {
-            return Err(anyhow::anyhow!("Merkle tree not found for package {}", package_id));
+            return Err(anyhow::anyhow!(
+                "Merkle tree not found for package {package_id}"
+            ));
         }
 
         Ok(())
@@ -544,10 +549,7 @@ impl FileBasedStorage {
     fn get_chunk_path(&self, address: &ContentAddress) -> PathBuf {
         let hex = address.to_hex();
         // Use first 2 chars as directory for better file system performance
-        self.base_path
-            .join(&hex[..2])
-            .join(&hex[2..4])
-            .join(&hex)
+        self.base_path.join(&hex[..2]).join(&hex[2..4]).join(&hex)
     }
 }
 
@@ -627,13 +629,9 @@ impl Default for DistributionConfig {
             nat_traversal: NatTraversalConfig {
                 enable_upnp: true,
                 enable_stun: true,
-                stun_servers: vec![
-                    "stun.hypermesh.online:3478".to_string(),
-                ],
+                stun_servers: vec!["stun.hypermesh.online:3478".to_string()],
                 enable_relay: true,
-                relay_servers: vec![
-                    "relay.hypermesh.online:8081".to_string(),
-                ],
+                relay_servers: vec!["relay.hypermesh.online:8081".to_string()],
             },
             security: SecurityConfig::default(),
             require_signatures: true,
@@ -680,12 +678,14 @@ mod tests {
             RegistryConfig::default(),
         ));
 
-        let mut config = DistributionConfig::default();
-        config.bootstrap_nodes = vec![]; // No bootstrap nodes for test
+        let config = DistributionConfig {
+            bootstrap_nodes: vec![], // No bootstrap nodes for test
+            ..Default::default()
+        };
         let distribution = P2PDistribution::new(registry, config).await;
         // STOQ transport requires TrustChain CA — skip in offline environments
         if let Err(e) = &distribution {
-            eprintln!("Distribution creation skipped (no network): {:?}", e);
+            eprintln!("Distribution creation skipped (no network): {e:?}");
             return;
         }
         assert!(distribution.is_ok());

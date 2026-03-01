@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use http::{Request, Response, header::HeaderValue};
+use http::{header::HeaderValue, Request, Response};
 use std::time::Instant;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -19,11 +19,7 @@ impl RequestLogger {
         );
     }
 
-    pub fn log_response<B>(
-        response: &Response<B>,
-        request_id: &str,
-        start_time: Instant,
-    ) {
+    pub fn log_response<B>(response: &Response<B>, request_id: &str, start_time: Instant) {
         let duration_ms = start_time.elapsed().as_millis();
         let status = response.status();
 

@@ -7,8 +7,8 @@
 //! This module defines the configuration structures for the Catalog extension,
 //! including settings for library management, consensus validation, and resource limits.
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Main configuration for the Catalog extension
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +60,7 @@ impl Default for CatalogExtensionConfig {
     fn default() -> Self {
         Self {
             library_path: PathBuf::from("./catalog-library"),
-            cache_size: 1024 * 1024 * 1024, // 1GB
+            cache_size: 1024 * 1024 * 1024,      // 1GB
             max_package_size: 100 * 1024 * 1024, // 100MB
             enable_p2p: true,
             consensus_validation: true,
@@ -153,29 +153,30 @@ impl CatalogExtensionConfig {
     pub fn validate(&self) -> Result<(), ConfigError> {
         // Check library path
         if !self.library_path.exists() {
-            return Err(ConfigError::InvalidPath(
-                format!("Library path does not exist: {:?}", self.library_path)
-            ));
+            return Err(ConfigError::InvalidPath(format!(
+                "Library path does not exist: {:?}",
+                self.library_path
+            )));
         }
 
         // Check cache size
         if self.cache_size == 0 {
             return Err(ConfigError::InvalidValue(
-                "Cache size must be greater than 0".to_string()
+                "Cache size must be greater than 0".to_string(),
             ));
         }
 
         // Check max package size
         if self.max_package_size == 0 {
             return Err(ConfigError::InvalidValue(
-                "Max package size must be greater than 0".to_string()
+                "Max package size must be greater than 0".to_string(),
             ));
         }
 
         // Check memory limit
         if self.max_memory_usage < self.cache_size {
             return Err(ConfigError::InvalidValue(
-                "Max memory usage must be greater than cache size".to_string()
+                "Max memory usage must be greater than cache size".to_string(),
             ));
         }
 
@@ -231,7 +232,7 @@ impl Default for IndexingConfig {
     fn default() -> Self {
         Self {
             auto_index: true,
-            index_interval: 300, // 5 minutes
+            index_interval: 300,               // 5 minutes
             max_index_size: 100 * 1024 * 1024, // 100MB
             enable_full_text: true,
             compress_index: true,
@@ -364,17 +365,20 @@ impl ConfigLoader {
         }
 
         if let Ok(size) = std::env::var("CATALOG_CACHE_SIZE") {
-            config.cache_size = size.parse()
+            config.cache_size = size
+                .parse()
                 .map_err(|_| ConfigError::InvalidValue("Invalid cache size".to_string()))?;
         }
 
         if let Ok(enable) = std::env::var("CATALOG_ENABLE_P2P") {
-            config.enable_p2p = enable.parse()
+            config.enable_p2p = enable
+                .parse()
                 .map_err(|_| ConfigError::InvalidValue("Invalid P2P setting".to_string()))?;
         }
 
         if let Ok(enable) = std::env::var("CATALOG_CONSENSUS_VALIDATION") {
-            config.consensus_validation = enable.parse()
+            config.consensus_validation = enable
+                .parse()
                 .map_err(|_| ConfigError::InvalidValue("Invalid consensus setting".to_string()))?;
         }
 
@@ -393,10 +397,10 @@ impl ConfigLoader {
     /// Load configuration from file
     pub fn from_file(path: &PathBuf) -> Result<CatalogExtensionConfig, ConfigError> {
         let contents = std::fs::read_to_string(path)
-            .map_err(|e| ConfigError::InvalidPath(format!("Cannot read config file: {}", e)))?;
+            .map_err(|e| ConfigError::InvalidPath(format!("Cannot read config file: {e}")))?;
 
         let config: CatalogExtensionConfig = toml::from_str(&contents)
-            .map_err(|e| ConfigError::InvalidValue(format!("Invalid TOML: {}", e)))?;
+            .map_err(|e| ConfigError::InvalidValue(format!("Invalid TOML: {e}")))?;
 
         config.validate()?;
         Ok(config)

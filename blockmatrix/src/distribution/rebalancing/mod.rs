@@ -223,9 +223,7 @@ impl RebalanceManager {
         let mut dist: HashMap<String, Vec<ShardId>> = HashMap::new();
         for (shard_id, replicas) in &self.shard_map {
             for (nid, _) in replicas {
-                dist.entry(nid.clone())
-                    .or_default()
-                    .push(shard_id.clone());
+                dist.entry(nid.clone()).or_default().push(shard_id.clone());
             }
         }
         dist
@@ -265,11 +263,7 @@ impl RebalanceManager {
         }
     }
 
-    fn add_balance_moves(
-        &self,
-        report: &RebalanceReport,
-        actions: &mut Vec<RebalanceAction>,
-    ) {
+    fn add_balance_moves(&self, report: &RebalanceReport, actions: &mut Vec<RebalanceAction>) {
         for overloaded in &report.overloaded_nodes {
             for underloaded in &report.underloaded_nodes {
                 if let Some(shard_id) =
@@ -394,8 +388,7 @@ mod tests {
                 RebalanceAction::ReplicateShard { shard_id, to_node }
                 if shard_id == "shard-1" && to_node == "node-b"
             )),
-            "Expected ReplicateShard action, got: {:?}",
-            actions
+            "Expected ReplicateShard action, got: {actions:?}"
         );
     }
 
@@ -405,7 +398,10 @@ mod tests {
         register_shard_on_nodes(
             &mut mgr,
             "shard-1",
-            &[("node-a", coord(10, 10, 10)), ("node-b", coord(-10, 10, 10))],
+            &[
+                ("node-a", coord(10, 10, 10)),
+                ("node-b", coord(-10, 10, 10)),
+            ],
         );
         mgr.nodes.insert("node-c".to_string(), coord(10, -10, 10));
 
@@ -414,8 +410,7 @@ mod tests {
             actions.iter().any(|a| matches!(
                 a, RebalanceAction::ReplicateShard { shard_id, .. } if shard_id == "shard-1"
             )),
-            "Expected ReplicateShard for shard-1, got: {:?}",
-            actions
+            "Expected ReplicateShard for shard-1, got: {actions:?}"
         );
     }
 
@@ -425,7 +420,10 @@ mod tests {
         register_shard_on_nodes(
             &mut mgr,
             "shard-1",
-            &[("node-a", coord(10, 10, 10)), ("node-b", coord(-10, 10, 10))],
+            &[
+                ("node-a", coord(10, 10, 10)),
+                ("node-b", coord(-10, 10, 10)),
+            ],
         );
         mgr.nodes.insert("node-c".to_string(), coord(10, -10, -10));
 
@@ -434,10 +432,12 @@ mod tests {
             actions.iter().any(|a| matches!(
                 a, RebalanceAction::ReplicateShard { shard_id, .. } if shard_id == "shard-1"
             )),
-            "Expected emergency replication, got: {:?}",
-            actions
+            "Expected emergency replication, got: {actions:?}"
         );
-        assert!(!mgr.nodes.contains_key("node-a"), "Failed node should be removed");
+        assert!(
+            !mgr.nodes.contains_key("node-a"),
+            "Failed node should be removed"
+        );
     }
 
     #[test]
@@ -448,11 +448,15 @@ mod tests {
         mgr.nodes.insert("node-b".to_string(), coord(-10, 10, 10));
 
         for i in 0..10 {
-            mgr.register_shard(format!("shard-{}", i), "node-a", &pos_a);
+            mgr.register_shard(format!("shard-{i}"), "node-a", &pos_a);
         }
 
         let report = mgr.check_balance();
-        assert!(report.imbalance_score > 0.3, "Expected high imbalance: {}", report.imbalance_score);
+        assert!(
+            report.imbalance_score > 0.3,
+            "Expected high imbalance: {}",
+            report.imbalance_score
+        );
         assert!(report.overloaded_nodes.contains(&"node-a".to_string()));
         assert!(report.underloaded_nodes.contains(&"node-b".to_string()));
     }
@@ -469,14 +473,17 @@ mod tests {
         mgr.nodes.insert("node-a".to_string(), pos_a);
         mgr.nodes.insert("node-b".to_string(), coord(-10, 10, 10));
         for i in 0..10 {
-            mgr.register_shard(format!("shard-{}", i), "node-a", &pos_a);
+            mgr.register_shard(format!("shard-{i}"), "node-a", &pos_a);
         }
 
         let actions = mgr.plan_rebalance();
         assert!(!actions.is_empty(), "First plan should produce actions");
         mgr.execute_actions(&actions);
 
-        assert!(mgr.plan_rebalance().is_empty(), "Cooldown should block second plan");
+        assert!(
+            mgr.plan_rebalance().is_empty(),
+            "Cooldown should block second plan"
+        );
     }
 
     #[test]
@@ -491,7 +498,7 @@ mod tests {
         let count = actions.iter()
             .filter(|a| matches!(a, RebalanceAction::ReplicateShard { shard_id, .. } if shard_id == "shard-1"))
             .count();
-        assert!(count >= 1, "Expected >= 1 ReplicateShard, got {}", count);
+        assert!(count >= 1, "Expected >= 1 ReplicateShard, got {count}");
     }
 
     #[test]
@@ -509,7 +516,11 @@ mod tests {
             }
             _ => None,
         });
-        assert_eq!(target, Some("node-c".to_string()), "Should prefer different octant");
+        assert_eq!(
+            target,
+            Some("node-c".to_string()),
+            "Should prefer different octant"
+        );
     }
 
     #[test]
@@ -531,21 +542,35 @@ mod tests {
             let sy = if (i / 2) % 2 == 0 { 1 } else { -1 };
             let sz = if (i / 4) % 2 == 0 { 1 } else { -1 };
             mgr.nodes.insert(
-                format!("node-{}", i),
-                coord(sx * (i * 7 + 5) as i64, sy * (i * 3 + 10) as i64, sz * (i * 11 + 2) as i64),
+                format!("node-{i}"),
+                coord(
+                    sx * (i * 7 + 5) as i64,
+                    sy * (i * 3 + 10) as i64,
+                    sz * (i * 11 + 2) as i64,
+                ),
             );
         }
         for i in 0..100 {
             let idx = i % 50;
-            let pos = *mgr.nodes.get(&format!("node-{}", idx)).expect("test: node exists");
-            mgr.register_shard(format!("shard-{}", i), &format!("node-{}", idx), &pos);
+            let pos = *mgr
+                .nodes
+                .get(&format!("node-{idx}"))
+                .expect("test: node exists");
+            mgr.register_shard(format!("shard-{i}"), &format!("node-{idx}"), &pos);
         }
 
         let report = mgr.check_balance();
-        assert!(!report.orphaned_shards.is_empty(), "Shards under-replicated");
+        assert!(
+            !report.orphaned_shards.is_empty(),
+            "Shards under-replicated"
+        );
 
         let actions = mgr.plan_rebalance();
-        assert!(actions.len() >= 100, "Expected >= 100 actions, got {}", actions.len());
+        assert!(
+            actions.len() >= 100,
+            "Expected >= 100 actions, got {}",
+            actions.len()
+        );
 
         let result = mgr.execute_actions(&actions);
         assert!(result.actions_executed > 0);
@@ -572,10 +597,16 @@ mod tests {
         assert_eq!(result.actions_failed, 0, "No actions should fail");
 
         let dist = mgr.get_shard_distribution();
-        let count = dist.iter()
+        let count = dist
+            .iter()
             .filter(|(_, shards)| shards.contains(&"shard-1".to_string()))
             .count();
-        assert!(count >= mgr.config.min_replicas, "shard-1 needs >= {} replicas, has {}", mgr.config.min_replicas, count);
+        assert!(
+            count >= mgr.config.min_replicas,
+            "shard-1 needs >= {} replicas, has {}",
+            mgr.config.min_replicas,
+            count
+        );
     }
 
     #[test]
@@ -592,7 +623,9 @@ mod tests {
         assert_eq!(result.actions_executed, 1);
 
         let dist = mgr.get_shard_distribution();
-        assert!(dist.get("node-b").map_or(false, |s| s.contains(&"shard-1".to_string())));
+        assert!(dist
+            .get("node-b")
+            .is_some_and(|s| s.contains(&"shard-1".to_string())));
     }
 
     #[test]
@@ -604,19 +637,27 @@ mod tests {
             cooldown_secs: 0,
         });
         let positions = [
-            coord(10, 10, 10), coord(-10, 10, 10), coord(10, -10, 10),
-            coord(-10, -10, 10), coord(10, 10, -10),
+            coord(10, 10, 10),
+            coord(-10, 10, 10),
+            coord(10, -10, 10),
+            coord(-10, -10, 10),
+            coord(10, 10, -10),
         ];
         for (i, pos) in positions.iter().enumerate() {
-            let nid = format!("node-{}", i);
+            let nid = format!("node-{i}");
             mgr.nodes.insert(nid.clone(), *pos);
             mgr.register_shard("shard-1".to_string(), &nid, pos);
         }
 
-        let removes = mgr.plan_rebalance().iter()
+        let removes = mgr
+            .plan_rebalance()
+            .iter()
             .filter(|a| matches!(a, RebalanceAction::RemoveReplica { .. }))
             .count();
-        assert!(removes >= 2, "Should remove >= 2 excess (5 - max 3), got {}", removes);
+        assert!(
+            removes >= 2,
+            "Should remove >= 2 excess (5 - max 3), got {removes}"
+        );
     }
 
     #[test]

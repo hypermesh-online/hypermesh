@@ -10,17 +10,17 @@
 //! - Usage statistics
 //! - Storage pool management
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{
-    AssetRegistration, AssetError, AssetResult, PrivacyMode, StorageRequirements, StorageType,
-};
-use super::sharding::ShardingConfig;
 use super::devices::{StorageDevice, StorageStatus};
+use super::sharding::ShardingConfig;
+use crate::assets::core::{
+    AssetError, AssetRegistration, AssetResult, PrivacyMode, StorageRequirements, StorageType,
+};
 
 /// Storage allocation record
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -139,18 +139,18 @@ pub async fn allocate_storage_from_devices(
     let mut suitable_devices: Vec<String> = devices
         .iter()
         .filter(|(_, device)| {
-            matches!(device.status, StorageStatus::Available) &&
-            device.storage_type == storage_req.storage_type &&
-            device.available_capacity_bytes >= storage_req.size_bytes &&
-            device.max_iops >= storage_req.min_iops.unwrap_or(0) &&
-            device.max_throughput_mbps >= storage_req.min_bandwidth_mbps.unwrap_or(0)
+            matches!(device.status, StorageStatus::Available)
+                && device.storage_type == storage_req.storage_type
+                && device.available_capacity_bytes >= storage_req.size_bytes
+                && device.max_iops >= storage_req.min_iops.unwrap_or(0)
+                && device.max_throughput_mbps >= storage_req.min_bandwidth_mbps.unwrap_or(0)
         })
         .map(|(device_id, _)| device_id.clone())
         .collect();
 
     // Sort by available capacity (largest first)
     suitable_devices.sort_by_key(|device_id| {
-        let device = devices.get(device_id).unwrap();
+        let device = devices.get(device_id).expect("device_id from filtered keys must exist");
         std::cmp::Reverse(device.available_capacity_bytes)
     });
 
@@ -162,14 +162,15 @@ pub async fn allocate_storage_from_devices(
         return Err(AssetError::AllocationFailed {
             reason: format!(
                 "Insufficient storage devices for replication: {} required, {} available",
-                required_replicas, suitable_devices.len()
-            )
+                required_replicas,
+                suitable_devices.len()
+            ),
         });
     }
 
     // Allocate to multiple devices for replication
     for device_id in suitable_devices.iter().take(required_replicas as usize) {
-        let device = devices.get_mut(device_id).unwrap();
+        let device = devices.get_mut(device_id).expect("device_id from suitable_devices must exist");
 
         if device.available_capacity_bytes < size_per_replica {
             continue; // Skip if insufficient space
@@ -187,7 +188,7 @@ pub async fn allocate_storage_from_devices(
     if allocated_devices.len() < required_replicas as usize {
         // Rollback partial allocation
         for device_id in &allocated_devices {
-            let device = devices.get_mut(device_id).unwrap();
+            let device = devices.get_mut(device_id).expect("allocated device_id must exist for rollback");
             device.status = StorageStatus::Available;
             device.allocated_to = None;
             device.available_capacity_bytes += size_per_replica;
@@ -195,7 +196,7 @@ pub async fn allocate_storage_from_devices(
         }
 
         return Err(AssetError::AllocationFailed {
-            reason: "Insufficient storage capacity across available devices".to_string()
+            reason: "Insufficient storage capacity across available devices".to_string(),
         });
     }
 
@@ -211,7 +212,8 @@ pub async fn deallocate_storage_from_devices(
     let mut devices = storage_devices.write().await;
     let mut device_allocs = device_allocations.write().await;
 
-    let size_per_device = allocation.allocated_size_bytes / allocation.allocated_devices.len() as u64;
+    let size_per_device =
+        allocation.allocated_size_bytes / allocation.allocated_devices.len() as u64;
 
     for device_id in &allocation.allocated_devices {
         if let Some(device) = devices.get_mut(device_id) {
@@ -238,20 +240,20 @@ pub async fn update_usage_stats(
             stats.total_allocations += 1;
             stats.active_allocations += 1;
             stats.total_bytes_allocated += bytes;
-        },
+        }
         StorageOperation::Deallocate => {
             stats.total_deallocations += 1;
             stats.active_allocations = stats.active_allocations.saturating_sub(1);
             stats.total_bytes_allocated = stats.total_bytes_allocated.saturating_sub(bytes);
-        },
+        }
         StorageOperation::_Read => {
             stats.total_read_ops += 1;
             stats.total_bytes_read += bytes;
-        },
+        }
         StorageOperation::_Write => {
             stats.total_write_ops += 1;
             stats.total_bytes_written += bytes;
-        },
+        }
     }
 }
 
@@ -261,15 +263,18 @@ pub fn initialize_default_pool(
     device_ids: Vec<String>,
 ) -> HashMap<String, StoragePool> {
     let mut storage_pools = HashMap::new();
-    storage_pools.insert("default".to_string(), StoragePool {
-        pool_id: "default".to_string(),
-        total_capacity,
-        available_capacity: total_capacity,
-        storage_type: StorageType::Ssd, // Default assumption
-        privacy_level: PrivacyMode::PRIVATE,
-        devices: device_ids,
-        allocations: Vec::new(),
-        health_status: PoolHealthStatus::Healthy,
-    });
+    storage_pools.insert(
+        "default".to_string(),
+        StoragePool {
+            pool_id: "default".to_string(),
+            total_capacity,
+            available_capacity: total_capacity,
+            storage_type: StorageType::Ssd, // Default assumption
+            privacy_level: PrivacyMode::PRIVATE,
+            devices: device_ids,
+            allocations: Vec::new(),
+            health_status: PoolHealthStatus::Healthy,
+        },
+    );
     storage_pools
 }

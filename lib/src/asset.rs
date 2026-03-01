@@ -34,7 +34,7 @@ pub enum AssetKind {
 impl fmt::Display for AssetKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AssetKind::System(s) => write!(f, "System({})", s),
+            AssetKind::System(s) => write!(f, "System({s})"),
             AssetKind::UserDefined(u) => write!(f, "UserDefined({})", u.type_name),
         }
     }
@@ -565,8 +565,7 @@ mod tests {
             warnings: vec!["deprecated field: model_year".into()],
         };
         let json = serde_json::to_string(&outcome).expect("test: serialize");
-        let back: ValidationOutcome =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let back: ValidationOutcome = serde_json::from_str(&json).expect("test: deserialize");
         assert!(!back.valid);
         assert_eq!(back.errors.len(), 1);
         assert_eq!(back.warnings.len(), 1);

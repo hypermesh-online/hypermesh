@@ -144,7 +144,7 @@ impl Default for TierModifiers {
 // ---------------------------------------------------------------------------
 
 /// Per-tier demurrage overrides. `None` means "use tier default".
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TierDemurrageOverrides {
     pub l0: Option<DemurrageRate>,
     pub l1: Option<DemurrageRate>,
@@ -160,17 +160,6 @@ impl TierDemurrageOverrides {
             MarketTier::L1 => self.l1,
             MarketTier::L2 => self.l2,
             MarketTier::L3 => self.l3,
-        }
-    }
-}
-
-impl Default for TierDemurrageOverrides {
-    fn default() -> Self {
-        Self {
-            l0: None,
-            l1: None,
-            l2: None,
-            l3: None,
         }
     }
 }
@@ -291,8 +280,7 @@ mod tests {
         for q in &quadrants {
             assert!(
                 !q.description().is_empty(),
-                "{:?} description must not be empty",
-                q
+                "{q:?} description must not be empty"
             );
         }
     }

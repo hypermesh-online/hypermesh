@@ -11,12 +11,12 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use super::super::{
-    PrivacyAllocationResult, ResourceAllocationConfig, ConsensusRequirementConfig,
-    ProxyConfiguration, allocation_types::PrivacyAllocationType,
+    allocation_types::PrivacyAllocationType, ConsensusRequirementConfig, PrivacyAllocationResult,
+    ProxyConfiguration, ResourceAllocationConfig,
 };
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError, PrivacyMode};
-use crate::consensus::proof::ConsensusProof;
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, PrivacyMode};
 use crate::assets::proxy::RemoteProxyManager;
+use crate::consensus::proof::ConsensusProof;
 
 use super::types::*;
 
@@ -27,7 +27,8 @@ impl PrivacyManager {
         proxy_manager: Option<Arc<RemoteProxyManager>>,
     ) -> AssetResult<Self> {
         let enforcer = Arc::new(super::super::PrivacyEnforcer::new(&config).await?);
-        let reward_calculator = Arc::new(super::super::CaesarRewardCalculator::new(&config.base_reward_config).await?);
+        let reward_calculator =
+            Arc::new(super::super::CaesarRewardCalculator::new(&config.base_reward_config).await?);
 
         Ok(Self {
             config,
@@ -53,11 +54,10 @@ impl PrivacyManager {
             PrivacyEventType::ConfigurationChanged,
             Some(user_id),
             None,
-            HashMap::from([
-                ("action".to_string(), "user_config_registered".to_string())
-            ]),
+            HashMap::from([("action".to_string(), "user_config_registered".to_string())]),
             LogLevel::Info,
-        ).await?;
+        )
+        .await?;
 
         Ok(())
     }
@@ -73,59 +73,55 @@ impl PrivacyManager {
         // Get user configuration
         let user_config = {
             let configs = self.user_configs.read().await;
-            configs.get(user_id)
+            configs
+                .get(user_id)
                 .ok_or_else(|| AssetError::AdapterError {
-                    message: format!("No privacy configuration found for user: {}", user_id)
+                    message: format!("No privacy configuration found for user: {user_id}"),
                 })?
                 .clone()
         };
 
         // Determine privacy level
-        let privacy_level = requested_privacy_level
-            .unwrap_or(user_config.preferred_privacy_level.clone());
+        let privacy_level = requested_privacy_level.unwrap_or(user_config.preferred_privacy_level);
 
         // Validate consensus proof if required
         if let Some(proof) = &consensus_proof {
             if !proof.validate() {
                 return Err(AssetError::AdapterError {
-                    message: "Invalid consensus proof provided".to_string()
+                    message: "Invalid consensus proof provided".to_string(),
                 });
             }
         }
 
         // Determine allocation type based on privacy level and user history
-        let allocation_type = self.determine_allocation_type(
-            &privacy_level,
-            &user_config.privacy_history,
-        ).await?;
+        let allocation_type = self
+            .determine_allocation_type(&privacy_level, &user_config.privacy_history)
+            .await?;
 
         // Create resource allocation configuration
-        let resource_config = self.create_resource_config(
-            &user_config,
-            &privacy_level,
-            asset_id,
-        ).await?;
+        let resource_config = self
+            .create_resource_config(&user_config, &privacy_level, asset_id)
+            .await?;
 
         // Create consensus requirements
-        let consensus_requirements = self.merge_consensus_requirements(
-            &user_config.consensus_requirements,
-            &privacy_level,
-        ).await?;
+        let consensus_requirements = self
+            .merge_consensus_requirements(&user_config.consensus_requirements, &privacy_level)
+            .await?;
 
         // Calculate CAESAR rewards
-        let reward_config = self.reward_calculator.calculate_reward_config(
-            &privacy_level,
-            &resource_config,
-            &user_config.reward_preferences,
-        ).await?;
+        let reward_config = self
+            .reward_calculator
+            .calculate_reward_config(
+                &privacy_level,
+                &resource_config,
+                &user_config.reward_preferences,
+            )
+            .await?;
 
         // Configure proxy settings if enabled
         let proxy_config = if user_config.proxy_preferences.enabled {
-            self.create_proxy_config(
-                &user_config.proxy_preferences,
-                &privacy_level,
-                asset_id,
-            ).await?
+            self.create_proxy_config(&user_config.proxy_preferences, &privacy_level, asset_id)
+                .await?
         } else {
             ProxyConfiguration::default()
         };
@@ -137,7 +133,7 @@ impl PrivacyManager {
         let allocation_result = PrivacyAllocationResult {
             asset_id: asset_id.clone(),
             allocation_type,
-            privacy_level: privacy_level.clone(),
+            privacy_level,
             resource_config,
             consensus_requirements,
             reward_config,
@@ -159,11 +155,12 @@ impl PrivacyManager {
             Some(user_id.to_string()),
             Some(allocation_id.clone()),
             HashMap::from([
-                ("privacy_level".to_string(), format!("{:?}", privacy_level)),
+                ("privacy_level".to_string(), format!("{privacy_level:?}")),
                 ("asset_id".to_string(), asset_id.to_string()),
             ]),
             LogLevel::Info,
-        ).await?;
+        )
+        .await?;
 
         Ok(allocation_result)
     }
@@ -178,9 +175,10 @@ impl PrivacyManager {
         // Get allocation
         let allocation = {
             let allocations = self.active_allocations.read().await;
-            allocations.get(allocation_id)
+            allocations
+                .get(allocation_id)
                 .ok_or_else(|| AssetError::AdapterError {
-                    message: format!("Allocation not found: {}", allocation_id)
+                    message: format!("Allocation not found: {allocation_id}"),
                 })?
                 .clone()
         };
@@ -192,33 +190,30 @@ impl PrivacyManager {
                     PrivacyEventType::AccessDenied,
                     Some(requester_id.to_string()),
                     Some(allocation_id.to_string()),
-                    HashMap::from([
-                        ("reason".to_string(), "allocation_expired".to_string())
-                    ]),
+                    HashMap::from([("reason".to_string(), "allocation_expired".to_string())]),
                     LogLevel::Warn,
-                ).await?;
+                )
+                .await?;
 
                 return Ok(false);
             }
         }
 
         // Validate with enforcer
-        let validation_result = self.enforcer.validate_access(
-            &allocation,
-            requester_id,
-            access_type,
-        ).await?;
+        let validation_result = self
+            .enforcer
+            .validate_access(&allocation, requester_id, access_type)
+            .await?;
 
         if validation_result.allowed {
             self.log_privacy_event(
                 PrivacyEventType::AccessGranted,
                 Some(requester_id.to_string()),
                 Some(allocation_id.to_string()),
-                HashMap::from([
-                    ("access_type".to_string(), access_type.to_string())
-                ]),
+                HashMap::from([("access_type".to_string(), access_type.to_string())]),
                 LogLevel::Info,
-            ).await?;
+            )
+            .await?;
         } else {
             self.log_privacy_event(
                 PrivacyEventType::AccessDenied,
@@ -226,10 +221,14 @@ impl PrivacyManager {
                 Some(allocation_id.to_string()),
                 HashMap::from([
                     ("access_type".to_string(), access_type.to_string()),
-                    ("reason".to_string(), validation_result.reason.unwrap_or_default()),
+                    (
+                        "reason".to_string(),
+                        validation_result.reason.unwrap_or_default(),
+                    ),
                 ]),
                 LogLevel::Warn,
-            ).await?;
+            )
+            .await?;
         }
 
         Ok(validation_result.allowed)
@@ -260,11 +259,13 @@ impl PrivacyManager {
         _privacy_level: &PrivacyMode,
         asset_id: &AssetRegistration,
     ) -> AssetResult<ResourceAllocationConfig> {
-        let asset_type = asset_id.asset_type()
-            .map(|at| format!("{:?}", at).to_lowercase())
+        let asset_type = asset_id
+            .asset_type()
+            .map(|at| format!("{at:?}").to_lowercase())
             .unwrap_or_else(|| "unknown".to_string());
 
-        let resource_privacy = user_config.resource_privacy_settings
+        let resource_privacy = user_config
+            .resource_privacy_settings
             .get(&asset_type)
             .cloned()
             .unwrap_or_else(|| ResourcePrivacyConfig::default_for_type(&asset_type));
@@ -358,6 +359,7 @@ impl ResourcePrivacyConfig {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for ProxyConfiguration {
     fn default() -> Self {
         Self {

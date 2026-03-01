@@ -9,15 +9,13 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug, error};
+use tracing::{debug, error, info, warn};
 
-use crate::matrix::coordinate::MatrixCoordinate;
-use crate::network::blockchain_integration::{
-    MatrixPositionValidator, ValidationStatus
-};
 use crate::blockchain::node_chain::NodeBlockchain;
+use crate::matrix::coordinate::MatrixCoordinate;
+use crate::network::blockchain_integration::{MatrixPositionValidator, ValidationStatus};
 use trustchain::consensus::ConsensusProof;
 
 /// Network position validator for matrix topology
@@ -80,8 +78,10 @@ impl NetworkPositionValidator {
 
         // Check cache first
         if let Some(cached) = self.check_cache(&coordinate, &node_id).await {
-            debug!("Using cached validation for position ({},{},{}): {}",
-                coordinate.x, coordinate.y, coordinate.z, cached);
+            debug!(
+                "Using cached validation for position ({},{},{}): {}",
+                coordinate.x, coordinate.y, coordinate.z, cached
+            );
             return Ok(cached);
         }
 
@@ -89,21 +89,22 @@ impl NetworkPositionValidator {
         let validation_start = SystemTime::now();
 
         // Try to register the position (this validates it)
-        match self.position_validator.register_position(
-            coordinate.clone(),
-            node_id.clone(),
-            consensus_proof,
-        ).await {
+        match self
+            .position_validator
+            .register_position(coordinate, node_id.clone(), consensus_proof)
+            .await
+        {
             Ok(registration) => {
                 let is_valid = registration.validation_status == ValidationStatus::Validated;
 
                 // Cache the result
                 self.cache_validation(
-                    coordinate.clone(),
+                    coordinate,
                     node_id.clone(),
                     is_valid,
                     1.0, // Full confidence for successful registration
-                ).await;
+                )
+                .await;
 
                 if let Ok(elapsed) = validation_start.elapsed() {
                     info!(
@@ -118,15 +119,15 @@ impl NetworkPositionValidator {
                 // Check if it's because position is already claimed
                 if e.to_string().contains("already claimed") {
                     // Check if it's claimed by the same node
-                    if let Some(existing) = self.position_validator.get_position(&coordinate).await {
+                    if let Some(existing) = self.position_validator.get_position(&coordinate).await
+                    {
                         if existing.node_id == node_id {
                             // Same node, position is valid
                             self.cache_validation(
-                                coordinate.clone(),
-                                node_id,
-                                true,
+                                coordinate, node_id, true,
                                 0.9, // Slightly lower confidence for re-validation
-                            ).await;
+                            )
+                            .await;
                             return Ok(true);
                         } else {
                             // Different node claims this position
@@ -146,12 +147,7 @@ impl NetworkPositionValidator {
                 );
 
                 // Cache negative result
-                self.cache_validation(
-                    coordinate,
-                    node_id,
-                    false,
-                    0.0,
-                ).await;
+                self.cache_validation(coordinate, node_id, false, 0.0).await;
 
                 Ok(false)
             }
@@ -193,7 +189,7 @@ impl NetworkPositionValidator {
         );
 
         let all_positions = self.position_validator.get_validated_positions().await;
-        let mut validation = TopologyValidation::new(center.clone());
+        let mut validation = TopologyValidation::new(center);
 
         for registration in all_positions {
             let distance = center.euclidean_distance(&registration.coordinate);
@@ -206,7 +202,7 @@ impl NetworkPositionValidator {
                 if self.validate_matrix_rules(&registration.coordinate).await {
                     validation.valid_positions += 1;
                 } else {
-                    validation.invalid_positions.push(registration.coordinate.clone());
+                    validation.invalid_positions.push(registration.coordinate);
                 }
             }
         }
@@ -233,8 +229,10 @@ impl NetworkPositionValidator {
         if distance_from_origin < 10.0 && self.strict_mode {
             // Central positions need extra validation in strict mode
             // This would check additional requirements like minimum uptime, reputation, etc.
-            debug!("Central position ({},{},{}) requires additional validation",
-                coordinate.x, coordinate.y, coordinate.z);
+            debug!(
+                "Central position ({},{},{}) requires additional validation",
+                coordinate.x, coordinate.y, coordinate.z
+            );
         }
 
         true
@@ -269,14 +267,14 @@ impl NetworkPositionValidator {
         let mut cache = self.validation_cache.write().await;
 
         cache.entries.insert(
-            coordinate.clone(),
+            coordinate,
             CachedValidation {
                 _coordinate: coordinate,
                 node_id,
                 is_valid,
                 timestamp: SystemTime::now(),
                 _confidence: confidence,
-            }
+            },
         );
 
         // Clean old entries if cache is too large
@@ -353,13 +351,17 @@ impl ValidationCache {
         // This would track actual hits/misses in production
         // For now, estimate based on cache freshness
         let now = SystemTime::now();
-        let fresh_entries = self.entries.values().filter(|entry| {
-            if let Ok(age) = now.duration_since(entry.timestamp) {
-                age < Duration::from_secs(60) // Fresh = < 1 minute old
-            } else {
-                false
-            }
-        }).count();
+        let fresh_entries = self
+            .entries
+            .values()
+            .filter(|entry| {
+                if let Ok(age) = now.duration_since(entry.timestamp) {
+                    age < Duration::from_secs(60) // Fresh = < 1 minute old
+                } else {
+                    false
+                }
+            })
+            .count();
 
         if self.entries.is_empty() {
             0.0
@@ -375,48 +377,46 @@ mod tests {
 
     #[tokio::test]
     async fn test_network_position_validation() {
-        let coordinate = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(coordinate.clone()));
+        let coordinate = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(coordinate));
         let validator = NetworkPositionValidator::new(blockchain, false);
 
         // Create test proof
         let proof = ConsensusProof::new_for_testing();
 
         // Validate position
-        let result = validator.validate_node_position(
-            coordinate.clone(),
-            "test_node".to_string(),
-            proof,
-        ).await;
+        let result = validator
+            .validate_node_position(coordinate, "test_node".to_string(), proof)
+            .await;
 
         assert!(result.is_ok());
-        assert!(result.unwrap());
+        assert!(result.expect("test: expected result"));
     }
 
     #[tokio::test]
     async fn test_topology_consistency_validation() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(center.clone()));
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(center));
         let validator = NetworkPositionValidator::new(blockchain, false);
 
         // Register some positions
         for x in -2..=2 {
             for y in -2..=2 {
-                let coord = MatrixCoordinate::new(x * 10, y * 10, 0).unwrap();
+                let coord = MatrixCoordinate::new(x * 10, y * 10, 0).expect("test: valid coordinate");
                 let proof = ConsensusProof::new_for_testing();
-                let _ = validator.validate_node_position(
-                    coord,
-                    format!("node_{}_{}", x, y),
-                    proof,
-                ).await;
+                let _ = validator
+                    .validate_node_position(coord, format!("node_{x}_{y}"), proof)
+                    .await;
             }
         }
 
         // Validate topology
-        let topology = validator.validate_topology_consistency(
-            center,
-            50.0, // Radius
-        ).await.unwrap();
+        let topology = validator
+            .validate_topology_consistency(
+                center, 50.0, // Radius
+            )
+            .await
+            .expect("test: expected success");
 
         assert!(topology.positions_in_radius > 0);
         assert_eq!(topology.valid_positions, topology.positions_in_radius);
@@ -425,25 +425,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_validation_caching() {
-        let coordinate = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(coordinate.clone()));
+        let coordinate = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(coordinate));
         let validator = NetworkPositionValidator::new(blockchain, false);
 
         let proof = ConsensusProof::new_for_testing();
 
         // First validation - should hit blockchain
-        let result1 = validator.validate_node_position(
-            coordinate.clone(),
-            "cached_node".to_string(),
-            proof.clone(),
-        ).await.unwrap();
+        let result1 = validator
+            .validate_node_position(coordinate, "cached_node".to_string(), proof.clone())
+            .await
+            .expect("test: expected success");
 
         // Second validation - should hit cache
-        let result2 = validator.validate_node_position(
-            coordinate.clone(),
-            "cached_node".to_string(),
-            proof,
-        ).await.unwrap();
+        let result2 = validator
+            .validate_node_position(coordinate, "cached_node".to_string(), proof)
+            .await
+            .expect("test: expected success");
 
         assert_eq!(result1, result2);
 

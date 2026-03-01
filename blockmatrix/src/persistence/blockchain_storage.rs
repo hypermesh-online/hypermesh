@@ -7,18 +7,18 @@
 //! Provides efficient storage for per-node blockchains with append-only logs,
 //! indexes, and write-ahead logging for crash recovery.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 use tracing::info;
 
+use super::{PersistenceError, PersistenceResult};
 use crate::blockchain::block::Block;
 use crate::blockchain::node_chain::ChainStats;
-use super::{PersistenceError, PersistenceResult};
 
 /// Block file size threshold (1000 blocks per file)
 const BLOCKS_PER_FILE: u64 = 1000;
@@ -147,8 +147,10 @@ impl BlockchainStorage {
 
         // Determine which file to write to
         let file_id = (block.index / BLOCKS_PER_FILE) as u32;
-        let file_path = self.storage_dir.join("blocks")
-            .join(format!("{:08}.blk", file_id));
+        let file_path = self
+            .storage_dir
+            .join("blocks")
+            .join(format!("{file_id:08}.blk"));
 
         // Append block to file
         let mut file = OpenOptions::new()
@@ -170,7 +172,7 @@ impl BlockchainStorage {
 
             block_index.insert(
                 block.hash.clone(),
-                (file_id, offset, serialized.len() as u32)
+                (file_id, offset, serialized.len() as u32),
             );
             index_map.insert(block.index, block.hash.clone());
         }
@@ -191,8 +193,10 @@ impl BlockchainStorage {
         self.save_metadata().await?;
         self.save_index().await?;
 
-        info!("Wrote block {} to storage (file {}, offset {})",
-              block.index, file_id, offset);
+        info!(
+            "Wrote block {} to storage (file {}, offset {})",
+            block.index, file_id, offset
+        );
 
         Ok(())
     }
@@ -212,9 +216,7 @@ impl BlockchainStorage {
                     Ok(None)
                 }
             }
-            BlockQuery::ByHash(hash) => {
-                self.read_block_by_hash(&hash).await
-            }
+            BlockQuery::ByHash(hash) => self.read_block_by_hash(&hash).await,
             BlockQuery::Range(start, _end) => {
                 // For range queries, return first block (caller should iterate)
                 // Use read_block_by_index to avoid recursion
@@ -269,8 +271,10 @@ impl BlockchainStorage {
         };
 
         if let Some((file_id, offset, size)) = location {
-            let file_path = self.storage_dir.join("blocks")
-                .join(format!("{:08}.blk", file_id));
+            let file_path = self
+                .storage_dir
+                .join("blocks")
+                .join(format!("{file_id:08}.blk"));
 
             let mut file = File::open(&file_path)?;
             file.seek(SeekFrom::Start(offset))?;
@@ -301,7 +305,7 @@ impl BlockchainStorage {
             chain_height: metadata.chain_height,
             chain_start: Some(metadata.created_at),
             avg_block_time_ms: 0.0, // Would need to calculate from blocks
-            total_data_size: 0, // Would need to sum from index
+            total_data_size: 0,     // Would need to sum from index
         }
     }
 
@@ -320,8 +324,7 @@ impl BlockchainStorage {
     /// Load metadata from disk
     fn load_metadata(path: &Path) -> PersistenceResult<ChainMetadata> {
         let json = std::fs::read_to_string(path)?;
-        serde_json::from_str(&json)
-            .map_err(|e| PersistenceError::Deserialization(e.to_string()))
+        serde_json::from_str(&json).map_err(|e| PersistenceError::Deserialization(e.to_string()))
     }
 
     /// Save block index to disk
@@ -339,13 +342,12 @@ impl BlockchainStorage {
     }
 
     /// Load block index from disk
-    fn load_index(path: &Path) -> PersistenceResult<(
-        HashMap<String, (u32, u64, u32)>,
-        HashMap<u64, String>
-    )> {
+    #[allow(clippy::type_complexity)]
+    fn load_index(
+        path: &Path,
+    ) -> PersistenceResult<(HashMap<String, (u32, u64, u32)>, HashMap<u64, String>)> {
         let data = std::fs::read(path)?;
-        bincode::deserialize(&data)
-            .map_err(|e| PersistenceError::Deserialization(e.to_string()))
+        bincode::deserialize(&data).map_err(|e| PersistenceError::Deserialization(e.to_string()))
     }
 
     /// Replay WAL entries
@@ -394,10 +396,7 @@ struct WalWriter {
 
 impl WalWriter {
     fn new(path: PathBuf) -> PersistenceResult<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
+        let file = OpenOptions::new().create(true).append(true).open(path)?;
 
         Ok(Self {
             file: BufWriter::new(file),
@@ -461,11 +460,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_blockchain_storage_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
         let metadata = storage.get_metadata().await;
         assert_eq!(metadata.total_blocks, 0);
@@ -474,46 +473,52 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_and_read_block() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let block = Block::genesis(coord);
 
         // Write block
-        storage.write_block(&block).await.unwrap();
+        storage.write_block(&block).await.expect("test: async operation");
 
         // Read by index
-        let read_block = storage.read_block(BlockQuery::ByIndex(0)).await.unwrap();
+        let read_block = storage.read_block(BlockQuery::ByIndex(0)).await.expect("test: async operation");
         assert!(read_block.is_some());
-        assert_eq!(read_block.unwrap().hash, block.hash);
+        assert_eq!(read_block.expect("test: assertion value").hash, block.hash);
 
         // Read by hash
-        let read_block = storage.read_block(BlockQuery::ByHash(block.hash.clone())).await.unwrap();
+        let read_block = storage
+            .read_block(BlockQuery::ByHash(block.hash.clone()))
+            .await
+            .expect("test: expected success");
         assert!(read_block.is_some());
-        assert_eq!(read_block.unwrap().index, 0);
+        assert_eq!(read_block.expect("test: assertion value").index, 0);
     }
 
     #[tokio::test]
     async fn test_multiple_blocks() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        use crate::assets::core::AssetRegistration;
 
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let mut prev_block = Block::genesis(coord.clone());
-        storage.write_block(&prev_block).await.unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
-        // Write additional blocks
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let mut prev_block = Block::genesis(coord);
+        storage.write_block(&prev_block).await.expect("test: async operation");
+
+        // Write additional blocks (each must contain at least one asset)
         for i in 1..10 {
-            let mut block = Block::new(i, vec![], prev_block.hash.clone(), coord.clone());
-            block.hash = format!("hash_{}", i); // Simplified for testing
-            storage.write_block(&block).await.unwrap();
+            let asset = AssetRegistration::genesis(coord);
+            let mut block = Block::new(i, vec![asset], prev_block.hash.clone(), coord);
+            block.hash = format!("hash_{i}"); // Simplified for testing
+            storage.write_block(&block).await.expect("test: async operation");
             prev_block = block;
         }
 
@@ -523,64 +528,64 @@ mod tests {
         assert_eq!(metadata.chain_height, 9);
 
         // Read range
-        let blocks = storage.read_range(0, 5).await.unwrap();
+        let blocks = storage.read_range(0, 5).await.expect("test: async operation");
         assert_eq!(blocks.len(), 6);
     }
 
     #[tokio::test]
     async fn test_wal_replay() {
-        let temp_dir = TempDir::new().unwrap();
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
 
         {
-            let storage = BlockchainStorage::new(
-                temp_dir.path().to_path_buf(),
-                "test_node".to_string()
-            ).await.unwrap();
+            let storage =
+                BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                    .await
+                    .expect("test: expected success");
 
-            let block = Block::genesis(coord.clone());
-            storage.write_block(&block).await.unwrap();
+            let block = Block::genesis(coord);
+            storage.write_block(&block).await.expect("test: async operation");
         }
 
         // Create new storage instance and replay WAL
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
-        let replayed = storage.replay_wal().await.unwrap();
+        let replayed = storage.replay_wal().await.expect("test: async operation");
         assert!(replayed > 0);
 
         // Verify block exists after replay
-        let block = storage.read_block(BlockQuery::ByIndex(0)).await.unwrap();
+        let block = storage.read_block(BlockQuery::ByIndex(0)).await.expect("test: async operation");
         assert!(block.is_some());
     }
 
     #[tokio::test]
     async fn test_metadata_persistence() {
-        let temp_dir = TempDir::new().unwrap();
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
 
         // Write some blocks
         {
-            let storage = BlockchainStorage::new(
-                temp_dir.path().to_path_buf(),
-                "test_node".to_string()
-            ).await.unwrap();
+            let storage =
+                BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                    .await
+                    .expect("test: expected success");
 
             for i in 0..5 {
-                let mut block = Block::genesis(coord.clone());
+                let mut block = Block::genesis(coord);
                 block.index = i;
-                block.hash = format!("hash_{}", i);
-                storage.write_block(&block).await.unwrap();
+                block.hash = format!("hash_{i}");
+                storage.write_block(&block).await.expect("test: async operation");
             }
         }
 
         // Load storage again and verify metadata
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
         let metadata = storage.get_metadata().await;
         assert_eq!(metadata.total_blocks, 5);
@@ -589,44 +594,48 @@ mod tests {
 
     #[tokio::test]
     async fn test_last_n_blocks_query() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
-        let coord = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
         // Write 10 blocks
         for i in 0..10 {
-            let mut block = Block::genesis(coord.clone());
+            let mut block = Block::genesis(coord);
             block.index = i;
-            block.hash = format!("hash_{}", i);
-            storage.write_block(&block).await.unwrap();
+            block.hash = format!("hash_{i}");
+            storage.write_block(&block).await.expect("test: async operation");
         }
 
         // Query last 3 blocks
-        let block = storage.read_block(BlockQuery::Last(3)).await.unwrap();
+        let block = storage.read_block(BlockQuery::Last(3)).await.expect("test: async operation");
         assert!(block.is_some());
-        assert_eq!(block.unwrap().index, 7);
+        assert_eq!(block.expect("test: assertion value").index, 7);
     }
 
     #[tokio::test]
     async fn test_flush_wal() {
-        let temp_dir = TempDir::new().unwrap();
-        let storage = BlockchainStorage::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string()
-        ).await.unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
 
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let block = Block::genesis(coord);
 
-        storage.write_block(&block).await.unwrap();
-        storage.flush_wal().await.unwrap();
+        storage.write_block(&block).await.expect("test: async operation");
+        storage.flush_wal().await.expect("test: async operation");
 
         // Verify WAL file exists
-        let wal_path = temp_dir.path().join("test_node").join("blockchain").join("wal.log");
+        let wal_path = temp_dir
+            .path()
+            .join("test_node")
+            .join("blockchain")
+            .join("wal.log");
         assert!(wal_path.exists());
     }
 }

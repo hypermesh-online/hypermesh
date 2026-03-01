@@ -11,15 +11,15 @@
 //! - Network boundary validation
 //! - Violation detection and logging
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
 use tracing::debug;
+use uuid::Uuid;
 
 // Import network types from parent module
 use super::trust::NetworkType;
@@ -63,7 +63,11 @@ pub type Timestamp = DateTime<Utc>;
 #[async_trait]
 pub trait IsolationManager: Send + Sync {
     /// Configure isolation for new network
-    async fn configure_network(&self, network_id: NetworkId, network_type: NetworkType) -> Result<()>;
+    async fn configure_network(
+        &self,
+        network_id: NetworkId,
+        network_type: NetworkType,
+    ) -> Result<()>;
 
     /// Remove network isolation configuration
     async fn remove_network(&self, network_id: NetworkId) -> Result<()>;
@@ -186,7 +190,11 @@ impl ConnectionPool {
     }
 
     /// Create connection pool with custom limits
-    pub fn with_limits(network_id: NetworkId, max_connections: usize, timeout_seconds: u64) -> Self {
+    pub fn with_limits(
+        network_id: NetworkId,
+        max_connections: usize,
+        timeout_seconds: u64,
+    ) -> Self {
         ConnectionPool {
             network_id,
             connections: Arc::new(RwLock::new(Vec::new())),
@@ -199,7 +207,10 @@ impl ConnectionPool {
     pub async fn add_connection(&self, conn: Connection) -> Result<()> {
         let mut connections = self.connections.write().await;
         if connections.len() >= self.max_connections {
-            return Err(anyhow!("Connection pool full: max {} connections", self.max_connections));
+            return Err(anyhow!(
+                "Connection pool full: max {} connections",
+                self.max_connections
+            ));
         }
         connections.push(conn);
         Ok(())
@@ -286,7 +297,7 @@ pub enum ConnectionState {
 }
 
 /// Isolation statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct IsolationStats {
     /// Total packets validated
     pub packets_validated: u64,
@@ -300,19 +311,6 @@ pub struct IsolationStats {
     pub active_networks: usize,
     /// Total connections across all pools
     pub total_connections: usize,
-}
-
-impl Default for IsolationStats {
-    fn default() -> Self {
-        IsolationStats {
-            packets_validated: 0,
-            packets_rejected: 0,
-            violations_detected: 0,
-            violations_by_type: HashMap::new(),
-            active_networks: 0,
-            total_connections: 0,
-        }
-    }
 }
 
 /// Helper to create zero hash

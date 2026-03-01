@@ -9,39 +9,41 @@
 //!
 //! This module implements the highest priority missing component from the Caesar Asset Roadmap.
 
-pub mod manager;
-pub mod routing;
 pub mod forwarding;
-pub mod trust_integration;
+pub mod manager;
+pub mod nat_translation;
+pub mod proxy_selector;
+pub mod remote_memory_transport;
+pub mod routing;
+pub mod scope_routing;
 pub mod security;
 pub mod sharding;
-pub mod nat_translation;
-pub mod remote_memory_transport;
-pub mod proxy_selector;
-pub mod scope_routing;
+pub mod trust_integration;
 
-pub use manager::{RemoteProxyManager};
-pub use routing::{ProxyRouter, ProxyRoute, RouteTable};
-pub use forwarding::{ProxyForwarder, ForwardingRule, ForwardingMode, ForwardingRuleType};
-pub use trust_integration::{TrustChainIntegration, CertificateValidator};
-pub use security::{QuantumSecurity, FalconSigner, KyberEncryption};
-pub use sharding::{ShardedDataAccess, ShardManager, EncryptedShard};
-pub use nat_translation::{NATTranslator, GlobalAddress, MemoryPermissions, PrivacyConfig};
+pub use forwarding::{ForwardingMode, ForwardingRule, ForwardingRuleType, ProxyForwarder};
+pub use manager::RemoteProxyManager;
+pub use nat_translation::{GlobalAddress, MemoryPermissions, NATTranslator, PrivacyConfig};
+pub use proxy_selector::{ProxyNode, ProxySelector, ProxySelectorConfig, TrustLevel};
 pub use remote_memory_transport::{
-    RemoteMemoryTransport, TransportConfig, MappedMemoryRegion,
-    MemoryOperationType, OperationResult, TransportMetrics,
+    MappedMemoryRegion, MemoryOperationType, OperationResult, RemoteMemoryTransport,
+    TransportConfig, TransportMetrics,
 };
-pub use proxy_selector::{ProxySelector, ProxyNode, TrustLevel, ProxySelectorConfig};
+pub use routing::{ProxyRoute, ProxyRouter, RouteTable};
 pub use scope_routing::{
-    ScopeAwareRouter, ScopeRoutingConfig, ScopeAwareRoute,
-    GatewayNodeInfo, ScopeRoutingError, ScopeRoutingStats,
+    GatewayNodeInfo, ScopeAwareRoute, ScopeAwareRouter, ScopeRoutingConfig, ScopeRoutingError,
+    ScopeRoutingStats,
 };
+pub use security::{FalconSigner, KyberEncryption, QuantumSecurity};
+pub use sharding::{EncryptedShard, ShardManager, ShardedDataAccess};
+pub use trust_integration::{CertificateValidator, TrustChainIntegration};
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // Re-export ProxyAddress from core
-pub use crate::assets::core::{ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyMode};
+pub use crate::assets::core::{
+    AssetError, AssetRegistration, AssetResult, PrivacyMode, ProxyAddress,
+};
 
 /// Global proxy network configuration
 #[derive(Clone, Debug)]
@@ -72,12 +74,42 @@ pub struct PortRange {
 impl Default for ProxyNetworkConfig {
     fn default() -> Self {
         let mut port_ranges = HashMap::new();
-        port_ranges.insert("memory".to_string(), PortRange { start: 8000, end: 8999 });
-        port_ranges.insert("cpu".to_string(), PortRange { start: 9000, end: 9999 });
-        port_ranges.insert("gpu".to_string(), PortRange { start: 10000, end: 10999 });
-        port_ranges.insert("storage".to_string(), PortRange { start: 11000, end: 11999 });
-        port_ranges.insert("network".to_string(), PortRange { start: 12000, end: 12999 });
-        
+        port_ranges.insert(
+            "memory".to_string(),
+            PortRange {
+                start: 8000,
+                end: 8999,
+            },
+        );
+        port_ranges.insert(
+            "cpu".to_string(),
+            PortRange {
+                start: 9000,
+                end: 9999,
+            },
+        );
+        port_ranges.insert(
+            "gpu".to_string(),
+            PortRange {
+                start: 10000,
+                end: 10999,
+            },
+        );
+        port_ranges.insert(
+            "storage".to_string(),
+            PortRange {
+                start: 11000,
+                end: 11999,
+            },
+        );
+        port_ranges.insert(
+            "network".to_string(),
+            PortRange {
+                start: 12000,
+                end: 12999,
+            },
+        );
+
         Self {
             network_prefix: [0x2a, 0x01, 0x04, 0xf8, 0x01, 0x10, 0x53, 0xad], // HyperMesh IPv6 prefix
             hypermesh_network_id: Some("hypermesh-main".to_string()),
@@ -118,22 +150,22 @@ pub struct ProxySystemStats {
 pub enum ProxySystemError {
     #[error("Proxy node not found: {node_id}")]
     ProxyNodeNotFound { node_id: String },
-    
+
     #[error("NAT translation failed for address: {address}")]
     NATTranslationFailed { address: String },
-    
+
     #[error("Trust validation failed: {reason}")]
     TrustValidationFailed { reason: String },
-    
+
     #[error("Quantum security validation failed: {reason}")]
     QuantumSecurityFailed { reason: String },
-    
+
     #[error("Forwarding failed: {reason}")]
     ForwardingFailed { reason: String },
-    
+
     #[error("Sharded access failed: {reason}")]
     ShardedAccessFailed { reason: String },
-    
+
     #[error("Configuration error: {message}")]
     ConfigurationError { message: String },
 }

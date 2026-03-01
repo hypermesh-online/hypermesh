@@ -7,12 +7,12 @@
 //! This module provides actual cryptographic validation for the four-proof consensus system.
 //! Replaces all mock implementations with real security checks.
 
-use anyhow::{Result, anyhow};
-use std::time::{SystemTime, Duration, Instant};
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-use tracing::{info, warn, error, debug};
+use std::time::{Duration, Instant, SystemTime};
+use tracing::{debug, error, info, warn};
 
-use super::proof::{SpaceProof, StakeProof, WorkProof, TimeProof};
+use super::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 use super::{ConsensusProof, ConsensusResult};
 
 /// Real cryptographic signature verification
@@ -21,6 +21,12 @@ pub struct CryptoVerifier {
     trusted_keys: HashMap<String, Vec<u8>>,
     /// Signature verification cache
     verification_cache: HashMap<String, (SystemTime, bool)>,
+}
+
+impl Default for CryptoVerifier {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CryptoVerifier {
@@ -34,7 +40,7 @@ impl CryptoVerifier {
     /// Verify a cryptographic signature (real implementation)
     pub fn verify_signature(&mut self, node_id: &str, data: &[u8], signature: &[u8]) -> bool {
         // Check cache first (signatures are expensive to verify)
-        let cache_key = format!("{}-{:?}", node_id, signature);
+        let cache_key = format!("{node_id}-{signature:?}");
         if let Some((timestamp, result)) = self.verification_cache.get(&cache_key) {
             if timestamp.elapsed().unwrap_or(Duration::MAX) < Duration::from_secs(60) {
                 debug!("Using cached signature verification result");
@@ -46,7 +52,8 @@ impl CryptoVerifier {
         let result = self.perform_signature_verification(node_id, data, signature);
 
         // Cache the result
-        self.verification_cache.insert(cache_key, (SystemTime::now(), result));
+        self.verification_cache
+            .insert(cache_key, (SystemTime::now(), result));
 
         result
     }
@@ -94,6 +101,12 @@ pub struct RealSpaceValidator {
     crypto_verifier: CryptoVerifier,
 }
 
+impl Default for RealSpaceValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RealSpaceValidator {
     pub fn new() -> Self {
         Self {
@@ -108,29 +121,34 @@ impl RealSpaceValidator {
 
         // 1. Check storage bounds
         if proof.total_storage < self.minimum_storage {
-            error!("Storage below minimum: {} < {}", proof.total_storage, self.minimum_storage);
+            error!(
+                "Storage below minimum: {} < {}",
+                proof.total_storage, self.minimum_storage
+            );
             return Ok(false);
         }
 
         if proof.total_storage > self.maximum_storage {
-            error!("Storage exceeds maximum (possible gaming): {} > {}", proof.total_storage, self.maximum_storage);
+            error!(
+                "Storage exceeds maximum (possible gaming): {} > {}",
+                proof.total_storage, self.maximum_storage
+            );
             return Ok(false);
         }
 
         // 2. Verify storage commitment signature
-        let commitment_data = format!("{}-{}-{}",
-            proof.node_id,
-            proof.total_storage,
-            proof.file_hash
+        let commitment_data = format!(
+            "{}-{}-{}",
+            proof.node_id, proof.total_storage, proof.file_hash
         );
 
-        let signature = hex::decode(&proof.file_hash)
-            .map_err(|e| anyhow!("Invalid commitment hash: {}", e))?;
+        let signature =
+            hex::decode(&proof.file_hash).map_err(|e| anyhow!("Invalid commitment hash: {e}"))?;
 
         if !self.crypto_verifier.verify_signature(
             &proof.node_id,
             commitment_data.as_bytes(),
-            &signature
+            &signature,
         ) {
             error!("Storage commitment signature verification failed");
             return Ok(false);
@@ -158,6 +176,12 @@ pub struct RealStakeValidator {
     stake_registry: HashMap<String, u64>,
 }
 
+impl Default for RealStakeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RealStakeValidator {
     pub fn new() -> Self {
         let mut thresholds = HashMap::new();
@@ -173,19 +197,27 @@ impl RealStakeValidator {
     }
 
     pub async fn validate(&mut self, proof: &StakeProof, minimum_stake: u64) -> Result<bool> {
-        info!("Validating Proof of Stake for holder: {}", proof.stake_holder);
+        info!(
+            "Validating Proof of Stake for holder: {}",
+            proof.stake_holder
+        );
 
         // 1. Check minimum stake requirement
         if proof.stake_amount < minimum_stake {
-            error!("Stake below minimum: {} < {}", proof.stake_amount, minimum_stake);
+            error!(
+                "Stake below minimum: {} < {}",
+                proof.stake_amount, minimum_stake
+            );
             return Ok(false);
         }
 
         // 2. Verify stake ownership (would query blockchain in production)
         if let Some(&registered_stake) = self.stake_registry.get(&proof.stake_holder_id) {
             if registered_stake < proof.stake_amount {
-                error!("Claimed stake exceeds registered amount: {} > {}",
-                    proof.stake_amount, registered_stake);
+                error!(
+                    "Claimed stake exceeds registered amount: {} > {}",
+                    proof.stake_amount, registered_stake
+                );
                 return Ok(false);
             }
         } else {
@@ -195,17 +227,16 @@ impl RealStakeValidator {
         }
 
         // 3. Verify stake proof signature
-        let stake_data = format!("{}-{}-{:?}",
-            proof.stake_holder_id,
-            proof.stake_amount,
-            proof.stake_timestamp
+        let stake_data = format!(
+            "{}-{}-{:?}",
+            proof.stake_holder_id, proof.stake_amount, proof.stake_timestamp
         );
 
         let signature = proof.sign();
         if !self.crypto_verifier.verify_signature(
             &proof.stake_holder_id,
             stake_data.as_bytes(),
-            signature.as_bytes()
+            signature.as_bytes(),
         ) {
             error!("Stake proof signature verification failed");
             return Ok(false);
@@ -213,7 +244,8 @@ impl RealStakeValidator {
 
         // 4. Check stake age (not too old)
         if let Ok(elapsed) = proof.stake_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(30 * 24 * 3600) { // 30 days max
+            if elapsed > Duration::from_secs(30 * 24 * 3600) {
+                // 30 days max
                 error!("Stake proof too old: {:?}", elapsed);
                 return Ok(false);
             }
@@ -239,6 +271,12 @@ pub struct RealWorkValidator {
     crypto_verifier: CryptoVerifier,
 }
 
+impl Default for RealWorkValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RealWorkValidator {
     pub fn new() -> Self {
         Self {
@@ -249,7 +287,10 @@ impl RealWorkValidator {
     }
 
     pub async fn validate(&mut self, proof: &WorkProof) -> Result<bool> {
-        info!("Validating Proof of Work for workload: {}", proof.workload_id);
+        info!(
+            "Validating Proof of Work for workload: {}",
+            proof.workload_id
+        );
 
         // 1. Check computational power is reasonable
         if proof.computational_power == 0 {
@@ -257,8 +298,12 @@ impl RealWorkValidator {
             return Ok(false);
         }
 
-        if proof.computational_power > 1000000 { // Unreasonably high
-            error!("Computational power unreasonably high: {}", proof.computational_power);
+        if proof.computational_power > 1000000 {
+            // Unreasonably high
+            error!(
+                "Computational power unreasonably high: {}",
+                proof.computational_power
+            );
             return Ok(false);
         }
 
@@ -271,22 +316,26 @@ impl RealWorkValidator {
         }
 
         // 3. Verify computation time is reasonable
-        if std::time::Duration::from_secs(proof.computational_power / 1000) > self.maximum_computation_time {
-            error!("Computation time exceeds maximum: {:?}", std::time::Duration::from_secs(proof.computational_power / 1000));
+        if std::time::Duration::from_secs(proof.computational_power / 1000)
+            > self.maximum_computation_time
+        {
+            error!(
+                "Computation time exceeds maximum: {:?}",
+                std::time::Duration::from_secs(proof.computational_power / 1000)
+            );
             return Ok(false);
         }
 
         // 4. Verify work proof signature
-        let work_data = format!("{}-{}-{:?}",
-            proof.workload_id,
-            proof.computational_power,
-            proof.workload_id
+        let work_data = format!(
+            "{}-{}-{:?}",
+            proof.workload_id, proof.computational_power, proof.workload_id
         );
 
         if !self.crypto_verifier.verify_signature(
             &proof.workload_id,
             work_data.as_bytes(),
-            proof.workload_id.as_bytes()
+            proof.workload_id.as_bytes(),
         ) {
             error!("Work proof signature verification failed");
             return Ok(false);
@@ -326,6 +375,12 @@ pub struct RealTimeValidator {
     _crypto_verifier: CryptoVerifier,
 }
 
+impl Default for RealTimeValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RealTimeValidator {
     pub fn new() -> Self {
         Self {
@@ -340,19 +395,23 @@ impl RealTimeValidator {
 
         // 1. Check network time offset
         if proof.network_time_offset > self.maximum_time_drift {
-            error!("Network time offset too large: {:?}", proof.network_time_offset);
+            error!(
+                "Network time offset too large: {:?}",
+                proof.network_time_offset
+            );
             return Ok(false);
         }
 
         // 2. Verify VDF (Verifiable Delay Function) was computed correctly
-        if !self.verify_vdf(&proof.nonce.to_string(), &vec![]) {
+        if !self.verify_vdf(&proof.nonce.to_string(), &[]) {
             error!("VDF verification failed");
             return Ok(false);
         }
 
         // 3. Check time synchronization is recent
         let elapsed = std::time::Duration::from_secs(1);
-        if elapsed > Duration::from_secs(300) { // 5 minutes max
+        if elapsed > Duration::from_secs(300) {
+            // 5 minutes max
             error!("Time synchronization too old: {:?}", elapsed);
             return Ok(false);
         }
@@ -396,7 +455,8 @@ impl RealTimeValidator {
 
         // Check proof is not too old
         if let Ok(age) = now.duration_since(proof.time_verification_timestamp) {
-            if age > Duration::from_secs(3600) { // 1 hour max
+            if age > Duration::from_secs(3600) {
+                // 1 hour max
                 error!("Proof timestamp too old: {:?}", age);
                 return false;
             }
@@ -427,6 +487,12 @@ struct ValidationMetrics {
     time_failures: u64,
 }
 
+impl Default for RealStateAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RealStateAuthenticator {
     pub fn new() -> Self {
         Self {
@@ -439,7 +505,11 @@ impl RealStateAuthenticator {
     }
 
     /// Validate all four proofs with real cryptographic verification
-    pub async fn validate_consensus(&mut self, proof: &ConsensusProof, minimum_stake: u64) -> Result<ConsensusResult> {
+    pub async fn validate_consensus(
+        &mut self,
+        proof: &ConsensusProof,
+        minimum_stake: u64,
+    ) -> Result<ConsensusResult> {
         info!("🔐 Starting REAL consensus validation (no mocks, no bypasses)");
         let start_time = Instant::now();
 
@@ -458,14 +528,18 @@ impl RealStateAuthenticator {
             }
             Err(e) => {
                 error!("❌ Proof of Space error: {}", e);
-                failed_proofs.push(format!("SPACE: {}", e));
+                failed_proofs.push(format!("SPACE: {e}"));
                 self.metrics.space_failures += 1;
                 all_valid = false;
             }
         }
 
         // 2. Validate Proof of Stake (WHO)
-        match self.stake_validator.validate(&proof.stake_proof, minimum_stake).await {
+        match self
+            .stake_validator
+            .validate(&proof.stake_proof, minimum_stake)
+            .await
+        {
             Ok(true) => info!("✅ Proof of Stake valid"),
             Ok(false) => {
                 error!("❌ Proof of Stake invalid");
@@ -475,7 +549,7 @@ impl RealStateAuthenticator {
             }
             Err(e) => {
                 error!("❌ Proof of Stake error: {}", e);
-                failed_proofs.push(format!("STAKE: {}", e));
+                failed_proofs.push(format!("STAKE: {e}"));
                 self.metrics.stake_failures += 1;
                 all_valid = false;
             }
@@ -492,7 +566,7 @@ impl RealStateAuthenticator {
             }
             Err(e) => {
                 error!("❌ Proof of Work error: {}", e);
-                failed_proofs.push(format!("WORK: {}", e));
+                failed_proofs.push(format!("WORK: {e}"));
                 self.metrics.work_failures += 1;
                 all_valid = false;
             }
@@ -509,7 +583,7 @@ impl RealStateAuthenticator {
             }
             Err(e) => {
                 error!("❌ Proof of Time error: {}", e);
-                failed_proofs.push(format!("TIME: {}", e));
+                failed_proofs.push(format!("TIME: {e}"));
                 self.metrics.time_failures += 1;
                 all_valid = false;
             }
@@ -529,7 +603,10 @@ impl RealStateAuthenticator {
             })
         } else {
             self.metrics.failed_validations += 1;
-            error!("❌ Consensus validation failed. Failed proofs: {:?}", failed_proofs);
+            error!(
+                "❌ Consensus validation failed. Failed proofs: {:?}",
+                failed_proofs
+            );
 
             Ok(ConsensusResult::Invalid {
                 reason: format!("Failed proofs: {}", failed_proofs.join(", ")),
@@ -568,7 +645,7 @@ mod tests {
             Ok(p) => p,
             Err(_) => {
                 // In test environment, create a minimal proof
-                use crate::consensus::proof::{StakeProof, TimeProof, SpaceProof, WorkProof};
+                use crate::consensus::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
                 ConsensusProof::new(
                     StakeProof::default(),
                     TimeProof::default(),
@@ -579,7 +656,7 @@ mod tests {
         };
 
         // Validate with minimum stake of 1000
-        let result = validator.validate_consensus(&proof, 1000).await.unwrap();
+        let result = validator.validate_consensus(&proof, 1000).await.expect("test: async operation");
 
         // The default proof should fail real validation
         assert!(matches!(result, ConsensusResult::Invalid { .. }));

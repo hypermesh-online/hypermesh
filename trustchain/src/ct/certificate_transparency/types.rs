@@ -4,11 +4,11 @@
 
 //! Certificate Transparency types and configuration
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use std::collections::VecDeque;
 use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::Mutex;
 
 /// SHA256 algorithm for MerkleTree (used via Hasher trait implementation)
@@ -213,7 +213,10 @@ pub struct ConsistencyChecker;
 impl S3BackedStorage {
     /// Create new S3-backed storage
     pub async fn new(config: S3BucketConfig) -> crate::errors::Result<Self> {
-        tracing::info!("Initializing S3-backed storage: bucket={}", config.bucket_name);
+        tracing::info!(
+            "Initializing S3-backed storage: bucket={}",
+            config.bucket_name
+        );
         let s3_client = Arc::new(S3Client {});
         Ok(Self {
             _s3_client: s3_client,
@@ -226,11 +229,13 @@ impl S3BackedStorage {
     /// Store entry in S3 with encryption
     pub(crate) async fn store_entry(&self, entry: &CTEntry) -> crate::errors::Result<()> {
         tracing::info!("Storing CT entry in S3: {}", entry.entry_id);
-        let entry_data = serde_json::to_vec(entry)
-            .map_err(|e| crate::errors::TrustChainError::SerializationFailed {
+        let entry_data = serde_json::to_vec(entry).map_err(|e| {
+            crate::errors::TrustChainError::SerializationFailed {
                 reason: e.to_string(),
-            })?;
-        self.local_cache.insert(entry.entry_id.clone(), entry_data.clone());
+            }
+        })?;
+        self.local_cache
+            .insert(entry.entry_id.clone(), entry_data.clone());
         {
             let mut queue = self.write_queue.lock().await;
             queue.push_back(WriteOperation {
@@ -243,7 +248,10 @@ impl S3BackedStorage {
     }
 
     /// Find entry by certificate hash
-    pub(crate) async fn find_entry_by_hash(&self, _cert_hash: &[u8; 32]) -> crate::errors::Result<Option<CTEntry>> {
+    pub(crate) async fn find_entry_by_hash(
+        &self,
+        _cert_hash: &[u8; 32],
+    ) -> crate::errors::Result<Option<CTEntry>> {
         Ok(None)
     }
 }

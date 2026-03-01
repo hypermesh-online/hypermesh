@@ -3,19 +3,19 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Security Monitoring Dashboard
-//! 
+//!
 //! Real-time security monitoring with consensus validation integration
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
-use crate::consensus::ConsensusProof;
-use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::SecuritySeverity;
+use crate::consensus::ConsensusProof;
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Real-time security monitoring dashboard
 pub struct SecurityMonitoringDashboard {
@@ -64,9 +64,16 @@ impl Default for SecurityDashboardData {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SecurityStatus {
     Secure,
-    Warning { reason: String },
-    Alert { severity: SecuritySeverity, reason: String },
-    Critical { reason: String },
+    Warning {
+        reason: String,
+    },
+    Alert {
+        severity: SecuritySeverity,
+        reason: String,
+    },
+    Critical {
+        reason: String,
+    },
 }
 
 impl Default for SecurityStatus {
@@ -267,9 +274,13 @@ impl SecurityMonitoringDashboard {
     }
 
     /// Start monitoring session
-    pub async fn start_monitoring_session(&self, client_id: String, session_config: SessionConfig) -> TrustChainResult<String> {
+    pub async fn start_monitoring_session(
+        &self,
+        client_id: String,
+        session_config: SessionConfig,
+    ) -> TrustChainResult<String> {
         let session_id = uuid::Uuid::new_v4().to_string();
-        
+
         let session = MonitoringSession {
             session_id: session_id.clone(),
             client_id: client_id.clone(),
@@ -280,18 +291,21 @@ impl SecurityMonitoringDashboard {
 
         {
             let mut sessions = self.active_sessions.write().await;
-            
+
             // Check session limit
             if sessions.len() >= self.config.max_sessions as usize {
                 return Err(TrustChainError::SecurityError {
                     message: "Maximum monitoring sessions reached".to_string(),
                 });
             }
-            
+
             sessions.insert(session_id.clone(), session);
         }
 
-        info!("Started monitoring session: {} for client: {}", session_id, client_id);
+        info!(
+            "Started monitoring session: {} for client: {}",
+            session_id, client_id
+        );
         Ok(session_id)
     }
 
@@ -303,11 +317,13 @@ impl SecurityMonitoringDashboard {
         consensus_status: Option<ConsensusValidationStatus>,
     ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
-        
+
         // Find and update the operation
-        if let Some(operation) = metrics.live_certificate_operations.iter_mut()
-            .find(|op| op.operation_id == operation_id) {
-            
+        if let Some(operation) = metrics
+            .live_certificate_operations
+            .iter_mut()
+            .find(|op| op.operation_id == operation_id)
+        {
             operation.state = state;
             if let Some(status) = consensus_status {
                 operation.consensus_status = status;
@@ -320,19 +336,25 @@ impl SecurityMonitoringDashboard {
     }
 
     /// Add new certificate operation to monitoring
-    pub async fn add_certificate_operation(&self, operation: LiveCertificateOperation) -> TrustChainResult<()> {
+    pub async fn add_certificate_operation(
+        &self,
+        operation: LiveCertificateOperation,
+    ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
         metrics.live_certificate_operations.push(operation.clone());
         metrics.last_update = SystemTime::now();
-        
-        info!("Added certificate operation to monitoring: {} ({})", operation.operation_id, operation.operation_type);
+
+        info!(
+            "Added certificate operation to monitoring: {} ({})",
+            operation.operation_id, operation.operation_type
+        );
         Ok(())
     }
 
     /// Add security alert to dashboard
     pub async fn add_security_alert(&self, alert: ActiveSecurityAlert) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
-        
+
         // Update security status based on alert severity
         match alert.severity {
             SecuritySeverity::Critical => {
@@ -341,7 +363,10 @@ impl SecurityMonitoringDashboard {
                 };
             }
             SecuritySeverity::High => {
-                if matches!(metrics.security_status, SecurityStatus::Secure | SecurityStatus::Warning { .. }) {
+                if matches!(
+                    metrics.security_status,
+                    SecurityStatus::Secure | SecurityStatus::Warning { .. }
+                ) {
                     metrics.security_status = SecurityStatus::Alert {
                         severity: SecuritySeverity::High,
                         reason: alert.title.clone(),
@@ -359,30 +384,39 @@ impl SecurityMonitoringDashboard {
                 // Don't change status for low severity alerts
             }
         }
-        
+
         metrics.active_alerts.push(alert.clone());
         metrics.last_update = SystemTime::now();
-        
-        warn!("Security alert added to dashboard: {} ({})", alert.title, alert.severity);
+
+        warn!(
+            "Security alert added to dashboard: {} ({})",
+            alert.title, alert.severity
+        );
         Ok(())
     }
 
     /// Update consensus metrics
-    pub async fn update_consensus_metrics(&self, metrics_update: LiveConsensusMetrics) -> TrustChainResult<()> {
+    pub async fn update_consensus_metrics(
+        &self,
+        metrics_update: LiveConsensusMetrics,
+    ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
         metrics.consensus_metrics = metrics_update;
         metrics.last_update = SystemTime::now();
-        
+
         debug!("Consensus metrics updated");
         Ok(())
     }
 
     /// Update Byzantine metrics
-    pub async fn update_byzantine_metrics(&self, byzantine_update: ByzantineMetrics) -> TrustChainResult<()> {
+    pub async fn update_byzantine_metrics(
+        &self,
+        byzantine_update: ByzantineMetrics,
+    ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
         metrics.byzantine_metrics = byzantine_update;
         metrics.last_update = SystemTime::now();
-        
+
         debug!("Byzantine metrics updated");
         Ok(())
     }
@@ -394,7 +428,10 @@ impl SecurityMonitoringDashboard {
     }
 
     /// Get real-time updates for session
-    pub async fn get_session_updates(&self, session_id: &str) -> TrustChainResult<SecurityDashboardData> {
+    pub async fn get_session_updates(
+        &self,
+        session_id: &str,
+    ) -> TrustChainResult<SecurityDashboardData> {
         // Update session activity
         {
             let mut sessions = self.active_sessions.write().await;
@@ -413,7 +450,7 @@ impl SecurityMonitoringDashboard {
     /// Cleanup completed operations and old alerts
     pub async fn cleanup_dashboard(&self) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
-        
+
         // Remove completed operations older than 1 hour
         let cutoff_time = SystemTime::now() - Duration::from_secs(3600);
         metrics.live_certificate_operations.retain(|op| {
@@ -426,7 +463,8 @@ impl SecurityMonitoringDashboard {
         });
 
         // Remove old resolved alerts
-        let alert_cutoff = SystemTime::now() - Duration::from_secs(self.config.alert_retention_hours as u64 * 3600);
+        let alert_cutoff = SystemTime::now()
+            - Duration::from_secs(self.config.alert_retention_hours as u64 * 3600);
         metrics.active_alerts.retain(|alert| {
             match alert.status {
                 AlertStatus::Resolved => alert.timestamp > alert_cutoff,
@@ -436,8 +474,10 @@ impl SecurityMonitoringDashboard {
 
         // Update security status if no active critical/high alerts
         if !metrics.active_alerts.iter().any(|a| {
-            matches!(a.severity, SecuritySeverity::Critical | SecuritySeverity::High) &&
-            matches!(a.status, AlertStatus::Active)
+            matches!(
+                a.severity,
+                SecuritySeverity::Critical | SecuritySeverity::High
+            ) && matches!(a.status, AlertStatus::Active)
         }) {
             metrics.security_status = SecurityStatus::Secure;
         }
@@ -449,7 +489,7 @@ impl SecurityMonitoringDashboard {
     /// Stop monitoring session
     pub async fn stop_monitoring_session(&self, session_id: &str) -> TrustChainResult<()> {
         let mut sessions = self.active_sessions.write().await;
-        
+
         if sessions.remove(session_id).is_some() {
             info!("Stopped monitoring session: {}", session_id);
             Ok(())
@@ -474,34 +514,37 @@ mod tests {
     #[tokio::test]
     async fn test_dashboard_creation() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.unwrap();
-        
-        let data = dashboard.get_dashboard_data().await.unwrap();
+        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+
+        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
         assert!(matches!(data.security_status, SecurityStatus::Secure));
     }
 
     #[tokio::test]
     async fn test_monitoring_session() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.unwrap();
-        
+        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+
         let session_config = SessionConfig::default();
-        let session_id = dashboard.start_monitoring_session(
-            "test_client".to_string(),
-            session_config
-        ).await.unwrap();
-        
+        let session_id = dashboard
+            .start_monitoring_session("test_client".to_string(), session_config)
+            .await
+            .expect("test: expected success");
+
         assert_eq!(dashboard.get_active_session_count().await, 1);
-        
-        dashboard.stop_monitoring_session(&session_id).await.unwrap();
+
+        dashboard
+            .stop_monitoring_session(&session_id)
+            .await
+            .expect("test: expected success");
         assert_eq!(dashboard.get_active_session_count().await, 0);
     }
 
     #[tokio::test]
     async fn test_certificate_operation_tracking() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.unwrap();
-        
+        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+
         let operation = LiveCertificateOperation {
             operation_id: "test_op_001".to_string(),
             operation_type: "issue_certificate".to_string(),
@@ -512,19 +555,25 @@ mod tests {
             started_at: SystemTime::now(),
             state: OperationState::Created,
         };
-        
-        dashboard.add_certificate_operation(operation).await.unwrap();
-        
-        let data = dashboard.get_dashboard_data().await.unwrap();
+
+        dashboard
+            .add_certificate_operation(operation)
+            .await
+            .expect("test: expected success");
+
+        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
         assert_eq!(data.live_certificate_operations.len(), 1);
-        assert_eq!(data.live_certificate_operations[0].operation_id, "test_op_001");
+        assert_eq!(
+            data.live_certificate_operations[0].operation_id,
+            "test_op_001"
+        );
     }
 
     #[tokio::test]
     async fn test_security_alert_handling() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.unwrap();
-        
+        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+
         let alert = ActiveSecurityAlert {
             alert_id: "alert_001".to_string(),
             severity: SecuritySeverity::Critical,
@@ -535,11 +584,14 @@ mod tests {
             status: AlertStatus::Active,
             consensus_proof: None,
         };
-        
-        dashboard.add_security_alert(alert).await.unwrap();
-        
-        let data = dashboard.get_dashboard_data().await.unwrap();
+
+        dashboard.add_security_alert(alert).await.expect("test: async operation");
+
+        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
         assert_eq!(data.active_alerts.len(), 1);
-        assert!(matches!(data.security_status, SecurityStatus::Critical { .. }));
+        assert!(matches!(
+            data.security_status,
+            SecurityStatus::Critical { .. }
+        ));
     }
 }

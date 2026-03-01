@@ -4,11 +4,11 @@
 
 //! Container live migration implementation
 
-use crate::{ContainerId, error::Result};
+use crate::{error::Result, ContainerId};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// Migration request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,13 +63,17 @@ pub enum MigrationStatus {
 
 /// Default migration manager implementation
 pub struct DefaultMigrationManager {
-    active_migrations: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<ContainerId, MigrationStatus>>>,
+    active_migrations: std::sync::Arc<
+        tokio::sync::RwLock<std::collections::HashMap<ContainerId, MigrationStatus>>,
+    >,
 }
 
 impl DefaultMigrationManager {
     pub fn new() -> Self {
         Self {
-            active_migrations: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+            active_migrations: std::sync::Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         }
     }
 }
@@ -78,15 +82,17 @@ impl DefaultMigrationManager {
 impl MigrationManager for DefaultMigrationManager {
     async fn migrate(&self, request: MigrationRequest) -> Result<MigrationResult> {
         let start_time = std::time::Instant::now();
-        let container_id = request.container_id.clone();
+        let container_id = request.container_id;
 
-        info!("Starting migration of container {} to {} using {:?}",
-             container_id, request.destination_node, request.migration_type);
+        info!(
+            "Starting migration of container {} to {} using {:?}",
+            container_id, request.destination_node, request.migration_type
+        );
 
         // Update status to preparing
         {
             let mut migrations = self.active_migrations.write().await;
-            migrations.insert(container_id.clone(), MigrationStatus::Preparing);
+            migrations.insert(container_id, MigrationStatus::Preparing);
         }
 
         // Simulate migration process
@@ -96,29 +102,34 @@ impl MigrationManager for DefaultMigrationManager {
                 tokio::time::sleep(Duration::from_millis(50)).await;
 
                 // Transfer state
-                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
+                self.update_status(container_id, MigrationStatus::Transferring)
+                    .await;
                 tokio::time::sleep(Duration::from_millis(200)).await;
 
                 // Start on destination
                 tokio::time::sleep(Duration::from_millis(50)).await;
-            },
+            }
             MigrationType::Warm => {
                 // Pre-copy phase
-                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
+                self.update_status(container_id, MigrationStatus::Transferring)
+                    .await;
                 tokio::time::sleep(Duration::from_millis(150)).await;
 
                 // Stop and final transfer
-                self.update_status(container_id.clone(), MigrationStatus::Finalizing).await;
+                self.update_status(container_id, MigrationStatus::Finalizing)
+                    .await;
                 tokio::time::sleep(Duration::from_millis(50)).await;
-            },
+            }
             MigrationType::Hot => {
                 // Live migration with minimal downtime
-                self.update_status(container_id.clone(), MigrationStatus::Transferring).await;
+                self.update_status(container_id, MigrationStatus::Transferring)
+                    .await;
                 tokio::time::sleep(Duration::from_millis(80)).await;
 
-                self.update_status(container_id.clone(), MigrationStatus::Finalizing).await;
+                self.update_status(container_id, MigrationStatus::Finalizing)
+                    .await;
                 tokio::time::sleep(Duration::from_millis(20)).await;
-            },
+            }
         }
 
         let downtime = start_time.elapsed();
@@ -129,36 +140,46 @@ impl MigrationManager for DefaultMigrationManager {
             transferred_bytes: 1024 * 1024 * 100, // 100MB simulated
             error_message: None,
         };
-        
+
         // Update final status
         if result.success {
-            self.update_status(container_id.clone(), MigrationStatus::Complete).await;
-            info!("Successfully migrated container {} in {:?}", container_id, downtime);
+            self.update_status(container_id, MigrationStatus::Complete)
+                .await;
+            info!(
+                "Successfully migrated container {} in {:?}",
+                container_id, downtime
+            );
         } else {
-            self.update_status(container_id.clone(), MigrationStatus::Failed("Downtime budget exceeded".to_string())).await;
+            self.update_status(
+                container_id,
+                MigrationStatus::Failed("Downtime budget exceeded".to_string()),
+            )
+            .await;
         }
-        
+
         Ok(result)
     }
-    
+
     async fn prepare_migration(&self, container_id: ContainerId) -> Result<()> {
-        self.update_status(container_id.clone(), MigrationStatus::Preparing).await;
+        self.update_status(container_id, MigrationStatus::Preparing)
+            .await;
         debug!("Prepared migration for container {}", container_id);
         Ok(())
     }
-    
+
     async fn cancel_migration(&self, container_id: ContainerId) -> Result<()> {
         debug!("Cancelled migration for container {}", container_id);
         let mut migrations = self.active_migrations.write().await;
         migrations.remove(&container_id);
         Ok(())
     }
-    
+
     async fn get_migration_status(&self, container_id: ContainerId) -> Result<MigrationStatus> {
         let migrations = self.active_migrations.read().await;
-        Ok(migrations.get(&container_id)
-           .cloned()
-           .unwrap_or(MigrationStatus::NotStarted))
+        Ok(migrations
+            .get(&container_id)
+            .cloned()
+            .unwrap_or(MigrationStatus::NotStarted))
     }
 }
 

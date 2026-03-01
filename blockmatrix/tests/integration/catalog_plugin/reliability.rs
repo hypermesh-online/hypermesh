@@ -32,9 +32,9 @@ async fn test_resource_isolation() {
     // Set very restrictive quotas
     let quotas = ResourceQuotas {
         cpu_percent: 5.0,
-        memory_bytes: 50 * 1024 * 1024, // 50MB
+        memory_bytes: 50 * 1024 * 1024,   // 50MB
         storage_bytes: 100 * 1024 * 1024, // 100MB
-        network_bandwidth: 100 * 1024, // 100KB/s
+        network_bandwidth: 100 * 1024,    // 100KB/s
         file_descriptors: 50,
         max_threads: 5,
         ops_per_second: 10,
@@ -44,12 +44,15 @@ async fn test_resource_isolation() {
     let metadata = create_catalog_metadata();
 
     // Create security context
-    security_manager.create_context(
-        "catalog".to_string(),
-        &metadata,
-        metadata.required_capabilities.clone(),
-        quotas,
-    ).await.unwrap();
+    security_manager
+        .create_context(
+            "catalog".to_string(),
+            &metadata,
+            metadata.required_capabilities.clone(),
+            quotas,
+        )
+        .await
+        .unwrap();
 
     // Load extension with security manager monitoring
     let loader = create_test_loader();
@@ -70,7 +73,10 @@ async fn test_resource_isolation() {
             last_update: Some(SystemTime::now()),
         };
 
-        security_manager.update_usage("catalog", usage).await.unwrap();
+        security_manager
+            .update_usage("catalog", usage)
+            .await
+            .unwrap();
 
         // Check if within limits
         let check = security_manager.check_resource_usage("catalog").await;
@@ -118,7 +124,10 @@ async fn test_memory_leaks() {
 
         // Use extension heavily
         extension.register_assets().await.unwrap();
-        extension.extend_manager(asset_manager.clone()).await.unwrap();
+        extension
+            .extend_manager(asset_manager.clone())
+            .await
+            .unwrap();
 
         // Create many resources
         for i in 0..100 {
@@ -225,13 +234,11 @@ async fn test_missing_dependencies() {
         homepage: None,
         category: hypermesh::extensions::ExtensionCategory::AssetLibrary,
         hypermesh_version: semver::Version::parse("1.0.0").unwrap(),
-        dependencies: vec![
-            hypermesh::extensions::ExtensionDependency {
-                id: "non-existent-extension".to_string(),
-                version: semver::VersionReq::parse(">=1.0.0").unwrap(),
-                optional: false,
-            }
-        ],
+        dependencies: vec![hypermesh::extensions::ExtensionDependency {
+            id: "non-existent-extension".to_string(),
+            version: semver::VersionReq::parse(">=1.0.0").unwrap(),
+            optional: false,
+        }],
         required_capabilities: HashSet::new(),
         provided_assets: vec![],
         certificate_fingerprint: None,
@@ -295,8 +302,10 @@ async fn test_network_partition() {
     // Should handle network failure gracefully
     match response {
         Ok(resp) if !resp.success => {
-            info!("Network partition handled correctly: {}",
-                  resp.error.unwrap_or_default());
+            info!(
+                "Network partition handled correctly: {}",
+                resp.error.unwrap_or_default()
+            );
         }
         Ok(_) => {
             info!("Operation succeeded despite simulated partition");
@@ -353,8 +362,10 @@ async fn test_crash_recovery() {
     match result {
         Ok(resp) => {
             assert!(!resp.success || resp.error.is_some());
-            info!("Potential crash handled: success={}, error={:?}",
-                  resp.success, resp.error);
+            info!(
+                "Potential crash handled: success={}, error={:?}",
+                resp.success, resp.error
+            );
         }
         Err(e) => {
             info!("Crash handled with error: {}", e);

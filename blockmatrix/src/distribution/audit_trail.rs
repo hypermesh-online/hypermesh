@@ -96,11 +96,8 @@ pub async fn record_shard_placement_on_chain(
     let mut records = Vec::new();
 
     for placement in placements {
-        let mut record = AuditRecord::from_placement(
-            asset_id,
-            placement,
-            PlacementEvent::InitialPlacement,
-        );
+        let mut record =
+            AuditRecord::from_placement(asset_id, placement, PlacementEvent::InitialPlacement);
 
         // Record on blockchain (stub implementation)
         let tx_hash = record_to_blockchain(&record).await?;
@@ -217,8 +214,8 @@ async fn record_to_blockchain(record: &AuditRecord) -> AssetResult<String> {
     // 6. Return transaction hash
 
     // Generate mock transaction hash
-    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     let mut hasher = DefaultHasher::new();
     record.asset_id.hash(&mut hasher);
@@ -226,7 +223,7 @@ async fn record_to_blockchain(record: &AuditRecord) -> AssetResult<String> {
     record.node_id.hash(&mut hasher);
     let hash_value = hasher.finish();
 
-    let tx_hash = format!("0x{:016x}", hash_value);
+    let tx_hash = format!("0x{hash_value:016x}");
 
     Ok(tx_hash)
 }
@@ -239,7 +236,7 @@ mod tests {
     fn create_test_placement() -> ShardPlacement {
         ShardPlacement {
             shard_index: 0,
-            position: MatrixCoordinate::new(10, 20, 30).unwrap(),
+            position: MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate"),
             node_id: "test-node".to_string(),
             octant: 0,
             distance_from_origin: 37.4,
@@ -249,11 +246,8 @@ mod tests {
     #[test]
     fn test_audit_record_creation() {
         let placement = create_test_placement();
-        let record = AuditRecord::from_placement(
-            "test-asset",
-            &placement,
-            PlacementEvent::InitialPlacement,
-        );
+        let record =
+            AuditRecord::from_placement("test-asset", &placement, PlacementEvent::InitialPlacement);
 
         assert_eq!(record.asset_id, "test-asset");
         assert_eq!(record.shard_index, 0);
@@ -265,10 +259,9 @@ mod tests {
     #[tokio::test]
     async fn test_record_placement() {
         let placements = vec![create_test_placement()];
-        let records =
-            record_shard_placement_on_chain("test-asset", &placements)
-                .await
-                .unwrap();
+        let records = record_shard_placement_on_chain("test-asset", &placements)
+            .await
+            .expect("test: expected success");
 
         assert_eq!(records.len(), 1);
         assert!(records[0].tx_hash.is_some());
@@ -277,13 +270,9 @@ mod tests {
     #[tokio::test]
     async fn test_record_redistribution() {
         let placements = vec![create_test_placement()];
-        let records = record_redistribution(
-            "test-asset",
-            &placements,
-            "PoS revocation",
-        )
-        .await
-        .unwrap();
+        let records = record_redistribution("test-asset", &placements, "PoS revocation")
+            .await
+            .expect("test: expected success");
 
         assert_eq!(records.len(), 1);
         assert!(records[0].tx_hash.is_some());
@@ -306,7 +295,7 @@ mod tests {
             "Node capacity exceeded",
         )
         .await
-        .unwrap();
+        .expect("test: expected success");
 
         assert!(record.tx_hash.is_some());
 
@@ -334,6 +323,6 @@ mod tests {
     async fn test_verify_placement() {
         let result = verify_placement("test-asset", 0, "test-node").await;
         assert!(result.is_ok());
-        assert!(result.unwrap());
+        assert!(result.expect("test: expected success"));
     }
 }

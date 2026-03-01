@@ -153,7 +153,9 @@ impl StoqBlockTransport {
         endpoint_addr: String,
         position: MatrixPosition,
     ) -> Result<()> {
-        self.metrics.connect_attempts.fetch_add(1, Ordering::Relaxed);
+        self.metrics
+            .connect_attempts
+            .fetch_add(1, Ordering::Relaxed);
 
         let now = Instant::now();
         let node = Arc::new(ReflectorNode {
@@ -183,11 +185,7 @@ impl StoqBlockTransport {
     // -- Messaging -----------------------------------------------------------
 
     /// Serialize a message and push it to the outbox for a single target.
-    pub fn send_message(
-        &self,
-        message: &ReflectorMessage,
-        target_node_id: &str,
-    ) -> Result<()> {
+    pub fn send_message(&self, message: &ReflectorMessage, target_node_id: &str) -> Result<()> {
         if !self.reflector_nodes.contains_key(target_node_id) {
             warn!(target = %target_node_id, "send_message to unknown reflector");
         }
@@ -200,7 +198,9 @@ impl StoqBlockTransport {
             .write()
             .push((target_node_id.to_string(), bytes));
         self.metrics.messages_sent.fetch_add(1, Ordering::Relaxed);
-        self.metrics.bytes_sent.fetch_add(byte_len, Ordering::Relaxed);
+        self.metrics
+            .bytes_sent
+            .fetch_add(byte_len, Ordering::Relaxed);
         Ok(())
     }
 
@@ -301,12 +301,7 @@ impl StoqBlockTransport {
     }
 
     /// Update a reflector's health score and block height.
-    pub fn update_reflector_health(
-        &self,
-        node_id: &str,
-        health: f64,
-        block_height: u64,
-    ) {
+    pub fn update_reflector_health(&self, node_id: &str, health: f64, block_height: u64) {
         if let Some(entry) = self.reflector_nodes.get(node_id) {
             let node = entry.value();
             *node.health_score.write() = health.clamp(0.0, 1.0);

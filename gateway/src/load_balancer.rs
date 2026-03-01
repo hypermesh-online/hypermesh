@@ -129,9 +129,7 @@ impl LoadBalancer {
                     .map(|(addr, _, _)| *addr)
                     .expect("healthy is non-empty (checked above)")
             }
-            LoadBalanceStrategy::WeightedRoundRobin => {
-                self.select_weighted_round_robin(&healthy)
-            }
+            LoadBalanceStrategy::WeightedRoundRobin => self.select_weighted_round_robin(&healthy),
             LoadBalanceStrategy::HealthAware => {
                 // Combine: prefer fewer connections, then higher weight.
                 // Score = (active_connections + 1) * 1000 / (weight + 1). Lower is better.
@@ -158,15 +156,11 @@ impl LoadBalancer {
     /// Weighted round-robin: distribute according to weight ratios.
     ///
     /// Uses modular arithmetic over the total weight to pick the right backend.
-    fn select_weighted_round_robin(
-        &self,
-        healthy: &[(SocketAddr, u32, usize)],
-    ) -> SocketAddr {
+    fn select_weighted_round_robin(&self, healthy: &[(SocketAddr, u32, usize)]) -> SocketAddr {
         let total_weight: u64 = healthy.iter().map(|(_, w, _)| *w as u64).sum();
         if total_weight == 0 {
             // Fallback to simple round-robin if all weights are somehow 0.
-            let idx =
-                self.round_robin_counter.fetch_add(1, Ordering::Relaxed) % healthy.len();
+            let idx = self.round_robin_counter.fetch_add(1, Ordering::Relaxed) % healthy.len();
             return healthy[idx].0;
         }
 
@@ -182,7 +176,10 @@ impl LoadBalancer {
         }
 
         // Should never reach here, but return the last backend as fallback.
-        healthy.last().map(|(addr, _, _)| *addr).expect("healthy is non-empty")
+        healthy
+            .last()
+            .map(|(addr, _, _)| *addr)
+            .expect("healthy is non-empty")
     }
 
     /// Report a successful request completion to a backend.
@@ -337,7 +334,10 @@ mod tests {
 
         // next should have been selected because it had min connections
         // (before selection incremented it)
-        let next_state = backends.iter().find(|b| b.addr == next).expect("test: found");
+        let next_state = backends
+            .iter()
+            .find(|b| b.addr == next)
+            .expect("test: found");
         // It was incremented by select, so it should be min_conns + 1 or equal
         assert!(
             next_state.active_connections <= min_conns + 1,
@@ -473,7 +473,10 @@ mod tests {
 
     #[test]
     fn default_strategy_is_round_robin() {
-        assert_eq!(LoadBalanceStrategy::default(), LoadBalanceStrategy::RoundRobin);
+        assert_eq!(
+            LoadBalanceStrategy::default(),
+            LoadBalanceStrategy::RoundRobin
+        );
     }
 
     #[test]

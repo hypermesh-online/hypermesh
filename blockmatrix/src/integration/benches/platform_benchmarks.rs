@@ -15,7 +15,7 @@ use hypermesh_integration::{
 
 /// Benchmark platform initialization time
 fn bench_platform_initialization(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("platform_initialization", |b| {
         b.to_async(&rt).iter(|| async {
@@ -36,7 +36,7 @@ fn bench_platform_initialization(c: &mut Criterion) {
 
 /// Benchmark service registry operations
 fn bench_service_registry(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     let registry = ServiceRegistry::new();
     
@@ -75,7 +75,7 @@ fn bench_service_registry(c: &mut Criterion) {
 
 /// Benchmark metrics collection
 fn bench_metrics_collection(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     let metrics = IntegrationMetrics::new();
     
@@ -104,7 +104,7 @@ fn bench_config_validation(c: &mut Criterion) {
 
 /// Benchmark concurrent service operations
 fn bench_concurrent_operations(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     let registry = ServiceRegistry::new();
     
@@ -145,7 +145,7 @@ fn bench_concurrent_operations(c: &mut Criterion) {
 
 /// Benchmark platform metrics under load
 fn bench_platform_metrics_load(c: &mut Criterion) {
-    let rt = Runtime::new().unwrap();
+    let rt = Runtime::new().expect("operation should succeed");
     
     c.bench_function("platform_metrics_load", |b| {
         b.to_async(&rt).iter(|| async {

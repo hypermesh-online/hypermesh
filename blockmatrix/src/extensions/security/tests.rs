@@ -4,10 +4,8 @@
 
 //! Tests for extension security system.
 
+use super::super::{ExtensionCapability, ExtensionCategory, ExtensionMetadata, ResourceLimits};
 use super::*;
-use super::super::{
-    ExtensionCapability, ExtensionMetadata, ExtensionCategory, ResourceLimits,
-};
 use std::collections::HashSet;
 
 #[test]
@@ -102,28 +100,41 @@ async fn test_security_manager() {
     };
 
     // Create context with limited capabilities
-    let context = manager.create_context(
-        "test".to_string(),
-        &metadata,
-        HashSet::from([ExtensionCapability::AssetManagement]),
-        quotas,
-    ).await.expect("test");
+    let context = manager
+        .create_context(
+            "test".to_string(),
+            &metadata,
+            HashSet::from([ExtensionCapability::AssetManagement]),
+            quotas,
+        )
+        .await
+        .expect("test");
 
     assert_eq!(context.extension_id, "test");
-    assert!(context.capabilities.contains(&ExtensionCapability::AssetManagement));
-    assert!(!context.capabilities.contains(&ExtensionCapability::NetworkAccess));
+    assert!(context
+        .capabilities
+        .contains(&ExtensionCapability::AssetManagement));
+    assert!(!context
+        .capabilities
+        .contains(&ExtensionCapability::NetworkAccess));
 
     // Check granted capability
-    assert!(manager.check_capability(
-        "test",
-        &ExtensionCapability::AssetManagement,
-        "test_operation"
-    ).await.is_ok());
+    assert!(manager
+        .check_capability(
+            "test",
+            &ExtensionCapability::AssetManagement,
+            "test_operation"
+        )
+        .await
+        .is_ok());
 
     // Check non-granted capability
-    assert!(manager.check_capability(
-        "test",
-        &ExtensionCapability::NetworkAccess,
-        "test_operation"
-    ).await.is_err());
+    assert!(manager
+        .check_capability(
+            "test",
+            &ExtensionCapability::NetworkAccess,
+            "test_operation"
+        )
+        .await
+        .is_err());
 }

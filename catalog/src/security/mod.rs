@@ -7,20 +7,20 @@
 //! Integrates TrustChain certificate-based package verification
 //! using quantum-resistant FALCON-1024 signatures
 
-pub mod trustchain;
-pub mod signing;
-pub mod reputation;
 pub mod policies;
+pub mod reputation;
+pub mod signing;
+pub mod trustchain;
 
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
-use std::sync::Arc;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
-pub use trustchain::{TrustChainIntegration, TrustChainConfig};
-pub use signing::{PackageSigner, SignatureVerifier, PackageSignature};
+pub use policies::{PolicyEngine, TrustLevel, TrustPolicy};
 pub use reputation::{PublisherAuthenticator, PublisherVerification};
-pub use policies::{TrustPolicy, PolicyEngine, TrustLevel};
+pub use signing::{PackageSignature, PackageSigner, SignatureVerifier};
+pub use trustchain::{TrustChainConfig, TrustChainIntegration};
 
 use crate::assets::AssetPackage;
 
@@ -77,7 +77,7 @@ impl Default for SecurityConfig {
             auto_security_updates: true,
             vulnerability_scanning: true,
             max_package_size: 100 * 1024 * 1024, // 100MB
-            cert_cache_ttl: 3600, // 1 hour
+            cert_cache_ttl: 3600,                // 1 hour
             blacklisted_publishers: vec![],
             whitelisted_publishers: vec![],
             enable_pqc_signatures: true,
@@ -267,7 +267,7 @@ impl SecurityManager {
         let trustchain = Arc::new(
             TrustChainIntegration::new(trustchain_config)
                 .await
-                .context("Failed to initialize TrustChain integration")?
+                .context("Failed to initialize TrustChain integration")?,
         );
 
         // Initialize signing and verification systems
@@ -300,10 +300,13 @@ impl SecurityManager {
         private_key: &[u8],
     ) -> Result<PackageSignature> {
         // Increment metrics
-        self.metrics.packages_verified.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .packages_verified
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Sign the package
-        let signature = self.signer
+        let signature = self
+            .signer
             .sign_package(package, publisher_cert, private_key)
             .await
             .context("Failed to sign package")?;
@@ -315,10 +318,7 @@ impl SecurityManager {
     }
 
     /// Verify a package before installation
-    pub async fn verify_package(
-        &self,
-        package: &AssetPackage,
-    ) -> Result<VerificationResult> {
+    pub async fn verify_package(&self, package: &AssetPackage) -> Result<VerificationResult> {
         let mut result = VerificationResult {
             verified: false,
             timestamp: chrono::Utc::now(),
@@ -342,9 +342,13 @@ impl SecurityManager {
             result.policy_result.violations.push(PolicyViolation {
                 violation_type: ViolationType::PackageSizeExceeded,
                 severity: Severity::Medium,
-                description: format!("Package size exceeds maximum allowed size of {} bytes",
-                    self.config.max_package_size),
-                remediation: Some("Consider splitting the package into smaller components".to_string()),
+                description: format!(
+                    "Package size exceeds maximum allowed size of {} bytes",
+                    self.config.max_package_size
+                ),
+                remediation: Some(
+                    "Consider splitting the package into smaller components".to_string(),
+                ),
             });
             return Ok(result);
         }
@@ -357,21 +361,29 @@ impl SecurityManager {
 
                 if let Some(publisher_info) = sig_result.publisher {
                     // Check blacklist
-                    if self.config.blacklisted_publishers.contains(&publisher_info.common_name) {
+                    if self
+                        .config
+                        .blacklisted_publishers
+                        .contains(&publisher_info.common_name)
+                    {
                         result.policy_result.violations.push(PolicyViolation {
                             violation_type: ViolationType::BlacklistedPublisher,
                             severity: Severity::Critical,
-                            description: format!("Publisher '{}' is blacklisted",
-                                publisher_info.common_name),
+                            description: format!(
+                                "Publisher '{}' is blacklisted",
+                                publisher_info.common_name
+                            ),
                             remediation: None,
                         });
-                        self.metrics.blacklisted_blocked.fetch_add(1,
-                            std::sync::atomic::Ordering::Relaxed);
+                        self.metrics
+                            .blacklisted_blocked
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         return Ok(result);
                     }
 
                     // Binary publisher authentication check
-                    let auth_result = self.authenticator
+                    let auth_result = self
+                        .authenticator
                         .verify(&publisher_info.cert_fingerprint)
                         .await?;
 
@@ -379,41 +391,54 @@ impl SecurityManager {
                     result.publisher_authenticated = auth_result.authenticated;
 
                     // Reject unauthenticated publishers under strict policy
-                    if !auth_result.authenticated &&
-                       self.config.default_trust_policy == TrustLevel::Strict {
+                    if !auth_result.authenticated
+                        && self.config.default_trust_policy == TrustLevel::Strict
+                    {
                         result.policy_result.violations.push(PolicyViolation {
                             violation_type: ViolationType::UnauthenticatedPublisher,
                             severity: Severity::High,
-                            description: format!("Publisher '{}' is not certificate-authenticated",
-                                publisher_info.common_name),
-                            remediation: Some("Publisher must obtain a valid TrustChain certificate".to_string()),
+                            description: format!(
+                                "Publisher '{}' is not certificate-authenticated",
+                                publisher_info.common_name
+                            ),
+                            remediation: Some(
+                                "Publisher must obtain a valid TrustChain certificate".to_string(),
+                            ),
                         });
                     }
                 }
             }
             Err(e) => {
-                result.errors.push(format!("Signature verification failed: {}", e));
+                result
+                    .errors
+                    .push(format!("Signature verification failed: {e}"));
                 result.policy_result.violations.push(PolicyViolation {
                     violation_type: ViolationType::InvalidSignature,
                     severity: Severity::Critical,
                     description: "Package signature verification failed".to_string(),
-                    remediation: Some("Ensure package is signed with a valid TrustChain certificate".to_string()),
+                    remediation: Some(
+                        "Ensure package is signed with a valid TrustChain certificate".to_string(),
+                    ),
                 });
-                self.metrics.verification_failures.fetch_add(1,
-                    std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .verification_failures
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 return Ok(result);
             }
         }
 
         // Scan for vulnerabilities if enabled
         if self.config.vulnerability_scanning {
-            self.metrics.vulnerability_scans.fetch_add(1,
-                std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .vulnerability_scans
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
             let vulnerabilities = self.scan_vulnerabilities(package).await?;
             if !vulnerabilities.is_empty() {
-                self.metrics.vulnerabilities_found.fetch_add(vulnerabilities.len() as u64,
-                    std::sync::atomic::Ordering::Relaxed);
+                self.metrics.vulnerabilities_found.fetch_add(
+                    vulnerabilities.len() as u64,
+                    std::sync::atomic::Ordering::Relaxed,
+                );
 
                 for vuln in &vulnerabilities {
                     if vuln.severity >= Severity::High {
@@ -421,8 +446,10 @@ impl SecurityManager {
                             violation_type: ViolationType::Vulnerability,
                             severity: vuln.severity.clone(),
                             description: format!("Critical vulnerability detected: {}", vuln.title),
-                            remediation: vuln.fixed_version.as_ref()
-                                .map(|v| format!("Update to version {}", v)),
+                            remediation: vuln
+                                .fixed_version
+                                .as_ref()
+                                .map(|v| format!("Update to version {v}")),
                         });
                     }
                 }
@@ -431,14 +458,11 @@ impl SecurityManager {
         }
 
         // Apply trust policy
-        let policy_evaluation = self.policy_engine
-            .evaluate_package(&result)
-            .await?;
+        let policy_evaluation = self.policy_engine.evaluate_package(&result).await?;
 
         result.policy_result = policy_evaluation;
-        result.verified = result.signature_valid &&
-                         result.certificate_valid &&
-                         result.policy_result.allowed;
+        result.verified =
+            result.signature_valid && result.certificate_valid && result.policy_result.allowed;
 
         Ok(result)
     }
@@ -451,11 +475,7 @@ impl SecurityManager {
     }
 
     /// Revoke a publisher's certificate (binary: authenticated or not)
-    pub async fn revoke_publisher(
-        &self,
-        cert_fingerprint: &str,
-        reason: &str,
-    ) {
+    pub async fn revoke_publisher(&self, cert_fingerprint: &str, reason: &str) {
         self.authenticator.revoke(cert_fingerprint, reason).await;
     }
 
@@ -485,7 +505,9 @@ impl SecurityManager {
 
     /// Pin certificate for a publisher
     pub async fn pin_certificate(&mut self, publisher: String, cert_fingerprint: String) {
-        self.config.pinned_certificates.insert(publisher, cert_fingerprint);
+        self.config
+            .pinned_certificates
+            .insert(publisher, cert_fingerprint);
     }
 }
 
@@ -498,7 +520,8 @@ impl AssetPackage {
 
     /// Get package signature
     pub fn get_signature(&self) -> Option<PackageSignature> {
-        self.signature.as_ref()
+        self.signature
+            .as_ref()
             .and_then(|v| serde_json::from_value(v.clone()).ok())
     }
 }

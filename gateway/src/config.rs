@@ -25,9 +25,7 @@ pub enum CertificateSource {
         common_name: String,
     },
     /// Generate an ephemeral self-signed certificate at startup.
-    SelfSigned {
-        common_name: String,
-    },
+    SelfSigned { common_name: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,10 +119,18 @@ pub struct CorsConfig {
 impl Default for GatewayConfig {
     fn default() -> Self {
         Self {
-            listen_addr: "[::]:8443".parse().expect("hardcoded default listen addr is valid"),
-            trustchain_addr: "[::1]:50053".parse().expect("hardcoded default trustchain addr is valid"),
-            blockmatrix_addr: "[::1]:8446".parse().expect("hardcoded default blockmatrix addr is valid"),
-            caesar_addr: "[::1]:9294".parse().expect("hardcoded default caesar addr is valid"),
+            listen_addr: "[::]:8443"
+                .parse()
+                .expect("hardcoded default listen addr is valid"),
+            trustchain_addr: "[::1]:50053"
+                .parse()
+                .expect("hardcoded default trustchain addr is valid"),
+            blockmatrix_addr: "[::1]:8446"
+                .parse()
+                .expect("hardcoded default blockmatrix addr is valid"),
+            caesar_addr: "[::1]:9294"
+                .parse()
+                .expect("hardcoded default caesar addr is valid"),
             trustchain_server_name: "trustchain".to_string(),
             blockmatrix_server_name: "blockmatrix".to_string(),
             caesar_server_name: "caesar".to_string(),

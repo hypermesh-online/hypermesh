@@ -5,14 +5,14 @@
 //! Extension system trait definitions
 
 use async_trait::async_trait;
+use semver::Version;
 use std::collections::HashMap;
 use std::sync::Arc;
-use semver::Version;
 
-use crate::assets::core::{AssetManager, AssetRegistration, AssetType, ConsensusProof};
-use super::types::*;
 use super::asset_types::*;
 use super::package_types::*;
+use super::types::*;
+use crate::assets::core::{AssetManager, AssetRegistration, AssetType, ConsensusProof};
 
 /// Core trait that all HyperMesh extensions must implement
 #[async_trait]
@@ -24,13 +24,16 @@ pub trait HyperMeshExtension: Send + Sync {
     async fn initialize(&mut self, config: ExtensionConfig) -> ExtensionResult<()>;
 
     /// Register assets provided by this extension
-    async fn register_assets(&self) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>>;
+    async fn register_assets(
+        &self,
+    ) -> ExtensionResult<HashMap<AssetType, Box<dyn AssetExtensionHandler>>>;
 
     /// Extend the asset manager with custom functionality
     async fn extend_manager(&self, asset_manager: Arc<AssetManager>) -> ExtensionResult<()>;
 
     /// Handle extension-specific API calls
-    async fn handle_request(&self, request: ExtensionRequest) -> ExtensionResult<ExtensionResponse>;
+    async fn handle_request(&self, request: ExtensionRequest)
+        -> ExtensionResult<ExtensionResponse>;
 
     /// Get current extension status
     async fn status(&self) -> ExtensionStatus;
@@ -58,7 +61,11 @@ pub trait AssetExtensionHandler: Send + Sync {
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration>;
 
     /// Update an existing asset
-    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()>;
+    async fn update_asset(
+        &self,
+        id: &AssetRegistration,
+        update: AssetUpdate,
+    ) -> ExtensionResult<()>;
 
     /// Delete an asset
     async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()>;
@@ -70,10 +77,18 @@ pub trait AssetExtensionHandler: Send + Sync {
     async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata>;
 
     /// Validate asset with consensus proofs
-    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool>;
+    async fn validate_asset(
+        &self,
+        id: &AssetRegistration,
+        proof: ConsensusProof,
+    ) -> ExtensionResult<bool>;
 
     /// Handle asset-specific operations
-    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult>;
+    async fn handle_operation(
+        &self,
+        id: &AssetRegistration,
+        operation: AssetOperation,
+    ) -> ExtensionResult<OperationResult>;
 }
 
 /// Asset library extension trait for Catalog-like functionality
@@ -86,19 +101,35 @@ pub trait AssetLibraryExtension: HyperMeshExtension {
     async fn get_package(&self, package_id: &str) -> ExtensionResult<AssetPackage>;
 
     /// Install an asset package
-    async fn install_package(&self, package_id: &str, options: InstallOptions) -> ExtensionResult<InstallResult>;
+    async fn install_package(
+        &self,
+        package_id: &str,
+        options: InstallOptions,
+    ) -> ExtensionResult<InstallResult>;
 
     /// Uninstall an asset package
     async fn uninstall_package(&self, package_id: &str) -> ExtensionResult<()>;
 
     /// Update an installed package
-    async fn update_package(&self, package_id: &str, version: Option<Version>) -> ExtensionResult<UpdateResult>;
+    async fn update_package(
+        &self,
+        package_id: &str,
+        version: Option<Version>,
+    ) -> ExtensionResult<UpdateResult>;
 
     /// Search for packages
-    async fn search_packages(&self, query: &str, options: SearchOptions) -> ExtensionResult<Vec<AssetPackage>>;
+    async fn search_packages(
+        &self,
+        query: &str,
+        options: SearchOptions,
+    ) -> ExtensionResult<Vec<AssetPackage>>;
 
     /// Publish a new package to the library
-    async fn publish_package(&self, package: AssetPackageSpec, proof: ConsensusProof) -> ExtensionResult<PublishResult>;
+    async fn publish_package(
+        &self,
+        package: AssetPackageSpec,
+        proof: ConsensusProof,
+    ) -> ExtensionResult<PublishResult>;
 
     /// Verify package integrity
     async fn verify_package(&self, package_id: &str) -> ExtensionResult<VerificationResult>;

@@ -62,12 +62,9 @@ impl ModeConfig {
 
     /// Returns `true` when any enabled mode requires a STOQ listener.
     pub fn needs_stoq_listener(&self) -> bool {
-        self.enabled_modes.iter().any(|m| {
-            matches!(
-                m,
-                GatewayMode::OutboundProxy | GatewayMode::InterNetwork
-            )
-        })
+        self.enabled_modes
+            .iter()
+            .any(|m| matches!(m, GatewayMode::OutboundProxy | GatewayMode::InterNetwork))
     }
 }
 

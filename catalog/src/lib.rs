@@ -19,37 +19,41 @@
 // #![warn(missing_docs)]
 #![deny(unsafe_code)]
 
-pub mod assets;
-pub mod template;
-pub mod registry;
-pub mod validation;
-pub mod documentation;
-pub mod versioning;
-pub mod scripting;
-pub(crate) mod hypermesh_integration;
-pub mod library;
-pub(crate) mod hypermesh_bridge;
-pub mod extension;
-pub(crate) mod plugin;
-pub mod distribution;
-pub mod security;
-pub mod sharing;
 pub mod api;
 pub(crate) mod asset_compat;
+pub mod assets;
+pub mod distribution;
+pub mod documentation;
+pub mod extension;
+pub(crate) mod hypermesh_bridge;
+pub(crate) mod hypermesh_integration;
+pub mod library;
+pub(crate) mod plugin;
+pub mod registry;
+pub mod scripting;
+pub mod security;
 pub mod settlement;
+pub mod sharing;
+pub mod template;
+pub mod validation;
+pub mod versioning;
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 // Re-export key types from HyperMesh
-pub use blockmatrix::consensus::proof_of_state_integration::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 pub use blockmatrix::assets::core::{AssetRegistration, AssetType};
+pub use blockmatrix::consensus::proof_of_state_integration::{
+    ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof,
+};
 
 // Canonical asset types from lib (aliased to avoid collision with catalog's own AssetMetadata)
-pub use hypermesh_lib::{AssetKind, SystemAssetKind, UserAssetKind, AssetAdapter as LibAssetAdapter};
-pub use hypermesh_lib::BaseState as LibBaseState;
 pub use hypermesh_lib::AssetMetadata as LibAssetMetadata;
+pub use hypermesh_lib::BaseState as LibBaseState;
+pub use hypermesh_lib::{
+    AssetAdapter as LibAssetAdapter, AssetKind, SystemAssetKind, UserAssetKind,
+};
 
 // Define ExecutionResult locally (Catalog-specific)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,27 +78,29 @@ pub struct ConsensusContext {
     /// Time synchronization tolerance (ms)
     pub time_sync_tolerance_ms: u64,
 }
+pub use api::{CatalogAppState, CatalogStoqApi, CatalogStoqConfig};
 pub use assets::{
-    AssetPackage, AssetSpec, AssetMetadata, AssetContent, AssetSecurity,
-    AssetResources, AssetExecution, AssetDependency
+    AssetContent, AssetDependency, AssetExecution, AssetMetadata, AssetPackage, AssetResources,
+    AssetSecurity, AssetSpec,
 };
-pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateRuntime};
-pub use registry::{
-    CatalogRegistry, RegistryConfig, SearchQuery, SearchResult, SearchResults,
-    RegistryStatistics, TrustPolicy, SortCriteria, DateRange,
-    AssetTypeDefinition, TypeMetadata, ValidationRule, ValidationRuleType,
-    TypeValidationResult,
-};
-pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
-pub use documentation::DocumentationGenerator;
-pub use versioning::{VersionManager, SemanticVersion, DependencyResolver};
-pub use scripting::{ScriptingEngine, ScriptResult};
-pub use security::VerificationResult;
-pub use sharing::{SharingConfig, SharingStats, SharingEvent, PeerInfo};
-pub use sharing::protocols::SharePermission;
 pub use distribution::DistributionConfig;
-pub use settlement::{CatalogRewardAdapter, ContributionTracker, ContributionMetrics, RewardService, RewardDistribution};
-pub use api::{CatalogStoqApi, CatalogStoqConfig, CatalogAppState};
+pub use documentation::DocumentationGenerator;
+pub use registry::{
+    AssetTypeDefinition, CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics,
+    SearchQuery, SearchResult, SearchResults, SortCriteria, TrustPolicy, TypeMetadata,
+    TypeValidationResult, ValidationRule, ValidationRuleType,
+};
+pub use scripting::{ScriptResult, ScriptingEngine};
+pub use security::VerificationResult;
+pub use settlement::{
+    CatalogRewardAdapter, ContributionMetrics, ContributionTracker, RewardDistribution,
+    RewardService,
+};
+pub use sharing::protocols::SharePermission;
+pub use sharing::{PeerInfo, SharingConfig, SharingEvent, SharingStats};
+pub use template::{CatalogTemplateGenerator, TemplateConfig, TemplateRuntime};
+pub use validation::{AssetValidator, ValidationConfig, ValidationResult};
+pub use versioning::{DependencyResolver, SemanticVersion, VersionManager};
 
 /// Catalog version
 pub const CATALOG_VERSION: &str = "0.1.0";
@@ -152,13 +158,17 @@ impl Catalog {
         // Initialize components
         #[allow(deprecated)] // During migration to CatalogRegistry
         let asset_registry = Arc::new(registry::AssetRegistry::new(config.registry).await?);
-        let template_generator = Arc::new(template::CatalogTemplateGenerator::new(config.template)?);
+        let template_generator =
+            Arc::new(template::CatalogTemplateGenerator::new(config.template)?);
         let asset_validator = Arc::new(validation::AssetValidator::with_config(config.validation));
-        let documentation_generator = Arc::new(documentation::DocumentationGenerator::new(config.documentation)?);
+        let documentation_generator = Arc::new(documentation::DocumentationGenerator::new(
+            config.documentation,
+        )?);
         let version_manager = Arc::new(versioning::VersionManager::new());
 
         // Initialize HyperMesh client
-        let hypermesh_address = config.hypermesh_address
+        let hypermesh_address = config
+            .hypermesh_address
             .unwrap_or_else(|| "catalog.hypermesh.online".to_string());
         let mut hypermesh_client = hypermesh_integration::HyperMeshClient::new(hypermesh_address);
 
@@ -179,38 +189,38 @@ impl Catalog {
             hypermesh_client: Arc::new(tokio::sync::Mutex::new(hypermesh_client)),
         })
     }
-    
+
     /// Get consensus configuration
     pub fn consensus_context(&self) -> Arc<ConsensusContext> {
         Arc::clone(&self.consensus_context)
     }
-    
+
     /// Get asset registry
     #[allow(deprecated)] // During migration to CatalogRegistry
     pub fn asset_registry(&self) -> Arc<registry::AssetRegistry> {
         Arc::clone(&self.asset_registry)
     }
-    
+
     /// Get template generator
     pub fn template_generator(&self) -> Arc<template::CatalogTemplateGenerator> {
         Arc::clone(&self.template_generator)
     }
-    
+
     /// Get asset validator
     pub fn asset_validator(&self) -> Arc<validation::AssetValidator> {
         Arc::clone(&self.asset_validator)
     }
-    
+
     /// Get documentation generator
     pub fn documentation_generator(&self) -> Arc<documentation::DocumentationGenerator> {
         Arc::clone(&self.documentation_generator)
     }
-    
+
     /// Get version manager
     pub fn version_manager(&self) -> Arc<versioning::VersionManager> {
         Arc::clone(&self.version_manager)
     }
-    
+
     /// Publish an asset package
     ///
     /// Validates the package first, then publishes to the registry.
@@ -231,15 +241,14 @@ impl Catalog {
         // Lightweight consensus metadata check: if the package declares consensus_required,
         // verify that the consensus context is configured. Heavy proof validation happens
         // in the extension lifecycle (publish_package).
-        if package.spec.spec.security.consensus_required {
-            if self.consensus_context.min_stake_amount == 0
-                && self.consensus_context.min_space_commitment == 0
-            {
-                tracing::warn!(
-                    "Package '{}' requires consensus but consensus context has zero thresholds",
-                    package.spec.metadata.name,
-                );
-            }
+        if package.spec.spec.security.consensus_required
+            && self.consensus_context.min_stake_amount == 0
+            && self.consensus_context.min_space_commitment == 0
+        {
+            tracing::warn!(
+                "Package '{}' requires consensus but consensus context has zero thresholds",
+                package.spec.metadata.name,
+            );
         }
 
         // Publish to registry
@@ -252,28 +261,39 @@ impl Catalog {
     pub async fn install_asset(&self, id: &assets::AssetPackageId) -> Result<AssetPackage> {
         self.asset_registry.install(id).await
     }
-    
+
     /// Search for assets
-    pub async fn search_assets(&self, query: &registry::SearchQuery) -> Result<registry::SearchResults> {
+    pub async fn search_assets(
+        &self,
+        query: &registry::SearchQuery,
+    ) -> Result<registry::SearchResults> {
         self.asset_registry.search(query).await
     }
-    
+
     /// Generate asset from template
     pub async fn generate_from_template(
         &self,
         template_name: &str,
         context: template::TemplateContext,
     ) -> Result<template::TemplateGenerationResult> {
-        self.template_generator.generate_from_template(template_name, context).await
+        self.template_generator
+            .generate_from_template(template_name, context)
+            .await
     }
-    
+
     /// Validate an asset package
-    pub async fn validate_asset(&self, package: &AssetPackage) -> Result<validation::ValidationResult> {
+    pub async fn validate_asset(
+        &self,
+        package: &AssetPackage,
+    ) -> Result<validation::ValidationResult> {
         self.asset_validator.validate(package).await
     }
-    
+
     /// Generate documentation for an asset
-    pub async fn generate_documentation(&self, package: &AssetPackage) -> Result<documentation::GeneratedDocumentation> {
+    pub async fn generate_documentation(
+        &self,
+        package: &AssetPackage,
+    ) -> Result<documentation::GeneratedDocumentation> {
         self.documentation_generator.generate(package).await
     }
 
@@ -301,7 +321,9 @@ impl Catalog {
         let resource_requirements = asset_adapter.map_asset_to_resources(package);
 
         // Execute on HyperMesh
-        hypermesh_client.execute_asset(asset_id, resource_requirements).await
+        hypermesh_client
+            .execute_asset(asset_id, resource_requirements)
+            .await
     }
 
     /// Query execution status on HyperMesh
@@ -338,7 +360,7 @@ impl CatalogBuilder {
             config: CatalogConfig::default(),
         }
     }
-    
+
     /// Set consensus configuration
     pub fn with_consensus(mut self, config: ConsensusContext) -> Self {
         self.config.consensus = config;
@@ -356,7 +378,7 @@ impl CatalogBuilder {
         self.config.trustchain_cert_path = Some(cert_path.into());
         self
     }
-    
+
     /// Build the Catalog instance
     pub async fn build(self) -> Result<Catalog> {
         Catalog::new(self.config).await
@@ -372,13 +394,13 @@ impl Default for CatalogBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_catalog_creation() {
         let catalog = CatalogBuilder::new().build().await;
         assert!(catalog.is_ok());
     }
-    
+
     #[test]
     fn test_catalog_version() {
         assert_eq!(CATALOG_VERSION, "0.1.0");

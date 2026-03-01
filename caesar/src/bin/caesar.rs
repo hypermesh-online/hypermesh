@@ -45,9 +45,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Spawn server and wait for Ctrl+C
     let server = Arc::clone(&api);
-    let server_handle = tokio::spawn(async move {
-        server.serve().await
-    });
+    let server_handle = tokio::spawn(async move { server.serve().await });
 
     tokio::signal::ctrl_c()
         .await
@@ -58,11 +56,7 @@ async fn main() -> anyhow::Result<()> {
     api.stop();
 
     // Give the server loop a moment to observe the stop flag
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        server_handle,
-    )
-    .await;
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), server_handle).await;
 
     println!("  Caesar stopped.");
     Ok(())

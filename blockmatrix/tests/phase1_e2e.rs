@@ -14,13 +14,13 @@
 //!
 //! These tests validate the integrated system at scale with 100-node networks.
 
-use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
-use blockmatrix::matrix::MatrixCoordinate;
-use blockmatrix::matrix::tensor::{Vector3D, Matrix3x3, PathFinder};
-use blockmatrix::matrix::geospatial::{GpsCoordinate, GpsConverter, ScaleResolution};
 use blockmatrix::blockchain::PropagationStrategy;
-use tempfile::TempDir;
+use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
+use blockmatrix::matrix::geospatial::{GpsConverter, GpsCoordinate, ScaleResolution};
+use blockmatrix::matrix::tensor::{Matrix3x3, PathFinder, Vector3D};
+use blockmatrix::matrix::MatrixCoordinate;
 use std::time::Instant;
+use tempfile::TempDir;
 
 /// Create a test matrix foundation with temporary storage
 async fn create_test_foundation() -> (MatrixFoundation, TempDir) {
@@ -47,14 +47,17 @@ async fn test_e2e_100_node_matrix_network() {
     for x in 0..10 {
         for y in 0..10 {
             let coord = MatrixCoordinate::new(x * 10, y * 10, 0).unwrap();
-            let node_id = format!("node_{}_{}", x, y);
+            let node_id = format!("node_{x}_{y}");
             foundation.add_node(node_id, coord).await.unwrap();
         }
     }
     let creation_time = start.elapsed();
 
-    println!("✓ Created 100 nodes in {:?}", creation_time);
-    assert!(creation_time.as_millis() < 1000, "Node creation should be <1s");
+    println!("✓ Created 100 nodes in {creation_time:?}");
+    assert!(
+        creation_time.as_millis() < 1000,
+        "Node creation should be <1s"
+    );
 
     // Verify node count
     assert_eq!(foundation.node_count().await, 100);
@@ -76,23 +79,29 @@ async fn test_e2e_100_node_matrix_network() {
 
     // Test radius-based neighbor discovery
     let neighbors = foundation.find_neighbors_in_radius(&center, 20.0).await;
-    assert!(neighbors.len() >= 4, "Should find at least 4 neighbors within radius");
+    assert!(
+        neighbors.len() >= 4,
+        "Should find at least 4 neighbors within radius"
+    );
     println!("✓ Radius-based neighbor discovery working");
 
     // Add blocks to multiple nodes
     let start = Instant::now();
     for i in 0..10 {
-        let node_id = format!("node_{}_{}", i, i);
-        let data = format!("Block data from node {}", i).into_bytes();
+        let node_id = format!("node_{i}_{i}");
+        let data = format!("Block data from node {i}").into_bytes();
         foundation.add_block(&node_id, data).await.unwrap();
     }
     let block_time = start.elapsed();
-    println!("✓ Added 10 blocks in {:?}", block_time);
-    assert!(block_time.as_millis() < 500, "Block addition should be <500ms");
+    println!("✓ Added 10 blocks in {block_time:?}");
+    assert!(
+        block_time.as_millis() < 500,
+        "Block addition should be <500ms"
+    );
 
     // Verify blockchain heights
     for i in 0..10 {
-        let node_id = format!("node_{}_{}", i, i);
+        let node_id = format!("node_{i}_{i}");
         let height = foundation.get_blockchain_height(&node_id).await.unwrap();
         assert_eq!(height, 1, "Each node should have genesis + 1 block");
     }
@@ -102,7 +111,7 @@ async fn test_e2e_100_node_matrix_network() {
     let start = Instant::now();
     let snapshot_id = foundation.save_network_state().await.unwrap();
     let save_time = start.elapsed();
-    println!("✓ Network state saved in {:?} (snapshot: {})", save_time, snapshot_id);
+    println!("✓ Network state saved in {save_time:?} (snapshot: {snapshot_id})");
     assert!(save_time.as_secs() < 10, "Save should complete in <10s");
 
     // Clean shutdown
@@ -123,7 +132,10 @@ async fn test_e2e_full_workflow() {
     for x in 0..5 {
         for y in 0..5 {
             let coord = MatrixCoordinate::new(x * 100, y * 100, 0).unwrap();
-            foundation.add_node(format!("node_{}_{}", x, y), coord).await.unwrap();
+            foundation
+                .add_node(format!("node_{x}_{y}"), coord)
+                .await
+                .unwrap();
         }
     }
     assert_eq!(foundation.node_count().await, 25);
@@ -133,7 +145,7 @@ async fn test_e2e_full_workflow() {
     println!("Step 2: Verifying blockchains...");
     for x in 0..5 {
         for y in 0..5 {
-            let node_id = format!("node_{}_{}", x, y);
+            let node_id = format!("node_{x}_{y}");
             let height = foundation.get_blockchain_height(&node_id).await.unwrap();
             assert_eq!(height, 0, "Should have genesis block only");
         }
@@ -144,8 +156,8 @@ async fn test_e2e_full_workflow() {
     println!("Step 3: Adding blocks to all nodes...");
     for x in 0..5 {
         for y in 0..5 {
-            let node_id = format!("node_{}_{}", x, y);
-            let data = format!("Data from node ({}, {})", x, y).into_bytes();
+            let node_id = format!("node_{x}_{y}");
+            let data = format!("Data from node ({x}, {y})").into_bytes();
             foundation.add_block(&node_id, data).await.unwrap();
         }
     }
@@ -155,7 +167,7 @@ async fn test_e2e_full_workflow() {
     println!("Step 4: Verifying blockchain integrity...");
     for x in 0..5 {
         for y in 0..5 {
-            let node_id = format!("node_{}_{}", x, y);
+            let node_id = format!("node_{x}_{y}");
             let height = foundation.get_blockchain_height(&node_id).await.unwrap();
             assert_eq!(height, 1, "Each node should have genesis + 1 block");
         }
@@ -191,7 +203,7 @@ async fn test_e2e_full_workflow() {
     // Step 7: Test persistence and recovery
     println!("Step 7: Testing persistence...");
     let snapshot_id = foundation.save_network_state().await.unwrap();
-    println!("✓ Network state persisted (snapshot: {})", snapshot_id);
+    println!("✓ Network state persisted (snapshot: {snapshot_id})");
 
     // Step 8: Verify network statistics
     println!("Step 8: Verifying network statistics...");
@@ -229,9 +241,12 @@ async fn test_e2e_geospatial_positioning() {
         let matrix_coord = converter.gps_to_matrix(&gps).unwrap();
 
         let node_id = format!("node_{}", name.to_lowercase().replace(" ", "_"));
-        foundation.add_node(node_id.clone(), matrix_coord.clone()).await.unwrap();
+        foundation
+            .add_node(node_id.clone(), matrix_coord)
+            .await
+            .unwrap();
 
-        println!("✓ {} at GPS({}, {}) -> Matrix{}", name, lat, lon, matrix_coord);
+        println!("✓ {name} at GPS({lat}, {lon}) -> Matrix{matrix_coord}");
 
         // Verify round-trip conversion
         let converted_back = converter.matrix_to_gps(&matrix_coord).unwrap();
@@ -271,11 +286,11 @@ async fn test_e2e_tensor_operations() {
     let distance = direction.magnitude();
     let normalized = direction.normalize().unwrap();
 
-    println!("Origin: {:?}", origin);
-    println!("Destination: {:?}", destination);
-    println!("Direction: {:?}", direction);
-    println!("Distance: {:.2}", distance);
-    println!("Normalized: {:?}", normalized);
+    println!("Origin: {origin:?}");
+    println!("Destination: {destination:?}");
+    println!("Direction: {direction:?}");
+    println!("Distance: {distance:.2}");
+    println!("Normalized: {normalized:?}");
 
     assert!((distance - 141.42).abs() < 0.1);
     assert!((normalized.magnitude() - 1.0).abs() < 0.01);
@@ -284,7 +299,7 @@ async fn test_e2e_tensor_operations() {
     let rotation = Matrix3x3::rotation_z(45.0_f64.to_radians());
     let transformed = rotation.transform_vector(&origin);
 
-    println!("✓ Vector operations validated (transformed: {:?})", transformed);
+    println!("✓ Vector operations validated (transformed: {transformed:?})");
 
     // Test pathfinding
     let start = MatrixCoordinate::new(0, 0, 0).unwrap();
@@ -292,14 +307,19 @@ async fn test_e2e_tensor_operations() {
 
     let path_finder = PathFinder::new();
     // Simple pathfinding with empty neighbor function for demo
-    let path = path_finder.find_path(&start, &goal, |coord| {
-        // Return valid neighbors (simplified for testing)
-        vec![
-            coord.translate(1, 0, 0).ok(),
-            coord.translate(0, 1, 0).ok(),
-            coord.translate(1, 1, 0).ok(),
-        ].into_iter().flatten().collect()
-    }).ok();
+    let path = path_finder
+        .find_path(&start, &goal, |coord| {
+            // Return valid neighbors (simplified for testing)
+            vec![
+                coord.translate(1, 0, 0).ok(),
+                coord.translate(0, 1, 0).ok(),
+                coord.translate(1, 1, 0).ok(),
+            ]
+            .into_iter()
+            .flatten()
+            .collect()
+        })
+        .ok();
 
     if let Some(path) = path {
         println!("✓ Pathfinding working (path length: {})", path.len());
@@ -321,10 +341,13 @@ async fn test_e2e_blockchain_propagation() {
     let node_count = 10;
     for i in 0..node_count {
         let coord = MatrixCoordinate::new(i * 10, 0, 0).unwrap();
-        foundation.add_node(format!("node{}", i), coord).await.unwrap();
+        foundation
+            .add_node(format!("node{i}"), coord)
+            .await
+            .unwrap();
     }
 
-    println!("Created {} nodes in a line", node_count);
+    println!("Created {node_count} nodes in a line");
 
     // Test different propagation strategies
     for strategy in &[
@@ -333,23 +356,23 @@ async fn test_e2e_blockchain_propagation() {
         PropagationStrategy::RoutedPath,
         PropagationStrategy::DistanceThreshold(50.0),
     ] {
-        println!("Testing {:?} propagation...", strategy);
+        println!("Testing {strategy:?} propagation...");
 
         // Add blocks to all nodes
         for i in 0..node_count {
-            let node_id = format!("node{}", i);
-            let data = format!("Block from node{} with {:?}", i, strategy).into_bytes();
+            let node_id = format!("node{i}");
+            let data = format!("Block from node{i} with {strategy:?}").into_bytes();
             foundation.add_block(&node_id, data).await.unwrap();
         }
 
         // Verify all nodes received their blocks
         for i in 0..node_count {
-            let node_id = format!("node{}", i);
+            let node_id = format!("node{i}");
             let height = foundation.get_blockchain_height(&node_id).await.unwrap();
-            assert!(height > 0, "Node {} should have blocks", i);
+            assert!(height > 0, "Node {i} should have blocks");
         }
 
-        println!("✓ {:?} propagation successful", strategy);
+        println!("✓ {strategy:?} propagation successful");
     }
 
     foundation.shutdown().await.unwrap();
@@ -374,13 +397,16 @@ async fn test_e2e_persistence_recovery() {
         // Add nodes
         for i in 0..20 {
             let coord = MatrixCoordinate::new(i * 5, i * 5, 0).unwrap();
-            foundation.add_node(format!("node{}", i), coord).await.unwrap();
+            foundation
+                .add_node(format!("node{i}"), coord)
+                .await
+                .unwrap();
         }
 
         // Add blocks
         for i in 0..20 {
-            let node_id = format!("node{}", i);
-            let data = format!("Persistent data {}", i).into_bytes();
+            let node_id = format!("node{i}");
+            let data = format!("Persistent data {i}").into_bytes();
             foundation.add_block(&node_id, data).await.unwrap();
         }
 
@@ -391,7 +417,7 @@ async fn test_e2e_persistence_recovery() {
         let snapshot_id = foundation.save_network_state().await.unwrap();
         let save_time = start.elapsed();
 
-        println!("✓ Saved state in {:?} (snapshot: {})", save_time, snapshot_id);
+        println!("✓ Saved state in {save_time:?} (snapshot: {snapshot_id})");
         assert!(save_time.as_secs() < 5, "Save should be <5s");
 
         foundation.shutdown().await.unwrap();
@@ -409,7 +435,7 @@ async fn test_e2e_persistence_recovery() {
         foundation.recover_network_state().await.unwrap();
         let recovery_time = start.elapsed();
 
-        println!("✓ Recovered state in {:?}", recovery_time);
+        println!("✓ Recovered state in {recovery_time:?}");
         assert!(recovery_time.as_secs() < 10, "Recovery should be <10s");
 
         // Note: Recovery validation would require storing node registry
@@ -431,12 +457,15 @@ async fn test_e2e_performance_validation() {
     let start = Instant::now();
     for i in 0..100 {
         let coord = MatrixCoordinate::new(i, i, i).unwrap();
-        foundation.add_node(format!("node{}", i), coord).await.unwrap();
+        foundation
+            .add_node(format!("node{i}"), coord)
+            .await
+            .unwrap();
     }
     let creation_time = start.elapsed();
     let per_node_time = creation_time.as_micros() / 100;
 
-    println!("Node creation: {} µs per node", per_node_time);
+    println!("Node creation: {per_node_time} µs per node");
     assert!(per_node_time < 10_000, "Should create node in <10ms");
 
     // Test 2: Neighbor discovery performance
@@ -448,20 +477,20 @@ async fn test_e2e_performance_validation() {
     let discovery_time = start.elapsed();
     let per_query = discovery_time.as_micros() / 100;
 
-    println!("Neighbor discovery: {} µs per query", per_query);
+    println!("Neighbor discovery: {per_query} µs per query");
     assert!(per_query < 1_000, "Should discover neighbors in <1ms");
 
     // Test 3: Block addition performance
     let start = Instant::now();
     for i in 0..100 {
-        let node_id = format!("node{}", i);
+        let node_id = format!("node{i}");
         let data = vec![i as u8; 1024]; // 1KB blocks
         foundation.add_block(&node_id, data).await.unwrap();
     }
     let block_time = start.elapsed();
     let per_block = block_time.as_micros() / 100;
 
-    println!("Block addition: {} µs per block", per_block);
+    println!("Block addition: {per_block} µs per block");
     assert!(per_block < 5_000, "Should add block in <5ms");
 
     // Test 4: Network stats performance
@@ -472,7 +501,7 @@ async fn test_e2e_performance_validation() {
     let stats_time = start.elapsed();
     let per_stat = stats_time.as_micros() / 100;
 
-    println!("Network stats: {} µs per query", per_stat);
+    println!("Network stats: {per_stat} µs per query");
     assert!(per_stat < 500, "Should get stats in <500µs");
 
     foundation.shutdown().await.unwrap();
@@ -486,7 +515,7 @@ async fn test_e2e_matrix_distance_calculations() {
     let (foundation, _temp_dir) = create_test_foundation().await;
 
     // Create nodes at specific positions
-    let positions = vec![
+    let positions = [
         (0, 0, 0),
         (100, 0, 0),
         (0, 100, 0),
@@ -496,7 +525,10 @@ async fn test_e2e_matrix_distance_calculations() {
 
     for (i, (x, y, z)) in positions.iter().enumerate() {
         let coord = MatrixCoordinate::new(*x, *y, *z).unwrap();
-        foundation.add_node(format!("node{}", i), coord).await.unwrap();
+        foundation
+            .add_node(format!("node{i}"), coord)
+            .await
+            .unwrap();
     }
 
     // Test all distance metrics
@@ -541,7 +573,10 @@ async fn test_e2e_concurrent_operations() {
     // Create initial nodes
     for i in 0..10 {
         let coord = MatrixCoordinate::new(i * 10, 0, 0).unwrap();
-        foundation.add_node(format!("node{}", i), coord).await.unwrap();
+        foundation
+            .add_node(format!("node{i}"), coord)
+            .await
+            .unwrap();
     }
 
     // Concurrent block additions
@@ -550,9 +585,9 @@ async fn test_e2e_concurrent_operations() {
     for i in 0..10 {
         let foundation = foundation.clone();
         let handle = tokio::spawn(async move {
-            let node_id = format!("node{}", i);
+            let node_id = format!("node{i}");
             for j in 0..10 {
-                let data = format!("Block {} from node {}", j, i).into_bytes();
+                let data = format!("Block {j} from node {i}").into_bytes();
                 foundation.add_block(&node_id, data).await.unwrap();
             }
         });
@@ -568,9 +603,9 @@ async fn test_e2e_concurrent_operations() {
 
     // Verify all blocks were added
     for i in 0..10 {
-        let node_id = format!("node{}", i);
+        let node_id = format!("node{i}");
         let height = foundation.get_blockchain_height(&node_id).await.unwrap();
-        assert_eq!(height, 10, "Node {} should have 10 blocks", i);
+        assert_eq!(height, 10, "Node {i} should have 10 blocks");
     }
 
     println!("✓ All blocks verified");

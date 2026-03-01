@@ -6,9 +6,9 @@
 //!
 //! Shared types, enums, and constants used throughout privacy enforcement.
 
-use std::time::Duration;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::assets::core::PrivacyMode;
 
@@ -55,17 +55,11 @@ pub enum EnforcementAction {
         duration: Duration,
     },
     /// Suspend user account
-    SuspendUser {
-        duration: Duration,
-    },
+    SuspendUser { duration: Duration },
     /// Revoke resource allocation
-    RevokeAllocation {
-        allocation_id: String,
-    },
+    RevokeAllocation { allocation_id: String },
     /// Reduce privacy level
-    ReducePrivacyMode {
-        new_level: PrivacyMode,
-    },
+    ReducePrivacyMode { new_level: PrivacyMode },
     /// Require reauth
     RequireReauthentication,
     /// Escalate to administrator
@@ -418,7 +412,7 @@ impl Default for AutoRecoveryConfig {
 }
 
 /// Recovery procedures after violations
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct RecoveryProcedures {
     /// Automatic recovery attempts
     pub auto_recovery: AutoRecoveryConfig,
@@ -428,14 +422,4 @@ pub struct RecoveryProcedures {
 
     /// Recovery validation steps
     pub validation_steps: Vec<RecoveryValidationStep>,
-}
-
-impl Default for RecoveryProcedures {
-    fn default() -> Self {
-        Self {
-            auto_recovery: AutoRecoveryConfig::default(),
-            manual_procedures: Vec::new(),
-            validation_steps: Vec::new(),
-        }
-    }
 }

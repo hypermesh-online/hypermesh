@@ -21,42 +21,47 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 
 // Submodules
-pub mod asset_id;
 pub mod adapter;
-pub mod status;
+pub mod asset_id;
 pub mod privacy;
 pub mod proxy;
+pub mod status;
 
 // Re-exports
-pub use asset_id::{
-    AssetRegistration, AssetType, AssetIdError, SecurityError,
-    NetworkScope, RegistryId, FederationId, NodeFingerprint,
-    AssetCategory, BaseSystemType, ApplicationDomain,
-    ProofScope, ProofRequirements, ScopeBinding,
-    AssetData,
-};
 pub use adapter::{
-    AssetAdapter, AssetAllocationRequest, ResourceRequirements, ResourceLimits, ResourceUsage,
-    CpuRequirements, CpuUsage, CpuLimit,
-    GpuRequirements, GpuUsage, GpuLimit,
-    MemoryRequirements, MemoryUsage, MemoryLimit,
-    StorageRequirements, StorageUsage, StorageLimit, StorageType,
-    NetworkRequirements, NetworkUsage, NetworkLimit,
-    ContainerRequirements, VolumeMount, PortMapping,
-    AdapterHealth, AdapterCapabilities,
-    EconomicRequirements, AssetPriority
+    AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocationRequest, AssetPriority,
+    ContainerRequirements, CpuLimit, CpuRequirements, CpuUsage, EconomicRequirements, GpuLimit,
+    GpuRequirements, GpuUsage, MemoryLimit, MemoryRequirements, MemoryUsage, NetworkLimit,
+    NetworkRequirements, NetworkUsage, PortMapping, ResourceLimits, ResourceRequirements,
+    ResourceUsage, StorageLimit, StorageRequirements, StorageType, StorageUsage, VolumeMount,
 };
-pub use status::{AssetStatus, AssetState};
-pub use privacy::AssetAllocation;
+pub use asset_id::{
+    ApplicationDomain, AssetCategory, AssetData, AssetIdError, AssetRegistration, AssetType,
+    BaseSystemType, FederationId, NetworkScope, NodeFingerprint, ProofRequirements, ProofScope,
+    RegistryId, ScopeBinding, SecurityError,
+};
 pub use hypermesh_lib::PrivacyMode;
+pub use privacy::AssetAllocation;
 pub use proxy::{
-    ProxyAddress, ProxyType, ProxyAddressResolver, ProxyNodeInfo, ProxyCapabilities, ProxyStatistics,
+    GlobalAddress,
+    NATTranslator,
+    ProxyAddress,
+    ProxyAddressResolver,
+    ProxyCapabilities,
+    ProxyForwarder,
+    ProxyNetworkConfig,
+    ProxyNodeInfo,
+    ProxyRouter,
+    ProxyStatistics,
+    ProxySystemStats,
+    ProxyType,
+    QuantumSecurity,
     // CRITICAL Remote Proxy/NAT system exports
-    RemoteProxyManager, ProxyRouter, ProxyForwarder,
-    TrustChainIntegration, QuantumSecurity, ShardedDataAccess,
-    NATTranslator, GlobalAddress,
-    ProxySystemStats, ProxyNetworkConfig,
+    RemoteProxyManager,
+    ShardedDataAccess,
+    TrustChainIntegration,
 };
+pub use status::{AssetState, AssetStatus};
 
 /// Result type for asset operations
 pub type AssetResult<T> = Result<T, AssetError>;
@@ -67,27 +72,27 @@ pub enum AssetError {
     /// Asset not found
     #[error("Asset not found: {asset_id}")]
     AssetNotFound { asset_id: String },
-    
+
     /// Consensus validation failed
     #[error("Consensus validation failed: {reason}")]
     ConsensusValidationFailed { reason: String },
-    
+
     /// Invalid privacy level configuration
     #[error("Invalid privacy level: {level:?}")]
     InvalidPrivacyLevel { level: PrivacyMode },
-    
+
     /// Resource allocation failed
     #[error("Resource allocation failed: {reason}")]
     AllocationFailed { reason: String },
-    
+
     /// Proxy address resolution failed
     #[error("Proxy address resolution failed: {address:?}")]
     ProxyResolutionFailed { address: ProxyAddress },
-    
+
     /// Certificate validation failed
     #[error("Certificate validation failed: {fingerprint}")]
     CertificateValidationFailed { fingerprint: String },
-    
+
     /// Adapter operation failed
     #[error("Adapter operation failed: {message}")]
     AdapterError { message: String },
@@ -114,7 +119,11 @@ pub enum AssetError {
 
     /// Permission denied
     #[error("Permission denied for {operation} on {resource}: {reason}")]
-    PermissionDenied { operation: String, resource: String, reason: String },
+    PermissionDenied {
+        operation: String,
+        resource: String,
+        reason: String,
+    },
 
     /// Memory access failed
     #[error("Memory access failed: {reason}")]
@@ -143,8 +152,8 @@ pub enum AssetError {
 
 // Import Proof of State Four-Proof Consensus System
 pub use crate::consensus::proof_of_state_integration::{
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState, ClientCredentials, Proof,
+    ClientCredentials, ConsensusProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
+    WorkState, WorkloadType,
 };
 
 // All consensus proof types are now imported from Proof of State integration above
@@ -185,6 +194,12 @@ impl Default for ConsensusRequirements {
     }
 }
 
+impl Default for AssetManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AssetManager {
     /// Create new asset manager
     pub fn new() -> Self {
@@ -210,7 +225,7 @@ impl AssetManager {
                 BaseSystemType::Blockchain => AssetType::Container,
             }),
             AssetCategory::Application(_) => Err(AssetError::AdapterError {
-                message: "Cannot determine asset type for application asset".to_string()
+                message: "Cannot determine asset type for application asset".to_string(),
             }),
         }
     }
@@ -226,42 +241,46 @@ impl AssetManager {
         tracing::info!("Registered adapter for asset type: {:?}", asset_type);
         Ok(())
     }
-    
+
     /// Allocate an asset with consensus proof validation
     pub async fn allocate_asset(
         &self,
         request: AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         // Validate consensus proof first
-        self.validate_consensus_proof(&request.consensus_proof).await?;
-        
+        self.validate_consensus_proof(&request.consensus_proof)
+            .await?;
+
         // Get appropriate adapter
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&request.asset_type)
-            .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No adapter found for asset type: {:?}", request.asset_type)
-            })?;
-        
+        let adapter =
+            adapters
+                .get(&request.asset_type)
+                .ok_or_else(|| AssetError::AdapterError {
+                    message: format!("No adapter found for asset type: {:?}", request.asset_type),
+                })?;
+
         // Delegate to adapter
         let allocation = adapter.allocate_asset(&request).await?;
-        
+
         // Register asset status
         let mut assets = self.assets.write().await;
         assets.insert(allocation.asset_id.clone(), allocation.status.clone());
-        
+
         tracing::info!("Allocated asset: {}", allocation.asset_id);
         Ok(allocation)
     }
-    
+
     /// Deallocate an asset
     pub async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()> {
         // Derive asset type from category
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No adapter found for asset type: {:?}", asset_type)
+                message: format!("No adapter found for asset type: {asset_type:?}"),
             })?;
 
         // Delegate to adapter
@@ -289,9 +308,10 @@ impl AssetManager {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         adapter.get_asset_status(asset_id).await
@@ -306,46 +326,65 @@ impl AssetManager {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
-        adapter.configure_privacy_level(asset_id, privacy_level).await
+        adapter
+            .configure_privacy_level(asset_id, privacy_level)
+            .await
     }
 
     /// Assign proxy address for remote access
-    pub async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress> {
+    pub async fn assign_proxy_address(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> AssetResult<ProxyAddress> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         let proxy_address = adapter.assign_proxy_address(asset_id).await?;
 
         // Register with proxy resolver
-        self.proxy_resolver.register_mapping(proxy_address.clone(), asset_id.clone()).await;
+        self.proxy_resolver
+            .register_mapping(proxy_address.clone(), asset_id.clone())
+            .await;
 
         Ok(proxy_address)
     }
 
     /// Resolve proxy address to asset ID
-    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
-        self.proxy_resolver.resolve(proxy_addr).await
+    pub async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration> {
+        self.proxy_resolver
+            .resolve(proxy_addr)
+            .await
             .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                address: proxy_addr.clone()
+                address: proxy_addr.clone(),
             })
     }
 
     /// List all assets of a specific type
-    pub async fn list_assets_by_type(&self, asset_type: AssetType) -> AssetResult<Vec<AssetStatus>> {
+    pub async fn list_assets_by_type(
+        &self,
+        asset_type: AssetType,
+    ) -> AssetResult<Vec<AssetStatus>> {
         let assets = self.assets.read().await;
         let filtered_assets: Vec<AssetStatus> = assets
             .iter()
-            .filter(|(id, _)| Self::category_to_asset_type(&id.category).ok() == Some(asset_type.clone()))
+            .filter(|(id, _)| {
+                Self::category_to_asset_type(&id.category).ok() == Some(asset_type.clone())
+            })
             .map(|(_, status)| status.clone())
             .collect();
 
@@ -353,13 +392,17 @@ impl AssetManager {
     }
 
     /// Get resource usage for an asset
-    pub async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage> {
+    pub async fn get_resource_usage(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> AssetResult<ResourceUsage> {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         adapter.get_resource_usage(asset_id).await
@@ -374,30 +417,31 @@ impl AssetManager {
         let asset_type = Self::category_to_asset_type(&asset_id.category)?;
 
         let adapters = self.adapters.read().await;
-        let adapter = adapters.get(&asset_type)
+        let adapter = adapters
+            .get(&asset_type)
             .ok_or_else(|| AssetError::AssetNotFound {
-                asset_id: asset_id.to_string()
+                asset_id: asset_id.to_string(),
             })?;
 
         adapter.set_resource_limits(asset_id, limits).await
     }
-    
+
     /// Validate consensus proof according to requirements using Proof of State Four-Proof System
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
         // Use Proof of State comprehensive validation first
         if let Err(e) = proof.validate_comprehensive().await {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: format!("Proof of State comprehensive validation failed: {}", e)
+                reason: format!("Proof of State comprehensive validation failed: {e}"),
             });
         }
-        
+
         // Basic validation check
         if !proof.validate() {
             return Err(AssetError::ConsensusValidationFailed {
-                reason: "Basic consensus proof validation failed".to_string()
+                reason: "Basic consensus proof validation failed".to_string(),
             });
         }
-        
+
         // Check against HyperMesh asset requirements
         if self.consensus_requirements.require_all_proofs {
             // All four proofs must be present and valid (enforced by Proof of State)
@@ -405,35 +449,36 @@ impl AssetManager {
                 return Err(AssetError::ConsensusValidationFailed {
                     reason: format!(
                         "Insufficient stake: {} < required {}",
-                        proof.stake_proof.stake_amount,
-                        self.consensus_requirements.minimum_stake
-                    )
+                        proof.stake_proof.stake_amount, self.consensus_requirements.minimum_stake
+                    ),
                 });
             }
-            
+
             if proof.time_proof.network_time_offset > self.consensus_requirements.max_time_offset {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Time offset too large".to_string()
+                    reason: "Time offset too large".to_string(),
                 });
             }
-            
-            if proof.work_proof.computational_power < self.consensus_requirements.minimum_compute_power {
+
+            if proof.work_proof.computational_power
+                < self.consensus_requirements.minimum_compute_power
+            {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Insufficient computational power".to_string()
+                    reason: "Insufficient computational power".to_string(),
                 });
             }
-            
+
             // Validate storage space commitment (from Proof of State SpaceProof)
             if proof.space_proof.total_storage == 0 {
                 return Err(AssetError::ConsensusValidationFailed {
-                    reason: "No storage space committed".to_string()
+                    reason: "No storage space committed".to_string(),
                 });
             }
         }
-        
+
         Ok(true)
     }
-    
+
     /// Get current asset statistics
     pub async fn get_asset_statistics(&self) -> AssetStatistics {
         let assets = self.assets.read().await;
@@ -496,22 +541,18 @@ pub struct AssetStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_consensus_proof_validation() {
         // Test Proof of State Four-Proof Consensus System integration
         let stake_proof = StakeProof::new(
             "test-holder".to_string(),
-            "test-holder-id".to_string(), 
-            1000
+            "test-holder-id".to_string(),
+            1000,
         );
-        
-        let space_proof = SpaceProof::new(
-            "test-node".to_string(),
-            "/test/path".to_string(),
-            1024
-        );
-        
+
+        let space_proof = SpaceProof::new("test-node".to_string(), "/test/path".to_string(), 1024);
+
         let work_proof = WorkProof::new(
             "test-worker".to_string(),   // owner_id
             "test-workload".to_string(), // workload_id
@@ -520,21 +561,16 @@ mod tests {
             WorkloadType::Compute,       // workload_type
             WorkState::Completed,        // work_state
         );
-        
+
         let time_proof = TimeProof::new(Duration::from_secs(10));
-        
+
         // ConsensusProof::new expects: (stake, time, space, work)
-        let consensus_proof = ConsensusProof::new(
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof
-        );
-        
+        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+
         // Test basic validation (synchronous)
         assert!(consensus_proof.validate());
     }
-    
+
     #[tokio::test]
     async fn test_asset_manager_creation() {
         let manager = AssetManager::new();

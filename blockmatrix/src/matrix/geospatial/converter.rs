@@ -91,19 +91,19 @@ impl GpsCoordinate {
     /// Create a new GPS coordinate
     pub fn new(latitude: f64, longitude: f64, elevation: f64) -> Result<Self, GpsError> {
         if !latitude.is_finite() {
-            return Err(GpsError::InvalidNumeric(format!("latitude: {}", latitude)));
+            return Err(GpsError::InvalidNumeric(format!("latitude: {latitude}")));
         }
         if !longitude.is_finite() {
-            return Err(GpsError::InvalidNumeric(format!("longitude: {}", longitude)));
+            return Err(GpsError::InvalidNumeric(format!("longitude: {longitude}")));
         }
         if !elevation.is_finite() {
-            return Err(GpsError::InvalidNumeric(format!("elevation: {}", elevation)));
+            return Err(GpsError::InvalidNumeric(format!("elevation: {elevation}")));
         }
 
-        if latitude < -MAX_LATITUDE || latitude > MAX_LATITUDE {
+        if !(-MAX_LATITUDE..=MAX_LATITUDE).contains(&latitude) {
             return Err(GpsError::InvalidLatitude(latitude));
         }
-        if longitude < -MAX_LONGITUDE || longitude > MAX_LONGITUDE {
+        if !(-MAX_LONGITUDE..=MAX_LONGITUDE).contains(&longitude) {
             return Err(GpsError::InvalidLongitude(longitude));
         }
 
@@ -160,7 +160,14 @@ impl GpsConverter {
 
         // Calculate relative differences
         let lat_diff = lat_rad - origin_lat_rad;
-        let lon_diff = lon_rad - origin_lon_rad;
+        let mut lon_diff = lon_rad - origin_lon_rad;
+
+        // Handle date line wrapping: normalize longitude difference to [-PI, PI]
+        if lon_diff > PI {
+            lon_diff -= 2.0 * PI;
+        } else if lon_diff < -PI {
+            lon_diff += 2.0 * PI;
+        }
 
         // Convert to kilometers using spherical approximation
         // x = longitude difference * Earth radius * cos(average latitude)
@@ -177,8 +184,7 @@ impl GpsConverter {
         let z_km = (gps.elevation - self.origin.elevation) / 1000.0;
         let z = (z_km * scale).round() as i64;
 
-        MatrixCoordinate::new(x, y, z)
-            .map_err(|_| GpsError::ConversionOverflow)
+        MatrixCoordinate::new(x, y, z).map_err(|_| GpsError::ConversionOverflow)
     }
 
     /// Convert matrix coordinate back to GPS
@@ -235,8 +241,8 @@ impl GpsConverter {
         let dlat = lat2_rad - lat1_rad;
         let dlon = lon2_rad - lon1_rad;
 
-        let a = (dlat / 2.0).sin().powi(2) +
-                lat1_rad.cos() * lat2_rad.cos() * (dlon / 2.0).sin().powi(2);
+        let a = (dlat / 2.0).sin().powi(2)
+            + lat1_rad.cos() * lat2_rad.cos() * (dlon / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().asin();
 
         EARTH_RADIUS_KM * c
@@ -305,8 +311,8 @@ mod tests {
         let converter = GpsConverter::new(ScaleResolution::Standard);
 
         // Points on the equator
-        let gps = GpsCoordinate::at_sea_level(0.0, 1.0).unwrap(); // ~111km east
-        let matrix = converter.gps_to_matrix(&gps).unwrap();
+        let gps = GpsCoordinate::at_sea_level(0.0, 1.0).expect("test: expected success"); // ~111km east
+        let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
 
         // At equator, 1 degree longitude ≈ 111km
         assert!((matrix.x as f64 - 111.0).abs() < 1.0);
@@ -319,8 +325,8 @@ mod tests {
         let converter = GpsConverter::new(ScaleResolution::Standard);
 
         // 1 degree latitude ≈ 111km everywhere
-        let gps = GpsCoordinate::at_sea_level(1.0, 0.0).unwrap();
-        let matrix = converter.gps_to_matrix(&gps).unwrap();
+        let gps = GpsCoordinate::at_sea_level(1.0, 0.0).expect("test: expected success");
+        let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
 
         assert_eq!(matrix.x, 0);
         assert!((matrix.y as f64 - 111.0).abs() < 1.0);
@@ -333,15 +339,15 @@ mod tests {
 
         // Test various coordinates
         let test_coords = vec![
-            GpsCoordinate::new(45.5, -122.6, 100.0).unwrap(), // Portland
-            GpsCoordinate::new(-33.9, 151.2, 50.0).unwrap(),  // Sydney
-            GpsCoordinate::new(51.5, -0.1, 10.0).unwrap(),    // London
-            GpsCoordinate::new(35.7, 139.7, 30.0).unwrap(),   // Tokyo
+            GpsCoordinate::new(45.5, -122.6, 100.0).expect("test: creation"), // Portland
+            GpsCoordinate::new(-33.9, 151.2, 50.0).expect("test: creation"),  // Sydney
+            GpsCoordinate::new(51.5, -0.1, 10.0).expect("test: creation"),    // London
+            GpsCoordinate::new(35.7, 139.7, 30.0).expect("test: creation"),   // Tokyo
         ];
 
         for original in test_coords {
-            let matrix = converter.gps_to_matrix(&original).unwrap();
-            let recovered = converter.matrix_to_gps(&matrix).unwrap();
+            let matrix = converter.gps_to_matrix(&original).expect("test: expected success");
+            let recovered = converter.matrix_to_gps(&matrix).expect("test: expected success");
 
             // Check accuracy (should be within ~0.1 degrees with Fine resolution)
             assert!((recovered.latitude - original.latitude).abs() < 0.1);
@@ -356,14 +362,14 @@ mod tests {
         let converter = GpsConverter::new(ScaleResolution::Standard);
 
         // North pole
-        let north_pole = GpsCoordinate::at_sea_level(90.0, 0.0).unwrap();
-        let matrix = converter.gps_to_matrix(&north_pole).unwrap();
+        let north_pole = GpsCoordinate::at_sea_level(90.0, 0.0).expect("test: expected success");
+        let matrix = converter.gps_to_matrix(&north_pole).expect("test: expected success");
         assert_eq!(matrix.x, 0); // Longitude is undefined at poles
         assert!((matrix.y as f64 - 10007.0).abs() < 10.0); // ~10007km from equator
 
         // South pole
-        let south_pole = GpsCoordinate::at_sea_level(-90.0, 0.0).unwrap();
-        let matrix2 = converter.gps_to_matrix(&south_pole).unwrap();
+        let south_pole = GpsCoordinate::at_sea_level(-90.0, 0.0).expect("test: expected success");
+        let matrix2 = converter.gps_to_matrix(&south_pole).expect("test: expected success");
         assert_eq!(matrix2.x, 0);
         assert!((matrix2.y as f64 + 10007.0).abs() < 10.0);
     }
@@ -373,15 +379,27 @@ mod tests {
         let converter = GpsConverter::new(ScaleResolution::Standard);
 
         // Points near the International Date Line
-        let west = GpsCoordinate::at_sea_level(0.0, 179.0).unwrap();
-        let east = GpsCoordinate::at_sea_level(0.0, -179.0).unwrap();
+        let west = GpsCoordinate::at_sea_level(0.0, 179.0).expect("test: expected success");
+        let east = GpsCoordinate::at_sea_level(0.0, -179.0).expect("test: expected success");
 
-        let matrix_west = converter.gps_to_matrix(&west).unwrap();
-        let matrix_east = converter.gps_to_matrix(&east).unwrap();
+        let matrix_west = converter.gps_to_matrix(&west).expect("test: expected success");
+        let matrix_east = converter.gps_to_matrix(&east).expect("test: expected success");
 
-        // They should be close in matrix space (2 degrees apart)
-        let distance = (matrix_west.x - matrix_east.x).abs() as f64;
-        assert!(distance < 250.0); // ~222km at equator
+        // In a flat projection centered at origin (0,0), these points are on opposite
+        // sides of the map. Calculate the "short way around" distance: the full
+        // circumference minus the flat distance gives the true geographic gap.
+        let flat_distance = (matrix_west.x - matrix_east.x).abs() as f64;
+        let scale = converter.resolution().units_per_km();
+        let circumference = 2.0 * PI * EARTH_RADIUS_KM * scale;
+        let short_distance = circumference - flat_distance;
+
+        // They should be ~222km apart (2 degrees at equator)
+        assert!(
+            short_distance < 250.0 * scale,
+            "Short-way distance {} should be < {}",
+            short_distance,
+            250.0 * scale
+        );
     }
 
     #[test]
@@ -389,8 +407,8 @@ mod tests {
         let converter = GpsConverter::new(ScaleResolution::Standard);
 
         // Mount Everest height
-        let everest = GpsCoordinate::new(27.9881, 86.9250, 8848.0).unwrap();
-        let matrix = converter.gps_to_matrix(&everest).unwrap();
+        let everest = GpsCoordinate::new(27.9881, 86.9250, 8848.0).expect("test: creation");
+        let matrix = converter.gps_to_matrix(&everest).expect("test: expected success");
 
         // Z should represent ~8.8km elevation
         assert!((matrix.z as f64 - 8.8).abs() < 1.0);
@@ -399,18 +417,18 @@ mod tests {
     #[test]
     fn test_custom_origin() {
         // Set origin at New York City
-        let nyc = GpsCoordinate::new(40.7128, -74.0060, 10.0).unwrap();
+        let nyc = GpsCoordinate::new(40.7128, -74.0060, 10.0).expect("test: creation");
         let converter = GpsConverter::with_origin(ScaleResolution::Standard, nyc);
 
         // NYC should map to (0,0,0)
-        let matrix = converter.gps_to_matrix(&nyc).unwrap();
+        let matrix = converter.gps_to_matrix(&nyc).expect("test: expected success");
         assert_eq!(matrix.x, 0);
         assert_eq!(matrix.y, 0);
         assert_eq!(matrix.z, 0);
 
         // Philadelphia (~150km south)
-        let philly = GpsCoordinate::new(39.9526, -75.1652, 10.0).unwrap();
-        let matrix2 = converter.gps_to_matrix(&philly).unwrap();
+        let philly = GpsCoordinate::new(39.9526, -75.1652, 10.0).expect("test: creation");
+        let matrix2 = converter.gps_to_matrix(&philly).expect("test: expected success");
         assert!(matrix2.y < -80); // South is negative Y
         assert!((matrix2.x as f64 + 80.0).abs() < 40.0); // West
     }
@@ -418,15 +436,15 @@ mod tests {
     #[test]
     fn test_gps_distance() {
         // New York to Los Angeles (~3935 km)
-        let nyc = GpsCoordinate::at_sea_level(40.7128, -74.0060).unwrap();
-        let la = GpsCoordinate::at_sea_level(34.0522, -118.2437).unwrap();
+        let nyc = GpsCoordinate::at_sea_level(40.7128, -74.0060).expect("test: expected success");
+        let la = GpsCoordinate::at_sea_level(34.0522, -118.2437).expect("test: expected success");
 
         let distance = GpsConverter::gps_distance_km(&nyc, &la);
         assert!((distance - 3935.0).abs() < 50.0); // Within 50km accuracy
 
         // London to Paris (~344 km)
-        let london = GpsCoordinate::at_sea_level(51.5074, -0.1278).unwrap();
-        let paris = GpsCoordinate::at_sea_level(48.8566, 2.3522).unwrap();
+        let london = GpsCoordinate::at_sea_level(51.5074, -0.1278).expect("test: expected success");
+        let paris = GpsCoordinate::at_sea_level(48.8566, 2.3522).expect("test: expected success");
 
         let distance2 = GpsConverter::gps_distance_km(&london, &paris);
         assert!((distance2 - 344.0).abs() < 10.0);

@@ -13,16 +13,15 @@
 
 mod common;
 
-use catalog::{
-    HyperMeshAssetRegistry, BridgeConfig,
-    assets::AssetPackage,
-    AssetDiscovery, AssetRegistry,
-    registry::{SearchQuery, SortCriteria, AssetFilters},
-};
+use anyhow::Result;
 use blockmatrix::assets::core::AssetManager;
+use catalog::{
+    assets::AssetPackage,
+    registry::{AssetFilters, SearchQuery, SortCriteria},
+    AssetDiscovery, AssetRegistry, BridgeConfig, HyperMeshAssetRegistry,
+};
 use hypermesh_lib::PrivacyMode;
 use std::sync::Arc;
-use anyhow::Result;
 
 #[tokio::test]
 async fn test_hypermesh_bridge_creation() -> Result<()> {
@@ -99,14 +98,20 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
 
     let results = registry.search(&query).await?;
     assert!(results.total_count > 0, "Should find published asset");
-    assert!(results.execution_time_ms < 10, "Search should be < 10ms (in-memory)");
+    assert!(
+        results.execution_time_ms < 10,
+        "Search should be < 10ms (in-memory)"
+    );
 
     // Verify asset details
     if let Some(result) = results.assets.first() {
         assert_eq!(result.asset.name, "Test Asset");
         assert_eq!(result.asset.version, "1.0.0");
         assert_eq!(result.asset.registry, "hypermesh");
-        assert!(result.asset.verified, "HyperMesh assets are consensus-verified");
+        assert!(
+            result.asset.verified,
+            "HyperMesh assets are consensus-verified"
+        );
     }
 
     Ok(())
@@ -141,7 +146,10 @@ async fn test_performance_without_network_calls() -> Result<()> {
     let publish_time = start.elapsed();
 
     println!("Published 100 assets in {:?}", publish_time);
-    assert!(publish_time.as_millis() < 500, "Publishing 100 assets should take < 500ms");
+    assert!(
+        publish_time.as_millis() < 500,
+        "Publishing 100 assets should take < 500ms"
+    );
 
     // Search performance
     let start = std::time::Instant::now();
@@ -163,7 +171,10 @@ async fn test_performance_without_network_calls() -> Result<()> {
     let search_time = start.elapsed();
 
     println!("100 searches completed in {:?}", search_time);
-    assert!(search_time.as_millis() < 100, "100 searches should complete in < 100ms");
+    assert!(
+        search_time.as_millis() < 100,
+        "100 searches should complete in < 100ms"
+    );
 
     Ok(())
 }
@@ -211,11 +222,9 @@ async fn test_asset_filtering_through_hypermesh() -> Result<()> {
 
 /// Helper function to create test asset packages
 fn create_test_asset_package(id: &str, name: &str, version: &str) -> AssetPackage {
-    use catalog::{
-        AssetSpecification, AssetFormat, AssetValidation, AssetDependency
-    };
-    use std::collections::HashMap;
+    use catalog::{AssetDependency, AssetFormat, AssetSpecification, AssetValidation};
     use chrono::Utc;
+    use std::collections::HashMap;
 
     AssetPackage {
         spec: AssetSpec {
@@ -271,7 +280,10 @@ async fn test_zero_stubs_production_ready() -> Result<()> {
 
     // Verify it's stored in HyperMesh, not a stub
     let retrieved = registry.get_asset(&package_id).await?;
-    assert!(retrieved.is_some(), "Asset should be retrievable from HyperMesh");
+    assert!(
+        retrieved.is_some(),
+        "Asset should be retrievable from HyperMesh"
+    );
 
     let retrieved_package = retrieved.unwrap();
     assert_eq!(retrieved_package.spec.metadata.name, "Production Asset");

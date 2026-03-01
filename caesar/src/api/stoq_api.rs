@@ -11,20 +11,20 @@
 //! [`CaesarProtocol`] behind a `tokio::sync::RwLock`, enabling concurrent
 //! read access with exclusive writes.
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use rust_decimal_macros::dec;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, instrument};
+use tracing::{debug, info, instrument};
 
-use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
-use stoq::StoqApiServer;
+use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::StoqApiServer;
 
-use crate::CaesarProtocol;
 use crate::governor;
+use crate::CaesarProtocol;
 
 // ---------------------------------------------------------------------------
 // Shared application state
@@ -149,17 +149,15 @@ impl ApiHandler for RoutePacketHandler {
         debug!("Handling route_packet: {}", request.id);
 
         let req: RoutePacketRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(
-                format!("Invalid route_packet request: {}", e),
-            ))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid route_packet request: {e}")))?;
 
         let protocol = self.state.protocol.read().await;
 
         // Touch the protocol to verify it is healthy
-        let _active = protocol.active_packet_count().await
-            .map_err(|e| ApiError::HandlerError(
-                format!("Failed to query active packets: {}", e),
-            ))?;
+        let _active = protocol
+            .active_packet_count()
+            .await
+            .map_err(|e| ApiError::HandlerError(format!("Failed to query active packets: {e}")))?;
 
         // Accept the packet. Full routing (find_route + process_handoff) requires
         // candidate CapacityMetrics from the network layer, which the API caller
@@ -204,16 +202,14 @@ impl ApiHandler for GetNodeStatusHandler {
         debug!("Handling node_status: {}", request.id);
 
         let req: GetNodeStatusRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(
-                format!("Invalid node_status request: {}", e),
-            ))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid node_status request: {e}")))?;
 
         let protocol = self.state.protocol.read().await;
 
-        let active = protocol.active_packet_count().await
-            .map_err(|e| ApiError::HandlerError(
-                format!("Failed to query active packets: {}", e),
-            ))?;
+        let active = protocol
+            .active_packet_count()
+            .await
+            .map_err(|e| ApiError::HandlerError(format!("Failed to query active packets: {e}")))?;
 
         let response = GetNodeStatusResponse {
             node_id: req.node_id,
@@ -299,17 +295,19 @@ impl ApiHandler for GetEffectiveRateHandler {
 
         let protocol = self.state.protocol.read().await;
 
-        let in_transit = protocol.in_transit_value().await
-            .map_err(|e| ApiError::HandlerError(
-                format!("Failed to query in-transit value: {}", e),
-            ))?;
+        let in_transit = protocol.in_transit_value().await.map_err(|e| {
+            ApiError::HandlerError(format!("Failed to query in-transit value: {e}"))
+        })?;
 
-        let composite = protocol.oracle().calculate_effective_rate(
-            dec!(0.01),       // avg_fee_rate: 1% baseline
-            dec!(0.0),        // speculation_index: neutral
-            in_transit.0,     // real in-transit float
-            dec!(1000000),    // total_capacity: 1M grams default
-        ).await;
+        let composite = protocol
+            .oracle()
+            .calculate_effective_rate(
+                dec!(0.01),    // avg_fee_rate: 1% baseline
+                dec!(0.0),     // speculation_index: neutral
+                in_transit.0,  // real in-transit float
+                dec!(1000000), // total_capacity: 1M grams default
+            )
+            .await;
 
         let response = GetEffectiveRateResponse {
             network_fees_component: composite.network_fees_component,
@@ -352,15 +350,19 @@ impl ApiHandler for CaesarHealthHandler {
         let breaker_ok = !protocol.conservation_status();
 
         let health = HealthStatus {
-            status: if breaker_ok { "healthy".to_string() } else { "degraded".to_string() },
+            status: if breaker_ok {
+                "healthy".to_string()
+            } else {
+                "degraded".to_string()
+            },
             service: "caesar".to_string(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             active_packet_count: active as u64,
             circuit_breaker_ok: breaker_ok,
         };
 
-        let payload = serde_json::to_vec(&health)
-            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+        let payload =
+            serde_json::to_vec(&health).map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
         Ok(ApiResponse {
             request_id: request.id,
@@ -405,10 +407,7 @@ pub struct CaesarStoqApi {
 impl CaesarStoqApi {
     /// Create new Caesar API server over STOQ with shared application state.
     #[instrument(skip(config, app_state))]
-    pub async fn new(
-        config: CaesarStoqConfig,
-        app_state: Arc<CaesarAppState>,
-    ) -> Result<Self> {
+    pub async fn new(config: CaesarStoqConfig, app_state: Arc<CaesarAppState>) -> Result<Self> {
         info!("Creating Caesar STOQ API server on {}", config.bind_address);
 
         // Parse bind address
@@ -416,11 +415,7 @@ impl CaesarStoqApi {
             .bind_address
             .split(':')
             .next()
-            .and_then(|addr| {
-                addr.trim_matches(|c| c == '[' || c == ']')
-                    .parse()
-                    .ok()
-            })
+            .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
             .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
 
         let port: u16 = config
@@ -454,13 +449,14 @@ impl CaesarStoqApi {
         server.register_handler(Arc::new(GetEffectiveRateHandler {
             state: app_state.clone(),
         }));
-        server.register_handler(Arc::new(CaesarHealthHandler {
-            state: app_state,
-        }));
+        server.register_handler(Arc::new(CaesarHealthHandler { state: app_state }));
 
         info!("Caesar STOQ API handlers registered (5 endpoints)");
 
-        Ok(Self { server, _config: config })
+        Ok(Self {
+            server,
+            _config: config,
+        })
     }
 
     /// Start the API server
@@ -496,8 +492,7 @@ mod tests {
             sender_node: "node-a".to_string(),
             recipient_hint: Some("node-z".to_string()),
         };
-        let json = serde_json::to_string(&req)
-            .expect("test: serialization should succeed");
+        let json = serde_json::to_string(&req).expect("test: serialization should succeed");
         assert!(json.contains("pkt-001"));
         assert!(json.contains("L0"));
     }
@@ -509,8 +504,7 @@ mod tests {
             health_score: rust_decimal::Decimal::new(75, 0),
             recommended_fee_adjustment: rust_decimal::Decimal::ZERO,
         };
-        let json = serde_json::to_string(&resp)
-            .expect("test: serialization should succeed");
+        let json = serde_json::to_string(&resp).expect("test: serialization should succeed");
         assert!(json.contains("golden_era"));
     }
 
@@ -521,9 +515,7 @@ mod tests {
     async fn make_app_state(dir: &TempDir) -> Arc<CaesarAppState> {
         let config = crate::CaesarConfig {
             storage: crate::storage::StorageConfig {
-                path: dir.path().to_str()
-                    .expect("test: tempdir path")
-                    .to_string(),
+                path: dir.path().to_str().expect("test: tempdir path").to_string(),
             },
             ..crate::CaesarConfig::default()
         };
@@ -540,9 +532,7 @@ mod tests {
             id: "test-req-1".to_string(),
             service: "caesar".to_string(),
             method: path.to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(body).expect("test: serialize request body"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(body).expect("test: serialize request body")),
             metadata: std::collections::HashMap::new(),
         }
     }
@@ -566,12 +556,14 @@ mod tests {
         };
 
         let api_req = make_api_request("route_packet", &req);
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: handler should succeed");
 
         assert!(resp.success, "response should be successful");
-        let body: RoutePacketResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize response");
+        let body: RoutePacketResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize response");
         assert_eq!(body.packet_id, "pkt-test-001");
         assert!(body.success);
         assert_eq!(body.state, "accepted");
@@ -593,12 +585,14 @@ mod tests {
             metadata: std::collections::HashMap::new(),
         };
 
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: health handler should succeed");
 
         assert!(resp.success);
-        let body: HealthStatus = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize health response");
+        let body: HealthStatus =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize health response");
         assert_eq!(body.status, "healthy");
         assert_eq!(body.service, "caesar");
         assert_eq!(body.active_packet_count, 0);
@@ -619,12 +613,14 @@ mod tests {
             metadata: std::collections::HashMap::new(),
         };
 
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: governor handler should succeed");
 
         assert!(resp.success);
-        let body: GetGovernorParamsResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize governor response");
+        let body: GetGovernorParamsResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize governor response");
         assert_eq!(body.pressure, "golden_era");
         assert_eq!(body.health_score, rust_decimal::Decimal::new(50, 0));
         assert_eq!(body.recommended_fee_adjustment, rust_decimal::Decimal::ZERO);
@@ -644,17 +640,22 @@ mod tests {
             metadata: std::collections::HashMap::new(),
         };
 
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: effective rate handler should succeed");
 
         assert!(resp.success);
-        let body: GetEffectiveRateResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize rate response");
+        let body: GetEffectiveRateResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize rate response");
 
         // With default gold price 2350 and 1% fee, 0 speculation, 0 in-transit:
         // effective_rate = (2350 / 31.1035) * (1 + 0.01 + 0 - 0) > 0
-        assert!(body.effective_rate > rust_decimal::Decimal::ZERO,
-            "effective rate should be positive: {}", body.effective_rate);
+        assert!(
+            body.effective_rate > rust_decimal::Decimal::ZERO,
+            "effective rate should be positive: {}",
+            body.effective_rate
+        );
         assert_eq!(body.network_fees_component, dec!(0.01));
         assert_eq!(body.speculation_pressure, rust_decimal::Decimal::ZERO);
     }
@@ -667,38 +668,60 @@ mod tests {
         // Mint a packet so active count is non-zero
         {
             let mut protocol = app.protocol.write().await;
-            protocol.mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
-                hypermesh_lib::economic::GoldGrams::from_decimal(dec!(100)),
-                hypermesh_lib::economic::GoldGrams::from_decimal(dec!(0.1)),
-                hypermesh_lib::economic::MarketTier::L0,
-                20,
-                hypermesh_lib::economic::GoldGrams::from_decimal(dec!(5)),
-            ).await.expect("test: mint");
+            protocol
+                .mint_packet(
+                    hypermesh_lib::NodeId::from("sender"),
+                    hypermesh_lib::NodeId::from("recipient"),
+                    hypermesh_lib::economic::GoldGrams::from_decimal(dec!(100)),
+                    hypermesh_lib::economic::GoldGrams::from_decimal(dec!(0.1)),
+                    hypermesh_lib::economic::MarketTier::L0,
+                    20,
+                    hypermesh_lib::economic::GoldGrams::from_decimal(dec!(5)),
+                )
+                .await
+                .expect("test: mint");
         }
 
         let handler = GetNodeStatusHandler { state: app };
-        let req = GetNodeStatusRequest { node_id: "node-abc".to_string() };
+        let req = GetNodeStatusRequest {
+            node_id: "node-abc".to_string(),
+        };
         let api_req = make_api_request("node_status", &req);
 
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: node status handler should succeed");
 
         assert!(resp.success);
-        let body: GetNodeStatusResponse = serde_json::from_slice(&resp.payload)
-            .expect("test: deserialize node status response");
+        let body: GetNodeStatusResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize node status response");
         assert_eq!(body.node_id, "node-abc");
         assert_eq!(body.active_packets, 1, "should report 1 active packet");
     }
 
     #[test]
     fn test_format_pressure_all_variants() {
-        assert_eq!(format_pressure(&governor::PressureQuadrant::Bubble), "bubble");
+        assert_eq!(
+            format_pressure(&governor::PressureQuadrant::Bubble),
+            "bubble"
+        );
         assert_eq!(format_pressure(&governor::PressureQuadrant::Crash), "crash");
-        assert_eq!(format_pressure(&governor::PressureQuadrant::Stagnation), "stagnation");
-        assert_eq!(format_pressure(&governor::PressureQuadrant::GoldenEra), "golden_era");
-        assert_eq!(format_pressure(&governor::PressureQuadrant::Bottleneck), "bottleneck");
-        assert_eq!(format_pressure(&governor::PressureQuadrant::Vacuum), "vacuum");
+        assert_eq!(
+            format_pressure(&governor::PressureQuadrant::Stagnation),
+            "stagnation"
+        );
+        assert_eq!(
+            format_pressure(&governor::PressureQuadrant::GoldenEra),
+            "golden_era"
+        );
+        assert_eq!(
+            format_pressure(&governor::PressureQuadrant::Bottleneck),
+            "bottleneck"
+        );
+        assert_eq!(
+            format_pressure(&governor::PressureQuadrant::Vacuum),
+            "vacuum"
+        );
     }
 }

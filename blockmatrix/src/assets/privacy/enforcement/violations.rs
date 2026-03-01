@@ -6,9 +6,9 @@
 //!
 //! Types and structures for tracking and managing privacy violations.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
 
 use crate::assets::core::AssetResult;
 
@@ -230,6 +230,12 @@ pub enum ComplianceStatus {
     Warning,
     Violation,
     Suspended,
+}
+
+impl Default for ViolationTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ViolationTracker {

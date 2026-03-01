@@ -10,23 +10,20 @@
 use std::path::PathBuf;
 
 use catalog::extension::{
-    CatalogExtension, CatalogExtensionConfig,
-    ExtensionCategory, ExtensionCapability,
-    HyperMeshExtension, AssetLibraryExtension,
+    AssetLibraryExtension, CatalogExtension, CatalogExtensionConfig, ExtensionCapability,
+    ExtensionCategory, HyperMeshExtension,
 };
 
 use blockmatrix::assets::core::AssetType;
 use blockmatrix::extensions::{
-    ExtensionRequest, ExtensionState, ExtensionHealth,
-    PackageFilter, SearchOptions,
+    ExtensionHealth, ExtensionRequest, ExtensionState, PackageFilter, SearchOptions,
 };
 
 // ---------------------------------------------------------------------------
 // Helper: test-friendly config with small cache to avoid OOM
 // ---------------------------------------------------------------------------
 fn test_config() -> CatalogExtensionConfig {
-    CatalogExtensionConfig::new()
-        .with_cache_size(1024) // 1024 entries, not 1GB
+    CatalogExtensionConfig::new().with_cache_size(1024) // 1024 entries, not 1GB
 }
 
 // ===========================================================================
@@ -66,7 +63,9 @@ fn test_extension_provided_assets() {
 
     let metadata = extension.metadata();
     // provided_assets has: VirtualMachine, Library, Library(overwritten by Dataset), Container
-    assert!(metadata.provided_assets.contains(&AssetType::VirtualMachine));
+    assert!(metadata
+        .provided_assets
+        .contains(&AssetType::VirtualMachine));
     assert!(metadata.provided_assets.contains(&AssetType::Library));
     assert!(metadata.provided_assets.contains(&AssetType::Container));
 }
@@ -98,7 +97,11 @@ async fn test_extension_register_assets_returns_handlers() {
     let handlers = extension.register_assets().await.unwrap();
     // HashMap deduplicates by key, so Library is overwritten by DatasetHandler
     // Expected keys: VirtualMachine, Library (DatasetHandler), Container (TemplateHandler)
-    assert_eq!(handlers.len(), 3, "Should have 3 distinct asset type handlers");
+    assert_eq!(
+        handlers.len(),
+        3,
+        "Should have 3 distinct asset type handlers"
+    );
     assert!(handlers.contains_key(&AssetType::VirtualMachine));
     assert!(handlers.contains_key(&AssetType::Library));
     assert!(handlers.contains_key(&AssetType::Container));
@@ -109,7 +112,10 @@ async fn test_extension_status_initial() {
     let extension = CatalogExtension::new(test_config());
 
     let status = extension.status().await;
-    assert!(matches!(status.state, ExtensionState::Running), "Initial state should be Running");
+    assert!(
+        matches!(status.state, ExtensionState::Running),
+        "Initial state should be Running"
+    );
     assert_eq!(status.total_requests, 0);
     assert_eq!(status.error_count, 0);
     assert_eq!(status.active_operations, 0);
@@ -153,7 +159,10 @@ async fn test_extension_handle_request_unknown_method() {
     assert!(!response.success);
     assert!(response.error.is_some());
     let error_msg = response.error.unwrap();
-    assert!(error_msg.contains("Unknown method"), "Error should mention unknown method");
+    assert!(
+        error_msg.contains("Unknown method"),
+        "Error should mention unknown method"
+    );
 }
 
 #[tokio::test]
@@ -163,7 +172,9 @@ async fn test_extension_validate_without_catalog() {
     // Catalog is not initialized (no Catalog::new called via initialize)
     let report = extension.validate().await.unwrap();
     assert!(!report.valid);
-    let has_init_error = report.errors.iter()
+    let has_init_error = report
+        .errors
+        .iter()
         .any(|e| e.code == "CATALOG_NOT_INITIALIZED");
     assert!(has_init_error, "Should have CATALOG_NOT_INITIALIZED error");
 }
@@ -197,9 +208,9 @@ async fn test_extension_shutdown() {
     // After shutdown, health should be degraded/unhealthy
     let status = extension.status().await;
     match status.health {
-        ExtensionHealth::Unhealthy(_) => { /* expected */ },
-        ExtensionHealth::Degraded(_) => { /* also acceptable during shutdown */ },
-        other => panic!("Expected unhealthy/degraded after shutdown, got {:?}", other),
+        ExtensionHealth::Unhealthy(_) => { /* expected */ }
+        ExtensionHealth::Degraded(_) => { /* also acceptable during shutdown */ }
+        other => panic!("Expected unhealthy/degraded after shutdown, got {other:?}"),
     }
 }
 
@@ -221,7 +232,10 @@ async fn test_extension_request_increments_counter() {
 
     let status_after = extension.status().await;
     // handle_request calls increment_requests (1) + status also calls it (total may vary)
-    assert!(status_after.total_requests > 0, "Total requests should be incremented");
+    assert!(
+        status_after.total_requests > 0,
+        "Total requests should be incremented"
+    );
 }
 
 // ===========================================================================
@@ -240,7 +254,10 @@ async fn test_extension_list_packages_returns_empty() {
         verified_only: false,
     };
     let packages = extension.list_packages(filter).await.unwrap();
-    assert!(packages.is_empty(), "list_packages should return empty for new extension");
+    assert!(
+        packages.is_empty(),
+        "list_packages should return empty for new extension"
+    );
 }
 
 #[tokio::test]
@@ -262,8 +279,14 @@ async fn test_extension_search_packages_returns_empty() {
         sort_by: None,
         order: None,
     };
-    let packages = extension.search_packages("anything", options).await.unwrap();
-    assert!(packages.is_empty(), "search_packages should return empty for new extension");
+    let packages = extension
+        .search_packages("anything", options)
+        .await
+        .unwrap();
+    assert!(
+        packages.is_empty(),
+        "search_packages should return empty for new extension"
+    );
 }
 
 // ===========================================================================
@@ -303,15 +326,14 @@ fn test_config_min_stake_for_publish() {
 #[cfg(feature = "future-tests")]
 mod future_extension_tests {
     use catalog::extension::{
-        CatalogExtension, CatalogExtensionConfig,
-        VirtualMachineHandler, LibraryHandler, DatasetHandler, TemplateHandler,
+        CatalogExtension, CatalogExtensionConfig, DatasetHandler, LibraryHandler, TemplateHandler,
+        VirtualMachineHandler,
     };
 
     use blockmatrix::extensions::{
-        HyperMeshExtension, AssetLibraryExtension, ExtensionConfig,
-        ExtensionCapability, ExtensionRequest, ExtensionState,
-        AssetCreationSpec, AssetQuery, PackageFilter, InstallOptions,
-        SearchOptions, ResourceLimits,
+        AssetCreationSpec, AssetLibraryExtension, AssetQuery, ExtensionCapability, ExtensionConfig,
+        ExtensionRequest, ExtensionState, HyperMeshExtension, InstallOptions, PackageFilter,
+        ResourceLimits, SearchOptions,
     };
 
     use blockmatrix::assets::core::AssetType;
@@ -358,16 +380,27 @@ mod future_extension_tests {
         let metadata = extension.metadata();
         assert_eq!(metadata.id, "catalog");
         assert_eq!(metadata.name, "HyperMesh Catalog");
-        assert_eq!(metadata.category, hypermesh::extensions::ExtensionCategory::AssetLibrary);
+        assert_eq!(
+            metadata.category,
+            hypermesh::extensions::ExtensionCategory::AssetLibrary
+        );
 
-        assert!(metadata.provided_assets.contains(&AssetType::VirtualMachine));
+        assert!(metadata
+            .provided_assets
+            .contains(&AssetType::VirtualMachine));
         assert!(metadata.provided_assets.contains(&AssetType::Library));
         assert!(metadata.provided_assets.contains(&AssetType::Dataset));
         assert!(metadata.provided_assets.contains(&AssetType::Template));
 
-        assert!(metadata.required_capabilities.contains(&ExtensionCapability::AssetManagement));
-        assert!(metadata.required_capabilities.contains(&ExtensionCapability::NetworkAccess));
-        assert!(metadata.required_capabilities.contains(&ExtensionCapability::VMExecution));
+        assert!(metadata
+            .required_capabilities
+            .contains(&ExtensionCapability::AssetManagement));
+        assert!(metadata
+            .required_capabilities
+            .contains(&ExtensionCapability::NetworkAccess));
+        assert!(metadata
+            .required_capabilities
+            .contains(&ExtensionCapability::VMExecution));
     }
 
     #[tokio::test]

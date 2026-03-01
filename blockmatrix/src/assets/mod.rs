@@ -7,61 +7,49 @@
 //! This module provides the core asset management system for HyperMesh,
 //! treating all resources as assets with consensus proof validation.
 
-pub mod core;
 pub mod adapters;
-pub mod proxy;
-pub mod privacy;
-pub mod multi_node;
 pub mod blockchain;
-pub mod matrix_blockchain;
+pub mod core;
 pub mod cross_chain;
+pub mod matrix_blockchain;
+pub mod multi_node;
 pub mod pipeline;
+pub mod privacy;
+pub mod proxy;
 pub mod storage;
 
 // Re-export main types for easy access
 pub use core::{
-    AssetManager, AssetRegistration, AssetType, AssetAllocation,
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    WorkloadType, WorkState, PrivacyMode, AssetStatistics, AssetAdapter, AssetError,
+    AssetAdapter, AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetStatistics,
+    AssetType, ConsensusProof, PrivacyMode, SpaceProof, StakeProof, TimeProof, WorkProof,
+    WorkState, WorkloadType,
 };
 
-pub use adapters::{
-    CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
-};
+pub use adapters::{CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter};
 
-pub use proxy::{
-    ProxyAddress, RemoteProxyManager, ProxyNetworkConfig,
-};
+pub use proxy::{ProxyAddress, ProxyNetworkConfig, RemoteProxyManager};
 
-pub use privacy::{
-    PrivacyManager, ResourceAllocation,
-};
+pub use privacy::{PrivacyManager, ResourceAllocation};
 
 #[cfg(feature = "multi-node")]
 pub use multi_node::{
-    MultiNodeCoordinator, NodeInfo, NodeCapabilities,
-    ConsensusManager, ConsensusDecision, NetworkTopology,
+    ConsensusDecision, ConsensusManager, MultiNodeCoordinator, NetworkTopology, NodeCapabilities,
+    NodeInfo,
 };
 
-pub use blockchain::{
-    HyperMeshAssetRecord, AssetRecordType,
-    AssetBlockchainManager,
-};
+pub use blockchain::{AssetBlockchainManager, AssetRecordType, HyperMeshAssetRecord};
 
 pub use matrix_blockchain::{
-    BlockchainMatrixCoordinate, EntityBlockchain, EntityType,
-    MatrixBlockchainManager,
+    BlockchainMatrixCoordinate, EntityBlockchain, EntityType, MatrixBlockchainManager,
 };
 
 pub use pipeline::{
-    AssetPipeline, PipelineConfig, ProcessedAsset, PipelineStats,
-    Compressor, Encryptor, Sharder, MatrixDistributor,
+    AssetPipeline, Compressor, Encryptor, MatrixDistributor, PipelineConfig, PipelineStats,
+    ProcessedAsset, Sharder,
 };
 
 pub use storage::{
-    ContentAddressedStorage, StorageStats, Hash,
-    HashBucket, BucketId, BucketMapper,
-    DeduplicationEngine, DeduplicationResult, DeduplicationStats,
-    ContentAddress, RetrievalInstructions,
-    ReplicationStrategy, ReplicationConfig, PopularityMetrics,
+    BucketId, BucketMapper, ContentAddress, ContentAddressedStorage, DeduplicationEngine,
+    DeduplicationResult, DeduplicationStats, Hash, HashBucket, PopularityMetrics,
+    ReplicationConfig, ReplicationStrategy, RetrievalInstructions, StorageStats,
 };

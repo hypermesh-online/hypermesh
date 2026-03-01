@@ -4,10 +4,10 @@
 
 //! Health check system for TrustChain
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tracing::debug;
 
@@ -92,6 +92,12 @@ pub enum IssueSeverity {
     Critical,
 }
 
+impl Default for HealthCheck {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HealthCheck {
     /// Create new health check system
     pub fn new() -> Self {
@@ -110,7 +116,7 @@ impl HealthCheck {
                     consecutive_failures: 0,
                     response_time_ms: None,
                     details: HashMap::new(),
-                }
+                },
             );
         }
 
@@ -158,18 +164,17 @@ impl HealthCheck {
         // - Certificate generation capability
         // - Key storage access
         // - Rotation status
-        details.insert("certificate_generation".to_string(), "operational".to_string());
+        details.insert(
+            "certificate_generation".to_string(),
+            "operational".to_string(),
+        );
         details.insert("key_storage".to_string(), "accessible".to_string());
         details.insert("rotation_enabled".to_string(), "true".to_string());
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "ca",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("ca", is_healthy, response_time, details)
+            .await;
     }
 
     /// Check CT service health
@@ -185,12 +190,8 @@ impl HealthCheck {
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "ct",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("ct", is_healthy, response_time, details)
+            .await;
     }
 
     /// Check DNS service health
@@ -206,12 +207,8 @@ impl HealthCheck {
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "dns",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("dns", is_healthy, response_time, details)
+            .await;
     }
 
     /// Check consensus service health
@@ -223,16 +220,15 @@ impl HealthCheck {
         // Simulate consensus health check
         details.insert("proof_validation".to_string(), "operational".to_string());
         details.insert("byzantine_detection".to_string(), "active".to_string());
-        details.insert("hypermesh_connection".to_string(), "established".to_string());
+        details.insert(
+            "hypermesh_connection".to_string(),
+            "established".to_string(),
+        );
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "consensus",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("consensus", is_healthy, response_time, details)
+            .await;
     }
 
     /// Check STOQ transport health
@@ -248,12 +244,8 @@ impl HealthCheck {
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "stoq",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("stoq", is_healthy, response_time, details)
+            .await;
     }
 
     /// Check API service health
@@ -269,12 +261,8 @@ impl HealthCheck {
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health(
-            "api",
-            is_healthy,
-            response_time,
-            details
-        ).await;
+        self.update_component_health("api", is_healthy, response_time, details)
+            .await;
     }
 
     /// Update component health status
@@ -339,7 +327,9 @@ impl HealthCheck {
                         HealthState::Critical => IssueSeverity::Critical,
                         _ => IssueSeverity::Low,
                     },
-                    message: format!("{} is in {} state", name,
+                    message: format!(
+                        "{} is in {} state",
+                        name,
                         match health.status {
                             HealthState::Healthy => "healthy",
                             HealthState::Degraded => "degraded",
@@ -399,12 +389,9 @@ mod tests {
         let health = HealthCheck::new();
 
         // Update a component to unhealthy
-        health.update_component_health(
-            "ca",
-            false,
-            100,
-            HashMap::new()
-        ).await;
+        health
+            .update_component_health("ca", false, 100, HashMap::new())
+            .await;
 
         let status = health.get_status().await;
         assert!(!status.is_healthy);
@@ -416,8 +403,12 @@ mod tests {
         let health = HealthCheck::new();
 
         // Set different health states
-        health.update_component_health("ca", true, 10, HashMap::new()).await;
-        health.update_component_health("ct", false, 100, HashMap::new()).await;
+        health
+            .update_component_health("ca", true, 10, HashMap::new())
+            .await;
+        health
+            .update_component_health("ct", false, 100, HashMap::new())
+            .await;
 
         let status = health.get_status().await;
         assert!(status.health_score < 1.0);

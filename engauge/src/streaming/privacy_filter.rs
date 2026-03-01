@@ -16,8 +16,8 @@ use hypermesh_lib::PrivacyMode;
 use rand::Rng;
 
 use super::protocol::{
-    CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame,
-    MetricsPayload, RoutingSnapshot, VerificationSnapshot,
+    CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame, MetricsPayload,
+    RoutingSnapshot, VerificationSnapshot,
 };
 
 // ---------------------------------------------------------------------------
@@ -61,12 +61,8 @@ impl DifferentialPrivacyFilter {
         let is_private = frame.privacy_mode == PrivacyMode::PRIVATE;
 
         let noised_payload = match frame.payload {
-            MetricsPayload::Capacity(c) => {
-                MetricsPayload::Capacity(self.noise_capacity(c))
-            }
-            MetricsPayload::Congestion(c) => {
-                MetricsPayload::Congestion(self.noise_congestion(c))
-            }
+            MetricsPayload::Capacity(c) => MetricsPayload::Capacity(self.noise_capacity(c)),
+            MetricsPayload::Congestion(c) => MetricsPayload::Congestion(self.noise_congestion(c)),
             MetricsPayload::Routing(r) => {
                 if is_private {
                     return None;
@@ -113,17 +109,9 @@ impl DifferentialPrivacyFilter {
     fn noise_capacity(&self, mut c: CapacitySnapshot) -> CapacitySnapshot {
         c.bytes_served = self.noise_u64(c.bytes_served, 1_000_000.0);
         c.compute_delivered = self.noise_u64(c.compute_delivered, 10_000.0);
-        c.storage_maintained_bytes = self.noise_u64(
-            c.storage_maintained_bytes,
-            1_000_000.0,
-        );
-        c.bandwidth_available_bps = self.noise_u64(
-            c.bandwidth_available_bps,
-            1_000_000.0,
-        );
-        c.uptime_ratio = self
-            .add_laplace_noise(c.uptime_ratio, 0.01)
-            .clamp(0.0, 1.0);
+        c.storage_maintained_bytes = self.noise_u64(c.storage_maintained_bytes, 1_000_000.0);
+        c.bandwidth_available_bps = self.noise_u64(c.bandwidth_available_bps, 1_000_000.0);
+        c.uptime_ratio = self.add_laplace_noise(c.uptime_ratio, 0.01).clamp(0.0, 1.0);
         c
     }
 
@@ -195,10 +183,7 @@ mod tests {
     use super::*;
     use hypermesh_lib::NodeId;
 
-    fn make_frame(
-        privacy: PrivacyMode,
-        payload: MetricsPayload,
-    ) -> MetricsFrame {
+    fn make_frame(privacy: PrivacyMode, payload: MetricsPayload) -> MetricsFrame {
         MetricsFrame {
             source_node: NodeId::from("filter-test-node"),
             timestamp_us: 1_700_000_000_000_000,
@@ -378,8 +363,7 @@ mod tests {
 
         // Standard deviation should be roughly sensitivity/epsilon = 100.
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
-            / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         let stddev = variance.sqrt();
 
         // Laplace std dev = b * sqrt(2) = (100/1) * 1.414 ~ 141.

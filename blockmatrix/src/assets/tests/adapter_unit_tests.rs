@@ -38,7 +38,7 @@ async fn test_cpu_adapter_basic() {
     assert!(capabilities.supported_privacy_levels.contains(&PrivacyMode::PRIVATE));
     assert!(capabilities.features.contains(&"multi_core".to_string()));
     
-    let health = adapter.health_check().await.unwrap();
+    let health = adapter.health_check().await.expect("test: async operation");
     assert!(!health.performance_metrics.is_empty());
 }
 
@@ -53,7 +53,7 @@ async fn test_gpu_adapter_basic() {
     assert!(capabilities.features.contains(&"nova_support".to_string()));
     assert!(capabilities.features.contains(&"consensus_acceleration".to_string()));
     
-    let health = adapter.health_check().await.unwrap();
+    let health = adapter.health_check().await.expect("test: async operation");
     assert!(health.healthy);
     assert!(health.performance_metrics.contains_key("total_devices"));
 }
@@ -69,7 +69,7 @@ async fn test_memory_adapter_basic() {
     assert!(capabilities.features.contains(&"nat_addressing".to_string()));
     assert!(capabilities.features.contains(&"numa_aware".to_string()));
     
-    let health = adapter.health_check().await.unwrap();
+    let health = adapter.health_check().await.expect("test: async operation");
     assert!(health.healthy);
     assert!(health.performance_metrics.contains_key("total_memory_gb"));
 }
@@ -86,7 +86,7 @@ async fn test_storage_adapter_basic() {
     assert!(capabilities.features.contains(&"kyber_encryption".to_string()));
     assert!(capabilities.features.contains(&"content_aware_sharding".to_string()));
     
-    let health = adapter.health_check().await.unwrap();
+    let health = adapter.health_check().await.expect("test: async operation");
     assert!(health.healthy);
     assert!(health.performance_metrics.contains_key("total_capacity_gb"));
 }
@@ -119,22 +119,22 @@ async fn test_adapter_privacy_levels() {
 #[tokio::test]
 async fn test_adapter_health_checks() {
     let cpu_adapter = CpuAssetAdapter::new().await;
-    let cpu_health = cpu_adapter.health_check().await.unwrap();
+    let cpu_health = cpu_adapter.health_check().await.expect("test: async operation");
     assert!(cpu_health.healthy);
     assert!(cpu_health.performance_metrics.contains_key("total_cores"));
     
     let gpu_adapter = GpuAssetAdapter::new().await;
-    let gpu_health = gpu_adapter.health_check().await.unwrap();
+    let gpu_health = gpu_adapter.health_check().await.expect("test: async operation");
     assert!(gpu_health.healthy);
     assert!(gpu_health.performance_metrics.contains_key("total_devices"));
     
     let memory_adapter = MemoryAssetAdapter::new().await;
-    let memory_health = memory_adapter.health_check().await.unwrap();
+    let memory_health = memory_adapter.health_check().await.expect("test: async operation");
     assert!(memory_health.healthy);
     assert!(memory_health.performance_metrics.contains_key("total_memory_gb"));
     
     let storage_adapter = StorageAssetAdapter::new().await;
-    let storage_health = storage_adapter.health_check().await.unwrap();
+    let storage_health = storage_adapter.health_check().await.expect("test: async operation");
     assert!(storage_health.healthy);
     assert!(storage_health.performance_metrics.contains_key("total_capacity_gb"));
 }

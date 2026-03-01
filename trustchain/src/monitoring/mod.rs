@@ -6,20 +6,20 @@
 //!
 //! Built-in monitoring without external dependencies for production deployment
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
 use tokio::time::interval;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
-pub mod metrics;
-pub mod health;
 pub mod export;
+pub mod health;
+pub mod metrics;
 
-pub use metrics::{Metrics, MetricsSnapshot, ComponentMetrics};
-pub use health::{HealthCheck, HealthStatus, ComponentHealth};
-pub use export::{MetricsExporter, ExportFormat};
+pub use export::{ExportFormat, MetricsExporter};
+pub use health::{ComponentHealth, HealthCheck, HealthStatus};
+pub use metrics::{ComponentMetrics, Metrics, MetricsSnapshot};
 
 /// Native monitoring system for TrustChain
 pub struct MonitoringSystem {
@@ -87,10 +87,10 @@ impl Default for AlertThresholds {
     fn default() -> Self {
         Self {
             max_cert_issuance_ms: 100, // 100ms threshold
-            min_success_rate: 0.95,     // 95% success rate
-            max_memory_mb: 4096,        // 4GB memory
-            max_error_rate: 0.05,       // 5% error rate
-            min_availability: 0.99,      // 99% availability
+            min_success_rate: 0.95,    // 95% success rate
+            max_memory_mb: 4096,       // 4GB memory
+            max_error_rate: 0.05,      // 5% error rate
+            min_availability: 0.99,    // 99% availability
         }
     }
 }
@@ -190,12 +190,16 @@ impl MonitoringSystem {
 
     /// Record certificate issuance
     pub async fn record_cert_issuance(&self, duration_ms: u64, success: bool) {
-        self.metrics.record_cert_issuance(duration_ms, success).await;
+        self.metrics
+            .record_cert_issuance(duration_ms, success)
+            .await;
     }
 
     /// Record DNS resolution
     pub async fn record_dns_resolution(&self, duration_ms: u64, success: bool) {
-        self.metrics.record_dns_resolution(duration_ms, success).await;
+        self.metrics
+            .record_dns_resolution(duration_ms, success)
+            .await;
     }
 
     /// Record CT log entry
@@ -205,7 +209,9 @@ impl MonitoringSystem {
 
     /// Record consensus validation
     pub async fn record_consensus_validation(&self, duration_ms: u64, success: bool) {
-        self.metrics.record_consensus_validation(duration_ms, success).await;
+        self.metrics
+            .record_consensus_validation(duration_ms, success)
+            .await;
     }
 
     /// Get current metrics snapshot
@@ -247,8 +253,10 @@ impl MonitoringSystem {
                         id: uuid::Uuid::new_v4().to_string(),
                         level: AlertLevel::Warning,
                         component: "ca".to_string(),
-                        message: format!("Certificate issuance time exceeds threshold: {}ms > {}ms",
-                            avg_time, self.config.alert_thresholds.max_cert_issuance_ms),
+                        message: format!(
+                            "Certificate issuance time exceeds threshold: {}ms > {}ms",
+                            avg_time, self.config.alert_thresholds.max_cert_issuance_ms
+                        ),
                         timestamp: SystemTime::now(),
                         metric: Some("avg_issuance_time_ms".to_string()),
                         value: Some(*avg_time),
@@ -263,9 +271,11 @@ impl MonitoringSystem {
                     id: uuid::Uuid::new_v4().to_string(),
                     level: AlertLevel::Error,
                     component: "ca".to_string(),
-                    message: format!("CA success rate below threshold: {:.2}% < {:.2}%",
+                    message: format!(
+                        "CA success rate below threshold: {:.2}% < {:.2}%",
                         ca_metrics.success_rate * 100.0,
-                        self.config.alert_thresholds.min_success_rate * 100.0),
+                        self.config.alert_thresholds.min_success_rate * 100.0
+                    ),
                     timestamp: SystemTime::now(),
                     metric: Some("success_rate".to_string()),
                     value: Some(ca_metrics.success_rate),
@@ -347,7 +357,7 @@ mod tests {
     #[tokio::test]
     async fn test_monitoring_system_creation() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.unwrap();
+        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
 
         let health = monitoring.get_health().await;
         assert!(health.is_healthy);
@@ -356,7 +366,7 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_recording() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.unwrap();
+        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
 
         // Record some metrics
         monitoring.record_cert_issuance(35, true).await;
@@ -372,10 +382,10 @@ mod tests {
     #[tokio::test]
     async fn test_system_info() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.unwrap();
+        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
 
         let info = monitoring.get_system_info().await;
         assert!(!info.version.is_empty());
-        assert!(info.uptime_seconds >= 0);
+        let _ = info.uptime_seconds; // uptime_seconds is u64, always valid
     }
 }

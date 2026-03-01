@@ -6,10 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetType, AssetAllocation};
 use super::pricing::Currency;
+use crate::assets::core::{AssetAllocation, AssetType};
 
 pub type UserId = String;
 pub type ContributionId = String;
@@ -50,18 +50,13 @@ pub struct SessionEarnings {
 }
 
 /// Payout status
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum PayoutStatus {
+    #[default]
     Pending,
     Processing,
     Completed,
     Failed(String),
-}
-
-impl Default for PayoutStatus {
-    fn default() -> Self {
-        PayoutStatus::Pending
-    }
 }
 
 /// Session performance metrics

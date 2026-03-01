@@ -16,7 +16,7 @@ async fn test_http3_bridge_initialization() -> Result<()> {
     // 2. Using an HTTP/3 client to connect
     // 3. Verifying responses match expected format
 
-    assert!(true, "HTTP/3 bridge compilation successful");
+    // HTTP/3 bridge compilation successful
     Ok(())
 }
 

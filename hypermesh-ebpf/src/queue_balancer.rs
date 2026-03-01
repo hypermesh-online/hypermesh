@@ -16,7 +16,7 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 use crate::af_xdp::{AfXdpManager, AfXdpSocket, AfXdpStats};
@@ -26,7 +26,7 @@ use crate::af_xdp::{AfXdpManager, AfXdpSocket, AfXdpStats};
 // -----------------------------------------------------------------------
 
 /// Metadata about a packet to help the balancer select a queue.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct PacketHint {
     /// 5-tuple flow hash for flow-affine steering
     pub flow_hash: u32,
@@ -34,16 +34,6 @@ pub struct PacketHint {
     pub packet_size: u32,
     /// Priority: 0=best-effort, 1=priority, 2=control
     pub priority: u8,
-}
-
-impl Default for PacketHint {
-    fn default() -> Self {
-        Self {
-            flow_hash: 0,
-            packet_size: 0,
-            priority: 0,
-        }
-    }
 }
 
 /// Per-queue health/load metrics used by balancer strategies.
@@ -244,7 +234,7 @@ impl MultiQueueManager {
         for q in 0..queue_count {
             let socket = af_xdp_manager
                 .create_socket(interface, q)
-                .map_err(|e| anyhow!("failed to create socket for {}:{}: {}", interface, q, e))?;
+                .map_err(|e| anyhow!("failed to create socket for {interface}:{q}: {e}"))?;
             sockets.push(socket);
         }
 
@@ -299,7 +289,9 @@ impl MultiQueueManager {
                 Err(e) => {
                     tracing::debug!(
                         "send_batch on queue {} failed (sent {} so far): {}",
-                        q, total_sent, e,
+                        q,
+                        total_sent,
+                        e,
                     );
                 }
             }
@@ -425,9 +417,18 @@ mod tests {
     fn test_round_robin_cycles() {
         let balancer = RoundRobinBalancer::new();
         let metrics = vec![
-            QueueMetrics { queue_id: 0, ..Default::default() },
-            QueueMetrics { queue_id: 1, ..Default::default() },
-            QueueMetrics { queue_id: 2, ..Default::default() },
+            QueueMetrics {
+                queue_id: 0,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 1,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 2,
+                ..Default::default()
+            },
         ];
         let hint = PacketHint::default();
 
@@ -520,10 +521,22 @@ mod tests {
     fn test_flow_hash_affinity() {
         let balancer = FlowHashBalancer::new();
         let metrics = vec![
-            QueueMetrics { queue_id: 0, ..Default::default() },
-            QueueMetrics { queue_id: 1, ..Default::default() },
-            QueueMetrics { queue_id: 2, ..Default::default() },
-            QueueMetrics { queue_id: 3, ..Default::default() },
+            QueueMetrics {
+                queue_id: 0,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 1,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 2,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 3,
+                ..Default::default()
+            },
         ];
 
         let hint = PacketHint {
@@ -547,10 +560,22 @@ mod tests {
     fn test_flow_hash_distribution() {
         let balancer = FlowHashBalancer::new();
         let metrics = vec![
-            QueueMetrics { queue_id: 0, ..Default::default() },
-            QueueMetrics { queue_id: 1, ..Default::default() },
-            QueueMetrics { queue_id: 2, ..Default::default() },
-            QueueMetrics { queue_id: 3, ..Default::default() },
+            QueueMetrics {
+                queue_id: 0,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 1,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 2,
+                ..Default::default()
+            },
+            QueueMetrics {
+                queue_id: 3,
+                ..Default::default()
+            },
         ];
 
         // Collect which queues get selected for different hashes
@@ -565,14 +590,21 @@ mod tests {
         }
 
         // With 100 different hashes across 4 queues, all should be hit
-        assert_eq!(seen.len(), 4, "flow hashes should distribute across all queues");
+        assert_eq!(
+            seen.len(),
+            4,
+            "flow hashes should distribute across all queues"
+        );
     }
 
     // -- Single queue: all strategies work --
 
     #[test]
     fn test_single_queue_all_strategies() {
-        let metrics = vec![QueueMetrics { queue_id: 0, ..Default::default() }];
+        let metrics = vec![QueueMetrics {
+            queue_id: 0,
+            ..Default::default()
+        }];
         let hint = PacketHint {
             flow_hash: 42,
             packet_size: 100,

@@ -6,11 +6,11 @@
 //!
 //! Handles DNS record registration with blockchain integration.
 
-use super::{DnsRecord, DnsError, DnsResult, Domain, DnsPoolManager};
-use crate::consensus::ConsensusProof;
+use super::{DnsError, DnsPoolManager, DnsRecord, DnsResult, Domain};
 use crate::blockchain::NodeBlockchain;
+use crate::consensus::ConsensusProof;
 use crate::dns::validation::DnsValidator;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -95,7 +95,9 @@ impl DnsRegistrar {
         }
 
         // Register to blockchain
-        let tx_hash = self.register_to_blockchain(&domain, &record, &proof).await?;
+        let tx_hash = self
+            .register_to_blockchain(&domain, &record, &proof)
+            .await?;
 
         // Add to public pool
         self.pool_manager.register_public(record.clone()).await?;
@@ -113,7 +115,10 @@ impl DnsRegistrar {
         let mut registrations = self.registrations.write().await;
         registrations.insert(domain.full.clone(), registration.clone());
 
-        info!("✅ Public DNS registered: {} (tx: {})", domain.full, tx_hash);
+        info!(
+            "✅ Public DNS registered: {} (tx: {})",
+            domain.full, tx_hash
+        );
         Ok(registration)
     }
 
@@ -144,7 +149,9 @@ impl DnsRegistrar {
         }
 
         // Register to blockchain
-        let tx_hash = self.register_to_blockchain(&domain, &record, &proof).await?;
+        let tx_hash = self
+            .register_to_blockchain(&domain, &record, &proof)
+            .await?;
 
         // Add to federated pool
         self.pool_manager
@@ -197,10 +204,7 @@ impl DnsRegistrar {
             Some(blockchain) => {
                 // Create blockchain transaction for DNS registration
                 let bc = blockchain.write().await;
-                let tx_data = format!(
-                    "DNS Registration: {} -> {:?}",
-                    domain.full, record.data
-                );
+                let tx_data = format!("DNS Registration: {} -> {:?}", domain.full, record.data);
                 let block = bc
                     .add_block_with_data(tx_data.into_bytes())
                     .await
@@ -220,10 +224,10 @@ impl DnsRegistrar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dns::{DnsRecordType, DnsRecordData};
     use crate::consensus::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
+    use crate::dns::{DnsRecordData, DnsRecordType};
     use std::net::Ipv6Addr;
     use std::time::Duration;
 
@@ -259,14 +263,14 @@ mod tests {
         let validator = Arc::new(DnsValidator::new(false));
         let registrar = DnsRegistrar::new(pool_manager, validator);
 
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         let record = create_test_record("nike");
         let proof = create_test_proof();
 
         let registration = registrar
             .register_public(domain, record, proof)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         assert_eq!(registration.status, RegistrationStatus::Active);
         assert!(registration.tx_hash.is_some());
@@ -278,14 +282,14 @@ mod tests {
         let validator = Arc::new(DnsValidator::new(false));
         let registrar = DnsRegistrar::new(pool_manager, validator);
 
-        let domain = Domain::parse("admin.nike").unwrap();
+        let domain = Domain::parse("admin.nike").expect("test: expected success");
         let record = create_test_record("admin.nike");
         let proof = create_test_proof();
 
         let registration = registrar
             .register_federated(domain, "nike-internal".to_string(), record, proof)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         assert_eq!(registration.status, RegistrationStatus::Active);
         assert!(registration.tx_hash.is_some());
@@ -297,17 +301,17 @@ mod tests {
         let validator = Arc::new(DnsValidator::new(false));
         let registrar = DnsRegistrar::new(pool_manager, validator);
 
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         let record = create_test_record("nike");
         let proof = create_test_proof();
 
         registrar
             .register_public(domain, record, proof)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
-        let registration = registrar.get_registration("nike").await.unwrap();
+        let registration = registrar.get_registration("nike").await.expect("test: async operation");
         assert!(registration.is_some());
-        assert_eq!(registration.unwrap().domain.full, "nike");
+        assert_eq!(registration.expect("test: assertion value").domain.full, "nike");
     }
 }

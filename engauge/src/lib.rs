@@ -13,25 +13,34 @@
 //! - [`throttle`] -- Governor feedback signals (band/demurrage modifiers).
 //! - [`capacity`] -- Per-node capacity metrics (bytes served, compute, uptime).
 
-pub mod receipt;
-pub mod metrics;
-pub mod compliance;
-pub mod organic_detection;
-pub mod throttle;
 pub mod capacity;
-pub mod trending;
-pub mod streaming;
-pub mod routing_intel;
+pub mod compliance;
 pub mod marketplace;
+pub mod metrics;
+pub mod organic_detection;
+pub mod receipt;
+pub mod routing_intel;
+pub mod streaming;
+pub mod throttle;
+pub mod trending;
 
 // Re-export primary types at crate root for convenience.
-pub use receipt::{ContentReceipt, ReceiptBundle, WorkUnits, VerificationResult};
-pub use metrics::{MetricsCollector, ActivityScore, MetricsSnapshot};
-pub use compliance::{KycAttestation, AttestationLevel, ComplianceChecker, ComplianceResult};
-pub use organic_detection::{TrafficPattern, TrafficClassification, TrafficClassifier, ClassifierConfig};
-pub use throttle::{ThrottleSignal, EngaugeThrottle};
-pub use capacity::{CapacityMetrics, CapacityScore, CapacityReport};
-pub use trending::{EpochTracker, EpochRecord, TrendDirection, CapacityTrend, AggregatedCapacity};
-pub use streaming::{MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator};
-pub use routing_intel::{RoutingIntelligence, RoutingAdvisor, PathAdvisor, TensorWeightModifier, PathPolicyRecommendation};
-pub use marketplace::{ResourcePool, LeaseContract, LeaseManager, PricingEngine, ContentPushManager};
+pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
+pub use compliance::{AttestationLevel, ComplianceChecker, ComplianceResult, KycAttestation};
+pub use marketplace::{
+    ContentPushManager, LeaseContract, LeaseManager, PricingEngine, ResourcePool,
+};
+pub use metrics::{ActivityScore, MetricsCollector, MetricsSnapshot};
+pub use organic_detection::{
+    ClassifierConfig, TrafficClassification, TrafficClassifier, TrafficPattern,
+};
+pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
+pub use routing_intel::{
+    PathAdvisor, PathPolicyRecommendation, RoutingAdvisor, RoutingIntelligence,
+    TensorWeightModifier,
+};
+pub use streaming::{
+    MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator,
+};
+pub use throttle::{EngaugeThrottle, ThrottleSignal};
+pub use trending::{AggregatedCapacity, CapacityTrend, EpochRecord, EpochTracker, TrendDirection};

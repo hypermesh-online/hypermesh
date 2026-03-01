@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use super::types::*;
 use super::reporting::*;
+use super::types::*;
 
 impl Default for SharingMinimizationSettings {
     fn default() -> Self {
@@ -77,6 +77,7 @@ impl Default for RiskReportingRequirements {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for ReportFilteringPreferences {
     fn default() -> Self {
         Self {
@@ -175,6 +176,7 @@ impl Default for UtilityTradeoffPreferences {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for AdaptiveAdjustmentSettings {
     fn default() -> Self {
         Self {

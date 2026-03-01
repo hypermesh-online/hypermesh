@@ -19,21 +19,22 @@
 //!
 //! Total: 28 comprehensive integration tests
 
+use anyhow::Result;
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::network::{
+    isolation::{DefaultIsolationManager, IsolationManager},
     multi_network::{MultiNetworkCoordinator, NetworkConfig},
     trust::{
-        NetworkType, NetworkHandler, NetworkConfig as TrustNetworkConfig,
-        Certificate, ProofOfState, EphemeralKey,
-        AnonymousNetworkHandler, P2PNetworkHandler, FederatedNetworkHandler, PublicNetworkHandler,
+        AnonymousNetworkHandler, Certificate, EphemeralKey, FederatedNetworkHandler,
+        NetworkConfig as TrustNetworkConfig, NetworkHandler, NetworkType, P2PNetworkHandler,
+        ProofOfState, PublicNetworkHandler,
     },
-    isolation::{DefaultIsolationManager, IsolationManager},
 };
-use blockmatrix::assets::core::{AssetRegistration, AssetCategory, BaseSystemType, NetworkScope, AssetData};
 use std::sync::Arc;
-use anyhow::Result;
-use uuid::Uuid;
-use tokio;
 use tracing::info;
+use uuid::Uuid;
 
 /// Helper: Create test asset
 fn create_test_asset() -> AssetRegistration {
@@ -99,7 +100,10 @@ async fn qg1_self_signed_certificate_created() -> Result<()> {
     // Verify it's self-signed
     assert!(cert.is_self_signed(), "Certificate should be self-signed");
     assert_eq!(cert.subject, "localhost");
-    assert!(!cert.is_blockchain_registered(), "Should not be blockchain registered");
+    assert!(
+        !cert.is_blockchain_registered(),
+        "Should not be blockchain registered"
+    );
 
     info!("✅ QG1.2: Self-signed certificate created locally");
     Ok(())
@@ -111,7 +115,10 @@ async fn qg1_localhost_dns_resolution_functional() -> Result<()> {
 
     // Verify localhost is resolvable without external DNS
     let localhost = "::1".parse::<std::net::IpAddr>().unwrap();
-    assert!(localhost.is_loopback(), "Should resolve to loopback address");
+    assert!(
+        localhost.is_loopback(),
+        "Should resolve to loopback address"
+    );
 
     info!("✅ QG1.3: Localhost DNS resolution functional");
     Ok(())
@@ -166,10 +173,9 @@ async fn qg2_anonymous_never_leaks_identity() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join anonymous network
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
     // Verify no certificate exists (no persistent identity)
     let networks = coordinator.list_networks().await;
@@ -178,7 +184,10 @@ async fn qg2_anonymous_never_leaks_identity() -> Result<()> {
 
     // Anonymous should use ephemeral keys only
     let ephemeral = EphemeralKey::generate();
-    assert!(ephemeral.session_id != Uuid::nil(), "Ephemeral key generated");
+    assert!(
+        ephemeral.session_id != Uuid::nil(),
+        "Ephemeral key generated"
+    );
 
     info!("✅ QG2.1: Anonymous connections never leak identity");
     Ok(())
@@ -192,15 +201,19 @@ async fn qg2_p2p_peer_list_isolation() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join two P2P networks with different peer lists
-    let p2p1_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer1.local:8080".to_string()]),
-    ).await?;
+    let p2p1_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer1.local:8080".to_string()]),
+        )
+        .await?;
 
-    let p2p2_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer2.local:8080".to_string()]),
-    ).await?;
+    let p2p2_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer2.local:8080".to_string()]),
+        )
+        .await?;
 
     // Verify they're different networks
     assert_ne!(p2p1_id, p2p2_id, "Should be different P2P networks");
@@ -221,15 +234,23 @@ async fn qg2_federated_network_isolation() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join two federated networks with different gateways
-    let fed1_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway1.company.internal".to_string() },
-        NetworkConfig::federated("gateway1.company.internal".to_string()),
-    ).await?;
+    let fed1_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway1.company.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway1.company.internal".to_string()),
+        )
+        .await?;
 
-    let fed2_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway2.company.internal".to_string() },
-        NetworkConfig::federated("gateway2.company.internal".to_string()),
-    ).await?;
+    let fed2_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway2.company.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway2.company.internal".to_string()),
+        )
+        .await?;
 
     // Verify they're different federations
     assert_ne!(fed1_id, fed2_id, "Should be different federated networks");
@@ -250,26 +271,33 @@ async fn qg2_public_network_can_be_disabled() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join only anonymous, P2P, and federated (no public)
-    coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
-    coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
-        NetworkConfig::federated("gateway.internal".to_string()),
-    ).await?;
+    coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.internal".to_string()),
+        )
+        .await?;
 
     // Verify no public network
     let stats = coordinator.get_network_stats().await;
     assert_eq!(stats.public_count, 0, "Public network should be disabled");
-    assert!(stats.anonymous_count > 0 || stats.p2p_count > 0 || stats.federated_count > 0,
-        "Other networks should be active");
+    assert!(
+        stats.anonymous_count > 0 || stats.p2p_count > 0 || stats.federated_count > 0,
+        "Other networks should be active"
+    );
 
     info!("✅ QG2.4: Public network can be completely disabled");
     Ok(())
@@ -287,25 +315,32 @@ async fn qg3_all_four_networks_simultaneously() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join all 4 network types
-    let _anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let _anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    let _p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let _p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
-    let _fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
-        NetworkConfig::federated("gateway.internal".to_string()),
-    ).await?;
+    let _fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.internal".to_string()),
+        )
+        .await?;
 
-    let _pub_id = coordinator.join_network(
-        NetworkType::Public,
-        NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
-    ).await?;
+    let _pub_id = coordinator
+        .join_network(
+            NetworkType::Public,
+            NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
+        )
+        .await?;
 
     // Verify all 4 are active
     let active = coordinator.active_networks().await;
@@ -320,7 +355,11 @@ async fn qg3_all_four_networks_simultaneously() -> Result<()> {
 
     // Verify no cross-network state leakage
     let violations = isolation.check_violations().await;
-    assert_eq!(violations.len(), 0, "CRITICAL: No cross-network state leakage");
+    assert_eq!(
+        violations.len(),
+        0,
+        "CRITICAL: No cross-network state leakage"
+    );
 
     info!("✅ QG3: All 4 network types operating simultaneously with complete isolation");
     Ok(())
@@ -349,7 +388,10 @@ async fn qg4_anonymous_no_validation() -> Result<()> {
     let connection = handler.bootstrap(config).await?;
 
     // Verify no certificate
-    assert!(connection.certificate.is_none(), "Anonymous should have no certificate");
+    assert!(
+        connection.certificate.is_none(),
+        "Anonymous should have no certificate"
+    );
     assert_eq!(connection.network_type, NetworkType::Anonymous);
 
     info!("✅ QG4.1: Anonymous network has no validation, no signing");
@@ -377,7 +419,10 @@ async fn qg4_p2p_direct_exchange() -> Result<()> {
     // Verify self-signed certificate
     if let Some(cert) = &connection.certificate {
         assert!(cert.is_self_signed(), "P2P should use self-signed certs");
-        assert!(!cert.is_blockchain_registered(), "P2P certs not blockchain registered");
+        assert!(
+            !cert.is_blockchain_registered(),
+            "P2P certs not blockchain registered"
+        );
     }
 
     info!("✅ QG4.2: P2P uses direct peer exchange with self-signed certs");
@@ -393,7 +438,9 @@ async fn qg4_federated_gateway_only() -> Result<()> {
 
     // Bootstrap federated network
     let config = TrustNetworkConfig {
-        network_type: NetworkType::Federated { gateway_url: "gateway.federation.example".to_string() },
+        network_type: NetworkType::Federated {
+            gateway_url: "gateway.federation.example".to_string(),
+        },
         peer_addresses: vec![],
         federation_gateway: Some("gateway.federation.example".to_string()),
         dns_name: None,
@@ -404,7 +451,11 @@ async fn qg4_federated_gateway_only() -> Result<()> {
 
     // Verify certificate is issued by federation gateway
     if let Some(cert) = &connection.certificate {
-        assert_eq!(cert.issuer(), "gateway.federation.example", "Cert issued by federation gateway");
+        assert_eq!(
+            cert.issuer(),
+            "gateway.federation.example",
+            "Cert issued by federation gateway"
+        );
         assert!(!cert.is_self_signed(), "Federated certs are gateway-signed");
     }
 
@@ -432,9 +483,16 @@ async fn qg4_public_blockchain_only() -> Result<()> {
 
     // Verify certificate is blockchain registered
     if let Some(cert) = &connection.certificate {
-        assert!(cert.is_blockchain_registered(), "Public cert must be blockchain registered");
+        assert!(
+            cert.is_blockchain_registered(),
+            "Public cert must be blockchain registered"
+        );
         // NOTE: Architecture decision - uses BlockMatrix blockchain, not trust.hypermesh.online
-        assert_eq!(cert.issuer(), "trust.hypermesh.online", "Issued by global CA");
+        assert_eq!(
+            cert.issuer(),
+            "blockmatrix-local-blockchain",
+            "Issued by local BlockMatrix blockchain"
+        );
     }
 
     info!("✅ QG4.4: Public uses blockchain registration (through BlockMatrix)");
@@ -453,20 +511,24 @@ async fn qg5_user_can_disable_public() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // User chooses to ONLY use private networks (no public)
-    coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
     // Verify no public network
     let stats = coordinator.get_network_stats().await;
     assert_eq!(stats.public_count, 0, "User disabled public network");
-    assert!(stats.anonymous_count > 0 || stats.p2p_count > 0, "Private networks active");
+    assert!(
+        stats.anonymous_count > 0 || stats.p2p_count > 0,
+        "Private networks active"
+    );
 
     info!("✅ QG5.1: User can disable public network entirely");
     Ok(())
@@ -481,20 +543,22 @@ async fn qg5_user_specifies_federation_gateway() -> Result<()> {
 
     // User specifies custom federation gateway
     let custom_gateway = "gateway.mycompany.internal".to_string();
-    let fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: custom_gateway.clone() },
-        NetworkConfig::federated(custom_gateway.clone()),
-    ).await?;
+    let fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: custom_gateway.clone(),
+            },
+            NetworkConfig::federated(custom_gateway.clone()),
+        )
+        .await?;
 
     // Verify custom gateway is used
     let networks = coordinator.list_networks().await;
     let fed_network = networks.iter().find(|(id, _)| id == &fed_id);
     assert!(fed_network.is_some(), "Federation network active");
 
-    if let Some((_, net_type)) = fed_network {
-        if let NetworkType::Federated { gateway_url } = net_type {
-            assert_eq!(gateway_url, &custom_gateway, "User-specified gateway used");
-        }
+    if let Some((_, NetworkType::Federated { gateway_url })) = fed_network {
+        assert_eq!(gateway_url, &custom_gateway, "User-specified gateway used");
     }
 
     info!("✅ QG5.2: User can specify custom federation gateway URL");
@@ -509,30 +573,34 @@ async fn qg5_user_controls_asset_sharing() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join multiple networks
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
     // Create asset
     let asset = create_test_asset();
 
     // User chooses to share ONLY with P2P network (not Anonymous)
-    coordinator.set_asset_visibility(
-        asset.clone(),
-        vec![p2p_id.clone()],
-    ).await?;
+    coordinator
+        .set_asset_visibility(asset.clone(), vec![p2p_id])
+        .await?;
 
     // Verify asset visibility control
-    let p2p_response = coordinator.handle_asset_request(p2p_id.clone(), asset.clone()).await?;
+    let p2p_response = coordinator
+        .handle_asset_request(p2p_id, asset.clone())
+        .await?;
     assert!(p2p_response.authorized, "P2P can access asset");
 
-    let anon_response = coordinator.handle_asset_request(anon_id.clone(), asset.clone()).await?;
+    let anon_response = coordinator
+        .handle_asset_request(anon_id, asset.clone())
+        .await?;
     assert!(!anon_response.authorized, "Anonymous blocked from asset");
 
     info!("✅ QG5.3: User controls asset sharing per network");
@@ -552,10 +620,9 @@ async fn qg6_no_network_transitions() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join anonymous network
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
     // Verify network type cannot change
     // (Architecture: Networks are immutable - cannot transition Anonymous -> P2P)
@@ -563,19 +630,28 @@ async fn qg6_no_network_transitions() -> Result<()> {
     let anon_network = networks.iter().find(|(id, _)| id == &anon_id);
 
     if let Some((_, net_type)) = anon_network {
-        assert_eq!(net_type, &NetworkType::Anonymous, "Network type is immutable");
+        assert_eq!(
+            net_type,
+            &NetworkType::Anonymous,
+            "Network type is immutable"
+        );
     }
 
     // To change network type, must disconnect and rejoin as new type
-    coordinator.leave_network(anon_id.clone()).await?;
+    coordinator.leave_network(anon_id).await?;
 
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
     // Verify these are DIFFERENT networks (not a transition)
-    assert_ne!(anon_id, p2p_id, "Must create NEW network, not transition existing");
+    assert_ne!(
+        anon_id, p2p_id,
+        "Must create NEW network, not transition existing"
+    );
 
     info!("✅ QG6.1: Networks CANNOT transition - must disconnect and create new");
     Ok(())
@@ -589,20 +665,25 @@ async fn qg6_independent_connect() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Connect to networks in any order
-    let _fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
-        NetworkConfig::federated("gateway.internal".to_string()),
-    ).await?;
+    let _fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.internal".to_string()),
+        )
+        .await?;
 
-    let _anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let _anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    let _p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let _p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
     // Verify all are independently connected
     let active = coordinator.active_networks().await;
@@ -620,28 +701,39 @@ async fn qg6_independent_disconnect() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Connect to 3 networks
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
-    let fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
-        NetworkConfig::federated("gateway.internal".to_string()),
-    ).await?;
+    let fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.internal".to_string()),
+        )
+        .await?;
 
     // Disconnect from P2P only
-    coordinator.leave_network(p2p_id.clone()).await?;
+    coordinator.leave_network(p2p_id).await?;
 
     // Verify others still connected
-    assert!(coordinator.is_connected(anon_id).await, "Anonymous still connected");
+    assert!(
+        coordinator.is_connected(anon_id).await,
+        "Anonymous still connected"
+    );
     assert!(!coordinator.is_connected(p2p_id).await, "P2P disconnected");
-    assert!(coordinator.is_connected(fed_id).await, "Federated still connected");
+    assert!(
+        coordinator.is_connected(fed_id).await,
+        "Federated still connected"
+    );
 
     // Verify no disruption to other networks
     let violations = isolation.check_violations().await;
@@ -674,7 +766,10 @@ async fn qg7_self_signed_stays_local() -> Result<()> {
     // Verify it's self-signed and local
     assert!(cert.is_self_signed(), "Certificate is self-signed");
     assert_eq!(cert.subject, "localhost", "Subject is localhost");
-    assert_eq!(cert.issuer, "localhost", "Issuer is localhost (self-signed)");
+    assert_eq!(
+        cert.issuer, "localhost",
+        "Issuer is localhost (self-signed)"
+    );
 
     info!("✅ QG7.1: Self-signed cert stays local (never transmitted)");
     Ok(())
@@ -709,7 +804,10 @@ async fn qg7_p2p_out_of_band() -> Result<()> {
     // Bootstrap with peer addresses (out-of-band exchange)
     let config = TrustNetworkConfig {
         network_type: NetworkType::P2P,
-        peer_addresses: vec!["peer1.local:8080".to_string(), "peer2.local:8080".to_string()],
+        peer_addresses: vec![
+            "peer1.local:8080".to_string(),
+            "peer2.local:8080".to_string(),
+        ],
         federation_gateway: None,
         dns_name: None,
         proof_of_state: None,
@@ -720,7 +818,10 @@ async fn qg7_p2p_out_of_band() -> Result<()> {
     // Verify certificate is self-signed (exchanged directly with peers)
     if let Some(cert) = &connection.certificate {
         assert!(cert.is_self_signed(), "P2P cert is self-signed");
-        assert!(!cert.is_blockchain_registered(), "Not blockchain registered");
+        assert!(
+            !cert.is_blockchain_registered(),
+            "Not blockchain registered"
+        );
     }
 
     info!("✅ QG7.3: P2P certs exchanged out-of-band (direct peer exchange)");
@@ -747,7 +848,10 @@ async fn qg7_public_blockchain_registered() -> Result<()> {
 
     // Verify certificate is blockchain registered
     if let Some(cert) = &connection.certificate {
-        assert!(cert.is_blockchain_registered(), "Public cert must be blockchain registered");
+        assert!(
+            cert.is_blockchain_registered(),
+            "Public cert must be blockchain registered"
+        );
         assert!(!cert.is_self_signed(), "Not self-signed");
         assert_eq!(cert.network_type, NetworkType::Public);
     }
@@ -768,17 +872,20 @@ async fn qg8_assets_truly_anonymous() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join anonymous network
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
     // Create and share asset to anonymous network
     let asset = create_test_asset();
-    coordinator.set_asset_visibility(asset.clone(), vec![anon_id.clone()]).await?;
+    coordinator
+        .set_asset_visibility(asset.clone(), vec![anon_id])
+        .await?;
 
     // Verify STOQ validates no tracking
-    let response = coordinator.handle_asset_request(anon_id.clone(), asset.clone()).await?;
+    let response = coordinator
+        .handle_asset_request(anon_id, asset.clone())
+        .await?;
     assert!(response.authorized, "Asset accessible in anonymous network");
 
     // Verify no identity tracking
@@ -798,28 +905,38 @@ async fn qg8_p2p_assets_peer_specific() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join P2P network
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer1.local:8080".to_string()]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer1.local:8080".to_string()]),
+        )
+        .await?;
 
     // Join anonymous network
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
     // Share asset ONLY to P2P network
     let asset = create_test_asset();
-    coordinator.set_asset_visibility(asset.clone(), vec![p2p_id.clone()]).await?;
+    coordinator
+        .set_asset_visibility(asset.clone(), vec![p2p_id])
+        .await?;
 
     // Verify P2P can access
-    let p2p_response = coordinator.handle_asset_request(p2p_id.clone(), asset.clone()).await?;
+    let p2p_response = coordinator
+        .handle_asset_request(p2p_id, asset.clone())
+        .await?;
     assert!(p2p_response.authorized, "P2P peer can access asset");
 
     // Verify anonymous CANNOT access
-    let anon_response = coordinator.handle_asset_request(anon_id.clone(), asset.clone()).await?;
-    assert!(!anon_response.authorized, "Anonymous peer blocked from P2P asset");
+    let anon_response = coordinator
+        .handle_asset_request(anon_id, asset.clone())
+        .await?;
+    assert!(
+        !anon_response.authorized,
+        "Anonymous peer blocked from P2P asset"
+    );
 
     info!("✅ QG8.2: P2P assets only visible to specific peers");
     Ok(())
@@ -833,28 +950,46 @@ async fn qg8_federated_assets_contained() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join federated network
-    let fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.federation.example".to_string() },
-        NetworkConfig::federated("gateway.federation.example".to_string()),
-    ).await?;
+    let fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.federation.example".to_string(),
+            },
+            NetworkConfig::federated("gateway.federation.example".to_string()),
+        )
+        .await?;
 
     // Join public network
-    let pub_id = coordinator.join_network(
-        NetworkType::Public,
-        NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
-    ).await?;
+    let pub_id = coordinator
+        .join_network(
+            NetworkType::Public,
+            NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
+        )
+        .await?;
 
     // Share asset ONLY to federation
     let asset = create_test_asset();
-    coordinator.set_asset_visibility(asset.clone(), vec![fed_id.clone()]).await?;
+    coordinator
+        .set_asset_visibility(asset.clone(), vec![fed_id])
+        .await?;
 
     // Verify federation can access
-    let fed_response = coordinator.handle_asset_request(fed_id.clone(), asset.clone()).await?;
-    assert!(fed_response.authorized, "Federation member can access asset");
+    let fed_response = coordinator
+        .handle_asset_request(fed_id, asset.clone())
+        .await?;
+    assert!(
+        fed_response.authorized,
+        "Federation member can access asset"
+    );
 
     // Verify public network CANNOT access
-    let pub_response = coordinator.handle_asset_request(pub_id.clone(), asset.clone()).await?;
-    assert!(!pub_response.authorized, "Public network blocked from federated asset");
+    let pub_response = coordinator
+        .handle_asset_request(pub_id, asset.clone())
+        .await?;
+    assert!(
+        !pub_response.authorized,
+        "Public network blocked from federated asset"
+    );
 
     info!("✅ QG8.3: Federated assets contained within federation");
     Ok(())
@@ -868,47 +1003,68 @@ async fn qg8_public_assets_discoverable() -> Result<()> {
     let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
 
     // Join all network types
-    let anon_id = coordinator.join_network(
-        NetworkType::Anonymous,
-        NetworkConfig::anonymous(),
-    ).await?;
+    let anon_id = coordinator
+        .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+        .await?;
 
-    let p2p_id = coordinator.join_network(
-        NetworkType::P2P,
-        NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
-    ).await?;
+    let p2p_id = coordinator
+        .join_network(
+            NetworkType::P2P,
+            NetworkConfig::p2p(vec!["peer.local:8080".to_string()]),
+        )
+        .await?;
 
-    let fed_id = coordinator.join_network(
-        NetworkType::Federated { gateway_url: "gateway.internal".to_string() },
-        NetworkConfig::federated("gateway.internal".to_string()),
-    ).await?;
+    let fed_id = coordinator
+        .join_network(
+            NetworkType::Federated {
+                gateway_url: "gateway.internal".to_string(),
+            },
+            NetworkConfig::federated("gateway.internal".to_string()),
+        )
+        .await?;
 
-    let pub_id = coordinator.join_network(
-        NetworkType::Public,
-        NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
-    ).await?;
+    let pub_id = coordinator
+        .join_network(
+            NetworkType::Public,
+            NetworkConfig::public("node.hypermesh.online".to_string(), generate_test_proof()),
+        )
+        .await?;
 
     // Share asset to PUBLIC network (globally discoverable)
     let asset = create_test_asset();
-    coordinator.set_asset_visibility(asset.clone(), vec![pub_id.clone()]).await?;
+    coordinator
+        .set_asset_visibility(asset.clone(), vec![pub_id])
+        .await?;
 
     // Verify public network can access
-    let pub_response = coordinator.handle_asset_request(pub_id.clone(), asset.clone()).await?;
+    let pub_response = coordinator
+        .handle_asset_request(pub_id, asset.clone())
+        .await?;
     assert!(pub_response.authorized, "Public network can access asset");
 
     // Verify other networks CANNOT access (not shared to them)
-    let anon_response = coordinator.handle_asset_request(anon_id.clone(), asset.clone()).await?;
+    let anon_response = coordinator
+        .handle_asset_request(anon_id, asset.clone())
+        .await?;
     assert!(!anon_response.authorized, "Anonymous blocked (not shared)");
 
-    let p2p_response = coordinator.handle_asset_request(p2p_id.clone(), asset.clone()).await?;
+    let p2p_response = coordinator
+        .handle_asset_request(p2p_id, asset.clone())
+        .await?;
     assert!(!p2p_response.authorized, "P2P blocked (not shared)");
 
-    let fed_response = coordinator.handle_asset_request(fed_id.clone(), asset.clone()).await?;
+    let fed_response = coordinator
+        .handle_asset_request(fed_id, asset.clone())
+        .await?;
     assert!(!fed_response.authorized, "Federated blocked (not shared)");
 
     // STOQ + PoS integration validates access at protocol level
     let violations = isolation.check_violations().await;
-    assert_eq!(violations.len(), 0, "STOQ + PoS validation ensures proper access control");
+    assert_eq!(
+        violations.len(),
+        0,
+        "STOQ + PoS validation ensures proper access control"
+    );
 
     info!("✅ QG8.4: Public assets globally discoverable with STOQ + PoS validation");
     Ok(())

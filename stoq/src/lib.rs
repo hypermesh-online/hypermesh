@@ -13,14 +13,14 @@
 // Documentation warnings disabled during early development
 // #![warn(missing_docs)]
 
-pub mod transport;
-pub mod config;
-pub mod extensions;
-pub mod protocol;
 pub mod api;
-pub mod network_isolation;
-pub mod errors;
+pub mod config;
 pub mod error_utils;
+pub mod errors;
+pub mod extensions;
+pub mod network_isolation;
+pub mod protocol;
+pub mod transport;
 
 // Test utilities for crypto initialization
 #[cfg(test)]
@@ -29,44 +29,42 @@ pub mod test_utils;
 // ARCHITECTURE ENFORCEMENT: STOQ is pure transport - no routing, chunking, or edge features
 // These belong in application layers that use STOQ as transport
 
+use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use anyhow::Result;
-use serde::{Serialize, Deserialize};
 
 // Re-export pure transport types and protocol extensions
-pub use transport::{StoqTransport, TransportConfig, Connection, Endpoint, Stream, NetworkTier};
-pub use transport::falcon::{
-    FalconEngine, FalconTransport, FalconVariant, FalconPublicKey,
-    FalconPrivateKey, FalconSignature
-};
 pub use config::StoqConfig;
 pub use extensions::{
-    StoqProtocolExtension, DefaultStoqExtensions, PacketToken, PacketShard,
-    HopInfo, SeedInfo, SeedNode, SeedPriority, StoqPacket
+    DefaultStoqExtensions, HopInfo, PacketShard, PacketToken, SeedInfo, SeedNode, SeedPriority,
+    StoqPacket, StoqProtocolExtension,
 };
+pub use transport::falcon::{
+    FalconEngine, FalconPrivateKey, FalconPublicKey, FalconSignature, FalconTransport,
+    FalconVariant,
+};
+pub use transport::{Connection, Endpoint, NetworkTier, StoqTransport, Stream, TransportConfig};
 
 // Re-export API layer for application protocol
-pub use api::{
-    StoqApiServer, StoqApiClient, ApiHandler, ApiRequest, ApiResponse, ApiError
-};
+pub use api::{ApiError, ApiHandler, ApiRequest, ApiResponse, StoqApiClient, StoqApiServer};
 
 // Re-export network isolation for multi-network support
 pub use network_isolation::{
-    NetworkIsolationManager, NetworkStack, IsolationConfig,
-    NetworkTunnel, TrafficType, IsolationViolation
+    IsolationConfig, IsolationViolation, NetworkIsolationManager, NetworkStack, NetworkTunnel,
+    TrafficType,
 };
 
 // Re-export multi-path QUIC connection management
 pub use transport::multipath::{MultiPathConnection, PathPolicy, PathScheduler};
 
 // Re-export reflector pool transport for Network-scope sync
-pub use transport::reflector::{StoqBlockTransport, SyncProtocol, ReflectorMessage};
+pub use transport::reflector::{ReflectorMessage, StoqBlockTransport, SyncProtocol};
 
 // Backward compatibility: re-export modules for tests
-pub use transport::metrics as performance_monitor;
 pub use transport::adaptive as phoenix;
+pub use transport::metrics as performance_monitor;
 pub use transport::metrics as monitoring;
 
 // Crypto module re-export
@@ -88,13 +86,13 @@ pub const DEFAULT_PORT: u16 = 9292;
 pub trait Transport: Send + Sync {
     /// Connect to a remote endpoint
     async fn connect(&self, endpoint: &Endpoint) -> Result<Connection>;
-    
+
     /// Accept incoming connections
     async fn accept(&self) -> Result<Connection>;
-    
+
     /// Get transport statistics
     fn stats(&self) -> TransportStats;
-    
+
     /// Close all connections and shutdown
     async fn shutdown(&self);
 }
@@ -104,7 +102,7 @@ pub trait Transport: Send + Sync {
 pub trait Listener: Send + Sync {
     /// Accept an incoming connection
     async fn accept(&self) -> Result<Connection>;
-    
+
     /// Get the local address
     fn local_addr(&self) -> Result<SocketAddr>;
 }
@@ -144,13 +142,13 @@ impl StoqBuilder {
             config: StoqConfig::default(),
         }
     }
-    
+
     /// Set custom configuration
     pub fn with_config(mut self, config: StoqConfig) -> Self {
         self.config = config;
         self
     }
-    
+
     /// Build the STOQ instance
     pub async fn build(self) -> Result<Stoq> {
         Stoq::new(self.config).await
@@ -167,18 +165,15 @@ impl Stoq {
     /// Create a new STOQ transport instance
     pub async fn new(config: StoqConfig) -> Result<Self> {
         let transport = Arc::new(StoqTransport::new(config.transport.clone()).await?);
-        
-        Ok(Self {
-            transport,
-            config,
-        })
+
+        Ok(Self { transport, config })
     }
-    
+
     /// Get the transport layer
     pub fn transport(&self) -> Arc<StoqTransport> {
         self.transport.clone()
     }
-    
+
     /// Get current configuration
     pub fn config(&self) -> &StoqConfig {
         &self.config
@@ -194,25 +189,26 @@ impl Default for StoqBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_stoq_builder() {
         // Initialize crypto provider
-        if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+        if rustls::crypto::ring::default_provider()
+            .install_default()
+            .is_err()
+        {
             // Already installed, ignore error
         }
-        
-        let stoq = StoqBuilder::new()
-            .build()
-            .await;
+
+        let stoq = StoqBuilder::new().build().await;
         assert!(stoq.is_ok());
     }
-    
+
     #[test]
     fn test_protocol_version() {
         assert_eq!(PROTOCOL_VERSION, "1.0.0");
     }
-    
+
     #[test]
     fn test_default_values() {
         assert_eq!(DEFAULT_PORT, 9292);

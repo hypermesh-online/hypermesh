@@ -7,11 +7,11 @@
 //! Provides real Proof of State validation for HyperMesh operations.
 //! Integrates with TrustChain's four-proof consensus system (WHO, WHEN, WHERE, WHAT).
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
-use tracing::{debug, warn, error, info};
 use std::time::Instant;
+use tracing::{debug, error, info, warn};
+use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
 
 /// Consensus validator trait
 #[async_trait]
@@ -20,7 +20,11 @@ pub trait StateAuthenticator: Send + Sync {
     async fn validate(&self, proof: &[u8]) -> Result<bool>;
 
     /// Validate with specific requirements
-    async fn validate_with_requirements(&self, proof: &[u8], requirements: &ConsensusRequirements) -> Result<bool>;
+    async fn validate_with_requirements(
+        &self,
+        proof: &[u8],
+        requirements: &ConsensusRequirements,
+    ) -> Result<bool>;
 
     /// Get validator name
     fn name(&self) -> &str;
@@ -32,6 +36,12 @@ pub struct DefaultStateAuthenticator {
     requirements: ConsensusRequirements,
     /// Enable detailed validation logging
     verbose: bool,
+}
+
+impl Default for DefaultStateAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DefaultStateAuthenticator {
@@ -79,8 +89,12 @@ impl StateAuthenticator for DefaultStateAuthenticator {
         }
 
         // Check proof size (reasonable bounds)
-        if proof.len() > 1024 * 1024 {  // 1MB max
-            warn!("Consensus validation failed: proof size {} exceeds maximum", proof.len());
+        if proof.len() > 1024 * 1024 {
+            // 1MB max
+            warn!(
+                "Consensus validation failed: proof size {} exceeds maximum",
+                proof.len()
+            );
             return Ok(false);
         }
 
@@ -91,10 +105,10 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                     debug!("Successfully deserialized consensus proof");
                 }
                 p
-            },
+            }
             Err(e) => {
                 error!("Failed to deserialize consensus proof: {}", e);
-                return Err(anyhow!("Invalid proof format: {}", e));
+                return Err(anyhow!("Invalid proof format: {e}"));
             }
         };
 
@@ -111,10 +125,22 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                     );
 
                     if self.verbose {
-                        debug!("✓ Stake proof: {} tokens validated", consensus_proof.stake_proof.stake_amount);
-                        debug!("✓ Time proof: offset {} ms", consensus_proof.time_proof.network_time_offset.as_millis());
-                        debug!("✓ Space proof: {} GB storage", consensus_proof.space_proof.total_storage / (1024 * 1024 * 1024));
-                        debug!("✓ Work proof: {} compute units", consensus_proof.work_proof.computational_power);
+                        debug!(
+                            "✓ Stake proof: {} tokens validated",
+                            consensus_proof.stake_proof.stake_amount
+                        );
+                        debug!(
+                            "✓ Time proof: offset {} ms",
+                            consensus_proof.time_proof.network_time_offset.as_millis()
+                        );
+                        debug!(
+                            "✓ Space proof: {} GB storage",
+                            consensus_proof.space_proof.total_storage / (1024 * 1024 * 1024)
+                        );
+                        debug!(
+                            "✓ Work proof: {} compute units",
+                            consensus_proof.work_proof.computational_power
+                        );
                     }
 
                     Ok(true)
@@ -130,7 +156,9 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                         ));
                     }
 
-                    if consensus_proof.time_proof.network_time_offset > self.requirements.max_time_offset {
+                    if consensus_proof.time_proof.network_time_offset
+                        > self.requirements.max_time_offset
+                    {
                         failed_requirements.push(format!(
                             "Time offset too large: {:?} > {:?}",
                             consensus_proof.time_proof.network_time_offset,
@@ -138,7 +166,8 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                         ));
                     }
 
-                    if consensus_proof.space_proof.total_storage < self.requirements.minimum_storage {
+                    if consensus_proof.space_proof.total_storage < self.requirements.minimum_storage
+                    {
                         failed_requirements.push(format!(
                             "Insufficient storage: {} < {}",
                             consensus_proof.space_proof.total_storage,
@@ -146,7 +175,9 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                         ));
                     }
 
-                    if consensus_proof.work_proof.computational_power < self.requirements.minimum_compute {
+                    if consensus_proof.work_proof.computational_power
+                        < self.requirements.minimum_compute
+                    {
                         failed_requirements.push(format!(
                             "Insufficient compute power: {} < {}",
                             consensus_proof.work_proof.computational_power,
@@ -161,11 +192,11 @@ impl StateAuthenticator for DefaultStateAuthenticator {
 
                     Ok(false)
                 }
-            },
+            }
             Ok(false) => {
                 warn!("Consensus validation failed: proof validation returned false");
                 Ok(false)
-            },
+            }
             Err(e) => {
                 error!("Consensus validation failed with error: {}", e);
 
@@ -183,12 +214,16 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                     warn!("✗ Work proof (WHAT) validation failed");
                 }
 
-                Err(anyhow!("Consensus validation failed: {}", e))
+                Err(anyhow!("Consensus validation failed: {e}"))
             }
         }
     }
 
-    async fn validate_with_requirements(&self, proof: &[u8], requirements: &ConsensusRequirements) -> Result<bool> {
+    async fn validate_with_requirements(
+        &self,
+        proof: &[u8],
+        requirements: &ConsensusRequirements,
+    ) -> Result<bool> {
         // Create a temporary validator with custom requirements
         let validator = DefaultStateAuthenticator::with_requirements(requirements.clone())
             .verbose(self.verbose);
@@ -205,6 +240,12 @@ pub struct ProductionStateAuthenticator {
     inner: DefaultStateAuthenticator,
 }
 
+impl Default for ProductionStateAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProductionStateAuthenticator {
     pub fn new() -> Self {
         Self {
@@ -219,8 +260,14 @@ impl StateAuthenticator for ProductionStateAuthenticator {
         self.inner.validate(proof).await
     }
 
-    async fn validate_with_requirements(&self, proof: &[u8], requirements: &ConsensusRequirements) -> Result<bool> {
-        self.inner.validate_with_requirements(proof, requirements).await
+    async fn validate_with_requirements(
+        &self,
+        proof: &[u8],
+        requirements: &ConsensusRequirements,
+    ) -> Result<bool> {
+        self.inner
+            .validate_with_requirements(proof, requirements)
+            .await
     }
 
     fn name(&self) -> &str {
@@ -240,7 +287,7 @@ mod tests {
         let validator = DefaultStateAuthenticator::new();
         let result = validator.validate(&[]).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.expect("test: expected success"));
     }
 
     #[tokio::test]
@@ -249,7 +296,7 @@ mod tests {
         let huge_proof = vec![0u8; 2 * 1024 * 1024]; // 2MB
         let result = validator.validate(&huge_proof).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.expect("test: expected success"));
     }
 
     #[tokio::test]
@@ -258,6 +305,9 @@ mod tests {
         let malformed = vec![0xFF, 0xBA, 0xDC, 0x0D, 0xE5];
         let result = validator.validate(&malformed).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid proof format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid proof format"));
     }
 }

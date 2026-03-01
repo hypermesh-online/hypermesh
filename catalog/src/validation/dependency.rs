@@ -8,8 +8,8 @@
 //! Migrated to use Asset Registry architecture with BlockMatrix Assets.
 
 use anyhow::Result;
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 // Use local Catalog AssetPackage
 use crate::assets::AssetPackage;
@@ -44,6 +44,12 @@ pub struct DependencyNode {
 
 /// Dependency resolver
 pub struct DependencyResolver;
+
+impl Default for DependencyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DependencyResolver {
     /// Create new dependency resolver
@@ -84,7 +90,7 @@ impl DependencyResolver {
 
         // Detect circular dependencies
         if let Some(cycle) = graph.detect_cycle() {
-            return Err(anyhow::anyhow!("Circular dependency detected: {:?}", cycle));
+            return Err(anyhow::anyhow!("Circular dependency detected: {cycle:?}"));
         }
 
         // Resolve versions
@@ -107,8 +113,9 @@ impl DependencyResolver {
 
         // Collect all versions for each package
         for node in &graph.nodes {
-            version_map.entry(node.asset_id.clone())
-                .or_insert_with(Vec::new)
+            version_map
+                .entry(node.asset_id.clone())
+                .or_default()
                 .push(node.version.clone());
         }
 
@@ -136,6 +143,12 @@ pub struct DependencyGraph {
     pub edges: HashMap<String, Vec<String>>,
 }
 
+impl Default for DependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependencyGraph {
     /// Create new dependency graph
     pub fn new() -> Self {
@@ -151,7 +164,7 @@ impl DependencyGraph {
         for dep in &node.dependencies {
             self.edges
                 .entry(node.asset_id.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(dep.name.clone());
         }
 
@@ -166,12 +179,9 @@ impl DependencyGraph {
 
         for node in &self.nodes {
             if !visited.contains(&node.asset_id) {
-                if let Some(cycle) = self.detect_cycle_util(
-                    &node.asset_id,
-                    &mut visited,
-                    &mut rec_stack,
-                    &mut path,
-                ) {
+                if let Some(cycle) =
+                    self.detect_cycle_util(&node.asset_id, &mut visited, &mut rec_stack, &mut path)
+                {
                     return Some(cycle);
                 }
             }
@@ -195,7 +205,8 @@ impl DependencyGraph {
         if let Some(neighbors) = self.edges.get(node) {
             for neighbor in neighbors {
                 if !visited.contains(neighbor) {
-                    if let Some(cycle) = self.detect_cycle_util(neighbor, visited, rec_stack, path) {
+                    if let Some(cycle) = self.detect_cycle_util(neighbor, visited, rec_stack, path)
+                    {
                         return Some(cycle);
                     }
                 } else if rec_stack.contains(neighbor) {

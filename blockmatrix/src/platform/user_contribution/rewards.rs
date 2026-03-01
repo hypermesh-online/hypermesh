@@ -4,8 +4,8 @@
 
 //! Reward calculation engine and authentication config
 
-use std::collections::HashMap;
 use crate::assets::core::AssetType;
+use std::collections::HashMap;
 
 /// Reward calculation engine
 pub struct RewardEngine {
@@ -28,6 +28,12 @@ pub struct PerformanceMultipliers {
 pub struct AuthenticationConfig {
     /// Whether authentication is required for rewards
     pub require_authentication: bool,
+}
+
+impl Default for RewardEngine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RewardEngine {

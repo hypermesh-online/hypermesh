@@ -123,10 +123,7 @@ impl CtFederationSync {
     }
 
     /// Build a `RequestEntries` message. Unknown peers start at index 0.
-    pub async fn prepare_sync_request(
-        &self,
-        peer_ca_id: &str,
-    ) -> TrustChainResult<CtSyncMessage> {
+    pub async fn prepare_sync_request(&self, peer_ca_id: &str) -> TrustChainResult<CtSyncMessage> {
         self.metrics.sync_attempts.fetch_add(1, Ordering::Relaxed);
         let from_index = self
             .peer_sync_state
@@ -137,7 +134,10 @@ impl CtFederationSync {
             .unwrap_or(0);
 
         debug!(peer = peer_ca_id, from_index, "Preparing CT sync request");
-        Ok(CtSyncMessage::RequestEntries { from_index, max_count: 1000 })
+        Ok(CtSyncMessage::RequestEntries {
+            from_index,
+            max_count: 1000,
+        })
     }
 
     /// Build a `RequestConsistencyProof` message.
@@ -147,7 +147,9 @@ impl CtFederationSync {
         old_size: u64,
         new_size: u64,
     ) -> CtSyncMessage {
-        self.metrics.consistency_checks.fetch_add(1, Ordering::Relaxed);
+        self.metrics
+            .consistency_checks
+            .fetch_add(1, Ordering::Relaxed);
         CtSyncMessage::RequestConsistencyProof { old_size, new_size }
     }
 
@@ -159,9 +161,11 @@ impl CtFederationSync {
         response: CtSyncMessage,
     ) -> TrustChainResult<SyncResult> {
         let (entries, tree_size, root_hash) = match response {
-            CtSyncMessage::EntriesResponse { entries, tree_size, root_hash } => {
-                (entries, tree_size, root_hash)
-            }
+            CtSyncMessage::EntriesResponse {
+                entries,
+                tree_size,
+                root_hash,
+            } => (entries, tree_size, root_hash),
             _ => {
                 return Err(TrustChainError::InvalidRequest {
                     reason: "Expected EntriesResponse message".into(),
@@ -179,19 +183,25 @@ impl CtFederationSync {
                     max_seq = entry.sequence_number + 1;
                 }
             } else {
-                warn!(peer = peer_ca_id, seq = entry.sequence_number, "Rejected CT sync entry");
+                warn!(
+                    peer = peer_ca_id,
+                    seq = entry.sequence_number,
+                    "Rejected CT sync entry"
+                );
                 rejected += 1;
             }
         }
 
         {
             let mut state = self.peer_sync_state.write().await;
-            let peer = state.entry(peer_ca_id.to_string()).or_insert(PeerSyncState {
-                last_synced_index: 0,
-                last_sync_time: SystemTime::now(),
-                peer_tree_size: 0,
-                peer_root_hash: [0u8; 32],
-            });
+            let peer = state
+                .entry(peer_ca_id.to_string())
+                .or_insert(PeerSyncState {
+                    last_synced_index: 0,
+                    last_sync_time: SystemTime::now(),
+                    peer_tree_size: 0,
+                    peer_root_hash: [0u8; 32],
+                });
             if max_seq > peer.last_synced_index {
                 peer.last_synced_index = max_seq;
             }
@@ -200,9 +210,14 @@ impl CtFederationSync {
             peer.peer_root_hash = root_hash;
         }
 
-        self.metrics.entries_synced.fetch_add(accepted, Ordering::Relaxed);
+        self.metrics
+            .entries_synced
+            .fetch_add(accepted, Ordering::Relaxed);
         self.metrics.sync_successes.fetch_add(1, Ordering::Relaxed);
-        debug!(peer = peer_ca_id, received, accepted, rejected, "Processed CT entries");
+        debug!(
+            peer = peer_ca_id,
+            received, accepted, rejected, "Processed CT entries"
+        );
 
         Ok(SyncResult {
             entries_received: received,
@@ -215,9 +230,11 @@ impl CtFederationSync {
     /// Verify a `ConsistencyProofResponse` confirms append-only semantics.
     pub fn verify_consistency_proof(&self, proof: &CtSyncMessage) -> TrustChainResult<bool> {
         let (old_size, new_size, hashes) = match proof {
-            CtSyncMessage::ConsistencyProofResponse { old_size, new_size, proof } => {
-                (*old_size, *new_size, proof)
-            }
+            CtSyncMessage::ConsistencyProofResponse {
+                old_size,
+                new_size,
+                proof,
+            } => (*old_size, *new_size, proof),
             _ => {
                 return Err(TrustChainError::InvalidRequest {
                     reason: "Expected ConsistencyProofResponse message".into(),
@@ -252,14 +269,26 @@ impl CtFederationSync {
                 entries.push(CtLogEntry {
                     sequence_number: le.sequence_number,
                     certificate_der: le.certificate_der,
-                    timestamp: le.timestamp.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
+                    timestamp: le
+                        .timestamp
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
                     issuer_ca_id: le.issuer_ca_id,
                 });
             }
         }
 
-        let root_hash = stats.shard_stats.first().map(|s| s.root_hash).unwrap_or([0u8; 32]);
-        Ok(CtSyncMessage::EntriesResponse { entries, tree_size: local_size, root_hash })
+        let root_hash = stats
+            .shard_stats
+            .first()
+            .map(|s| s.root_hash)
+            .unwrap_or([0u8; 32]);
+        Ok(CtSyncMessage::EntriesResponse {
+            entries,
+            tree_size: local_size,
+            root_hash,
+        })
     }
 
     /// Aggregate sync status across all tracked peers.
@@ -270,8 +299,14 @@ impl CtFederationSync {
 
         for ps in state.values() {
             total_remote += ps.peer_tree_size;
-            let age = now.duration_since(ps.last_sync_time).unwrap_or(Duration::ZERO);
-            if age > self.stale_threshold { stale += 1; } else { synced += 1; }
+            let age = now
+                .duration_since(ps.last_sync_time)
+                .unwrap_or(Duration::ZERO);
+            if age > self.stale_threshold {
+                stale += 1;
+            } else {
+                synced += 1;
+            }
         }
 
         FederationSyncStatus {
@@ -283,10 +318,13 @@ impl CtFederationSync {
     }
 
     /// Read-only access to the sync metrics counters.
-    pub fn metrics(&self) -> &CtSyncMetrics { &self.metrics }
+    pub fn metrics(&self) -> &CtSyncMetrics {
+        &self.metrics
+    }
 
     fn validate_entry(entry: &CtLogEntry) -> bool {
-        if entry.certificate_der.is_empty() || entry.timestamp == 0 || entry.issuer_ca_id.is_empty() {
+        if entry.certificate_der.is_empty() || entry.timestamp == 0 || entry.issuer_ca_id.is_empty()
+        {
             return false;
         }
         let hash: [u8; 32] = Sha256::digest(&entry.certificate_der).into();
@@ -304,14 +342,16 @@ mod tests {
         let dir = TempDir::new().expect("test: create temp dir");
         let mut cfg = CTConfig::testing();
         cfg.storage_path = dir.path().to_str().expect("test: path to str").to_string();
-        let ct = CertificateTransparency::new(cfg).await.expect("test: create CT");
+        let ct = CertificateTransparency::new(cfg)
+            .await
+            .expect("test: create CT");
         (Arc::new(ct), dir)
     }
 
     fn make_entry(seq: u64, issuer: &str) -> CtLogEntry {
         CtLogEntry {
             sequence_number: seq,
-            certificate_der: format!("cert-der-{}", seq).into_bytes(),
+            certificate_der: format!("cert-der-{seq}").into_bytes(),
             timestamp: 1_700_000_000 + seq,
             issuer_ca_id: issuer.to_string(),
         }
@@ -321,9 +361,15 @@ mod tests {
     async fn test_prepare_sync_request_new_peer() {
         let (ct, _dir) = create_test_ct().await;
         let sync = CtFederationSync::new(ct);
-        let msg = sync.prepare_sync_request("unknown-peer").await.expect("test: request");
+        let msg = sync
+            .prepare_sync_request("unknown-peer")
+            .await
+            .expect("test: request");
         match msg {
-            CtSyncMessage::RequestEntries { from_index, max_count } => {
+            CtSyncMessage::RequestEntries {
+                from_index,
+                max_count,
+            } => {
                 assert_eq!(from_index, 0);
                 assert!(max_count > 0);
             }
@@ -340,8 +386,13 @@ mod tests {
             tree_size: 2,
             root_hash: [0xAA; 32],
         };
-        sync.process_entries_response("peer-a", response).await.expect("test: process");
-        let msg = sync.prepare_sync_request("peer-a").await.expect("test: request");
+        sync.process_entries_response("peer-a", response)
+            .await
+            .expect("test: process");
+        let msg = sync
+            .prepare_sync_request("peer-a")
+            .await
+            .expect("test: request");
         match msg {
             CtSyncMessage::RequestEntries { from_index, .. } => {
                 assert_eq!(from_index, 2, "should continue after last entry");
@@ -355,11 +406,18 @@ mod tests {
         let (ct, _dir) = create_test_ct().await;
         let sync = CtFederationSync::new(ct);
         let response = CtSyncMessage::EntriesResponse {
-            entries: vec![make_entry(0, "peer-b"), make_entry(1, "peer-b"), make_entry(2, "peer-b")],
+            entries: vec![
+                make_entry(0, "peer-b"),
+                make_entry(1, "peer-b"),
+                make_entry(2, "peer-b"),
+            ],
             tree_size: 3,
             root_hash: [0xBB; 32],
         };
-        let result = sync.process_entries_response("peer-b", response).await.expect("test: process");
+        let result = sync
+            .process_entries_response("peer-b", response)
+            .await
+            .expect("test: process");
         assert_eq!(result.entries_received, 3);
         assert_eq!(result.entries_accepted, 3);
         assert_eq!(result.entries_rejected, 0);
@@ -374,11 +432,18 @@ mod tests {
     #[tokio::test]
     async fn test_get_local_entries_for_peer() {
         let (ct, _dir) = create_test_ct().await;
-        ct.log_certificate(b"test-cert-federation").await.expect("test: log cert");
+        ct.log_certificate(b"test-cert-federation")
+            .await
+            .expect("test: log cert");
         let sync = CtFederationSync::new(ct);
-        let msg = sync.get_local_entries_for_peer(0, 10).await.expect("test: get entries");
+        let msg = sync
+            .get_local_entries_for_peer(0, 10)
+            .await
+            .expect("test: get entries");
         match msg {
-            CtSyncMessage::EntriesResponse { entries, tree_size, .. } => {
+            CtSyncMessage::EntriesResponse {
+                entries, tree_size, ..
+            } => {
                 assert_eq!(entries.len(), 1);
                 assert!(tree_size >= 1);
                 assert_eq!(entries[0].sequence_number, 0);
@@ -399,7 +464,9 @@ mod tests {
                 tree_size: 1,
                 root_hash: [0xCC; 32],
             };
-            sync.process_entries_response(peer, resp).await.expect("test: process");
+            sync.process_entries_response(peer, resp)
+                .await
+                .expect("test: process");
         }
         let status = sync.get_sync_status().await;
         assert_eq!(status.peers_tracked, 2);
@@ -412,14 +479,18 @@ mod tests {
     async fn test_metrics_tracking() {
         let (ct, _dir) = create_test_ct().await;
         let sync = CtFederationSync::new(ct);
-        sync.prepare_sync_request("m-peer").await.expect("test: request");
+        sync.prepare_sync_request("m-peer")
+            .await
+            .expect("test: request");
         assert_eq!(sync.metrics().sync_attempts.load(Ordering::Relaxed), 1);
         let resp = CtSyncMessage::EntriesResponse {
             entries: vec![make_entry(0, "m-peer"), make_entry(1, "m-peer")],
             tree_size: 2,
             root_hash: [0xDD; 32],
         };
-        sync.process_entries_response("m-peer", resp).await.expect("test: process");
+        sync.process_entries_response("m-peer", resp)
+            .await
+            .expect("test: process");
         assert_eq!(sync.metrics().sync_successes.load(Ordering::Relaxed), 1);
         assert_eq!(sync.metrics().entries_synced.load(Ordering::Relaxed), 2);
         let _ = sync.prepare_consistency_request("m-peer", 0, 2);
@@ -432,19 +503,29 @@ mod tests {
         let sync = CtFederationSync::new(ct);
         // Empty proof, same sizes => identical trees
         let trivial = CtSyncMessage::ConsistencyProofResponse {
-            old_size: 5, new_size: 5, proof: vec![],
+            old_size: 5,
+            new_size: 5,
+            proof: vec![],
         };
-        assert!(sync.verify_consistency_proof(&trivial).expect("test: verify"));
+        assert!(sync
+            .verify_consistency_proof(&trivial)
+            .expect("test: verify"));
         // Two-hash proof => valid
         let valid = CtSyncMessage::ConsistencyProofResponse {
-            old_size: 3, new_size: 7, proof: vec![[0xAA; 32], [0xBB; 32]],
+            old_size: 3,
+            new_size: 7,
+            proof: vec![[0xAA; 32], [0xBB; 32]],
         };
         assert!(sync.verify_consistency_proof(&valid).expect("test: verify"));
         // old > new => invalid
         let invalid = CtSyncMessage::ConsistencyProofResponse {
-            old_size: 10, new_size: 5, proof: vec![[0xAA; 32]],
+            old_size: 10,
+            new_size: 5,
+            proof: vec![[0xAA; 32]],
         };
-        assert!(!sync.verify_consistency_proof(&invalid).expect("test: verify"));
+        assert!(!sync
+            .verify_consistency_proof(&invalid)
+            .expect("test: verify"));
     }
 
     #[tokio::test]
@@ -452,12 +533,34 @@ mod tests {
         let (ct, _dir) = create_test_ct().await;
         let sync = CtFederationSync::new(ct);
         let entries = vec![
-            CtLogEntry { sequence_number: 0, certificate_der: vec![], timestamp: 100, issuer_ca_id: "ca".into() },
-            CtLogEntry { sequence_number: 1, certificate_der: vec![1, 2, 3], timestamp: 0, issuer_ca_id: "ca".into() },
-            CtLogEntry { sequence_number: 2, certificate_der: vec![4, 5, 6], timestamp: 100, issuer_ca_id: String::new() },
+            CtLogEntry {
+                sequence_number: 0,
+                certificate_der: vec![],
+                timestamp: 100,
+                issuer_ca_id: "ca".into(),
+            },
+            CtLogEntry {
+                sequence_number: 1,
+                certificate_der: vec![1, 2, 3],
+                timestamp: 0,
+                issuer_ca_id: "ca".into(),
+            },
+            CtLogEntry {
+                sequence_number: 2,
+                certificate_der: vec![4, 5, 6],
+                timestamp: 100,
+                issuer_ca_id: String::new(),
+            },
         ];
-        let resp = CtSyncMessage::EntriesResponse { entries, tree_size: 3, root_hash: [0xFF; 32] };
-        let result = sync.process_entries_response("bad-peer", resp).await.expect("test: process");
+        let resp = CtSyncMessage::EntriesResponse {
+            entries,
+            tree_size: 3,
+            root_hash: [0xFF; 32],
+        };
+        let result = sync
+            .process_entries_response("bad-peer", resp)
+            .await
+            .expect("test: process");
         assert_eq!(result.entries_received, 3);
         assert_eq!(result.entries_rejected, 3);
         assert_eq!(result.entries_accepted, 0);

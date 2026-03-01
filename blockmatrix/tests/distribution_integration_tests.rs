@@ -12,16 +12,17 @@
 //! 3. DMV Title (FullPublic → Public nodes only, NO federated)
 //! 4. Customer Credit Report (Private → Explicitly granted nodes)
 
+use async_trait::async_trait;
 use blockmatrix::{
-    distribution::{
-        distribute_shards_pos_aware, NodeInfo,
-        pos_validator::{StateAuthenticator, StorageAccessValidation, DistributionProofType},
-    },
-    assets::pipeline::sharding::{Sharder, ShardingConfig},
     assets::core::AssetResult,
+    assets::pipeline::sharding::{Sharder, ShardingConfig},
+    distribution::{
+        distribute_shards_pos_aware,
+        pos_validator::{DistributionProofType, StateAuthenticator, StorageAccessValidation},
+        NodeInfo,
+    },
     matrix::coordinate::MatrixCoordinate,
 };
-use async_trait::async_trait;
 use std::time::SystemTime;
 
 /// Local mock for integration tests (the library-side mock is #[cfg(test)] only)
@@ -90,7 +91,7 @@ fn create_sharder() -> Sharder {
 
 /// Create test data
 fn create_test_data(name: &str) -> Vec<u8> {
-    format!("{} data content", name).into_bytes().repeat(100)
+    format!("{name} data content").into_bytes().repeat(100)
 }
 
 /// Create network nodes for car purchase scenario
@@ -188,7 +189,10 @@ async fn test_car_purchase_scenario_bank_loan_document() {
         );
     }
 
-    println!("✓ Bank Loan Document: {} shards distributed to bank nodes only", result.placements.len());
+    println!(
+        "✓ Bank Loan Document: {} shards distributed to bank nodes only",
+        result.placements.len()
+    );
 }
 
 #[tokio::test]
@@ -226,7 +230,10 @@ async fn test_car_purchase_scenario_dealer_invoice() {
         );
     }
 
-    println!("✓ Dealer Invoice: {} shards distributed to dealer/bank nodes only", result.placements.len());
+    println!(
+        "✓ Dealer Invoice: {} shards distributed to dealer/bank nodes only",
+        result.placements.len()
+    );
 }
 
 #[tokio::test]
@@ -240,20 +247,16 @@ async fn test_car_purchase_scenario_dmv_title() {
     let consensus = MockStateAuthenticator::new(true);
 
     // Distribute with PublicNetwork privacy level
-    let result = distribute_shards_pos_aware(
-        shards,
-        "dmv-title",
-        "PublicNetwork",
-        &nodes,
-        &consensus,
-    )
-    .await
-    .unwrap();
+    let result =
+        distribute_shards_pos_aware(shards, "dmv-title", "PublicNetwork", &nodes, &consensus)
+            .await
+            .unwrap();
 
     // Verify ONLY on public/fullpublic nodes
     for placement in &result.placements {
         assert!(
-            placement.node_id.starts_with("public-") || placement.node_id.starts_with("fullpublic-"),
+            placement.node_id.starts_with("public-")
+                || placement.node_id.starts_with("fullpublic-"),
             "DMV title leaked to private network node: {}",
             placement.node_id
         );
@@ -264,7 +267,10 @@ async fn test_car_purchase_scenario_dmv_title() {
         );
     }
 
-    println!("✓ DMV Title: {} shards distributed to public nodes only", result.placements.len());
+    println!(
+        "✓ DMV Title: {} shards distributed to public nodes only",
+        result.placements.len()
+    );
 }
 
 #[tokio::test]
@@ -324,7 +330,10 @@ async fn test_car_purchase_scenario_credit_report() {
         );
     }
 
-    println!("✓ Credit Report: {} shards distributed to explicitly granted nodes only", result.placements.len());
+    println!(
+        "✓ Credit Report: {} shards distributed to explicitly granted nodes only",
+        result.placements.len()
+    );
 }
 
 #[tokio::test]
@@ -374,15 +383,10 @@ async fn test_octant_distribution_quality() {
     let nodes = create_car_purchase_nodes();
     let consensus = MockStateAuthenticator::new(true);
 
-    let result = distribute_shards_pos_aware(
-        shards,
-        "test-asset",
-        "PrivateNetwork",
-        &nodes,
-        &consensus,
-    )
-    .await
-    .unwrap();
+    let result =
+        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &consensus)
+            .await
+            .unwrap();
 
     // Verify multiple octants used
     assert!(
@@ -414,15 +418,10 @@ async fn test_golden_ratio_spacing() {
     let nodes = create_car_purchase_nodes();
     let consensus = MockStateAuthenticator::new(true);
 
-    let result = distribute_shards_pos_aware(
-        shards,
-        "test-asset",
-        "PrivateNetwork",
-        &nodes,
-        &consensus,
-    )
-    .await
-    .unwrap();
+    let result =
+        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &consensus)
+            .await
+            .unwrap();
 
     // Calculate pairwise distances
     let mut distances = Vec::new();
@@ -440,11 +439,10 @@ async fn test_golden_ratio_spacing() {
     let avg_distance = distances.iter().sum::<f64>() / distances.len() as f64;
     assert!(
         avg_distance > 0.0,
-        "Invalid average distance: {}",
-        avg_distance
+        "Invalid average distance: {avg_distance}"
     );
 
-    println!("✓ Golden Ratio Spacing: average distance {:.2}", avg_distance);
+    println!("✓ Golden Ratio Spacing: average distance {avg_distance:.2}");
 }
 
 #[tokio::test]
@@ -457,14 +455,9 @@ async fn test_pos_validation_integration() {
     let nodes = create_car_purchase_nodes();
     let consensus = MockStateAuthenticator::new(true);
 
-    let result = distribute_shards_pos_aware(
-        shards,
-        "test-asset",
-        "PrivateNetwork",
-        &nodes,
-        &consensus,
-    )
-    .await;
+    let result =
+        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &consensus)
+            .await;
 
     assert!(result.is_ok(), "PoS validation failed");
 

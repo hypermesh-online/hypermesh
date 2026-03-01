@@ -7,7 +7,7 @@
 //! Efficiently serialize and transmit retrieval instructions with minimal overhead.
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::RetrievalPlan;
 
@@ -109,9 +109,7 @@ impl InstructionTransmitter {
         let _start = std::time::Instant::now();
 
         let bytes = match format {
-            CompressionFormat::None => {
-                serde_json::to_vec(plan)?
-            }
+            CompressionFormat::None => serde_json::to_vec(plan)?,
             CompressionFormat::Brotli => {
                 let json = serde_json::to_vec(plan)?;
                 self.compress_brotli(&json)?
@@ -120,19 +118,14 @@ impl InstructionTransmitter {
                 let json = serde_json::to_vec(plan)?;
                 self.compress_zstd(&json)?
             }
-            CompressionFormat::MessagePack => {
-                rmp_serde::to_vec(plan)?
-            }
+            CompressionFormat::MessagePack => rmp_serde::to_vec(plan)?,
         };
 
         Ok(bytes)
     }
 
     /// Encode with statistics tracking
-    pub fn encode_with_stats(
-        &self,
-        plan: &RetrievalPlan,
-    ) -> Result<(Vec<u8>, TransmissionStats)> {
+    pub fn encode_with_stats(&self, plan: &RetrievalPlan) -> Result<(Vec<u8>, TransmissionStats)> {
         let start = std::time::Instant::now();
 
         // Get uncompressed size
@@ -168,9 +161,7 @@ impl InstructionTransmitter {
         format: CompressionFormat,
     ) -> Result<RetrievalPlan> {
         match format {
-            CompressionFormat::None => {
-                Ok(serde_json::from_slice(bytes)?)
-            }
+            CompressionFormat::None => Ok(serde_json::from_slice(bytes)?),
             CompressionFormat::Brotli => {
                 let decompressed = self.decompress_brotli(bytes)?;
                 Ok(serde_json::from_slice(&decompressed)?)
@@ -179,9 +170,7 @@ impl InstructionTransmitter {
                 let decompressed = self.decompress_zstd(bytes)?;
                 Ok(serde_json::from_slice(&decompressed)?)
             }
-            CompressionFormat::MessagePack => {
-                Ok(rmp_serde::from_slice(bytes)?)
-            }
+            CompressionFormat::MessagePack => Ok(rmp_serde::from_slice(bytes)?),
         }
     }
 
@@ -195,11 +184,7 @@ impl InstructionTransmitter {
             ..Default::default()
         };
 
-        brotli::BrotliCompress(
-            &mut std::io::Cursor::new(data),
-            &mut output,
-            &params,
-        )?;
+        brotli::BrotliCompress(&mut std::io::Cursor::new(data), &mut output, &params)?;
 
         Ok(output)
     }
@@ -207,10 +192,7 @@ impl InstructionTransmitter {
     /// Decompress Brotli
     fn decompress_brotli(&self, data: &[u8]) -> Result<Vec<u8>> {
         let mut output = Vec::new();
-        brotli::BrotliDecompress(
-            &mut std::io::Cursor::new(data),
-            &mut output,
-        )?;
+        brotli::BrotliDecompress(&mut std::io::Cursor::new(data), &mut output)?;
         Ok(output)
     }
 
@@ -258,8 +240,8 @@ impl Default for InstructionTransmitter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::retrieval::{CompleteShardMap, RetrievalMetadata, ShardMapEntry, ShardLocation};
     use crate::matrix::MatrixCoordinate;
+    use crate::retrieval::{CompleteShardMap, RetrievalMetadata, ShardLocation, ShardMapEntry};
 
     fn create_test_plan() -> RetrievalPlan {
         let content_hash = [1u8; 32];
@@ -269,8 +251,8 @@ mod tests {
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
             let locations = vec![
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).unwrap(), 0.9),
-                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).unwrap(), 0.85),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate"), 0.9),
+                ShardLocation::new(MatrixCoordinate::new(i as i64, 1, 0).expect("test: valid coordinate"), 0.85),
             ];
             let entry = ShardMapEntry::new(shard_hash, locations);
             shard_map.add_entry(entry);
@@ -303,7 +285,10 @@ mod tests {
         let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
-        assert_eq!(plan.shard_map.entries.len(), decoded.shard_map.entries.len());
+        assert_eq!(
+            plan.shard_map.entries.len(),
+            decoded.shard_map.entries.len()
+        );
     }
 
     #[test]
@@ -315,7 +300,10 @@ mod tests {
         let decoded = transmitter.decode(&encoded).expect("test: decode");
 
         assert_eq!(plan.content_hash, decoded.content_hash);
-        assert_eq!(plan.shard_map.entries.len(), decoded.shard_map.entries.len());
+        assert_eq!(
+            plan.shard_map.entries.len(),
+            decoded.shard_map.entries.len()
+        );
     }
 
     #[test]
@@ -345,7 +333,9 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Brotli);
 
-        let (_compressed, stats) = transmitter.encode_with_stats(&plan).expect("test: encode_with_stats");
+        let (_compressed, stats) = transmitter
+            .encode_with_stats(&plan)
+            .expect("test: encode_with_stats");
 
         println!("Original size: {} bytes", stats.original_size);
         println!("Compressed size: {} bytes", stats.compressed_size);
@@ -362,13 +352,18 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::new(CompressionFormat::Brotli);
 
-        let (compressed, _stats) = transmitter.encode_with_stats(&plan).expect("test: encode_with_stats");
+        let (compressed, _stats) = transmitter
+            .encode_with_stats(&plan)
+            .expect("test: encode_with_stats");
 
         println!("Compressed instruction size: {} bytes", compressed.len());
 
         // Target: <1KB for typical retrieval plan
-        assert!(compressed.len() < 1024,
-            "Instruction size {} exceeds 1KB target", compressed.len());
+        assert!(
+            compressed.len() < 1024,
+            "Instruction size {} exceeds 1KB target",
+            compressed.len()
+        );
     }
 
     #[test]
@@ -376,15 +371,18 @@ mod tests {
         let plan = create_test_plan();
         let transmitter = InstructionTransmitter::default();
 
-        let best_format = transmitter.benchmark_formats(&plan).expect("test: benchmark_formats");
-        println!("Best format: {:?}", best_format);
+        let best_format = transmitter
+            .benchmark_formats(&plan)
+            .expect("test: benchmark_formats");
+        println!("Best format: {best_format:?}");
 
         // Should find a format
-        assert!(matches!(best_format,
-            CompressionFormat::Brotli |
-            CompressionFormat::Zstd |
-            CompressionFormat::MessagePack |
-            CompressionFormat::None
+        assert!(matches!(
+            best_format,
+            CompressionFormat::Brotli
+                | CompressionFormat::Zstd
+                | CompressionFormat::MessagePack
+                | CompressionFormat::None
         ));
     }
 
@@ -399,8 +397,14 @@ mod tests {
     #[test]
     fn test_format_mime_types() {
         assert_eq!(CompressionFormat::None.mime_type(), "application/json");
-        assert_eq!(CompressionFormat::Brotli.mime_type(), "application/x-brotli");
+        assert_eq!(
+            CompressionFormat::Brotli.mime_type(),
+            "application/x-brotli"
+        );
         assert_eq!(CompressionFormat::Zstd.mime_type(), "application/zstd");
-        assert_eq!(CompressionFormat::MessagePack.mime_type(), "application/msgpack");
+        assert_eq!(
+            CompressionFormat::MessagePack.mime_type(),
+            "application/msgpack"
+        );
     }
 }

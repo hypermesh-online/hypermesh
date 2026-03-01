@@ -29,40 +29,26 @@
 //! assert!(direction.magnitude() > 0.0);
 //! ```
 
-pub mod vector;
 pub mod matrix_ops;
-pub mod routing;
 pub mod path_finding;
+pub mod routing;
 pub mod transaction_routing;
+pub mod vector;
 
 // Re-export main types and functions
-pub use vector::{Vector3D, TensorError};
 pub use matrix_ops::Matrix3x3;
-pub use routing::{
-    calculate_routing_vector,
-    calculate_routing_path,
-    routing_similarity,
-    find_aligned_nodes,
-    calculate_orthogonal_routes,
-    calculate_load_balanced_routes,
-    score_route_quality,
-};
 pub use path_finding::{
-    PathFinder,
-    PathError,
-    calculate_path_cost,
-    optimize_path,
-    bidirectional_search,
+    bidirectional_search, calculate_path_cost, optimize_path, PathError, PathFinder,
+};
+pub use routing::{
+    calculate_load_balanced_routes, calculate_orthogonal_routes, calculate_routing_path,
+    calculate_routing_vector, find_aligned_nodes, routing_similarity, score_route_quality,
 };
 pub use transaction_routing::{
-    TransactionRouter,
-    TransactionRoutingConfig,
-    TransactionRoute,
-    RouteHop,
-    ScopeTransition,
-    RoutingError,
-    RoutingStatistics,
+    RouteHop, RoutingError, RoutingStatistics, ScopeTransition, TransactionRoute,
+    TransactionRouter, TransactionRoutingConfig,
 };
+pub use vector::{TensorError, Vector3D};
 
 #[cfg(test)]
 #[path = "tests/mod.rs"]

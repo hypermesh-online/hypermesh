@@ -103,10 +103,7 @@ impl StoqListener {
                     }
 
                     // Brief back-off before retrying; increases with consecutive errors
-                    let backoff_ms = std::cmp::min(
-                        100 * u64::from(consecutive_errors),
-                        5000,
-                    );
+                    let backoff_ms = std::cmp::min(100 * u64::from(consecutive_errors), 5000);
                     tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
                 }
             }
@@ -164,7 +161,7 @@ mod tests {
             blockchain_scope: BlockchainScope::Device,
         };
 
-        let debug_str = format!("{:?}", info);
+        let debug_str = format!("{info:?}");
         assert!(debug_str.contains("test-id"));
         assert!(debug_str.contains("[::1]:1234"));
     }

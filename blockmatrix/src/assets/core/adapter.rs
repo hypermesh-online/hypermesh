@@ -7,16 +7,16 @@
 //! Defines the universal AssetAdapter interface that all asset types
 //! must implement for specialized handling while maintaining a unified interface.
 
-use std::collections::HashMap;
-use std::time::Duration;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::Duration;
 
-use super::{AssetRegistration, AssetType, AssetResult, ConsensusProof};
-use super::status::AssetStatus;
 use super::privacy::AssetAllocation;
-use hypermesh_lib::PrivacyMode;
 use super::proxy::ProxyAddress;
+use super::status::AssetStatus;
+use super::{AssetRegistration, AssetResult, AssetType, ConsensusProof};
+use hypermesh_lib::PrivacyMode;
 
 /// Universal asset adapter trait
 /// All asset types must implement this for specialized handling
@@ -24,38 +24,53 @@ use super::proxy::ProxyAddress;
 pub trait AssetAdapter: Send + Sync {
     /// Get the asset type this adapter handles
     fn asset_type(&self) -> AssetType;
-    
+
     /// Validate consensus proof for this asset type
     /// CRITICAL: Every operation requires PoSpace + PoStake + PoWork + PoTime validation
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool>;
-    
+
     /// Allocate an asset instance
-    async fn allocate_asset(&self, request: &AssetAllocationRequest) -> AssetResult<AssetAllocation>;
-    
+    async fn allocate_asset(
+        &self,
+        request: &AssetAllocationRequest,
+    ) -> AssetResult<AssetAllocation>;
+
     /// Deallocate an asset instance
     async fn deallocate_asset(&self, asset_id: &AssetRegistration) -> AssetResult<()>;
-    
+
     /// Get current status of an asset
     async fn get_asset_status(&self, asset_id: &AssetRegistration) -> AssetResult<AssetStatus>;
-    
+
     /// Configure privacy level for asset sharing
-    async fn configure_privacy_level(&self, asset_id: &AssetRegistration, privacy: PrivacyMode) -> AssetResult<()>;
-    
+    async fn configure_privacy_level(
+        &self,
+        asset_id: &AssetRegistration,
+        privacy: PrivacyMode,
+    ) -> AssetResult<()>;
+
     /// Assign remote proxy address (NAT-like system)
-    async fn assign_proxy_address(&self, asset_id: &AssetRegistration) -> AssetResult<ProxyAddress>;
-    
+    async fn assign_proxy_address(&self, asset_id: &AssetRegistration)
+        -> AssetResult<ProxyAddress>;
+
     /// Resolve proxy address to local asset reference
-    async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration>;
-    
+    async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration>;
+
     /// Get real-time resource usage
     async fn get_resource_usage(&self, asset_id: &AssetRegistration) -> AssetResult<ResourceUsage>;
-    
+
     /// Set resource limits
-    async fn set_resource_limits(&self, asset_id: &AssetRegistration, limits: ResourceLimits) -> AssetResult<()>;
-    
+    async fn set_resource_limits(
+        &self,
+        asset_id: &AssetRegistration,
+        limits: ResourceLimits,
+    ) -> AssetResult<()>;
+
     /// Health check for adapter functionality
     async fn health_check(&self) -> AssetResult<AdapterHealth>;
-    
+
     /// Get adapter capabilities
     fn get_capabilities(&self) -> AdapterCapabilities;
 }
@@ -80,7 +95,7 @@ pub struct AssetAllocationRequest {
 }
 
 /// Resource requirements specification
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ResourceRequirements {
     /// CPU requirements
     pub cpu: Option<CpuRequirements>,
@@ -323,7 +338,7 @@ pub struct NetworkUsage {
 }
 
 /// Resource limits configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ResourceLimits {
     /// CPU limits
     pub cpu_limit: Option<CpuLimit>,
@@ -420,32 +435,6 @@ pub struct AdapterCapabilities {
     pub features: Vec<String>,
 }
 
-impl Default for ResourceRequirements {
-    fn default() -> Self {
-        Self {
-            cpu: None,
-            gpu_usage: None,
-            memory_usage: None,
-            storage_usage: None,
-            network_usage: None,
-            container: None,
-            economic: None,
-        }
-    }
-}
-
-impl Default for ResourceLimits {
-    fn default() -> Self {
-        Self {
-            cpu_limit: None,
-            gpu_limit: None,
-            memory_limit: None,
-            storage_limit: None,
-            network_limit: None,
-        }
-    }
-}
-
 /// Economic requirements for asset allocation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EconomicRequirements {
@@ -477,7 +466,7 @@ pub enum AssetPriority {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_resource_requirements_creation() {
         let requirements = ResourceRequirements {
@@ -495,18 +484,18 @@ mod tests {
             }),
             ..Default::default()
         };
-        
+
         assert!(requirements.cpu.is_some());
         assert!(requirements.memory_usage.is_some());
         assert!(requirements.gpu_usage.is_none());
     }
-    
+
     #[test]
     fn test_storage_type_serialization() {
         let storage_type = StorageType::Nvme;
-        let serialized = serde_json::to_string(&storage_type).unwrap();
-        let deserialized: StorageType = serde_json::from_str(&serialized).unwrap();
-        
+        let serialized = serde_json::to_string(&storage_type).expect("test: serialization");
+        let deserialized: StorageType = serde_json::from_str(&serialized).expect("test: deserialization");
+
         assert!(matches!(deserialized, StorageType::Nvme));
     }
 }

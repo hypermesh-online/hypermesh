@@ -7,12 +7,12 @@
 //! Provides L1/L2/L3 caching for optimal performance with automatic tier management.
 
 use super::types::LibraryAssetPackage;
-use anyhow::{Result, Context};
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
+use tokio::sync::RwLock;
 
 /// Cache statistics
 #[derive(Debug, Clone, Default)]
@@ -113,7 +113,8 @@ impl LRUCache {
             while self.current_size + size_bytes > max_size && !self.access_order.is_empty() {
                 if let Some(evicted_key) = self.access_order.pop_front() {
                     if let Some(evicted_entry) = self.entries.remove(&evicted_key) {
-                        self.current_size = self.current_size.saturating_sub(evicted_entry.size_bytes);
+                        self.current_size =
+                            self.current_size.saturating_sub(evicted_entry.size_bytes);
                         if evicted.is_none() {
                             evicted = Some(evicted_entry);
                         }
@@ -186,15 +187,20 @@ struct DiskCacheEntry {
 impl DiskCache {
     async fn new(cache_dir: String, max_size_mb: usize) -> Result<Self> {
         // Create cache directory if it doesn't exist
-        tokio::fs::create_dir_all(&cache_dir).await
+        tokio::fs::create_dir_all(&cache_dir)
+            .await
             .context("Failed to create cache directory")?;
 
         // Load existing index if present
-        let index_path = format!("{}/index.json", cache_dir);
+        let index_path = format!("{cache_dir}/index.json");
         let index = if tokio::fs::metadata(&index_path).await.is_ok() {
             let index_data = tokio::fs::read_to_string(&index_path).await?;
-            let temp_index: HashMap<String, DiskCacheEntry> = serde_json::from_str(&index_data).unwrap_or_default();
-            temp_index.into_iter().map(|(k, v)| (Arc::from(k.as_str()), v)).collect()
+            let temp_index: HashMap<String, DiskCacheEntry> =
+                serde_json::from_str(&index_data).unwrap_or_default();
+            temp_index
+                .into_iter()
+                .map(|(k, v)| (Arc::from(k.as_str()), v))
+                .collect()
         } else {
             HashMap::new()
         };
@@ -235,15 +241,15 @@ impl DiskCache {
 
     async fn insert(&mut self, key: Arc<str>, package: Arc<LibraryAssetPackage>) -> Result<()> {
         // Serialize package
-        let data = bincode::serialize(&*package)
-            .context("Failed to serialize package")?;
+        let data = bincode::serialize(&*package).context("Failed to serialize package")?;
 
         let size_bytes = data.len();
 
         // Check if we need to evict
         while self.current_size + size_bytes > self.max_size_bytes && !self.index.is_empty() {
             // Find oldest entry
-            let oldest_key = self.index
+            let oldest_key = self
+                .index
                 .iter()
                 .min_by_key(|(_, entry)| entry.last_accessed)
                 .map(|(k, _)| Arc::clone(k));
@@ -259,16 +265,20 @@ impl DiskCache {
         let file_name = format!("{}.cache", hex::encode(key.as_bytes()));
         let file_path = format!("{}/{}", self.cache_dir, file_name);
 
-        tokio::fs::write(&file_path, &data).await
+        tokio::fs::write(&file_path, &data)
+            .await
             .context("Failed to write cache file")?;
 
         // Update index
-        self.index.insert(key, DiskCacheEntry {
-            file_path: file_name,
-            hash: package.hash.to_string(),
-            size_bytes,
-            last_accessed: chrono::Utc::now().timestamp(),
-        });
+        self.index.insert(
+            key,
+            DiskCacheEntry {
+                file_path: file_name,
+                hash: package.hash.to_string(),
+                size_bytes,
+                last_accessed: chrono::Utc::now().timestamp(),
+            },
+        );
 
         self.current_size += size_bytes;
 
@@ -289,7 +299,9 @@ impl DiskCache {
 
     async fn save_index(&self) -> Result<()> {
         let index_path = format!("{}/index.json", self.cache_dir);
-        let temp_index: HashMap<String, DiskCacheEntry> = self.index.iter()
+        let temp_index: HashMap<String, DiskCacheEntry> = self
+            .index
+            .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
             .collect();
         let index_data = serde_json::to_string(&temp_index)?;
@@ -323,7 +335,7 @@ impl PackageCache {
         // Initialize L3 cache if path is provided
         if let Some(path) = &self.l3_cache_path {
             let _disk_cache = DiskCache::new(path.clone(), 1000).await?; // 1GB default
-            // Note: In actual implementation, would store this properly
+                                                                         // Note: In actual implementation, would store this properly
         }
         Ok(())
     }
@@ -399,7 +411,8 @@ impl PackageCache {
                 drop(l2);
                 if let Some(l3) = &self.l3_cache {
                     let mut l3 = l3.write().await;
-                    l3.insert(Arc::clone(&l2_evicted.package.id), l2_evicted.package).await?;
+                    l3.insert(Arc::clone(&l2_evicted.package.id), l2_evicted.package)
+                        .await?;
                 }
             }
         }
@@ -460,11 +473,16 @@ impl PackageCache {
 /// Estimate package size in bytes for cache management
 fn estimate_package_size(package: &LibraryAssetPackage) -> usize {
     // Rough estimation based on content
-    let metadata_size = package.metadata().name.len() +
-                       package.metadata().version.len() +
-                       package.metadata().description.as_ref().map_or(0, |d| d.len());
+    let metadata_size = package.metadata().name.len()
+        + package.metadata().version.len()
+        + package
+            .metadata()
+            .description
+            .as_ref()
+            .map_or(0, |d| d.len());
 
-    let content_size = package.content_refs
+    let content_size = package
+        .content_refs
         .as_ref()
         .map_or(0, |refs| refs.total_size as usize);
 
@@ -521,18 +539,18 @@ mod tests {
         let key3: Arc<str> = Arc::from("pkg3");
 
         // Insert packages
-        cache.insert(key1.clone(), package1.clone()).await.unwrap();
-        cache.insert(key2.clone(), package2.clone()).await.unwrap();
-        cache.insert(key3.clone(), package3.clone()).await.unwrap();
+        cache.insert(key1.clone(), package1.clone()).await.expect("test: async operation");
+        cache.insert(key2.clone(), package2.clone()).await.expect("test: async operation");
+        cache.insert(key3.clone(), package3.clone()).await.expect("test: async operation");
 
         // pkg3 should be in L1 (most recent)
         // pkg2 should be in L2 (evicted from L1)
         // pkg1 should be in L2 (evicted from L1)
 
         // Get pkg1 (should promote from L2 to L1)
-        assert!(cache.get(&key1).await.unwrap().is_some());
+        assert!(cache.get(&key1).await.expect("test: async operation").is_some());
 
-        let stats = cache.get_stats().await.unwrap();
+        let stats = cache.get_stats().await.expect("test: async operation");
         assert_eq!(stats.l2_hits, 1);
     }
 
@@ -558,7 +576,11 @@ mod tests {
                 modified: 0,
             }),
             spec: Some(PackageSpec {
-                runtime: RuntimeRequirements { runtime_type: "lua".to_string(), version: "5.4".to_string(), dependencies: vec![] },
+                runtime: RuntimeRequirements {
+                    runtime_type: "lua".to_string(),
+                    version: "5.4".to_string(),
+                    dependencies: vec![],
+                },
                 resources: ResourceRequirements::default(),
                 security: SecurityConfig {
                     consensus_required: false,

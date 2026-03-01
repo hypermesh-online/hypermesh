@@ -224,43 +224,43 @@ mod tests {
 
     #[tokio::test]
     async fn test_storage_basic() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let storage_path = temp_dir.path().join("ct_storage");
 
-        let storage = CTStorage::new(storage_path.to_str().unwrap()).await.unwrap();
+        let storage = CTStorage::new(storage_path.to_str().expect("test: async operation")).await.expect("test: async operation");
 
         // Create a test log entry
         let entry = LogEntry::default(); // Would need actual LogEntry creation
 
         // Store entry
-        let seq = storage.store_entry(entry.clone()).await.unwrap();
+        let seq = storage.store_entry(entry.clone()).await.expect("test: async operation");
         assert_eq!(seq, 0);
 
         // Retrieve entry
-        let retrieved = storage.get_entry(seq).await.unwrap();
+        let retrieved = storage.get_entry(seq).await.expect("test: async operation");
         assert!(retrieved.is_some());
 
         // Get stats
-        let stats = storage.get_stats().await.unwrap();
+        let stats = storage.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_entries, 1);
     }
 
     #[tokio::test]
     async fn test_storage_persistence() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let storage_path = temp_dir.path().join("ct_storage");
 
         // Create and populate storage
         {
-            let storage = CTStorage::new(storage_path.to_str().unwrap()).await.unwrap();
+            let storage = CTStorage::new(storage_path.to_str().expect("test: async operation")).await.expect("test: async operation");
             let entry = LogEntry::default();
-            storage.store_entry(entry).await.unwrap();
+            storage.store_entry(entry).await.expect("test: async operation");
         }
 
         // Reload storage
         {
-            let storage = CTStorage::new(storage_path.to_str().unwrap()).await.unwrap();
-            let stats = storage.get_stats().await.unwrap();
+            let storage = CTStorage::new(storage_path.to_str().expect("test: async operation")).await.expect("test: async operation");
+            let stats = storage.get_stats().await.expect("test: async operation");
             assert_eq!(stats.total_entries, 1);
         }
     }

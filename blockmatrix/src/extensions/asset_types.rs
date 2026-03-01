@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetType, AssetRegistration, AssetAllocation, PrivacyMode, ConsensusProof};
 use super::types::ResourceUsageReport;
+use crate::assets::core::{
+    AssetAllocation, AssetRegistration, AssetType, ConsensusProof, PrivacyMode,
+};
 
 /// Asset creation specification
 #[derive(Debug, Clone, Serialize, Deserialize)]

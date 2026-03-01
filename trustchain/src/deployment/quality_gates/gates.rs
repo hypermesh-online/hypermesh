@@ -4,22 +4,26 @@
 
 //! Individual quality gate implementations for TrustChain deployment validation.
 
-use std::path::Path;
 use anyhow::Result;
+use std::path::Path;
 
-use super::{QualityGate, GateResult, QualityGateStatus};
+use super::{GateResult, QualityGate, QualityGateStatus};
 
 /// Security Theater Detection Gate
 pub(super) struct SecurityTheaterGate;
 
 impl QualityGate for SecurityTheaterGate {
-    fn name(&self) -> &str { "SecurityTheaterDetection" }
+    fn name(&self) -> &str {
+        "SecurityTheaterDetection"
+    }
 
     fn description(&self) -> &str {
         "Detects security theater patterns including default_for_testing() bypasses"
     }
 
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool {
+        true
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::process::Command;
@@ -30,7 +34,7 @@ impl QualityGate for SecurityTheaterGate {
             "Mock",
             "TODO.*security",
             "stub.*implementation",
-            "fake.*certificate"
+            "fake.*certificate",
         ];
 
         let mut violations = Vec::new();
@@ -53,8 +57,7 @@ impl QualityGate for SecurityTheaterGate {
                             if count > 0 {
                                 total_matches += count;
                                 violations.push(format!(
-                                    "VIOLATION: Found {} instances of '{}' in {}",
-                                    count, pattern, file
+                                    "VIOLATION: Found {count} instances of '{pattern}' in {file}"
                                 ));
                             }
                         }
@@ -71,12 +74,16 @@ impl QualityGate for SecurityTheaterGate {
             QualityGateStatus::Fail
         };
 
-        let score = if total_matches == 0 { 1.0 } else { 1.0 - (total_matches as f64 / 50.0).min(1.0) };
+        let score = if total_matches == 0 {
+            1.0
+        } else {
+            1.0 - (total_matches as f64 / 50.0).min(1.0)
+        };
 
         Ok(GateResult {
             status,
             score,
-            message: format!("Found {} security theater patterns", total_matches),
+            message: format!("Found {total_matches} security theater patterns"),
             details: violations,
         })
     }
@@ -86,18 +93,22 @@ impl QualityGate for SecurityTheaterGate {
 pub(super) struct ConsensusValidationGate;
 
 impl QualityGate for ConsensusValidationGate {
-    fn name(&self) -> &str { "ConsensusValidation" }
+    fn name(&self) -> &str {
+        "ConsensusValidation"
+    }
 
     fn description(&self) -> &str {
         "Validates proper consensus proof validation is implemented"
     }
 
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool {
+        true
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::fs;
 
-        let consensus_file = format!("{}/src/consensus/mod.rs", source_path);
+        let consensus_file = format!("{source_path}/src/consensus/mod.rs");
 
         if !Path::new(&consensus_file).exists() {
             return Ok(GateResult {
@@ -112,7 +123,8 @@ impl QualityGate for ConsensusValidationGate {
 
         let has_network_generation = content.contains("generate_from_network");
         let has_validation = content.contains("validate_with_requirements");
-        let testing_restricted = content.contains("#[cfg(test)]") && content.contains("default_for_testing");
+        let testing_restricted =
+            content.contains("#[cfg(test)]") && content.contains("default_for_testing");
 
         let mut details = Vec::new();
         let mut score = 0.0;
@@ -159,18 +171,22 @@ impl QualityGate for ConsensusValidationGate {
 pub(super) struct HSMDependencyGate;
 
 impl QualityGate for HSMDependencyGate {
-    fn name(&self) -> &str { "HSMDependencyCheck" }
+    fn name(&self) -> &str {
+        "HSMDependencyCheck"
+    }
 
     fn description(&self) -> &str {
         "Ensures HSM dependencies are removed (software-only requirement)"
     }
 
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool {
+        true
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::fs;
 
-        let cargo_file = format!("{}/Cargo.toml", source_path);
+        let cargo_file = format!("{source_path}/Cargo.toml");
 
         if !Path::new(&cargo_file).exists() {
             return Ok(GateResult {
@@ -183,19 +199,14 @@ impl QualityGate for HSMDependencyGate {
 
         let content = fs::read_to_string(&cargo_file)?;
 
-        let hsm_patterns = [
-            "aws-sdk-cloudhsm",
-            "rusty-hsm",
-            "pkcs11",
-            "hsm-client",
-        ];
+        let hsm_patterns = ["aws-sdk-cloudhsm", "rusty-hsm", "pkcs11", "hsm-client"];
 
         let mut violations = Vec::new();
         let mut hsm_found = false;
 
         for pattern in &hsm_patterns {
             if content.contains(pattern) {
-                violations.push(format!("VIOLATION: HSM dependency found: {}", pattern));
+                violations.push(format!("VIOLATION: HSM dependency found: {pattern}"));
                 hsm_found = true;
             }
         }
@@ -223,7 +234,10 @@ impl QualityGate for HSMDependencyGate {
         Ok(GateResult {
             status,
             score,
-            message: format!("HSM dependency check: {}", if hsm_found { "FAILED" } else { "PASSED" }),
+            message: format!(
+                "HSM dependency check: {}",
+                if hsm_found { "FAILED" } else { "PASSED" }
+            ),
             details: violations,
         })
     }
@@ -233,18 +247,22 @@ impl QualityGate for HSMDependencyGate {
 pub(super) struct MockResponseGate;
 
 impl QualityGate for MockResponseGate {
-    fn name(&self) -> &str { "MockResponseDetection" }
+    fn name(&self) -> &str {
+        "MockResponseDetection"
+    }
 
     fn description(&self) -> &str {
         "Detects dangerous mock responses in API endpoints"
     }
 
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool {
+        true
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::process::Command;
 
-        let api_path = format!("{}/src/api", source_path);
+        let api_path = format!("{source_path}/src/api");
 
         if !Path::new(&api_path).exists() {
             return Ok(GateResult {
@@ -277,16 +295,16 @@ impl QualityGate for MockResponseGate {
         let fix_lines: Vec<&str> = security_fixes.lines().collect();
 
         for line in mock_lines.iter().take(10) {
-            violations.push(format!("VIOLATION: Mock response detected: {}", line));
+            violations.push(format!("VIOLATION: Mock response detected: {line}"));
         }
 
         for line in fix_lines.iter().take(5) {
-            violations.push(format!("OK: Security fix detected: {}", line));
+            violations.push(format!("OK: Security fix detected: {line}"));
         }
 
         let status = if mock_count == 0 || fix_lines.len() >= mock_count {
             QualityGateStatus::Pass
-        } else if fix_lines.len() > 0 {
+        } else if !fix_lines.is_empty() {
             QualityGateStatus::Warning
         } else {
             QualityGateStatus::Fail
@@ -301,7 +319,11 @@ impl QualityGate for MockResponseGate {
         Ok(GateResult {
             status,
             score,
-            message: format!("Mock responses: {} found, {} security fixes applied", mock_count, fix_lines.len()),
+            message: format!(
+                "Mock responses: {} found, {} security fixes applied",
+                mock_count,
+                fix_lines.len()
+            ),
             details: violations,
         })
     }
@@ -311,13 +333,17 @@ impl QualityGate for MockResponseGate {
 pub(super) struct ProductionReadinessGate;
 
 impl QualityGate for ProductionReadinessGate {
-    fn name(&self) -> &str { "ProductionReadiness" }
+    fn name(&self) -> &str {
+        "ProductionReadiness"
+    }
 
     fn description(&self) -> &str {
         "Validates production-ready implementations"
     }
 
-    fn is_blocking(&self) -> bool { false }
+    fn is_blocking(&self) -> bool {
+        false
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::process::Command;
@@ -356,17 +382,25 @@ impl QualityGate for ProductionReadinessGate {
         let mut score = 0.0;
 
         if production_count >= 10 {
-            details.push(format!("OK: {} production-ready implementations found", production_count));
+            details.push(format!(
+                "OK: {production_count} production-ready implementations found"
+            ));
             score += 0.5;
         } else {
-            details.push(format!("WARNING: Only {} production implementations found", production_count));
+            details.push(format!(
+                "WARNING: Only {production_count} production implementations found"
+            ));
         }
 
         if error_handling_count >= 50 {
-            details.push(format!("OK: {} proper error handling implementations found", error_handling_count));
+            details.push(format!(
+                "OK: {error_handling_count} proper error handling implementations found"
+            ));
             score += 0.5;
         } else {
-            details.push(format!("WARNING: Only {} error handling implementations found", error_handling_count));
+            details.push(format!(
+                "WARNING: Only {error_handling_count} error handling implementations found"
+            ));
         }
 
         let status = if score >= 0.8 {
@@ -390,20 +424,24 @@ impl QualityGate for ProductionReadinessGate {
 pub(super) struct DNSInfrastructureGate;
 
 impl QualityGate for DNSInfrastructureGate {
-    fn name(&self) -> &str { "DNSInfrastructure" }
+    fn name(&self) -> &str {
+        "DNSInfrastructure"
+    }
 
     fn description(&self) -> &str {
         "Validates DNS infrastructure replaces localhost stubs"
     }
 
-    fn is_blocking(&self) -> bool { true }
+    fn is_blocking(&self) -> bool {
+        true
+    }
 
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::fs;
 
         let dns_files = [
-            format!("{}/src/dns/authoritative_server.rs", source_path),
-            format!("{}/src/dns/production_zones.rs", source_path),
+            format!("{source_path}/src/dns/authoritative_server.rs"),
+            format!("{source_path}/src/dns/production_zones.rs"),
         ];
 
         let mut details = Vec::new();
@@ -417,16 +455,24 @@ impl QualityGate for DNSInfrastructureGate {
                 let content = fs::read_to_string(file_path)?;
 
                 if content.contains("localhost") && !content.contains("replacing localhost stubs") {
-                    details.push(format!("VIOLATION: {} still contains localhost stubs", file_path));
-                } else if content.contains("trust.hypermesh.online") && content.contains("production") {
-                    details.push(format!("OK: {} has production DNS infrastructure", file_path));
+                    details.push(format!(
+                        "VIOLATION: {file_path} still contains localhost stubs"
+                    ));
+                } else if content.contains("trust.hypermesh.online")
+                    && content.contains("production")
+                {
+                    details.push(format!("OK: {file_path} has production DNS infrastructure"));
                     score += 0.4;
                 } else {
-                    details.push(format!("WARNING: {} needs production DNS configuration", file_path));
+                    details.push(format!(
+                        "WARNING: {file_path} needs production DNS configuration"
+                    ));
                     score += 0.1;
                 }
             } else {
-                details.push(format!("VIOLATION: Missing DNS infrastructure file: {}", file_path));
+                details.push(format!(
+                    "VIOLATION: Missing DNS infrastructure file: {file_path}"
+                ));
             }
         }
 
@@ -445,7 +491,11 @@ impl QualityGate for DNSInfrastructureGate {
         Ok(GateResult {
             status,
             score,
-            message: format!("DNS infrastructure: {}/{} files implemented", files_found, dns_files.len()),
+            message: format!(
+                "DNS infrastructure: {}/{} files implemented",
+                files_found,
+                dns_files.len()
+            ),
             details,
         })
     }

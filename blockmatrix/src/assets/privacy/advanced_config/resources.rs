@@ -6,23 +6,22 @@
 //!
 //! Configuration for resource-specific privacy settings and allocation optimization.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
-
 
 /// Resource privacy settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ResourcePrivacySettings {
     /// Default resource privacy level
     pub default_privacy_level: String,
-    
+
     /// Per-resource-type settings
     pub per_type_settings: HashMap<String, ResourceTypePrivacySettings>,
-    
+
     /// Resource grouping settings
     pub grouping_settings: ResourceGroupingSettings,
-    
+
     /// Resource allocation optimization
     pub allocation_optimization: ResourceAllocationOptimization,
 }
@@ -32,13 +31,13 @@ pub struct ResourcePrivacySettings {
 pub struct ResourceTypePrivacySettings {
     /// Privacy level for this resource type
     pub privacy_level: String,
-    
+
     /// Privacy rules
     pub privacy_rules: Vec<ResourcePrivacyRule>,
-    
+
     /// Performance settings
     pub performance_settings: ResourcePerformanceSettings,
-    
+
     /// Quality of service settings
     pub qos_settings: QualityOfServiceSettings,
 }
@@ -48,16 +47,16 @@ pub struct ResourceTypePrivacySettings {
 pub struct ResourcePrivacyRule {
     /// Rule name
     pub name: String,
-    
+
     /// Rule condition
     pub condition: ResourceRuleCondition,
-    
+
     /// Rule action
     pub action: ResourceRuleAction,
-    
+
     /// Rule priority
     pub priority: u32,
-    
+
     /// Rule enabled
     pub enabled: bool,
 }
@@ -87,13 +86,13 @@ pub enum ResourceRuleAction {
 pub struct ResourcePerformanceSettings {
     /// Performance priority
     pub priority: PerformancePriority,
-    
+
     /// Resource limits
     pub limits: HashMap<String, String>,
-    
+
     /// Monitoring settings
     pub monitoring: PerformanceMonitoringSettings,
-    
+
     /// Optimization preferences
     pub optimization_preferences: Vec<String>,
 }
@@ -112,13 +111,13 @@ pub enum PerformancePriority {
 pub struct QualityOfServiceSettings {
     /// Minimum QoS guarantees
     pub min_guarantees: HashMap<String, f32>,
-    
+
     /// Maximum allowed latency
     pub max_latency: Duration,
-    
+
     /// Bandwidth requirements
     pub bandwidth_requirements: HashMap<String, u64>,
-    
+
     /// Reliability requirements
     pub reliability_requirements: f32,
 }
@@ -128,13 +127,13 @@ pub struct QualityOfServiceSettings {
 pub struct PerformanceMonitoringSettings {
     /// Enable monitoring
     pub enabled: bool,
-    
+
     /// Monitoring frequency
     pub frequency: Duration,
-    
+
     /// Metrics to collect
     pub metrics: Vec<PerformanceMetric>,
-    
+
     /// Alert thresholds
     pub alert_thresholds: HashMap<String, f32>,
 }
@@ -154,10 +153,10 @@ pub enum PerformanceMetric {
 pub struct ResourceGroupingSettings {
     /// Grouping strategy
     pub strategy: ResourceGroupingStrategy,
-    
+
     /// Group policies
     pub group_policies: Vec<ResourceGroupPolicy>,
-    
+
     /// Cross-resource policies
     pub cross_resource_policies: Vec<CrossResourcePolicy>,
 }
@@ -177,13 +176,13 @@ pub enum ResourceGroupingStrategy {
 pub struct ResourceGroupPolicy {
     /// Policy name
     pub name: String,
-    
+
     /// Group criteria
     pub criteria: HashMap<String, String>,
-    
+
     /// Policy inheritance
     pub inheritance: PolicyInheritance,
-    
+
     /// Policy priority
     pub priority: u32,
 }
@@ -202,13 +201,13 @@ pub enum PolicyInheritance {
 pub struct CrossResourcePolicy {
     /// Policy name
     pub name: String,
-    
+
     /// Resource types affected
     pub resource_types: Vec<String>,
-    
+
     /// Policy conditions
     pub conditions: Vec<CrossResourceCondition>,
-    
+
     /// Policy actions
     pub actions: Vec<CrossResourceAction>,
 }
@@ -236,13 +235,13 @@ pub enum CrossResourceAction {
 pub struct ResourceAllocationOptimization {
     /// Enable optimization
     pub enabled: bool,
-    
+
     /// Optimization objectives
     pub objectives: Vec<OptimizationObjective>,
-    
+
     /// Optimization constraints
     pub constraints: Vec<OptimizationConstraint>,
-    
+
     /// Optimization frequency
     pub frequency: Duration,
 }
@@ -262,13 +261,13 @@ pub enum OptimizationObjective {
 pub struct OptimizationConstraint {
     /// Constraint type
     pub constraint_type: String,
-    
+
     /// Constraint value
     pub value: f32,
-    
+
     /// Constraint priority
     pub priority: u32,
-    
+
     /// Soft vs hard constraint
     pub hard_constraint: bool,
 }

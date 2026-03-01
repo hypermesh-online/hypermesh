@@ -149,11 +149,7 @@ impl AuthManager {
     ///
     /// * `Anonymous` privacy mode skips authentication entirely.
     /// * `Private` / `Public` modes derive identity from the connection ID.
-    pub fn authenticate_stoq(
-        &self,
-        privacy_mode: PrivacyMode,
-        connection_id: &str,
-    ) -> AuthResult {
+    pub fn authenticate_stoq(&self, privacy_mode: PrivacyMode, connection_id: &str) -> AuthResult {
         self.stats.total_attempts.fetch_add(1, Ordering::Relaxed);
 
         if privacy_mode == PrivacyMode::ANONYMOUS {
@@ -164,18 +160,13 @@ impl AuthManager {
         // For Private/Public the STOQ handshake itself serves as identity
         self.stats.successful.fetch_add(1, Ordering::Relaxed);
         AuthResult::Authenticated {
-            identity: format!("stoq:{}", connection_id),
+            identity: format!("stoq:{connection_id}"),
             privacy_mode,
         }
     }
 
     /// Register an authenticated session that can be looked up by token.
-    pub fn register_session(
-        &self,
-        token: String,
-        identity: String,
-        privacy_mode: PrivacyMode,
-    ) {
+    pub fn register_session(&self, token: String, identity: String, privacy_mode: PrivacyMode) {
         debug!(identity = %identity, "Registering auth session");
         self.sessions.insert(
             token,
@@ -217,10 +208,7 @@ impl AuthManager {
     pub fn is_exempt_path(path: &str) -> bool {
         matches!(
             path,
-            "/health"
-                | "/bootstrap"
-                | "/.well-known/acme-challenge"
-                | "/favicon.ico"
+            "/health" | "/bootstrap" | "/.well-known/acme-challenge" | "/favicon.ico"
         )
     }
 
@@ -243,7 +231,7 @@ impl AuthManager {
                 self.stats.successful.fetch_add(1, Ordering::Relaxed);
                 let truncated = &token[..8.min(token.len())];
                 return AuthResult::Authenticated {
-                    identity: format!("bootstrap:{}", truncated),
+                    identity: format!("bootstrap:{truncated}"),
                     privacy_mode: PrivacyMode::PUBLIC,
                 };
             }
@@ -333,11 +321,7 @@ mod tests {
     #[test]
     fn http3_session_token_authenticates() {
         let mgr = AuthManager::new(None);
-        mgr.register_session(
-            "tok-123".into(),
-            "alice".into(),
-            PrivacyMode::PUBLIC,
-        );
+        mgr.register_session("tok-123".into(), "alice".into(), PrivacyMode::PUBLIC);
 
         let mut headers = http::HeaderMap::new();
         headers.insert(
@@ -367,7 +351,7 @@ mod tests {
 
         let mgr = AuthManager::new(Some(handler));
         let mut headers = http::HeaderMap::new();
-        let val = format!("Bearer {}", token);
+        let val = format!("Bearer {token}");
         headers.insert(
             "authorization",
             http::HeaderValue::from_str(&val).expect("test: valid header"),
@@ -433,11 +417,7 @@ mod tests {
     #[test]
     fn register_and_lookup_session() {
         let mgr = AuthManager::new(None);
-        mgr.register_session(
-            "s-1".into(),
-            "bob".into(),
-            PrivacyMode::PRIVATE,
-        );
+        mgr.register_session("s-1".into(), "bob".into(), PrivacyMode::PRIVATE);
 
         let mut headers = http::HeaderMap::new();
         headers.insert(
@@ -451,11 +431,7 @@ mod tests {
     #[test]
     fn cleanup_removes_expired_sessions() {
         let mgr = AuthManager::new(None);
-        mgr.register_session(
-            "old-tok".into(),
-            "eve".into(),
-            PrivacyMode::PUBLIC,
-        );
+        mgr.register_session("old-tok".into(), "eve".into(), PrivacyMode::PUBLIC);
 
         // Sleep briefly so the session ages past 0ms
         std::thread::sleep(Duration::from_millis(10));
@@ -467,11 +443,7 @@ mod tests {
     #[test]
     fn cleanup_retains_fresh_sessions() {
         let mgr = AuthManager::new(None);
-        mgr.register_session(
-            "fresh-tok".into(),
-            "carol".into(),
-            PrivacyMode::PUBLIC,
-        );
+        mgr.register_session("fresh-tok".into(), "carol".into(), PrivacyMode::PUBLIC);
 
         let removed = mgr.cleanup_sessions(Duration::from_secs(3600));
         assert_eq!(removed, 0, "fresh session should be retained");

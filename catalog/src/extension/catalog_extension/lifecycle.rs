@@ -9,19 +9,20 @@
 
 use async_trait::async_trait;
 // BLAKE3 used via blake3::hash() for domain and package hashes
+use semver::Version;
 use std::collections::HashMap;
 use std::sync::Arc;
-use semver::Version;
 
 use blockmatrix::extensions::{
-    AssetLibraryExtension, ExtensionResult, ExtensionError,
-    AssetPackage, PackageFilter, InstallOptions, InstallResult,
-    UpdateResult, SearchOptions, AssetPackageSpec, PublishResult, VerificationResult,
-    ResourceUsageReport, SecurityIssue,
+    AssetLibraryExtension, AssetPackage, AssetPackageSpec, ExtensionError, ExtensionResult,
+    InstallOptions, InstallResult, PackageFilter, PublishResult, ResourceUsageReport,
+    SearchOptions, SecurityIssue, UpdateResult, VerificationResult,
 };
 
-use blockmatrix::assets::core::{AssetType, AssetRegistration, AssetData, NetworkScope, AssetCategory};
 use blockmatrix::assets::core::ApplicationDomain;
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, AssetType, NetworkScope,
+};
 
 use super::types::CatalogExtension;
 
@@ -77,8 +78,12 @@ impl AssetLibraryExtension for CatalogExtension {
             // the package metadata. The proof is validated at publish time; for installs,
             // we check if the package's security metadata requires consensus and log
             // that validation is deferred to the execution layer.
-            let package_preview = self.library_manager.read().await
-                .get_package(package_id).await;
+            let package_preview = self
+                .library_manager
+                .read()
+                .await
+                .get_package(package_id)
+                .await;
             if let Some(pkg) = package_preview {
                 if let Some(ref spec) = pkg.spec {
                     if spec.security.consensus_required {
@@ -94,23 +99,27 @@ impl AssetLibraryExtension for CatalogExtension {
 
         let library_manager = self.library_manager.read().await;
 
-        let package = library_manager.get_package(package_id).await
+        let package = library_manager
+            .get_package(package_id)
+            .await
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Package not found: {}", package_id)
+                message: format!("Package not found: {package_id}"),
             })?;
 
         let start = std::time::Instant::now();
 
-        library_manager.install_package((*package).clone()).await
+        library_manager
+            .install_package((*package).clone())
+            .await
             .map_err(|e| ExtensionError::RuntimeError {
-                message: format!("Failed to install package: {}", e)
+                message: format!("Failed to install package: {e}"),
             })?;
 
         let install_duration = start.elapsed();
 
-        let installed_asset_ids: Vec<AssetRegistration> = vec![
-            AssetRegistration::from_hex_string(package_id)
-                .unwrap_or_else(|_| {
+        let installed_asset_ids: Vec<AssetRegistration> =
+            vec![
+                AssetRegistration::from_hex_string(package_id).unwrap_or_else(|_| {
                     let asset_data = AssetData {
                         config: package_id.as_bytes().to_vec(),
                         definition: b"catalog_package".to_vec(),
@@ -124,8 +133,8 @@ impl AssetLibraryExtension for CatalogExtension {
                             domain_hash: *blake3::hash(b"catalog").as_bytes(),
                         }),
                     )
-                })
-        ];
+                }),
+            ];
 
         let result = InstallResult {
             package_id: package_id.to_string(),
@@ -139,7 +148,8 @@ impl AssetLibraryExtension for CatalogExtension {
             memory_usage: result.installed_assets.len() as u64 * 1024,
             network_bytes: 1024 * 1024,
             storage_bytes: 1024 * 1024,
-        }).await;
+        })
+        .await;
 
         self.complete_operation().await;
         Ok(result)
@@ -150,9 +160,11 @@ impl AssetLibraryExtension for CatalogExtension {
         self.start_operation().await;
 
         let library_manager = self.library_manager.read().await;
-        library_manager.uninstall_package(package_id).await
+        library_manager
+            .uninstall_package(package_id)
+            .await
             .map_err(|e| ExtensionError::RuntimeError {
-                message: format!("Failed to uninstall package: {}", e)
+                message: format!("Failed to uninstall package: {e}"),
             })?;
 
         self.complete_operation().await;
@@ -169,9 +181,11 @@ impl AssetLibraryExtension for CatalogExtension {
 
         let library_manager = self.library_manager.read().await;
 
-        let package = library_manager.get_package(package_id).await
+        let package = library_manager
+            .get_package(package_id)
+            .await
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Package not found: {}", package_id)
+                message: format!("Package not found: {package_id}"),
             })?;
 
         let mut updated_package = (*package).clone();
@@ -181,9 +195,11 @@ impl AssetLibraryExtension for CatalogExtension {
 
         let start = std::time::Instant::now();
 
-        library_manager.update_package(updated_package.clone()).await
+        library_manager
+            .update_package(updated_package.clone())
+            .await
             .map_err(|e| ExtensionError::RuntimeError {
-                message: format!("Failed to update package: {}", e)
+                message: format!("Failed to update package: {e}"),
             })?;
 
         let update_duration = start.elapsed();
@@ -229,7 +245,8 @@ impl AssetLibraryExtension for CatalogExtension {
             if !proof.validate() {
                 self.complete_operation().await;
                 return Err(ExtensionError::RuntimeError {
-                    message: "Proof of State validation failed: insufficient proof of state".to_string(),
+                    message: "Proof of State validation failed: insufficient proof of state"
+                        .to_string(),
                 });
             }
 
@@ -273,9 +290,11 @@ impl AssetLibraryExtension for CatalogExtension {
 
         let start = std::time::Instant::now();
 
-        library_manager.publish_package(lib_package.clone()).await
+        library_manager
+            .publish_package(lib_package.clone())
+            .await
             .map_err(|e| ExtensionError::RuntimeError {
-                message: format!("Failed to publish package: {}", e)
+                message: format!("Failed to publish package: {e}"),
             })?;
 
         let _publish_duration = start.elapsed();
@@ -297,9 +316,11 @@ impl AssetLibraryExtension for CatalogExtension {
         self.start_operation().await;
 
         let library_manager = self.library_manager.read().await;
-        let is_valid = library_manager.verify_package(package_id).await
+        let is_valid = library_manager
+            .verify_package(package_id)
+            .await
             .map_err(|e| ExtensionError::RuntimeError {
-                message: format!("Verification failed: {}", e)
+                message: format!("Verification failed: {e}"),
             })?;
 
         let result = VerificationResult {

@@ -8,17 +8,17 @@
 //! communication. StoqTransport manages connection pooling, FALCON crypto,
 //! adaptive optimization, and bidirectional streams internally.
 
-use anyhow::{Result, Context};
-use std::sync::Arc;
-use std::net::{SocketAddr, Ipv6Addr};
-use tokio::sync::{RwLock, mpsc};
-use serde::{Serialize, Deserialize};
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::{Ipv6Addr, SocketAddr};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{mpsc, RwLock};
 
-use crate::assets::AssetPackageId;
-use super::{DistributionConfig, PackageManager};
 use super::dht::DhtNodeId;
+use super::{DistributionConfig, PackageManager};
+use crate::assets::AssetPackageId;
 
 /// STOQ transport layer for P2P communication.
 ///
@@ -204,19 +204,21 @@ impl StoqTransportLayer {
     /// FALCON quantum-resistant crypto, and adaptive optimization.
     pub async fn new(dist_config: DistributionConfig) -> Result<Self> {
         // Build real STOQ TransportConfig from distribution settings
-        let mut stoq_config = stoq::TransportConfig::default();
-        stoq_config.bind_address = Ipv6Addr::UNSPECIFIED;
-        stoq_config.port = stoq::DEFAULT_PORT;
-        stoq_config.max_connections = Some(dist_config.max_concurrent_transfers as u32);
-        // 0-RTT disabled by default in STOQ for security (replay attack risk)
-        stoq_config.enable_0rtt = false;
-        stoq_config.enable_migration = true;
+        let stoq_config = stoq::TransportConfig {
+            bind_address: Ipv6Addr::UNSPECIFIED,
+            port: stoq::DEFAULT_PORT,
+            max_connections: Some(dist_config.max_concurrent_transfers as u32),
+            // 0-RTT disabled by default in STOQ for security (replay attack risk)
+            enable_0rtt: false,
+            enable_migration: true,
+            ..Default::default()
+        };
 
         // Create real STOQ transport (manages quinn endpoint internally)
         let transport = Arc::new(
             stoq::StoqTransport::new(stoq_config)
                 .await
-                .context("Failed to create STOQ transport")?
+                .context("Failed to create STOQ transport")?,
         );
 
         // Create transport layer configuration
@@ -263,15 +265,15 @@ impl StoqTransportLayer {
             SocketAddr::V6(v6) => *v6.ip(),
             SocketAddr::V4(_) => {
                 return Err(anyhow::anyhow!(
-                    "STOQ requires IPv6 addresses, got IPv4: {}",
-                    peer_addr
+                    "STOQ requires IPv6 addresses, got IPv4: {peer_addr}"
                 ));
             }
         };
         let stoq_endpoint = stoq::Endpoint::new(ipv6_addr, peer_addr.port());
 
         // Connect using real STOQ transport (handles TLS, pooling, crypto)
-        let connection = self.transport
+        let connection = self
+            .transport
             .connect(&stoq_endpoint)
             .await
             .context("Failed to connect to peer via STOQ")?;
@@ -286,7 +288,9 @@ impl StoqTransportLayer {
         }
 
         // Add to connection pool
-        self.connection_pool.add_connection(node_id.clone(), connection).await?;
+        self.connection_pool
+            .add_connection(node_id.clone(), connection)
+            .await?;
 
         Ok(node_id)
     }
@@ -311,14 +315,16 @@ impl StoqTransportLayer {
 
         // Apply bandwidth limiting for upload
         let request_data = bincode::serialize(&request)?;
-        self.bandwidth_manager.limit_upload(request_data.len()).await?;
+        self.bandwidth_manager
+            .limit_upload(request_data.len())
+            .await?;
 
         // Send request (quinn::SendStream implements AsyncWrite via tokio)
-        send.write_all(&request_data).await
+        send.write_all(&request_data)
+            .await
             .context("Failed to write request data")?;
         // Signal end of request by finishing the send stream
-        send.finish()
-            .context("Failed to finish send stream")?;
+        send.finish().context("Failed to finish send stream")?;
 
         // Receive response (quinn::RecvStream implements AsyncRead)
         let response_data = recv
@@ -327,7 +333,9 @@ impl StoqTransportLayer {
             .context("Failed to read response data")?;
 
         // Apply bandwidth limiting for download
-        self.bandwidth_manager.limit_download(response_data.len()).await?;
+        self.bandwidth_manager
+            .limit_download(response_data.len())
+            .await?;
 
         // Deserialize response
         let response: ResponseData = bincode::deserialize(&response_data)?;
@@ -361,11 +369,7 @@ impl StoqTransportLayer {
 
                 // Handle each connection in its own task
                 let pm = package_manager.clone();
-                tokio::spawn(Self::handle_connection(
-                    connection,
-                    package_id,
-                    pm,
-                ));
+                tokio::spawn(Self::handle_connection(connection, package_id, pm));
             }
         });
 
@@ -405,11 +409,8 @@ impl StoqTransportLayer {
                     };
 
                     // Handle request
-                    let response = Self::handle_request(
-                        request,
-                        package_id,
-                        package_manager.clone(),
-                    ).await;
+                    let response =
+                        Self::handle_request(request, package_id, package_manager.clone()).await;
 
                     // Send response via quinn::SendStream (implements AsyncWrite)
                     let response_data = match bincode::serialize(&response) {
@@ -451,7 +452,10 @@ impl StoqTransportLayer {
                     Err(e) => ResponseData::Error(e.to_string()),
                 }
             }
-            RequestType::GetChunk { package_id: req_id, chunk_index } => {
+            RequestType::GetChunk {
+                package_id: req_id,
+                chunk_index,
+            } => {
                 if req_id != package_id {
                     return ResponseData::Error("Package not found".to_string());
                 }
@@ -461,7 +465,10 @@ impl StoqTransportLayer {
                     Err(e) => ResponseData::Error(e.to_string()),
                 }
             }
-            RequestType::GetChunks { package_id: req_id, chunk_indices } => {
+            RequestType::GetChunks {
+                package_id: req_id,
+                chunk_indices,
+            } => {
                 if req_id != package_id {
                     return ResponseData::Error("Package not found".to_string());
                 }
@@ -471,7 +478,9 @@ impl StoqTransportLayer {
                     match package_manager.get_chunk(&package_id, index).await {
                         Ok(chunk) => chunks.push(chunk),
                         Err(e) => {
-                            return ResponseData::Error(format!("Failed to get chunk {}: {}", index, e));
+                            return ResponseData::Error(format!(
+                                "Failed to get chunk {index}: {e}"
+                            ));
                         }
                     }
                 }
@@ -489,7 +498,7 @@ impl StoqTransportLayer {
         connections
             .get(peer_id)
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Not connected to peer {}", peer_id))
+            .ok_or_else(|| anyhow::anyhow!("Not connected to peer {peer_id}"))
     }
 
     /// Disconnect from a peer by closing the STOQ connection.
@@ -510,7 +519,11 @@ impl StoqTransportLayer {
 
 impl ConnectionPool {
     /// Add a connection to the pool
-    async fn add_connection(&self, node_id: DhtNodeId, connection: Arc<stoq::Connection>) -> Result<()> {
+    async fn add_connection(
+        &self,
+        node_id: DhtNodeId,
+        connection: Arc<stoq::Connection>,
+    ) -> Result<()> {
         let mut pools = self.pools.write().await;
         let pool = pools.entry(node_id).or_insert_with(Vec::new);
 
@@ -551,10 +564,8 @@ impl BandwidthManager {
         limiter.consume(bytes as u64).await?;
 
         // Update current rate
-        self.current_upload_rate.fetch_add(
-            bytes as u64,
-            std::sync::atomic::Ordering::Relaxed,
-        );
+        self.current_upload_rate
+            .fetch_add(bytes as u64, std::sync::atomic::Ordering::Relaxed);
 
         Ok(())
     }
@@ -565,22 +576,22 @@ impl BandwidthManager {
         limiter.consume(bytes as u64).await?;
 
         // Update current rate
-        self.current_download_rate.fetch_add(
-            bytes as u64,
-            std::sync::atomic::Ordering::Relaxed,
-        );
+        self.current_download_rate
+            .fetch_add(bytes as u64, std::sync::atomic::Ordering::Relaxed);
 
         Ok(())
     }
 
     /// Get current upload rate
     pub fn get_upload_rate(&self) -> u64 {
-        self.current_upload_rate.load(std::sync::atomic::Ordering::Relaxed)
+        self.current_upload_rate
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Get current download rate
     pub fn get_download_rate(&self) -> u64 {
-        self.current_download_rate.load(std::sync::atomic::Ordering::Relaxed)
+        self.current_download_rate
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

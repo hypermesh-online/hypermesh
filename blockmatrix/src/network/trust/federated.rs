@@ -7,17 +7,16 @@
 //! Core Principle: Federation gateway acts as trust anchor for that specific federation.
 //! Examples: bank.internal, hospital.federation, government.fed
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use anyhow::{Result, anyhow};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
-    StoqTransport, PeerInfo, AssetRequest, AssetResponse, Certificate, PeerId,
-    request_federation_membership, new_random_network_id,
+    new_random_network_id, request_federation_membership, AssetRequest, AssetResponse, Certificate,
+    NetworkConfig, NetworkConnection, NetworkHandler, NetworkType, PeerId, PeerInfo, StoqTransport,
 };
 
 /// Federated network handler - federation-specific trust anchor
@@ -65,7 +64,11 @@ impl FederatedNetworkHandler {
     }
 
     /// Join a specific federation
-    async fn join_federation(&self, gateway_url: &str, stoq: &Arc<StoqTransport>) -> Result<Certificate> {
+    async fn join_federation(
+        &self,
+        gateway_url: &str,
+        stoq: &Arc<StoqTransport>,
+    ) -> Result<Certificate> {
         info!("Joining federation at: {}", gateway_url);
 
         // Request membership from federation gateway
@@ -88,7 +91,7 @@ impl FederatedNetworkHandler {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_secs()
+                .as_secs(),
         );
 
         info!("Successfully joined federation: {}", gateway_url);
@@ -105,7 +108,7 @@ impl FederatedNetworkHandler {
 
         // Placeholder member discovery
         for i in 0..3 {
-            let member_id = PeerId::new(format!("federation-member-{}", i));
+            let member_id = PeerId::new(format!("federation-member-{i}"));
             members.insert(member_id);
         }
 
@@ -129,13 +132,14 @@ impl NetworkHandler for FederatedNetworkHandler {
     async fn bootstrap(&self, config: NetworkConfig) -> Result<NetworkConnection> {
         info!("Bootstrapping federated network connection");
 
-        let gateway_url = config.federation_gateway
+        let gateway_url = config
+            .federation_gateway
             .ok_or_else(|| anyhow!("Federation gateway URL required for federated mode"))?;
 
         // Create STOQ transport for this federation
-        let stoq = StoqTransport::new_for_network(
-            NetworkType::Federated { gateway_url: gateway_url.clone() }
-        )?;
+        let stoq = StoqTransport::new_for_network(NetworkType::Federated {
+            gateway_url: gateway_url.clone(),
+        })?;
 
         // Store the gateway URL
         *self.federation_gateway.write().await = gateway_url.clone();
@@ -161,7 +165,10 @@ impl NetworkHandler for FederatedNetworkHandler {
         *self.connection.write().await = Some(connection_ref);
 
         let member_count = self.federation_members.read().await.len();
-        info!("Federated network bootstrapped with {} members", member_count);
+        info!(
+            "Federated network bootstrapped with {} members",
+            member_count
+        );
         Ok(connection)
     }
 
@@ -174,7 +181,7 @@ impl NetworkHandler for FederatedNetworkHandler {
             return Err(anyhow!("No federation certificate - bootstrap first"));
         }
 
-        let cert = cert_opt.as_ref().unwrap();
+        let cert = cert_opt.as_ref().expect("certificate existence checked above");
         if cert.is_expired() {
             return Err(anyhow!("Federation certificate expired"));
         }
@@ -193,7 +200,10 @@ impl NetworkHandler for FederatedNetworkHandler {
             NetworkType::Federated { gateway_url } => {
                 // Must be same federation
                 if gateway_url != our_gateway.as_str() {
-                    warn!("Peer {} is in different federation: {}", peer.peer_id, gateway_url);
+                    warn!(
+                        "Peer {} is in different federation: {}",
+                        peer.peer_id, gateway_url
+                    );
                     return Ok(false);
                 }
             }
@@ -234,18 +244,19 @@ impl NetworkHandler for FederatedNetworkHandler {
 
         let response = AssetResponse {
             asset_id: request.asset_id.clone(),
-            data: if authorized {
-                None // Would fetch actual data
-            } else {
-                None
-            },
+            data: None, // Would fetch actual data when authorized
             authorized,
             metadata: {
                 let mut meta = std::collections::HashMap::new();
                 meta.insert("network".to_string(), "federated".to_string());
-                meta.insert("federation".to_string(), self.federation_gateway.read().await.clone());
-                meta.insert("member_count".to_string(),
-                    self.federation_members.read().await.len().to_string());
+                meta.insert(
+                    "federation".to_string(),
+                    self.federation_gateway.read().await.clone(),
+                );
+                meta.insert(
+                    "member_count".to_string(),
+                    self.federation_members.read().await.len().to_string(),
+                );
                 if let Some(peer_id) = &request.peer_id {
                     meta.insert("peer".to_string(), peer_id.to_string());
                 }
@@ -265,7 +276,8 @@ impl NetworkHandler for FederatedNetworkHandler {
             let duration = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_secs() - joined_at;
+                .as_secs()
+                - joined_at;
             info!(
                 "Federation session ended - Federation: {}, Duration: {}s, Members: {}",
                 info.name, duration, info.member_count
@@ -283,7 +295,7 @@ impl NetworkHandler for FederatedNetworkHandler {
         // Note: This is synchronous so we can't await. We'll need to store a cached value
         // For now, return a placeholder
         NetworkType::Federated {
-            gateway_url: String::from("federation")
+            gateway_url: String::from("federation"),
         }
     }
 }
@@ -303,7 +315,7 @@ mod tests {
         let handler = FederatedNetworkHandler::new();
         let config = NetworkConfig {
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
             peer_addresses: vec![],
             federation_gateway: Some("bank.internal".to_string()),
@@ -311,7 +323,7 @@ mod tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
         match connection.network_type {
             NetworkType::Federated { gateway_url } => {
                 assert_eq!(gateway_url, "bank.internal");
@@ -335,7 +347,7 @@ mod tests {
             fingerprint: "test".to_string(),
             expires_at: u64::MAX,
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
             blockchain_registered: false,
         };
@@ -346,10 +358,10 @@ mod tests {
             address: "127.0.0.1:8080".to_string(),
             certificate: Some(valid_cert),
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
         };
-        assert!(handler.validate_peer(&valid_peer).await.unwrap());
+        assert!(handler.validate_peer(&valid_peer).await.expect("test: async operation"));
 
         // Different federation
         let different_cert = Certificate {
@@ -360,7 +372,7 @@ mod tests {
             fingerprint: "test2".to_string(),
             expires_at: u64::MAX,
             network_type: NetworkType::Federated {
-                gateway_url: "hospital.federation".to_string()
+                gateway_url: "hospital.federation".to_string(),
             },
             blockchain_registered: false,
         };
@@ -370,10 +382,10 @@ mod tests {
             address: "127.0.0.1:8081".to_string(),
             certificate: Some(different_cert),
             network_type: NetworkType::Federated {
-                gateway_url: "hospital.federation".to_string()
+                gateway_url: "hospital.federation".to_string(),
             },
         };
-        assert!(!handler.validate_peer(&different_peer).await.unwrap());
+        assert!(!handler.validate_peer(&different_peer).await.expect("test: async operation"));
     }
 
     #[tokio::test]
@@ -381,7 +393,7 @@ mod tests {
         let handler = FederatedNetworkHandler::new();
         let config = NetworkConfig {
             network_type: NetworkType::Federated {
-                gateway_url: "bank.internal".to_string()
+                gateway_url: "bank.internal".to_string(),
             },
             peer_addresses: vec![],
             federation_gateway: None, // Missing gateway
@@ -391,6 +403,9 @@ mod tests {
 
         let result = handler.bootstrap(config).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("gateway URL required"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("gateway URL required"));
     }
 }

@@ -167,8 +167,7 @@ mod tests {
         };
 
         let chain_head = [0x01; 32];
-        let challenge_response =
-            compute_challenge_response(&request.challenge_nonce, &chain_head);
+        let challenge_response = compute_challenge_response(&request.challenge_nonce, &chain_head);
 
         let response = PoSPingResponse {
             chain_head_hash: chain_head,
@@ -241,10 +240,7 @@ mod tests {
 
     #[test]
     fn aggregate_all_inconsistent() {
-        let results = vec![
-            make_result(false, 5000, 1),
-            make_result(false, 3000, 1),
-        ];
+        let results = vec![make_result(false, 5000, 1), make_result(false, 3000, 1)];
         let agg = aggregate_epoch_results(&results);
         assert_eq!(agg.probes_sent, 2);
         assert_eq!(agg.probes_passed, 0);

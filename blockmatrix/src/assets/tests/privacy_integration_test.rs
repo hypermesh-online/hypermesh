@@ -64,7 +64,7 @@ async fn test_privacy_allocation_workflow() {
     };
     
     // Create privacy manager
-    let privacy_manager = PrivacyManager::new(manager_config, None).await.unwrap();
+    let privacy_manager = PrivacyManager::new(manager_config, None).await.expect("test: async operation");
     
     // Create user privacy configuration
     let user_config = UserPrivacyConfiguration {
@@ -122,7 +122,7 @@ async fn test_privacy_allocation_workflow() {
     };
     
     // Register user configuration
-    privacy_manager.register_user_config("test-user-123".to_string(), user_config).await.unwrap();
+    privacy_manager.register_user_config("test-user-123".to_string(), user_config).await.expect("test: async operation");
     
     // Create test asset
     let asset_id = AssetRegistration::new(AssetType::Cpu);
@@ -170,7 +170,7 @@ async fn test_privacy_allocation_workflow() {
         &asset_id,
         Some(PrivacyMode::PUBLIC), // Override default
         Some(consensus_proof),
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     // Verify allocation result
     assert_eq!(allocation_result.asset_id, asset_id);
@@ -196,7 +196,7 @@ async fn test_privacy_allocation_workflow() {
         &allocation_result.allocation_id,
         "test-user-123",
         "read",
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert!(access_allowed, "User should have access to their own allocation");
     
@@ -205,7 +205,7 @@ async fn test_privacy_allocation_workflow() {
         &allocation_result.allocation_id,
         "unauthorized-user",
         "read",
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert!(!access_denied, "Unauthorized user should be denied access");
     
@@ -294,7 +294,7 @@ async fn test_caesar_reward_calculation() {
         },
     };
     
-    let reward_calculator = CaesarRewardCalculator::new(&base_config).await.unwrap();
+    let reward_calculator = CaesarRewardCalculator::new(&base_config).await.expect("test: async operation");
     
     // Test reward calculation for different privacy levels
     let resource_config = super::ResourceAllocationConfig::default();
@@ -316,7 +316,7 @@ async fn test_caesar_reward_calculation() {
         &PrivacyMode::PUBLIC,
         &resource_config,
         &user_preferences,
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert_eq!(full_public_config.privacy_multiplier, 1.0);
     assert!(full_public_config.base_reward_rate > 0.0);
@@ -326,7 +326,7 @@ async fn test_caesar_reward_calculation() {
         &PrivacyMode::PRIVATE,
         &resource_config,
         &user_preferences,
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert_eq!(private_config.privacy_multiplier, 0.0);
     
@@ -335,7 +335,7 @@ async fn test_caesar_reward_calculation() {
         &PrivacyMode::PRIVATE,
         &resource_config,
         &user_preferences,
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert!(p2p_config.privacy_multiplier > 0.0);
     assert!(p2p_config.privacy_multiplier < 1.0);
@@ -358,7 +358,7 @@ async fn test_caesar_reward_calculation() {
         &PrivacyMode::PUBLIC,
         &performance_metrics,
         "Silver", // User tier
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert!(reward_result.final_reward > 0.0);
     assert!(reward_result.final_reward >= reward_result.base_reward);
@@ -389,7 +389,7 @@ async fn test_privacy_enforcement() {
         },
     };
     
-    let enforcer = PrivacyEnforcer::new(&manager_config).await.unwrap();
+    let enforcer = PrivacyEnforcer::new(&manager_config).await.expect("test: async operation");
     
     // Create test allocation
     let asset_id = AssetRegistration::new(AssetType::Memory);
@@ -411,7 +411,7 @@ async fn test_privacy_enforcement() {
         &allocation_result,
         "authorized-user",
         "read",
-    ).await.unwrap();
+    ).await.expect("test: async operation");
     
     assert!(access_result.allowed, "Access should be allowed for valid request");
     assert!(access_result.risk_assessment.is_some());
@@ -441,7 +441,7 @@ async fn test_privacy_enforcement() {
         resolution_status: super::enforcement::ResolutionStatus::Open,
     };
     
-    enforcer.record_violation(violation).await.unwrap();
+    enforcer.record_violation(violation).await.expect("test: async operation");
     
     println!("Privacy enforcement test completed successfully");
 }
@@ -453,14 +453,14 @@ fn test_user_privacy_config_validation() {
     config.user_id = "test-user".to_string();
     
     // Test basic validation
-    let warnings = config.validate().unwrap();
+    let warnings = config.validate().expect("test: validation");
     assert!(warnings.is_empty(), "Default config should have no validation warnings");
     
     // Test conflicting settings
     config.privacy_settings.privacy_preference = super::config::PrivacyPreference::MaximumPrivacy;
     config.privacy_settings.default_privacy_level = PrivacyMode::PUBLIC;
     
-    let warnings = config.validate().unwrap();
+    let warnings = config.validate().expect("test: validation");
     assert!(!warnings.is_empty(), "Conflicting settings should produce warnings");
     assert!(warnings[0].contains("Maximum privacy mode conflicts"));
     
@@ -470,7 +470,7 @@ fn test_user_privacy_config_validation() {
     
     config.resource_settings.per_resource_settings.insert("cpu".to_string(), resource_settings);
     
-    let warnings = config.validate().unwrap();
+    let warnings = config.validate().expect("test: validation");
     let has_allocation_warning = warnings.iter().any(|w| w.contains("allocation exceeds 100%"));
     assert!(has_allocation_warning, "Should warn about allocation exceeding 100%");
     

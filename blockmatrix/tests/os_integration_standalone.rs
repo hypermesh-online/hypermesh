@@ -21,7 +21,6 @@ mod os_integration_tests {
 
     // Mock minimal imports to avoid compilation issues
     mod mock_os_abstraction {
-        
 
         #[derive(Debug, Clone)]
         #[allow(dead_code)]
@@ -124,7 +123,7 @@ mod os_integration_tests {
                                 let name = entry.file_name().to_string_lossy().to_string();
                                 if name.starts_with("card") && !name.contains('-') {
                                     Some(GpuInfo {
-                                        model: format!("GPU: {}", name),
+                                        model: format!("GPU: {name}"),
                                         vendor: "Unknown".to_string(),
                                         memory_bytes: None,
                                     })
@@ -172,7 +171,7 @@ mod os_integration_tests {
                             swap_used_bytes: None,
                         })
                     }
-                    Err(e) => Err(format!("Failed to read /proc/meminfo: {}", e)),
+                    Err(e) => Err(format!("Failed to read /proc/meminfo: {e}")),
                 }
             }
             fn detect_storage(&self) -> Result<Vec<StorageInfo>, String> {
@@ -299,9 +298,8 @@ mod os_integration_tests {
                 println!("  No GPUs detected (expected on headless systems)");
             }
 
-            // Should not panic
-            assert!(true);
-            println!("✅ GPU detection handled gracefully");
+            // GPU detection completed without panic
+            println!("GPU detection handled gracefully");
         }
     }
 
@@ -366,7 +364,7 @@ mod os_integration_tests {
             let os = create_os_abstraction().expect("Failed to create OS abstraction");
             let supported = os.is_ebpf_supported();
 
-            println!("eBPF Supported: {}", supported);
+            println!("eBPF Supported: {supported}");
             println!("✅ eBPF support check completed");
         }
     }
@@ -489,7 +487,7 @@ mod os_integration_tests {
                 Ok(cpu) => {
                     println!("\nCPU: {} cores, {}", cpu.cores, cpu.model);
                 }
-                Err(e) => println!("CPU Error: {}", e),
+                Err(e) => println!("CPU Error: {e}"),
             }
 
             // Memory
@@ -501,7 +499,7 @@ mod os_integration_tests {
                         mem.usage_percent
                     );
                 }
-                Err(e) => println!("Memory Error: {}", e),
+                Err(e) => println!("Memory Error: {e}"),
             }
 
             // GPU
@@ -513,7 +511,7 @@ mod os_integration_tests {
                         println!("GPU: {} device(s) detected", gpus.len());
                     }
                 }
-                Err(e) => println!("GPU Error: {}", e),
+                Err(e) => println!("GPU Error: {e}"),
             }
 
             // eBPF

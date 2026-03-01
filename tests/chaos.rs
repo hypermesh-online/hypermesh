@@ -6,8 +6,8 @@
 // Tests system resilience under adverse conditions
 
 use anyhow::Result;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time;
 
@@ -25,7 +25,7 @@ pub async fn test_network_partition() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Split-brain test failed: {}", e));
+            errors.push(format!("Split-brain test failed: {e}"));
             passed = false;
         }
     }
@@ -39,7 +39,7 @@ pub async fn test_network_partition() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Asymmetric partition test failed: {}", e));
+            errors.push(format!("Asymmetric partition test failed: {e}"));
             passed = false;
         }
     }
@@ -53,7 +53,7 @@ pub async fn test_network_partition() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Cascading failure test failed: {}", e));
+            errors.push(format!("Cascading failure test failed: {e}"));
             passed = false;
         }
     }
@@ -75,7 +75,7 @@ pub async fn test_node_failures() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Single node failure test failed: {}", e));
+            errors.push(format!("Single node failure test failed: {e}"));
             passed = false;
         }
     }
@@ -89,7 +89,7 @@ pub async fn test_node_failures() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Multiple node failure test failed: {}", e));
+            errors.push(format!("Multiple node failure test failed: {e}"));
             passed = false;
         }
     }
@@ -103,7 +103,7 @@ pub async fn test_node_failures() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Leader failure test failed: {}", e));
+            errors.push(format!("Leader failure test failed: {e}"));
             passed = false;
         }
     }
@@ -125,7 +125,7 @@ pub async fn test_malicious_nodes() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Byzantine generals test failed: {}", e));
+            errors.push(format!("Byzantine generals test failed: {e}"));
             passed = false;
         }
     }
@@ -139,7 +139,7 @@ pub async fn test_malicious_nodes() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Sybil attack test failed: {}", e));
+            errors.push(format!("Sybil attack test failed: {e}"));
             passed = false;
         }
     }
@@ -153,7 +153,7 @@ pub async fn test_malicious_nodes() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Eclipse attack test failed: {}", e));
+            errors.push(format!("Eclipse attack test failed: {e}"));
             passed = false;
         }
     }
@@ -167,7 +167,7 @@ pub async fn test_malicious_nodes() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Double spending test failed: {}", e));
+            errors.push(format!("Double spending test failed: {e}"));
             passed = false;
         }
     }
@@ -189,7 +189,7 @@ pub async fn test_resource_exhaustion() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Memory exhaustion test failed: {}", e));
+            errors.push(format!("Memory exhaustion test failed: {e}"));
             passed = false;
         }
     }
@@ -203,7 +203,7 @@ pub async fn test_resource_exhaustion() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("CPU saturation test failed: {}", e));
+            errors.push(format!("CPU saturation test failed: {e}"));
             passed = false;
         }
     }
@@ -217,7 +217,7 @@ pub async fn test_resource_exhaustion() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Disk exhaustion test failed: {}", e));
+            errors.push(format!("Disk exhaustion test failed: {e}"));
             passed = false;
         }
     }
@@ -231,7 +231,7 @@ pub async fn test_resource_exhaustion() -> (bool, Vec<String>) {
             }
         }
         Err(e) => {
-            errors.push(format!("Bandwidth saturation test failed: {}", e));
+            errors.push(format!("Bandwidth saturation test failed: {e}"));
             passed = false;
         }
     }
@@ -257,8 +257,9 @@ pub async fn test_10k_connections() -> (bool, Vec<String>) {
                     conn_count.fetch_add(1, Ordering::SeqCst);
                 }
                 Err(e) => {
-                    if i < 100 { // Only log first 100 errors
-                        eprintln!("Connection {} failed: {}", i, e);
+                    if i < 100 {
+                        // Only log first 100 errors
+                        eprintln!("Connection {i} failed: {e}");
                     }
                     success_flag.store(false, Ordering::SeqCst);
                 }
@@ -283,8 +284,7 @@ pub async fn test_10k_connections() -> (bool, Vec<String>) {
 
     if !passed {
         errors.push(format!(
-            "Only {} of 10,000 connections succeeded",
-            final_count
+            "Only {final_count} of 10,000 connections succeeded"
         ));
     }
 
@@ -395,12 +395,12 @@ mod tests {
     #[tokio::test]
     async fn test_network_partitions() {
         let (passed, errors) = test_network_partition().await;
-        assert!(passed, "Network partition test failed: {:?}", errors);
+        assert!(passed, "Network partition test failed: {errors:?}");
     }
 
     #[tokio::test]
     async fn test_malicious_behavior() {
         let (passed, errors) = test_malicious_nodes().await;
-        assert!(passed, "Malicious node test failed: {:?}", errors);
+        assert!(passed, "Malicious node test failed: {errors:?}");
     }
 }

@@ -6,8 +6,8 @@
 //!
 //! Verifies real cryptographic implementations and security features
 
-use stoq::transport::falcon::{FalconEngine, FalconVariant, FalconTransport};
 use anyhow::Result;
+use stoq::transport::falcon::{FalconEngine, FalconTransport, FalconVariant};
 
 #[tokio::test]
 async fn test_real_falcon_cryptography() -> Result<()> {
@@ -20,8 +20,14 @@ async fn test_real_falcon_cryptography() -> Result<()> {
     let (private_key, public_key) = engine.generate_keypair()?;
     println!("✅ Generated FALCON-1024 keypair:");
     println!("  - Public key: {} bytes", public_key.key_data.len());
-    println!("  - Private key: {} bytes", private_key.variant.private_key_size());
-    println!("  - Fingerprint: {:?}", hex::encode(&public_key.fingerprint()[..8]));
+    println!(
+        "  - Private key: {} bytes",
+        private_key.variant.private_key_size()
+    );
+    println!(
+        "  - Fingerprint: {:?}",
+        hex::encode(&public_key.fingerprint()[..8])
+    );
 
     // Test signature generation and verification
     let test_messages = vec![
@@ -33,9 +39,18 @@ async fn test_real_falcon_cryptography() -> Result<()> {
 
     for message in test_messages {
         let signature = engine.sign(&private_key, message)?;
-        println!("\n📝 Signed message: {:?}", std::str::from_utf8(message).unwrap());
-        println!("  - Signature size: {} bytes", signature.signature_data.len());
-        println!("  - Message hash: {:?}", hex::encode(&signature.message_hash[..8]));
+        println!(
+            "\n📝 Signed message: {:?}",
+            std::str::from_utf8(message).unwrap()
+        );
+        println!(
+            "  - Signature size: {} bytes",
+            signature.signature_data.len()
+        );
+        println!(
+            "  - Message hash: {:?}",
+            hex::encode(&signature.message_hash[..8])
+        );
 
         // Verify with correct key
         let valid = engine.verify(&public_key, &signature, message)?;
@@ -88,7 +103,10 @@ async fn test_falcon_transport_security() -> Result<()> {
     // Alice signs handshake
     let alice_signature = alice.sign_handshake_data(handshake_data)?;
     println!("\n📝 Alice signed handshake:");
-    println!("  - Signature size: {} bytes", alice_signature.signature_data.len());
+    println!(
+        "  - Signature size: {} bytes",
+        alice_signature.signature_data.len()
+    );
 
     // Bob verifies Alice's signature
     let verified = bob.verify_handshake_signature("alice", &alice_signature, handshake_data)?;
@@ -98,7 +116,10 @@ async fn test_falcon_transport_security() -> Result<()> {
     // Bob signs response
     let bob_signature = bob.sign_handshake_data(handshake_data)?;
     println!("\n📝 Bob signed handshake:");
-    println!("  - Signature size: {} bytes", bob_signature.signature_data.len());
+    println!(
+        "  - Signature size: {} bytes",
+        bob_signature.signature_data.len()
+    );
 
     // Alice verifies Bob's signature
     let verified = alice.verify_handshake_signature("bob", &bob_signature, handshake_data)?;
@@ -124,7 +145,7 @@ async fn test_quantum_resistance_properties() -> Result<()> {
 
     // Test both FALCON variants
     for variant in [FalconVariant::Falcon512, FalconVariant::Falcon1024] {
-        println!("\nTesting {:?}:", variant);
+        println!("\nTesting {variant:?}:");
         println!("  - Security level: {} bits", variant.security_level());
         println!("  - Public key size: {} bytes", variant.public_key_size());
         println!("  - Private key size: {} bytes", variant.private_key_size());
@@ -135,7 +156,10 @@ async fn test_quantum_resistance_properties() -> Result<()> {
 
         // Verify key sizes match expected
         assert_eq!(public_key.key_data.len(), variant.public_key_size());
-        assert_eq!(private_key.variant.private_key_size(), variant.private_key_size());
+        assert_eq!(
+            private_key.variant.private_key_size(),
+            variant.private_key_size()
+        );
 
         // Generate and verify signature
         let message = b"Quantum-resistant message";
@@ -181,7 +205,7 @@ async fn test_byzantine_fault_detection() -> Result<()> {
     let result = honest_node.verify_handshake_signature(
         "byzantine",
         &byzantine_signature,
-        valid_data  // Wrong data for this signature
+        valid_data, // Wrong data for this signature
     )?;
 
     assert!(!result, "Forged signature should be detected");
@@ -208,8 +232,14 @@ fn test_memory_safety() {
     assert_eq!(private_key.variant, FalconVariant::Falcon1024);
 
     // Test that keys are properly sized
-    assert_eq!(private_key.variant.private_key_size(), FalconVariant::Falcon1024.private_key_size());
-    assert_eq!(public_key.key_data.len(), FalconVariant::Falcon1024.public_key_size());
+    assert_eq!(
+        private_key.variant.private_key_size(),
+        FalconVariant::Falcon1024.private_key_size()
+    );
+    assert_eq!(
+        public_key.key_data.len(),
+        FalconVariant::Falcon1024.public_key_size()
+    );
 
     println!("✅ Memory safety verified");
     println!("\n🔐 CRYPTOGRAPHIC MEMORY SAFETY CONFIRMED");

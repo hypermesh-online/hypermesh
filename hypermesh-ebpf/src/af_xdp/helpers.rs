@@ -9,7 +9,7 @@
 //! buffer setup, and interface name resolution.
 
 #[cfg(feature = "kernel-attach")]
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 #[cfg(feature = "kernel-attach")]
 use std::sync::atomic::AtomicU32;
@@ -18,7 +18,7 @@ use std::sync::atomic::AtomicU32;
 use super::kernel_types::*;
 
 #[cfg(feature = "kernel-attach")]
-use super::manager::{UmemConfig, RingConfig};
+use super::manager::{RingConfig, UmemConfig};
 
 // -----------------------------------------------------------------------
 // Kernel helper functions (behind kernel-attach)
@@ -123,10 +123,7 @@ pub(super) fn mmap_ring(
     // For fill/completion rings, each descriptor is u64 (8 bytes).
     // For rx/tx rings, each descriptor is XdpDesc (16 bytes).
     // We use the larger size to be safe.
-    let desc_entry_size = std::cmp::max(
-        std::mem::size_of::<u64>(),
-        std::mem::size_of::<XdpDesc>(),
-    );
+    let desc_entry_size = std::cmp::max(std::mem::size_of::<u64>(), std::mem::size_of::<XdpDesc>());
     let map_len = ring_offset.desc as usize + (ring_size as usize * desc_entry_size);
 
     let map_addr = unsafe {

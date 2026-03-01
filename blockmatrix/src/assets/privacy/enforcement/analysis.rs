@@ -6,12 +6,12 @@
 //!
 //! Pattern detection, baseline analysis, and risk scoring for privacy enforcement.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
 
-use crate::assets::core::AssetResult;
 use super::super::PrivacyAllocationResult;
+use crate::assets::core::AssetResult;
 
 /// Access pattern analyzer
 pub struct AccessPatternAnalyzer {
@@ -334,6 +334,12 @@ pub struct DetectedAnomaly {
     pub risk_level: RiskLevel,
 }
 
+impl Default for AccessPatternAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AccessPatternAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -354,6 +360,12 @@ impl AccessPatternAnalyzer {
             anomalies: vec![],
             similarity_score: 0.9,
         })
+    }
+}
+
+impl Default for RiskAssessmentEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -381,7 +393,10 @@ impl RiskAssessmentEngine {
         })
     }
 
-    pub async fn update_risk_scores(&self, _violation: &super::violations::PrivacyViolation) -> AssetResult<()> {
+    pub async fn update_risk_scores(
+        &self,
+        _violation: &super::violations::PrivacyViolation,
+    ) -> AssetResult<()> {
         // Implementation would update risk models based on violation
         Ok(())
     }

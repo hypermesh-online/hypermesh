@@ -12,9 +12,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use stoq::{StoqTransport, TransportConfig as StoqTransportConfig};
+use super::middleware::{add_cors_headers, RequestLogger};
 use super::router::Router;
-use super::middleware::{RequestLogger, add_cors_headers};
+use stoq::{StoqTransport, TransportConfig as StoqTransportConfig};
 
 pub struct Http3StoqServer {
     addr: SocketAddr,
@@ -37,7 +37,10 @@ impl Http3StoqServer {
 
         // Ensure IPv6 address
         if !self.addr.is_ipv6() {
-            return Err(anyhow::anyhow!("HTTP/3 server requires IPv6 address, got: {}", self.addr));
+            return Err(anyhow::anyhow!(
+                "HTTP/3 server requires IPv6 address, got: {}",
+                self.addr
+            ));
         }
 
         let ipv6_addr = match self.addr.ip() {
@@ -56,7 +59,7 @@ impl Http3StoqServer {
             max_idle_timeout: Duration::from_secs(60),
             cert_rotation_interval: Duration::from_secs(86400),
             max_concurrent_streams: 100,
-            send_buffer_size: 2 * 1024 * 1024, // 2MB
+            send_buffer_size: 2 * 1024 * 1024,    // 2MB
             receive_buffer_size: 2 * 1024 * 1024, // 2MB
             connection_pool_size: 10,
             enable_zero_copy: true,
@@ -78,7 +81,8 @@ impl Http3StoqServer {
         };
 
         // Initialize STOQ transport
-        let transport = StoqTransport::new(stoq_config).await
+        let transport = StoqTransport::new(stoq_config)
+            .await
             .context("Failed to initialize STOQ transport")?;
 
         info!("HTTP/3 server (STOQ) listening on https://{}", self.addr);
@@ -106,10 +110,7 @@ impl Http3StoqServer {
     }
 }
 
-async fn handle_connection(
-    quic_conn: quinn::Connection,
-    router: Arc<Router>,
-) -> Result<()> {
+async fn handle_connection(quic_conn: quinn::Connection, router: Arc<Router>) -> Result<()> {
     // Create h3 connection using h3_quinn adapter
     let quinn_conn = h3_quinn::Connection::new(quic_conn);
     let mut h3_conn = H3Connection::new(quinn_conn).await?;

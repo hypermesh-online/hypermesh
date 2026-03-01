@@ -3,18 +3,17 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Individual Proof Implementations
-//! 
+//!
 //! Based on Proof of State reference implementation from /home/persist/repos/personal/Proof of State/src/mods/proof.rs
 //! Adapted for TrustChain certificate operations with IPv6-only networking
 
-use serde::{Serialize, Deserialize};
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use std::time::{Duration, SystemTime};
 
 /// Helper functions for real proof generation (replacing security theater)
-
 /// Query node stake from HyperMesh network
 async fn query_node_stake(node_id: &str) -> Result<u64> {
     // In production, this would query the actual HyperMesh blockchain
@@ -51,7 +50,7 @@ async fn query_system_storage() -> Result<(u64, u64)> {
             let available_storage = 50 * 1024 * 1024 * 1024; // 50GB free
             Ok((total_storage, available_storage))
         }
-        Err(e) => Err(anyhow!("Failed to query storage: {}", e))
+        Err(e) => Err(anyhow!("Failed to query storage: {e}")),
     }
 }
 
@@ -63,7 +62,7 @@ async fn generate_storage_commitment(storage_path: &str) -> Result<String> {
 
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map_err(|e| anyhow!("System time error: {}", e))?
+        .map_err(|e| anyhow!("System time error: {e}"))?
         .as_secs();
     hasher.update(&timestamp.to_le_bytes());
 
@@ -92,7 +91,7 @@ async fn generate_work_challenges() -> Result<Vec<String>> {
 
         let timestamp_nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .map_err(|e| anyhow!("System time error: {}", e))?
+            .map_err(|e| anyhow!("System time error: {e}"))?
             .as_nanos();
         hasher.update(&timestamp_nanos.to_le_bytes());
         hasher.update(&rand::thread_rng().gen::<u64>().to_le_bytes());
@@ -138,11 +137,11 @@ impl StakeProof {
 
         // Validate minimum stake requirements
         if stake_amount < 1000 {
-            return Err(anyhow!("Insufficient stake: {} < 1000", stake_amount));
+            return Err(anyhow!("Insufficient stake: {stake_amount} < 1000"));
         }
 
         // Generate cryptographic proof of stake ownership
-        let stake_holder = format!("hypermesh_node_{}", node_id);
+        let stake_holder = format!("hypermesh_node_{node_id}");
 
         Ok(Self {
             stake_holder,
@@ -153,6 +152,7 @@ impl StakeProof {
     }
 
     #[cfg(test)]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self {
             stake_holder: "localhost_test".to_string(),
@@ -171,16 +171,19 @@ impl StakeProof {
     pub fn sign(&self) -> String {
         let mut hasher = blake3::Hasher::new();
 
-        let timestamp = self.stake_timestamp
+        let timestamp = self
+            .stake_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
-        hasher.update(format!("{}-{}-{}",
-            self.stake_holder_id,
-            self.stake_amount,
-            timestamp
-        ).as_bytes());
+        hasher.update(
+            format!(
+                "{}-{}-{}",
+                self.stake_holder_id, self.stake_amount, timestamp
+            )
+            .as_bytes(),
+        );
         hasher.finalize().to_hex().to_string()
     }
 }
@@ -194,7 +197,8 @@ impl Proof for StakeProof {
 
         // Validate stake age (not too old)
         if let Ok(elapsed) = self.stake_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(60 * 60 * 24 * 30) { // 30 days max
+            if elapsed > Duration::from_secs(60 * 60 * 24 * 30) {
+                // 30 days max
                 return false;
             }
         }
@@ -206,10 +210,10 @@ impl Proof for StakeProof {
 
 impl PartialEq for StakeProof {
     fn eq(&self, other: &Self) -> bool {
-        self.stake_holder == other.stake_holder &&
-        self.stake_holder_id == other.stake_holder_id &&
-        self.stake_amount == other.stake_amount &&
-        self.stake_timestamp == other.stake_timestamp
+        self.stake_holder == other.stake_holder
+            && self.stake_holder_id == other.stake_holder_id
+            && self.stake_amount == other.stake_amount
+            && self.stake_timestamp == other.stake_timestamp
     }
 }
 
@@ -271,13 +275,16 @@ impl TimeProof {
 
         // Validate time offset is within acceptable bounds
         if network_time_offset > Duration::from_secs(300) {
-            return Err(anyhow!("Time offset too large: {:?} > 5 minutes", network_time_offset));
+            return Err(anyhow!(
+                "Time offset too large: {network_time_offset:?} > 5 minutes"
+            ));
         }
 
         Ok(Self::new(network_time_offset))
     }
 
     #[cfg(test)]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self::new(Duration::from_secs(0))
     }
@@ -290,7 +297,8 @@ impl TimeProof {
         bytes.extend_from_slice(&self.network_time_offset.as_micros().to_le_bytes());
 
         // Serialize time_verification_timestamp
-        let timestamp_micros = self.time_verification_timestamp
+        let timestamp_micros = self
+            .time_verification_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_micros())
             .unwrap_or(0);
@@ -307,23 +315,29 @@ impl TimeProof {
 
     /// Deserialize from network transmission
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() < 40 { // Minimum size check
+        if data.len() < 40 {
+            // Minimum size check
             return Err(anyhow!("Invalid data length for TimeProof"));
         }
 
         // Deserialize network_time_offset (bytes 0-15)
-        let network_time_offset_bytes: [u8; 16] = data[0..16].try_into()
+        let network_time_offset_bytes: [u8; 16] = data[0..16]
+            .try_into()
             .map_err(|_| anyhow!("Invalid network_time_offset slice"))?;
-        let network_time_offset = Duration::from_micros(u128::from_le_bytes(network_time_offset_bytes) as u64);
+        let network_time_offset =
+            Duration::from_micros(u128::from_le_bytes(network_time_offset_bytes) as u64);
 
         // Deserialize timestamp (bytes 16-31)
-        let timestamp_bytes: [u8; 16] = data[16..32].try_into()
+        let timestamp_bytes: [u8; 16] = data[16..32]
+            .try_into()
             .map_err(|_| anyhow!("Invalid timestamp slice"))?;
         let timestamp_micros = u128::from_le_bytes(timestamp_bytes) as u64;
-        let time_verification_timestamp = SystemTime::UNIX_EPOCH + Duration::from_micros(timestamp_micros);
+        let time_verification_timestamp =
+            SystemTime::UNIX_EPOCH + Duration::from_micros(timestamp_micros);
 
         // Deserialize nonce (bytes 32-39)
-        let nonce_bytes: [u8; 8] = data[32..40].try_into()
+        let nonce_bytes: [u8; 8] = data[32..40]
+            .try_into()
             .map_err(|_| anyhow!("Invalid nonce slice"))?;
         let nonce = u64::from_le_bytes(nonce_bytes);
 
@@ -345,7 +359,8 @@ impl Proof for TimeProof {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.network_time_offset.as_micros().to_le_bytes());
 
-        let timestamp_micros = self.time_verification_timestamp
+        let timestamp_micros = self
+            .time_verification_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_micros())
             .unwrap_or(0);
@@ -360,19 +375,21 @@ impl Proof for TimeProof {
 impl PartialEq for TimeProof {
     fn eq(&self, other: &Self) -> bool {
         // Compare timestamps at microsecond precision (serialization granularity)
-        let self_micros = self.time_verification_timestamp
+        let self_micros = self
+            .time_verification_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_micros())
             .unwrap_or(0);
-        let other_micros = other.time_verification_timestamp
+        let other_micros = other
+            .time_verification_timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_micros())
             .unwrap_or(0);
 
-        self.network_time_offset == other.network_time_offset &&
-        self_micros == other_micros &&
-        self.nonce == other.nonce &&
-        self.proof_hash == other.proof_hash
+        self.network_time_offset == other.network_time_offset
+            && self_micros == other_micros
+            && self.nonce == other.nonce
+            && self.proof_hash == other.proof_hash
     }
 }
 
@@ -417,12 +434,13 @@ impl SpaceProof {
         let (total_storage, available_storage) = query_system_storage().await?;
 
         // Validate minimum storage requirements
-        if total_storage < 1024 * 1024 * 1024 { // 1GB minimum
-            return Err(anyhow!("Insufficient storage: {} < 1GB", total_storage));
+        if total_storage < 1024 * 1024 * 1024 {
+            // 1GB minimum
+            return Err(anyhow!("Insufficient storage: {total_storage} < 1GB"));
         }
 
         // Generate storage commitment with actual file hash
-        let storage_path = format!("/hypermesh/storage/{}", node_id);
+        let storage_path = format!("/hypermesh/storage/{node_id}");
         let file_hash = generate_storage_commitment(&storage_path).await?;
 
         Ok(Self {
@@ -436,6 +454,7 @@ impl SpaceProof {
     }
 
     #[cfg(test)]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self {
             node_id: "localhost_node".to_string(),
@@ -467,11 +486,11 @@ impl Proof for SpaceProof {
 
 impl PartialEq for SpaceProof {
     fn eq(&self, other: &Self) -> bool {
-        self.node_id == other.node_id &&
-        self.storage_path == other.storage_path &&
-        self.total_size == other.total_size &&
-        self.total_storage == other.total_storage &&
-        self.file_hash == other.file_hash
+        self.node_id == other.node_id
+            && self.storage_path == other.storage_path
+            && self.total_size == other.total_size
+            && self.total_storage == other.total_storage
+            && self.file_hash == other.file_hash
     }
 }
 
@@ -558,7 +577,9 @@ impl WorkProof {
 
         // Validate minimum compute requirements
         if computational_power < 100 {
-            return Err(anyhow!("Insufficient compute power: {} < 100", computational_power));
+            return Err(anyhow!(
+                "Insufficient compute power: {computational_power} < 100"
+            ));
         }
 
         // Generate real work challenges
@@ -581,6 +602,7 @@ impl WorkProof {
     }
 
     #[cfg(test)]
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> Self {
         Self {
             owner_id: "localhost_test".to_string(),
@@ -611,7 +633,8 @@ impl Proof for WorkProof {
         // Validate work is not pending indefinitely
         if matches!(self.work_state, WorkState::Pending) {
             if let Ok(elapsed) = self.proof_timestamp.elapsed() {
-                if elapsed > Duration::from_secs(60 * 10) { // 10 minutes max pending
+                if elapsed > Duration::from_secs(60 * 10) {
+                    // 10 minutes max pending
                     return false;
                 }
             }
@@ -624,10 +647,10 @@ impl Proof for WorkProof {
 
 impl PartialEq for WorkProof {
     fn eq(&self, other: &Self) -> bool {
-        self.owner_id == other.owner_id &&
-        self.workload_id == other.workload_id &&
-        self.pid == other.pid &&
-        self.computational_power == other.computational_power
+        self.owner_id == other.owner_id
+            && self.workload_id == other.workload_id
+            && self.pid == other.pid
+            && self.computational_power == other.computational_power
     }
 }
 
@@ -664,8 +687,8 @@ mod tests {
     fn test_time_proof_serialization() {
         let time_proof = TimeProof::default();
         let bytes = time_proof.to_bytes();
-        let deserialized = TimeProof::from_bytes(&bytes).unwrap();
-        
+        let deserialized = TimeProof::from_bytes(&bytes).expect("test: expected success");
+
         assert_eq!(time_proof, deserialized);
     }
 

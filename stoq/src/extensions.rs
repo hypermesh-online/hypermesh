@@ -13,11 +13,11 @@
 //! - Multi-hop routing protocol
 //! - Seeding and mirroring protocol
 
-use bytes::{Bytes, BytesMut, BufMut};
-use serde::{Serialize, Deserialize};
+use bytes::{BufMut, Bytes, BytesMut};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 // BLAKE3 for all content hashing (whitepaper mandate)
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 /// STOQ protocol extension trait - defines the core protocol enhancements
 pub trait StoqProtocolExtension {
@@ -232,7 +232,9 @@ impl DefaultStoqExtensions {
     }
 
     /// Create with metrics collection
-    pub fn with_metrics(metrics: std::sync::Arc<crate::transport::metrics::TransportMetrics>) -> Self {
+    pub fn with_metrics(
+        metrics: std::sync::Arc<crate::transport::metrics::TransportMetrics>,
+    ) -> Self {
         Self {
             sequence_counter: std::sync::atomic::AtomicU64::new(0),
             metrics: Some(metrics),
@@ -248,7 +250,9 @@ impl Default for DefaultStoqExtensions {
 
 impl StoqProtocolExtension for DefaultStoqExtensions {
     fn tokenize_packet(&self, data: &[u8]) -> PacketToken {
-        let sequence = self.sequence_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let sequence = self
+            .sequence_counter
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let token = PacketToken::new(data, sequence);
 
         // Record metrics if available
@@ -282,7 +286,7 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
 
         let packet_hash = *blake3::hash(data).as_bytes();
 
-        let total_shards = (data.len() + max_shard_size - 1) / max_shard_size;
+        let total_shards = data.len().div_ceil(max_shard_size);
         let shard_id = rand::random::<u32>();
 
         let mut shards = Vec::new();
@@ -346,7 +350,11 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
             if let Some(ref metrics) = self.metrics {
                 metrics.record_reassembly_error();
             }
-            return Err(anyhow!("Missing shards: expected {}, got {}", total_shards, shards.len()));
+            return Err(anyhow!(
+                "Missing shards: expected {}, got {}",
+                total_shards,
+                shards.len()
+            ));
         }
 
         for (i, shard) in shards.iter().enumerate() {
@@ -354,7 +362,7 @@ impl StoqProtocolExtension for DefaultStoqExtensions {
                 if let Some(ref metrics) = self.metrics {
                     metrics.record_reassembly_error();
                 }
-                return Err(anyhow!("Missing shard sequence {}", i));
+                return Err(anyhow!("Missing shard sequence {i}"));
             }
         }
 
@@ -419,10 +427,10 @@ mod tests {
         let data = b"this is a test packet that will be sharded into multiple pieces";
         let max_shard_size = 10;
 
-        let shards = extensions.shard_packet(data, max_shard_size).unwrap();
+        let shards = extensions.shard_packet(data, max_shard_size).expect("test: shard operation");
         assert!(shards.len() > 1);
 
-        let reassembled = extensions.reassemble_shards(shards).unwrap();
+        let reassembled = extensions.reassemble_shards(shards).expect("test: reassembly");
         assert_eq!(reassembled.as_ref(), data);
     }
 
@@ -438,7 +446,7 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        extensions.add_hop_info(&mut packet, hop).unwrap();
+        extensions.add_hop_info(&mut packet, hop).expect("test: insertion");
         assert_eq!(packet.hops.len(), 1);
     }
 
@@ -446,9 +454,11 @@ mod tests {
     fn test_packet_serialization() {
         let mut packet = StoqPacket::new(Bytes::from_static(b"test data"));
         packet.token = Some(PacketToken::new(b"test data", 1));
-        packet.metadata.insert("key1".to_string(), "value1".to_string());
+        packet
+            .metadata
+            .insert("key1".to_string(), "value1".to_string());
 
-        let serialized = packet.serialize().unwrap();
+        let serialized = packet.serialize().expect("test: expected success");
         assert!(!serialized.is_empty());
     }
 }

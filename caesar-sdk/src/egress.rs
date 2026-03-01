@@ -202,9 +202,7 @@ mod tests {
         let adapter = MockEgressAdapter::new(GoldGrams::zero());
         let value = GoldGrams::from_decimal(Decimal::new(10, 0));
 
-        let result = adapter
-            .settle(value, "acct_789", "USD", gold_price())
-            .await;
+        let result = adapter.settle(value, "acct_789", "USD", gold_price()).await;
 
         assert!(result.is_err());
         let err = result.expect_err("test: should be InsufficientLiquidity");
@@ -219,9 +217,7 @@ mod tests {
         let adapter = MockEgressAdapter::new(capacity_5000());
         let value = GoldGrams::from_decimal(Decimal::new(1, 0));
 
-        let result = adapter
-            .settle(value, "acct_000", "JPY", gold_price())
-            .await;
+        let result = adapter.settle(value, "acct_000", "JPY", gold_price()).await;
 
         assert!(result.is_err());
         let err = result.expect_err("test: should be UnsupportedDenomination");

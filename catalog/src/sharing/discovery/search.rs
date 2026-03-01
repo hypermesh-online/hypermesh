@@ -6,9 +6,9 @@ use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
-use crate::{AssetRegistration, AssetMetadata};
-use super::types::*;
 use super::super::{PeerInfo, SharePermission};
+use super::types::*;
+use crate::{AssetMetadata, AssetRegistration};
 
 impl super::DiscoveryService {
     /// Search across network
@@ -32,9 +32,10 @@ impl super::DiscoveryService {
             let peer_address = peer_info.address.clone();
 
             // Spawn parallel search tasks
-            let task = tokio::spawn(async move {
-                Self::search_peer(&peer_id, &peer_address, &query).await
-            });
+            let task =
+                tokio::spawn(
+                    async move { Self::search_peer(&peer_id, &peer_address, &query).await },
+                );
             search_tasks.push(task);
         }
 
@@ -70,7 +71,7 @@ impl super::DiscoveryService {
         let mut results = Vec::new();
 
         for (_asset_id, entry) in index.iter() {
-            let (matches, highlights) = self.full_text_match(&entry, query);
+            let (matches, highlights) = self.full_text_match(entry, query);
             if matches {
                 results.push(SearchResult {
                     index: entry.clone(),
@@ -85,7 +86,11 @@ impl super::DiscoveryService {
     }
 
     /// Fuzzy search for approximate matches
-    pub async fn fuzzy_search(&self, query: &str, max_distance: usize) -> Result<Vec<SearchResult>> {
+    pub async fn fuzzy_search(
+        &self,
+        query: &str,
+        max_distance: usize,
+    ) -> Result<Vec<SearchResult>> {
         if !self.search_capabilities.fuzzy {
             return Ok(Vec::new());
         }
@@ -119,7 +124,14 @@ impl super::DiscoveryService {
         }
 
         // Check description
-        if entry.metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
+        if entry
+            .metadata
+            .description
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase()
+            .contains(&query_lower)
+        {
             return true;
         }
 
@@ -161,7 +173,13 @@ impl super::DiscoveryService {
         }
 
         // Description match
-        if metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
+        if metadata
+            .description
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase()
+            .contains(&query_lower)
+        {
             score += 0.2;
         }
 
@@ -190,7 +208,10 @@ impl super::DiscoveryService {
         0.0
     }
 
-    pub(super) async fn search_cache(&self, query: &str) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
+    pub(super) async fn search_cache(
+        &self,
+        query: &str,
+    ) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
         let cache = self.federated_cache.read().await;
         let elapsed = SystemTime::now()
             .duration_since(cache.cached_at)
@@ -204,7 +225,11 @@ impl super::DiscoveryService {
                 results.push((asset_id.clone(), entry.metadata.clone()));
             }
         }
-        if results.is_empty() { Ok(None) } else { Ok(Some(results)) }
+        if results.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(results))
+        }
     }
 
     pub(super) async fn cache_search_results(
@@ -215,17 +240,20 @@ impl super::DiscoveryService {
         let mut cache = self.federated_cache.write().await;
         for (asset_id, metadata) in results {
             if !cache.entries.contains_key(asset_id) {
-                cache.entries.insert(asset_id.clone(), AssetIndex {
-                    asset_id: asset_id.clone(),
-                    metadata: metadata.clone(),
-                    available_nodes: HashSet::new(),
-                    permissions: SharePermission::Public,
-                    indexed_at: SystemTime::now(),
-                    keywords: self.extract_keywords(metadata),
-                    categories: metadata.tags.clone(),
-                    dependencies: vec![],
-                    usage_stats: UsageStats::default(),
-                });
+                cache.entries.insert(
+                    asset_id.clone(),
+                    AssetIndex {
+                        asset_id: asset_id.clone(),
+                        metadata: metadata.clone(),
+                        available_nodes: HashSet::new(),
+                        permissions: SharePermission::Public,
+                        indexed_at: SystemTime::now(),
+                        keywords: self.extract_keywords(metadata),
+                        categories: metadata.tags.clone(),
+                        dependencies: vec![],
+                        usage_stats: UsageStats::default(),
+                    },
+                );
             }
         }
         cache.cached_at = SystemTime::now();
@@ -249,7 +277,7 @@ impl super::DiscoveryService {
         results.sort_by(|a, b| {
             let rel_a = self.calculate_relevance(&a.1, query);
             let rel_b = self.calculate_relevance(&b.1, query);
-            rel_b.partial_cmp(&rel_a).unwrap()
+            rel_b.partial_cmp(&rel_a).expect("relevance scores should be valid for comparison")
         });
         results
     }
@@ -259,7 +287,8 @@ impl super::DiscoveryService {
 
         // Update category associations
         for category in &entry.categories {
-            engine.category_associations
+            engine
+                .category_associations
                 .entry(category.clone())
                 .or_insert_with(Vec::new)
                 .push(entry.asset_id.clone());
@@ -268,7 +297,8 @@ impl super::DiscoveryService {
         // Update similarity matrix (simplified)
         // Would use more sophisticated similarity calculation
         for dep in &entry.dependencies {
-            engine.similarity_matrix
+            engine
+                .similarity_matrix
                 .entry(entry.asset_id.clone())
                 .or_insert_with(Vec::new)
                 .push((dep.clone(), 0.8));
@@ -287,7 +317,14 @@ impl super::DiscoveryService {
             return (true, highlights);
         }
 
-        if entry.metadata.description.as_deref().unwrap_or("").to_lowercase().contains(&query_lower) {
+        if entry
+            .metadata
+            .description
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase()
+            .contains(&query_lower)
+        {
             // Extract matching portion
             if let Some(ref desc) = entry.metadata.description {
                 if let Some(start) = desc.to_lowercase().find(&query_lower) {
@@ -318,9 +355,7 @@ impl super::DiscoveryService {
             curr[0] = i;
             for j in 1..=n {
                 let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-                curr[j] = (prev[j] + 1)
-                    .min(curr[j - 1] + 1)
-                    .min(prev[j - 1] + cost);
+                curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
             }
             std::mem::swap(&mut prev, &mut curr);
         }

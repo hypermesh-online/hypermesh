@@ -4,13 +4,13 @@
 
 //! Container resource management and enforcement
 
+use super::error::{ContainerError, Result};
 use crate::ContainerId;
-use super::error::{Result, ContainerError};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 /// Resource allocation for containers
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,10 +130,7 @@ pub enum ResourceEvent {
         new_limit: Option<u64>,
     },
     /// OOM (Out of Memory) event
-    OutOfMemory {
-        requested: u64,
-        available: u64,
-    },
+    OutOfMemory { requested: u64, available: u64 },
 }
 
 /// Resource manager trait
@@ -177,20 +174,26 @@ impl CgroupResourceManager {
             monitoring_enabled: true,
         }
     }
-    
+
     /// Enable or disable monitoring
     pub fn set_monitoring(&mut self, enabled: bool) {
         self.monitoring_enabled = enabled;
     }
-    
+
     /// Calculate CPU usage percentage
-    fn _calculate_cpu_usage(&self, previous: Option<&ResourceUsage>, current: &ResourceUsage) -> f64 {
+    fn _calculate_cpu_usage(
+        &self,
+        previous: Option<&ResourceUsage>,
+        current: &ResourceUsage,
+    ) -> f64 {
         if let Some(prev) = previous {
-            let time_diff = current.timestamp.duration_since(prev.timestamp)
+            let time_diff = current
+                .timestamp
+                .duration_since(prev.timestamp)
                 .unwrap_or(Duration::from_secs(1))
                 .as_nanos() as f64;
             let cpu_diff = (current.cpu_time_ns - prev.cpu_time_ns) as f64;
-            
+
             if time_diff > 0.0 {
                 (cpu_diff / time_diff) * 100.0
             } else {
@@ -200,9 +203,13 @@ impl CgroupResourceManager {
             0.0
         }
     }
-    
+
     /// Check memory limits
-    async fn check_memory_limit(&self, id: &ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
+    async fn check_memory_limit(
+        &self,
+        id: &ContainerId,
+        usage: &ResourceUsage,
+    ) -> Option<ResourceEvent> {
         let quotas = self.quotas.read().await;
         if let Some(quota) = quotas.get(id) {
             if let Some(limit) = quota.memory_limit {
@@ -226,9 +233,13 @@ impl CgroupResourceManager {
         }
         None
     }
-    
+
     /// Check CPU limits
-    async fn check_cpu_limit(&self, id: &ContainerId, usage: &ResourceUsage) -> Option<ResourceEvent> {
+    async fn check_cpu_limit(
+        &self,
+        id: &ContainerId,
+        usage: &ResourceUsage,
+    ) -> Option<ResourceEvent> {
         let quotas = self.quotas.read().await;
         if let Some(quota) = quotas.get(id) {
             if let Some(cpu_limit) = quota.cpu_quota {
@@ -245,7 +256,7 @@ impl CgroupResourceManager {
         }
         None
     }
-    
+
     /// Simulate reading resource usage from cgroups
     async fn read_cgroup_usage(&self, _id: &ContainerId) -> ResourceUsage {
         // In a real implementation, this would read from /sys/fs/cgroup/
@@ -258,9 +269,9 @@ impl CgroupResourceManager {
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_nanos() as u64,
-            io_bandwidth_current: 1024 * 1024, // 1MB/s
-            io_bytes_read: 1024 * 1024 * 50,   // 50MB total
-            io_bytes_written: 1024 * 1024 * 25, // 25MB total
+            io_bandwidth_current: 1024 * 1024,     // 1MB/s
+            io_bytes_read: 1024 * 1024 * 50,       // 50MB total
+            io_bytes_written: 1024 * 1024 * 25,    // 25MB total
             network_bandwidth_current: 1024 * 512, // 512KB/s
             network_bytes_rx: 1024 * 1024 * 10,    // 10MB total
             network_bytes_tx: 1024 * 1024 * 5,     // 5MB total
@@ -286,11 +297,10 @@ impl ResourceManager for CgroupResourceManager {
 
     async fn get_quota(&self, id: &ContainerId) -> Result<ResourceQuota> {
         let quotas = self.quotas.read().await;
-        quotas.get(id)
+        quotas
+            .get(id)
             .cloned()
-            .ok_or_else(|| ContainerError::NotFound {
-                id: id.to_string()
-            })
+            .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
     }
 
     async fn get_usage(&self, id: &ContainerId) -> Result<ResourceUsage> {
@@ -301,38 +311,38 @@ impl ResourceManager for CgroupResourceManager {
             let mut history = self.usage_history.write().await;
             let container_history = history.entry(*id).or_insert_with(Vec::new);
             container_history.push(usage.clone());
-            
+
             // Keep only last 100 entries to prevent memory bloat
             if container_history.len() > 100 {
                 container_history.remove(0);
             }
         }
-        
+
         Ok(usage)
     }
-    
+
     async fn enforce_limits(&self, id: &ContainerId) -> Result<EnforcementAction> {
         let usage = self.get_usage(id).await?;
 
         // Check memory limits first (highest priority)
-        if let Some(event) = self.check_memory_limit(id, &usage).await {
-            if let ResourceEvent::LimitExceeded { action, .. } = event {
-                warn!("Container {} exceeded memory limit", id);
-                return Ok(action);
-            }
+        if let Some(ResourceEvent::LimitExceeded { action, .. }) =
+            self.check_memory_limit(id, &usage).await
+        {
+            warn!("Container {} exceeded memory limit", id);
+            return Ok(action);
         }
-        
+
         // Check CPU limits
-        if let Some(event) = self.check_cpu_limit(id, &usage).await {
-            if let ResourceEvent::LimitExceeded { action, .. } = event {
-                debug!("Container {} exceeded CPU limit", id);
-                return Ok(action);
-            }
+        if let Some(ResourceEvent::LimitExceeded { action, .. }) =
+            self.check_cpu_limit(id, &usage).await
+        {
+            debug!("Container {} exceeded CPU limit", id);
+            return Ok(action);
         }
-        
+
         Ok(EnforcementAction::Allow)
     }
-    
+
     async fn update_limits(&self, id: &ContainerId, quota: ResourceQuota) -> Result<()> {
         let old_quota = {
             let quotas = self.quotas.read().await;
@@ -341,22 +351,26 @@ impl ResourceManager for CgroupResourceManager {
 
         // Update the quota
         self.set_quota(id, quota.clone()).await?;
-        
+
         // Generate allocation change events
         if let Some(old) = old_quota {
             if old.memory_limit != quota.memory_limit {
-                info!("Memory limit changed for container {}: {:?} -> {:?}", 
-                     id, old.memory_limit, quota.memory_limit);
+                info!(
+                    "Memory limit changed for container {}: {:?} -> {:?}",
+                    id, old.memory_limit, quota.memory_limit
+                );
             }
             if old.cpu_quota != quota.cpu_quota {
-                info!("CPU quota changed for container {}: {:?} -> {:?}", 
-                     id, old.cpu_quota, quota.cpu_quota);
+                info!(
+                    "CPU quota changed for container {}: {:?} -> {:?}",
+                    id, old.cpu_quota, quota.cpu_quota
+                );
             }
         }
-        
+
         Ok(())
     }
-    
+
     async fn monitor(&self, id: &ContainerId) -> Result<Vec<ResourceEvent>> {
         let mut events = Vec::new();
         let usage = self.get_usage(id).await?;
@@ -375,28 +389,33 @@ impl ResourceManager for CgroupResourceManager {
         if let Some(container_history) = history.get(id) {
             if container_history.len() >= 2 {
                 // Safe: len() >= 2 guarantees last() and penultimate exist
-                let current = container_history.last()
+                let current = container_history
+                    .last()
                     .ok_or_else(|| ContainerError::Resource {
-                        message: format!("Missing usage history for container {:?}", id)
+                        message: format!("Missing usage history for container {id:?}"),
                     })?;
                 let previous = &container_history[container_history.len() - 2];
-                
+
                 // Calculate memory growth rate
                 if current.memory_usage > previous.memory_usage {
                     let growth_rate = (current.memory_usage - previous.memory_usage) as f64
                         / previous.memory_usage as f64;
-                    
-                    if growth_rate > 0.1 { // 10% growth
-                        debug!("Rapid memory growth detected for container {}: {:.2}%", 
-                              id, growth_rate * 100.0);
+
+                    if growth_rate > 0.1 {
+                        // 10% growth
+                        debug!(
+                            "Rapid memory growth detected for container {}: {:.2}%",
+                            id,
+                            growth_rate * 100.0
+                        );
                     }
                 }
             }
         }
-        
+
         Ok(events)
     }
-    
+
     async fn cleanup(&self, id: &ContainerId) -> Result<()> {
         // Remove quota configuration
         let mut quotas = self.quotas.write().await;
@@ -405,7 +424,7 @@ impl ResourceManager for CgroupResourceManager {
         // Clear usage history
         let mut history = self.usage_history.write().await;
         history.remove(id);
-        
+
         // In a real implementation, this would clean up cgroup directories
         info!("Cleaned up resources for container {}", id);
         Ok(())
@@ -422,7 +441,7 @@ impl Default for ResourceQuota {
     fn default() -> Self {
         Self {
             memory_limit: Some(1024 * 1024 * 1024), // 1GB default
-            cpu_quota: Some(1.0), // 1 core default
+            cpu_quota: Some(1.0),                   // 1 core default
             cpu_period: Duration::from_millis(100),
             io_bandwidth_limit: None,
             network_bandwidth_limit: None,

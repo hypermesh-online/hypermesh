@@ -7,9 +7,9 @@
 //! PoS-driven DNS access validation using consensus system.
 
 use super::{DnsError, DnsResult, Domain};
+use crate::consensus::validation::{DefaultStateAuthenticator, StateAuthenticator};
 use crate::consensus::{ConsensusProof, ConsensusRequirements};
-use crate::consensus::validation::{StateAuthenticator, DefaultStateAuthenticator};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, warn};
 
@@ -65,11 +65,9 @@ impl DnsValidator {
         debug!("Validating DNS access for domain: {}", domain.full);
 
         // Serialize proof for validation
-        let proof_bytes = proof
-            .to_bytes()
-            .map_err(|e| DnsError::ValidationFailed {
-                reason: format!("Failed to serialize proof: {}", e),
-            })?;
+        let proof_bytes = proof.to_bytes().map_err(|e| DnsError::ValidationFailed {
+            reason: format!("Failed to serialize proof: {e}"),
+        })?;
 
         // Validate consensus proof
         let is_valid = self
@@ -77,7 +75,7 @@ impl DnsValidator {
             .validate(&proof_bytes)
             .await
             .map_err(|e| DnsError::ValidationFailed {
-                reason: format!("Consensus validation failed: {}", e),
+                reason: format!("Consensus validation failed: {e}"),
             })?;
 
         if !is_valid {
@@ -146,9 +144,7 @@ impl DnsValidator {
                 // requires Network scope blockchain sync.
                 Ok(true)
             }
-            None => {
-                Ok(false)
-            }
+            None => Ok(false),
         }
     }
 
@@ -194,10 +190,13 @@ mod tests {
     #[tokio::test]
     async fn test_dns_access_validation() {
         let validator = DnsValidator::new(false); // Non-strict for testing
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         let proof = create_test_proof();
 
-        let result = validator.validate_dns_access(&domain, &proof).await.unwrap();
+        let result = validator
+            .validate_dns_access(&domain, &proof)
+            .await
+            .expect("test: expected success");
         assert!(result.valid);
         assert_eq!(result.validated_proofs.len(), 4);
     }
@@ -205,13 +204,13 @@ mod tests {
     #[tokio::test]
     async fn test_registration_validation() {
         let validator = DnsValidator::new(false);
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         let proof = create_test_proof();
 
         let result = validator
             .validate_registration(&domain, &proof)
             .await
-            .unwrap();
+            .expect("test: expected success");
         assert!(result.valid);
     }
 
@@ -220,32 +219,28 @@ mod tests {
         let validator = DnsValidator::new(true);
 
         // Public domain accessible
-        let domain = Domain::parse("nike").unwrap();
-        assert!(validator
-            .validate_network_access(&domain, None)
-            .unwrap());
+        let domain = Domain::parse("nike").expect("test: expected success");
+        assert!(validator.validate_network_access(&domain, None).expect("test: validation"));
 
         // Federated domain requires network
-        let domain = Domain::parse("admin.nike").unwrap();
+        let domain = Domain::parse("admin.nike").expect("test: expected success");
         assert!(validator
             .validate_network_access(&domain, Some("nike-internal"))
-            .unwrap());
-        assert!(!validator
-            .validate_network_access(&domain, None)
-            .unwrap());
+            .expect("test: expected success"));
+        assert!(!validator.validate_network_access(&domain, None).expect("test: validation"));
     }
 
     #[test]
     fn test_fully_federated_check() {
         let validator = DnsValidator::new(true);
 
-        let domain = Domain::parse("nike").unwrap();
+        let domain = Domain::parse("nike").expect("test: expected success");
         assert!(!validator.is_fully_federated(&domain));
 
-        let domain = Domain::parse("admin.nike").unwrap();
+        let domain = Domain::parse("admin.nike").expect("test: expected success");
         assert!(!validator.is_fully_federated(&domain));
 
-        let domain = Domain::parse("classified.internal.gov").unwrap();
+        let domain = Domain::parse("classified.internal.gov").expect("test: expected success");
         assert!(validator.is_fully_federated(&domain));
     }
 }

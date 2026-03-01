@@ -6,11 +6,11 @@
 //!
 //! This provides the actual consensus functionality needed by the asset blockchain manager.
 
-use std::sync::Arc;
-use async_trait::async_trait;
-use anyhow::Result;
-use crate::consensus::{ConsensusProof, ConsensusError, ConsensusConfig};
+use crate::consensus::{ConsensusConfig, ConsensusError, ConsensusProof};
 use crate::transport::PeerIdentity;
+use anyhow::Result;
+use async_trait::async_trait;
+use std::sync::Arc;
 
 /// Result type for consensus operations
 pub type ConsensusResult<T> = Result<T, ConsensusError>;
@@ -91,7 +91,8 @@ impl AsyncConsensus for DefaultConsensus {
 
     async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> ConsensusResult<bool> {
         // Use TrustChain's comprehensive validation
-        proof.validate_comprehensive()
+        proof
+            .validate_comprehensive()
             .await
             .map_err(|e| ConsensusError::ValidationFailed(e.to_string()))
     }

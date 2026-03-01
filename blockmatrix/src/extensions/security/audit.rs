@@ -52,9 +52,8 @@ impl AuditLogger {
         entries.push(entry);
 
         // Clean up old entries
-        let retention_cutoff = SystemTime::now() - Duration::from_secs(
-            self.config.retention_days as u64 * 86400
-        );
+        let retention_cutoff =
+            SystemTime::now() - Duration::from_secs(self.config.retention_days as u64 * 86400);
 
         entries.retain(|e| e.timestamp > retention_cutoff);
     }
@@ -62,7 +61,8 @@ impl AuditLogger {
     /// Get audit entries for extension
     pub async fn get_entries(&self, extension_id: &str) -> Vec<AuditEntry> {
         let entries = self.entries.read().await;
-        entries.iter()
+        entries
+            .iter()
             .filter(|e| e.extension_id == extension_id)
             .cloned()
             .collect()

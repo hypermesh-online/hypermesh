@@ -5,7 +5,7 @@
 //! Security monitoring and metrics
 
 use super::error::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
@@ -38,6 +38,12 @@ pub struct SecurityMonitor {
     running: Arc<RwLock<bool>>,
 }
 
+impl Default for SecurityMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SecurityMonitor {
     pub fn new() -> Self {
         Self {
@@ -58,44 +64,44 @@ impl SecurityMonitor {
             running: Arc::new(RwLock::new(false)),
         }
     }
-    
+
     pub async fn start(&self) -> Result<()> {
         let mut running = self.running.write().await;
         *running = true;
-        
+
         info!("Started security monitoring");
-        
+
         // Start background monitoring task
         let metrics = Arc::clone(&self.metrics);
         let running_flag = Arc::clone(&self.running);
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(10));
-            
+
             while *running_flag.read().await {
                 interval.tick().await;
-                
+
                 // Update metrics periodically
                 let mut metrics = metrics.write().await;
                 metrics.timestamp = SystemTime::now();
                 metrics.events_processed += 10; // Simulate activity
             }
         });
-        
+
         Ok(())
     }
-    
+
     pub async fn stop(&self) -> Result<()> {
         let mut running = self.running.write().await;
         *running = false;
         info!("Stopped security monitoring");
         Ok(())
     }
-    
+
     pub async fn get_metrics(&self) -> SecurityMetrics {
         self.metrics.read().await.clone()
     }
-    
+
     pub async fn record_event(&self, event_type: &str) {
         let mut metrics = self.metrics.write().await;
         match event_type {
@@ -103,7 +109,7 @@ impl SecurityMonitor {
             "policy_evaluated" => metrics.policies_evaluated += 1,
             "certificate_issued" => metrics.certificates_issued += 1,
             "access_denied" => metrics.access_denials += 1,
-            _ => {},
+            _ => {}
         }
         metrics.events_processed += 1;
     }

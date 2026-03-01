@@ -4,19 +4,16 @@
 
 //! Validation types - results, reports, traits, and performance metrics
 
-use std::time::SystemTime;
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::SystemTime;
 
 /// Validation result
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ValidationResult {
     /// Validation passed
-    Passed {
-        message: String,
-        duration_ms: u64,
-    },
+    Passed { message: String, duration_ms: u64 },
 
     /// Validation failed
     Failed {
@@ -25,9 +22,7 @@ pub enum ValidationResult {
     },
 
     /// Validation skipped
-    Skipped {
-        reason: String,
-    },
+    Skipped { reason: String },
 }
 
 impl ValidationResult {

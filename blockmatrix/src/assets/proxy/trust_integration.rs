@@ -6,24 +6,24 @@
 //!
 //! Integrates with TrustChain certificate hierarchy for federated trust validation
 
+use blake3;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use serde::{Deserialize, Serialize};
-use blake3;
 
-use crate::assets::core::{AssetResult, AssetError, ProxyNodeInfo, ProxyCapabilities};
+use crate::assets::core::{AssetError, AssetResult, ProxyCapabilities, ProxyNodeInfo};
 
 /// TrustChain integration handler
 pub struct TrustChainIntegration {
     /// Certificate validator
     certificate_validator: CertificateValidator,
-    
+
     /// Trust chain cache
     trust_chain_cache: HashMap<String, TrustChain>,
-    
+
     /// Certificate revocation list
     revocation_list: HashMap<String, RevocationEntry>,
-    
+
     /// Integration configuration
     config: TrustChainConfig,
 }
@@ -32,13 +32,13 @@ pub struct TrustChainIntegration {
 pub struct CertificateValidator {
     /// Root certificate authorities
     root_cas: HashMap<String, RootCA>,
-    
+
     /// Intermediate certificate authorities
     intermediate_cas: HashMap<String, IntermediateCA>,
-    
+
     /// Certificate validation cache
     validation_cache: HashMap<String, ValidationResult>,
-    
+
     /// Validation configuration
     validation_config: ValidationConfig,
 }
@@ -48,28 +48,28 @@ pub struct CertificateValidator {
 pub struct TrustChain {
     /// Chain identifier
     pub chain_id: String,
-    
+
     /// Root CA certificate fingerprint
     pub root_ca_fingerprint: String,
-    
+
     /// Intermediate CA certificates (if any)
     pub intermediate_certificates: Vec<String>,
-    
+
     /// End entity certificate fingerprint
     pub end_entity_fingerprint: String,
-    
+
     /// Chain validation status
     pub validation_status: ChainValidationStatus,
-    
+
     /// Trust level (0.0 - 1.0)
     pub trust_level: f32,
-    
+
     /// Chain creation timestamp
     pub created_at: SystemTime,
-    
+
     /// Last validation timestamp
     pub last_validated: SystemTime,
-    
+
     /// Chain expiration timestamp
     pub expires_at: SystemTime,
 }
@@ -79,19 +79,19 @@ pub struct TrustChain {
 pub enum ChainValidationStatus {
     /// Chain is valid and trusted
     Valid,
-    
+
     /// Chain validation is pending
     Pending,
-    
+
     /// Chain has expired
     Expired,
-    
+
     /// Chain validation failed
     ValidationFailed { reason: String },
-    
+
     /// Chain has been revoked
     Revoked,
-    
+
     /// Chain is untrusted
     Untrusted,
 }
@@ -101,19 +101,19 @@ pub enum ChainValidationStatus {
 struct RootCA {
     /// CA identifier
     ca_id: String,
-    
+
     /// CA name
     ca_name: String,
-    
+
     /// Public key fingerprint
     public_key_fingerprint: String,
-    
+
     /// CA trust level
     trust_level: f32,
-    
+
     /// CA status
     status: CAStatus,
-    
+
     /// Certificate validity period
     valid_from: SystemTime,
     valid_until: SystemTime,
@@ -124,22 +124,22 @@ struct RootCA {
 struct IntermediateCA {
     /// CA identifier
     ca_id: String,
-    
+
     /// CA name
     ca_name: String,
-    
+
     /// Parent CA identifier
     parent_ca_id: String,
-    
+
     /// Public key fingerprint
     public_key_fingerprint: String,
-    
+
     /// CA trust level
     trust_level: f32,
-    
+
     /// CA status
     status: CAStatus,
-    
+
     /// Certificate validity period
     valid_from: SystemTime,
     valid_until: SystemTime,
@@ -187,13 +187,13 @@ pub struct ValidationResult {
 struct RevocationEntry {
     /// Revoked certificate fingerprint
     certificate_fingerprint: String,
-    
+
     /// Revocation reason
     revocation_reason: RevocationReason,
-    
+
     /// Revocation timestamp
     revoked_at: SystemTime,
-    
+
     /// Revoking authority
     revoking_authority: String,
 }
@@ -217,19 +217,19 @@ pub enum RevocationReason {
 struct TrustChainConfig {
     /// Enable certificate validation caching
     enable_validation_caching: bool,
-    
+
     /// Validation cache timeout
     validation_cache_timeout: Duration,
-    
+
     /// Maximum trust chain length
     max_chain_length: u8,
-    
+
     /// Minimum trust level required
     min_trust_level: f32,
-    
+
     /// Enable online revocation checking
     enable_online_revocation_check: bool,
-    
+
     /// Revocation check timeout
     _revocation_check_timeout: Duration,
 }
@@ -246,7 +246,6 @@ impl Default for TrustChainConfig {
         }
     }
 }
-
 
 /// Validation configuration
 #[derive(Clone, Debug)]
@@ -280,60 +279,81 @@ impl Default for ValidationConfig {
     }
 }
 
+impl Default for TrustChainIntegration {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TrustChainIntegration {
     /// Create new TrustChain integration
     pub fn new() -> Self {
         Self {
-            certificate_validator: CertificateValidator::new().unwrap_or_else(|_| CertificateValidator {
-                root_cas: HashMap::new(),
-                intermediate_cas: HashMap::new(),
-                validation_cache: HashMap::new(),
-                validation_config: ValidationConfig::default(),
+            certificate_validator: CertificateValidator::new().unwrap_or_else(|_| {
+                CertificateValidator {
+                    root_cas: HashMap::new(),
+                    intermediate_cas: HashMap::new(),
+                    validation_cache: HashMap::new(),
+                    validation_config: ValidationConfig::default(),
+                }
             }),
             trust_chain_cache: HashMap::new(),
             revocation_list: HashMap::new(),
             config: TrustChainConfig::default(),
         }
     }
-    
+
     /// Validate proxy node certificate against TrustChain
     pub async fn validate_node_certificate(&self, node_info: &ProxyNodeInfo) -> AssetResult<bool> {
         // Check validation cache first
         if self.config.enable_validation_caching {
-            if let Some(cached_result) = self.get_cached_validation(&node_info.certificate_fingerprint).await? {
+            if let Some(cached_result) = self
+                .get_cached_validation(&node_info.certificate_fingerprint)
+                .await?
+            {
                 if cached_result.expires_at > SystemTime::now() {
                     return Ok(cached_result.is_valid);
                 }
             }
         }
-        
+
         // Check revocation list
-        if self.is_certificate_revoked(&node_info.certificate_fingerprint).await? {
-            tracing::warn!("Certificate is revoked: {}", node_info.certificate_fingerprint);
+        if self
+            .is_certificate_revoked(&node_info.certificate_fingerprint)
+            .await?
+        {
+            tracing::warn!(
+                "Certificate is revoked: {}",
+                node_info.certificate_fingerprint
+            );
             return Ok(false);
         }
-        
+
         // Build trust chain
-        let trust_chain = self.build_trust_chain(&node_info.certificate_fingerprint).await?;
-        
+        let trust_chain = self
+            .build_trust_chain(&node_info.certificate_fingerprint)
+            .await?;
+
         // Validate trust chain
         let validation_result = self.validate_trust_chain(&trust_chain).await?;
-        
+
         // Cache validation result
         if self.config.enable_validation_caching {
-            self.cache_validation_result(&node_info.certificate_fingerprint, &validation_result).await?;
+            self.cache_validation_result(&node_info.certificate_fingerprint, &validation_result)
+                .await?;
         }
-        
+
         tracing::info!(
             "Node certificate validation for {:?}: {} (trust level: {})",
             node_info.node_id,
             validation_result.is_valid,
             validation_result.trust_level
         );
-        
-        Ok(validation_result.is_valid && validation_result.trust_level >= self.config.min_trust_level)
+
+        Ok(validation_result.is_valid
+            && validation_result.trust_level >= self.config.min_trust_level)
     }
-    
+
     /// Build trust chain for certificate
     async fn build_trust_chain(&self, certificate_fingerprint: &str) -> AssetResult<TrustChain> {
         // Check cache first
@@ -342,7 +362,7 @@ impl TrustChainIntegration {
                 return Ok(cached_chain.clone());
             }
         }
-        
+
         // TODO: Implement actual TrustChain certificate chain building
         // For now, simulate chain building
         let chain = TrustChain {
@@ -356,19 +376,29 @@ impl TrustChainIntegration {
             last_validated: SystemTime::UNIX_EPOCH,
             expires_at: SystemTime::now() + Duration::from_secs(86400), // 24 hours
         };
-        
-        tracing::debug!("Built trust chain for certificate: {}", certificate_fingerprint);
+
+        tracing::debug!(
+            "Built trust chain for certificate: {}",
+            certificate_fingerprint
+        );
         Ok(chain)
     }
-    
+
     /// Validate trust chain
-    async fn validate_trust_chain(&self, trust_chain: &TrustChain) -> AssetResult<ValidationResult> {
+    async fn validate_trust_chain(
+        &self,
+        trust_chain: &TrustChain,
+    ) -> AssetResult<ValidationResult> {
         let mut is_valid = true;
         let mut trust_level = 1.0_f32;
         let mut validation_message = "Trust chain validation successful".to_string();
-        
+
         // Validate root CA
-        if let Some(root_ca) = self.certificate_validator.root_cas.get(&trust_chain.root_ca_fingerprint) {
+        if let Some(root_ca) = self
+            .certificate_validator
+            .root_cas
+            .get(&trust_chain.root_ca_fingerprint)
+        {
             if !matches!(root_ca.status, CAStatus::Active) {
                 is_valid = false;
                 validation_message = "Root CA is not active".to_string();
@@ -382,41 +412,54 @@ impl TrustChainIntegration {
             is_valid = false;
             validation_message = "Root CA not found in trust store".to_string();
         }
-        
+
         // Validate intermediate CAs
         for intermediate_fingerprint in &trust_chain.intermediate_certificates {
-            if let Some(intermediate_ca) = self.certificate_validator.intermediate_cas.get(intermediate_fingerprint) {
+            if let Some(intermediate_ca) = self
+                .certificate_validator
+                .intermediate_cas
+                .get(intermediate_fingerprint)
+            {
                 if !matches!(intermediate_ca.status, CAStatus::Active) {
                     is_valid = false;
-                    validation_message = format!("Intermediate CA {} is not active", intermediate_fingerprint);
+                    validation_message =
+                        format!("Intermediate CA {intermediate_fingerprint} is not active");
                     break;
                 } else if intermediate_ca.valid_until < SystemTime::now() {
                     is_valid = false;
-                    validation_message = format!("Intermediate CA {} has expired", intermediate_fingerprint);
+                    validation_message =
+                        format!("Intermediate CA {intermediate_fingerprint} has expired");
                     break;
                 } else {
                     trust_level = trust_level.min(intermediate_ca.trust_level);
                 }
             } else {
                 is_valid = false;
-                validation_message = format!("Intermediate CA {} not found", intermediate_fingerprint);
+                validation_message =
+                    format!("Intermediate CA {intermediate_fingerprint} not found");
                 break;
             }
         }
-        
+
         // Validate chain length
         let chain_length = 1 + trust_chain.intermediate_certificates.len() as u8; // Root + intermediates
         if chain_length > self.config.max_chain_length {
             is_valid = false;
-            validation_message = format!("Trust chain too long: {} > {}", chain_length, self.config.max_chain_length);
+            validation_message = format!(
+                "Trust chain too long: {} > {}",
+                chain_length, self.config.max_chain_length
+            );
         }
-        
+
         // Apply minimum trust level requirement
         if is_valid && trust_level < self.config.min_trust_level {
             is_valid = false;
-            validation_message = format!("Trust level too low: {} < {}", trust_level, self.config.min_trust_level);
+            validation_message = format!(
+                "Trust level too low: {} < {}",
+                trust_level, self.config.min_trust_level
+            );
         }
-        
+
         let validation_message_clone = validation_message.clone();
         let result = ValidationResult {
             certificate_fingerprint: trust_chain.end_entity_fingerprint.clone(),
@@ -424,43 +467,53 @@ impl TrustChainIntegration {
             trust_level,
             chain_depth: trust_level, // Same value as trust_level
             validation_message,
-            errors: if is_valid { Vec::new() } else { vec![validation_message_clone] },
+            errors: if is_valid {
+                Vec::new()
+            } else {
+                vec![validation_message_clone]
+            },
             validated_at: SystemTime::now(),
             expires_at: SystemTime::now() + self.config.validation_cache_timeout,
         };
-        
+
         tracing::debug!(
             "Trust chain validation result: {} (trust level: {})",
             result.is_valid,
             result.trust_level
         );
-        
+
         Ok(result)
     }
-    
+
     /// Check if certificate is revoked
     async fn is_certificate_revoked(&self, certificate_fingerprint: &str) -> AssetResult<bool> {
         // Check local revocation list
         if self.revocation_list.contains_key(certificate_fingerprint) {
             return Ok(true);
         }
-        
+
         // TODO: Implement online revocation checking (OCSP/CRL)
         if self.config.enable_online_revocation_check {
             // Simulate online revocation check
-            tracing::debug!("Performing online revocation check for: {}", certificate_fingerprint);
+            tracing::debug!(
+                "Performing online revocation check for: {}",
+                certificate_fingerprint
+            );
         }
-        
+
         Ok(false)
     }
-    
+
     /// Get cached validation result
-    async fn get_cached_validation(&self, _certificate_fingerprint: &str) -> AssetResult<Option<ValidationResult>> {
+    async fn get_cached_validation(
+        &self,
+        _certificate_fingerprint: &str,
+    ) -> AssetResult<Option<ValidationResult>> {
         // TODO: Implement actual cache lookup
         // For now, return None to force validation
         Ok(None)
     }
-    
+
     /// Cache validation result
     async fn cache_validation_result(
         &self,
@@ -471,7 +524,7 @@ impl TrustChainIntegration {
         tracing::debug!("Cached validation result for: {}", certificate_fingerprint);
         Ok(())
     }
-    
+
     /// Generate chain ID
     fn generate_chain_id(&self, certificate_fingerprint: &str) -> AssetResult<String> {
         let mut hasher = blake3::Hasher::new();
@@ -479,14 +532,14 @@ impl TrustChainIntegration {
         let nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|_| AssetError::AdapterError {
-                message: "Invalid system time for chain ID generation".to_string()
+                message: "Invalid system time for chain ID generation".to_string(),
             })?
             .as_nanos();
         hasher.update(&nanos.to_le_bytes());
         let hash = hasher.finalize();
         Ok(hex::encode(&hash.as_bytes()[..16]))
     }
-    
+
     /// Add certificate to revocation list
     pub async fn revoke_certificate(
         &mut self,
@@ -500,21 +553,25 @@ impl TrustChainIntegration {
             revoked_at: SystemTime::now(),
             revoking_authority,
         };
-        
-        self.revocation_list.insert(certificate_fingerprint.clone(), revocation_entry);
-        
+
+        self.revocation_list
+            .insert(certificate_fingerprint.clone(), revocation_entry);
+
         tracing::warn!("Revoked certificate: {}", certificate_fingerprint);
         Ok(())
     }
-    
+
     /// Get trust level for certificate
-    pub async fn get_certificate_trust_level(&self, certificate_fingerprint: &str) -> AssetResult<f32> {
+    pub async fn get_certificate_trust_level(
+        &self,
+        certificate_fingerprint: &str,
+    ) -> AssetResult<f32> {
         if let Some(cached_result) = self.get_cached_validation(certificate_fingerprint).await? {
             if cached_result.expires_at > SystemTime::now() {
                 return Ok(cached_result.trust_level);
             }
         }
-        
+
         // If not cached, perform validation to get trust level
         let _mock_node_info = ProxyNodeInfo {
             node_id: [0u8; 8], // Unknown node ID
@@ -532,13 +589,13 @@ impl TrustChainIntegration {
             last_heartbeat: SystemTime::now(),
             certificate_fingerprint: certificate_fingerprint.to_string(),
         };
-        
+
         let trust_chain = self.build_trust_chain(certificate_fingerprint).await?;
         let validation_result = self.validate_trust_chain(&trust_chain).await?;
-        
+
         Ok(validation_result.trust_level)
     }
-    
+
     /// Cleanup expired cache entries
     pub async fn cleanup_expired_cache(&self) -> AssetResult<u64> {
         // TODO: Implement cache cleanup
@@ -552,30 +609,36 @@ impl CertificateValidator {
     pub fn new() -> AssetResult<Self> {
         let mut root_cas = HashMap::new();
         let mut intermediate_cas = HashMap::new();
-        
+
         // Add default HyperMesh root CA
-        root_cas.insert("hypermesh-root-ca".to_string(), RootCA {
-            ca_id: "hypermesh-root-ca".to_string(),
-            ca_name: "HyperMesh Root CA".to_string(),
-            public_key_fingerprint: "hypermesh-root-ca-key".to_string(),
-            trust_level: 1.0,
-            status: CAStatus::Active,
-            valid_from: SystemTime::now() - Duration::from_secs(86400 * 365), // 1 year ago
-            valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 10), // 10 years
-        });
-        
+        root_cas.insert(
+            "hypermesh-root-ca".to_string(),
+            RootCA {
+                ca_id: "hypermesh-root-ca".to_string(),
+                ca_name: "HyperMesh Root CA".to_string(),
+                public_key_fingerprint: "hypermesh-root-ca-key".to_string(),
+                trust_level: 1.0,
+                status: CAStatus::Active,
+                valid_from: SystemTime::now() - Duration::from_secs(86400 * 365), // 1 year ago
+                valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 10), // 10 years
+            },
+        );
+
         // Add default intermediate CA
-        intermediate_cas.insert("hypermesh-intermediate-ca".to_string(), IntermediateCA {
-            ca_id: "hypermesh-intermediate-ca".to_string(),
-            ca_name: "HyperMesh Intermediate CA".to_string(),
-            parent_ca_id: "hypermesh-root-ca".to_string(),
-            public_key_fingerprint: "hypermesh-intermediate-ca-key".to_string(),
-            trust_level: 0.9,
-            status: CAStatus::Active,
-            valid_from: SystemTime::now() - Duration::from_secs(86400 * 30), // 30 days ago
-            valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 2), // 2 years
-        });
-        
+        intermediate_cas.insert(
+            "hypermesh-intermediate-ca".to_string(),
+            IntermediateCA {
+                ca_id: "hypermesh-intermediate-ca".to_string(),
+                ca_name: "HyperMesh Intermediate CA".to_string(),
+                parent_ca_id: "hypermesh-root-ca".to_string(),
+                public_key_fingerprint: "hypermesh-intermediate-ca-key".to_string(),
+                trust_level: 0.9,
+                status: CAStatus::Active,
+                valid_from: SystemTime::now() - Duration::from_secs(86400 * 30), // 30 days ago
+                valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 2), // 2 years
+            },
+        );
+
         Ok(Self {
             root_cas,
             intermediate_cas,
@@ -585,7 +648,10 @@ impl CertificateValidator {
     }
 
     /// Validate a certificate
-    pub async fn validate_certificate(&self, certificate_fingerprint: &str) -> AssetResult<ValidationResult> {
+    pub async fn validate_certificate(
+        &self,
+        certificate_fingerprint: &str,
+    ) -> AssetResult<ValidationResult> {
         // Check cache first
         if let Some(cached) = self.validation_cache.get(certificate_fingerprint) {
             if cached.expires_at > SystemTime::now() {
@@ -632,13 +698,16 @@ impl CertificateValidator {
         if !self.validation_config.strict_mode || self.validation_config.allow_self_signed {
             result.trust_level = 0.5;
             result.chain_depth = 0.5;
-            result.validation_message = "Self-signed or unknown certificate accepted in non-strict mode".to_string();
+            result.validation_message =
+                "Self-signed or unknown certificate accepted in non-strict mode".to_string();
         } else {
             result.is_valid = false;
             result.trust_level = 0.0;
             result.chain_depth = 0.0;
             result.validation_message = "Certificate validation failed".to_string();
-            result.errors.push("Unknown certificate in strict mode".to_string());
+            result
+                .errors
+                .push("Unknown certificate in strict mode".to_string());
         }
 
         Ok(result)
@@ -649,7 +718,7 @@ impl CertificateValidator {
 mod tests {
     use super::*;
     use crate::assets::core::ProxyCapabilities;
-    
+
     fn create_test_node_info() -> ProxyNodeInfo {
         // Convert string to [u8; 8] for node_id
         let mut node_id_bytes = [0u8; 8];
@@ -674,27 +743,30 @@ mod tests {
             certificate_fingerprint: "test-cert-fingerprint".to_string(),
         }
     }
-    
+
     #[tokio::test]
     async fn test_trust_chain_integration_creation() {
         let integration = TrustChainIntegration::new();
         assert_eq!(integration.trust_chain_cache.len(), 0);
         assert_eq!(integration.revocation_list.len(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_certificate_validator_creation() {
         let validator = CertificateValidator::new().expect("Failed to create CertificateValidator");
         assert!(!validator.root_cas.is_empty());
         assert!(!validator.intermediate_cas.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_build_trust_chain() {
         let integration = TrustChainIntegration::new();
         let cert_fingerprint = "test-cert-fingerprint";
 
-        let trust_chain = integration.build_trust_chain(cert_fingerprint).await.expect("Failed to build trust chain");
+        let trust_chain = integration
+            .build_trust_chain(cert_fingerprint)
+            .await
+            .expect("Failed to build trust chain");
 
         assert_eq!(trust_chain.end_entity_fingerprint, cert_fingerprint);
         assert!(!trust_chain.chain_id.is_empty());
@@ -707,7 +779,10 @@ mod tests {
         let node_info = create_test_node_info();
 
         // This should succeed with the default setup
-        let is_valid = integration.validate_node_certificate(&node_info).await.expect("Failed to validate node certificate");
+        let is_valid = integration
+            .validate_node_certificate(&node_info)
+            .await
+            .expect("Failed to validate node certificate");
         assert!(is_valid);
     }
 
@@ -717,18 +792,27 @@ mod tests {
         let cert_fingerprint = "test-cert-to-revoke".to_string();
 
         // Certificate should not be revoked initially
-        let is_revoked = integration.is_certificate_revoked(&cert_fingerprint).await.expect("Failed to check revocation status");
+        let is_revoked = integration
+            .is_certificate_revoked(&cert_fingerprint)
+            .await
+            .expect("Failed to check revocation status");
         assert!(!is_revoked);
 
         // Revoke the certificate
-        integration.revoke_certificate(
-            cert_fingerprint.clone(),
-            RevocationReason::KeyCompromise,
-            "test-authority".to_string(),
-        ).await.expect("Failed to revoke certificate");
+        integration
+            .revoke_certificate(
+                cert_fingerprint.clone(),
+                RevocationReason::KeyCompromise,
+                "test-authority".to_string(),
+            )
+            .await
+            .expect("Failed to revoke certificate");
 
         // Certificate should now be revoked
-        let is_revoked = integration.is_certificate_revoked(&cert_fingerprint).await.expect("Failed to check revocation status");
+        let is_revoked = integration
+            .is_certificate_revoked(&cert_fingerprint)
+            .await
+            .expect("Failed to check revocation status");
         assert!(is_revoked);
     }
 }

@@ -12,6 +12,8 @@ pub struct StreamManager {
 
 impl StreamManager {
     pub fn new(max_streams: u32) -> Self {
-        Self { _max_streams: max_streams }
+        Self {
+            _max_streams: max_streams,
+        }
     }
 }

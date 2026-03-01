@@ -88,10 +88,7 @@ pub fn find_k_nearest(
         .collect();
 
     // Sort by distance (ascending)
-    distances.sort_by(|a, b| {
-        a.1.partial_cmp(&b.1)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     // Take first K elements
     distances.into_iter().take(k).collect()
@@ -240,29 +237,29 @@ mod tests {
 
     fn create_test_candidates() -> Vec<MatrixCoordinate> {
         vec![
-            MatrixCoordinate::new(1, 1, 1).unwrap(),
-            MatrixCoordinate::new(2, 2, 2).unwrap(),
-            MatrixCoordinate::new(5, 5, 5).unwrap(),
-            MatrixCoordinate::new(10, 10, 10).unwrap(),
-            MatrixCoordinate::new(1, 0, 0).unwrap(),
-            MatrixCoordinate::new(0, 1, 0).unwrap(),
-            MatrixCoordinate::new(0, 0, 1).unwrap(),
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+            MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"),
+            MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"),
+            MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate"),
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 0, 1).expect("test: valid coordinate"),
         ]
     }
 
     #[test]
     fn test_find_neighbors() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = create_test_candidates();
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
         assert!(neighbors.len() >= 3); // At least the unit distance ones
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).unwrap()));
+        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")));
     }
 
     #[test]
     fn test_find_neighbors_empty() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = Vec::new();
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
@@ -271,10 +268,10 @@ mod tests {
 
     #[test]
     fn test_find_neighbors_none_in_range() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(100, 100, 100).unwrap(),
-            MatrixCoordinate::new(200, 200, 200).unwrap(),
+            MatrixCoordinate::new(100, 100, 100).expect("test: valid coordinate"),
+            MatrixCoordinate::new(200, 200, 200).expect("test: valid coordinate"),
         ];
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
@@ -283,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_find_k_nearest() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = create_test_candidates();
 
         let nearest = find_k_nearest(&center, &candidates, 3);
@@ -300,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_find_k_nearest_k_zero() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = create_test_candidates();
 
         let nearest = find_k_nearest(&center, &candidates, 0);
@@ -309,10 +306,10 @@ mod tests {
 
     #[test]
     fn test_find_k_nearest_k_larger_than_candidates() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(1, 0, 0).unwrap(),
-            MatrixCoordinate::new(2, 0, 0).unwrap(),
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate"),
         ];
 
         let nearest = find_k_nearest(&center, &candidates, 10);
@@ -321,23 +318,23 @@ mod tests {
 
     #[test]
     fn test_find_neighbors_cubic() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = create_test_candidates();
 
         let neighbors = find_neighbors_cubic(&center, &candidates, 2);
 
         // Should include (1,1,1), (2,2,2), and unit distance ones
         assert!(neighbors.len() >= 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).unwrap()));
-        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).unwrap()));
+        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
+        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate")));
     }
 
     #[test]
     fn test_find_neighbors_cubic_radius_zero() {
-        let center = MatrixCoordinate::new(5, 5, 5).unwrap();
+        let center = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(5, 5, 5).unwrap(),
-            MatrixCoordinate::new(6, 5, 5).unwrap(),
+            MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"),
+            MatrixCoordinate::new(6, 5, 5).expect("test: valid coordinate"),
         ];
 
         let neighbors = find_neighbors_cubic(&center, &candidates, 0);
@@ -347,7 +344,7 @@ mod tests {
 
     #[test]
     fn test_find_neighbors_spherical() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = create_test_candidates();
 
         let neighbors = find_neighbors_spherical(&center, &candidates, 5.0);
@@ -358,45 +355,45 @@ mod tests {
 
     #[test]
     fn test_find_neighbors_manhattan() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(1, 1, 1).unwrap(),  // distance = 3
-            MatrixCoordinate::new(2, 2, 2).unwrap(),  // distance = 6
-            MatrixCoordinate::new(1, 0, 0).unwrap(),  // distance = 1
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"), // distance = 3
+            MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"), // distance = 6
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"), // distance = 1
         ];
 
         let neighbors = find_neighbors_manhattan(&center, &candidates, 4);
         assert_eq!(neighbors.len(), 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).unwrap()));
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).unwrap()));
+        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
+        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")));
     }
 
     #[test]
     fn test_find_neighbors_chebyshev() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(2, 2, 2).unwrap(),  // distance = 2
-            MatrixCoordinate::new(5, 3, 1).unwrap(),  // distance = 5
-            MatrixCoordinate::new(1, 1, 1).unwrap(),  // distance = 1
+            MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"), // distance = 2
+            MatrixCoordinate::new(5, 3, 1).expect("test: valid coordinate"), // distance = 5
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"), // distance = 1
         ];
 
         let neighbors = find_neighbors_chebyshev(&center, &candidates, 3);
         assert_eq!(neighbors.len(), 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).unwrap()));
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).unwrap()));
+        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate")));
+        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
     }
 
     #[test]
     fn test_negative_coordinates() {
-        let center = MatrixCoordinate::new(-5, -5, -5).unwrap();
+        let center = MatrixCoordinate::new(-5, -5, -5).expect("test: valid coordinate");
         let candidates = vec![
-            MatrixCoordinate::new(-4, -4, -4).unwrap(),
-            MatrixCoordinate::new(-10, -10, -10).unwrap(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(),
+            MatrixCoordinate::new(-4, -4, -4).expect("test: valid coordinate"),
+            MatrixCoordinate::new(-10, -10, -10).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
         ];
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
-        assert!(neighbors.len() >= 1);
-        assert!(neighbors.contains(&MatrixCoordinate::new(-4, -4, -4).unwrap()));
+        assert!(!neighbors.is_empty());
+        assert!(neighbors.contains(&MatrixCoordinate::new(-4, -4, -4).expect("test: valid coordinate")));
     }
 }

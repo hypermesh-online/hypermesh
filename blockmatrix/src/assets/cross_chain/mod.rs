@@ -13,14 +13,12 @@ pub mod types;
 
 pub use types::*;
 
-use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
 use blake3;
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
+use super::matrix_blockchain::{EntityType, MatrixBlockchainManager, ValidationResult};
 use crate::assets::core::asset_id::AssetRegistration;
-use super::matrix_blockchain::{
-    MatrixBlockchainManager, EntityType, ValidationResult,
-};
 
 /// Cross-chain validation manager
 pub struct CrossChainValidationManager {
@@ -83,10 +81,8 @@ impl CrossChainValidationManager {
             match self.validate_network_step(&validator, step).await {
                 Ok(result) => {
                     for (key, value) in &result.public_confirmations {
-                        public_confirmations.insert(
-                            format!("{}:{}", step.network_domain, key),
-                            value.clone()
-                        );
+                        public_confirmations
+                            .insert(format!("{}:{}", step.network_domain, key), value.clone());
                     }
                     network_results.insert(step.network_domain.clone(), result);
                 }
@@ -115,9 +111,8 @@ impl CrossChainValidationManager {
         }
 
         // Determine overall validation status
-        let validation_status = self.determine_validation_status(
-            &network_results, &zk_proof_results,
-        );
+        let validation_status =
+            self.determine_validation_status(&network_results, &zk_proof_results);
 
         let result = CrossChainValidationResult {
             validation_id: validation_id.clone(),
@@ -126,9 +121,8 @@ impl CrossChainValidationManager {
             public_confirmations,
             zk_proof_results,
             validated_at: SystemTime::now(),
-            expires_at: SystemTime::now() + Duration::from_secs(
-                validator.cache_config.cache_ttl_seconds,
-            ),
+            expires_at: SystemTime::now()
+                + Duration::from_secs(validator.cache_config.cache_ttl_seconds),
             consensus_proofs: Vec::new(),
         };
 
@@ -149,29 +143,24 @@ impl CrossChainValidationManager {
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         match workflow_type {
             BusinessWorkflowType::VehiclePurchase => {
-                self.validate_vehicle_purchase_workflow(
-                    asset_id, participating_entities,
-                ).await
+                self.validate_vehicle_purchase_workflow(asset_id, participating_entities)
+                    .await
             }
             BusinessWorkflowType::AssetFinancing => {
-                self.validate_stub_workflow(
-                    "asset_financing", asset_id, participating_entities,
-                ).await
+                self.validate_stub_workflow("asset_financing", asset_id, participating_entities)
+                    .await
             }
             BusinessWorkflowType::InsuranceClaim => {
-                self.validate_stub_workflow(
-                    "insurance_claim", asset_id, participating_entities,
-                ).await
+                self.validate_stub_workflow("insurance_claim", asset_id, participating_entities)
+                    .await
             }
             BusinessWorkflowType::SupplyChain => {
-                self.validate_stub_workflow(
-                    "supply_chain", asset_id, participating_entities,
-                ).await
+                self.validate_stub_workflow("supply_chain", asset_id, participating_entities)
+                    .await
             }
             BusinessWorkflowType::Custom(workflow_name) => {
-                self.validate_stub_workflow(
-                    &workflow_name, asset_id, participating_entities,
-                ).await
+                self.validate_stub_workflow(&workflow_name, asset_id, participating_entities)
+                    .await
             }
         }
     }
@@ -197,10 +186,7 @@ impl CrossChainValidationManager {
             NetworkValidationStep {
                 network_domain: "dealer.hypermesh.online".to_string(),
                 entity_type: EntityType::Dealer,
-                validations: vec![
-                    "vehicle_in_inventory".to_string(),
-                    "price_set".to_string(),
-                ],
+                validations: vec!["vehicle_in_inventory".to_string(), "price_set".to_string()],
                 expected_confirmations: vec!["available_for_sale".to_string()],
                 step_order: 1,
                 dependencies: vec![0],
@@ -231,18 +217,16 @@ impl CrossChainValidationManager {
             },
         ];
 
-        let zk_statements = vec![
-            ZKProofStatement {
-                statement_id: "financing_amount_sufficient".to_string(),
-                field_name: "loan_amount".to_string(),
-                statement_type: ZKStatementType::GreaterThan {
-                    threshold: 0.0,
-                    field: "loan_amount".to_string(),
-                },
-                public_parameters: HashMap::new(),
-                verification_key: vec![],
+        let zk_statements = vec![ZKProofStatement {
+            statement_id: "financing_amount_sufficient".to_string(),
+            field_name: "loan_amount".to_string(),
+            statement_type: ZKStatementType::GreaterThan {
+                threshold: 0.0,
+                field: "loan_amount".to_string(),
             },
-        ];
+            public_parameters: HashMap::new(),
+            verification_key: vec![],
+        }];
 
         let validator = CrossNetworkValidator {
             source_network: "buyer.hypermesh.online".to_string(),
@@ -281,10 +265,7 @@ impl CrossChainValidationManager {
     ) -> Result<CrossChainValidationResult, CrossChainValidationError> {
         Err(CrossChainValidationError::NetworkValidationFailed {
             network_usage: workflow_name.to_string(),
-            error: format!(
-                "Cross-chain {} workflow validation not yet implemented",
-                workflow_name,
-            ),
+            error: format!("Cross-chain {workflow_name} workflow validation not yet implemented",),
         })
     }
 
@@ -325,21 +306,17 @@ impl CrossChainValidationManager {
     ) -> CrossChainValidationStatus {
         let valid_networks: Vec<String> = network_results
             .iter()
-            .filter_map(|(domain, result)| {
-                match result.status {
-                    ValidationResult::Valid => Some(domain.clone()),
-                    _ => None,
-                }
+            .filter_map(|(domain, result)| match result.status {
+                ValidationResult::Valid => Some(domain.clone()),
+                _ => None,
             })
             .collect();
 
         let failed_networks: Vec<String> = network_results
             .iter()
-            .filter_map(|(domain, result)| {
-                match result.status {
-                    ValidationResult::Invalid { .. } => Some(domain.clone()),
-                    _ => None,
-                }
+            .filter_map(|(domain, result)| match result.status {
+                ValidationResult::Invalid { .. } => Some(domain.clone()),
+                _ => None,
             })
             .collect();
 
@@ -378,14 +355,15 @@ impl CrossChainValidationManager {
     /// Clear expired cache entries
     pub fn cleanup_cache(&mut self) {
         let now = SystemTime::now();
-        self.validation_cache.retain(|_, result| result.expires_at > now);
+        self.validation_cache
+            .retain(|_, result| result.expires_at > now);
     }
 
     /// Add trust relationship between entities
     pub fn add_trust_relationship(&mut self, entity1: String, entity2: String) {
         self.trust_relationships
             .entry(entity1)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(entity2);
     }
 
@@ -477,9 +455,7 @@ mod tests {
         let workflow = BusinessWorkflowType::VehiclePurchase;
         assert!(matches!(workflow, BusinessWorkflowType::VehiclePurchase));
 
-        let custom_workflow = BusinessWorkflowType::Custom(
-            "real_estate_transaction".to_string(),
-        );
+        let custom_workflow = BusinessWorkflowType::Custom("real_estate_transaction".to_string());
         if let BusinessWorkflowType::Custom(name) = custom_workflow {
             assert_eq!(name, "real_estate_transaction");
         } else {
@@ -494,16 +470,12 @@ mod tests {
 
         validator_manager.add_trust_relationship(
             "dealer.hypermesh.online".to_string(),
-            "bank.hypermesh.online".to_string()
+            "bank.hypermesh.online".to_string(),
         );
 
-        assert!(validator_manager.has_trust_relationship(
-            "dealer.hypermesh.online",
-            "bank.hypermesh.online"
-        ));
-        assert!(!validator_manager.has_trust_relationship(
-            "bank.hypermesh.online",
-            "dealer.hypermesh.online"
-        ));
+        assert!(validator_manager
+            .has_trust_relationship("dealer.hypermesh.online", "bank.hypermesh.online"));
+        assert!(!validator_manager
+            .has_trust_relationship("bank.hypermesh.online", "dealer.hypermesh.online"));
     }
 }

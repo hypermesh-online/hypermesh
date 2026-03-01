@@ -18,15 +18,15 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::{
-    ExtensionCapability, ExtensionConfig, ExtensionError,
-    ExtensionMetadata, ExtensionRequest, ExtensionResponse,
-    ExtensionResult, HyperMeshExtension, ValidationReport,
-    AssetExtensionHandler, AssetLibraryExtension,
+    AssetExtensionHandler, AssetLibraryExtension, ExtensionCapability, ExtensionConfig,
+    ExtensionError, ExtensionMetadata, ExtensionRequest, ExtensionResponse, ExtensionResult,
+    HyperMeshExtension, ValidationReport,
 };
 
 use crate::assets::core::{AssetManager, AssetType, PrivacyMode};
 
 /// Unified extension management system for HyperMesh
+#[allow(clippy::type_complexity)]
 pub struct UnifiedExtensionManager {
     /// Loaded extensions
     extensions: Arc<RwLock<HashMap<String, Arc<Box<dyn HyperMeshExtension>>>>>,
@@ -133,9 +133,8 @@ impl UnifiedExtensionManager {
         }
 
         if let Err(e) = extension.initialize(config).await {
-            self.update_extension_state(
-                &extension_id, ExtensionState::Error(e.to_string()),
-            ).await;
+            self.update_extension_state(&extension_id, ExtensionState::Error(e.to_string()))
+                .await;
             return Err(e);
         }
 
@@ -166,7 +165,8 @@ impl UnifiedExtensionManager {
             load_order.push(extension_id.clone());
         }
 
-        self.update_extension_state(&extension_id, ExtensionState::Active).await;
+        self.update_extension_state(&extension_id, ExtensionState::Active)
+            .await;
 
         {
             let mut metrics = self.metrics.write().await;
@@ -180,7 +180,8 @@ impl UnifiedExtensionManager {
     /// Unload an extension
     pub async fn unload_extension(&self, extension_id: &str) -> ExtensionResult<()> {
         info!("Unloading extension: {}", extension_id);
-        self.update_extension_state(extension_id, ExtensionState::Unloading).await;
+        self.update_extension_state(extension_id, ExtensionState::Unloading)
+            .await;
 
         let extension = {
             let mut extensions = self.extensions.write().await;
@@ -192,9 +193,7 @@ impl UnifiedExtensionManager {
         };
 
         if let Err(e) = Arc::get_mut(&mut extension.clone())
-            .ok_or_else(|| ExtensionError::Internal(
-                anyhow::anyhow!("Extension still in use"),
-            ))?
+            .ok_or_else(|| ExtensionError::Internal(anyhow::anyhow!("Extension still in use")))?
             .shutdown()
             .await
         {
@@ -229,7 +228,7 @@ impl UnifiedExtensionManager {
                 metadata: metadata.clone(),
                 state: states
                     .get(&metadata.id)
-                    .map(|s| s.clone())
+                    .cloned()
                     .unwrap_or_else(|| ExtensionStateInfo {
                         id: metadata.id.clone(),
                         state: ExtensionState::Error("Unknown state".to_string()),
@@ -253,7 +252,7 @@ impl UnifiedExtensionManager {
             metadata: metadata.clone(),
             state: states
                 .get(extension_id)
-                .map(|s| s.clone())
+                .cloned()
                 .unwrap_or_else(|| ExtensionStateInfo {
                     id: extension_id.to_string(),
                     state: ExtensionState::Error("Unknown state".to_string()),
@@ -393,8 +392,8 @@ impl UnifiedExtensionManager {
         let manifest_data = std::fs::read_to_string(manifest_path)
             .map_err(|e| ExtensionError::Internal(e.into()))?;
 
-        let manifest: ExtensionManifest = serde_json::from_str(&manifest_data)
-            .map_err(|e| ExtensionError::Internal(e.into()))?;
+        let manifest: ExtensionManifest =
+            serde_json::from_str(&manifest_data).map_err(|e| ExtensionError::Internal(e.into()))?;
 
         Ok(manifest.id)
     }
@@ -410,12 +409,12 @@ impl UnifiedExtensionManager {
         let registry = self.registry.read().await;
         for dep in &metadata.dependencies {
             if !dep.optional {
-                let installed = registry
-                    .get(&dep.extension_id)
-                    .ok_or_else(|| ExtensionError::DependencyResolutionFailed {
+                let installed = registry.get(&dep.extension_id).ok_or_else(|| {
+                    ExtensionError::DependencyResolutionFailed {
                         extension: metadata.id.clone(),
                         dependency: dep.extension_id.clone(),
-                    })?;
+                    }
+                })?;
 
                 if !dep.version_requirement.matches(&installed.version) {
                     return Err(ExtensionError::VersionIncompatible {
@@ -444,7 +443,7 @@ impl UnifiedExtensionManager {
         for cap in &metadata.required_capabilities {
             if !granted_capabilities.contains(cap) {
                 return Err(ExtensionError::CapabilityNotGranted {
-                    capability: format!("{:?}", cap),
+                    capability: format!("{cap:?}"),
                 });
             }
         }
@@ -474,13 +473,15 @@ impl UnifiedExtensionManager {
 
     /// Pause an extension
     pub async fn pause_extension(&self, extension_id: &str) -> ExtensionResult<()> {
-        self.update_extension_state(extension_id, ExtensionState::Paused).await;
+        self.update_extension_state(extension_id, ExtensionState::Paused)
+            .await;
         Ok(())
     }
 
     /// Resume an extension
     pub async fn resume_extension(&self, extension_id: &str) -> ExtensionResult<()> {
-        self.update_extension_state(extension_id, ExtensionState::Active).await;
+        self.update_extension_state(extension_id, ExtensionState::Active)
+            .await;
         Ok(())
     }
 

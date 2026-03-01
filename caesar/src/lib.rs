@@ -16,19 +16,19 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 // Module declarations -- packet-centric EVP modules
-pub mod models;
-pub mod storage;
-pub mod packet_processor;
 pub mod fee_distribution;
 pub mod gold_oracle;
-pub mod routing;
 pub mod holding;
+pub mod models;
+pub mod packet_processor;
+pub mod routing;
+pub mod storage;
 
 // Legacy banking/cross-chain modules (future sprint update)
 pub mod banking_interop_bridge;
 pub mod banking_providers;
-pub mod crypto_exchange_providers;
 pub mod cross_chain_bridge;
+pub mod crypto_exchange_providers;
 
 // Conservation law (whitepaper section 3.1)
 pub mod conservation;
@@ -42,8 +42,8 @@ pub mod cli;
 // Core EVP sub-systems
 pub mod evp;
 pub mod governor;
-pub mod upi;
 pub mod settlement;
+pub mod upi;
 
 // CaesarProtocol impl and orchestration methods
 mod protocol;

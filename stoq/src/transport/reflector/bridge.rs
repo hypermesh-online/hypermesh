@@ -147,10 +147,8 @@ impl ReflectorBridge {
                 block_hashes,
                 peer_height,
             } => {
-                let hashes: Result<Vec<[u8; 32]>> = block_hashes
-                    .iter()
-                    .map(|h| Self::hex_to_hash(h))
-                    .collect();
+                let hashes: Result<Vec<[u8; 32]>> =
+                    block_hashes.iter().map(|h| Self::hex_to_hash(h)).collect();
                 Ok(ReflectorMessage::SyncResponse {
                     network_id: Self::string_to_network_id(network_id)?,
                     block_hashes: hashes?,
@@ -197,8 +195,7 @@ impl ReflectorBridge {
 
     /// Decode a 32-character hex string back to a [`NetworkId`].
     pub fn string_to_network_id(s: &str) -> Result<NetworkId> {
-        let bytes = hex::decode(s)
-            .with_context(|| format!("invalid hex for NetworkId: {}", s))?;
+        let bytes = hex::decode(s).with_context(|| format!("invalid hex for NetworkId: {s}"))?;
         if bytes.len() != 16 {
             anyhow::bail!(
                 "NetworkId hex must be 32 chars (16 bytes), got {} chars ({} bytes)",
@@ -213,8 +210,7 @@ impl ReflectorBridge {
 
     /// Decode a 64-character hex string to a `[u8; 32]` hash.
     fn hex_to_hash(s: &str) -> Result<[u8; 32]> {
-        let bytes = hex::decode(s)
-            .with_context(|| format!("invalid hex for block hash: {}", s))?;
+        let bytes = hex::decode(s).with_context(|| format!("invalid hex for block hash: {s}"))?;
         if bytes.len() != 32 {
             anyhow::bail!(
                 "block hash hex must be 64 chars (32 bytes), got {} chars ({} bytes)",
@@ -260,8 +256,8 @@ mod tests {
             timestamp: 999,
         };
 
-        let bridged = ReflectorBridge::to_matrix_message(&msg)
-            .expect("test: heartbeat should bridge");
+        let bridged =
+            ReflectorBridge::to_matrix_message(&msg).expect("test: heartbeat should bridge");
 
         match bridged {
             BridgedMatrixMessage::ReflectorHeartbeat {
@@ -291,10 +287,9 @@ mod tests {
             requesting_node: "requester".to_string(),
         };
 
-        let bridged = ReflectorBridge::to_matrix_message(&original)
-            .expect("test: should bridge");
-        let back = ReflectorBridge::from_matrix_message(&bridged)
-            .expect("test: should convert back");
+        let bridged = ReflectorBridge::to_matrix_message(&original).expect("test: should bridge");
+        let back =
+            ReflectorBridge::from_matrix_message(&bridged).expect("test: should convert back");
 
         // requesting_node is lost in the bridge (not part of MatrixMessage)
         match back {
@@ -319,8 +314,7 @@ mod tests {
         let s = ReflectorBridge::network_id_to_string(&id);
         assert_eq!(s.len(), 32); // 16 bytes -> 32 hex chars
 
-        let back = ReflectorBridge::string_to_network_id(&s)
-            .expect("test: should decode");
+        let back = ReflectorBridge::string_to_network_id(&s).expect("test: should decode");
         assert_eq!(back, id);
     }
 
@@ -344,8 +338,7 @@ mod tests {
             announcing_node: "announcer".to_string(),
         };
 
-        let bridged = ReflectorBridge::to_matrix_message(&msg)
-            .expect("test: should bridge");
+        let bridged = ReflectorBridge::to_matrix_message(&msg).expect("test: should bridge");
 
         match &bridged {
             BridgedMatrixMessage::SyncAnnounce {
@@ -360,8 +353,8 @@ mod tests {
         }
 
         // Round-trip back
-        let back = ReflectorBridge::from_matrix_message(&bridged)
-            .expect("test: should convert back");
+        let back =
+            ReflectorBridge::from_matrix_message(&bridged).expect("test: should convert back");
         match back {
             ReflectorMessage::BlockAnnounce {
                 block_height,
@@ -385,8 +378,7 @@ mod tests {
             responding_node: "resp".to_string(),
         };
 
-        let bridged = ReflectorBridge::to_matrix_message(&msg)
-            .expect("test: should bridge");
+        let bridged = ReflectorBridge::to_matrix_message(&msg).expect("test: should bridge");
 
         match &bridged {
             BridgedMatrixMessage::SyncResponse {
@@ -402,8 +394,8 @@ mod tests {
         }
 
         // Round-trip
-        let back = ReflectorBridge::from_matrix_message(&bridged)
-            .expect("test: should convert back");
+        let back =
+            ReflectorBridge::from_matrix_message(&bridged).expect("test: should convert back");
         match back {
             ReflectorMessage::SyncResponse {
                 block_hashes: bh,

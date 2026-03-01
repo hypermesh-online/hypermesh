@@ -127,8 +127,7 @@ impl ScopeBridgeProxy {
             bytes_transferred: 0,
             started_at: Instant::now(),
         };
-        self.active_transfers
-            .insert(transfer_id.clone(), transfer);
+        self.active_transfers.insert(transfer_id.clone(), transfer);
         self.stats
             .transfers_initiated
             .fetch_add(1, Ordering::Relaxed);
@@ -148,25 +147,14 @@ impl ScopeBridgeProxy {
     ///
     /// [`GatewayError::ScopeRouting`] if the transfer does not exist or has
     /// already completed/failed.
-    pub fn record_bytes(
-        &self,
-        transfer_id: &str,
-        bytes: u64,
-    ) -> Result<(), GatewayError> {
-        let mut entry = self
-            .active_transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| {
-                GatewayError::ScopeRouting(format!(
-                    "transfer '{}' not found",
-                    transfer_id
-                ))
-            })?;
+    pub fn record_bytes(&self, transfer_id: &str, bytes: u64) -> Result<(), GatewayError> {
+        let mut entry = self.active_transfers.get_mut(transfer_id).ok_or_else(|| {
+            GatewayError::ScopeRouting(format!("transfer '{transfer_id}' not found"))
+        })?;
         match entry.state {
             TransferState::Completed | TransferState::Failed => {
                 return Err(GatewayError::ScopeRouting(format!(
-                    "transfer '{}' already finalised",
-                    transfer_id
+                    "transfer '{transfer_id}' already finalised"
                 )));
             }
             TransferState::Pending => {
@@ -191,15 +179,9 @@ impl ScopeBridgeProxy {
     ///
     /// [`GatewayError::ScopeRouting`] if the transfer does not exist.
     pub fn complete_transfer(&self, transfer_id: &str) -> Result<(), GatewayError> {
-        let mut entry = self
-            .active_transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| {
-                GatewayError::ScopeRouting(format!(
-                    "transfer '{}' not found",
-                    transfer_id
-                ))
-            })?;
+        let mut entry = self.active_transfers.get_mut(transfer_id).ok_or_else(|| {
+            GatewayError::ScopeRouting(format!("transfer '{transfer_id}' not found"))
+        })?;
         entry.state = TransferState::Completed;
         self.stats
             .transfers_completed
@@ -216,24 +198,12 @@ impl ScopeBridgeProxy {
     /// # Errors
     ///
     /// [`GatewayError::ScopeRouting`] if the transfer does not exist.
-    pub fn fail_transfer(
-        &self,
-        transfer_id: &str,
-        reason: &str,
-    ) -> Result<(), GatewayError> {
-        let mut entry = self
-            .active_transfers
-            .get_mut(transfer_id)
-            .ok_or_else(|| {
-                GatewayError::ScopeRouting(format!(
-                    "transfer '{}' not found",
-                    transfer_id
-                ))
-            })?;
+    pub fn fail_transfer(&self, transfer_id: &str, reason: &str) -> Result<(), GatewayError> {
+        let mut entry = self.active_transfers.get_mut(transfer_id).ok_or_else(|| {
+            GatewayError::ScopeRouting(format!("transfer '{transfer_id}' not found"))
+        })?;
         entry.state = TransferState::Failed;
-        self.stats
-            .transfers_failed
-            .fetch_add(1, Ordering::Relaxed);
+        self.stats.transfers_failed.fetch_add(1, Ordering::Relaxed);
         warn!(
             "transfer {} failed: {} ({} bytes transferred)",
             transfer_id, reason, entry.bytes_transferred
@@ -327,8 +297,7 @@ mod tests {
     #[test]
     fn same_scope_transfer_rejected() {
         let proxy = ScopeBridgeProxy::new();
-        let result =
-            proxy.start_transfer(BlockchainScope::Device, BlockchainScope::Device);
+        let result = proxy.start_transfer(BlockchainScope::Device, BlockchainScope::Device);
         assert!(result.is_err());
     }
 
@@ -427,9 +396,7 @@ mod tests {
         proxy.complete_transfer(&id1).expect("test: complete");
         assert_eq!(proxy.active_count(), 1);
 
-        proxy
-            .fail_transfer(&id2, "reason")
-            .expect("test: fail");
+        proxy.fail_transfer(&id2, "reason").expect("test: fail");
         assert_eq!(proxy.active_count(), 0);
     }
 

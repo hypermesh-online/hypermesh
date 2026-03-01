@@ -8,15 +8,11 @@
 
 mod common;
 
-use catalog::security::{
-    SecurityManager, SecurityConfig, TrustLevel,
-    PolicyEngine
-};
 use catalog::assets::AssetPackage;
 use catalog::distribution::DistributionConfig;
+use catalog::security::{PolicyEngine, SecurityConfig, SecurityManager, TrustLevel};
 
 use anyhow::Result;
-use tokio;
 
 /// Create a test package
 fn create_test_package(name: &str) -> AssetPackage {
@@ -31,9 +27,13 @@ async fn test_security_manager_initialization() -> Result<()> {
     let config = SecurityConfig::default();
     let security_manager = SecurityManager::new(config).await?;
 
-    assert!(security_manager.get_metrics().packages_verified.load(
-        std::sync::atomic::Ordering::Relaxed
-    ) == 0);
+    assert!(
+        security_manager
+            .get_metrics()
+            .packages_verified
+            .load(std::sync::atomic::Ordering::Relaxed)
+            == 0
+    );
 
     Ok(())
 }
@@ -131,7 +131,7 @@ async fn test_distribution_with_security() -> Result<()> {
 async fn test_certificate_validation_flow() -> Result<()> {
     use catalog::security::trustchain::TrustChainConfig;
 
-    let config = TrustChainConfig {
+    let _config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
         enable_pqc: true,
         cert_cache_ttl: 3600,
@@ -145,7 +145,7 @@ async fn test_certificate_validation_flow() -> Result<()> {
 
 #[tokio::test]
 async fn test_security_policy_evaluation() -> Result<()> {
-    use catalog::security::{VerificationResult, PolicyResult};
+    use catalog::security::{PolicyResult, VerificationResult};
 
     let engine = PolicyEngine::new(TrustLevel::Moderate);
 
@@ -183,16 +183,22 @@ async fn test_blacklist_whitelist() -> Result<()> {
     let mut security_manager = SecurityManager::new(config).await?;
 
     // Test blacklisting
-    security_manager.blacklist_publisher("malicious-publisher".to_string()).await;
+    security_manager
+        .blacklist_publisher("malicious-publisher".to_string())
+        .await;
 
     // Test whitelisting
-    security_manager.whitelist_publisher("trusted-publisher".to_string()).await;
+    security_manager
+        .whitelist_publisher("trusted-publisher".to_string())
+        .await;
 
     // Test certificate pinning
-    security_manager.pin_certificate(
-        "important-publisher".to_string(),
-        "abc123def456".to_string()
-    ).await;
+    security_manager
+        .pin_certificate(
+            "important-publisher".to_string(),
+            "abc123def456".to_string(),
+        )
+        .await;
 
     Ok(())
 }
@@ -232,15 +238,15 @@ async fn test_signature_algorithms() -> Result<()> {
         match algo {
             SignatureAlgorithm::Falcon1024 => {
                 // FALCON-1024 post-quantum signature
-                assert_eq!(format!("{:?}", algo), "Falcon1024");
+                assert_eq!(format!("{algo:?}"), "Falcon1024");
             }
             SignatureAlgorithm::Ed25519 => {
                 // ED25519 elliptic curve signature
-                assert_eq!(format!("{:?}", algo), "Ed25519");
+                assert_eq!(format!("{algo:?}"), "Ed25519");
             }
             SignatureAlgorithm::HybridFalconEd25519 => {
                 // Hybrid signature for maximum security
-                assert_eq!(format!("{:?}", algo), "HybridFalconEd25519");
+                assert_eq!(format!("{algo:?}"), "HybridFalconEd25519");
             }
         }
     }
@@ -262,9 +268,9 @@ fn test_trust_levels() {
 
     for level in levels {
         match level {
-            TrustLevel::Strict => assert_eq!(format!("{:?}", level), "Strict"),
-            TrustLevel::Moderate => assert_eq!(format!("{:?}", level), "Moderate"),
-            TrustLevel::Permissive => assert_eq!(format!("{:?}", level), "Permissive"),
+            TrustLevel::Strict => assert_eq!(format!("{level:?}"), "Strict"),
+            TrustLevel::Moderate => assert_eq!(format!("{level:?}"), "Moderate"),
+            TrustLevel::Permissive => assert_eq!(format!("{level:?}"), "Permissive"),
             TrustLevel::Custom(name) => assert_eq!(name, "enterprise"),
         }
     }
@@ -274,7 +280,7 @@ fn test_trust_levels() {
 fn test_publisher_types() {
     use catalog::security::PublisherType;
 
-    let types = vec![
+    let types = [
         PublisherType::Individual,
         PublisherType::Organization,
         PublisherType::Community,

@@ -7,30 +7,30 @@
 //! This module implements the four-proof consensus system extracted from Proof of State
 //! for use in TrustChain certificate operations and CT log validation.
 
-use serde::{Serialize, Deserialize};
-use std::time::{SystemTime, Duration};
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use std::time::{Duration, SystemTime};
 
-pub mod proof;
-pub mod validator;
-pub mod validation;
 pub mod asset_integration;
 pub mod block_matrix;
 pub mod hypermesh_client;
+pub mod proof;
 pub mod real_validator;
+pub mod validation;
+pub mod validator;
 
-pub use proof::*;
-#[allow(ambiguous_glob_reexports)]
-pub use validator::*;
-pub use validation::*;
 pub use asset_integration::*;
 pub use block_matrix::*;
 #[allow(ambiguous_glob_reexports)]
 pub use hypermesh_client::*;
+pub use proof::*;
+pub use validation::*;
+#[allow(ambiguous_glob_reexports)]
+pub use validator::*;
 
 /// Proof of State Four-Proof Consensus System
 /// Based on the reference implementation from /home/persist/repos/personal/Proof of State/src/mods/proof.rs
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct ConsensusProof {
     /// WHO owns/validates (economic security)
     pub stake_proof: StakeProof,
@@ -95,39 +95,40 @@ impl ConsensusProof {
 
         // Create space proof with proper total_size
         let mut space_proof = SpaceProof::new(
-            "test_node_001".to_string(),  // node_id
-            "test_storage_path".to_string(),  // storage_path
-            100 * 1024 * 1024 * 1024  // 100GB total_storage
+            "test_node_001".to_string(),     // node_id
+            "test_storage_path".to_string(), // storage_path
+            100 * 1024 * 1024 * 1024,        // 100GB total_storage
         );
         // Set total_size to a non-zero value (50GB used)
         space_proof.total_size = 50 * 1024 * 1024 * 1024;
-        space_proof.file_hash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
+        space_proof.file_hash =
+            "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
 
         Self {
             stake_proof: StakeProof::new(
                 "test_stake_holder".to_string(),
                 "test_node_001".to_string(),
-                10000  // Sufficient stake amount for validation
+                10000, // Sufficient stake amount for validation
             ),
-            time_proof: TimeProof::new(Duration::from_secs(1)),  // Valid time offset
+            time_proof: TimeProof::new(Duration::from_secs(1)), // Valid time offset
             space_proof,
             work_proof: WorkProof::new(
                 "test_owner".to_string(),
                 "test_workload_001".to_string(),
-                1234,  // PID
-                1000,  // Valid computational power (>16 for CPU validation)
-                WorkloadType::Compute,  // General computation
-                WorkState::Running
+                1234,                  // PID
+                1000,                  // Valid computational power (>16 for CPU validation)
+                WorkloadType::Compute, // General computation
+                WorkState::Running,
             ),
         }
     }
 
     /// Validate all four proofs
     pub fn validate(&self) -> bool {
-        self.stake_proof.validate() &&
-        self.time_proof.validate() &&
-        self.space_proof.validate() &&
-        self.work_proof.validate()
+        self.stake_proof.validate()
+            && self.time_proof.validate()
+            && self.space_proof.validate()
+            && self.work_proof.validate()
     }
 
     /// Comprehensive validation of all four proofs with detailed error reporting
@@ -175,12 +176,12 @@ impl ConsensusProof {
 
     /// Serialize for network transmission
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        bincode::serialize(self).map_err(|e| anyhow!("Failed to serialize ConsensusProof: {}", e))
+        bincode::serialize(self).map_err(|e| anyhow!("Failed to serialize ConsensusProof: {e}"))
     }
 
     /// Deserialize from network transmission
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|e| anyhow!("Failed to deserialize ConsensusProof: {}", e))
+        bincode::deserialize(data).map_err(|e| anyhow!("Failed to deserialize ConsensusProof: {e}"))
     }
 
     /// Generate cryptographic hash of the consensus proof (BLAKE3)
@@ -191,16 +192,6 @@ impl ConsensusProof {
 }
 
 // STUB: Phase 3 - Default implementation for ConsensusProof
-impl Default for ConsensusProof {
-    fn default() -> Self {
-        Self {
-            stake_proof: StakeProof::default(),
-            time_proof: TimeProof::default(),
-            space_proof: SpaceProof::default(),
-            work_proof: WorkProof::default(),
-        }
-    }
-}
 
 /// Requirements for consensus validation
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -220,11 +211,11 @@ pub struct ConsensusRequirements {
 impl Default for ConsensusRequirements {
     fn default() -> Self {
         Self {
-            minimum_stake: 5000,                          // 5K tokens minimum
-            max_time_offset: Duration::from_secs(60),     // 60 second max offset
-            minimum_storage: 1024 * 1024 * 1024,         // 1GB minimum
-            minimum_compute: 1000,                        // 1000 compute units
-            byzantine_tolerance: 0.33,                    // 33% Byzantine tolerance
+            minimum_stake: 5000,                      // 5K tokens minimum
+            max_time_offset: Duration::from_secs(60), // 60 second max offset
+            minimum_storage: 1024 * 1024 * 1024,      // 1GB minimum
+            minimum_compute: 1000,                    // 1000 compute units
+            byzantine_tolerance: 0.33,                // 33% Byzantine tolerance
         }
     }
 }
@@ -233,21 +224,21 @@ impl Default for ConsensusRequirements {
 impl ConsensusRequirements {
     pub fn production() -> Self {
         Self {
-            minimum_stake: 50000,                         // 50K tokens for production
-            max_time_offset: Duration::from_secs(30),     // 30 second max offset
-            minimum_storage: 10 * 1024 * 1024 * 1024,    // 10GB minimum
-            minimum_compute: 10000,                       // 10K compute units
-            byzantine_tolerance: 0.33,                    // 33% Byzantine tolerance
+            minimum_stake: 50000,                     // 50K tokens for production
+            max_time_offset: Duration::from_secs(30), // 30 second max offset
+            minimum_storage: 10 * 1024 * 1024 * 1024, // 10GB minimum
+            minimum_compute: 10000,                   // 10K compute units
+            byzantine_tolerance: 0.33,                // 33% Byzantine tolerance
         }
     }
 
     pub fn localhost_testing() -> Self {
         Self {
-            minimum_stake: 100,                           // 100 tokens for testing
-            max_time_offset: Duration::from_secs(300),    // 5 minute max offset
-            minimum_storage: 1024 * 1024,                // 1MB minimum
-            minimum_compute: 10,                          // 10 compute units
-            byzantine_tolerance: 0.0,                     // No Byzantine tolerance for testing
+            minimum_stake: 100,                        // 100 tokens for testing
+            max_time_offset: Duration::from_secs(300), // 5 minute max offset
+            minimum_storage: 1024 * 1024,              // 1MB minimum
+            minimum_compute: 10,                       // 10 compute units
+            byzantine_tolerance: 0.0,                  // No Byzantine tolerance for testing
         }
     }
 }
@@ -335,7 +326,10 @@ mod tests {
         let bytes = proof.to_bytes()?;
         let deserialized = ConsensusProof::from_bytes(&bytes)?;
 
-        assert_eq!(proof.stake_proof.stake_amount, deserialized.stake_proof.stake_amount);
+        assert_eq!(
+            proof.stake_proof.stake_amount,
+            deserialized.stake_proof.stake_amount
+        );
         Ok(())
     }
 
@@ -355,10 +349,22 @@ mod tests {
         let proof = ConsensusProof::new_for_testing();
 
         // Check that all components have valid values
-        assert!(proof.space_proof.total_size > 0, "Space proof should have non-zero total_size");
-        assert!(proof.stake_proof.stake_amount >= 50, "Stake proof should have sufficient amount for CPU validation");
-        assert!(proof.work_proof.computational_power >= 16, "Work proof should have sufficient computational power for CPU");
-        assert!(proof.time_proof.nonce > 0, "Time proof should have non-zero nonce");
+        assert!(
+            proof.space_proof.total_size > 0,
+            "Space proof should have non-zero total_size"
+        );
+        assert!(
+            proof.stake_proof.stake_amount >= 50,
+            "Stake proof should have sufficient amount for CPU validation"
+        );
+        assert!(
+            proof.work_proof.computational_power >= 16,
+            "Work proof should have sufficient computational power for CPU"
+        );
+        assert!(
+            proof.time_proof.nonce > 0,
+            "Time proof should have non-zero nonce"
+        );
 
         // Validate the overall proof
         assert!(proof.validate(), "Test proof should pass validation");

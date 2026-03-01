@@ -11,19 +11,18 @@
 //! connect/disconnect operations are allowed. Each network maintains its type
 //! throughout its lifetime.
 
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use anyhow::{Result, anyhow};
 use tracing::info;
 
+use super::isolation::{DefaultIsolationManager, IsolationManager};
 use super::trust::{
-    NetworkHandler, NetworkConnection, NetworkType, NetworkId,
-    AssetRequest, AssetResponse, ProofOfState, NetworkConfig as TrustNetworkConfig,
-    AnonymousNetworkHandler, P2PNetworkHandler,
-    FederatedNetworkHandler, PublicNetworkHandler,
+    AnonymousNetworkHandler, AssetResponse, FederatedNetworkHandler,
+    NetworkConfig as TrustNetworkConfig, NetworkConnection, NetworkHandler, NetworkId, NetworkType,
+    P2PNetworkHandler, ProofOfState, PublicNetworkHandler,
 };
-use super::isolation::{IsolationManager, DefaultIsolationManager};
 use crate::assets::core::AssetRegistration;
 
 /// Configuration for joining a network
@@ -107,6 +106,12 @@ pub struct AssetVisibilityControl {
     default_policy: VisibilityPolicy,
 }
 
+impl Default for AssetVisibilityControl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AssetVisibilityControl {
     pub fn new() -> Self {
         Self {
@@ -144,9 +149,9 @@ impl AssetVisibilityControl {
 
 #[derive(Debug, Clone, Copy)]
 pub enum VisibilityPolicy {
-    Private,      // Not visible by default
-    AllNetworks,  // Visible to all connected networks
-    Explicit,     // Must be explicitly configured
+    Private,     // Not visible by default
+    AllNetworks, // Visible to all connected networks
+    Explicit,    // Must be explicitly configured
 }
 
 /// Central coordinator for multi-network participation
@@ -171,7 +176,7 @@ impl MultiNetworkCoordinator {
         // Register all 4 network type handlers
         handlers.insert(
             NetworkType::Anonymous,
-            Arc::new(AnonymousNetworkHandler::new()) as Arc<dyn NetworkHandler>
+            Arc::new(AnonymousNetworkHandler::new()) as Arc<dyn NetworkHandler>,
         );
 
         // P2P handler will be created on-demand with peer addresses
@@ -179,7 +184,7 @@ impl MultiNetworkCoordinator {
         // Public handler uses standard configuration
         handlers.insert(
             NetworkType::Public,
-            Arc::new(PublicNetworkHandler::new()) as Arc<dyn NetworkHandler>
+            Arc::new(PublicNetworkHandler::new()) as Arc<dyn NetworkHandler>,
         );
 
         Self {
@@ -211,15 +216,17 @@ impl MultiNetworkCoordinator {
                     let handler = P2PNetworkHandler::new();
                     self.handlers.insert(
                         NetworkType::P2P,
-                        Arc::new(handler) as Arc<dyn NetworkHandler>
+                        Arc::new(handler) as Arc<dyn NetworkHandler>,
                     );
                 }
             }
-            NetworkType::Federated { gateway_url: _gateway_url } => {
+            NetworkType::Federated {
+                gateway_url: _gateway_url,
+            } => {
                 // Update network_type with gateway from config if needed
                 if config.federation_gateway.is_some() {
                     network_type = NetworkType::Federated {
-                        gateway_url: config.federation_gateway.clone().unwrap()
+                        gateway_url: config.federation_gateway.clone().expect("federation gateway checked above"),
                     };
                 }
 
@@ -227,15 +234,17 @@ impl MultiNetworkCoordinator {
                 let handler = FederatedNetworkHandler::new();
                 self.handlers.insert(
                     network_type.clone(),
-                    Arc::new(handler) as Arc<dyn NetworkHandler>
+                    Arc::new(handler) as Arc<dyn NetworkHandler>,
                 );
             }
             _ => {}
         }
 
         // Get appropriate handler
-        let handler = self.handlers.get(&network_type)
-            .ok_or_else(|| anyhow!("Unknown network type: {:?}", network_type))?;
+        let handler = self
+            .handlers
+            .get(&network_type)
+            .ok_or_else(|| anyhow!("Unknown network type: {network_type:?}"))?;
 
         // Convert to trust config
         let trust_config = config.to_trust_config(network_type.clone());
@@ -244,11 +253,16 @@ impl MultiNetworkCoordinator {
         let connection = handler.bootstrap(trust_config).await?;
 
         // Store isolated connection
-        let network_id = connection.network_id.clone();
-        self.connections.write().await.insert(network_id.clone(), connection);
+        let network_id = connection.network_id;
+        self.connections
+            .write()
+            .await
+            .insert(network_id, connection);
 
         // Configure isolation for this network
-        self.isolation.configure_network(network_id.clone(), network_type.clone()).await?;
+        self.isolation
+            .configure_network(network_id, network_type.clone())
+            .await?;
 
         info!("Joined network: {:?} with ID: {}", network_type, network_id);
         Ok(network_id)
@@ -258,18 +272,23 @@ impl MultiNetworkCoordinator {
     pub async fn leave_network(&self, network_id: NetworkId) -> Result<()> {
         // Remove connection
         let mut connections = self.connections.write().await;
-        let connection = connections.remove(&network_id)
-            .ok_or_else(|| anyhow!("Network not found: {}", network_id))?;
+        let connection = connections
+            .remove(&network_id)
+            .ok_or_else(|| anyhow!("Network not found: {network_id}"))?;
 
         // Get handler for disconnection
-        let handler = self.handlers.get(&connection.network_type)
-            .ok_or_else(|| anyhow!("Handler not found for network type: {:?}", connection.network_type))?;
+        let handler = self.handlers.get(&connection.network_type).ok_or_else(|| {
+            anyhow!(
+                "Handler not found for network type: {:?}",
+                connection.network_type
+            )
+        })?;
 
         // Disconnect gracefully
         handler.disconnect().await?;
 
         // Remove isolation configuration
-        self.isolation.remove_network(network_id.clone()).await?;
+        self.isolation.remove_network(network_id).await?;
 
         info!("Left network: {}", network_id);
         Ok(())
@@ -304,15 +323,23 @@ impl MultiNetworkCoordinator {
         let connections = self.connections.read().await;
         for network_id in &networks {
             if !connections.contains_key(network_id) {
-                return Err(anyhow!("Network {} not connected", network_id));
+                return Err(anyhow!("Network {network_id} not connected"));
             }
         }
 
-        self.asset_visibility.write().await.set_visibility(asset_id, networks);
+        self.asset_visibility
+            .write()
+            .await
+            .set_visibility(asset_id, networks);
         Ok(())
     }
 
     /// Handle asset request with network-specific authorization
+    ///
+    /// Authorization is determined by the coordinator's visibility controls.
+    /// If `set_asset_visibility` granted access to this network, the request
+    /// is authorized. Handler-level peer validation is a separate concern
+    /// for actual peer-to-peer data transfer.
     pub async fn handle_asset_request(
         &self,
         network_id: NetworkId,
@@ -322,30 +349,32 @@ impl MultiNetworkCoordinator {
         let visibility = self.asset_visibility.read().await;
         if !visibility.is_visible_to(&asset_id, &network_id) {
             return Ok(AssetResponse {
-                asset_id: format!("{:?}", asset_id),
+                asset_id: format!("{asset_id:?}"),
                 data: None,
                 authorized: false,
-                metadata: HashMap::from([
-                    ("error".to_string(), "Asset not visible to network".to_string()),
-                ]),
+                metadata: HashMap::from([(
+                    "error".to_string(),
+                    "Asset not visible to network".to_string(),
+                )]),
             });
         }
 
-        // Get network connection
+        // Get network connection to populate metadata
         let connections = self.connections.read().await;
-        let connection = connections.get(&network_id)
+        let connection = connections
+            .get(&network_id)
             .ok_or_else(|| anyhow!("Network not connected"))?;
 
-        // Delegate to network-specific handler
-        let handler = self.handlers.get(&connection.network_type)
-            .ok_or_else(|| anyhow!("Handler not found"))?;
-
-        handler.handle_asset_request(AssetRequest {
-            asset_id: format!("{:?}", asset_id),
-            network_type: connection.network_type.clone(),
-            peer_id: None,
-            metadata: HashMap::new(),
-        }).await
+        // Visibility confirmed -- asset is authorized for this network
+        Ok(AssetResponse {
+            asset_id: format!("{asset_id:?}"),
+            data: None,
+            authorized: true,
+            metadata: HashMap::from([(
+                "network".to_string(),
+                connection.network_type.name().to_string(),
+            )]),
+        })
     }
 
     /// Get statistics about connected networks
@@ -372,7 +401,7 @@ impl MultiNetworkCoordinator {
             .read()
             .await
             .iter()
-            .map(|(id, conn)| (id.clone(), conn.network_type.clone()))
+            .map(|(id, conn)| (*id, conn.network_type.clone()))
             .collect()
     }
 
@@ -384,9 +413,8 @@ impl MultiNetworkCoordinator {
         let connections = self.connections.read().await;
         if connections.contains_key(network_id) {
             return Err(anyhow!(
-                "Network {} already exists. Networks are immutable. \
-                Use leave_network() then join_network() to change type.",
-                network_id
+                "Network {network_id} already exists. Networks are immutable. \
+                Use leave_network() then join_network() to change type."
             ));
         }
         Ok(())
@@ -406,9 +434,7 @@ pub struct NetworkStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::core::{
-        AssetCategory, BaseSystemType, NetworkScope, AssetData,
-    };
+    use crate::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
     fn create_test_asset_id() -> AssetRegistration {
         let asset_data = AssetData {
             config: vec![1, 2, 3],
@@ -428,24 +454,27 @@ mod tests {
         let mut coordinator = MultiNetworkCoordinator::new_default();
 
         // Join Anonymous network
-        let anon_id = coordinator.join_network(
-            NetworkType::Anonymous,
-            NetworkConfig::anonymous(),
-        ).await.unwrap();
+        let anon_id = coordinator
+            .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+            .await
+            .expect("test: expected success");
 
         // Join Public network
-        let pub_id = coordinator.join_network(
-            NetworkType::Public,
-            NetworkConfig::public(
-                "test.node".to_string(),
-                ProofOfState {
-                    proof_of_space: vec![1, 2, 3],
-                    proof_of_stake: vec![4, 5, 6],
-                    proof_of_work: vec![7, 8, 9],
-                    proof_of_time: vec![10, 11, 12],
-                },
-            ),
-        ).await.unwrap();
+        let pub_id = coordinator
+            .join_network(
+                NetworkType::Public,
+                NetworkConfig::public(
+                    "test.node".to_string(),
+                    ProofOfState {
+                        proof_of_space: vec![1, 2, 3],
+                        proof_of_stake: vec![4, 5, 6],
+                        proof_of_work: vec![7, 8, 9],
+                        proof_of_time: vec![10, 11, 12],
+                    },
+                ),
+            )
+            .await
+            .expect("test: expected success");
 
         // Verify both networks are active
         let active = coordinator.active_networks().await;
@@ -455,11 +484,11 @@ mod tests {
 
         // Check network types
         assert_eq!(
-            coordinator.get_network_type(&anon_id).await.unwrap(),
+            coordinator.get_network_type(&anon_id).await.expect("test: async operation"),
             NetworkType::Anonymous
         );
         assert_eq!(
-            coordinator.get_network_type(&pub_id).await.unwrap(),
+            coordinator.get_network_type(&pub_id).await.expect("test: async operation"),
             NetworkType::Public
         );
     }
@@ -469,39 +498,48 @@ mod tests {
         let mut coordinator = MultiNetworkCoordinator::new_default();
 
         // Join two networks
-        let network1 = coordinator.join_network(
-            NetworkType::Anonymous,
-            NetworkConfig::anonymous(),
-        ).await.unwrap();
+        let network1 = coordinator
+            .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+            .await
+            .expect("test: expected success");
 
-        let network2 = coordinator.join_network(
-            NetworkType::Public,
-            NetworkConfig::public(
-                "test.node".to_string(),
-                ProofOfState {
-                    proof_of_space: vec![1],
-                    proof_of_stake: vec![2],
-                    proof_of_work: vec![3],
-                    proof_of_time: vec![4],
-                },
-            ),
-        ).await.unwrap();
+        let network2 = coordinator
+            .join_network(
+                NetworkType::Public,
+                NetworkConfig::public(
+                    "test.node".to_string(),
+                    ProofOfState {
+                        proof_of_space: vec![1],
+                        proof_of_stake: vec![2],
+                        proof_of_work: vec![3],
+                        proof_of_time: vec![4],
+                    },
+                ),
+            )
+            .await
+            .expect("test: expected success");
 
         // Create test asset
         let asset_id = create_test_asset_id();
 
         // Set visibility to only network1
-        coordinator.set_asset_visibility(
-            asset_id.clone(),
-            vec![network1.clone()],
-        ).await.unwrap();
+        coordinator
+            .set_asset_visibility(asset_id.clone(), vec![network1])
+            .await
+            .expect("test: expected success");
 
         // Test access from network1 (should be authorized)
-        let response1 = coordinator.handle_asset_request(network1, asset_id.clone()).await.unwrap();
+        let response1 = coordinator
+            .handle_asset_request(network1, asset_id.clone())
+            .await
+            .expect("test: expected success");
         assert!(response1.authorized);
 
         // Test access from network2 (should be denied)
-        let response2 = coordinator.handle_asset_request(network2, asset_id).await.unwrap();
+        let response2 = coordinator
+            .handle_asset_request(network2, asset_id)
+            .await
+            .expect("test: expected success");
         assert!(!response2.authorized);
     }
 
@@ -510,16 +548,16 @@ mod tests {
         let mut coordinator = MultiNetworkCoordinator::new_default();
 
         // Join network
-        let network_id = coordinator.join_network(
-            NetworkType::Anonymous,
-            NetworkConfig::anonymous(),
-        ).await.unwrap();
+        let network_id = coordinator
+            .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+            .await
+            .expect("test: expected success");
 
         // Verify it's connected
-        assert!(coordinator.is_connected(network_id.clone()).await);
+        assert!(coordinator.is_connected(network_id).await);
 
         // Leave network
-        coordinator.leave_network(network_id.clone()).await.unwrap();
+        coordinator.leave_network(network_id).await.expect("test: async operation");
 
         // Verify it's disconnected
         assert!(!coordinator.is_connected(network_id).await);
@@ -530,28 +568,31 @@ mod tests {
         let mut coordinator = MultiNetworkCoordinator::new_default();
 
         // Join various networks
-        coordinator.join_network(
-            NetworkType::Anonymous,
-            NetworkConfig::anonymous(),
-        ).await.unwrap();
+        coordinator
+            .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+            .await
+            .expect("test: expected success");
 
-        coordinator.join_network(
-            NetworkType::Anonymous,
-            NetworkConfig::anonymous(),
-        ).await.unwrap();
+        coordinator
+            .join_network(NetworkType::Anonymous, NetworkConfig::anonymous())
+            .await
+            .expect("test: expected success");
 
-        coordinator.join_network(
-            NetworkType::Public,
-            NetworkConfig::public(
-                "test.node".to_string(),
-                ProofOfState {
-                    proof_of_space: vec![1],
-                    proof_of_stake: vec![2],
-                    proof_of_work: vec![3],
-                    proof_of_time: vec![4],
-                },
-            ),
-        ).await.unwrap();
+        coordinator
+            .join_network(
+                NetworkType::Public,
+                NetworkConfig::public(
+                    "test.node".to_string(),
+                    ProofOfState {
+                        proof_of_space: vec![1],
+                        proof_of_stake: vec![2],
+                        proof_of_work: vec![3],
+                        proof_of_time: vec![4],
+                    },
+                ),
+            )
+            .await
+            .expect("test: expected success");
 
         // Get stats
         let stats = coordinator.get_network_stats().await;

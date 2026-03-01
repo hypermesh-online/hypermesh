@@ -4,12 +4,12 @@
 
 //! Performance benchmarks for instruction-based retrieval system
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use blockmatrix::retrieval::{
-    InstructionTransmitter, CompressionFormat, RetrievalPlan,
-    CompleteShardMap, ShardMapEntry, ShardLocation, RetrievalMetadata,
-};
 use blockmatrix::matrix::MatrixCoordinate;
+use blockmatrix::retrieval::{
+    CompleteShardMap, CompressionFormat, InstructionTransmitter, RetrievalMetadata, RetrievalPlan,
+    ShardLocation, ShardMapEntry,
+};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 fn create_test_plan(shard_count: usize, replicas_per_shard: usize) -> RetrievalPlan {
     let content_hash = [1u8; 32];
@@ -18,12 +18,7 @@ fn create_test_plan(shard_count: usize, replicas_per_shard: usize) -> RetrievalP
     for i in 0..shard_count {
         let shard_hash = [(i % 256) as u8; 32];
         let locations: Vec<ShardLocation> = (0..replicas_per_shard)
-            .map(|r| {
-                ShardLocation::new(
-                    MatrixCoordinate::new(i as i64, r as i64, 0).unwrap(),
-                    0.9,
-                )
-            })
+            .map(|r| ShardLocation::new(MatrixCoordinate::new(i as i64, r as i64, 0).unwrap(), 0.9))
             .collect();
 
         let entry = ShardMapEntry::new(shard_hash, locations);
@@ -74,9 +69,11 @@ fn bench_instruction_encoding(c: &mut Criterion) {
         CompressionFormat::Brotli,
         CompressionFormat::Zstd,
         CompressionFormat::MessagePack,
-    ].iter() {
+    ]
+    .iter()
+    {
         group.bench_with_input(
-            BenchmarkId::new("format", format!("{:?}", format)),
+            BenchmarkId::new("format", format!("{format:?}")),
             format,
             |b, format| {
                 let transmitter = InstructionTransmitter::new(*format);
@@ -100,12 +97,14 @@ fn bench_instruction_decoding(c: &mut Criterion) {
         CompressionFormat::Brotli,
         CompressionFormat::Zstd,
         CompressionFormat::MessagePack,
-    ].iter() {
+    ]
+    .iter()
+    {
         let transmitter = InstructionTransmitter::new(*format);
         let encoded = transmitter.encode(&plan).unwrap();
 
         group.bench_with_input(
-            BenchmarkId::new("format", format!("{:?}", format)),
+            BenchmarkId::new("format", format!("{format:?}")),
             format,
             |b, format| {
                 let transmitter = InstructionTransmitter::new(*format);
@@ -171,9 +170,11 @@ fn bench_compression_ratio(c: &mut Criterion) {
         CompressionFormat::Brotli,
         CompressionFormat::Zstd,
         CompressionFormat::MessagePack,
-    ].iter() {
+    ]
+    .iter()
+    {
         group.bench_with_input(
-            BenchmarkId::new("format", format!("{:?}", format)),
+            BenchmarkId::new("format", format!("{format:?}")),
             format,
             |b, format| {
                 let transmitter = InstructionTransmitter::new(*format);
@@ -216,15 +217,12 @@ fn bench_shard_map_operations(c: &mut Criterion) {
 }
 
 fn bench_replica_selection(c: &mut Criterion) {
-    use blockmatrix::retrieval::{FallbackManager, FallbackStrategy};
     use blockmatrix::retrieval::fallback::SelectionCriteria;
+    use blockmatrix::retrieval::{FallbackManager, FallbackStrategy};
 
     let mut group = c.benchmark_group("replica_selection");
 
-    let manager = FallbackManager::new(
-        SelectionCriteria::default(),
-        FallbackStrategy::Adaptive,
-    );
+    let manager = FallbackManager::new(SelectionCriteria::default(), FallbackStrategy::Adaptive);
 
     let shard_hash = [1u8; 32];
     let locations: Vec<ShardLocation> = (0..10)

@@ -9,12 +9,10 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::privacy::{
-    PrivacySystem, PrivacyConfig, PrivacyMode, TrustLevel,
-    PrivacyFlexibilityMatrix, TierSwitcher, PolicyManager,
-    PolicyAction, PolicyDecision, ActionType, ValidationType,
-    PrivacyEbpfBridge, PrivacyEbpfMetrics, EbpfEventType,
-    PrivacyPresets, AnonymousTier, PrivateP2PTier, FederatedTier, PublicTier,
-    validation_requirements_for,
+    validation_requirements_for, ActionType, AnonymousTier, EbpfEventType, FederatedTier,
+    PolicyAction, PolicyDecision, PolicyManager, PrivacyConfig, PrivacyEbpfBridge,
+    PrivacyEbpfMetrics, PrivacyFlexibilityMatrix, PrivacyMode, PrivacyPresets, PrivacySystem,
+    PrivateP2PTier, PublicTier, TierSwitcher, TrustLevel, ValidationType,
 };
 use std::collections::HashSet;
 
@@ -33,7 +31,9 @@ fn test_all_four_privacy_tiers() {
     // Test Federated tier
     let mut federated = FederatedTier::new(5);
     let network_id = [1u8; 16];
-    assert!(federated.add_partner(network_id, TrustLevel::Partner).is_ok());
+    assert!(federated
+        .add_partner(network_id, TrustLevel::Partner)
+        .is_ok());
     assert!(federated.meets_trust_requirement(&network_id));
 
     // Test Public tier
@@ -51,18 +51,12 @@ fn test_privacy_flexibility_matrix_configurations() {
     assert_eq!(uniform.caesar_multiplier(), 1.0);
 
     // Test anonymous network with public assets
-    let anon_public = PrivacyFlexibilityMatrix::new(
-        PrivacyMode::ANONYMOUS,
-        PrivacyMode::PUBLIC
-    );
+    let anon_public = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
     assert!(anon_public.is_anonymous_public());
     assert!(anon_public.caesar_multiplier() > 0.5); // Gets bonus
 
     // Test privacy-focused configuration
-    let private_config = PrivacyFlexibilityMatrix::new(
-        PrivacyMode::PRIVATE,
-        PrivacyMode::PRIVATE
-    );
+    let private_config = PrivacyFlexibilityMatrix::new(PrivacyMode::PRIVATE, PrivacyMode::PRIVATE);
     assert!(private_config.is_privacy_focused());
     assert_eq!(private_config.privacy_score(), 0.7);
 
@@ -165,10 +159,7 @@ fn test_privacy_system_end_to_end() {
     assert_eq!(system.current_tier(), PrivacyMode::ANONYMOUS);
 
     // Update flexibility matrix
-    let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyMode::ANONYMOUS,
-        PrivacyMode::PUBLIC
-    );
+    let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
     assert!(system.update_flexibility_matrix(matrix).is_ok());
 
     // Check CAESAR multiplier
@@ -274,10 +265,7 @@ fn test_caesar_rewards_calculation() {
     assert_eq!(PrivacyMode::PUBLIC.caesar_multiplier(), 1.0);
 
     // Test flexibility matrix combined multiplier
-    let matrix = PrivacyFlexibilityMatrix::new(
-        PrivacyMode::ANONYMOUS,
-        PrivacyMode::PUBLIC
-    );
+    let matrix = PrivacyFlexibilityMatrix::new(PrivacyMode::ANONYMOUS, PrivacyMode::PUBLIC);
     // Should get bonus for contributing publicly while anonymous
     // (0.0 + 1.0) / 2.0 * 1.2 = 0.6
     assert!(matrix.caesar_multiplier() > 0.55);

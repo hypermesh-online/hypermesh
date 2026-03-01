@@ -8,16 +8,16 @@
 // across Linux, Windows, BSD, and macOS. It enables HyperMesh to detect hardware
 // resources and monitor system performance via eBPF without OS-specific code in the core.
 
-pub mod types;
-pub mod linux;
-pub mod windows;
 pub mod bsd;
+pub mod linux;
 pub mod macos;
 pub mod platform_info;
+pub mod types;
+pub mod windows;
 
 // Re-export types publicly
-pub use types::*;
 use anyhow::Result;
+pub use types::*;
 
 /// OS Abstraction trait providing unified interface for hardware detection and eBPF monitoring
 ///
@@ -31,7 +31,6 @@ pub trait OsAbstraction: Send + Sync {
     fn platform(&self) -> &str;
 
     /// Hardware Detection Methods
-
     /// Detect CPU information (cores, frequency, architecture)
     /// - Linux: Parse /proc/cpuinfo
     /// - Windows: Query Win32_Processor via WMI
@@ -68,7 +67,6 @@ pub trait OsAbstraction: Send + Sync {
     fn get_resource_usage(&self) -> Result<ResourceUsage>;
 
     /// eBPF Integration Methods
-
     /// Load eBPF program into kernel
     /// - Linux: Use libbpf bpf_object__open/load
     /// - Windows: Use eBpf-for-windows API
@@ -140,9 +138,12 @@ mod tests {
     #[test]
     fn test_create_os_abstraction() {
         let os = create_os_abstraction();
-        assert!(os.is_ok(), "Should create OS abstraction for current platform");
+        assert!(
+            os.is_ok(),
+            "Should create OS abstraction for current platform"
+        );
 
-        let os = os.unwrap();
+        let os = os.expect("test: expected success");
         let platform = os.platform();
 
         // Verify platform detection matches current OS
@@ -166,13 +167,13 @@ mod tests {
         // Test CPU detection
         let cpu = os.detect_cpu();
         assert!(cpu.is_ok(), "CPU detection should succeed");
-        let cpu = cpu.unwrap();
+        let cpu = cpu.expect("test: expected success");
         assert!(cpu.cores > 0, "Should detect at least one CPU core");
 
         // Test memory detection
         let memory = os.detect_memory();
         assert!(memory.is_ok(), "Memory detection should succeed");
-        let memory = memory.unwrap();
+        let memory = memory.expect("test: expected success");
         assert!(memory.total_bytes > 0, "Should detect non-zero memory");
     }
 
@@ -187,7 +188,7 @@ mod tests {
         {
             // On Linux, eBPF should be supported on kernel 4.4+
             // We don't assert true because CI might run on old kernel
-            println!("Linux eBPF support: {}", supported);
+            println!("Linux eBPF support: {supported}");
         }
     }
 }

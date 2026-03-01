@@ -6,10 +6,10 @@
 //!
 //! Defines DNS record types for the DNS-as-Asset system.
 
-use serde::{Serialize, Deserialize};
-use std::net::Ipv6Addr;
-use std::time::{SystemTime, Duration};
 use crate::matrix::MatrixCoordinate;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
+use std::time::{Duration, SystemTime};
 
 /// DNS record type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

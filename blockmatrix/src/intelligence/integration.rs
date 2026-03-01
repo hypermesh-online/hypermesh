@@ -7,21 +7,21 @@
 //! This module provides the integration logic that connects all Phase 2 components
 //! together, ensuring seamless data flow and coordination between systems.
 
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use std::collections::HashMap;
-use tokio::sync::{RwLock, mpsc};
-use anyhow::{Result, Context};
-use tracing::{info, debug, warn, error, instrument};
-use serde::{Serialize, Deserialize};
-use async_trait::async_trait;
+use tokio::sync::{mpsc, RwLock};
+use tracing::{debug, error, info, instrument, warn};
 
-use crate::assets::pipeline::{Shard, ShardingConfig, EncryptionConfig};
-use crate::assets::multi_node::{NetworkId, MultiNetworkCoordinator};
-use crate::assets::storage::{ContentAddressedStorage, ContentAddress, DeduplicationResult};
+use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId};
+use crate::assets::pipeline::{EncryptionConfig, Shard, ShardingConfig};
+use crate::assets::storage::{ContentAddress, ContentAddressedStorage, DeduplicationResult};
 use crate::matrix::MatrixCoordinate;
-use stoq::StoqTransport;
 use hypermesh_lib::PrivacyMode;
+use stoq::StoqTransport;
 
 /// Configuration for component integration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -280,7 +280,11 @@ impl ComponentIntegration {
         networks: &[NetworkId],
     ) -> Result<Vec<ContentAddress>> {
         let start = Instant::now();
-        debug!("Integrating storage for asset {} across {} networks", asset_id, networks.len());
+        debug!(
+            "Integrating storage for asset {} across {} networks",
+            asset_id,
+            networks.len()
+        );
 
         let mut addresses = Vec::new();
 
@@ -299,7 +303,7 @@ impl ComponentIntegration {
 
             // Register with network coordinator
             coordinator
-                .register_content(network.clone(), asset_id.to_string(), address.clone())
+                .register_content(*network, asset_id.to_string(), address.clone())
                 .await
                 .context("Failed to register content with network")?;
 
@@ -329,7 +333,10 @@ impl ComponentIntegration {
         privacy_tier: &PrivacyMode,
     ) -> Result<stoq::Connection> {
         let start = Instant::now();
-        debug!("Integrating STOQ with matrix routing from {:?} to {:?}", source, destination);
+        debug!(
+            "Integrating STOQ with matrix routing from {:?} to {:?}",
+            source, destination
+        );
 
         // Calculate path between coordinates
         let path = vec![source, destination]; // Simple direct path
@@ -341,7 +348,10 @@ impl ComponentIntegration {
         let endpoint = stoq::Endpoint {
             address: std::net::Ipv6Addr::LOCALHOST, // Use localhost as placeholder for matrix coordinates
             port: 9292,
-            server_name: Some(format!("matrix://[{}:{}:{}]", destination.x, destination.y, destination.z)),
+            server_name: Some(format!(
+                "matrix://[{}:{}:{}]",
+                destination.x, destination.y, destination.z
+            )),
         };
 
         let connection = stoq
@@ -355,16 +365,16 @@ impl ComponentIntegration {
 
     /// Validate integration between components
     #[instrument(skip(self))]
-    pub async fn validate_integration(
-        &self,
-        components: Vec<String>,
-    ) -> Result<bool> {
+    pub async fn validate_integration(&self, components: Vec<String>) -> Result<bool> {
         if !self.config.enable_validation {
             return Ok(true);
         }
 
         let start = Instant::now();
-        info!("Validating integration between {} components", components.len());
+        info!(
+            "Validating integration between {} components",
+            components.len()
+        );
 
         let health_status = self.health_status.read().await;
 
@@ -390,7 +400,8 @@ impl ComponentIntegration {
             }
         }
 
-        self.record_call("validate_integration", start.elapsed()).await;
+        self.record_call("validate_integration", start.elapsed())
+            .await;
         Ok(true)
     }
 
@@ -432,54 +443,43 @@ impl ComponentIntegration {
 
     /// Perform health checks on all components
     async fn perform_health_checks() -> Vec<HealthCheck> {
-        let mut checks = Vec::new();
-
-        // Check STOQ transport
-        checks.push(HealthCheck {
-            component: "stoq_transport".to_string(),
-            status: ComponentStatus::Healthy,
-            last_check: SystemTime::now(),
-            response_time_ms: 5,
-            diagnostics: HashMap::new(),
-        });
-
-        // Check privacy manager
-        checks.push(HealthCheck {
-            component: "privacy_manager".to_string(),
-            status: ComponentStatus::Healthy,
-            last_check: SystemTime::now(),
-            response_time_ms: 3,
-            diagnostics: HashMap::new(),
-        });
-
-        // Check network coordinator
-        checks.push(HealthCheck {
-            component: "network_coordinator".to_string(),
-            status: ComponentStatus::Healthy,
-            last_check: SystemTime::now(),
-            response_time_ms: 4,
-            diagnostics: HashMap::new(),
-        });
-
-        // Check asset pipeline
-        checks.push(HealthCheck {
-            component: "asset_pipeline".to_string(),
-            status: ComponentStatus::Healthy,
-            last_check: SystemTime::now(),
-            response_time_ms: 6,
-            diagnostics: HashMap::new(),
-        });
-
-        // Check content storage
-        checks.push(HealthCheck {
-            component: "content_storage".to_string(),
-            status: ComponentStatus::Healthy,
-            last_check: SystemTime::now(),
-            response_time_ms: 7,
-            diagnostics: HashMap::new(),
-        });
-
-        checks
+        vec![
+            HealthCheck {
+                component: "stoq_transport".to_string(),
+                status: ComponentStatus::Healthy,
+                last_check: SystemTime::now(),
+                response_time_ms: 5,
+                diagnostics: HashMap::new(),
+            },
+            HealthCheck {
+                component: "privacy_manager".to_string(),
+                status: ComponentStatus::Healthy,
+                last_check: SystemTime::now(),
+                response_time_ms: 3,
+                diagnostics: HashMap::new(),
+            },
+            HealthCheck {
+                component: "network_coordinator".to_string(),
+                status: ComponentStatus::Healthy,
+                last_check: SystemTime::now(),
+                response_time_ms: 4,
+                diagnostics: HashMap::new(),
+            },
+            HealthCheck {
+                component: "asset_pipeline".to_string(),
+                status: ComponentStatus::Healthy,
+                last_check: SystemTime::now(),
+                response_time_ms: 6,
+                diagnostics: HashMap::new(),
+            },
+            HealthCheck {
+                component: "content_storage".to_string(),
+                status: ComponentStatus::Healthy,
+                last_check: SystemTime::now(),
+                response_time_ms: 7,
+                diagnostics: HashMap::new(),
+            },
+        ]
     }
 
     /// Record component call metrics
@@ -495,13 +495,16 @@ impl ComponentIntegration {
         if metrics.total_calls == 1 {
             metrics.avg_latency_ms = duration_ms;
         } else {
-            metrics.avg_latency_ms =
-                (metrics.avg_latency_ms * (metrics.total_calls - 1) + duration_ms)
+            metrics.avg_latency_ms = (metrics.avg_latency_ms * (metrics.total_calls - 1)
+                + duration_ms)
                 / metrics.total_calls;
         }
 
         // Update call distribution
-        *metrics.call_distribution.entry(component.to_string()).or_insert(0) += 1;
+        *metrics
+            .call_distribution
+            .entry(component.to_string())
+            .or_insert(0) += 1;
     }
 
     /// Get integration health report
@@ -511,9 +514,15 @@ impl ComponentIntegration {
 
         let components: Vec<HealthCheck> = health_status.values().cloned().collect();
 
-        let overall_status = if components.iter().all(|c| c.status == ComponentStatus::Healthy) {
+        let overall_status = if components
+            .iter()
+            .all(|c| c.status == ComponentStatus::Healthy)
+        {
             ComponentStatus::Healthy
-        } else if components.iter().any(|c| matches!(c.status, ComponentStatus::Unhealthy(_))) {
+        } else if components
+            .iter()
+            .any(|c| matches!(c.status, ComponentStatus::Unhealthy(_)))
+        {
             ComponentStatus::Unhealthy("One or more components unhealthy".to_string())
         } else {
             ComponentStatus::Degraded("Some components degraded".to_string())
@@ -552,17 +561,13 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
         // This is a placeholder implementation
         let hash: [u8; 32] = *blake3::hash(asset_id.as_bytes()).as_bytes();
 
-        Ok(ContentAddress::new(
-            hash,
-            vec![],
-            vec![],
-        ))
+        Ok(ContentAddress::new(hash, vec![], vec![]))
     }
 
     async fn _deduplicate_shard(&self, shard: Shard) -> Result<DeduplicationResult> {
         // Implementation would deduplicate the shard
         // This is a placeholder implementation
-        use crate::assets::storage::{BucketId, compute_hash};
+        use crate::assets::storage::{compute_hash, BucketId};
         let hash = compute_hash(&shard.data);
 
         Ok(DeduplicationResult {
@@ -600,7 +605,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
     async fn get_network_config(&self, network: &NetworkId) -> Result<NetworkConfig> {
         // Placeholder implementation
         Ok(NetworkConfig {
-            _network_id: network.clone(),
+            _network_id: *network,
             _privacy_tier: PrivacyMode::PUBLIC,
         })
     }
@@ -660,7 +665,7 @@ mod tests {
     #[tokio::test]
     async fn test_component_integration_creation() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.unwrap();
+        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
 
         let health = integration.get_health().await;
         assert!(matches!(health.overall_status, ComponentStatus::Healthy));
@@ -669,14 +674,14 @@ mod tests {
     #[tokio::test]
     async fn test_privacy_pipeline_integration() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.unwrap();
+        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
 
         let mut pipeline_config = crate::assets::pipeline::PipelineConfig::default();
 
         integration
             .integrate_privacy_pipeline(&PrivacyMode::PUBLIC, &mut pipeline_config)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         assert!(pipeline_config.encryption.quantum_resistant);
         assert_eq!(pipeline_config.sharding.parity_shards, 4);
@@ -685,17 +690,14 @@ mod tests {
     #[tokio::test]
     async fn test_integration_validation() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.unwrap();
+        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
 
         // Wait for health checks to populate
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let components = vec![
-            "stoq_transport".to_string(),
-            "privacy_manager".to_string(),
-        ];
+        let components = vec!["stoq_transport".to_string(), "privacy_manager".to_string()];
 
-        let valid = integration.validate_integration(components).await.unwrap();
+        let valid = integration.validate_integration(components).await.expect("test: async operation");
         assert!(valid);
     }
 }

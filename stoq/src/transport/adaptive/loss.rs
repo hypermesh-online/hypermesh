@@ -95,10 +95,7 @@ mod tests {
         }
 
         let avg = adj.average_loss();
-        assert!(
-            (avg - 3.0).abs() < 0.01,
-            "expected 3.0, got {avg}"
-        );
+        assert!((avg - 3.0).abs() < 0.01, "expected 3.0, got {avg}");
         assert!(!adj.should_downgrade());
         assert!(!adj.should_upgrade());
     }

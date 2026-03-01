@@ -15,17 +15,14 @@
 //! Implements Byzantine fault-tolerant consensus for distributed asset allocation,
 //! state synchronization, and conflict resolution across HyperMesh nodes.
 
+use blake3;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use blake3;
 
-use crate::assets::core::{
-    AssetRegistration, AssetResult, AssetError,
-    AssetState, ConsensusProof,
-};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, AssetState, ConsensusProof};
 
 use super::PeerIdentity;
 
@@ -176,15 +173,9 @@ pub enum ProposalData {
         to_node: PeerIdentity,
     },
     /// Configuration change data
-    Configuration {
-        key: String,
-        value: String,
-    },
+    Configuration { key: String, value: String },
     /// Leader election data
-    LeaderElection {
-        candidate: PeerIdentity,
-        term: u64,
-    },
+    LeaderElection { candidate: PeerIdentity, term: u64 },
 }
 
 /// Vote in consensus round
@@ -311,7 +302,10 @@ impl ConsensusManager {
     /// Validate proposal
     async fn validate_proposal(&self, proposal: &ConsensusProposal) -> AssetResult<()> {
         // Check proposal signature
-        if !self.verify_signature(&proposal.signature, &proposal.proposer).await {
+        if !self
+            .verify_signature(&proposal.signature, &proposal.proposer)
+            .await
+        {
             return Err(AssetError::ConsensusValidationFailed {
                 reason: "Invalid proposal signature".to_string(),
             });
@@ -335,7 +329,8 @@ impl ConsensusManager {
                 // Check if there's a clear leader and no conflicts
                 let nodes = self.consensus_nodes.read().await;
                 let leader_exists = nodes.values().any(|n| n.is_leader);
-                let high_reputation = nodes.get(&proposal.proposer)
+                let high_reputation = nodes
+                    .get(&proposal.proposer)
                     .map(|n| n.reputation > 0.9)
                     .unwrap_or(false);
 
@@ -382,7 +377,10 @@ impl ConsensusManager {
             leader: self.get_current_leader().await,
         };
 
-        self.voting_rounds.write().await.insert(round_id.clone(), round);
+        self.voting_rounds
+            .write()
+            .await
+            .insert(round_id.clone(), round);
 
         Ok(round_id)
     }
@@ -407,7 +405,9 @@ impl ConsensusManager {
                 let nodes = consensus_nodes.read().await;
                 let total_weight = nodes.values().map(|n| n.voting_weight).sum::<f32>();
 
-                let accept_weight: f32 = round.votes.iter()
+                let accept_weight: f32 = round
+                    .votes
+                    .iter()
                     .filter(|(_, v)| v.value == VoteValue::Accept)
                     .filter_map(|(node_id, _)| nodes.get(node_id))
                     .map(|n| n.voting_weight)
@@ -419,9 +419,10 @@ impl ConsensusManager {
                     round.status = RoundStatus::Completed;
                     let mut metrics = metrics.write().await;
                     metrics.successful_rounds += 1;
-                    metrics.avg_consensus_time_ms =
-                        (metrics.avg_consensus_time_ms * (metrics.successful_rounds - 1) as f64
-                         + start_time.elapsed().as_millis() as f64) / metrics.successful_rounds as f64;
+                    metrics.avg_consensus_time_ms = (metrics.avg_consensus_time_ms
+                        * (metrics.successful_rounds - 1) as f64
+                        + start_time.elapsed().as_millis() as f64)
+                        / metrics.successful_rounds as f64;
                 } else {
                     round.status = RoundStatus::Failed;
                     let mut metrics = metrics.write().await;
@@ -443,10 +444,12 @@ impl ConsensusManager {
         }
 
         let mut rounds = self.voting_rounds.write().await;
-        let round = rounds.get_mut(round_id)
-            .ok_or_else(|| AssetError::ConsensusValidationFailed {
-                reason: format!("Unknown voting round: {}", round_id),
-            })?;
+        let round =
+            rounds
+                .get_mut(round_id)
+                .ok_or_else(|| AssetError::ConsensusValidationFailed {
+                    reason: format!("Unknown voting round: {}", round_id),
+                })?;
 
         if round.status != RoundStatus::Active {
             return Err(AssetError::ConsensusValidationFailed {
@@ -462,7 +465,8 @@ impl ConsensusManager {
     /// Get consensus decision
     pub async fn get_decision(&self, round_id: &str) -> AssetResult<ConsensusDecision> {
         let rounds = self.voting_rounds.read().await;
-        let round = rounds.get(round_id)
+        let round = rounds
+            .get(round_id)
             .ok_or_else(|| AssetError::ConsensusValidationFailed {
                 reason: format!("Unknown round: {}", round_id),
             })?;
@@ -474,7 +478,8 @@ impl ConsensusManager {
         }
 
         let history = self.consensus_history.read().await;
-        history.iter()
+        history
+            .iter()
             .find(|d| d.decision_id == *round_id)
             .cloned()
             .ok_or_else(|| AssetError::ConsensusValidationFailed {
@@ -487,11 +492,12 @@ impl ConsensusManager {
         let mut nodes = self.consensus_nodes.write().await;
 
         // Simple leader election: highest reputation * successful participations
-        let leader = nodes.iter()
+        let leader = nodes
+            .iter()
             .max_by(|a, b| {
                 let score_a = a.1.reputation * a.1.successful_participations as f32;
                 let score_b = b.1.reputation * b.1.successful_participations as f32;
-                score_a.partial_cmp(&score_b).unwrap()
+                score_a.partial_cmp(&score_b).expect("reputation scores should be valid for comparison")
             })
             .map(|(id, _)| id.clone())
             .ok_or_else(|| AssetError::ConsensusValidationFailed {
@@ -512,7 +518,8 @@ impl ConsensusManager {
     /// Get current leader
     async fn get_current_leader(&self) -> Option<PeerIdentity> {
         let nodes = self.consensus_nodes.read().await;
-        nodes.iter()
+        nodes
+            .iter()
             .find(|(_, info)| info.is_leader)
             .map(|(id, _)| id.clone())
     }
@@ -527,7 +534,9 @@ impl ConsensusManager {
     async fn generate_consensus_proof(&self, proposal: &ConsensusProposal) -> ConsensusProof {
         // Generate a proper consensus proof
         // This would include the four-proof system from Proof of State
-        use crate::assets::core::{SpaceProof, StakeProof, WorkProof, TimeProof, WorkloadType, WorkState};
+        use crate::assets::core::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
 
         // ConsensusProof::new expects: (stake, time, space, work)
         ConsensusProof::new(
@@ -565,7 +574,11 @@ impl ConsensusManager {
     }
 
     /// Handle Byzantine behavior
-    pub async fn handle_byzantine_node(&self, node_id: &PeerIdentity, evidence: Vec<u8>) -> AssetResult<()> {
+    pub async fn handle_byzantine_node(
+        &self,
+        node_id: &PeerIdentity,
+        evidence: Vec<u8>,
+    ) -> AssetResult<()> {
         let mut nodes = self.consensus_nodes.write().await;
 
         if let Some(info) = nodes.get_mut(node_id) {
@@ -601,7 +614,7 @@ mod tests {
         PeerIdentity {
             name: "test-node".to_string(),
             id: [1u8; 32],
-            address: "::1".parse().unwrap(),
+            address: "::1".parse().expect("test: valid parse"),
             pub_key: vec![1, 2, 3],
         }
     }
@@ -632,7 +645,10 @@ mod tests {
         };
 
         assert_eq!(proposal.proposal_id, "test-proposal");
-        assert!(matches!(proposal.proposal_type, ProposalType::AssetAllocation));
+        assert!(matches!(
+            proposal.proposal_type,
+            ProposalType::AssetAllocation
+        ));
     }
 
     #[test]

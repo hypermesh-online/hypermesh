@@ -4,7 +4,7 @@
 
 //! Security configuration
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -103,7 +103,7 @@ pub struct RateLimitConfig {
 }
 
 /// Certificate management configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CertificateConfig {
     /// CA certificate configuration
     pub ca: CAConfig,
@@ -351,24 +351,20 @@ impl Default for EBPFConfig {
                     auto_load: true,
                 },
             ],
-            syscall_programs: vec![
-                EBPFProgramConfig {
-                    name: "syscall_monitor".to_string(),
-                    program_type: "kprobe".to_string(),
-                    attach_point: "sys_*".to_string(),
-                    program_path: PathBuf::from("/etc/hypermesh/ebpf/syscall_monitor.o"),
-                    auto_load: true,
-                },
-            ],
-            resource_programs: vec![
-                EBPFProgramConfig {
-                    name: "resource_enforcer".to_string(),
-                    program_type: "cgroup".to_string(),
-                    attach_point: "/sys/fs/cgroup".to_string(),
-                    program_path: PathBuf::from("/etc/hypermesh/ebpf/resource_enforcer.o"),
-                    auto_load: true,
-                },
-            ],
+            syscall_programs: vec![EBPFProgramConfig {
+                name: "syscall_monitor".to_string(),
+                program_type: "kprobe".to_string(),
+                attach_point: "sys_*".to_string(),
+                program_path: PathBuf::from("/etc/hypermesh/ebpf/syscall_monitor.o"),
+                auto_load: true,
+            }],
+            resource_programs: vec![EBPFProgramConfig {
+                name: "resource_enforcer".to_string(),
+                program_type: "cgroup".to_string(),
+                attach_point: "/sys/fs/cgroup".to_string(),
+                program_path: PathBuf::from("/etc/hypermesh/ebpf/resource_enforcer.o"),
+                auto_load: true,
+            }],
             default_policies: PolicyDefaults::default(),
         }
     }
@@ -380,31 +376,22 @@ impl Default for PolicyDefaults {
             network_usage: NetworkPolicyDefaults {
                 default_action: "deny".to_string(),
                 allowed_protocols: vec!["tcp".to_string(), "udp".to_string(), "icmp".to_string()],
-                rate_limits: vec![
-                    RateLimitConfig {
-                        protocol: "tcp".to_string(),
-                        limit: "10000/s".to_string(),
-                        burst: "1000".to_string(),
-                    },
-                ],
+                rate_limits: vec![RateLimitConfig {
+                    protocol: "tcp".to_string(),
+                    limit: "10000/s".to_string(),
+                    burst: "1000".to_string(),
+                }],
                 blocked_ip_ranges: vec!["0.0.0.0/8".to_string(), "127.0.0.0/8".to_string()],
             },
             syscall: SyscallPolicyDefaults {
                 default_action: "allow".to_string(),
                 blocked_syscalls: vec!["ptrace".to_string(), "kexec_load".to_string()],
-                monitored_syscalls: vec!["open".to_string(), "connect".to_string(), "execve".to_string()],
+                monitored_syscalls: vec![
+                    "open".to_string(),
+                    "connect".to_string(),
+                    "execve".to_string(),
+                ],
             },
-        }
-    }
-}
-
-impl Default for CertificateConfig {
-    fn default() -> Self {
-        Self {
-            ca: CAConfig::default(),
-            lifecycle: CertificateLifecycleConfig::default(),
-            hsm: HSMConfig::default(),
-            validation: CertificateValidationConfig::default(),
         }
     }
 }
@@ -461,27 +448,28 @@ impl Default for CertificateValidationConfig {
 impl Default for CapabilityConfig {
     fn default() -> Self {
         let mut defaults = HashMap::new();
-        defaults.insert("container_runtime".to_string(), vec![
-            "CAP_NET_BIND_SERVICE".to_string(),
-            "CAP_SETUID".to_string(),
-            "CAP_SETGID".to_string(),
-        ]);
-        defaults.insert("orchestrator".to_string(), vec![
-            "CAP_SYS_ADMIN".to_string(),
-            "CAP_NET_ADMIN".to_string(),
-        ]);
+        defaults.insert(
+            "container_runtime".to_string(),
+            vec![
+                "CAP_NET_BIND_SERVICE".to_string(),
+                "CAP_SETUID".to_string(),
+                "CAP_SETGID".to_string(),
+            ],
+        );
+        defaults.insert(
+            "orchestrator".to_string(),
+            vec!["CAP_SYS_ADMIN".to_string(), "CAP_NET_ADMIN".to_string()],
+        );
         defaults.insert("user_processes".to_string(), vec![]);
-        
+
         Self {
             enabled: true,
             defaults,
-            capability_sets: vec![
-                CapabilitySetConfig {
-                    name: "web_server".to_string(),
-                    capabilities: vec!["CAP_NET_BIND_SERVICE".to_string()],
-                    resources: vec!["tcp:80".to_string(), "tcp:443".to_string()],
-                },
-            ],
+            capability_sets: vec![CapabilitySetConfig {
+                name: "web_server".to_string(),
+                capabilities: vec!["CAP_NET_BIND_SERVICE".to_string()],
+                resources: vec!["tcp:80".to_string(), "tcp:443".to_string()],
+            }],
             delegation: DelegationConfig {
                 max_depth: 3,
                 allowed_delegators: vec!["orchestrator".to_string(), "admin".to_string()],

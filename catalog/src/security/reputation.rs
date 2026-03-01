@@ -7,11 +7,11 @@
 //! Whitepaper-aligned: "Something's either authentic or it isn't."
 //! No reputation scoring, no tiers, no decay, no float scores.
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use anyhow::Result;
-use serde::{Serialize, Deserialize};
 use tracing::info;
 
 /// Result of binary publisher authentication check.
@@ -32,6 +32,12 @@ pub struct PublisherVerification {
 pub struct PublisherAuthenticator {
     /// Revoked publisher IDs mapped to revocation reason.
     revoked: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl Default for PublisherAuthenticator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PublisherAuthenticator {
@@ -67,7 +73,10 @@ impl PublisherAuthenticator {
     pub async fn revoke(&self, cert_fingerprint: &str, reason: &str) {
         let mut revoked = self.revoked.write().await;
         revoked.insert(cert_fingerprint.to_string(), reason.to_string());
-        info!("Revoked publisher certificate: {} ({})", cert_fingerprint, reason);
+        info!(
+            "Revoked publisher certificate: {} ({})",
+            cert_fingerprint, reason
+        );
     }
 
     /// Check whether a publisher is revoked.
@@ -83,7 +92,10 @@ mod tests {
     #[tokio::test]
     async fn test_authenticator_creation() {
         let auth = PublisherAuthenticator::new();
-        let result = auth.verify("some-fingerprint").await.expect("test: verify should succeed");
+        let result = auth
+            .verify("some-fingerprint")
+            .await
+            .expect("test: verify should succeed");
         assert!(result.authenticated);
         assert!(result.certificate_valid);
         assert!(result.reason.is_none());
@@ -96,7 +108,10 @@ mod tests {
         auth.revoke("bad-fp", "compromised key").await;
         assert!(auth.is_revoked("bad-fp").await);
 
-        let result = auth.verify("bad-fp").await.expect("test: verify should succeed");
+        let result = auth
+            .verify("bad-fp")
+            .await
+            .expect("test: verify should succeed");
         assert!(!result.authenticated);
         assert!(!result.certificate_valid);
         assert!(result.reason.is_some());
@@ -107,7 +122,10 @@ mod tests {
         let auth = PublisherAuthenticator::new();
         auth.revoke("other-fp", "reason").await;
 
-        let result = auth.verify("good-fp").await.expect("test: verify should succeed");
+        let result = auth
+            .verify("good-fp")
+            .await
+            .expect("test: verify should succeed");
         assert!(result.authenticated);
     }
 }

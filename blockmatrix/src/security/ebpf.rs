@@ -8,25 +8,20 @@
 //! BlockMatrix is a CONFIGURATOR -- it sets policies and routing rules,
 //! but does not implement eBPF programs directly.
 
-use super::{
-    NetworkPacket, SystemCall, ProcessContext,
-    error::Result,
-    config::EBPFConfig,
-};
+use super::{config::EBPFConfig, error::Result, NetworkPacket, ProcessContext, SystemCall};
 use hypermesh_ebpf::{
-    HyperMeshEbpf, EbpfConfig, PacketDecision, ShardMetadata,
-    ExtensionValidator,
-    EXT_PROOF_OF_STATE, EXT_ASSET_HASH, EXT_MATRIX_ROUTING, EXT_PRIVACY_TIER,
-    ProofOfStateHeader, AssetHashHeader, MatrixRoutingHeader, PrivacyTierHeader,
+    AssetHashHeader, EbpfConfig, ExtensionValidator, HyperMeshEbpf, MatrixRoutingHeader,
+    PacketDecision, PrivacyTierHeader, ProofOfStateHeader, ShardMetadata, EXT_ASSET_HASH,
+    EXT_MATRIX_ROUTING, EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE,
 };
 use hypermesh_lib::{ContentHash, NetworkId, PrivacyMode};
 use parking_lot::RwLock;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 /// eBPF program handle (metadata only -- actual programs managed by hypermesh-ebpf)
 #[derive(Debug, Clone)]
@@ -143,10 +138,11 @@ impl EBPFSecurityManager {
     /// Create a new eBPF security manager delegating to hypermesh-ebpf
     pub async fn new() -> Result<Self> {
         let config = EBPFConfig::default();
-        let ebpf = HyperMeshEbpf::new(EbpfConfig::default())
-            .map_err(|e| super::error::SecurityError::EBPFError {
+        let ebpf = HyperMeshEbpf::new(EbpfConfig::default()).map_err(|e| {
+            super::error::SecurityError::EBPFError {
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         // Populate the default denied syscalls from config and hardcoded list
         let mut denied_syscalls: HashSet<String> = DEFAULT_DENIED_SYSCALLS
@@ -183,7 +179,9 @@ impl EBPFSecurityManager {
     /// attach point, or falls back to loopback. Also pushes default
     /// validation policies to the eBPF policy manager.
     pub async fn load_default_programs(&mut self) -> Result<()> {
-        let interface = self.config.network_programs
+        let interface = self
+            .config
+            .network_programs
             .first()
             .map(|p| p.attach_point.clone())
             .unwrap_or_else(|| DEFAULT_XDP_INTERFACE.to_string());
@@ -193,7 +191,7 @@ impl EBPFSecurityManager {
             let mut ebpf = self.ebpf.write();
             ebpf.attach_xdp(&interface)
                 .map_err(|e| super::error::SecurityError::EBPFError {
-                    message: format!("XDP attach to '{}': {}", interface, e),
+                    message: format!("XDP attach to '{interface}': {e}"),
                 })?;
         }
         self.attached_interface = Some(interface.clone());
@@ -223,7 +221,7 @@ impl EBPFSecurityManager {
             let mut ebpf = self.ebpf.write();
             ebpf.detach_xdp()
                 .map_err(|e| super::error::SecurityError::EBPFError {
-                    message: format!("XDP detach: {}", e),
+                    message: format!("XDP detach: {e}"),
                 })?;
         }
         self.attached_interface = None;
@@ -298,14 +296,12 @@ impl EBPFSecurityManager {
     ///
     /// Delegates to [`HyperMeshEbpf::register_asset_hash`] so the XDP
     /// pipeline can validate asset transfers at packet level.
-    pub fn register_asset(
-        &self,
-        hash: ContentHash,
-        metadata: ShardMetadata,
-    ) -> Result<()> {
-        self.ebpf.read().register_asset_hash(hash, metadata)
+    pub fn register_asset(&self, hash: ContentHash, metadata: ShardMetadata) -> Result<()> {
+        self.ebpf
+            .read()
+            .register_asset_hash(hash, metadata)
             .map_err(|e| super::error::SecurityError::EBPFError {
-                message: format!("register_asset_hash: {}", e),
+                message: format!("register_asset_hash: {e}"),
             })
     }
 
@@ -313,14 +309,12 @@ impl EBPFSecurityManager {
     ///
     /// Delegates to [`HyperMeshEbpf::set_privacy_tier`] to configure
     /// per-network validation policies (PoS requirements, hash checks, etc.).
-    pub fn set_privacy_mode(
-        &self,
-        network_id: NetworkId,
-        mode: PrivacyMode,
-    ) -> Result<()> {
-        self.ebpf.read().set_privacy_tier(network_id, mode)
+    pub fn set_privacy_mode(&self, network_id: NetworkId, mode: PrivacyMode) -> Result<()> {
+        self.ebpf
+            .read()
+            .set_privacy_tier(network_id, mode)
             .map_err(|e| super::error::SecurityError::EBPFError {
-                message: format!("set_privacy_tier: {}", e),
+                message: format!("set_privacy_tier: {e}"),
             })
     }
 
@@ -328,14 +322,12 @@ impl EBPFSecurityManager {
     ///
     /// Delegates to [`HyperMeshEbpf::set_pos_validation`] so subsequent
     /// packets referencing this hash can be validated at packet level.
-    pub fn report_pos_validation(
-        &self,
-        hash: ContentHash,
-        valid: bool,
-    ) -> Result<()> {
-        self.ebpf.read().set_pos_validation(hash, valid)
+    pub fn report_pos_validation(&self, hash: ContentHash, valid: bool) -> Result<()> {
+        self.ebpf
+            .read()
+            .set_pos_validation(hash, valid)
             .map_err(|e| super::error::SecurityError::EBPFError {
-                message: format!("set_pos_validation: {}", e),
+                message: format!("set_pos_validation: {e}"),
             })
     }
 
@@ -409,6 +401,12 @@ impl EBPFSecurityManager {
 /// this validator interprets the HyperMesh-specific semantics.
 pub struct BlockMatrixExtensionValidator;
 
+impl Default for BlockMatrixExtensionValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockMatrixExtensionValidator {
     /// Create a new BlockMatrix extension validator.
     pub fn new() -> Self {
@@ -418,11 +416,7 @@ impl BlockMatrixExtensionValidator {
 
 #[async_trait::async_trait]
 impl ExtensionValidator for BlockMatrixExtensionValidator {
-    async fn validate(
-        &self,
-        extension_type: u16,
-        extension_data: &[u8],
-    ) -> anyhow::Result<()> {
+    async fn validate(&self, extension_type: u16, extension_data: &[u8]) -> anyhow::Result<()> {
         match extension_type {
             EXT_PROOF_OF_STATE => {
                 if extension_data.len() < ProofOfStateHeader::SIZE {
@@ -433,9 +427,7 @@ impl ExtensionValidator for BlockMatrixExtensionValidator {
                     );
                 }
                 ProofOfStateHeader::from_bytes(extension_data)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "Failed to parse PoS extension header"
-                    ))?;
+                    .ok_or_else(|| anyhow::anyhow!("Failed to parse PoS extension header"))?;
                 Ok(())
             }
             EXT_ASSET_HASH => {
@@ -446,14 +438,14 @@ impl ExtensionValidator for BlockMatrixExtensionValidator {
                         AssetHashHeader::SIZE
                     );
                 }
-                let header = AssetHashHeader::from_bytes(extension_data)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "Failed to parse asset hash extension header"
-                    ))?;
+                let header = AssetHashHeader::from_bytes(extension_data).ok_or_else(|| {
+                    anyhow::anyhow!("Failed to parse asset hash extension header")
+                })?;
                 if !header.validate_shard_indices() {
                     anyhow::bail!(
                         "Invalid shard indices in asset hash: {}/{}",
-                        header.shard_index, header.shard_count
+                        header.shard_index,
+                        header.shard_count
                     );
                 }
                 Ok(())
@@ -466,10 +458,9 @@ impl ExtensionValidator for BlockMatrixExtensionValidator {
                         MatrixRoutingHeader::MIN_SIZE
                     );
                 }
-                MatrixRoutingHeader::from_bytes(extension_data)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "Failed to parse matrix routing extension header"
-                    ))?;
+                MatrixRoutingHeader::from_bytes(extension_data).ok_or_else(|| {
+                    anyhow::anyhow!("Failed to parse matrix routing extension header")
+                })?;
                 Ok(())
             }
             EXT_PRIVACY_TIER => {
@@ -480,17 +471,13 @@ impl ExtensionValidator for BlockMatrixExtensionValidator {
                         PrivacyTierHeader::SIZE
                     );
                 }
-                PrivacyTierHeader::from_bytes(extension_data)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "Invalid privacy tier value in extension header"
-                    ))?;
+                PrivacyTierHeader::from_bytes(extension_data).ok_or_else(|| {
+                    anyhow::anyhow!("Invalid privacy tier value in extension header")
+                })?;
                 Ok(())
             }
             _ => {
-                anyhow::bail!(
-                    "Unknown HyperMesh extension type: 0x{:04x}",
-                    extension_type
-                );
+                anyhow::bail!("Unknown HyperMesh extension type: 0x{extension_type:04x}");
             }
         }
     }
@@ -622,7 +609,9 @@ mod tests {
         let validator = BlockMatrixExtensionValidator::new();
         let result = validator.validate(0xFFFF, &[0u8; 32]).await;
         assert!(result.is_err());
-        let msg = result.expect_err("test: should reject unknown type").to_string();
+        let msg = result
+            .expect_err("test: should reject unknown type")
+            .to_string();
         assert!(msg.contains("Unknown"));
     }
 
@@ -641,7 +630,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_syscall_deny_list() {
-        let manager = EBPFSecurityManager::new().await
+        let manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         // ptrace should be denied by default
@@ -660,7 +650,9 @@ mod tests {
             },
             timestamp: SystemTime::now(),
         };
-        let result = manager.trace_syscall(&ptrace_call).await
+        let result = manager
+            .trace_syscall(&ptrace_call)
+            .await
             .expect("test: trace ptrace");
         assert!(!result, "ptrace should be denied");
 
@@ -680,14 +672,17 @@ mod tests {
             },
             timestamp: SystemTime::now(),
         };
-        let result = manager.trace_syscall(&read_call).await
+        let result = manager
+            .trace_syscall(&read_call)
+            .await
             .expect("test: trace read");
         assert!(result, "read should be allowed");
     }
 
     #[tokio::test]
     async fn test_monitor_process_open_policy() {
-        let manager = EBPFSecurityManager::new().await
+        let manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         // With no monitored PIDs, all processes are monitored
@@ -699,14 +694,17 @@ mod tests {
             cmdline: "test".to_string(),
             ppid: 1,
         };
-        let result = manager.monitor_process(&proc_ctx).await
+        let result = manager
+            .monitor_process(&proc_ctx)
+            .await
             .expect("test: monitor");
         assert!(result);
     }
 
     #[tokio::test]
     async fn test_monitor_process_with_pid_set() {
-        let mut manager = EBPFSecurityManager::new().await
+        let mut manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         manager.add_monitored_pid(100);
@@ -715,34 +713,47 @@ mod tests {
         let monitored = ProcessContext {
             pid: 100,
             name: "monitored".to_string(),
-            uid: 1000, gid: 1000,
-            cmdline: "test".to_string(), ppid: 1,
+            uid: 1000,
+            gid: 1000,
+            cmdline: "test".to_string(),
+            ppid: 1,
         };
-        let result = manager.monitor_process(&monitored).await
+        let result = manager
+            .monitor_process(&monitored)
+            .await
             .expect("test: monitor");
         assert!(result, "PID 100 should be monitored");
 
         let not_monitored = ProcessContext {
             pid: 999,
             name: "unknown".to_string(),
-            uid: 1000, gid: 1000,
-            cmdline: "test".to_string(), ppid: 1,
+            uid: 1000,
+            gid: 1000,
+            cmdline: "test".to_string(),
+            ppid: 1,
         };
-        let result = manager.monitor_process(&not_monitored).await
+        let result = manager
+            .monitor_process(&not_monitored)
+            .await
             .expect("test: monitor");
         assert!(!result, "PID 999 should not be monitored");
     }
 
     #[tokio::test]
     async fn test_register_asset_delegates() {
-        let manager = EBPFSecurityManager::new().await
+        let manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         let hash = ContentHash::from_bytes([0xAB; 32]);
         let metadata = ShardMetadata {
             shard_index: 0,
             shard_count: 10,
-            position: hypermesh_lib::MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+            position: hypermesh_lib::MatrixPosition {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
         };
 
         let result = manager.register_asset(hash, metadata);
@@ -757,7 +768,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_privacy_mode_delegates() {
-        let manager = EBPFSecurityManager::new().await
+        let manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         let network = NetworkId([0x01; 16]);
@@ -767,7 +779,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_report_pos_validation_delegates() {
-        let manager = EBPFSecurityManager::new().await
+        let manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         let hash = ContentHash::from_bytes([0xCD; 32]);
@@ -781,7 +794,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_and_unload_programs() {
-        let mut manager = EBPFSecurityManager::new().await
+        let mut manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         // Load default programs
@@ -800,7 +814,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_deny_and_allow_syscall() {
-        let mut manager = EBPFSecurityManager::new().await
+        let mut manager = EBPFSecurityManager::new()
+            .await
             .expect("test: create EBPFSecurityManager");
 
         // Add custom deny
@@ -812,19 +827,21 @@ mod tests {
             args: vec![],
             return_value: None,
             process: ProcessContext {
-                pid: 1, name: "test".to_string(),
-                uid: 0, gid: 0, cmdline: "test".to_string(), ppid: 0,
+                pid: 1,
+                name: "test".to_string(),
+                uid: 0,
+                gid: 0,
+                cmdline: "test".to_string(),
+                ppid: 0,
             },
             timestamp: SystemTime::now(),
         };
-        let result = manager.trace_syscall(&call).await
-            .expect("test: trace");
+        let result = manager.trace_syscall(&call).await.expect("test: trace");
         assert!(!result, "custom deny should block");
 
         // Remove it
         manager.allow_syscall("my_dangerous_call");
-        let result = manager.trace_syscall(&call).await
-            .expect("test: trace");
+        let result = manager.trace_syscall(&call).await.expect("test: trace");
         assert!(result, "after allow, should pass");
     }
 }

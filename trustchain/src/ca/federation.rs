@@ -93,8 +93,12 @@ pub struct FederationEvent {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FederationEventType {
-    PeerAdded, PeerRemoved, TrustLevelChanged,
-    ValidationSuccess, ValidationFailure, SyncCompleted,
+    PeerAdded,
+    PeerRemoved,
+    TrustLevelChanged,
+    ValidationSuccess,
+    ValidationFailure,
+    SyncCompleted,
 }
 
 /// Manages federated peer CAs and cross-CA certificate validation.
@@ -125,14 +129,23 @@ impl FederationManager {
         }
         if peers.len() >= self.policy.max_peers {
             return Err(TrustChainError::InvalidRequest {
-                reason: format!("Federation at capacity ({}/{})", peers.len(), self.policy.max_peers),
+                reason: format!(
+                    "Federation at capacity ({}/{})",
+                    peers.len(),
+                    self.policy.max_peers
+                ),
             });
         }
         info!("Adding federated peer CA '{}' ({})", peer.ca_id, peer.name);
         let (ca_id, name) = (peer.ca_id.clone(), peer.name.clone());
         peers.insert(ca_id.clone(), peer);
         drop(peers);
-        self.record_event(FederationEventType::PeerAdded, &ca_id, format!("Peer '{}' added", name)).await;
+        self.record_event(
+            FederationEventType::PeerAdded,
+            &ca_id,
+            format!("Peer '{name}' added"),
+        )
+        .await;
         Ok(())
     }
 
@@ -141,12 +154,17 @@ impl FederationManager {
         let mut peers = self.peers.write().await;
         if peers.remove(ca_id).is_none() {
             return Err(TrustChainError::InvalidRequest {
-                reason: format!("Peer CA '{}' not found", ca_id),
+                reason: format!("Peer CA '{ca_id}' not found"),
             });
         }
         drop(peers);
         info!("Removed federated peer CA '{}'", ca_id);
-        self.record_event(FederationEventType::PeerRemoved, ca_id, format!("Peer '{}' removed", ca_id)).await;
+        self.record_event(
+            FederationEventType::PeerRemoved,
+            ca_id,
+            format!("Peer '{ca_id}' removed"),
+        )
+        .await;
         Ok(())
     }
 
@@ -159,16 +177,27 @@ impl FederationManager {
     }
 
     /// Update the trust level of an existing peer.
-    pub async fn update_trust_level(&self, ca_id: &str, level: FederationTrustLevel) -> TrustChainResult<()> {
+    pub async fn update_trust_level(
+        &self,
+        ca_id: &str,
+        level: FederationTrustLevel,
+    ) -> TrustChainResult<()> {
         let mut peers = self.peers.write().await;
-        let peer = peers.get_mut(ca_id).ok_or_else(|| TrustChainError::InvalidRequest {
-            reason: format!("Peer CA '{}' not found", ca_id),
-        })?;
+        let peer = peers
+            .get_mut(ca_id)
+            .ok_or_else(|| TrustChainError::InvalidRequest {
+                reason: format!("Peer CA '{ca_id}' not found"),
+            })?;
         let old = peer.trust_level.clone();
         peer.trust_level = level.clone();
         drop(peers);
         info!("Updated trust for '{}': {:?} -> {:?}", ca_id, old, level);
-        self.record_event(FederationEventType::TrustLevelChanged, ca_id, format!("{:?} -> {:?}", old, level)).await;
+        self.record_event(
+            FederationEventType::TrustLevelChanged,
+            ca_id,
+            format!("{old:?} -> {level:?}"),
+        )
+        .await;
         Ok(())
     }
 
@@ -177,44 +206,86 @@ impl FederationManager {
     /// Looks up the peer, rejects if `Untrusted`, then verifies the FALCON-1024
     /// signature using the peer's public key.
     pub async fn validate_federated_certificate(
-        &self, cert_der: &[u8], issuer_ca_id: &str,
+        &self,
+        cert_der: &[u8],
+        issuer_ca_id: &str,
     ) -> TrustChainResult<FederatedValidationResult> {
         let peer = {
             let peers = self.peers.read().await;
-            peers.get(issuer_ca_id).cloned().ok_or_else(|| TrustChainError::InvalidRequest {
-                reason: format!("Issuer CA '{}' is not a known federation peer", issuer_ca_id),
-            })?
+            peers
+                .get(issuer_ca_id)
+                .cloned()
+                .ok_or_else(|| TrustChainError::InvalidRequest {
+                    reason: format!("Issuer CA '{issuer_ca_id}' is not a known federation peer"),
+                })?
         };
 
         if peer.trust_level == FederationTrustLevel::Untrusted {
-            warn!("Rejecting certificate from untrusted peer '{}'", issuer_ca_id);
-            self.record_event(FederationEventType::ValidationFailure, issuer_ca_id, "Rejected: untrusted".into()).await;
+            warn!(
+                "Rejecting certificate from untrusted peer '{}'",
+                issuer_ca_id
+            );
+            self.record_event(
+                FederationEventType::ValidationFailure,
+                issuer_ca_id,
+                "Rejected: untrusted".into(),
+            )
+            .await;
             return Ok(FederatedValidationResult {
-                valid: false, issuer_ca_id: issuer_ca_id.to_string(),
-                trust_level: FederationTrustLevel::Untrusted, validation_time: SystemTime::now(),
+                valid: false,
+                issuer_ca_id: issuer_ca_id.to_string(),
+                trust_level: FederationTrustLevel::Untrusted,
+                validation_time: SystemTime::now(),
                 details: "Certificate rejected: issuing CA is untrusted".into(),
             });
         }
 
         let valid = Self::verify_falcon_signature(cert_der, &peer.public_key);
         if valid {
-            debug!("Certificate from '{}' passed FALCON-1024 verification", issuer_ca_id);
-            self.record_event(FederationEventType::ValidationSuccess, issuer_ca_id, "Signature verified".into()).await;
+            debug!(
+                "Certificate from '{}' passed FALCON-1024 verification",
+                issuer_ca_id
+            );
+            self.record_event(
+                FederationEventType::ValidationSuccess,
+                issuer_ca_id,
+                "Signature verified".into(),
+            )
+            .await;
         } else {
-            warn!("Certificate from '{}' FAILED FALCON-1024 verification", issuer_ca_id);
-            self.record_event(FederationEventType::ValidationFailure, issuer_ca_id, "Signature verification failed".into()).await;
+            warn!(
+                "Certificate from '{}' FAILED FALCON-1024 verification",
+                issuer_ca_id
+            );
+            self.record_event(
+                FederationEventType::ValidationFailure,
+                issuer_ca_id,
+                "Signature verification failed".into(),
+            )
+            .await;
             if self.policy.auto_demote_on_failure {
                 if let Some(p) = self.peers.write().await.get_mut(issuer_ca_id) {
                     p.trust_level = FederationTrustLevel::Untrusted;
                 }
-                self.record_event(FederationEventType::TrustLevelChanged, issuer_ca_id, "Auto-demoted to Untrusted".into()).await;
+                self.record_event(
+                    FederationEventType::TrustLevelChanged,
+                    issuer_ca_id,
+                    "Auto-demoted to Untrusted".into(),
+                )
+                .await;
             }
         }
 
         Ok(FederatedValidationResult {
-            valid, issuer_ca_id: issuer_ca_id.to_string(),
-            trust_level: peer.trust_level.clone(), validation_time: SystemTime::now(),
-            details: if valid { "FALCON-1024 verification succeeded".into() } else { "FALCON-1024 verification failed".into() },
+            valid,
+            issuer_ca_id: issuer_ca_id.to_string(),
+            trust_level: peer.trust_level.clone(),
+            validation_time: SystemTime::now(),
+            details: if valid {
+                "FALCON-1024 verification succeeded".into()
+            } else {
+                "FALCON-1024 verification failed".into()
+            },
         })
     }
 
@@ -234,9 +305,12 @@ impl FederationManager {
             }
         }
         FederationStatus {
-            local_ca_id: self.local_ca_id.clone(), total_peers: peers.len(),
-            trusted_peers: trusted, conditional_peers: conditional,
-            untrusted_peers: untrusted, last_sync: latest_sync,
+            local_ca_id: self.local_ca_id.clone(),
+            total_peers: peers.len(),
+            trusted_peers: trusted,
+            conditional_peers: conditional,
+            untrusted_peers: untrusted,
+            last_sync: latest_sync,
         }
     }
 
@@ -252,21 +326,36 @@ impl FederationManager {
             debug!("Signed blob too short for length prefix");
             return false;
         }
-        let sig_len = u32::from_le_bytes([signed_blob[0], signed_blob[1], signed_blob[2], signed_blob[3]]) as usize;
+        let sig_len = u32::from_le_bytes([
+            signed_blob[0],
+            signed_blob[1],
+            signed_blob[2],
+            signed_blob[3],
+        ]) as usize;
         let header_end = 4 + sig_len;
         if signed_blob.len() < header_end {
-            debug!("Signed blob too short: need {} bytes, have {}", header_end, signed_blob.len());
+            debug!(
+                "Signed blob too short: need {} bytes, have {}",
+                header_end,
+                signed_blob.len()
+            );
             return false;
         }
         let (sig_bytes, cert_body) = (&signed_blob[4..header_end], &signed_blob[header_end..]);
 
         let public_key = match falcon1024::PublicKey::from_bytes(pub_key_bytes) {
             Ok(pk) => pk,
-            Err(e) => { warn!("Failed to reconstruct FALCON-1024 public key: {}", e); return false; }
+            Err(e) => {
+                warn!("Failed to reconstruct FALCON-1024 public key: {}", e);
+                return false;
+            }
         };
         let signature = match falcon1024::DetachedSignature::from_bytes(sig_bytes) {
             Ok(sig) => sig,
-            Err(e) => { debug!("Failed to reconstruct FALCON-1024 signature: {}", e); return false; }
+            Err(e) => {
+                debug!("Failed to reconstruct FALCON-1024 signature: {}", e);
+                return false;
+            }
         };
         let hash: [u8; 32] = Sha256::digest(cert_body).into();
         falcon1024::verify_detached_signature(&signature, &hash, &public_key).is_ok()
@@ -274,7 +363,10 @@ impl FederationManager {
 
     async fn record_event(&self, event_type: FederationEventType, ca_id: &str, details: String) {
         self.events.write().await.push(FederationEvent {
-            event_type, ca_id: ca_id.to_string(), timestamp: SystemTime::now(), details,
+            event_type,
+            ca_id: ca_id.to_string(),
+            timestamp: SystemTime::now(),
+            details,
         });
     }
 }
@@ -284,31 +376,48 @@ mod tests {
     use super::*;
 
     fn test_policy() -> FederationPolicy {
-        FederationPolicy { max_peers: 5, require_ct_proof: false, auto_demote_on_failure: true, max_sync_age: Duration::from_secs(3600) }
+        FederationPolicy {
+            max_peers: 5,
+            require_ct_proof: false,
+            auto_demote_on_failure: true,
+            max_sync_age: Duration::from_secs(3600),
+        }
     }
 
     fn make_peer(id: &str, trust: FederationTrustLevel) -> FederatedCA {
         FederatedCA {
-            ca_id: id.to_string(), name: format!("Peer {}", id),
-            public_key: vec![0u8; 32], root_certificate: vec![1u8; 64],
-            trust_level: trust, joined_at: SystemTime::now(),
-            last_sync: None, endpoint: "[::1]:8443".to_string(),
+            ca_id: id.to_string(),
+            name: format!("Peer {id}"),
+            public_key: vec![0u8; 32],
+            root_certificate: vec![1u8; 64],
+            trust_level: trust,
+            joined_at: SystemTime::now(),
+            last_sync: None,
+            endpoint: "[::1]:8443".to_string(),
         }
     }
 
     #[tokio::test]
     async fn test_add_and_list_peers() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.expect("test: add alpha");
-        mgr.add_peer(make_peer("beta", FederationTrustLevel::Conditional)).await.expect("test: add beta");
-        mgr.add_peer(make_peer("gamma", FederationTrustLevel::Untrusted)).await.expect("test: add gamma");
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: add alpha");
+        mgr.add_peer(make_peer("beta", FederationTrustLevel::Conditional))
+            .await
+            .expect("test: add beta");
+        mgr.add_peer(make_peer("gamma", FederationTrustLevel::Untrusted))
+            .await
+            .expect("test: add gamma");
         assert_eq!(mgr.list_peers().await.len(), 3);
     }
 
     #[tokio::test]
     async fn test_remove_peer() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.expect("test: add");
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: add");
         assert!(mgr.get_peer("alpha").await.is_some());
         mgr.remove_peer("alpha").await.expect("test: remove");
         assert!(mgr.get_peer("alpha").await.is_none());
@@ -317,15 +426,24 @@ mod tests {
     #[tokio::test]
     async fn test_duplicate_peer_rejected() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.expect("test: first add");
-        assert!(mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.is_err());
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: first add");
+        assert!(mgr
+            .add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .is_err());
     }
 
     #[tokio::test]
     async fn test_update_trust_level() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.expect("test: add");
-        mgr.update_trust_level("alpha", FederationTrustLevel::Conditional).await.expect("test: update");
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: add");
+        mgr.update_trust_level("alpha", FederationTrustLevel::Conditional)
+            .await
+            .expect("test: update");
         let peer = mgr.get_peer("alpha").await.expect("test: peer exists");
         assert_eq!(peer.trust_level, FederationTrustLevel::Conditional);
     }
@@ -347,7 +465,10 @@ mod tests {
         peer.public_key = pk.as_bytes().to_vec();
         mgr.add_peer(peer).await.expect("test: add peer");
 
-        let result = mgr.validate_federated_certificate(&blob, "signer-ca").await.expect("test: validate");
+        let result = mgr
+            .validate_federated_certificate(&blob, "signer-ca")
+            .await
+            .expect("test: validate");
         assert!(result.valid, "certificate should be valid");
         assert_eq!(result.trust_level, FederationTrustLevel::Full);
     }
@@ -355,8 +476,13 @@ mod tests {
     #[tokio::test]
     async fn test_validate_untrusted_cert_rejected() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("bad-ca", FederationTrustLevel::Untrusted)).await.expect("test: add");
-        let result = mgr.validate_federated_certificate(b"any-cert-data", "bad-ca").await.expect("test: validate");
+        mgr.add_peer(make_peer("bad-ca", FederationTrustLevel::Untrusted))
+            .await
+            .expect("test: add");
+        let result = mgr
+            .validate_federated_certificate(b"any-cert-data", "bad-ca")
+            .await
+            .expect("test: validate");
         assert!(!result.valid);
         assert_eq!(result.trust_level, FederationTrustLevel::Untrusted);
     }
@@ -365,18 +491,31 @@ mod tests {
     async fn test_max_peers_enforced() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         for i in 0..5 {
-            mgr.add_peer(make_peer(&format!("p{}", i), FederationTrustLevel::Full)).await.expect("test: add");
+            mgr.add_peer(make_peer(&format!("p{i}"), FederationTrustLevel::Full))
+                .await
+                .expect("test: add");
         }
-        assert!(mgr.add_peer(make_peer("overflow", FederationTrustLevel::Full)).await.is_err());
+        assert!(mgr
+            .add_peer(make_peer("overflow", FederationTrustLevel::Full))
+            .await
+            .is_err());
     }
 
     #[tokio::test]
     async fn test_federation_status() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("a", FederationTrustLevel::Full)).await.expect("test: add a");
-        mgr.add_peer(make_peer("b", FederationTrustLevel::Full)).await.expect("test: add b");
-        mgr.add_peer(make_peer("c", FederationTrustLevel::Conditional)).await.expect("test: add c");
-        mgr.add_peer(make_peer("d", FederationTrustLevel::Untrusted)).await.expect("test: add d");
+        mgr.add_peer(make_peer("a", FederationTrustLevel::Full))
+            .await
+            .expect("test: add a");
+        mgr.add_peer(make_peer("b", FederationTrustLevel::Full))
+            .await
+            .expect("test: add b");
+        mgr.add_peer(make_peer("c", FederationTrustLevel::Conditional))
+            .await
+            .expect("test: add c");
+        mgr.add_peer(make_peer("d", FederationTrustLevel::Untrusted))
+            .await
+            .expect("test: add d");
         let status = mgr.get_federation_status().await;
         assert_eq!(status.local_ca_id, "local-ca");
         assert_eq!(status.total_peers, 4);
@@ -388,13 +527,30 @@ mod tests {
     #[tokio::test]
     async fn test_federation_events_logged() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full)).await.expect("test: add");
-        mgr.update_trust_level("alpha", FederationTrustLevel::Conditional).await.expect("test: update");
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: add");
+        mgr.update_trust_level("alpha", FederationTrustLevel::Conditional)
+            .await
+            .expect("test: update");
         mgr.remove_peer("alpha").await.expect("test: remove");
         let events = mgr.get_events().await;
-        assert!(events.len() >= 3, "expected >= 3 events, got {}", events.len());
-        assert!(matches!(events[0].event_type, FederationEventType::PeerAdded));
-        assert!(matches!(events[1].event_type, FederationEventType::TrustLevelChanged));
-        assert!(matches!(events[2].event_type, FederationEventType::PeerRemoved));
+        assert!(
+            events.len() >= 3,
+            "expected >= 3 events, got {}",
+            events.len()
+        );
+        assert!(matches!(
+            events[0].event_type,
+            FederationEventType::PeerAdded
+        ));
+        assert!(matches!(
+            events[1].event_type,
+            FederationEventType::TrustLevelChanged
+        ));
+        assert!(matches!(
+            events[2].event_type,
+            FederationEventType::PeerRemoved
+        ));
     }
 }

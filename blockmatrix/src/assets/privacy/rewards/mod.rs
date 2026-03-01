@@ -28,11 +28,11 @@
 //! - Consensus proof validation
 //! - Performance metrics and tier bonuses
 
-mod types;
-mod config;
 mod calculation;
+mod config;
 mod defaults;
+mod types;
 
-pub use types::*;
 pub use config::*;
+pub use types::*;
 // defaults module only provides Default impls, no additional exports needed

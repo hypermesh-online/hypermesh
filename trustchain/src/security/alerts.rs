@@ -3,19 +3,19 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Security Alert Management System
-//! 
+//!
 //! Real-time security alerts with consensus validation integration
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, warn, error, debug};
+use tracing::{debug, error, info, warn};
 
-use crate::consensus::ConsensusProof;
-use crate::errors::{TrustChainError, Result as TrustChainResult};
 use super::SecuritySeverity;
+use crate::consensus::ConsensusProof;
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Security alert manager
 pub struct SecurityAlertManager {
@@ -125,7 +125,7 @@ impl Default for AlertConfig {
         Self {
             max_active_alerts: 1000,
             history_retention_hours: 72, // 3 days
-            auto_resolve_timeout: 3600, // 1 hour
+            auto_resolve_timeout: 3600,  // 1 hour
             enable_aggregation: true,
             rate_limit: 60, // 60 alerts per minute max
         }
@@ -146,7 +146,10 @@ pub struct EscalationRule {
 impl SecurityAlertManager {
     /// Create new security alert manager
     pub async fn new(threshold: SecuritySeverity) -> TrustChainResult<Self> {
-        info!("Initializing Security Alert Manager with threshold: {:?}", threshold);
+        info!(
+            "Initializing Security Alert Manager with threshold: {:?}",
+            threshold
+        );
 
         Ok(Self {
             threshold,
@@ -167,7 +170,10 @@ impl SecurityAlertManager {
     ) -> TrustChainResult<SecurityAlert> {
         // Check if alert meets threshold
         if severity < self.threshold {
-            debug!("Alert below threshold, ignoring: {} ({:?})", title, severity);
+            debug!(
+                "Alert below threshold, ignoring: {} ({:?})",
+                title, severity
+            );
             return Err(TrustChainError::SecurityError {
                 message: "Alert below threshold".to_string(),
             });
@@ -211,13 +217,13 @@ impl SecurityAlertManager {
         // Store alert
         {
             let mut active_alerts = self.active_alerts.write().await;
-            
+
             // Check max active alerts limit
             if active_alerts.len() >= self.config.max_active_alerts {
                 warn!("Maximum active alerts reached, removing oldest");
                 self.cleanup_oldest_alerts().await?;
             }
-            
+
             active_alerts.insert(alert_id.clone(), alert.clone());
         }
 
@@ -231,10 +237,10 @@ impl SecurityAlertManager {
         {
             let mut stats = self.stats.write().await;
             stats.total_alerts += 1;
-            
-            let severity_str = format!("{:?}", severity);
+
+            let severity_str = format!("{severity:?}");
             *stats.by_severity.entry(severity_str).or_insert(0) += 1;
-            
+
             let category_str = format!("{:?}", alert.category);
             *stats.by_category.entry(category_str).or_insert(0) += 1;
         }
@@ -256,7 +262,10 @@ impl SecurityAlertManager {
         }
 
         // Handle escalation if needed
-        if matches!(severity, SecuritySeverity::Critical | SecuritySeverity::High) {
+        if matches!(
+            severity,
+            SecuritySeverity::Critical | SecuritySeverity::High
+        ) {
             self.handle_escalation(&alert).await?;
         }
 
@@ -267,41 +276,54 @@ impl SecurityAlertManager {
     /// Acknowledge alert
     pub async fn acknowledge_alert(&self, alert_id: &str, operator: &str) -> TrustChainResult<()> {
         let mut active_alerts = self.active_alerts.write().await;
-        
+
         if let Some(alert) = active_alerts.get_mut(alert_id) {
             alert.status = AlertStatus::Acknowledged;
-            alert.metadata.insert("acknowledged_by".to_string(), operator.to_string());
+            alert
+                .metadata
+                .insert("acknowledged_by".to_string(), operator.to_string());
             let timestamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .map(|d| d.as_secs().to_string())
-                .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
-            alert.metadata.insert("acknowledged_at".to_string(), timestamp);
-            
+                .unwrap_or_else(|_| "0".to_string()); // Fallback if clock went backwards
+            alert
+                .metadata
+                .insert("acknowledged_at".to_string(), timestamp);
+
             info!("Alert acknowledged: {} by {}", alert_id, operator);
             Ok(())
         } else {
             Err(TrustChainError::SecurityError {
-                message: format!("Alert not found: {}", alert_id),
+                message: format!("Alert not found: {alert_id}"),
             })
         }
     }
 
     /// Resolve alert
-    pub async fn resolve_alert(&self, alert_id: &str, resolution_note: &str) -> TrustChainResult<()> {
+    pub async fn resolve_alert(
+        &self,
+        alert_id: &str,
+        resolution_note: &str,
+    ) -> TrustChainResult<()> {
         let mut active_alerts = self.active_alerts.write().await;
-        
+
         if let Some(alert) = active_alerts.get_mut(alert_id) {
             let resolution_time = alert.timestamp.elapsed().unwrap_or(Duration::from_secs(0));
-            
+
             alert.status = AlertStatus::Resolved;
-            alert.metadata.insert("resolution_note".to_string(), resolution_note.to_string());
+            alert
+                .metadata
+                .insert("resolution_note".to_string(), resolution_note.to_string());
             let timestamp = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .map(|d| d.as_secs().to_string())
-                .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
+                .unwrap_or_else(|_| "0".to_string()); // Fallback if clock went backwards
             alert.metadata.insert("resolved_at".to_string(), timestamp);
-            alert.metadata.insert("resolution_time_seconds".to_string(), resolution_time.as_secs().to_string());
-            
+            alert.metadata.insert(
+                "resolution_time_seconds".to_string(),
+                resolution_time.as_secs().to_string(),
+            );
+
             // Update resolution time statistics
             {
                 let mut stats = self.stats.write().await;
@@ -313,12 +335,16 @@ impl SecurityAlertManager {
                     (current_avg + new_time) / 2.0
                 };
             }
-            
-            info!("Alert resolved: {} in {:.2}s", alert_id, resolution_time.as_secs_f64());
+
+            info!(
+                "Alert resolved: {} in {:.2}s",
+                alert_id,
+                resolution_time.as_secs_f64()
+            );
             Ok(())
         } else {
             Err(TrustChainError::SecurityError {
-                message: format!("Alert not found: {}", alert_id),
+                message: format!("Alert not found: {alert_id}"),
             })
         }
     }
@@ -326,16 +352,12 @@ impl SecurityAlertManager {
     /// Get recent alerts
     pub async fn get_recent_alerts(&self, limit: usize) -> TrustChainResult<Vec<SecurityAlert>> {
         let history = self.alert_history.read().await;
-        
-        let mut recent_alerts: Vec<_> = history.iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect();
-        
+
+        let mut recent_alerts: Vec<_> = history.iter().rev().take(limit).cloned().collect();
+
         // Sort by timestamp (newest first)
         recent_alerts.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-        
+
         Ok(recent_alerts)
     }
 
@@ -343,16 +365,14 @@ impl SecurityAlertManager {
     pub async fn get_active_alerts(&self) -> TrustChainResult<Vec<SecurityAlert>> {
         let active_alerts = self.active_alerts.read().await;
         let mut alerts: Vec<_> = active_alerts.values().cloned().collect();
-        
+
         // Sort by severity (critical first) then by timestamp
-        alerts.sort_by(|a, b| {
-            match b.severity.partial_cmp(&a.severity) {
-                Some(std::cmp::Ordering::Equal) => b.timestamp.cmp(&a.timestamp),
-                Some(ordering) => ordering,
-                None => std::cmp::Ordering::Equal,
-            }
+        alerts.sort_by(|a, b| match b.severity.partial_cmp(&a.severity) {
+            Some(std::cmp::Ordering::Equal) => b.timestamp.cmp(&a.timestamp),
+            Some(ordering) => ordering,
+            None => std::cmp::Ordering::Equal,
         });
-        
+
         Ok(alerts)
     }
 
@@ -365,9 +385,9 @@ impl SecurityAlertManager {
     pub async fn process_auto_resolve(&self) -> TrustChainResult<()> {
         let mut active_alerts = self.active_alerts.write().await;
         let now = SystemTime::now();
-        
+
         let mut alerts_to_resolve = Vec::new();
-        
+
         for (alert_id, alert) in active_alerts.iter() {
             if let Some(auto_resolve_at) = alert.auto_resolve_at {
                 if now >= auto_resolve_at && matches!(alert.status, AlertStatus::Active) {
@@ -375,54 +395,59 @@ impl SecurityAlertManager {
                 }
             }
         }
-        
+
         for alert_id in alerts_to_resolve {
             if let Some(alert) = active_alerts.get_mut(&alert_id) {
                 alert.status = AlertStatus::AutoResolved;
                 let timestamp = now
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .map(|d| d.as_secs().to_string())
-                    .unwrap_or_else(|_| "0".to_string());  // Fallback if clock went backwards
-                alert.metadata.insert("auto_resolved_at".to_string(), timestamp);
+                    .unwrap_or_else(|_| "0".to_string()); // Fallback if clock went backwards
+                alert
+                    .metadata
+                    .insert("auto_resolved_at".to_string(), timestamp);
                 debug!("Auto-resolved alert: {}", alert_id);
             }
         }
-        
+
         Ok(())
     }
 
     /// Cleanup old alerts from history
     pub async fn cleanup_old_alerts(&self) -> TrustChainResult<()> {
-        let cutoff_time = SystemTime::now() - Duration::from_secs(self.config.history_retention_hours as u64 * 3600);
-        
+        let cutoff_time = SystemTime::now()
+            - Duration::from_secs(self.config.history_retention_hours as u64 * 3600);
+
         {
             let mut history = self.alert_history.write().await;
             let original_len = history.len();
             history.retain(|alert| alert.timestamp > cutoff_time);
             let removed = original_len - history.len();
-            
+
             if removed > 0 {
                 debug!("Cleaned up {} old alerts from history", removed);
             }
         }
-        
+
         // Also cleanup resolved active alerts older than cutoff
         {
             let mut active_alerts = self.active_alerts.write().await;
             let original_len = active_alerts.len();
             active_alerts.retain(|_, alert| {
                 match alert.status {
-                    AlertStatus::Resolved | AlertStatus::AutoResolved => alert.timestamp > cutoff_time,
+                    AlertStatus::Resolved | AlertStatus::AutoResolved => {
+                        alert.timestamp > cutoff_time
+                    }
                     _ => true, // Keep active, acknowledged, escalated alerts
                 }
             });
             let removed = original_len - active_alerts.len();
-            
+
             if removed > 0 {
                 debug!("Cleaned up {} old active alerts", removed);
             }
         }
-        
+
         Ok(())
     }
 
@@ -432,27 +457,39 @@ impl SecurityAlertManager {
     async fn check_rate_limit(&self) -> TrustChainResult<bool> {
         // Simple rate limiting based on recent alerts
         let recent_cutoff = SystemTime::now() - Duration::from_secs(60); // Last minute
-        
+
         let history = self.alert_history.read().await;
-        let recent_count = history.iter()
+        let recent_count = history
+            .iter()
             .rev()
             .take_while(|alert| alert.timestamp > recent_cutoff)
             .count();
-        
+
         Ok(recent_count < self.config.rate_limit as usize)
     }
 
     /// Categorize alert based on content
-    fn categorize_alert(&self, title: &str, description: &str, consensus_proof: &Option<ConsensusProof>) -> AlertCategory {
+    fn categorize_alert(
+        &self,
+        title: &str,
+        description: &str,
+        consensus_proof: &Option<ConsensusProof>,
+    ) -> AlertCategory {
         let content = format!("{} {}", title.to_lowercase(), description.to_lowercase());
-        
+
         if content.contains("consensus") || content.contains("proof") || consensus_proof.is_some() {
             AlertCategory::ConsensusValidation
         } else if content.contains("byzantine") || content.contains("malicious") {
             AlertCategory::ByzantineBehavior
-        } else if content.contains("certificate") || content.contains("ca") || content.contains("ct") {
+        } else if content.contains("certificate")
+            || content.contains("ca")
+            || content.contains("ct")
+        {
             AlertCategory::CertificateOperations
-        } else if content.contains("performance") || content.contains("slow") || content.contains("timeout") {
+        } else if content.contains("performance")
+            || content.contains("slow")
+            || content.contains("timeout")
+        {
             AlertCategory::Performance
         } else if content.contains("config") || content.contains("setting") {
             AlertCategory::Configuration
@@ -465,40 +502,49 @@ impl SecurityAlertManager {
     async fn handle_escalation(&self, alert: &SecurityAlert) -> TrustChainResult<()> {
         // In production, this would integrate with external alerting systems
         // For now, we just log the escalation
-        
+
         match alert.severity {
             SecuritySeverity::Critical => {
-                error!("ESCALATING CRITICAL ALERT: {} - Immediate attention required!", alert.title);
+                error!(
+                    "ESCALATING CRITICAL ALERT: {} - Immediate attention required!",
+                    alert.title
+                );
                 // Would send to pager, email, Slack, etc.
             }
             SecuritySeverity::High => {
-                warn!("ESCALATING HIGH SEVERITY ALERT: {} - Requires prompt attention", alert.title);
+                warn!(
+                    "ESCALATING HIGH SEVERITY ALERT: {} - Requires prompt attention",
+                    alert.title
+                );
                 // Would send email notification
             }
             _ => {
                 // No escalation for medium/low severity
             }
         }
-        
+
         Ok(())
     }
 
     /// Cleanup oldest alerts when limit is reached
     async fn cleanup_oldest_alerts(&self) -> TrustChainResult<()> {
         let mut active_alerts = self.active_alerts.write().await;
-        
+
         // Find oldest resolved/auto-resolved alert
         let mut oldest_resolved = None;
         let mut oldest_timestamp = SystemTime::now();
-        
+
         for (alert_id, alert) in active_alerts.iter() {
-            if matches!(alert.status, AlertStatus::Resolved | AlertStatus::AutoResolved) &&
-               alert.timestamp < oldest_timestamp {
+            if matches!(
+                alert.status,
+                AlertStatus::Resolved | AlertStatus::AutoResolved
+            ) && alert.timestamp < oldest_timestamp
+            {
                 oldest_timestamp = alert.timestamp;
                 oldest_resolved = Some(alert_id.clone());
             }
         }
-        
+
         if let Some(alert_id) = oldest_resolved {
             active_alerts.remove(&alert_id);
             debug!("Removed oldest resolved alert to make room: {}", alert_id);
@@ -506,21 +552,25 @@ impl SecurityAlertManager {
             // If no resolved alerts, remove oldest acknowledged
             let mut oldest_acknowledged = None;
             oldest_timestamp = SystemTime::now();
-            
+
             for (alert_id, alert) in active_alerts.iter() {
-                if matches!(alert.status, AlertStatus::Acknowledged) &&
-                   alert.timestamp < oldest_timestamp {
+                if matches!(alert.status, AlertStatus::Acknowledged)
+                    && alert.timestamp < oldest_timestamp
+                {
                     oldest_timestamp = alert.timestamp;
                     oldest_acknowledged = Some(alert_id.clone());
                 }
             }
-            
+
             if let Some(alert_id) = oldest_acknowledged {
                 active_alerts.remove(&alert_id);
-                debug!("Removed oldest acknowledged alert to make room: {}", alert_id);
+                debug!(
+                    "Removed oldest acknowledged alert to make room: {}",
+                    alert_id
+                );
             }
         }
-        
+
         Ok(())
     }
 }
@@ -531,21 +581,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_alert_manager_creation() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Medium).await.unwrap();
+        let manager = SecurityAlertManager::new(SecuritySeverity::Medium)
+            .await
+            .expect("test: expected success");
         assert_eq!(manager.threshold, SecuritySeverity::Medium);
     }
 
     #[tokio::test]
     async fn test_generate_alert() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Low).await.unwrap();
-        
-        let alert = manager.generate_alert(
-            SecuritySeverity::High,
-            "Test Alert".to_string(),
-            "This is a test alert".to_string(),
-            None,
-        ).await.unwrap();
-        
+        let manager = SecurityAlertManager::new(SecuritySeverity::Low)
+            .await
+            .expect("test: expected success");
+
+        let alert = manager
+            .generate_alert(
+                SecuritySeverity::High,
+                "Test Alert".to_string(),
+                "This is a test alert".to_string(),
+                None,
+            )
+            .await
+            .expect("test: expected success");
+
         assert_eq!(alert.title, "Test Alert");
         assert_eq!(alert.severity, SecuritySeverity::High);
         assert!(matches!(alert.status, AlertStatus::Active));
@@ -553,83 +610,113 @@ mod tests {
 
     #[tokio::test]
     async fn test_alert_below_threshold() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::High).await.unwrap();
-        
-        let result = manager.generate_alert(
-            SecuritySeverity::Low,
-            "Low Priority Alert".to_string(),
-            "This should be ignored".to_string(),
-            None,
-        ).await;
-        
+        let manager = SecurityAlertManager::new(SecuritySeverity::High)
+            .await
+            .expect("test: expected success");
+
+        let result = manager
+            .generate_alert(
+                SecuritySeverity::Low,
+                "Low Priority Alert".to_string(),
+                "This should be ignored".to_string(),
+                None,
+            )
+            .await;
+
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_acknowledge_alert() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Low).await.unwrap();
-        
-        let alert = manager.generate_alert(
-            SecuritySeverity::Medium,
-            "Test Alert".to_string(),
-            "Test description".to_string(),
-            None,
-        ).await.unwrap();
-        
-        manager.acknowledge_alert(&alert.alert_id, "test_operator").await.unwrap();
-        
-        let active_alerts = manager.get_active_alerts().await.unwrap();
+        let manager = SecurityAlertManager::new(SecuritySeverity::Low)
+            .await
+            .expect("test: expected success");
+
+        let alert = manager
+            .generate_alert(
+                SecuritySeverity::Medium,
+                "Test Alert".to_string(),
+                "Test description".to_string(),
+                None,
+            )
+            .await
+            .expect("test: expected success");
+
+        manager
+            .acknowledge_alert(&alert.alert_id, "test_operator")
+            .await
+            .expect("test: expected success");
+
+        let active_alerts = manager.get_active_alerts().await.expect("test: async operation");
         assert_eq!(active_alerts.len(), 1);
         assert!(matches!(active_alerts[0].status, AlertStatus::Acknowledged));
     }
 
     #[tokio::test]
     async fn test_resolve_alert() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Low).await.unwrap();
-        
-        let alert = manager.generate_alert(
-            SecuritySeverity::Medium,
-            "Test Alert".to_string(),
-            "Test description".to_string(),
-            None,
-        ).await.unwrap();
-        
-        manager.resolve_alert(&alert.alert_id, "Issue resolved").await.unwrap();
-        
-        let active_alerts = manager.get_active_alerts().await.unwrap();
+        let manager = SecurityAlertManager::new(SecuritySeverity::Low)
+            .await
+            .expect("test: expected success");
+
+        let alert = manager
+            .generate_alert(
+                SecuritySeverity::Medium,
+                "Test Alert".to_string(),
+                "Test description".to_string(),
+                None,
+            )
+            .await
+            .expect("test: expected success");
+
+        manager
+            .resolve_alert(&alert.alert_id, "Issue resolved")
+            .await
+            .expect("test: expected success");
+
+        let active_alerts = manager.get_active_alerts().await.expect("test: async operation");
         assert_eq!(active_alerts.len(), 1);
         assert!(matches!(active_alerts[0].status, AlertStatus::Resolved));
     }
 
     #[tokio::test]
     async fn test_get_recent_alerts() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Low).await.unwrap();
-        
+        let manager = SecurityAlertManager::new(SecuritySeverity::Low)
+            .await
+            .expect("test: expected success");
+
         // Generate multiple alerts
         for i in 0..5 {
-            manager.generate_alert(
-                SecuritySeverity::Medium,
-                format!("Test Alert {}", i),
-                "Test description".to_string(),
-                None,
-            ).await.unwrap();
+            manager
+                .generate_alert(
+                    SecuritySeverity::Medium,
+                    format!("Test Alert {i}"),
+                    "Test description".to_string(),
+                    None,
+                )
+                .await
+                .expect("test: expected success");
         }
-        
-        let recent_alerts = manager.get_recent_alerts(3).await.unwrap();
+
+        let recent_alerts = manager.get_recent_alerts(3).await.expect("test: async operation");
         assert_eq!(recent_alerts.len(), 3);
     }
 
     #[tokio::test]
     async fn test_alert_categorization() {
-        let manager = SecurityAlertManager::new(SecuritySeverity::Low).await.unwrap();
-        
-        let alert = manager.generate_alert(
-            SecuritySeverity::High,
-            "Consensus Validation Failed".to_string(),
-            "Four-proof consensus validation failed".to_string(),
-            None,
-        ).await.unwrap();
-        
+        let manager = SecurityAlertManager::new(SecuritySeverity::Low)
+            .await
+            .expect("test: expected success");
+
+        let alert = manager
+            .generate_alert(
+                SecuritySeverity::High,
+                "Consensus Validation Failed".to_string(),
+                "Four-proof consensus validation failed".to_string(),
+                None,
+            )
+            .await
+            .expect("test: expected success");
+
         assert!(matches!(alert.category, AlertCategory::ConsensusValidation));
     }
 }

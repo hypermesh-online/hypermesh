@@ -9,46 +9,46 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::assets::core::{AssetResult, AssetError, PrivacyMode};
 use super::super::PrivacyAllocationType;
+use crate::assets::core::{AssetError, AssetResult, PrivacyMode};
 use crate::assets::privacy::core::PrivacyPreference;
 
 // Re-export sub-modules
-pub use super::data_management::{DataMinimizationSettings, RetentionPreferences};
+pub use super::advanced::AdvancedPrivacyOptions;
 pub use super::consent::ConsentManagementSettings;
+pub use super::data_management::{DataMinimizationSettings, RetentionPreferences};
 pub use super::monitoring::DashboardPreferences;
 pub use super::resources::ResourcePrivacySettings;
+pub use super::templates::{PrivacyPreset, PrivacyTemplate};
 pub use super::validation::{PrivacyConstraints, PrivacyValidationRules};
-pub use super::templates::{PrivacyTemplate, PrivacyPreset};
-pub use super::advanced::AdvancedPrivacyOptions;
 
 /// Complete user privacy configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserPrivacyConfig {
     /// User identifier
     pub user_id: String,
-    
+
     /// Configuration version
     pub config_version: String,
-    
+
     /// Main privacy settings
     pub privacy_settings: PrivacySettings,
-    
+
     /// Resource-specific privacy settings
     pub resource_settings: ResourcePrivacySettings,
-    
+
     /// Privacy constraints and limits
     pub constraints: PrivacyConstraints,
-    
+
     /// Validation rules
     pub validation_rules: PrivacyValidationRules,
-    
+
     /// Configuration templates
     pub templates: Vec<PrivacyTemplate>,
-    
+
     /// Quick settings presets
     pub presets: Vec<PrivacyPreset>,
-    
+
     /// Advanced configuration options
     pub advanced_options: AdvancedPrivacyOptions,
 }
@@ -58,19 +58,19 @@ pub struct UserPrivacyConfig {
 pub struct PrivacySettings {
     /// Default privacy level
     pub default_privacy_level: PrivacyMode,
-    
+
     /// Default allocation type
     pub default_allocation_type: PrivacyAllocationType,
-    
+
     /// Privacy preference (user's desired privacy/functionality balance)
     pub privacy_preference: PrivacyPreference,
-    
+
     /// Data minimization settings
     pub data_minimization: DataMinimizationSettings,
-    
+
     /// Consent management
     pub consent_management: ConsentManagementSettings,
-    
+
     /// Privacy dashboard preferences
     pub dashboard_preferences: DashboardPreferences,
 }
@@ -96,23 +96,23 @@ impl UserPrivacyConfig {
         // Validate user ID
         if self.user_id.trim().is_empty() {
             return Err(AssetError::ValidationError {
-                message: "User ID cannot be empty".to_string()
+                message: "User ID cannot be empty".to_string(),
             });
         }
 
         // Validate configuration version
         if self.config_version.trim().is_empty() {
             return Err(AssetError::ValidationError {
-                message: "Configuration version cannot be empty".to_string()
+                message: "Configuration version cannot be empty".to_string(),
             });
         }
 
         // Validate privacy settings
         self.privacy_settings.validate()?;
-        
+
         // Validate constraints
         self.constraints.validate()?;
-        
+
         // Validate validation rules
         self.validation_rules.validate()?;
 
@@ -122,11 +122,13 @@ impl UserPrivacyConfig {
     /// Apply privacy template
     pub fn apply_template(&mut self, template_name: &str) -> AssetResult<()> {
         // Clone the template to avoid borrow checker issues
-        let template = self.templates.iter()
+        let template = self
+            .templates
+            .iter()
             .find(|t| t.name == template_name)
             .cloned()
             .ok_or_else(|| AssetError::NotFound {
-                resource: format!("Privacy template '{}'", template_name)
+                resource: format!("Privacy template '{template_name}'"),
             })?;
 
         template.apply_to_config(self)?;
@@ -136,11 +138,13 @@ impl UserPrivacyConfig {
     /// Apply privacy preset
     pub fn apply_preset(&mut self, preset_name: &str) -> AssetResult<()> {
         // Clone the preset to avoid borrow checker issues
-        let preset = self.presets.iter()
+        let preset = self
+            .presets
+            .iter()
             .find(|p| p.name == preset_name)
             .cloned()
             .ok_or_else(|| AssetError::NotFound {
-                resource: format!("Privacy preset '{}'", preset_name)
+                resource: format!("Privacy preset '{preset_name}'"),
             })?;
 
         preset.apply_to_config(self)?;
@@ -153,10 +157,10 @@ impl PrivacySettings {
     pub fn validate(&self) -> AssetResult<()> {
         // Validate data minimization settings
         self.data_minimization.validate()?;
-        
+
         // Validate consent management settings
         self.consent_management.validate()?;
-        
+
         Ok(())
     }
 }

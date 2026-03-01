@@ -5,24 +5,24 @@
 //! Core container runtime implementation with real process isolation.
 
 use super::{
-    types::{ContainerId, ContainerSpec, CreateOptions, ContainerStatus},
-    lifecycle::{ContainerLifecycle, DefaultContainerLifecycle, ContainerState},
-    image::{ImageManager, DefaultImageManager},
-    network::{ContainerNetwork, DefaultContainerNetwork, NetworkConfig},
-    filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
-    resources::{ResourceManager, CgroupResourceManager, ResourceUsage},
-    migration::{MigrationManager, DefaultMigrationManager, MigrationRequest},
-    monitoring::{ContainerMonitor, DefaultContainerMonitor, ContainerMetrics},
-    process::ProcessIsolation,
     config::ContainerConfig,
-    error::{Result, ContainerError},
+    error::{ContainerError, Result},
+    filesystem::{ContainerFilesystem, DefaultContainerFilesystem},
+    image::{DefaultImageManager, ImageManager},
+    lifecycle::{ContainerLifecycle, ContainerState, DefaultContainerLifecycle},
+    migration::{DefaultMigrationManager, MigrationManager, MigrationRequest},
+    monitoring::{ContainerMetrics, ContainerMonitor, DefaultContainerMonitor},
+    network::{ContainerNetwork, DefaultContainerNetwork, NetworkConfig},
+    process::ProcessIsolation,
+    resources::{CgroupResourceManager, ResourceManager, ResourceUsage},
+    types::{ContainerId, ContainerSpec, ContainerStatus, CreateOptions},
 };
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{info, warn, instrument};
+use tracing::{info, instrument, warn};
 
 /// Container runtime handle for managing container operations
 #[derive(Clone)]
@@ -154,13 +154,11 @@ impl ContainerRuntime {
         let migration_manager = Arc::new(DefaultMigrationManager::new());
         let monitor = Arc::new(DefaultContainerMonitor::new());
 
-        let max_memory = config.limits.max_memory_per_container
-            * config.runtime.max_containers as u64;
+        let max_memory =
+            config.limits.max_memory_per_container * config.runtime.max_containers as u64;
         let max_cpu_millicores = (config.limits.max_cpu_per_container * 1000.0) as u64
             * config.runtime.max_containers as u64;
-        let process_isolation = Arc::new(
-            ProcessIsolation::new(max_memory, max_cpu_millicores),
-        );
+        let process_isolation = Arc::new(ProcessIsolation::new(max_memory, max_cpu_millicores));
 
         Ok(Self {
             config,
@@ -188,13 +186,11 @@ impl ContainerRuntime {
         migration_manager: Arc<dyn MigrationManager>,
         monitor: Arc<dyn ContainerMonitor>,
     ) -> Self {
-        let max_memory = config.limits.max_memory_per_container
-            * config.runtime.max_containers as u64;
+        let max_memory =
+            config.limits.max_memory_per_container * config.runtime.max_containers as u64;
         let max_cpu_millicores = (config.limits.max_cpu_per_container * 1000.0) as u64
             * config.runtime.max_containers as u64;
-        let process_isolation = Arc::new(
-            ProcessIsolation::new(max_memory, max_cpu_millicores),
-        );
+        let process_isolation = Arc::new(ProcessIsolation::new(max_memory, max_cpu_millicores));
 
         Self {
             config,
@@ -227,7 +223,7 @@ impl ContainerRuntime {
         F: FnOnce(&mut RuntimeMetrics),
     {
         let mut metrics = self.metrics.write().await;
-        update_fn(&mut *metrics);
+        update_fn(&mut metrics);
     }
 
     /// Validate container specification
@@ -236,25 +232,24 @@ impl ContainerRuntime {
             return Err(ContainerError::config("Container image cannot be empty"));
         }
 
-        if spec.command.as_ref().map_or(true, |c| c.is_empty()) {
+        if spec.command.as_ref().is_none_or(|c| c.is_empty()) {
             return Err(ContainerError::config("Container command cannot be empty"));
         }
 
         // Validate resource limits
         if spec.resources.memory_bytes > self.config.limits.max_memory_per_container {
-            return Err(ContainerError::config(
-                format!("Memory limit {} exceeds maximum {}",
-                       spec.resources.memory_bytes,
-                       self.config.limits.max_memory_per_container)
-            ));
+            return Err(ContainerError::config(format!(
+                "Memory limit {} exceeds maximum {}",
+                spec.resources.memory_bytes, self.config.limits.max_memory_per_container
+            )));
         }
 
         let cpu_cores = (spec.resources.cpu_millicores as f64) / 1000.0;
         if cpu_cores > self.config.limits.max_cpu_per_container {
-            return Err(ContainerError::config(
-                format!("CPU quota {} exceeds maximum {}",
-                       cpu_cores, self.config.limits.max_cpu_per_container)
-            ));
+            return Err(ContainerError::config(format!(
+                "CPU quota {} exceeds maximum {}",
+                cpu_cores, self.config.limits.max_cpu_per_container
+            )));
         }
 
         Ok(())
@@ -293,7 +288,9 @@ impl ContainerRuntime {
         }
 
         // Create container filesystem
-        self.filesystem.create_container_filesystem(&id, &spec).await?;
+        self.filesystem
+            .create_container_filesystem(&id, &spec)
+            .await?;
 
         // Set up networking - spec doesn't have network field, use defaults
         let default_network_config = NetworkConfig {
@@ -373,9 +370,7 @@ impl ContainerRuntime {
             containers
                 .get(id)
                 .cloned()
-                .ok_or_else(|| ContainerError::NotFound {
-                    id: id.to_string(),
-                })?
+                .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?
         };
 
         let command = handle
@@ -408,9 +403,8 @@ impl ContainerRuntime {
             let total_time = metrics.avg_startup_time.as_nanos()
                 * (metrics.containers_started - 1) as u128
                 + startup_time.as_nanos();
-            metrics.avg_startup_time = Duration::from_nanos(
-                (total_time / metrics.containers_started as u128) as u64,
-            );
+            metrics.avg_startup_time =
+                Duration::from_nanos((total_time / metrics.containers_started as u128) as u64);
         })
         .await;
 
@@ -448,9 +442,8 @@ impl ContainerRuntime {
             let total_time = metrics.avg_shutdown_time.as_nanos()
                 * (metrics.containers_stopped - 1) as u128
                 + shutdown_time.as_nanos();
-            metrics.avg_shutdown_time = Duration::from_nanos(
-                (total_time / metrics.containers_stopped as u128) as u64,
-            );
+            metrics.avg_shutdown_time =
+                Duration::from_nanos((total_time / metrics.containers_stopped as u128) as u64);
         })
         .await;
 
@@ -485,9 +478,7 @@ impl ContainerRuntime {
         let mut containers = self.containers.write().await;
         let _handle = containers
             .remove(id)
-            .ok_or_else(|| ContainerError::NotFound {
-                id: id.to_string(),
-            })?;
+            .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })?;
         drop(containers);
 
         // Ensure process is stopped
@@ -547,9 +538,7 @@ impl ContainerRuntime {
         containers
             .get(id)
             .cloned()
-            .ok_or_else(|| ContainerError::NotFound {
-                id: id.to_string(),
-            })
+            .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
     }
 
     /// Get resource usage for container from the process isolation layer.

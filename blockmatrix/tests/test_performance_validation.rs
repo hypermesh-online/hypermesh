@@ -12,10 +12,10 @@
 #[cfg(test)]
 mod performance_validation_tests {
     use blockmatrix::os_integration::{create_os_abstraction, types::*};
-    use std::time::{Duration, Instant};
-    use std::thread;
-    use std::sync::{Arc, Mutex};
     use criterion::{black_box, Criterion};
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     // Performance requirements
     const MAX_FULL_PROFILE_MS: u64 = 500;
@@ -52,7 +52,10 @@ mod performance_validation_tests {
         let duration = start.elapsed();
 
         println!("Full system profile completed in {:?}", duration);
-        println!("  CPU: {} cores @ {} MHz", cpu_info.core_count, cpu_info.frequency_mhz);
+        println!(
+            "  CPU: {} cores @ {} MHz",
+            cpu_info.core_count, cpu_info.frequency_mhz
+        );
         println!("  GPU: {} devices detected", gpu_info.len());
         println!("  Memory: {} MB total", memory_info.total_mb);
         println!("  Storage: {} devices", storage_info.len());
@@ -60,7 +63,8 @@ mod performance_validation_tests {
         assert!(
             duration.as_millis() < MAX_FULL_PROFILE_MS as u128,
             "Full profile took {:?}, max allowed: {}ms",
-            duration, MAX_FULL_PROFILE_MS
+            duration,
+            MAX_FULL_PROFILE_MS
         );
     }
 
@@ -92,13 +96,15 @@ mod performance_validation_tests {
         assert!(
             avg.as_millis() < MAX_RESOURCE_SAMPLE_MS as u128,
             "Average sampling time {:?} exceeds {}ms",
-            avg, MAX_RESOURCE_SAMPLE_MS
+            avg,
+            MAX_RESOURCE_SAMPLE_MS
         );
 
         assert!(
             max.as_millis() < (MAX_RESOURCE_SAMPLE_MS * 2) as u128,
             "Max sampling time {:?} exceeds {}ms",
-            max, MAX_RESOURCE_SAMPLE_MS * 2
+            max,
+            MAX_RESOURCE_SAMPLE_MS * 2
         );
     }
 
@@ -126,7 +132,8 @@ mod performance_validation_tests {
             }
         };
 
-        let handle = os.load_ebpf_program(&program)
+        let handle = os
+            .load_ebpf_program(&program)
             .expect("Failed to load eBPF program");
 
         let mut timings = Vec::new();
@@ -149,10 +156,12 @@ mod performance_validation_tests {
         assert!(
             avg.as_millis() < MAX_EBPF_READ_MS as u128,
             "Average eBPF read {:?} exceeds {}ms",
-            avg, MAX_EBPF_READ_MS
+            avg,
+            MAX_EBPF_READ_MS
         );
 
-        os.unload_ebpf_program(handle).expect("Failed to unload eBPF");
+        os.unload_ebpf_program(handle)
+            .expect("Failed to unload eBPF");
     }
 
     #[test]
@@ -176,12 +185,16 @@ mod performance_validation_tests {
         let peak_mem = get_process_memory_mb();
         let memory_increase = peak_mem - baseline_mem;
 
-        println!("Peak memory: {} MB (increase: {} MB)", peak_mem, memory_increase);
+        println!(
+            "Peak memory: {} MB (increase: {} MB)",
+            peak_mem, memory_increase
+        );
 
         assert!(
             memory_increase < MAX_MEMORY_USAGE_MB,
             "Memory usage increased by {} MB, max allowed: {} MB",
-            memory_increase, MAX_MEMORY_USAGE_MB
+            memory_increase,
+            MAX_MEMORY_USAGE_MB
         );
     }
 
@@ -207,14 +220,17 @@ mod performance_validation_tests {
                 assert!(
                     increase < 50,
                     "Memory leak detected: {} MB increase after {} iterations",
-                    increase, iteration + 1
+                    increase,
+                    iteration + 1
                 );
             }
         }
 
         let final_mem = get_process_memory_mb();
-        println!("Memory after 100 iterations: {} MB (baseline: {} MB)",
-            final_mem, baseline_mem);
+        println!(
+            "Memory after 100 iterations: {} MB (baseline: {} MB)",
+            final_mem, baseline_mem
+        );
     }
 
     #[test]
@@ -303,7 +319,9 @@ mod performance_validation_tests {
             assert!(
                 diff < 100,
                 "Memory detection varied too much at iteration {}: {} vs {}",
-                i, mem_mb, first_mem
+                i,
+                mem_mb,
+                first_mem
             );
         }
 
@@ -344,8 +362,7 @@ mod performance_validation_tests {
         #[cfg(target_os = "linux")]
         {
             use std::fs;
-            let status = fs::read_to_string("/proc/self/status")
-                .unwrap_or_default();
+            let status = fs::read_to_string("/proc/self/status").unwrap_or_default();
 
             for line in status.lines() {
                 if line.starts_with("VmRSS:") {
@@ -361,19 +378,17 @@ mod performance_validation_tests {
 
         #[cfg(target_os = "windows")]
         {
+            use std::mem;
             use winapi::um::processthreadsapi::GetCurrentProcess;
             use winapi::um::psapi::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
-            use std::mem;
 
             unsafe {
                 let mut counters: PROCESS_MEMORY_COUNTERS = mem::zeroed();
                 counters.cb = mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
 
-                if GetProcessMemoryInfo(
-                    GetCurrentProcess(),
-                    &mut counters as *mut _,
-                    counters.cb
-                ) != 0 {
+                if GetProcessMemoryInfo(GetCurrentProcess(), &mut counters as *mut _, counters.cb)
+                    != 0
+                {
                     return (counters.WorkingSetSize / (1024 * 1024)) as usize;
                 }
             }

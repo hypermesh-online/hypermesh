@@ -11,16 +11,16 @@ pub mod types;
 
 pub use types::*;
 
+use anyhow::Result;
+use async_trait::async_trait;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use std::collections::HashMap;
-use anyhow::Result;
-use tracing::{info, debug, instrument};
-use async_trait::async_trait;
+use tracing::{debug, info, instrument};
 
+use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId, PrivacyMode};
 use crate::assets::pipeline::{Asset, AssetPipeline};
 use crate::assets::privacy::PrivacyManager;
-use crate::assets::multi_node::{MultiNetworkCoordinator, NetworkId, PrivacyMode};
 use crate::assets::storage::ContentAddressedStorage;
 use crate::matrix::MatrixCoordinate;
 use stoq::StoqTransport;
@@ -58,6 +58,12 @@ impl Default for PerformanceTargets {
             _max_network_latency_ms: 50,
             _min_storage_efficiency: 0.8,
         }
+    }
+}
+
+impl Default for IntegrationValidator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -100,9 +106,9 @@ impl IntegrationValidator {
         let storage_result = self.validate_content_storage(storage).await;
         results.insert("content_storage".to_string(), storage_result.clone());
 
-        let integration_result = self.validate_cross_component_integration(
-            stoq, privacy, network, pipeline, storage,
-        ).await;
+        let integration_result = self
+            .validate_cross_component_integration(stoq, privacy, network, pipeline, storage)
+            .await;
         results.insert("cross_component".to_string(), integration_result.clone());
 
         let e2e_result = self.validate_e2e_workflows(pipeline, storage).await;
@@ -113,7 +119,8 @@ impl IntegrationValidator {
 
         let passed = results.values().filter(|r| r.is_passed()).count();
         let failed = results.values().filter(|r| r.is_failed()).count();
-        let skipped = results.values()
+        let skipped = results
+            .values()
             .filter(|r| matches!(r, ValidationResult::Skipped { .. }))
             .count();
 
@@ -146,7 +153,10 @@ impl IntegrationValidator {
 
         info!(
             "Validation complete in {:?}: {} passed, {} failed, {} skipped",
-            start.elapsed(), passed, failed, skipped,
+            start.elapsed(),
+            passed,
+            failed,
+            skipped,
         );
 
         Ok(report)
@@ -176,10 +186,7 @@ impl IntegrationValidator {
     }
 
     /// Validate privacy manager
-    async fn validate_privacy_manager(
-        &self,
-        privacy: &PrivacyManager,
-    ) -> ValidationResult {
+    async fn validate_privacy_manager(&self, privacy: &PrivacyManager) -> ValidationResult {
         let start = Instant::now();
         debug!("Validating privacy manager");
 
@@ -208,10 +215,7 @@ impl IntegrationValidator {
 
         match network.get_active_networks().await {
             Ok(networks) => ValidationResult::Passed {
-                message: format!(
-                    "Network coordinator managing {} networks",
-                    networks.len(),
-                ),
+                message: format!("Network coordinator managing {} networks", networks.len(),),
                 duration_ms: start.elapsed().as_millis() as u64,
             },
             Err(e) => ValidationResult::Failed {
@@ -222,10 +226,7 @@ impl IntegrationValidator {
     }
 
     /// Validate asset pipeline
-    async fn validate_asset_pipeline(
-        &self,
-        pipeline: &AssetPipeline,
-    ) -> ValidationResult {
+    async fn validate_asset_pipeline(&self, pipeline: &AssetPipeline) -> ValidationResult {
         let start = Instant::now();
         debug!("Validating asset pipeline");
 
@@ -244,10 +245,7 @@ impl IntegrationValidator {
                     }
                 } else {
                     ValidationResult::Passed {
-                        message: format!(
-                            "Pipeline produced {} shards",
-                            processed.shards.len(),
-                        ),
+                        message: format!("Pipeline produced {} shards", processed.shards.len(),),
                         duration_ms: start.elapsed().as_millis() as u64,
                     }
                 }
@@ -272,7 +270,8 @@ impl IntegrationValidator {
         ValidationResult::Passed {
             message: format!(
                 "Storage operational: {} unique shards, {:.2}% deduplication",
-                stats.unique_shards, stats.deduplication_rate * 100.0,
+                stats.unique_shards,
+                stats.deduplication_rate * 100.0,
             ),
             duration_ms: start.elapsed().as_millis() as u64,
         }
@@ -298,10 +297,12 @@ impl IntegrationValidator {
 
         let processed = match pipeline.process_asset(test_asset).await {
             Ok(p) => p,
-            Err(e) => return ValidationResult::Failed {
-                reason: "Pipeline integration failed".to_string(),
-                details: vec![e.to_string()],
-            },
+            Err(e) => {
+                return ValidationResult::Failed {
+                    reason: "Pipeline integration failed".to_string(),
+                    details: vec![e.to_string()],
+                }
+            }
         };
 
         for shard in &processed.shards {
@@ -314,12 +315,15 @@ impl IntegrationValidator {
         }
 
         let test_network: NetworkId = NetworkId([0u8; 16]);
-        if let Err(e) = network.register_asset(
-            test_network,
-            processed.asset_id.clone(),
-            PrivacyMode::PRIVATE,
-            vec![],
-        ).await {
+        if let Err(e) = network
+            .register_asset(
+                test_network,
+                processed.asset_id.clone(),
+                PrivacyMode::PRIVATE,
+                vec![],
+            )
+            .await
+        {
             return ValidationResult::Failed {
                 reason: "Network integration failed".to_string(),
                 details: vec![e.to_string()],
@@ -349,23 +353,25 @@ impl IntegrationValidator {
 
         for (size, label) in test_sizes {
             let asset = Asset {
-                id: format!("e2e_test_{}", label),
+                id: format!("e2e_test_{label}"),
                 data: vec![0u8; size],
                 metadata: Default::default(),
             };
 
             let processed = match pipeline.process_asset(asset).await {
                 Ok(p) => p,
-                Err(e) => return ValidationResult::Failed {
-                    reason: format!("E2E workflow failed for {}", label),
-                    details: vec![e.to_string()],
-                },
+                Err(e) => {
+                    return ValidationResult::Failed {
+                        reason: format!("E2E workflow failed for {label}"),
+                        details: vec![e.to_string()],
+                    }
+                }
             };
 
             for shard in &processed.shards {
                 if let Err(e) = storage._store_shard(shard.clone()).await {
                     return ValidationResult::Failed {
-                        reason: format!("E2E storage failed for {}", label),
+                        reason: format!("E2E storage failed for {label}"),
                         details: vec![e.to_string()],
                     };
                 }
@@ -373,7 +379,7 @@ impl IntegrationValidator {
 
             if let Err(e) = storage.retrieve_shards(&processed.asset_id).await {
                 return ValidationResult::Failed {
-                    reason: format!("E2E retrieval failed for {}", label),
+                    reason: format!("E2E retrieval failed for {label}"),
                     details: vec![e.to_string()],
                 };
             }
@@ -396,8 +402,7 @@ impl IntegrationValidator {
         if processing_time_ms > self.performance_targets.max_processing_time_ms {
             failures.push(format!(
                 "Processing time {}ms exceeds target {}ms",
-                processing_time_ms,
-                self.performance_targets.max_processing_time_ms,
+                processing_time_ms, self.performance_targets.max_processing_time_ms,
             ));
         }
 
@@ -405,8 +410,7 @@ impl IntegrationValidator {
         if retrieval_time_ms > self.performance_targets.max_retrieval_time_ms {
             failures.push(format!(
                 "Retrieval time {}ms exceeds target {}ms",
-                retrieval_time_ms,
-                self.performance_targets.max_retrieval_time_ms,
+                retrieval_time_ms, self.performance_targets.max_retrieval_time_ms,
             ));
         }
 
@@ -437,7 +441,7 @@ impl IntegrationValidator {
         match name {
             "performance" => self.validate_performance_targets().await,
             _ => ValidationResult::Skipped {
-                reason: format!("Unknown validation: {}", name),
+                reason: format!("Unknown validation: {name}"),
             },
         }
     }
@@ -530,9 +534,7 @@ impl MultiNetworkCoordinatorExt for MultiNetworkCoordinator {
 trait ContentAddressedStorageExt {
     async fn _get_stats(&self) -> crate::assets::storage::StorageStats;
     async fn _store_shard(&self, shard: crate::assets::pipeline::Shard) -> Result<()>;
-    async fn retrieve_shards(
-        &self, asset_id: &str,
-    ) -> Result<Vec<crate::assets::pipeline::Shard>>;
+    async fn retrieve_shards(&self, asset_id: &str) -> Result<Vec<crate::assets::pipeline::Shard>>;
 }
 
 #[async_trait]
@@ -541,10 +543,7 @@ impl ContentAddressedStorageExt for ContentAddressedStorage {
         crate::assets::storage::StorageStats::default()
     }
 
-    async fn _store_shard(
-        &self,
-        _shard: crate::assets::pipeline::Shard,
-    ) -> Result<()> {
+    async fn _store_shard(&self, _shard: crate::assets::pipeline::Shard) -> Result<()> {
         Ok(())
     }
 

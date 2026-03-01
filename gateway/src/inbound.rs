@@ -128,7 +128,11 @@ mod tests {
         let proxy = InboundProxy::with_defaults();
         assert_eq!(proxy.route_count(), 4);
 
-        let names: Vec<&str> = proxy.routes.iter().map(|r| r.display_name.as_str()).collect();
+        let names: Vec<&str> = proxy
+            .routes
+            .iter()
+            .map(|r| r.display_name.as_str())
+            .collect();
         assert!(names.contains(&"Resource Dashboard"));
         assert!(names.contains(&"engauge Panel"));
         assert!(names.contains(&"Caesar Wallet"));

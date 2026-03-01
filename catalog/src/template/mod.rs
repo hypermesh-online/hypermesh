@@ -7,15 +7,15 @@
 //! Provides template generation capabilities for creating new asset packages
 //! from predefined templates with customizable parameters.
 
-mod helpers;
 mod builtin_templates;
+mod helpers;
 
 use crate::assets::*;
-use anyhow::{Result, Context};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use handlebars::Handlebars;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Template generator for creating asset packages
 pub struct CatalogTemplateGenerator {
@@ -262,7 +262,8 @@ impl CatalogTemplateGenerator {
         // Register template files with Handlebars
         for (file_name, content) in &template.files {
             let template_name = format!("{}:{}", template.name, file_name);
-            self.handlebars.register_template_string(&template_name, content)
+            self.handlebars
+                .register_template_string(&template_name, content)
                 .context("Failed to register template with Handlebars")?;
         }
 
@@ -294,8 +295,12 @@ impl CatalogTemplateGenerator {
             return Err(anyhow::anyhow!("Parameter name cannot be empty"));
         }
 
-        if !["string", "number", "boolean", "array", "object"].contains(&param.param_type.as_str()) {
-            return Err(anyhow::anyhow!("Invalid parameter type: {}", param.param_type));
+        if !["string", "number", "boolean", "array", "object"].contains(&param.param_type.as_str())
+        {
+            return Err(anyhow::anyhow!(
+                "Invalid parameter type: {}",
+                param.param_type
+            ));
         }
 
         Ok(())
@@ -307,19 +312,30 @@ impl CatalogTemplateGenerator {
         template_name: &str,
         context: TemplateContext,
     ) -> Result<TemplateGenerationResult> {
-        let template = self.templates.get(template_name)
-            .ok_or_else(|| anyhow::anyhow!("Template '{}' not found", template_name))?;
+        let template = self
+            .templates
+            .get(template_name)
+            .ok_or_else(|| anyhow::anyhow!("Template '{template_name}' not found"))?;
 
         // Validate context parameters
         self.validate_context(template, &context)?;
 
         // Prepare template context
         let mut template_context = context.parameters.clone();
-        template_context.insert("asset_name".to_string(), serde_json::Value::String(context.asset_name.clone()));
-        template_context.insert("asset_version".to_string(), serde_json::Value::String(context.asset_version.clone()));
+        template_context.insert(
+            "asset_name".to_string(),
+            serde_json::Value::String(context.asset_name.clone()),
+        );
+        template_context.insert(
+            "asset_version".to_string(),
+            serde_json::Value::String(context.asset_version.clone()),
+        );
 
         if let Some(author) = &context.author {
-            template_context.insert("author".to_string(), serde_json::Value::String(author.clone()));
+            template_context.insert(
+                "author".to_string(),
+                serde_json::Value::String(author.clone()),
+            );
         }
 
         for (key, value) in &context.metadata {
@@ -330,24 +346,34 @@ impl CatalogTemplateGenerator {
         let mut generated_files = Vec::new();
         let mut file_contents = HashMap::new();
 
-        for (file_name, _) in &template.files {
+        for file_name in template.files.keys() {
             let template_name_full = format!("{}:{}", template.name, file_name);
 
-            let rendered_file_name = self.handlebars.render_template(file_name, &template_context)
+            let rendered_file_name = self
+                .handlebars
+                .render_template(file_name, &template_context)
                 .context("Failed to render file name template")?;
 
-            let rendered_content = self.handlebars.render(&template_name_full, &template_context)
+            let rendered_content = self
+                .handlebars
+                .render(&template_name_full, &template_context)
                 .context("Failed to render template content")?;
 
-            let file_hash = blake3::hash(rendered_content.as_bytes()).to_hex().to_string();
+            let file_hash = blake3::hash(rendered_content.as_bytes())
+                .to_hex()
+                .to_string();
 
             generated_files.push(GeneratedFile {
                 path: rendered_file_name.clone(),
                 size: rendered_content.len() as u64,
                 hash: file_hash,
-                file_type: if rendered_file_name.ends_with(".yaml") || rendered_file_name.ends_with(".yml") {
+                file_type: if rendered_file_name.ends_with(".yaml")
+                    || rendered_file_name.ends_with(".yml")
+                {
                     GeneratedFileType::AssetSpec
-                } else if rendered_file_name.ends_with(".jl") || rendered_file_name.ends_with(".lua") {
+                } else if rendered_file_name.ends_with(".jl")
+                    || rendered_file_name.ends_with(".lua")
+                {
                     GeneratedFileType::SourceCode
                 } else if rendered_file_name.starts_with("test_") {
                     GeneratedFileType::Test
@@ -392,11 +418,17 @@ impl CatalogTemplateGenerator {
     }
 
     /// Execute post-generation action
-    async fn execute_post_action(&self, action: &PostGenerationAction, context: &TemplateContext) -> Result<()> {
+    async fn execute_post_action(
+        &self,
+        action: &PostGenerationAction,
+        context: &TemplateContext,
+    ) -> Result<()> {
         match action {
             PostGenerationAction::CreateFile { path, content } => {
                 let rendered_path = self.handlebars.render_template(path, &context.parameters)?;
-                let rendered_content = self.handlebars.render_template(content, &context.parameters)?;
+                let rendered_content = self
+                    .handlebars
+                    .render_template(content, &context.parameters)?;
 
                 let file_path = std::path::Path::new(&context.output_dir).join(rendered_path);
 
@@ -407,7 +439,11 @@ impl CatalogTemplateGenerator {
                 tokio::fs::write(file_path, rendered_content).await?;
             }
 
-            PostGenerationAction::ExecuteCommand { command: _, working_dir: _, env: _ } => {
+            PostGenerationAction::ExecuteCommand {
+                command: _,
+                working_dir: _,
+                env: _,
+            } => {
                 tracing::error!(
                     "SECURITY VIOLATION: Template attempted to execute shell command. \
                      All execution must use HyperMesh infrastructure via catalog.hypermesh.online"
@@ -428,7 +464,11 @@ impl CatalogTemplateGenerator {
     }
 
     /// Validate template context
-    fn validate_context(&self, template: &TemplateDefinition, context: &TemplateContext) -> Result<()> {
+    fn validate_context(
+        &self,
+        template: &TemplateDefinition,
+        context: &TemplateContext,
+    ) -> Result<()> {
         for param in &template.parameters {
             if param.required && !context.parameters.contains_key(&param.name) {
                 return Err(anyhow::anyhow!(
@@ -446,7 +486,11 @@ impl CatalogTemplateGenerator {
     }
 
     /// Validate parameter value against constraints
-    fn validate_parameter_value(&self, param: &TemplateParameter, value: &serde_json::Value) -> Result<()> {
+    fn validate_parameter_value(
+        &self,
+        param: &TemplateParameter,
+        value: &serde_json::Value,
+    ) -> Result<()> {
         if let Some(constraints) = &param.constraints {
             match param.param_type.as_str() {
                 "string" => {
@@ -455,7 +499,8 @@ impl CatalogTemplateGenerator {
                             if s.len() < min_len {
                                 return Err(anyhow::anyhow!(
                                     "Parameter '{}' is too short (minimum {} characters)",
-                                    param.name, min_len
+                                    param.name,
+                                    min_len
                                 ));
                             }
                         }
@@ -464,7 +509,8 @@ impl CatalogTemplateGenerator {
                             if s.len() > max_len {
                                 return Err(anyhow::anyhow!(
                                     "Parameter '{}' is too long (maximum {} characters)",
-                                    param.name, max_len
+                                    param.name,
+                                    max_len
                                 ));
                             }
                         }
@@ -496,7 +542,8 @@ impl CatalogTemplateGenerator {
                             if n < min {
                                 return Err(anyhow::anyhow!(
                                     "Parameter '{}' is too small (minimum {})",
-                                    param.name, min
+                                    param.name,
+                                    min
                                 ));
                             }
                         }
@@ -505,7 +552,8 @@ impl CatalogTemplateGenerator {
                             if n > max {
                                 return Err(anyhow::anyhow!(
                                     "Parameter '{}' is too large (maximum {})",
-                                    param.name, max
+                                    param.name,
+                                    max
                                 ));
                             }
                         }
@@ -538,16 +586,31 @@ mod tests {
     #[tokio::test]
     async fn test_template_generation() {
         let config = TemplateConfig::default();
-        let generator = CatalogTemplateGenerator::new(config).unwrap();
+        let generator = CatalogTemplateGenerator::new(config).expect("test: creation");
 
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
 
         let mut context_params = HashMap::new();
-        context_params.insert("program_name".to_string(), serde_json::Value::String("test_program".to_string()));
-        context_params.insert("script_name".to_string(), serde_json::Value::String("test_script".to_string()));
-        context_params.insert("description".to_string(), serde_json::Value::String("A test program".to_string()));
-        context_params.insert("consensus_required".to_string(), serde_json::Value::Bool(false));
-        context_params.insert("sandbox_level".to_string(), serde_json::Value::String("standard".to_string()));
+        context_params.insert(
+            "program_name".to_string(),
+            serde_json::Value::String("test_program".to_string()),
+        );
+        context_params.insert(
+            "script_name".to_string(),
+            serde_json::Value::String("test_script".to_string()),
+        );
+        context_params.insert(
+            "description".to_string(),
+            serde_json::Value::String("A test program".to_string()),
+        );
+        context_params.insert(
+            "consensus_required".to_string(),
+            serde_json::Value::Bool(false),
+        );
+        context_params.insert(
+            "sandbox_level".to_string(),
+            serde_json::Value::String("standard".to_string()),
+        );
 
         let context = TemplateContext {
             parameters: context_params,
@@ -558,7 +621,10 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        let result = generator.generate_from_template("lua-script", context).await.unwrap();
+        let result = generator
+            .generate_from_template("lua-script", context)
+            .await
+            .expect("test: expected success");
 
         assert!(!result.generated_files.is_empty());
         assert_eq!(result.asset_package.spec.metadata.name, "test_program");

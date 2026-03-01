@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::assets::core::{AssetType, PrivacyMode};
 use super::hardware::HardwareConfiguration;
-use super::pricing::PricingConfiguration;
 use super::notifications::NotificationPreferences;
+use super::pricing::PricingConfiguration;
+use crate::assets::core::{AssetType, PrivacyMode};
 
 /// Sharing preferences configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,65 +239,80 @@ impl SharingPreferences {
     pub fn default_for_hardware(hardware_config: &HardwareConfiguration) -> Self {
         let mut resource_settings = HashMap::new();
 
-        resource_settings.insert(AssetType::Cpu, ResourceSharingSettings {
-            enabled: true,
-            share_percentage: 25.0,
-            privacy_level: PrivacyMode::PRIVATE,
-            max_concurrent_users: 2,
-            max_session_duration: Duration::from_secs(3600),
-            min_price_per_unit: 0.10,
-            constraints: ResourceConstraints {
-                cpu_constraints: Some(CpuConstraints {
-                    max_threads_per_user: hardware_config.cpu_info.threads / 4,
-                    allowed_instruction_sets: hardware_config.cpu_info.instruction_sets.clone(),
-                    priority_level: CpuPriority::Normal,
-                    thermal_limit: Some(80),
-                }),
-                gpu_constraints: None,
-                memory_constraints: None,
-                storage_constraints: None,
-            },
-        });
-
-        resource_settings.insert(AssetType::Memory, ResourceSharingSettings {
-            enabled: false,
-            share_percentage: 10.0,
-            privacy_level: PrivacyMode::PRIVATE,
-            max_concurrent_users: 1,
-            max_session_duration: Duration::from_secs(1800),
-            min_price_per_unit: 0.01,
-            constraints: ResourceConstraints {
-                cpu_constraints: None,
-                gpu_constraints: None,
-                memory_constraints: Some(MemoryConstraints {
-                    max_allocation_per_user: hardware_config.memory_info.total_capacity / 10,
-                    memory_protection_level: MemoryProtectionLevel::Isolated,
-                    allowed_access_patterns: vec![AccessPattern::Sequential, AccessPattern::Random],
-                }),
-                storage_constraints: None,
-            },
-        });
-
-        if !hardware_config.gpu_info.is_empty() {
-            resource_settings.insert(AssetType::Gpu, ResourceSharingSettings {
-                enabled: false,
-                share_percentage: 50.0,
+        resource_settings.insert(
+            AssetType::Cpu,
+            ResourceSharingSettings {
+                enabled: true,
+                share_percentage: 25.0,
                 privacy_level: PrivacyMode::PRIVATE,
-                max_concurrent_users: 1,
-                max_session_duration: Duration::from_secs(7200),
-                min_price_per_unit: 1.00,
+                max_concurrent_users: 2,
+                max_session_duration: Duration::from_secs(3600),
+                min_price_per_unit: 0.10,
                 constraints: ResourceConstraints {
-                    cpu_constraints: None,
-                    gpu_constraints: Some(GpuConstraints {
-                        max_memory_per_user: hardware_config.gpu_info[0].memory_usage / 2,
-                        allowed_compute_types: vec![ComputeType::GeneralPurpose, ComputeType::MachineLearning],
-                        max_concurrent_kernels: 10,
-                        power_limit: Some(300),
+                    cpu_constraints: Some(CpuConstraints {
+                        max_threads_per_user: hardware_config.cpu_info.threads / 4,
+                        allowed_instruction_sets: hardware_config.cpu_info.instruction_sets.clone(),
+                        priority_level: CpuPriority::Normal,
+                        thermal_limit: Some(80),
                     }),
+                    gpu_constraints: None,
                     memory_constraints: None,
                     storage_constraints: None,
                 },
-            });
+            },
+        );
+
+        resource_settings.insert(
+            AssetType::Memory,
+            ResourceSharingSettings {
+                enabled: false,
+                share_percentage: 10.0,
+                privacy_level: PrivacyMode::PRIVATE,
+                max_concurrent_users: 1,
+                max_session_duration: Duration::from_secs(1800),
+                min_price_per_unit: 0.01,
+                constraints: ResourceConstraints {
+                    cpu_constraints: None,
+                    gpu_constraints: None,
+                    memory_constraints: Some(MemoryConstraints {
+                        max_allocation_per_user: hardware_config.memory_info.total_capacity / 10,
+                        memory_protection_level: MemoryProtectionLevel::Isolated,
+                        allowed_access_patterns: vec![
+                            AccessPattern::Sequential,
+                            AccessPattern::Random,
+                        ],
+                    }),
+                    storage_constraints: None,
+                },
+            },
+        );
+
+        if !hardware_config.gpu_info.is_empty() {
+            resource_settings.insert(
+                AssetType::Gpu,
+                ResourceSharingSettings {
+                    enabled: false,
+                    share_percentage: 50.0,
+                    privacy_level: PrivacyMode::PRIVATE,
+                    max_concurrent_users: 1,
+                    max_session_duration: Duration::from_secs(7200),
+                    min_price_per_unit: 1.00,
+                    constraints: ResourceConstraints {
+                        cpu_constraints: None,
+                        gpu_constraints: Some(GpuConstraints {
+                            max_memory_per_user: hardware_config.gpu_info[0].memory_usage / 2,
+                            allowed_compute_types: vec![
+                                ComputeType::GeneralPurpose,
+                                ComputeType::MachineLearning,
+                            ],
+                            max_concurrent_kernels: 10,
+                            power_limit: Some(300),
+                        }),
+                        memory_constraints: None,
+                        storage_constraints: None,
+                    },
+                },
+            );
         }
 
         Self {
@@ -362,12 +377,10 @@ impl PerformancePreferences {
             },
             noise_preferences: NoisePreferences {
                 max_fan_speed: 70,
-                quiet_hours: vec![
-                    TimeRange {
-                        start: "22:00".to_string(),
-                        end: "08:00".to_string(),
-                    }
-                ],
+                quiet_hours: vec![TimeRange {
+                    start: "22:00".to_string(),
+                    end: "08:00".to_string(),
+                }],
                 noise_tolerance: NoiseLevel::Normal,
             },
         }

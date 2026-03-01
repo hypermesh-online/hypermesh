@@ -8,7 +8,7 @@
 //! across hypermesh_lib and blockmatrix, including eBPF encoding and
 //! Caesar reward multipliers.
 
-use hypermesh_lib::{PrivacyMode, AccessScope};
+use hypermesh_lib::{AccessScope, PrivacyMode};
 
 #[test]
 fn ebpf_encoding_matches_spec() {
@@ -27,6 +27,7 @@ fn caesar_multipliers_match_spec() {
 }
 
 #[test]
+#[allow(clippy::assertions_on_constants)]
 fn two_axis_model_correctness() {
     // ANONYMOUS: Unbounded scope, not tracked
     assert_eq!(PrivacyMode::ANONYMOUS.scope, AccessScope::Unbounded);
@@ -53,11 +54,15 @@ fn blockmatrix_reexport_is_same_type() {
 
 #[test]
 fn serde_round_trip_all_presets() {
-    for mode in [PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
-        let json = serde_json::to_string(&mode)
-            .unwrap_or_else(|e| panic!("serialize {:?}: {}", mode, e));
-        let back: PrivacyMode = serde_json::from_str(&json)
-            .unwrap_or_else(|e| panic!("deserialize {:?}: {}", mode, e));
+    for mode in [
+        PrivacyMode::ANONYMOUS,
+        PrivacyMode::PRIVATE,
+        PrivacyMode::PUBLIC,
+    ] {
+        let json =
+            serde_json::to_string(&mode).unwrap_or_else(|e| panic!("serialize {mode:?}: {e}"));
+        let back: PrivacyMode =
+            serde_json::from_str(&json).unwrap_or_else(|e| panic!("deserialize {mode:?}: {e}"));
         assert_eq!(mode, back);
     }
 }

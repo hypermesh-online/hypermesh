@@ -5,9 +5,9 @@
 //! Container image management
 
 use super::config::StorageConfig;
-use super::error::{Result, ContainerError};
+use super::error::{ContainerError, Result};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -132,31 +132,31 @@ pub enum PullStatus {
 pub trait ImageManager: Send + Sync {
     /// Pull an image from a registry
     async fn pull(&self, reference: &str) -> Result<ContainerImage>;
-    
+
     /// Check if image exists locally
     async fn exists(&self, reference: &str) -> Result<bool>;
-    
+
     /// Get image metadata
     async fn get(&self, reference: &str) -> Result<ContainerImage>;
-    
+
     /// List available images
     async fn list(&self) -> Result<Vec<ContainerImage>>;
-    
+
     /// Remove an image
     async fn remove(&self, reference: &str) -> Result<()>;
-    
+
     /// Build an image from a context
     async fn build(&self, context: &Path, dockerfile: &Path, tag: &str) -> Result<ContainerImage>;
-    
+
     /// Export image to tar archive
     async fn export(&self, reference: &str, output_path: &Path) -> Result<()>;
-    
+
     /// Import image from tar archive
     async fn import(&self, input_path: &Path, reference: &str) -> Result<ContainerImage>;
-    
+
     /// Get image layers for container creation
     async fn get_layers(&self, reference: &str) -> Result<Vec<PathBuf>>;
-    
+
     /// Cleanup unused images
     async fn garbage_collect(&self) -> Result<Vec<String>>;
 }
@@ -172,29 +172,27 @@ impl DefaultImageManager {
     pub fn new(storage_config: &StorageConfig) -> Result<Self> {
         // Ensure image directory exists
         std::fs::create_dir_all(&storage_config.images)
-            .map_err(|e| ContainerError::image(
-                format!("Failed to create image directory: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to create image directory: {e}")))?;
+
         Ok(Self {
             storage_config: storage_config.clone(),
             images: std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         })
     }
-    
+
     /// Get image storage path
     fn image_path(&self, reference: &str) -> PathBuf {
         let safe_name = reference.replace(['/', ':'], "_");
         self.storage_config.images.join(safe_name)
     }
-    
+
     /// Simulate image pull from registry
     async fn simulate_pull(&self, reference: &str) -> Result<ContainerImage> {
         info!("Pulling image: {}", reference);
-        
+
         // Simulate network delay
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        
+
         // Create mock image layers
         let layers = vec![
             ImageLayer {
@@ -210,9 +208,9 @@ impl DefaultImageManager {
                 media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_string(),
             },
         ];
-        
+
         let total_size = layers.iter().map(|l| l.size).sum();
-        
+
         let image = ContainerImage {
             id: format!("sha256:{}", sha256::digest(reference)),
             reference: reference.to_string(),
@@ -250,22 +248,18 @@ impl DefaultImageManager {
                 ],
             },
         };
-        
+
         // Create image directory and metadata
         let image_path = self.image_path(reference);
         std::fs::create_dir_all(&image_path)
-            .map_err(|e| ContainerError::image(
-                format!("Failed to create image path: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to create image path: {e}")))?;
+
         // Save image metadata
         let metadata_path = image_path.join("metadata.json");
         let metadata_json = serde_json::to_string_pretty(&image)?;
         std::fs::write(metadata_path, metadata_json)
-            .map_err(|e| ContainerError::image(
-                format!("Failed to save image metadata: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to save image metadata: {e}")))?;
+
         info!("Successfully pulled image: {} ({})", reference, image.id);
         Ok(image)
     }
@@ -275,14 +269,14 @@ impl DefaultImageManager {
 impl ImageManager for DefaultImageManager {
     async fn pull(&self, reference: &str) -> Result<ContainerImage> {
         let image = self.simulate_pull(reference).await?;
-        
+
         // Store in cache
         let mut images = self.images.write().await;
         images.insert(reference.to_string(), image.clone());
-        
+
         Ok(image)
     }
-    
+
     async fn exists(&self, reference: &str) -> Result<bool> {
         // Check cache first
         let images = self.images.read().await;
@@ -290,13 +284,13 @@ impl ImageManager for DefaultImageManager {
             return Ok(true);
         }
         drop(images);
-        
+
         // Check filesystem
         let image_path = self.image_path(reference);
         let metadata_path = image_path.join("metadata.json");
         Ok(metadata_path.exists())
     }
-    
+
     async fn get(&self, reference: &str) -> Result<ContainerImage> {
         // Check cache first
         {
@@ -305,142 +299,141 @@ impl ImageManager for DefaultImageManager {
                 return Ok(image.clone());
             }
         }
-        
+
         // Try to load from filesystem
         let image_path = self.image_path(reference);
         let metadata_path = image_path.join("metadata.json");
-        
+
         if !metadata_path.exists() {
-            return Err(ContainerError::image(
-                format!("Image not found: {}", reference)
-            ));
+            return Err(ContainerError::image(format!(
+                "Image not found: {reference}"
+            )));
         }
-        
+
         let metadata_json = std::fs::read_to_string(metadata_path)
-            .map_err(|e| ContainerError::image(
-                format!("Failed to read image metadata: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to read image metadata: {e}")))?;
+
         let image: ContainerImage = serde_json::from_str(&metadata_json)
-            .map_err(|e| ContainerError::image(
-                format!("Failed to parse image metadata: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to parse image metadata: {e}")))?;
+
         // Cache the image
         let mut images = self.images.write().await;
         images.insert(reference.to_string(), image.clone());
-        
+
         Ok(image)
     }
-    
+
     async fn list(&self) -> Result<Vec<ContainerImage>> {
         let images = self.images.read().await;
         Ok(images.values().cloned().collect())
     }
-    
+
     async fn remove(&self, reference: &str) -> Result<()> {
         // Remove from cache
         let mut images = self.images.write().await;
         images.remove(reference);
         drop(images);
-        
+
         // Remove from filesystem
         let image_path = self.image_path(reference);
         if image_path.exists() {
-            std::fs::remove_dir_all(&image_path)
-                .map_err(|e| ContainerError::image(
-                    format!("Failed to remove image directory: {}", e)
-                ))?;
+            std::fs::remove_dir_all(&image_path).map_err(|e| {
+                ContainerError::image(format!("Failed to remove image directory: {e}"))
+            })?;
         }
-        
+
         info!("Removed image: {}", reference);
         Ok(())
     }
-    
-    async fn build(&self, _context: &Path, _dockerfile: &Path, tag: &str) -> Result<ContainerImage> {
+
+    async fn build(
+        &self,
+        _context: &Path,
+        _dockerfile: &Path,
+        tag: &str,
+    ) -> Result<ContainerImage> {
         // Simulate image build
         info!("Building image: {}", tag);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        
+
         // For now, just create a mock built image
         self.pull(tag).await
     }
-    
+
     async fn export(&self, reference: &str, output_path: &Path) -> Result<()> {
         let image = self.get(reference).await?;
-        
+
         // Simulate tar export
         info!("Exporting image {} to {:?}", reference, output_path);
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        
+
         // Create mock tar file
         std::fs::write(output_path, format!("Mock tar export of {}", image.id))
-            .map_err(|e| ContainerError::image(
-                format!("Failed to export image: {}", e)
-            ))?;
-        
+            .map_err(|e| ContainerError::image(format!("Failed to export image: {e}")))?;
+
         Ok(())
     }
-    
+
     async fn import(&self, input_path: &Path, reference: &str) -> Result<ContainerImage> {
         if !input_path.exists() {
             return Err(ContainerError::image(
-                "Import file does not exist".to_string()
+                "Import file does not exist".to_string(),
             ));
         }
-        
+
         info!("Importing image from {:?} as {}", input_path, reference);
-        
+
         // Simulate import (would normally extract tar and create image)
         self.pull(reference).await
     }
-    
+
     async fn get_layers(&self, reference: &str) -> Result<Vec<PathBuf>> {
         let image = self.get(reference).await?;
         let image_path = self.image_path(reference);
-        
+
         let mut layer_paths = Vec::new();
         for (i, layer) in image.layers.iter().enumerate() {
-            let layer_path = image_path.join(format!("layer_{}.tar", i));
-            
+            let layer_path = image_path.join(format!("layer_{i}.tar"));
+
             // Simulate layer file creation if it doesn't exist
             if !layer_path.exists() {
                 std::fs::write(&layer_path, format!("Mock layer data for {}", layer.digest))
-                    .map_err(|e| ContainerError::image(
-                        format!("Failed to create layer file: {}", e)
-                    ))?;
+                    .map_err(|e| {
+                        ContainerError::image(format!("Failed to create layer file: {e}"))
+                    })?;
             }
-            
+
             layer_paths.push(layer_path);
         }
-        
+
         Ok(layer_paths)
     }
-    
+
     async fn garbage_collect(&self) -> Result<Vec<String>> {
         info!("Running image garbage collection");
-        
+
         let mut removed_images = Vec::new();
         let cutoff_time = SystemTime::now() - self.storage_config.gc_policy.max_age;
-        
+
         let images = self.images.read().await;
-        let candidates: Vec<_> = images.iter()
+        let candidates: Vec<_> = images
+            .iter()
             .filter(|(_, image)| image.created_at < cutoff_time)
             .map(|(ref_name, _)| ref_name.clone())
             .collect();
         drop(images);
-        
+
         for reference in candidates {
             match self.remove(&reference).await {
                 Ok(_) => {
                     removed_images.push(reference);
-                },
+                }
                 Err(e) => {
                     warn!("Failed to remove image during GC: {}: {}", reference, e);
-                },
+                }
             }
         }
-        
+
         info!("Garbage collection removed {} images", removed_images.len());
         Ok(removed_images)
     }
@@ -451,7 +444,7 @@ mod sha256 {
     pub fn digest(input: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         input.hash(&mut hasher);
         format!("{:016x}{:016x}", hasher.finish(), hasher.finish())

@@ -13,20 +13,19 @@
 //! - Integrate with TrustChain certificate hierarchy for neighbor trust
 //! - Ensure consensus enforcement before accepting positions
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
-use serde::{Serialize, Deserialize};
-use std::time::{SystemTime, Duration};
+use tracing::{debug, info, warn};
 
-use crate::matrix::coordinate::MatrixCoordinate;
 use crate::blockchain::node_chain::NodeBlockchain;
+use crate::matrix::coordinate::MatrixCoordinate;
+use trustchain::consensus::validation::{ErrorCode, ProofType, ProofValidation};
 use trustchain::consensus::{
-    ConsensusProof, ConsensusRequirements,
-    StakeProof, TimeProof, SpaceProof, WorkProof
+    ConsensusProof, ConsensusRequirements, SpaceProof, StakeProof, TimeProof, WorkProof,
 };
-use trustchain::consensus::validation::{ProofValidation, ProofType, ErrorCode};
 
 /// Matrix position registration on blockchain
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -119,18 +118,19 @@ impl MatrixPositionValidator {
             if existing.validation_status == ValidationStatus::Validated {
                 return Err(anyhow!(
                     "Position ({},{},{}) already claimed by node {}",
-                    coordinate.x, coordinate.y, coordinate.z, existing.node_id
+                    coordinate.x,
+                    coordinate.y,
+                    coordinate.z,
+                    existing.node_id
                 ));
             }
         }
         drop(positions);
 
         // Validate the consensus proof
-        let validation_result = self.validate_position_claim(
-            &coordinate,
-            &node_id,
-            &consensus_proof
-        ).await?;
+        let validation_result = self
+            .validate_position_claim(&coordinate, &node_id, &consensus_proof)
+            .await?;
 
         if !validation_result.is_valid() {
             return Err(anyhow!(
@@ -144,7 +144,7 @@ impl MatrixPositionValidator {
 
         // Create registration
         let mut registration = MatrixPositionRegistration {
-            coordinate: coordinate.clone(),
+            coordinate,
             node_id: node_id.clone(),
             consensus_proof: proof_bytes.clone(),
             timestamp: SystemTime::now(),
@@ -165,16 +165,18 @@ impl MatrixPositionValidator {
             "timestamp": registration.timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs(),
         });
 
-        let block = self.blockchain.add_block_with_data(
-            serde_json::to_vec(&registration_data)?
-        ).await.map_err(|e| anyhow!("Failed to add block: {}", e))?;
+        let block = self
+            .blockchain
+            .add_block_with_data(serde_json::to_vec(&registration_data)?)
+            .await
+            .map_err(|e| anyhow!("Failed to add block: {e}"))?;
 
         registration.block_hash = Some(block.hash.clone());
         registration.validation_status = ValidationStatus::Validated;
 
         // Store validated registration
         let mut positions = self.positions.write().await;
-        positions.insert(coordinate.clone(), registration.clone());
+        positions.insert(coordinate, registration.clone());
 
         info!(
             "Successfully registered position ({},{},{}) for node {} in block {}",
@@ -202,49 +204,69 @@ impl MatrixPositionValidator {
         // Additional matrix-specific validations
 
         // 1. PoSpace (WHERE) - Must have storage at claimed position
-        if !self.validate_space_for_position(coordinate, &consensus_proof.space_proof).await {
+        if !self
+            .validate_space_for_position(coordinate, &consensus_proof.space_proof)
+            .await
+        {
             validation.space_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Space,
-                format!("Storage proof invalid for position ({},{},{})",
-                    coordinate.x, coordinate.y, coordinate.z),
+                format!(
+                    "Storage proof invalid for position ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z
+                ),
                 ErrorCode::StorageCommitmentInvalid,
             );
         }
 
         // 2. PoStake (WHO) - Must have sufficient stake for position
-        if !self.validate_stake_for_position(coordinate, &consensus_proof.stake_proof).await {
+        if !self
+            .validate_stake_for_position(coordinate, &consensus_proof.stake_proof)
+            .await
+        {
             validation.stake_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Stake,
-                format!("Insufficient stake for position ({},{},{})",
-                    coordinate.x, coordinate.y, coordinate.z),
+                format!(
+                    "Insufficient stake for position ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z
+                ),
                 ErrorCode::InsufficientStake,
             );
         }
 
         // 3. PoWork (WHAT) - Must prove computational work for position
-        if !self.validate_work_for_position(coordinate, &consensus_proof.work_proof).await {
+        if !self
+            .validate_work_for_position(coordinate, &consensus_proof.work_proof)
+            .await
+        {
             validation.work_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Work,
-                format!("Work proof invalid for position ({},{},{})",
-                    coordinate.x, coordinate.y, coordinate.z),
+                format!(
+                    "Work proof invalid for position ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z
+                ),
                 ErrorCode::InsufficientWork,
             );
         }
 
         // 4. PoTime (WHEN) - Must be temporally valid
-        if !self.validate_time_for_position(coordinate, &consensus_proof.time_proof).await {
+        if !self
+            .validate_time_for_position(coordinate, &consensus_proof.time_proof)
+            .await
+        {
             validation.time_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Time,
-                format!("Time proof invalid for position ({},{},{})",
-                    coordinate.x, coordinate.y, coordinate.z),
+                format!(
+                    "Time proof invalid for position ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z
+                ),
                 ErrorCode::TimeOffsetExceeded,
             );
         }
@@ -263,10 +285,18 @@ impl MatrixPositionValidator {
 
         // Recalculate confidence score
         validation.confidence_score = 0.0;
-        if validation.space_valid { validation.confidence_score += 0.25; }
-        if validation.stake_valid { validation.confidence_score += 0.25; }
-        if validation.work_valid { validation.confidence_score += 0.25; }
-        if validation.time_valid { validation.confidence_score += 0.25; }
+        if validation.space_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.stake_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.work_valid {
+            validation.confidence_score += 0.25;
+        }
+        if validation.time_valid {
+            validation.confidence_score += 0.25;
+        }
 
         Ok(validation)
     }
@@ -285,8 +315,11 @@ impl MatrixPositionValidator {
             if self.verbose {
                 warn!(
                     "Insufficient storage for position ({},{},{}): {} < {}",
-                    coordinate.x, coordinate.y, coordinate.z,
-                    space_proof.total_storage, required_storage
+                    coordinate.x,
+                    coordinate.y,
+                    coordinate.z,
+                    space_proof.total_storage,
+                    required_storage
                 );
             }
             return false;
@@ -294,7 +327,8 @@ impl MatrixPositionValidator {
 
         // For testing, allow file_hash without position hash
         // In production, require file_hash to include position reference
-        if self.requirements.minimum_stake > 1000 { // Production mode check
+        if self.requirements.minimum_stake > 1000 {
+            // Production mode check
             let position_hash = self.hash_position(coordinate);
             if !space_proof.file_hash.contains(&position_hash[0..8]) {
                 if self.verbose {
@@ -323,8 +357,11 @@ impl MatrixPositionValidator {
             if self.verbose {
                 warn!(
                     "Insufficient stake for position ({},{},{}): {} < {}",
-                    coordinate.x, coordinate.y, coordinate.z,
-                    stake_proof.stake_amount, required_stake
+                    coordinate.x,
+                    coordinate.y,
+                    coordinate.z,
+                    stake_proof.stake_amount,
+                    required_stake
                 );
             }
             return false;
@@ -332,7 +369,8 @@ impl MatrixPositionValidator {
 
         // Validate stake age (not too old for position claim)
         if let Ok(elapsed) = stake_proof.stake_timestamp.elapsed() {
-            if elapsed > Duration::from_secs(60 * 60 * 24) { // 24 hours max for position claims
+            if elapsed > Duration::from_secs(60 * 60 * 24) {
+                // 24 hours max for position claims
                 if self.verbose {
                     warn!(
                         "Stake too old for position claim at ({},{},{}): {:?}",
@@ -359,8 +397,11 @@ impl MatrixPositionValidator {
             if self.verbose {
                 warn!(
                     "Insufficient compute for position ({},{},{}): {} < {}",
-                    coordinate.x, coordinate.y, coordinate.z,
-                    work_proof.computational_power, required_compute
+                    coordinate.x,
+                    coordinate.y,
+                    coordinate.z,
+                    work_proof.computational_power,
+                    required_compute
                 );
             }
             return false;
@@ -368,7 +409,8 @@ impl MatrixPositionValidator {
 
         // For testing, allow workload_id without position hash
         // In production, require workload_id to include position reference
-        if self.requirements.minimum_stake > 1000 { // Production mode check
+        if self.requirements.minimum_stake > 1000 {
+            // Production mode check
             let position_hash = self.hash_position(coordinate);
             if !work_proof.workload_id.contains(&position_hash[0..8]) {
                 if self.verbose {
@@ -391,12 +433,12 @@ impl MatrixPositionValidator {
         time_proof: &TimeProof,
     ) -> bool {
         // Time offset must be reasonable for position claims
-        if time_proof.network_time_offset > Duration::from_secs(60) { // 1 minute max for positions
+        if time_proof.network_time_offset > Duration::from_secs(60) {
+            // 1 minute max for positions
             if self.verbose {
                 warn!(
                     "Time offset too large for position ({},{},{}): {:?}",
-                    coordinate.x, coordinate.y, coordinate.z,
-                    time_proof.network_time_offset
+                    coordinate.x, coordinate.y, coordinate.z, time_proof.network_time_offset
                 );
             }
             return false;
@@ -408,8 +450,7 @@ impl MatrixPositionValidator {
             if self.verbose {
                 warn!(
                     "Time proof nonce insufficient for position ({},{},{}): {} < {}",
-                    coordinate.x, coordinate.y, coordinate.z,
-                    time_proof.nonce, expected_nonce_min
+                    coordinate.x, coordinate.y, coordinate.z, time_proof.nonce, expected_nonce_min
                 );
             }
             return false;
@@ -426,9 +467,9 @@ impl MatrixPositionValidator {
         if distance_from_origin < 10.0 {
             100 * 1024 * 1024 * 1024 // 100GB for central positions
         } else if distance_from_origin < 100.0 {
-            10 * 1024 * 1024 * 1024  // 10GB for mid-range
+            10 * 1024 * 1024 * 1024 // 10GB for mid-range
         } else {
-            1024 * 1024 * 1024       // 1GB for edge positions
+            1024 * 1024 * 1024 // 1GB for edge positions
         }
     }
 
@@ -443,11 +484,11 @@ impl MatrixPositionValidator {
         let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
 
         if distance_from_origin < 10.0 {
-            100000  // High stake for central positions
+            100000 // High stake for central positions
         } else if distance_from_origin < 100.0 {
-            10000   // Medium stake for mid-range
+            10000 // Medium stake for mid-range
         } else {
-            1000    // Low stake for edge positions
+            1000 // Low stake for edge positions
         }
     }
 
@@ -462,11 +503,11 @@ impl MatrixPositionValidator {
         let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
 
         if distance_from_origin < 10.0 {
-            10000  // High compute for central positions
+            10000 // High compute for central positions
         } else if distance_from_origin < 100.0 {
-            1000   // Medium compute for mid-range
+            1000 // Medium compute for mid-range
         } else {
-            100    // Low compute for edge positions
+            100 // Low compute for edge positions
         }
     }
 
@@ -476,11 +517,11 @@ impl MatrixPositionValidator {
         let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
 
         if distance_from_origin < 10.0 {
-            1000000  // Long VDF for central positions
+            1000000 // Long VDF for central positions
         } else if distance_from_origin < 100.0 {
-            100000   // Medium VDF for mid-range
+            100000 // Medium VDF for mid-range
         } else {
-            10000    // Short VDF for edge positions
+            10000 // Short VDF for edge positions
         }
     }
 
@@ -503,7 +544,9 @@ impl MatrixPositionValidator {
 
     /// Get all validated positions
     pub async fn get_validated_positions(&self) -> Vec<MatrixPositionRegistration> {
-        self.positions.read().await
+        self.positions
+            .read()
+            .await
             .values()
             .filter(|r| r.validation_status == ValidationStatus::Validated)
             .cloned()
@@ -566,8 +609,8 @@ mod tests {
     #[tokio::test]
     async fn test_matrix_position_registration() {
         // Create blockchain for testing
-        let coordinate = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(coordinate.clone()));
+        let coordinate = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(coordinate));
 
         // Create validator
         let validator = MatrixPositionValidator::for_testing(blockchain);
@@ -576,14 +619,12 @@ mod tests {
         let consensus_proof = ConsensusProof::new_for_testing();
 
         // Register position
-        let registration = validator.register_position(
-            coordinate.clone(),
-            "test_node_001".to_string(),
-            consensus_proof,
-        ).await;
+        let registration = validator
+            .register_position(coordinate, "test_node_001".to_string(), consensus_proof)
+            .await;
 
         assert!(registration.is_ok());
-        let reg = registration.unwrap();
+        let reg = registration.expect("test: expected success");
         assert_eq!(reg.coordinate, coordinate);
         assert_eq!(reg.validation_status, ValidationStatus::Validated);
         assert!(reg.block_hash.is_some());
@@ -591,26 +632,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_position_rejection() {
-        let coordinate = MatrixCoordinate::new(5, 5, 5).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(coordinate.clone()));
+        let coordinate = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(coordinate));
         let validator = MatrixPositionValidator::for_testing(blockchain);
 
         // Register first claim
         let proof1 = ConsensusProof::new_for_testing();
-        let result1 = validator.register_position(
-            coordinate.clone(),
-            "node_001".to_string(),
-            proof1,
-        ).await;
+        let result1 = validator
+            .register_position(coordinate, "node_001".to_string(), proof1)
+            .await;
         assert!(result1.is_ok());
 
         // Try to register same position
         let proof2 = ConsensusProof::new_for_testing();
-        let result2 = validator.register_position(
-            coordinate.clone(),
-            "node_002".to_string(),
-            proof2,
-        ).await;
+        let result2 = validator
+            .register_position(coordinate, "node_002".to_string(), proof2)
+            .await;
 
         assert!(result2.is_err());
         assert!(result2.unwrap_err().to_string().contains("already claimed"));
@@ -618,36 +655,37 @@ mod tests {
 
     #[tokio::test]
     async fn test_neighbor_verification() {
-        let center = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let blockchain = Arc::new(NodeBlockchain::new(center.clone()));
+        let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let blockchain = Arc::new(NodeBlockchain::new(center));
         let validator = MatrixPositionValidator::for_testing(blockchain);
 
         // Register some neighbors
         let neighbors = vec![
-            MatrixCoordinate::new(1, 0, 0).unwrap(),
-            MatrixCoordinate::new(0, 1, 0).unwrap(),
-            MatrixCoordinate::new(0, 0, 1).unwrap(),
+            MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 0, 1).expect("test: valid coordinate"),
         ];
 
         for (i, neighbor) in neighbors.iter().enumerate() {
             let proof = ConsensusProof::new_for_testing();
-            let _ = validator.register_position(
-                neighbor.clone(),
-                format!("neighbor_{}", i),
-                proof,
-            ).await;
+            let _ = validator
+                .register_position(*neighbor, format!("neighbor_{i}"), proof)
+                .await;
         }
 
         // Verify neighbors
-        let verification = validator.verify_neighbor_positions(
-            &center,
-            neighbors.clone(),
-        ).await.unwrap();
+        let verification = validator
+            .verify_neighbor_positions(&center, neighbors.clone())
+            .await
+            .expect("test: expected success");
 
         assert_eq!(verification.len(), 3);
         for (coord, valid) in verification {
-            assert!(valid, "Neighbor at ({},{},{}) should be valid",
-                coord.x, coord.y, coord.z);
+            assert!(
+                valid,
+                "Neighbor at ({},{},{}) should be valid",
+                coord.x, coord.y, coord.z
+            );
         }
     }
 }

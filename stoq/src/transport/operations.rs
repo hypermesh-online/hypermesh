@@ -5,15 +5,15 @@
 //! STOQ Transport Operations - Send/Receive and Connection Management
 
 use anyhow::Result;
-use bytes::{Bytes, BufMut};
+use bytes::{BufMut, Bytes};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-use super::connection::{Connection, Endpoint, FrameBatch};
-use super::manager::StoqTransport;
 use super::adaptive::AdaptiveConnection;
 use super::config::NetworkTier;
+use super::connection::{Connection, Endpoint, FrameBatch};
+use super::manager::StoqTransport;
 
 impl StoqTransport {
     /// Send data with transport layer optimizations
@@ -50,12 +50,12 @@ impl StoqTransport {
                     let bytes = buffer.freeze();
 
                     // Try zero-copy datagram send
-                    if data.len() <= self.config.max_datagram_size {
-                        if conn.inner.send_datagram(bytes.clone()).is_ok() {
-                            self.performance_stats.read().record_zero_copy();
-                            self.performance_stats.read().record_pool_hit();
-                            return Ok(());
-                        }
+                    if data.len() <= self.config.max_datagram_size
+                        && conn.inner.send_datagram(bytes.clone()).is_ok()
+                    {
+                        self.performance_stats.read().record_zero_copy();
+                        self.performance_stats.read().record_pool_hit();
+                        return Ok(());
                     }
 
                     // Fallback to stream with zero-copy buffer
@@ -87,18 +87,24 @@ impl StoqTransport {
         let throughput_bps = (data.len() as f64 * 8.0) / duration.as_secs_f64();
         let throughput_gbps = throughput_bps / 1_000_000_000.0;
 
-        self.performance_stats.read().update_peak_throughput(throughput_gbps);
+        self.performance_stats
+            .read()
+            .update_peak_throughput(throughput_gbps);
 
         Ok(())
     }
 
     /// Send large data with frame batching for performance
-    pub(crate) async fn send_large_data_batched(&self, conn: &Connection, data: &[u8]) -> Result<()> {
+    pub(crate) async fn send_large_data_batched(
+        &self,
+        conn: &Connection,
+        data: &[u8],
+    ) -> Result<()> {
         let chunk_size = self.config.max_datagram_size;
-        let mut chunks = data.chunks(chunk_size);
+        let chunks = data.chunks(chunk_size);
         let mut batch = FrameBatch::new(self.config.frame_batch_size);
 
-        while let Some(chunk) = chunks.next() {
+        for chunk in chunks {
             let bytes = Bytes::copy_from_slice(chunk);
 
             if batch.add_frame(bytes) {
@@ -108,7 +114,7 @@ impl StoqTransport {
                     if conn.inner.send_datagram(frame).is_err() {
                         // Fallback to stream for failed datagrams
                         let mut stream = conn.open_stream().await?;
-                        stream.send(&chunk).await?;
+                        stream.send(chunk).await?;
                     }
                 }
                 self.performance_stats.read().record_frame_batch();
@@ -165,21 +171,33 @@ impl StoqTransport {
     }
 
     /// Enable connection multiplexing for specific endpoint (optimization)
-    pub async fn enable_multiplexing(&self, endpoint: &Endpoint, connection_count: usize) -> Result<()> {
+    pub async fn enable_multiplexing(
+        &self,
+        endpoint: &Endpoint,
+        connection_count: usize,
+    ) -> Result<()> {
         let pool_key = format!("{}:{}", endpoint.address, endpoint.port);
         let mut connections = VecDeque::with_capacity(connection_count);
 
         // Create multiple connections for bandwidth aggregation
         for i in 0..connection_count {
-            debug!("Creating multiplexed connection {}/{} to [{}]:{}", i + 1, connection_count, endpoint.address, endpoint.port);
+            debug!(
+                "Creating multiplexed connection {}/{} to [{}]:{}",
+                i + 1,
+                connection_count,
+                endpoint.address,
+                endpoint.port
+            );
 
             let connection = self.connect(endpoint).await?;
             connections.push_back(connection);
         }
 
         self.connection_multiplexer.insert(pool_key, connections);
-        info!("Enabled {}x connection multiplexing for [{}]:{} (optimization)",
-              connection_count, endpoint.address, endpoint.port);
+        info!(
+            "Enabled {}x connection multiplexing for [{}]:{} (optimization)",
+            connection_count, endpoint.address, endpoint.port
+        );
 
         Ok(())
     }
@@ -230,7 +248,10 @@ impl StoqTransport {
             });
         }
 
-        info!("Configuration updated for {} live connections", self.adaptive_connections.len());
+        info!(
+            "Configuration updated for {} live connections",
+            self.adaptive_connections.len()
+        );
     }
 
     /// Get adaptive connection by ID
@@ -245,22 +266,32 @@ impl StoqTransport {
             conn.force_adapt().await?;
             Ok(())
         } else {
-            Err(anyhow!("Connection not found: {}", id))
+            Err(anyhow!("Connection not found: {id}"))
         }
     }
 
     /// Get adaptation statistics for all connections
     pub fn adaptation_stats(&self) -> Vec<(String, super::adaptive::AdaptationStats)> {
-        self.adaptation_manager.all_stats()
+        self.adaptive_connections
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().adaptation_stats()))
+            .collect()
     }
 
     /// Enable or disable adaptive optimization globally
     pub fn set_adaptation_enabled(&self, enabled: bool) {
         self.adaptation_manager.set_enabled(enabled);
 
-        // Update all existing connections
+        // Update all existing adaptive connections
         for entry in self.adaptive_connections.iter() {
             entry.value().set_adaptation_enabled(enabled);
+        }
+
+        // Also update adaptation_manager's internal connections for consistency
+        for id in self.adaptation_manager.connection_ids() {
+            if let Some(conn) = self.adaptation_manager.get_connection(&id) {
+                conn.set_adaptation_enabled(enabled);
+            }
         }
 
         if enabled {
@@ -274,13 +305,11 @@ impl StoqTransport {
     pub async fn set_connection_tier(&self, id: &str, tier: NetworkTier) -> Result<()> {
         use anyhow::anyhow;
         if let Some(conn) = self.get_adaptive_connection(id) {
-            // This would require adding a method to AdaptiveConnection to set tier manually
-            // For now, force an adaptation which will detect the tier
-            conn.force_adapt().await?;
+            conn.set_tier(tier.clone())?;
             info!("Set network tier for connection {}: {:?}", id, tier);
             Ok(())
         } else {
-            Err(anyhow!("Connection not found: {}", id))
+            Err(anyhow!("Connection not found: {id}"))
         }
     }
 
@@ -302,12 +331,16 @@ impl StoqTransport {
 
     /// Get eBPF capabilities and status (delegates to hypermesh-ebpf)
     pub fn get_ebpf_status(&self) -> Option<super::ebpf::EbpfCapabilities> {
-        self.ebpf_transport.as_ref().map(|t| t.read().capabilities().clone())
+        self.ebpf_transport
+            .as_ref()
+            .map(|t| t.read().capabilities().clone())
     }
 
     /// Get eBPF metrics if available (delegates to hypermesh-ebpf)
     pub fn get_ebpf_metrics(&self) -> Option<super::ebpf::HyperMeshMetrics> {
-        self.ebpf_transport.as_ref().map(|t| t.read().metrics().collect())
+        self.ebpf_transport
+            .as_ref()
+            .map(|t| t.read().metrics().collect())
     }
 
     /// Attach XDP program to interface for acceleration (delegates to hypermesh-ebpf)
@@ -327,7 +360,10 @@ impl StoqTransport {
         use anyhow::anyhow;
         if let Some(ebpf) = &self.ebpf_transport {
             let _socket = ebpf.write().create_af_xdp_socket(interface, queue_id)?;
-            info!("Created AF_XDP zero-copy socket for {}:{}", interface, queue_id);
+            info!(
+                "Created AF_XDP zero-copy socket for {}:{}",
+                interface, queue_id
+            );
             Ok(())
         } else {
             Err(anyhow!("eBPF transport not available"))

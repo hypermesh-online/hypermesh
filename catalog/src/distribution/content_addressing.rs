@@ -6,9 +6,9 @@
 //!
 //! Provides content-addressed storage with Merkle trees for integrity verification
 
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
 use crate::assets::AssetPackage;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
 /// Content address (BLAKE3 hash)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -20,18 +20,19 @@ impl ContentAddress {
     /// Create content address from data
     pub fn from_data(data: &[u8]) -> Self {
         let hash_output = blake3::hash(data);
-        Self { hash: *hash_output.as_bytes() }
+        Self {
+            hash: *hash_output.as_bytes(),
+        }
     }
 
     /// Convert to hex string
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.hash)
+        hex::encode(self.hash)
     }
 
     /// Create from hex string
     pub fn from_hex(hex_str: &str) -> Result<Self> {
-        let bytes = hex::decode(hex_str)
-            .context("Invalid hex string")?;
+        let bytes = hex::decode(hex_str).context("Invalid hex string")?;
 
         if bytes.len() != 32 {
             return Err(anyhow::anyhow!("Invalid hash length"));
@@ -69,7 +70,9 @@ impl MerkleTree {
     /// Create a Merkle tree from package chunks
     pub fn from_chunks(chunks: &[Vec<u8>]) -> Result<Self> {
         if chunks.is_empty() {
-            return Err(anyhow::anyhow!("Cannot create Merkle tree from empty chunks"));
+            return Err(anyhow::anyhow!(
+                "Cannot create Merkle tree from empty chunks"
+            ));
         }
 
         // Create leaf nodes from chunk hashes
@@ -124,7 +127,9 @@ impl MerkleTree {
         hasher.update(left.as_bytes());
         hasher.update(right.as_bytes());
         let result = hasher.finalize();
-        ContentAddress { hash: *result.as_bytes() }
+        ContentAddress {
+            hash: *result.as_bytes(),
+        }
     }
 
     /// Convert package to chunks
@@ -219,7 +224,7 @@ impl MerkleTree {
 
         for (i, chunk) in chunks.iter().enumerate() {
             if !self.verify_chunk(i, chunk)? {
-                return Err(anyhow::anyhow!("Chunk {} verification failed", i));
+                return Err(anyhow::anyhow!("Chunk {i} verification failed"));
             }
         }
 
@@ -322,7 +327,7 @@ impl ContentChunker {
         // Verify no missing chunks
         for (i, chunk) in sorted_chunks.iter().enumerate() {
             if chunk.index != i {
-                return Err(anyhow::anyhow!("Missing chunk at index {}", i));
+                return Err(anyhow::anyhow!("Missing chunk at index {i}"));
             }
         }
 
@@ -349,12 +354,8 @@ impl ContentChunker {
                 encoder.write_all(data)?;
                 Ok(encoder.finish()?)
             }
-            CompressionType::Zstd => {
-                Ok(zstd::encode_all(data, 3)?)
-            }
-            CompressionType::Lz4 => {
-                Ok(lz4::block::compress(data, None, true)?)
-            }
+            CompressionType::Zstd => Ok(zstd::encode_all(data, 3)?),
+            CompressionType::Lz4 => Ok(lz4::block::compress(data, None, true)?),
         }
     }
 
@@ -371,12 +372,8 @@ impl ContentChunker {
                 decoder.read_to_end(&mut decompressed)?;
                 Ok(decompressed)
             }
-            CompressionType::Zstd => {
-                Ok(zstd::decode_all(data)?)
-            }
-            CompressionType::Lz4 => {
-                Ok(lz4::block::decompress(data, None)?)
-            }
+            CompressionType::Zstd => Ok(zstd::decode_all(data)?),
+            CompressionType::Lz4 => Ok(lz4::block::decompress(data, None)?),
         }
     }
 }
@@ -448,7 +445,8 @@ impl BinaryDiff {
             let mut diff = Vec::new();
 
             // Find common prefix
-            let common_prefix_len = old_data.iter()
+            let common_prefix_len = old_data
+                .iter()
                 .zip(new_data.iter())
                 .take_while(|(a, b)| a == b)
                 .count();
@@ -528,7 +526,7 @@ impl BinaryDiff {
                     offset += length;
                 }
                 _ => {
-                    return Err(anyhow::anyhow!("Invalid diff operation: {}", operation));
+                    return Err(anyhow::anyhow!("Invalid diff operation: {operation}"));
                 }
             }
         }
@@ -542,10 +540,7 @@ impl BinaryDiff {
             return 0.0;
         }
 
-        let common_bytes = a.iter()
-            .zip(b.iter())
-            .filter(|(x, y)| x == y)
-            .count();
+        let common_bytes = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
 
         let max_len = a.len().max(b.len());
         common_bytes as f64 / max_len as f64
@@ -565,7 +560,7 @@ mod tests {
         assert_eq!(addr1, addr2);
 
         let hex = addr1.to_hex();
-        let addr3 = ContentAddress::from_hex(&hex).unwrap();
+        let addr3 = ContentAddress::from_hex(&hex).expect("test: hex parsing");
 
         assert_eq!(addr1, addr3);
     }
@@ -579,15 +574,15 @@ mod tests {
             b"chunk4".to_vec(),
         ];
 
-        let tree = MerkleTree::from_chunks(&chunks).unwrap();
+        let tree = MerkleTree::from_chunks(&chunks).expect("test: expected success");
 
         // Verify chunks
         for (i, chunk) in chunks.iter().enumerate() {
-            assert!(tree.verify_chunk(i, chunk).unwrap());
+            assert!(tree.verify_chunk(i, chunk).expect("test: assertion value"));
         }
 
         // Test proof generation and verification
-        let proof = tree.get_proof(0).unwrap();
+        let proof = tree.get_proof(0).expect("test: expected success");
         assert!(MerkleTree::verify_proof(&proof, &chunks[0]));
     }
 
@@ -596,10 +591,10 @@ mod tests {
         let data = vec![0u8; 5000];
         let chunker = ContentChunker::new(1024, CompressionType::None);
 
-        let chunks = chunker.chunk_data(&data).unwrap();
+        let chunks = chunker.chunk_data(&data).expect("test: chunking");
         assert_eq!(chunks.len(), 5); // 5000 / 1024 = 4.88 -> 5 chunks
 
-        let reassembled = chunker.reassemble(&chunks).unwrap();
+        let reassembled = chunker.reassemble(&chunks).expect("test: reassembly");
         assert_eq!(reassembled, data);
     }
 
@@ -608,8 +603,8 @@ mod tests {
         let old_data = b"Hello, World!";
         let new_data = b"Hello, Rust!";
 
-        let diff = BinaryDiff::create_diff(old_data, new_data).unwrap();
-        let result = BinaryDiff::apply_diff(old_data, &diff).unwrap();
+        let diff = BinaryDiff::create_diff(old_data, new_data).expect("test: expected success");
+        let result = BinaryDiff::apply_diff(old_data, &diff).expect("test: expected success");
 
         assert_eq!(result, new_data);
     }

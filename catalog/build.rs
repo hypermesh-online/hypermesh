@@ -13,17 +13,23 @@ use std::path::PathBuf;
 
 fn main() {
     // Get the target directory
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR is always set by cargo"));
     let target_dir = out_dir
-        .parent().unwrap()
-        .parent().unwrap()
-        .parent().unwrap()
+        .parent()
+        .expect("OUT_DIR has parent")
+        .parent()
+        .expect("OUT_DIR grandparent exists")
+        .parent()
+        .expect("OUT_DIR great-grandparent exists")
         .to_path_buf();
 
     // Set up linking flags for creating a shared library
     if cfg!(target_os = "linux") {
         println!("cargo:rustc-cdylib-link-arg=-Wl,-soname,libcatalog.so");
-        println!("cargo:rustc-cdylib-link-arg=-Wl,--version-script={}/version.script", env::var("CARGO_MANIFEST_DIR").unwrap());
+        println!(
+            "cargo:rustc-cdylib-link-arg=-Wl,--version-script={}/version.script",
+            env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo")
+        );
     } else if cfg!(target_os = "macos") {
         println!("cargo:rustc-cdylib-link-arg=-Wl,-install_name,@rpath/libcatalog.dylib");
     }
@@ -81,7 +87,8 @@ cpu_cores = 2.0
 };
 "#;
 
-        let script_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("version.script");
+        let script_path =
+            PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo")).join("version.script");
         fs::write(&script_path, version_script).expect("Failed to write version script");
     }
 
@@ -90,12 +97,17 @@ cpu_cores = 2.0
     println!("cargo:rerun-if-env-changed=CARGO_MANIFEST_DIR");
 
     // Set metadata for the build
-    println!("cargo:rustc-env=CATALOG_VERSION={}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "cargo:rustc-env=CATALOG_VERSION={}",
+        env!("CARGO_PKG_VERSION")
+    );
 
     // Get build timestamp using standard library (chrono not available in build script)
-    println!("cargo:rustc-env=BUILD_TIMESTAMP={}",
-             std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs());
+    println!(
+        "cargo:rustc-env=BUILD_TIMESTAMP={}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time should be after UNIX epoch")
+            .as_secs()
+    );
 }

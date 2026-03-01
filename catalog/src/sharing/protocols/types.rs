@@ -2,10 +2,10 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-use crate::{AssetRegistration, AssetPackage, AssetMetadata};
+use crate::{AssetMetadata, AssetPackage, AssetRegistration};
 
 /// Share permission levels
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -50,11 +50,11 @@ pub struct BandwidthAllocation {
 impl Default for BandwidthAllocation {
     fn default() -> Self {
         Self {
-            max_upload: 10 * 1024 * 1024,     // 10 MB/s
-            max_download: 10 * 1024 * 1024,   // 10 MB/s
+            max_upload: 10 * 1024 * 1024,       // 10 MB/s
+            max_download: 10 * 1024 * 1024,     // 10 MB/s
             reserved_priority: 2 * 1024 * 1024, // 2 MB/s
-            per_peer_limit: 1024 * 1024,      // 1 MB/s
-            burst_size: 5 * 1024 * 1024,      // 5 MB burst
+            per_peer_limit: 1024 * 1024,        // 1 MB/s
+            burst_size: 5 * 1024 * 1024,        // 5 MB burst
             burst_duration: Duration::from_secs(5),
         }
     }
@@ -121,25 +121,26 @@ pub struct ContributionStats {
 
 /// Protocol message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum ProtocolMessage {
     /// Request package
     RequestPackage {
-        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
+        asset_id: String, // Package hash, not BlockMatrix AssetRegistration
         requester: String,
     },
     /// Package response
     PackageResponse {
-        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
+        asset_id: String, // Package hash, not BlockMatrix AssetRegistration
         package: AssetPackage,
     },
     /// Package metadata
     PackageMetadata {
-        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
+        asset_id: String, // Package hash, not BlockMatrix AssetRegistration
         metadata: AssetMetadata,
     },
     /// Availability notification
     AvailabilityNotification {
-        asset_id: String,  // Package hash, not BlockMatrix AssetRegistration
+        asset_id: String, // Package hash, not BlockMatrix AssetRegistration
         available: bool,
     },
     /// Bandwidth negotiation
@@ -153,10 +154,7 @@ pub enum ProtocolMessage {
         received_bytes: u64,
     },
     /// Error response
-    Error {
-        code: u32,
-        message: String,
-    },
+    Error { code: u32, message: String },
 }
 
 /// Peer connection state

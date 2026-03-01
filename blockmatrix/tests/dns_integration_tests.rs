@@ -6,22 +6,18 @@
 //!
 //! Sprint 3.3: Test scenarios for Nike (mixed), Bank (portal+private), Gov (fully federated)
 
-use blockmatrix::dns::*;
 use blockmatrix::consensus::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
 use blockmatrix::consensus::ConsensusProof;
+use blockmatrix::dns::*;
 use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 /// Create test consensus proof
 fn create_test_proof() -> ConsensusProof {
-    let stake = StakeProof::new(
-        "test-holder".to_string(),
-        "holder-id".to_string(),
-        1000,
-    );
+    let stake = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
     let time = TimeProof::new(Duration::from_secs(10));
     let space = SpaceProof::new(
         "test-node".to_string(),
@@ -62,15 +58,8 @@ async fn setup_dns_system() -> (
     let pool_manager = Arc::new(DnsPoolManager::new());
     let validator = Arc::new(DnsValidator::new(false)); // Non-strict for testing
     let cache = Arc::new(DnsCache::new(1000));
-    let registrar = Arc::new(DnsRegistrar::new(
-        pool_manager.clone(),
-        validator.clone(),
-    ));
-    let resolver = DnsResolver::new(
-        pool_manager.clone(),
-        validator.clone(),
-        cache.clone(),
-    );
+    let registrar = Arc::new(DnsRegistrar::new(pool_manager.clone(), validator.clone()));
+    let resolver = DnsResolver::new(pool_manager.clone(), validator.clone(), cache.clone());
 
     (pool_manager, validator, cache, registrar, resolver)
 }
@@ -84,18 +73,29 @@ async fn test_nike_scenario_mixed_public_and_federated() {
 
     // 1. Register public storefront
     let nike_domain = Domain::parse("nike").unwrap();
-    let nike_record = create_dns_record("nike", Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 1), "nike-node");
+    let nike_record = create_dns_record(
+        "nike",
+        Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 1),
+        "nike-node",
+    );
     let proof = create_test_proof();
 
     let registration = registrar
         .register_public(nike_domain.clone(), nike_record, proof.clone())
         .await
         .unwrap();
-    println!("✅ Registered public: nike -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered public: nike -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 2. Register federated admin
     let admin_domain = Domain::parse("admin.nike").unwrap();
-    let admin_record = create_dns_record("admin.nike", Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 2), "nike-node");
+    let admin_record = create_dns_record(
+        "admin.nike",
+        Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 2),
+        "nike-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -106,11 +106,18 @@ async fn test_nike_scenario_mixed_public_and_federated() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: admin.nike (nike-internal) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: admin.nike (nike-internal) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 3. Register federated warehouse
     let warehouse_domain = Domain::parse("warehouse.nike").unwrap();
-    let warehouse_record = create_dns_record("warehouse.nike", Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 3), "nike-node");
+    let warehouse_record = create_dns_record(
+        "warehouse.nike",
+        Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 3),
+        "nike-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -121,11 +128,18 @@ async fn test_nike_scenario_mixed_public_and_federated() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: warehouse.nike (nike-internal) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: warehouse.nike (nike-internal) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 4. Register federated supplier
     let supplier_domain = Domain::parse("supplier.nike").unwrap();
-    let supplier_record = create_dns_record("supplier.nike", Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 4), "nike-node");
+    let supplier_record = create_dns_record(
+        "supplier.nike",
+        Ipv6Addr::new(0x2001, 0xdb8, 1, 0, 0, 0, 0, 4),
+        "nike-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -136,7 +150,10 @@ async fn test_nike_scenario_mixed_public_and_federated() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: supplier.nike (nike-supply-chain) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: supplier.nike (nike-supply-chain) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 5. Query public storefront (anyone can access)
     let query = DnsQuery {
@@ -150,7 +167,10 @@ async fn test_nike_scenario_mixed_public_and_federated() {
     let response = resolver.resolve(query).await.unwrap();
     assert_eq!(response.tier, DnsResolutionTier::Public);
     assert_eq!(response.records.len(), 1);
-    println!("✅ Public query: nike -> {} records", response.records.len());
+    println!(
+        "✅ Public query: nike -> {} records",
+        response.records.len()
+    );
 
     // 6. Query federated admin (requires nike-internal network)
     let query = DnsQuery {
@@ -164,7 +184,10 @@ async fn test_nike_scenario_mixed_public_and_federated() {
     let response = resolver.resolve(query).await.unwrap();
     assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
     assert_eq!(response.records.len(), 1);
-    println!("✅ Federated query: admin.nike (nike-internal) -> {} records", response.records.len());
+    println!(
+        "✅ Federated query: admin.nike (nike-internal) -> {} records",
+        response.records.len()
+    );
 
     // 7. Query federated supplier (requires nike-supply-chain network)
     let query = DnsQuery {
@@ -178,7 +201,10 @@ async fn test_nike_scenario_mixed_public_and_federated() {
     let response = resolver.resolve(query).await.unwrap();
     assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
     assert_eq!(response.records.len(), 1);
-    println!("✅ Federated query: supplier.nike (nike-supply-chain) -> {} records", response.records.len());
+    println!(
+        "✅ Federated query: supplier.nike (nike-supply-chain) -> {} records",
+        response.records.len()
+    );
 
     println!("✅ Nike scenario complete: Mixed public/federated DNS\n");
 }
@@ -192,18 +218,29 @@ async fn test_bank_scenario_portal_and_private() {
 
     // 1. Register public website
     let bank_domain = Domain::parse("bank").unwrap();
-    let bank_record = create_dns_record("bank", Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 1), "bank-node");
+    let bank_record = create_dns_record(
+        "bank",
+        Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 1),
+        "bank-node",
+    );
     let proof = create_test_proof();
 
     let registration = registrar
         .register_public(bank_domain.clone(), bank_record, proof.clone())
         .await
         .unwrap();
-    println!("✅ Registered public: bank -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered public: bank -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 2. Register federated internal
     let internal_domain = Domain::parse("internal.bank").unwrap();
-    let internal_record = create_dns_record("internal.bank", Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 2), "bank-node");
+    let internal_record = create_dns_record(
+        "internal.bank",
+        Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 2),
+        "bank-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -214,11 +251,18 @@ async fn test_bank_scenario_portal_and_private() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: internal.bank (bank-employees) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: internal.bank (bank-employees) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 3. Register federated SWIFT
     let swift_domain = Domain::parse("swift.bank").unwrap();
-    let swift_record = create_dns_record("swift.bank", Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 3), "bank-node");
+    let swift_record = create_dns_record(
+        "swift.bank",
+        Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 3),
+        "bank-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -229,11 +273,18 @@ async fn test_bank_scenario_portal_and_private() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: swift.bank (bank-swift) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: swift.bank (bank-swift) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 4. Register federated compliance
     let compliance_domain = Domain::parse("compliance.bank").unwrap();
-    let compliance_record = create_dns_record("compliance.bank", Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 4), "bank-node");
+    let compliance_record = create_dns_record(
+        "compliance.bank",
+        Ipv6Addr::new(0x2001, 0xdb8, 2, 0, 0, 0, 0, 4),
+        "bank-node",
+    );
 
     let registration = registrar
         .register_federated(
@@ -244,7 +295,10 @@ async fn test_bank_scenario_portal_and_private() {
         )
         .await
         .unwrap();
-    println!("✅ Registered federated: compliance.bank (bank-compliance) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered federated: compliance.bank (bank-compliance) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 5. Query public website
     let query = DnsQuery {
@@ -257,7 +311,10 @@ async fn test_bank_scenario_portal_and_private() {
 
     let response = resolver.resolve(query).await.unwrap();
     assert_eq!(response.tier, DnsResolutionTier::Public);
-    println!("✅ Public query: bank -> {} records", response.records.len());
+    println!(
+        "✅ Public query: bank -> {} records",
+        response.records.len()
+    );
 
     // 6. Query federated internal (requires bank-employees network)
     let query = DnsQuery {
@@ -270,7 +327,10 @@ async fn test_bank_scenario_portal_and_private() {
 
     let response = resolver.resolve(query).await.unwrap();
     assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
-    println!("✅ Federated query: internal.bank (bank-employees) -> {} records", response.records.len());
+    println!(
+        "✅ Federated query: internal.bank (bank-employees) -> {} records",
+        response.records.len()
+    );
 
     // 7. Query federated SWIFT (requires bank-swift network)
     let query = DnsQuery {
@@ -283,7 +343,10 @@ async fn test_bank_scenario_portal_and_private() {
 
     let response = resolver.resolve(query).await.unwrap();
     assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
-    println!("✅ Federated query: swift.bank (bank-swift) -> {} records", response.records.len());
+    println!(
+        "✅ Federated query: swift.bank (bank-swift) -> {} records",
+        response.records.len()
+    );
 
     println!("✅ Bank scenario complete: Portal + private networks\n");
 }
@@ -314,7 +377,10 @@ async fn test_government_scenario_fully_federated() {
         )
         .await
         .unwrap();
-    println!("✅ Registered fully federated: classified.internal.gov (gov-classified) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered fully federated: classified.internal.gov (gov-classified) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 2. Register federated intel
     let intel_domain = Domain::parse("intel.internal.gov").unwrap();
@@ -333,7 +399,10 @@ async fn test_government_scenario_fully_federated() {
         )
         .await
         .unwrap();
-    println!("✅ Registered fully federated: intel.internal.gov (gov-intelligence) -> {}", registration.tx_hash.unwrap());
+    println!(
+        "✅ Registered fully federated: intel.internal.gov (gov-intelligence) -> {}",
+        registration.tx_hash.unwrap()
+    );
 
     // 3. Attempt to query without network membership (should fail or require proof)
     let query = DnsQuery {
@@ -359,8 +428,14 @@ async fn test_government_scenario_fully_federated() {
     };
 
     let response = resolver.resolve(query).await.unwrap();
-    assert!(matches!(response.tier, DnsResolutionTier::FullyFederated { .. }));
-    println!("✅ Fully federated query: classified.internal.gov (gov-classified) -> {} records", response.records.len());
+    assert!(matches!(
+        response.tier,
+        DnsResolutionTier::FullyFederated { .. }
+    ));
+    println!(
+        "✅ Fully federated query: classified.internal.gov (gov-classified) -> {} records",
+        response.records.len()
+    );
 
     // 5. Query intel with proper network
     let query = DnsQuery {
@@ -372,8 +447,14 @@ async fn test_government_scenario_fully_federated() {
     };
 
     let response = resolver.resolve(query).await.unwrap();
-    assert!(matches!(response.tier, DnsResolutionTier::FullyFederated { .. }));
-    println!("✅ Fully federated query: intel.internal.gov (gov-intelligence) -> {} records", response.records.len());
+    assert!(matches!(
+        response.tier,
+        DnsResolutionTier::FullyFederated { .. }
+    ));
+    println!(
+        "✅ Fully federated query: intel.internal.gov (gov-intelligence) -> {} records",
+        response.records.len()
+    );
 
     println!("✅ Government scenario complete: Fully federated DNS\n");
 }
@@ -396,11 +477,7 @@ async fn test_privacy_boundary_enforcement() {
         .unwrap();
 
     // Test 1: Public can query public pool
-    assert!(
-        pool_manager
-            .can_access(None, &DnsPoolType::Public)
-            .await
-    );
+    assert!(pool_manager.can_access(None, &DnsPoolType::Public).await);
     println!("✅ Public pool accessible without network membership");
 
     // Test 2: Federated requires matching network
@@ -423,11 +500,7 @@ async fn test_privacy_boundary_enforcement() {
     println!("✅ Federated pool denies wrong network");
 
     // Test 4: Federated denies no network
-    assert!(
-        !pool_manager
-            .can_access(None, &federated_type)
-            .await
-    );
+    assert!(!pool_manager.can_access(None, &federated_type).await);
     println!("✅ Federated pool denies no network membership");
 
     println!("✅ Privacy boundary enforcement complete\n");

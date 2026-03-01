@@ -2,27 +2,27 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! DNS-over-STOQ Implementation 
+//! DNS-over-STOQ Implementation
 //!
 //! Production-ready DNS resolution using STOQ transport protocol for
 //! high-performance, secure DNS queries with IPv6-only networking.
 //! This replaces the direct QUIC implementation with STOQ integration.
 
+use bytes::Bytes;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn, error};
-use bytes::Bytes;
+use tracing::{debug, error, info, warn};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use super::{DnsQuery, DnsRecord, DnsRecordData, DnsResponse};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::stoq_client::{
-    TrustChainStoqClient, StoqDnsQuery, StoqDnsResponse, DnsResourceRecord,
-    ServiceEndpoint, ServiceType
+    DnsResourceRecord, ServiceEndpoint, ServiceType, StoqDnsQuery, StoqDnsResponse,
+    TrustChainStoqClient,
 };
-use super::{DnsQuery, DnsResponse, DnsRecord, DnsRecordData};
 
 /// High-performance DNS resolver using STOQ transport
 pub struct DnsOverStoq {
@@ -102,14 +102,16 @@ impl Default for DnsOverStoqConfig {
                     ServiceType::Dns,
                     // Google DNS - literal IPv6 address is valid, parse is safe
                     Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888),
-                    853
-                ).with_service_name("dns.google".to_string()),
+                    853,
+                )
+                .with_service_name("dns.google".to_string()),
                 ServiceEndpoint::new(
                     ServiceType::Dns,
                     // Google DNS Secondary - literal IPv6 address
                     Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8844),
-                    853
-                ).with_service_name("dns.google".to_string()),
+                    853,
+                )
+                .with_service_name("dns.google".to_string()),
             ],
         }
     }
@@ -121,7 +123,10 @@ impl DnsOverStoq {
         stoq_client: Arc<TrustChainStoqClient>,
         config: DnsOverStoqConfig,
     ) -> TrustChainResult<Self> {
-        info!("Initializing DNS-over-STOQ resolver with {} servers", config.dns_servers.len());
+        info!(
+            "Initializing DNS-over-STOQ resolver with {} servers",
+            config.dns_servers.len()
+        );
 
         let resolver = Self {
             stoq_client,
@@ -139,39 +144,55 @@ impl DnsOverStoq {
     pub async fn resolve(&self, query: &DnsQuery) -> TrustChainResult<DnsResponse> {
         let start_time = std::time::Instant::now();
         let cache_key = self.generate_cache_key(query);
-        
-        debug!("Resolving DNS query via STOQ: {} (type: {:?})", query.name, query.record_type);
+
+        debug!(
+            "Resolving DNS query via STOQ: {} (type: {:?})",
+            query.name, query.record_type
+        );
 
         // Check cache first
         if let Some(cached_response) = self.check_cache(&cache_key).await {
             debug!("DNS cache hit for: {}", query.name);
-            self.metrics.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .cache_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Ok(cached_response);
         }
 
-        self.metrics.cache_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cache_misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Perform resolution with retries
         let mut last_error = None;
-        
+
         for attempt in 0..=self.config.max_retries {
             match self.resolve_with_stoq(query, attempt).await {
                 Ok(response) => {
                     // Cache successful response
                     self.cache_response(&cache_key, &response).await;
-                    
+
                     // Update metrics
                     let latency = start_time.elapsed().as_micros() as u64;
-                    self.metrics.queries_processed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .queries_processed
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     self.update_avg_latency(latency);
-                    
-                    debug!("DNS query resolved successfully: {} ({}μs)", query.name, latency);
+
+                    debug!(
+                        "DNS query resolved successfully: {} ({}μs)",
+                        query.name, latency
+                    );
                     return Ok(response);
                 }
                 Err(e) => {
                     if attempt < self.config.max_retries {
-                        warn!("DNS query attempt {} failed for {}, retrying: {}",
-                              attempt + 1, query.name, e);
+                        warn!(
+                            "DNS query attempt {} failed for {}, retrying: {}",
+                            attempt + 1,
+                            query.name,
+                            e
+                        );
                         tokio::time::sleep(self.config.retry_delay).await;
                     }
                     last_error = Some(e);
@@ -180,10 +201,15 @@ impl DnsOverStoq {
         }
 
         // All retries failed
-        self.metrics.failed_queries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        error!("DNS query failed after {} attempts: {}", 
-               self.config.max_retries + 1, query.name);
-        
+        self.metrics
+            .failed_queries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        error!(
+            "DNS query failed after {} attempts: {}",
+            self.config.max_retries + 1,
+            query.name
+        );
+
         Err(last_error.unwrap_or_else(|| TrustChainError::DNSError {
             operation: "resolve".to_string(),
             reason: "All retry attempts failed".to_string(),
@@ -191,7 +217,11 @@ impl DnsOverStoq {
     }
 
     /// Resolve query using STOQ transport with server selection
-    async fn resolve_with_stoq(&self, query: &DnsQuery, attempt: u32) -> TrustChainResult<DnsResponse> {
+    async fn resolve_with_stoq(
+        &self,
+        query: &DnsQuery,
+        attempt: u32,
+    ) -> TrustChainResult<DnsResponse> {
         // Convert TrustChain DnsQuery to STOQ StoqDnsQuery
         let stoq_query = StoqDnsQuery {
             query_id: query.id,
@@ -209,12 +239,16 @@ impl DnsOverStoq {
                 reason: "No DNS servers configured".to_string(),
             });
         }
-        
+
         let server_index = attempt as usize % resolvers.len();
         let selected_server = &resolvers[server_index];
 
-        debug!("Using DNS server: [{}]:{} (attempt {})", 
-               selected_server.address, selected_server.port, attempt + 1);
+        debug!(
+            "Using DNS server: [{}]:{} (attempt {})",
+            selected_server.address,
+            selected_server.port,
+            attempt + 1
+        );
 
         // Perform DNS query via STOQ
         let stoq_response = if self.config.enable_parallel_queries && attempt == 0 {
@@ -222,7 +256,9 @@ impl DnsOverStoq {
             self.resolve_parallel(&stoq_query).await?
         } else {
             // Single server query
-            self.stoq_client.resolve_dns(stoq_query).await
+            self.stoq_client
+                .resolve_dns(stoq_query)
+                .await
                 .map_err(|e| TrustChainError::DNSError {
                     operation: "stoq_dns_query".to_string(),
                     reason: e.to_string(),
@@ -237,19 +273,17 @@ impl DnsOverStoq {
     async fn resolve_parallel(&self, query: &StoqDnsQuery) -> TrustChainResult<StoqDnsResponse> {
         let resolvers = self.resolvers.read().await;
         let num_servers = std::cmp::min(3, resolvers.len()); // Use up to 3 servers in parallel
-        
+
         debug!("Executing parallel DNS queries to {} servers", num_servers);
-        
+
         let mut tasks = Vec::new();
-        
+
         for _i in 0..num_servers {
             let query_clone = query.clone();
             let stoq_client = self.stoq_client.clone();
-            
-            let task = tokio::spawn(async move {
-                stoq_client.resolve_dns(query_clone).await
-            });
-            
+
+            let task = tokio::spawn(async move { stoq_client.resolve_dns(query_clone).await });
+
             tasks.push(task);
         }
 
@@ -257,7 +291,9 @@ impl DnsOverStoq {
         for task in tasks {
             match task.await {
                 Ok(Ok(response)) => {
-                    self.metrics.parallel_queries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.metrics
+                        .parallel_queries
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     debug!("Parallel DNS query succeeded");
                     return Ok(response);
                 }
@@ -304,10 +340,7 @@ impl DnsOverStoq {
         }
 
         // Determine TTL from answers (use minimum TTL)
-        let ttl = answers.iter()
-            .map(|r| r.ttl)
-            .min()
-            .unwrap_or(300); // Default 5 minutes
+        let ttl = answers.iter().map(|r| r.ttl).min().unwrap_or(300); // Default 5 minutes
 
         Ok(DnsResponse {
             id: stoq_response.query_id,
@@ -323,7 +356,7 @@ impl DnsOverStoq {
     /// Convert STOQ DNS resource record to TrustChain DNS record
     fn convert_resource_record(&self, record: DnsResourceRecord) -> TrustChainResult<DnsRecord> {
         let data = self.parse_record_data(record.record_type, &record.data)?;
-        
+
         Ok(DnsRecord {
             name: record.name,
             record_type: self.u16_to_record_type(record.record_type),
@@ -336,13 +369,16 @@ impl DnsOverStoq {
     /// Parse DNS record data based on type
     fn parse_record_data(&self, record_type: u16, data: &Bytes) -> TrustChainResult<DnsRecordData> {
         match record_type {
-            1 => { // A record
+            1 => {
+                // A record
                 if data.len() == 4 {
-                    let bytes: [u8; 4] = data[0..4].try_into()
-                        .map_err(|_| TrustChainError::DNSError {
-                            operation: "parse_a_record".to_string(),
-                            reason: "Invalid A record data length".to_string(),
-                        })?;
+                    let bytes: [u8; 4] =
+                        data[0..4]
+                            .try_into()
+                            .map_err(|_| TrustChainError::DNSError {
+                                operation: "parse_a_record".to_string(),
+                                reason: "Invalid A record data length".to_string(),
+                            })?;
                     Ok(DnsRecordData::A(std::net::Ipv4Addr::from(bytes)))
                 } else {
                     Err(TrustChainError::DNSError {
@@ -351,13 +387,16 @@ impl DnsOverStoq {
                     })
                 }
             }
-            28 => { // AAAA record
+            28 => {
+                // AAAA record
                 if data.len() == 16 {
-                    let bytes: [u8; 16] = data[0..16].try_into()
-                        .map_err(|_| TrustChainError::DNSError {
-                            operation: "parse_aaaa_record".to_string(),
-                            reason: "Invalid AAAA record data length".to_string(),
-                        })?;
+                    let bytes: [u8; 16] =
+                        data[0..16]
+                            .try_into()
+                            .map_err(|_| TrustChainError::DNSError {
+                                operation: "parse_aaaa_record".to_string(),
+                                reason: "Invalid AAAA record data length".to_string(),
+                            })?;
                     Ok(DnsRecordData::AAAA(Ipv6Addr::from(bytes)))
                 } else {
                     Err(TrustChainError::DNSError {
@@ -366,30 +405,34 @@ impl DnsOverStoq {
                     })
                 }
             }
-            5 => { // CNAME record
-                let cname = String::from_utf8(data.to_vec())
-                    .map_err(|_| TrustChainError::DNSError {
+            5 => {
+                // CNAME record
+                let cname =
+                    String::from_utf8(data.to_vec()).map_err(|_| TrustChainError::DNSError {
                         operation: "parse_cname_record".to_string(),
                         reason: "Invalid UTF-8 in CNAME record".to_string(),
                     })?;
                 Ok(DnsRecordData::CNAME(cname))
             }
-            16 => { // TXT record
-                let txt = String::from_utf8(data.to_vec())
-                    .map_err(|_| TrustChainError::DNSError {
+            16 => {
+                // TXT record
+                let txt =
+                    String::from_utf8(data.to_vec()).map_err(|_| TrustChainError::DNSError {
                         operation: "parse_txt_record".to_string(),
                         reason: "Invalid UTF-8 in TXT record".to_string(),
                     })?;
                 Ok(DnsRecordData::TXT(txt))
             }
-            15 => { // MX record
+            15 => {
+                // MX record
                 if data.len() >= 3 {
                     let priority = u16::from_be_bytes([data[0], data[1]]);
-                    let exchange = String::from_utf8(data[2..].to_vec())
-                        .map_err(|_| TrustChainError::DNSError {
+                    let exchange = String::from_utf8(data[2..].to_vec()).map_err(|_| {
+                        TrustChainError::DNSError {
                             operation: "parse_mx_record".to_string(),
                             reason: "Invalid UTF-8 in MX record".to_string(),
-                        })?;
+                        }
+                    })?;
                     Ok(DnsRecordData::MX { priority, exchange })
                 } else {
                     Err(TrustChainError::DNSError {
@@ -398,9 +441,10 @@ impl DnsOverStoq {
                     })
                 }
             }
-            2 => { // NS record
-                let ns = String::from_utf8(data.to_vec())
-                    .map_err(|_| TrustChainError::DNSError {
+            2 => {
+                // NS record
+                let ns =
+                    String::from_utf8(data.to_vec()).map_err(|_| TrustChainError::DNSError {
                         operation: "parse_ns_record".to_string(),
                         reason: "Invalid UTF-8 in NS record".to_string(),
                     })?;
@@ -408,8 +452,11 @@ impl DnsOverStoq {
             }
             _ => {
                 // Unsupported record type - return as TXT
-                let txt = format!("Unsupported record type {}: {}", 
-                                record_type, hex::encode(data));
+                let txt = format!(
+                    "Unsupported record type {}: {}",
+                    record_type,
+                    hex::encode(data)
+                );
                 Ok(DnsRecordData::TXT(txt))
             }
         }
@@ -458,7 +505,12 @@ impl DnsOverStoq {
 
     /// Generate cache key for DNS query
     fn generate_cache_key(&self, query: &DnsQuery) -> String {
-        format!("{}:{}:{:?}", query.name, self.record_type_to_u16(query.record_type), query.class)
+        format!(
+            "{}:{}:{:?}",
+            query.name,
+            self.record_type_to_u16(query.record_type),
+            query.class
+        )
     }
 
     /// Check cache for existing response
@@ -468,7 +520,8 @@ impl DnsOverStoq {
                 // Update hit count
                 let mut entry = cached_entry.clone();
                 entry.hit_count += 1;
-                self.query_cache.insert(cache_key.to_string(), entry.clone());
+                self.query_cache
+                    .insert(cache_key.to_string(), entry.clone());
                 return Some(entry.response);
             } else {
                 // Expired entry, remove it
@@ -517,38 +570,57 @@ impl DnsOverStoq {
 
     /// Update average latency metric
     fn update_avg_latency(&self, latency_us: u64) {
-        let current_avg = self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .avg_latency_us
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = if current_avg == 0 {
             latency_us
         } else {
             (current_avg * 9 + latency_us) / 10 // Moving average
         };
-        self.metrics.avg_latency_us.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .avg_latency_us
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get resolver metrics
     pub fn get_metrics(&self) -> DnsOverStoqMetrics {
         DnsOverStoqMetrics {
             queries_processed: std::sync::atomic::AtomicU64::new(
-                self.metrics.queries_processed.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .queries_processed
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_hits: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_hits
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_misses: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_misses.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_misses
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             failed_queries: std::sync::atomic::AtomicU64::new(
-                self.metrics.failed_queries.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .failed_queries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             avg_latency_us: std::sync::atomic::AtomicU64::new(
-                self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .avg_latency_us
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             connection_reuse: std::sync::atomic::AtomicU64::new(
-                self.metrics.connection_reuse.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .connection_reuse
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             parallel_queries: std::sync::atomic::AtomicU64::new(
-                self.metrics.parallel_queries.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .parallel_queries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -556,9 +628,15 @@ impl DnsOverStoq {
     /// Get cache statistics
     pub async fn get_cache_stats(&self) -> (usize, usize, f64) {
         let total_entries = self.query_cache.len();
-        let total_queries = self.metrics.queries_processed.load(std::sync::atomic::Ordering::Relaxed);
-        let cache_hits = self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed);
-        
+        let total_queries = self
+            .metrics
+            .queries_processed
+            .load(std::sync::atomic::Ordering::Relaxed);
+        let cache_hits = self
+            .metrics
+            .cache_hits
+            .load(std::sync::atomic::Ordering::Relaxed);
+
         let hit_ratio = if total_queries > 0 {
             cache_hits as f64 / total_queries as f64
         } else {
@@ -615,13 +693,12 @@ impl DnsOverStoq {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
 
+    #[allow(dead_code)]
     async fn create_test_resolver() -> Result<DnsOverStoq, Box<dyn std::error::Error>> {
         // Create a mock STOQ client for testing
         // Note: In a real test environment, this would connect to a test STOQ server
-        let config = DnsOverStoqConfig::default();
+        let _config = DnsOverStoqConfig::default();
 
         // For now, return an error indicating this needs a running STOQ instance
         // This prevents the test from panicking while allowing other tests to run
@@ -631,7 +708,7 @@ mod tests {
     #[test]
     fn test_dns_over_stoq_config_default() {
         let config = DnsOverStoqConfig::default();
-        
+
         assert_eq!(config.query_timeout, Duration::from_secs(5));
         assert_eq!(config.cache_ttl, Duration::from_secs(300));
         assert_eq!(config.max_cache_entries, 10000);
@@ -644,10 +721,30 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_initialization() {
         let metrics = DnsOverStoqMetrics::default();
-        
-        assert_eq!(metrics.queries_processed.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.cache_misses.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.failed_queries.load(std::sync::atomic::Ordering::Relaxed), 0);
+
+        assert_eq!(
+            metrics
+                .queries_processed
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .cache_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .cache_misses
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .failed_queries
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
     }
 }

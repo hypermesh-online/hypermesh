@@ -4,9 +4,9 @@
 
 //! Type definitions for the Catalog-HyperMesh Integration Bridge
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 
 use crate::assets::core::AssetType;
 
@@ -189,9 +189,7 @@ pub struct CatalogDeploymentSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeploymentStrategy {
     /// Deploy as VM execution
-    VMExecution {
-        vm_config: VMDeploymentConfig,
-    },
+    VMExecution { vm_config: VMDeploymentConfig },
     /// Deploy as container
     Container {
         container_config: ContainerDeploymentConfig,

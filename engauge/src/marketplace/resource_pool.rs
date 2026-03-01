@@ -149,7 +149,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(PoolError::AnonymousNotAllowed) => {}
-            other => panic!("test: expected AnonymousNotAllowed, got {:?}", other),
+            other => unreachable!("test: expected AnonymousNotAllowed, got {other:?}"),
         }
     }
 

@@ -7,13 +7,13 @@
 //! This example shows how STOQ automatically adapts connection parameters
 //! based on detected network conditions, without dropping connections.
 
+use std::net::Ipv6Addr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
-use std::net::Ipv6Addr;
-use tokio::time::{sleep, interval};
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
+use tokio::time::{interval, sleep};
 use tracing::{info, warn};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,11 +26,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("=============================================================");
 
     // Create transport with initial conservative config
-    let mut config = TransportConfig::default();
-    config.bind_address = Ipv6Addr::UNSPECIFIED;
-    config.port = 9999;
-    config.max_concurrent_streams = 100;
-    config.send_buffer_size = 2 * 1024 * 1024; // Start with 2MB
+    let config = TransportConfig {
+        bind_address: Ipv6Addr::UNSPECIFIED,
+        port: 9999,
+        max_concurrent_streams: 100,
+        send_buffer_size: 2 * 1024 * 1024, // Start with 2MB
+        ..Default::default()
+    };
 
     let mut transport = StoqTransport::new(config.clone()).await?;
 
@@ -73,14 +75,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                             // Check adaptation stats
                             let stats = transport.adaptation_stats();
-                            if let Some((_, conn_stats)) = stats.iter()
-                                .find(|(id, _)| id == &conn_id) {
-
+                            if let Some((_, conn_stats)) =
+                                stats.iter().find(|(id, _)| id == &conn_id)
+                            {
                                 let current = adapt_count.load(Ordering::Relaxed);
                                 if conn_stats.adaptation_count > current {
-                                    adapt_count.store(conn_stats.adaptation_count, Ordering::Relaxed);
-                                    info!("Connection {} adapted to {:?} (adaptation #{})",
-                                          conn_id, conn_stats.current_tier, conn_stats.adaptation_count);
+                                    adapt_count
+                                        .store(conn_stats.adaptation_count, Ordering::Relaxed);
+                                    info!(
+                                        "Connection {} adapted to {:?} (adaptation #{})",
+                                        conn_id,
+                                        conn_stats.current_tier,
+                                        conn_stats.adaptation_count
+                                    );
                                 }
                             }
 
@@ -131,8 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Get current adaptation state
             let stats = monitor_transport.adaptation_stats();
             for (id, stat) in stats {
-                info!("Connection {} - Tier: {:?}, Adaptations: {}",
-                      id, stat.current_tier, stat.adaptation_count);
+                info!(
+                    "Connection {} - Tier: {:?}, Adaptations: {}",
+                    id, stat.current_tier, stat.adaptation_count
+                );
             }
         }
     });
@@ -192,20 +201,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("\n=== Final Statistics ===");
     let final_stats = transport.adaptation_stats();
     for (id, stat) in &final_stats {
-        info!("Connection {}: {} adaptations, current tier: {:?}",
-              id, stat.adaptation_count, stat.current_tier);
+        info!(
+            "Connection {}: {} adaptations, current tier: {:?}",
+            id, stat.adaptation_count, stat.current_tier
+        );
 
         // Show connection-specific metrics
         if let Some(adaptive_conn) = transport.get_adaptive_connection(id) {
             let conditions = adaptive_conn.conditions();
-            info!("  RTT: {:.2}ms, Loss: {:.2}%, Throughput: {:.2}Mbps",
-                  conditions.rtt_ms, conditions.packet_loss, conditions.throughput_mbps);
+            info!(
+                "  RTT: {:.2}ms, Loss: {:.2}%, Throughput: {:.2}Mbps",
+                conditions.rtt_ms, conditions.packet_loss, conditions.throughput_mbps
+            );
 
             let params = adaptive_conn.parameters();
-            info!("  Stream window: {}MB, Max streams: {}, Buffer: {}MB",
-                  params.stream_window / (1024 * 1024),
-                  params.max_streams,
-                  params.send_buffer_size / (1024 * 1024));
+            info!(
+                "  Stream window: {}MB, Max streams: {}, Buffer: {}MB",
+                params.stream_window / (1024 * 1024),
+                params.max_streams,
+                params.send_buffer_size / (1024 * 1024)
+            );
         }
     }
 

@@ -10,8 +10,8 @@
 
 use hypermesh_lib::economic::GoldGrams;
 use hypermesh_lib::NodeId;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 
@@ -104,8 +104,7 @@ impl FeeDistributor {
 
         let transit_payments: Vec<NodePayment> = if total_bytes == 0 {
             // All transit nodes relayed zero bytes -- split equally
-            let count = Decimal::from_usize(transit_nodes.len())
-                .unwrap_or(Decimal::ONE);
+            let count = Decimal::from_usize(transit_nodes.len()).unwrap_or(Decimal::ONE);
             let per_node = GoldGrams::from_decimal(transit_pool.0 / count);
             transit_nodes
                 .iter()
@@ -115,13 +114,11 @@ impl FeeDistributor {
                 })
                 .collect()
         } else {
-            let total_dec = Decimal::from_u64(total_bytes)
-                .unwrap_or(Decimal::ONE);
+            let total_dec = Decimal::from_u64(total_bytes).unwrap_or(Decimal::ONE);
             transit_nodes
                 .iter()
                 .map(|(node_id, bytes)| {
-                    let bytes_dec = Decimal::from_u64(*bytes)
-                        .unwrap_or(Decimal::ZERO);
+                    let bytes_dec = Decimal::from_u64(*bytes).unwrap_or(Decimal::ZERO);
                     let share = bytes_dec / total_dec;
                     NodePayment {
                         node_id: node_id.clone(),
@@ -177,8 +174,7 @@ impl FeeDistributor {
         let total_score: f64 = scores.iter().sum();
 
         let transit_payments: Vec<NodePayment> = if total_score < f64::EPSILON {
-            let count = Decimal::from_usize(transit_nodes.len())
-                .unwrap_or(Decimal::ONE);
+            let count = Decimal::from_usize(transit_nodes.len()).unwrap_or(Decimal::ONE);
             let per_node = GoldGrams::from_decimal(transit_pool.0 / count);
             transit_nodes
                 .iter()
@@ -192,8 +188,7 @@ impl FeeDistributor {
                 .iter()
                 .zip(scores.iter())
                 .map(|((node_id, _), &score)| {
-                    let share = Decimal::from_f64(score / total_score)
-                        .unwrap_or(Decimal::ZERO);
+                    let share = Decimal::from_f64(score / total_score).unwrap_or(Decimal::ZERO);
                     NodePayment {
                         node_id: node_id.clone(),
                         amount: GoldGrams::from_decimal(transit_pool.0 * share),
@@ -249,11 +244,7 @@ mod tests {
     fn distribute_no_transit_nodes() {
         let dist = distributor();
         let result = dist
-            .distribute_fee(
-                GoldGrams(dec!(10)),
-                NodeId::from("egress"),
-                &[],
-            )
+            .distribute_fee(GoldGrams(dec!(10)), NodeId::from("egress"), &[])
             .expect("test: egress-only distribution");
 
         assert_eq!(result.egress_payment.amount, GoldGrams(dec!(10)));
@@ -283,11 +274,7 @@ mod tests {
     #[test]
     fn distribute_zero_fee_error() {
         let dist = distributor();
-        let err = dist.distribute_fee(
-            GoldGrams::zero(),
-            NodeId::from("egress"),
-            &[],
-        );
+        let err = dist.distribute_fee(GoldGrams::zero(), NodeId::from("egress"), &[]);
         assert!(
             matches!(err, Err(FeeError::ZeroFee)),
             "expected ZeroFee, got {err:?}"
@@ -333,11 +320,13 @@ mod tests {
     fn distribute_with_capacity_weights_proportional() {
         let dist = distributor();
         let high_cap = engauge::CapacityMetrics::new(
-            1_073_741_824, 1_000_000, 10_737_418_240, 1_000_000_000, 1.0,
+            1_073_741_824,
+            1_000_000,
+            10_737_418_240,
+            1_000_000_000,
+            1.0,
         );
-        let low_cap = engauge::CapacityMetrics::new(
-            100_000, 10_000, 100_000, 100_000, 0.5,
-        );
+        let low_cap = engauge::CapacityMetrics::new(100_000, 10_000, 100_000, 100_000, 0.5);
         let result = dist
             .distribute_with_capacity_weights(
                 GoldGrams(dec!(100)),
@@ -355,7 +344,8 @@ mod tests {
         assert!(
             result.transit_payments[0].amount.0 > result.transit_payments[1].amount.0,
             "high-cap {} should exceed low-cap {}",
-            result.transit_payments[0].amount, result.transit_payments[1].amount
+            result.transit_payments[0].amount,
+            result.transit_payments[1].amount
         );
     }
 }

@@ -4,9 +4,9 @@
 
 //! Reporting and delivery configuration types for sharing module.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 /// Risk reporting requirements
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -31,7 +31,7 @@ fn test_origin() {
 #[test]
 fn test_distance_calculations() {
     let origin = MatrixCoordinate::origin();
-    let point = MatrixCoordinate::new(3, 4, 0).unwrap();
+    let point = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
 
     // Euclidean distance (3-4-5 triangle)
     assert_eq!(origin.euclidean_distance(&point), 5.0);
@@ -48,8 +48,8 @@ fn test_distance_calculations() {
 
 #[test]
 fn test_distance_symmetry() {
-    let a = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let b = MatrixCoordinate::new(50, 60, 70).unwrap();
+    let a = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let b = MatrixCoordinate::new(50, 60, 70).expect("test: valid coordinate");
 
     // Distance should be symmetric
     assert_eq!(a.euclidean_distance(&b), b.euclidean_distance(&a));
@@ -59,8 +59,8 @@ fn test_distance_symmetry() {
 
 #[test]
 fn test_distance_with_negative_coordinates() {
-    let a = MatrixCoordinate::new(-10, -20, -30).unwrap();
-    let b = MatrixCoordinate::new(10, 20, 30).unwrap();
+    let a = MatrixCoordinate::new(-10, -20, -30).expect("test: valid coordinate");
+    let b = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
 
     let euclidean = a.euclidean_distance(&b);
     assert!(euclidean > 0.0);
@@ -71,9 +71,9 @@ fn test_distance_with_negative_coordinates() {
 
 #[test]
 fn test_is_within_distance() {
-    let center = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let near = MatrixCoordinate::new(3, 4, 0).unwrap();
-    let far = MatrixCoordinate::new(100, 100, 100).unwrap();
+    let center = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let near = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
+    let far = MatrixCoordinate::new(100, 100, 100).expect("test: valid coordinate");
 
     assert!(center.is_within_distance(&near, 10.0));
     assert!(center.is_within_distance(&near, 5.0));
@@ -83,9 +83,9 @@ fn test_is_within_distance() {
 
 #[test]
 fn test_coordinate_equality() {
-    let a = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let b = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let c = MatrixCoordinate::new(10, 20, 31).unwrap();
+    let a = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let b = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let c = MatrixCoordinate::new(10, 20, 31).expect("test: valid coordinate");
 
     assert_eq!(a, b);
     assert_ne!(a, c);
@@ -94,31 +94,31 @@ fn test_coordinate_equality() {
 
 #[test]
 fn test_coordinate_display() {
-    let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
-    assert_eq!(format!("{}", coord), "(10,20,30)");
+    let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    assert_eq!(format!("{coord}"), "(10,20,30)");
 
-    let negative = MatrixCoordinate::new(-5, -10, -15).unwrap();
-    assert_eq!(format!("{}", negative), "(-5,-10,-15)");
+    let negative = MatrixCoordinate::new(-5, -10, -15).expect("test: valid coordinate");
+    assert_eq!(format!("{negative}"), "(-5,-10,-15)");
 }
 
 #[test]
 fn test_coordinate_serialization() {
-    let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+    let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
 
     // Serialize to JSON
-    let json = serde_json::to_string(&coord).unwrap();
+    let json = serde_json::to_string(&coord).expect("test: serialization");
     assert!(json.contains("10"));
     assert!(json.contains("20"));
     assert!(json.contains("30"));
 
     // Deserialize from JSON
-    let deserialized: MatrixCoordinate = serde_json::from_str(&json).unwrap();
+    let deserialized: MatrixCoordinate = serde_json::from_str(&json).expect("test: deserialization");
     assert_eq!(coord, deserialized);
 }
 
 #[test]
 fn test_zero_distance() {
-    let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+    let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
 
     assert_eq!(coord.euclidean_distance(&coord), 0.0);
     assert_eq!(coord.manhattan_distance(&coord), 0);
@@ -129,9 +129,9 @@ fn test_zero_distance() {
 #[test]
 fn test_triangle_inequality() {
     // Triangle inequality: d(a,c) <= d(a,b) + d(b,c)
-    let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let b = MatrixCoordinate::new(10, 10, 10).unwrap();
-    let c = MatrixCoordinate::new(20, 0, 0).unwrap();
+    let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+    let b = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
+    let c = MatrixCoordinate::new(20, 0, 0).expect("test: valid coordinate");
 
     let d_ac = a.euclidean_distance(&c);
     let d_ab = a.euclidean_distance(&b);
@@ -142,7 +142,7 @@ fn test_triangle_inequality() {
 
 #[test]
 fn test_coordinate_properties() {
-    let coord = MatrixCoordinate::new(42, 84, 126).unwrap();
+    let coord = MatrixCoordinate::new(42, 84, 126).expect("test: valid coordinate");
 
     // Test that coordinate values are preserved
     assert_eq!(coord.x, 42);
@@ -150,7 +150,7 @@ fn test_coordinate_properties() {
     assert_eq!(coord.z, 126);
 
     // Test clone
-    let cloned = coord.clone();
+    let cloned = coord;
     assert_eq!(coord, cloned);
 
     // Test copy
@@ -163,8 +163,8 @@ fn test_extreme_coordinates() {
     let max_coord = i64::MAX / 4;
     let min_coord = i64::MIN / 4;
 
-    let max_point = MatrixCoordinate::new(max_coord, max_coord, max_coord).unwrap();
-    let min_point = MatrixCoordinate::new(min_coord, min_coord, min_coord).unwrap();
+    let max_point = MatrixCoordinate::new(max_coord, max_coord, max_coord).expect("test: valid coordinate");
+    let min_point = MatrixCoordinate::new(min_coord, min_coord, min_coord).expect("test: valid coordinate");
 
     // Should not panic
     let _distance = max_point.euclidean_distance(&min_point);
@@ -178,9 +178,9 @@ fn test_coordinate_hash() {
 
     let mut set = HashSet::new();
 
-    let coord1 = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let coord2 = MatrixCoordinate::new(10, 20, 30).unwrap();
-    let coord3 = MatrixCoordinate::new(11, 20, 30).unwrap();
+    let coord1 = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let coord2 = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+    let coord3 = MatrixCoordinate::new(11, 20, 30).expect("test: valid coordinate");
 
     set.insert(coord1);
     set.insert(coord2); // Duplicate, should not increase size
@@ -193,20 +193,26 @@ fn test_coordinate_hash() {
 
 #[test]
 fn test_mixed_sign_coordinates() {
-    let coord = MatrixCoordinate::new(-10, 20, -30).unwrap();
-    let other = MatrixCoordinate::new(10, -20, 30).unwrap();
+    let coord = MatrixCoordinate::new(-10, 20, -30).expect("test: valid coordinate");
+    let other = MatrixCoordinate::new(10, -20, 30).expect("test: valid coordinate");
 
     let dist = coord.euclidean_distance(&other);
     assert!(dist > 0.0);
 
     // Test all combinations of signs
     let combos = vec![
-        (1, 1, 1), (1, 1, -1), (1, -1, 1), (1, -1, -1),
-        (-1, 1, 1), (-1, 1, -1), (-1, -1, 1), (-1, -1, -1),
+        (1, 1, 1),
+        (1, 1, -1),
+        (1, -1, 1),
+        (1, -1, -1),
+        (-1, 1, 1),
+        (-1, 1, -1),
+        (-1, -1, 1),
+        (-1, -1, -1),
     ];
 
     for (sx, sy, sz) in combos {
-        let c = MatrixCoordinate::new(sx * 10, sy * 20, sz * 30).unwrap();
+        let c = MatrixCoordinate::new(sx * 10, sy * 20, sz * 30).expect("test: valid coordinate");
         assert!(c.validate().is_ok());
     }
 }

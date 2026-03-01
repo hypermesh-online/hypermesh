@@ -68,7 +68,7 @@ impl HealthChecker {
             enabled_modes: self
                 .enabled_modes
                 .iter()
-                .map(|m| format!("{:?}", m))
+                .map(|m| format!("{m:?}"))
                 .collect(),
             http3_listening: true,
             stoq_listening: self.stoq_listening,
@@ -139,7 +139,10 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
-            response.headers().get("content-type").and_then(|v| v.to_str().ok()),
+            response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok()),
             Some("application/json")
         );
 

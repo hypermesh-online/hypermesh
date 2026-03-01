@@ -27,6 +27,12 @@ pub struct FalconTrustChainClient {
     trusted_keys: std::sync::RwLock<std::collections::HashSet<[u8; 32]>>,
 }
 
+impl Default for FalconTrustChainClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FalconTrustChainClient {
     /// Create a new FALCON-1024 TrustChain client
     pub fn new() -> Self {
@@ -76,7 +82,7 @@ impl TrustChainClient for FalconTrustChainClient {
 
         // Reconstruct public key
         let public_key = falcon1024::PublicKey::from_bytes(pubkey)
-            .map_err(|e| anyhow::anyhow!("Invalid FALCON-1024 public key: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Invalid FALCON-1024 public key: {e}"))?;
 
         // Reconstruct signature
         let detached_sig = match falcon1024::DetachedSignature::from_bytes(signature) {

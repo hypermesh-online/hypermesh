@@ -4,15 +4,17 @@
 
 //! NATTranslator implementation - core translation operations
 
+use blake3;
+use libc::{
+    mmap, munmap, MAP_ANONYMOUS, MAP_FAILED, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use blake3;
-use libc::{mmap, munmap, PROT_READ, PROT_WRITE, PROT_EXEC, MAP_PRIVATE, MAP_ANONYMOUS, MAP_FAILED};
 
-use crate::assets::core::{AssetRegistration, AssetResult, AssetError, ProxyAddress};
 use super::types::*;
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, ProxyAddress};
 
 /// The main NAT translator for memory addressing
 pub struct NATTranslator {
@@ -44,7 +46,9 @@ impl NATTranslator {
             _allocated_ranges: Vec::new(),
             _free_ranges: vec![AddressRange {
                 start: network_config.address_space_start,
-                end: network_config.address_space_start + network_config.address_space_size as usize - 1,
+                end: network_config.address_space_start
+                    + network_config.address_space_size as usize
+                    - 1,
                 size: network_config.address_space_size,
             }],
         };
@@ -108,7 +112,7 @@ impl NATTranslator {
 
             if ptr == MAP_FAILED {
                 return Err(AssetError::AdapterError {
-                    message: format!("mmap failed: {}", std::io::Error::last_os_error())
+                    message: format!("mmap failed: {}", std::io::Error::last_os_error()),
                 });
             }
 
@@ -172,7 +176,9 @@ impl NATTranslator {
     ) -> AssetResult<LocalAddressMapping> {
         self.validate_privacy_config(&privacy).await?;
 
-        let mut mapping = self.create_translation(global_addr, region_size, permissions).await?;
+        let mut mapping = self
+            .create_translation(global_addr, region_size, permissions)
+            .await?;
         mapping.privacy_config = Some(privacy);
 
         {
@@ -186,9 +192,15 @@ impl NATTranslator {
     /// Convert MemoryPermissions to PROT flags
     fn permissions_to_prot(&self, perms: &MemoryPermissions) -> i32 {
         let mut prot = 0;
-        if perms.read { prot |= PROT_READ; }
-        if perms.write { prot |= PROT_WRITE; }
-        if perms.execute { prot |= PROT_EXEC; }
+        if perms.read {
+            prot |= PROT_READ;
+        }
+        if perms.write {
+            prot |= PROT_WRITE;
+        }
+        if perms.execute {
+            prot |= PROT_EXEC;
+        }
         prot
     }
 
@@ -196,14 +208,14 @@ impl NATTranslator {
     async fn validate_privacy_config(&self, privacy: &PrivacyConfig) -> AssetResult<()> {
         if privacy.max_concurrent_access == 0 {
             return Err(AssetError::AdapterError {
-                message: "Max concurrent access must be greater than 0".to_string()
+                message: "Max concurrent access must be greater than 0".to_string(),
             });
         }
 
         if privacy.level == PrivacyMode::PRIVATE {
             if !privacy.allowed_networks.is_empty() || !privacy.allowed_peers.is_empty() {
                 return Err(AssetError::AdapterError {
-                    message: "Private level should not have allowed networks or peers".to_string()
+                    message: "Private level should not have allowed networks or peers".to_string(),
                 });
             }
         } else if privacy.level == PrivacyMode::ANONYMOUS {
@@ -217,20 +229,24 @@ impl NATTranslator {
     /// Translate global address to local address
     pub async fn translate_to_local(&self, global_addr: &GlobalAddress) -> AssetResult<usize> {
         let global_to_local = self.global_to_local.read().await;
-        let mapping = global_to_local.get(global_addr)
+        let mapping = global_to_local
+            .get(global_addr)
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No translation found for global address: {}", global_addr.to_string())
+                message: format!(
+                    "No translation found for global address: {}",
+                    global_addr.to_string()
+                ),
             })?;
 
         if !matches!(mapping.translation_state, TranslationState::Active) {
             return Err(AssetError::AdapterError {
-                message: "Translation is not active".to_string()
+                message: "Translation is not active".to_string(),
             });
         }
 
         if mapping.expires_at < SystemTime::now() {
             return Err(AssetError::AdapterError {
-                message: "Translation has expired".to_string()
+                message: "Translation has expired".to_string(),
             });
         }
 
@@ -245,10 +261,11 @@ impl NATTranslator {
     /// Translate local address to global address
     pub async fn translate_to_global(&self, local_addr: usize) -> AssetResult<GlobalAddress> {
         let local_to_global = self.local_to_global.read().await;
-        local_to_global.get(&local_addr)
+        local_to_global
+            .get(&local_addr)
             .cloned()
             .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No translation found for local address: 0x{:x}", local_addr)
+                message: format!("No translation found for local address: 0x{local_addr:x}"),
             })
     }
 
@@ -267,10 +284,13 @@ impl NATTranslator {
             }
 
             unsafe {
-                let result = munmap(mapping.local_address as *mut libc::c_void, mapping.region_size as usize);
+                let result = munmap(
+                    mapping.local_address as *mut libc::c_void,
+                    mapping.region_size as usize,
+                );
                 if result != 0 {
                     return Err(AssetError::AdapterError {
-                        message: format!("munmap failed: {}", std::io::Error::last_os_error())
+                        message: format!("munmap failed: {}", std::io::Error::last_os_error()),
                     });
                 }
             }
@@ -278,7 +298,9 @@ impl NATTranslator {
             {
                 let mut stats = self.translation_stats.write().await;
                 stats.active_translations = stats.active_translations.saturating_sub(1);
-                stats.total_memory_mapped = stats.total_memory_mapped.saturating_sub(mapping.region_size);
+                stats.total_memory_mapped = stats
+                    .total_memory_mapped
+                    .saturating_sub(mapping.region_size);
             }
 
             tracing::info!(

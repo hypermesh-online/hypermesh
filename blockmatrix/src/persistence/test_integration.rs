@@ -7,26 +7,26 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use tempfile::TempDir;
-    use crate::matrix::coordinate::MatrixCoordinate;
     use crate::blockchain::block::Block;
+    use crate::matrix::coordinate::MatrixCoordinate;
+    use tempfile::TempDir;
 
     #[tokio::test]
     async fn test_full_persistence_integration() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
 
         // 1. Test Matrix State Persistence
-        let coord = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let mut state = matrix_state::MatrixState::new(coord.clone());
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).unwrap());
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let mut state = matrix_state::MatrixState::new(coord);
+        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"));
 
         let serializer = matrix_state::MatrixStateSerializer::new(
             matrix_state::SerializationFormat::Bincode,
             true,
         );
 
-        let serialized = serializer.serialize(&state).unwrap();
-        let deserialized = serializer.deserialize(&serialized).unwrap();
+        let serialized = serializer.serialize(&state).expect("test: expected success");
+        let deserialized = serializer.deserialize(&serialized).expect("test: expected success");
         assert_eq!(deserialized.coordinate, state.coordinate);
         assert_eq!(deserialized.neighbors.len(), 1);
         println!("✅ Matrix state persistence: PASSED");
@@ -35,31 +35,34 @@ mod tests {
         let storage = blockchain_storage::BlockchainStorage::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
-        let genesis = Block::genesis(coord.clone());
-        storage.write_block(&genesis).await.unwrap();
+        let genesis = Block::genesis(coord);
+        storage.write_block(&genesis).await.expect("test: async operation");
 
-        let loaded = storage.read_block(blockchain_storage::BlockQuery::ByIndex(0))
-            .await.unwrap();
+        let loaded = storage
+            .read_block(blockchain_storage::BlockQuery::ByIndex(0))
+            .await
+            .expect("test: expected success");
         assert!(loaded.is_some());
-        assert_eq!(loaded.unwrap().hash, genesis.hash);
+        assert_eq!(loaded.expect("test: assertion value").hash, genesis.hash);
         println!("✅ Blockchain storage: PASSED");
 
         // 3. Test Topology Backup
         let backup_handler = topology_backup::TopologyBackup::new(
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
-        ).unwrap();
+        )
+        .expect("test: expected success");
 
         let mut topology = topology_backup::NetworkTopology::new();
-        let node = crate::matrix::geospatial::topology::TopologyNode::new(
-            "node1".to_string(),
-            coord.clone(),
-        );
+        let node =
+            crate::matrix::geospatial::topology::TopologyNode::new("node1".to_string(), coord);
         topology.add_node(node);
 
-        let backup_path = backup_handler.create_full_backup(&topology).await.unwrap();
+        let backup_path = backup_handler.create_full_backup(&topology).await.expect("test: async operation");
         assert!(backup_path.exists());
         println!("✅ Topology backup: PASSED");
 
@@ -68,7 +71,9 @@ mod tests {
             temp_dir.path().to_path_buf(),
             "test_node".to_string(),
             snapshots::SnapshotSchedule::Manual,
-        ).await.unwrap();
+        )
+        .await
+        .expect("test: expected success");
 
         #[derive(serde::Serialize, serde::Deserialize)]
         struct TestData {
@@ -79,23 +84,23 @@ mod tests {
             value: "test_snapshot".to_string(),
         };
 
-        let snapshot_id = snapshot_mgr.create_snapshot(
-            || Ok(test_data),
-            snapshots::SnapshotType::Full,
-        ).await.unwrap();
+        let snapshot_id = snapshot_mgr
+            .create_snapshot(|| Ok(test_data), snapshots::SnapshotType::Full)
+            .await
+            .expect("test: expected success");
 
         assert!(!snapshot_id.is_empty());
         println!("✅ Snapshot manager: PASSED");
 
         // 5. Test Recovery Manager
-        let mut recovery_mgr = recovery::RecoveryManager::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string(),
-        );
+        let mut recovery_mgr =
+            recovery::RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        let report = recovery_mgr.recover_all().await.unwrap();
-        assert!(report.status == recovery::RecoveryStatus::Completed ||
-                report.status == recovery::RecoveryStatus::Partial);
+        let report = recovery_mgr.recover_all().await.expect("test: async operation");
+        assert!(
+            report.status == recovery::RecoveryStatus::Completed
+                || report.status == recovery::RecoveryStatus::Partial
+        );
         println!("✅ Recovery manager: PASSED");
 
         // 6. Test Persistence Manager (full integration)
@@ -105,20 +110,19 @@ mod tests {
             ..Default::default()
         };
 
-        let persistence_mgr = manager::PersistenceManager::new(
-            config,
-            "test_node".to_string(),
-        ).await.unwrap();
+        let persistence_mgr = manager::PersistenceManager::new(config, "test_node".to_string())
+            .await
+            .expect("test: expected success");
 
         // Save matrix state
-        persistence_mgr.save_matrix_state(&state).await.unwrap();
+        persistence_mgr.save_matrix_state(&state).await.expect("test: async operation");
 
         // Save block
         let block = Block::genesis(coord);
-        persistence_mgr.save_block(&block).await.unwrap();
+        persistence_mgr.save_block(&block).await.expect("test: async operation");
 
         // Create snapshot
-        let snapshot = persistence_mgr.create_snapshot().await.unwrap();
+        let snapshot = persistence_mgr.create_snapshot().await.expect("test: async operation");
         assert!(!snapshot.is_empty());
 
         // Get stats
@@ -128,7 +132,7 @@ mod tests {
         println!("✅ Persistence manager: PASSED");
 
         // Shutdown
-        persistence_mgr.shutdown().await.unwrap();
+        persistence_mgr.shutdown().await.expect("test: async operation");
 
         println!("\n🎉 ALL PERSISTENCE TESTS PASSED!");
     }

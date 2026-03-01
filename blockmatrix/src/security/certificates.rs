@@ -4,8 +4,8 @@
 
 //! Certificate and key management
 
-use super::{error::Result, config::CertificateConfig};
-use serde::{Serialize, Deserialize};
+use super::{config::CertificateConfig, error::Result};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
@@ -40,18 +40,19 @@ impl PKIManager {
             config: config.clone(),
         })
     }
-    
+
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing PKI infrastructure");
         // Initialize CA if needed
         Ok(())
     }
-    
+
     pub async fn issue_certificate(&self, subject: &str) -> Result<Certificate> {
         let serial = uuid::Uuid::new_v4().to_string();
         let now = SystemTime::now();
-        let expiry = now + Duration::from_secs(self.config.lifecycle.default_validity_days as u64 * 24 * 3600);
-        
+        let expiry = now
+            + Duration::from_secs(self.config.lifecycle.default_validity_days as u64 * 24 * 3600);
+
         let cert = Certificate {
             serial_number: serial.clone(),
             subject: subject.to_string(),
@@ -60,14 +61,14 @@ impl PKIManager {
             validity_period: (now, expiry),
             signature: "mock_signature".to_string(),
         };
-        
+
         let mut certificates = self.certificates.write().await;
         certificates.insert(serial.clone(), cert.clone());
-        
+
         info!("Issued certificate for {}: {}", subject, serial);
         Ok(cert)
     }
-    
+
     pub async fn revoke_certificate(&self, serial: &SerialNumber) -> Result<()> {
         let mut revocation_list = self.revocation_list.write().await;
         revocation_list.insert(serial.clone());
@@ -84,7 +85,8 @@ pub struct CertificateRotationManager {
 impl CertificateRotationManager {
     pub async fn rotate_certificate(&self, serial: &SerialNumber) -> Result<Certificate> {
         // Simulate certificate rotation
-        self.pki_manager.issue_certificate(&format!("rotated_{}", serial)).await
+        self.pki_manager
+            .issue_certificate(&format!("rotated_{serial}"))
+            .await
     }
 }
-

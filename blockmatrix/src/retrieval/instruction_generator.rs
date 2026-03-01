@@ -9,11 +9,11 @@
 use anyhow::Result;
 use std::sync::Arc;
 
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::{ContentAddress, ContentAddressedStorage, Hash};
 use crate::integration::phase1_foundation::MatrixFoundation;
+use crate::matrix::MatrixCoordinate;
 
-use super::{RetrievalPlan, RetrievalMetadata, CompleteShardMap, ShardMapEntry, ShardLocation};
+use super::{CompleteShardMap, RetrievalMetadata, RetrievalPlan, ShardLocation, ShardMapEntry};
 
 /// Configuration for instruction generation
 #[derive(Debug, Clone)]
@@ -85,10 +85,7 @@ impl InstructionGenerator {
     }
 
     /// Generate retrieval instructions for a content hash
-    pub async fn generate(
-        &self,
-        content_hash: Hash,
-    ) -> Result<RetrievalPlan> {
+    pub async fn generate(&self, content_hash: Hash) -> Result<RetrievalPlan> {
         // Get content address from storage
         let content_address = self.get_content_address(content_hash).await?;
 
@@ -135,7 +132,9 @@ impl InstructionGenerator {
         // Convert to ContentAddress
         Ok(ContentAddress::new(
             content_hash,
-            retrieval_instructions.shard_map.iter()
+            retrieval_instructions
+                .shard_map
+                .iter()
                 .map(|(hash, _)| *hash)
                 .collect(),
             retrieval_instructions.shard_map.clone(),
@@ -143,28 +142,30 @@ impl InstructionGenerator {
     }
 
     /// Build complete shard map with all replica locations
-    async fn build_shard_map(
-        &self,
-        content_address: &ContentAddress,
-    ) -> Result<CompleteShardMap> {
+    async fn build_shard_map(&self, content_address: &ContentAddress) -> Result<CompleteShardMap> {
         let mut entries = Vec::new();
         let data_shard_count = content_address.metadata.erasure_coding.0;
 
-        for (shard_index, (shard_hash, positions)) in
-            content_address.retrieval_instructions.shard_map.iter().enumerate()
+        for (shard_index, (shard_hash, positions)) in content_address
+            .retrieval_instructions
+            .shard_map
+            .iter()
+            .enumerate()
         {
             // Limit replicas based on config
-            let replica_count = positions.len()
+            let replica_count = positions
+                .len()
                 .min(self.config.max_replicas)
                 .max(self.config.min_replicas.min(positions.len()));
 
             let is_data_shard = shard_index < data_shard_count;
 
-            let locations: Vec<ShardLocation> = positions.iter()
+            let locations: Vec<ShardLocation> = positions
+                .iter()
                 .take(replica_count)
                 .map(|pos| {
                     let health_score = self.estimate_node_health(pos);
-                    let mut location = ShardLocation::new(pos.clone(), health_score);
+                    let mut location = ShardLocation::new(*pos, health_score);
 
                     // Add latency if configured
                     if self.config.include_latency {
@@ -172,11 +173,7 @@ impl InstructionGenerator {
                     }
 
                     // Set priority combining distance, health, and shard type
-                    location.priority = self.calculate_priority(
-                        pos,
-                        health_score,
-                        is_data_shard,
-                    );
+                    location.priority = self.calculate_priority(pos, health_score, is_data_shard);
 
                     location
                 })
@@ -240,8 +237,7 @@ impl InstructionGenerator {
         };
 
         let distance = client_pos.euclidean_distance(position);
-        let latency = self.config.base_latency_ms
-            + distance * self.config.per_hop_latency_ms;
+        let latency = self.config.base_latency_ms + distance * self.config.per_hop_latency_ms;
 
         latency as u64
     }
@@ -278,9 +274,7 @@ impl InstructionGenerator {
         let shard_type_factor = if is_data_shard { 1.0 } else { 0.7 };
 
         // Weighted combination → normalized 0.0-1.0
-        let combined = 0.40 * distance_factor
-            + 0.35 * health_factor
-            + 0.25 * shard_type_factor;
+        let combined = 0.40 * distance_factor + 0.35 * health_factor + 0.25 * shard_type_factor;
 
         // Scale to u32 range 0-100
         let priority = (combined * 100.0).round() as u32;
@@ -309,7 +303,9 @@ mod tests {
         };
 
         let foundation = Arc::new(
-            MatrixFoundation::new(config).await.expect("test: create foundation"),
+            MatrixFoundation::new(config)
+                .await
+                .expect("test: create foundation"),
         );
         let storage = Arc::new(
             ContentAddressedStorage::new(foundation.clone())
@@ -328,8 +324,10 @@ mod tests {
         client_pos: MatrixCoordinate,
     ) -> (InstructionGenerator, TempDir) {
         let temp_dir = TempDir::new().expect("test: create temp dir");
-        let mut config = GeneratorConfig::default();
-        config.optimize_for_client = Some(client_pos);
+        let config = GeneratorConfig {
+            optimize_for_client: Some(client_pos),
+            ..GeneratorConfig::default()
+        };
 
         let foundation = Arc::new(
             MatrixFoundation::new(MatrixFoundationConfig {
@@ -408,8 +406,11 @@ mod tests {
         let (generator, _td) = build_generator_with_client(client).await;
         let health = generator.estimate_node_health(&nearby);
 
-        assert!(health >= 0.5 && health <= 1.0);
-        assert!(health > 0.9, "nearby node health should be > 0.9, got {health}");
+        assert!((0.5..=1.0).contains(&health));
+        assert!(
+            health > 0.9,
+            "nearby node health should be > 0.9, got {health}"
+        );
     }
 
     #[tokio::test]

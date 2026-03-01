@@ -7,21 +7,20 @@
 //! This module defines custom QUIC frame types for STOQ protocol extensions
 //! including tokenization, sharding, and FALCON signatures.
 
+use anyhow::{anyhow, Result};
 use bytes::{Bytes, BytesMut};
 use quinn::VarInt;
-use anyhow::{Result, anyhow};
 use tracing::trace;
 
-use crate::extensions::{PacketToken, PacketShard, HopInfo, SeedInfo};
+use crate::extensions::{HopInfo, PacketShard, PacketToken, SeedInfo};
 
 // Re-export varint utilities (public API)
-pub use super::frame_codec::{encode_varint, decode_varint};
+pub use super::frame_codec::{decode_varint, encode_varint};
 
 use super::frame_codec::{
-    encode_token_frame, encode_shard_frame, encode_hop_frame,
-    encode_seed_frame, encode_falcon_sig_frame, encode_falcon_key_frame,
-    decode_token_frame, decode_shard_frame, decode_hop_frame,
-    decode_seed_frame, decode_falcon_sig_frame, decode_falcon_key_frame,
+    decode_falcon_key_frame, decode_falcon_sig_frame, decode_hop_frame, decode_seed_frame,
+    decode_shard_frame, decode_token_frame, encode_falcon_key_frame, encode_falcon_sig_frame,
+    encode_hop_frame, encode_seed_frame, encode_shard_frame, encode_token_frame,
 };
 
 /// STOQ frame type enum
@@ -129,7 +128,11 @@ impl StoqFrame {
             }
         }
 
-        trace!("Encoded STOQ frame: type={:?}, size={}", self.frame_type(), buf.len());
+        trace!(
+            "Encoded STOQ frame: type={:?}, size={}",
+            self.frame_type(),
+            buf.len()
+        );
         Ok(buf.freeze())
     }
 
@@ -139,22 +142,14 @@ impl StoqFrame {
             return Err(anyhow!("Empty frame data"));
         }
 
-        let frame_type = decode_varint(&mut data)
-            .ok_or_else(|| anyhow!("Failed to decode frame type"))?;
+        let frame_type =
+            decode_varint(&mut data).ok_or_else(|| anyhow!("Failed to decode frame type"))?;
 
         match frame_type {
-            super::frame_types::STOQ_TOKEN => {
-                Ok(Self::Token(decode_token_frame(&mut data)?))
-            }
-            super::frame_types::STOQ_SHARD => {
-                Ok(Self::Shard(decode_shard_frame(&mut data)?))
-            }
-            super::frame_types::STOQ_HOP => {
-                Ok(Self::Hop(decode_hop_frame(&mut data)?))
-            }
-            super::frame_types::STOQ_SEED => {
-                Ok(Self::Seed(decode_seed_frame(&mut data)?))
-            }
+            super::frame_types::STOQ_TOKEN => Ok(Self::Token(decode_token_frame(&mut data)?)),
+            super::frame_types::STOQ_SHARD => Ok(Self::Shard(decode_shard_frame(&mut data)?)),
+            super::frame_types::STOQ_HOP => Ok(Self::Hop(decode_hop_frame(&mut data)?)),
+            super::frame_types::STOQ_SEED => Ok(Self::Seed(decode_seed_frame(&mut data)?)),
             super::frame_types::FALCON_SIG => {
                 Ok(Self::FalconSignature(decode_falcon_sig_frame(&mut data)?))
             }
@@ -185,8 +180,8 @@ mod tests {
         };
 
         let stoq_frame = StoqFrame::Token(frame.clone());
-        let encoded = stoq_frame.encode().unwrap();
-        let decoded = StoqFrame::decode(encoded).unwrap();
+        let encoded = stoq_frame.encode().expect("test: expected success");
+        let decoded = StoqFrame::decode(encoded).expect("test: expected success");
 
         if let StoqFrame::Token(decoded_frame) = decoded {
             assert_eq!(decoded_frame.token.hash, frame.token.hash);
@@ -212,8 +207,8 @@ mod tests {
         };
 
         let stoq_frame = StoqFrame::Shard(frame.clone());
-        let encoded = stoq_frame.encode().unwrap();
-        let decoded = StoqFrame::decode(encoded).unwrap();
+        let encoded = stoq_frame.encode().expect("test: expected success");
+        let decoded = StoqFrame::decode(encoded).expect("test: expected success");
 
         if let StoqFrame::Shard(decoded_frame) = decoded {
             assert_eq!(decoded_frame.shard.shard_id, frame.shard.shard_id);

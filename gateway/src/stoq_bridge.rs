@@ -100,16 +100,16 @@ impl StoqBridge {
         let bind_ip = match config.bind_addr {
             SocketAddr::V6(v6) => *v6.ip(),
             SocketAddr::V4(_) => {
-                return Err(
-                    GatewayError::Config("STOQ requires IPv6 bind address".into()).into(),
-                );
+                return Err(GatewayError::Config("STOQ requires IPv6 bind address".into()).into());
             }
         };
 
-        let mut transport_config = TransportConfig::default();
-        transport_config.bind_address = bind_ip;
-        transport_config.port = config.bind_addr.port();
-        transport_config.max_connections = Some(config.max_connections);
+        let transport_config = TransportConfig {
+            bind_address: bind_ip,
+            port: config.bind_addr.port(),
+            max_connections: Some(config.max_connections),
+            ..TransportConfig::default()
+        };
 
         info!(
             "Initializing STOQ bridge on [{}]:{}",
@@ -312,9 +312,7 @@ mod tests {
     #[test]
     fn bridge_config_custom_values() {
         let config = StoqBridgeConfig {
-            bind_addr: "[::1]:9000"
-                .parse()
-                .expect("test: valid addr"),
+            bind_addr: "[::1]:9000".parse().expect("test: valid addr"),
             max_connections: 50,
             default_privacy_mode: PrivacyMode::PRIVATE,
             default_blockchain_scope: BlockchainScope::Network,

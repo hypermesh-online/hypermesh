@@ -77,9 +77,7 @@ fn detect_cpu_macos() -> Result<CpuInfo> {
     let model = sysctl_value("machdep.cpu.brand_string")
         .unwrap_or_else(|_| "Unknown macOS CPU".to_string());
 
-    let frequency_mhz = sysctl_u64("hw.cpufrequency")
-        .map(|hz| hz / 1_000_000)
-        .ok();
+    let frequency_mhz = sysctl_u64("hw.cpufrequency").map(|hz| hz / 1_000_000).ok();
 
     let vendor = sysctl_value("machdep.cpu.vendor").ok();
 
@@ -193,7 +191,12 @@ fn parse_system_profiler_gpus(output: &str) -> Vec<GpuInfo> {
     // Flush last entry
     if let Some(model) = current_model.take() {
         if has_chipset_model {
-            gpus.push(build_gpu_info(model, current_vendor, current_vram, current_type));
+            gpus.push(build_gpu_info(
+                model,
+                current_vendor,
+                current_vram,
+                current_type,
+            ));
         }
     }
 
@@ -248,12 +251,10 @@ fn build_gpu_info(
 
 /// Detect memory via `sysctl hw.memsize` and `vm_stat`.
 fn detect_memory_macos() -> Result<MemoryInfo> {
-    let total_bytes = sysctl_u64("hw.memsize")
-        .context("failed to read hw.memsize")?;
+    let total_bytes = sysctl_u64("hw.memsize").context("failed to read hw.memsize")?;
 
     // Try vm_stat for usage breakdown
-    let (used_bytes, available_bytes) = parse_vm_stat(total_bytes)
-        .unwrap_or((0, total_bytes));
+    let (used_bytes, available_bytes) = parse_vm_stat(total_bytes).unwrap_or((0, total_bytes));
 
     let usage_percent = if total_bytes > 0 {
         (used_bytes as f64 / total_bytes as f64) * 100.0
@@ -262,8 +263,7 @@ fn detect_memory_macos() -> Result<MemoryInfo> {
     };
 
     // Swap info
-    let (swap_total_bytes, swap_used_bytes) = parse_swap_usage()
-        .unwrap_or((None, None));
+    let (swap_total_bytes, swap_used_bytes) = parse_swap_usage().unwrap_or((None, None));
 
     Ok(MemoryInfo {
         total_bytes,
@@ -349,12 +349,12 @@ fn parse_swap_usage() -> Option<(Option<u64>, Option<u64>)> {
 
 /// Parse a swap value like "2048.00M" into bytes.
 fn parse_swap_value(s: &str) -> Option<u64> {
-    let (num_str, suffix) = if s.ends_with('M') {
-        (&s[..s.len() - 1], 1024u64 * 1024)
-    } else if s.ends_with('G') {
-        (&s[..s.len() - 1], 1024u64 * 1024 * 1024)
-    } else if s.ends_with('K') {
-        (&s[..s.len() - 1], 1024u64)
+    let (num_str, suffix) = if let Some(n) = s.strip_suffix('M') {
+        (n, 1024u64 * 1024)
+    } else if let Some(n) = s.strip_suffix('G') {
+        (n, 1024u64 * 1024 * 1024)
+    } else if let Some(n) = s.strip_suffix('K') {
+        (n, 1024u64)
     } else {
         return s.parse::<u64>().ok();
     };
@@ -516,11 +516,7 @@ impl OsAbstraction for MacOsAbstraction {
         ))
     }
 
-    fn attach_ebpf_monitor(
-        &self,
-        _handle: EbpfHandle,
-        _attach_type: EbpfAttachType,
-    ) -> Result<()> {
+    fn attach_ebpf_monitor(&self, _handle: EbpfHandle, _attach_type: EbpfAttachType) -> Result<()> {
         Err(anyhow::anyhow!(
             "eBPF is not supported on macOS. HyperMesh eBPF requires Linux kernel >= 4.4"
         ))
@@ -569,7 +565,10 @@ mod tests {
         let result = macos.load_ebpf_program(&[0x95, 0, 0, 0, 0, 0, 0, 0]);
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("not supported"), "error should mention not supported: {msg}");
+        assert!(
+            msg.contains("not supported"),
+            "error should mention not supported: {msg}"
+        );
     }
 
     #[test]
@@ -599,7 +598,9 @@ mod tests {
     #[cfg(target_os = "macos")]
     fn test_macos_cpu_detection_live() {
         let macos = MacOsAbstraction::new().expect("test: macOS abstraction");
-        let cpu = macos.detect_cpu().expect("test: CPU detection should succeed");
+        let cpu = macos
+            .detect_cpu()
+            .expect("test: CPU detection should succeed");
         assert!(cpu.cores > 0, "should detect at least one CPU core");
         assert!(!cpu.model.is_empty(), "should have a CPU model string");
     }
@@ -610,7 +611,9 @@ mod tests {
     #[cfg(target_os = "macos")]
     fn test_macos_memory_detection_live() {
         let macos = MacOsAbstraction::new().expect("test: macOS abstraction");
-        let mem = macos.detect_memory().expect("test: memory detection should succeed");
+        let mem = macos
+            .detect_memory()
+            .expect("test: memory detection should succeed");
         assert!(mem.total_bytes > 0, "should detect non-zero total memory");
         assert!(mem.usage_percent >= 0.0 && mem.usage_percent <= 100.0);
     }
@@ -621,8 +624,13 @@ mod tests {
     #[cfg(target_os = "macos")]
     fn test_macos_storage_detection_live() {
         let macos = MacOsAbstraction::new().expect("test: macOS abstraction");
-        let storage = macos.detect_storage().expect("test: storage detection should succeed");
-        assert!(!storage.is_empty(), "should detect at least one storage device");
+        let storage = macos
+            .detect_storage()
+            .expect("test: storage detection should succeed");
+        assert!(
+            !storage.is_empty(),
+            "should detect at least one storage device"
+        );
     }
 
     // --- Parser unit tests (run on any platform) ---
@@ -693,7 +701,8 @@ Graphics/Displays:
 
     #[test]
     fn test_parse_page_size() {
-        let header = "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 100\n";
+        let header =
+            "Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 100\n";
         assert_eq!(parse_page_size(header), Some(16384));
     }
 
@@ -712,7 +721,10 @@ Graphics/Displays:
     fn test_detect_macos_storage_type() {
         assert_eq!(detect_macos_storage_type("/dev/nvme0n1"), StorageType::NVMe);
         assert_eq!(detect_macos_storage_type("/dev/disk1s1"), StorageType::SSD);
-        assert_eq!(detect_macos_storage_type("/dev/other"), StorageType::Unknown);
+        assert_eq!(
+            detect_macos_storage_type("/dev/other"),
+            StorageType::Unknown
+        );
     }
 
     #[test]

@@ -8,5 +8,5 @@
 //! across hypermesh_lib, blockmatrix, and trustchain.
 
 pub mod asset_pipeline;
-pub mod privacy_consistency;
 pub mod blockchain_scope;
+pub mod privacy_consistency;

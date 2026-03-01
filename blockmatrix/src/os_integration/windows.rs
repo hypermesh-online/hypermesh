@@ -15,12 +15,12 @@ use std::time::Instant;
 
 #[cfg(target_os = "windows")]
 use windows::{
-    Win32::System::{
-        SystemInformation::{GetSystemTimes, GlobalMemoryStatusEx, MEMORYSTATUSEX},
-        Performance::*,
-    },
     Win32::NetworkManagement::IpHelper::*,
     Win32::Storage::FileSystem::*,
+    Win32::System::{
+        Performance::*,
+        SystemInformation::{GetSystemTimes, GlobalMemoryStatusEx, MEMORYSTATUSEX},
+    },
 };
 
 /// CPU sample for delta calculations
@@ -91,9 +91,9 @@ impl WindowsAbstraction {
         {
             // Try to establish WMI connection for hardware detection
             let wmi_connection = wmi::WMIConnection::new(
-                wmi::COMLibrary::new()
-                    .context("Failed to initialize COM library")?
-            ).ok();
+                wmi::COMLibrary::new().context("Failed to initialize COM library")?,
+            )
+            .ok();
 
             Ok(Self {
                 _previous_cpu_sample: Mutex::new(None),
@@ -125,7 +125,7 @@ impl WindowsAbstraction {
             GetSystemTimes(
                 Some(idle_time.as_mut_ptr()),
                 Some(kernel_time.as_mut_ptr()),
-                Some(user_time.as_mut_ptr())
+                Some(user_time.as_mut_ptr()),
             )?;
 
             let idle_time = idle_time.assume_init();
@@ -134,7 +134,8 @@ impl WindowsAbstraction {
 
             // Convert FILETIME to u64 (100-nanosecond intervals)
             let idle = (idle_time.dwHighDateTime as u64) << 32 | idle_time.dwLowDateTime as u64;
-            let kernel = (kernel_time.dwHighDateTime as u64) << 32 | kernel_time.dwLowDateTime as u64;
+            let kernel =
+                (kernel_time.dwHighDateTime as u64) << 32 | kernel_time.dwLowDateTime as u64;
             let user = (user_time.dwHighDateTime as u64) << 32 | user_time.dwLowDateTime as u64;
 
             Ok(CpuSample {
@@ -184,10 +185,7 @@ impl WindowsAbstraction {
 
             // Sum up all interface statistics
             let num_entries = (*table).NumEntries;
-            let entries = std::slice::from_raw_parts(
-                (*table).Table.as_ptr(),
-                num_entries as usize
-            );
+            let entries = std::slice::from_raw_parts((*table).Table.as_ptr(), num_entries as usize);
 
             for entry in entries {
                 // Only count operational interfaces
@@ -210,7 +208,6 @@ impl WindowsAbstraction {
 
     #[cfg(target_os = "windows")]
     pub fn get_disk_stats(&self) -> Result<DiskStats> {
-
         let mut total_read = 0u64;
         let mut total_written = 0u64;
 
@@ -310,14 +307,15 @@ impl OsAbstraction for WindowsAbstraction {
 
                 if let Ok(controllers) = conn.query::<Win32_VideoController>() {
                     for controller in controllers {
-                        let vendor = controller.AdapterCompatibility
+                        let vendor = controller
+                            .AdapterCompatibility
                             .unwrap_or_else(|| "Unknown".to_string());
 
                         let gpu_type = if controller.Name.contains("Virtual") {
                             GpuType::Virtual
-                        } else if vendor.contains("Intel") &&
-                                  controller.Name.contains("UHD") ||
-                                  controller.Name.contains("Iris") {
+                        } else if vendor.contains("Intel") && controller.Name.contains("UHD")
+                            || controller.Name.contains("Iris")
+                        {
                             GpuType::Integrated
                         } else {
                             GpuType::Discrete
@@ -370,7 +368,9 @@ impl OsAbstraction for WindowsAbstraction {
                     used_bytes,
                     usage_percent,
                     swap_total_bytes: Some(mem_status.ullTotalPageFile),
-                    swap_used_bytes: Some(mem_status.ullTotalPageFile - mem_status.ullAvailPageFile),
+                    swap_used_bytes: Some(
+                        mem_status.ullTotalPageFile - mem_status.ullAvailPageFile,
+                    ),
                 });
             }
         }
@@ -408,7 +408,9 @@ impl OsAbstraction for WindowsAbstraction {
                                 storage_devices.push(StorageInfo {
                                     device: disk.DeviceID.clone(),
                                     mount_point: disk.DeviceID,
-                                    filesystem: disk.FileSystem.unwrap_or_else(|| "Unknown".to_string()),
+                                    filesystem: disk
+                                        .FileSystem
+                                        .unwrap_or_else(|| "Unknown".to_string()),
                                     total_bytes: total,
                                     used_bytes: used,
                                     available_bytes: free,
@@ -435,7 +437,7 @@ impl OsAbstraction for WindowsAbstraction {
             // Get CPU usage
             let cpu_usage_percent = {
                 let current_sample = self.get_cpu_sample()?;
-                let mut prev_guard = self._previous_cpu_sample.lock().unwrap();
+                let mut prev_guard = self._previous_cpu_sample.lock().expect("mutex should not be poisoned");
 
                 let usage = if let Some(ref prev_sample) = *prev_guard {
                     self.calculate_cpu_usage(prev_sample, &current_sample)
@@ -454,19 +456,23 @@ impl OsAbstraction for WindowsAbstraction {
             // Get network I/O rates
             let (network_rx_bytes_per_sec, network_tx_bytes_per_sec) = {
                 let current_stats = self.get_network_stats()?;
-                let mut prev_guard = self._previous_network_stats.lock().unwrap();
+                let mut prev_guard = self._previous_network_stats.lock().expect("mutex should not be poisoned");
 
                 let (rx_rate, tx_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);
                     let seconds = time_delta.as_secs_f64();
 
                     if seconds > 0.0 {
-                        let rx_delta = current_stats.bytes_received.saturating_sub(prev_stats.bytes_received);
-                        let tx_delta = current_stats.bytes_sent.saturating_sub(prev_stats.bytes_sent);
+                        let rx_delta = current_stats
+                            .bytes_received
+                            .saturating_sub(prev_stats.bytes_received);
+                        let tx_delta = current_stats
+                            .bytes_sent
+                            .saturating_sub(prev_stats.bytes_sent);
 
                         (
                             Some((rx_delta as f64 / seconds) as u64),
-                            Some((tx_delta as f64 / seconds) as u64)
+                            Some((tx_delta as f64 / seconds) as u64),
                         )
                     } else {
                         (None, None)
@@ -482,19 +488,23 @@ impl OsAbstraction for WindowsAbstraction {
             // Get disk I/O rates
             let (disk_read_bytes_per_sec, disk_write_bytes_per_sec) = {
                 let current_stats = self.get_disk_stats()?;
-                let mut prev_guard = self._previous_disk_stats.lock().unwrap();
+                let mut prev_guard = self._previous_disk_stats.lock().expect("mutex should not be poisoned");
 
                 let (read_rate, write_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);
                     let seconds = time_delta.as_secs_f64();
 
                     if seconds > 0.0 {
-                        let read_delta = current_stats.bytes_read.saturating_sub(prev_stats.bytes_read);
-                        let write_delta = current_stats.bytes_written.saturating_sub(prev_stats.bytes_written);
+                        let read_delta = current_stats
+                            .bytes_read
+                            .saturating_sub(prev_stats.bytes_read);
+                        let write_delta = current_stats
+                            .bytes_written
+                            .saturating_sub(prev_stats.bytes_written);
 
                         (
                             Some((read_delta as f64 / seconds) as u64),
-                            Some((write_delta as f64 / seconds) as u64)
+                            Some((write_delta as f64 / seconds) as u64),
                         )
                     } else {
                         (None, None)
@@ -544,7 +554,9 @@ impl OsAbstraction for WindowsAbstraction {
         // - Load BPF bytecode via eBpf-for-windows API
         // - Return handle for program management
 
-        Err(anyhow::anyhow!("Windows eBPF not implemented yet (Sprint 3)"))
+        Err(anyhow::anyhow!(
+            "Windows eBPF not implemented yet (Sprint 3)"
+        ))
     }
 
     fn attach_ebpf_monitor(&self, _handle: EbpfHandle, _attach_type: EbpfAttachType) -> Result<()> {
@@ -552,13 +564,17 @@ impl OsAbstraction for WindowsAbstraction {
         // - Attach to network bind/connect hooks
         // - Configure filters
 
-        Err(anyhow::anyhow!("Windows eBPF not implemented yet (Sprint 3)"))
+        Err(anyhow::anyhow!(
+            "Windows eBPF not implemented yet (Sprint 3)"
+        ))
     }
 
     fn read_ebpf_metrics(&self, _handle: EbpfHandle) -> Result<EbpfMetrics> {
         // TODO Sprint 3: Implement reading from eBpf-for-windows maps
 
-        Err(anyhow::anyhow!("Windows eBPF not implemented yet (Sprint 3)"))
+        Err(anyhow::anyhow!(
+            "Windows eBPF not implemented yet (Sprint 3)"
+        ))
     }
 
     fn unload_ebpf_program(&self, _handle: EbpfHandle) -> Result<()> {
@@ -597,16 +613,26 @@ mod tests {
         let windows = WindowsAbstraction::new().expect("Failed to create Windows abstraction");
 
         // First call - should return 0 (no previous sample)
-        let usage1 = windows.get_resource_usage().expect("Failed to get resource usage");
+        let usage1 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
         assert_eq!(usage1.cpu_usage_percent, 0.0, "First CPU usage should be 0");
 
         // Wait a bit for delta calculation
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Second call - should return actual usage
-        let usage2 = windows.get_resource_usage().expect("Failed to get resource usage");
-        assert!(usage2.cpu_usage_percent >= 0.0, "CPU usage should be non-negative");
-        assert!(usage2.cpu_usage_percent <= 100.0, "CPU usage should not exceed 100%");
+        let usage2 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
+        assert!(
+            usage2.cpu_usage_percent >= 0.0,
+            "CPU usage should be non-negative"
+        );
+        assert!(
+            usage2.cpu_usage_percent <= 100.0,
+            "CPU usage should not exceed 100%"
+        );
     }
 
     #[test]
@@ -615,15 +641,25 @@ mod tests {
         let windows = WindowsAbstraction::new().expect("Failed to create Windows abstraction");
 
         // First call - rates should be None (no previous sample)
-        let usage1 = windows.get_resource_usage().expect("Failed to get resource usage");
-        assert!(usage1.network_rx_bytes_per_sec.is_none(), "First RX rate should be None");
-        assert!(usage1.network_tx_bytes_per_sec.is_none(), "First TX rate should be None");
+        let usage1 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
+        assert!(
+            usage1.network_rx_bytes_per_sec.is_none(),
+            "First RX rate should be None"
+        );
+        assert!(
+            usage1.network_tx_bytes_per_sec.is_none(),
+            "First TX rate should be None"
+        );
 
         // Wait for some network activity
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         // Second call - should have rates if there's network activity
-        let usage2 = windows.get_resource_usage().expect("Failed to get resource usage");
+        let usage2 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
         // Rates might still be None if no network activity, which is valid
         if let Some(rx_rate) = usage2.network_rx_bytes_per_sec {
             assert!(rx_rate >= 0, "RX rate should be non-negative");
@@ -639,15 +675,25 @@ mod tests {
         let windows = WindowsAbstraction::new().expect("Failed to create Windows abstraction");
 
         // First call - rates should be None (no previous sample)
-        let usage1 = windows.get_resource_usage().expect("Failed to get resource usage");
-        assert!(usage1.disk_read_bytes_per_sec.is_none(), "First read rate should be None");
-        assert!(usage1.disk_write_bytes_per_sec.is_none(), "First write rate should be None");
+        let usage1 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
+        assert!(
+            usage1.disk_read_bytes_per_sec.is_none(),
+            "First read rate should be None"
+        );
+        assert!(
+            usage1.disk_write_bytes_per_sec.is_none(),
+            "First write rate should be None"
+        );
 
         // Wait for potential disk activity
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         // Second call - should have rates if there's disk activity
-        let usage2 = windows.get_resource_usage().expect("Failed to get resource usage");
+        let usage2 = windows
+            .get_resource_usage()
+            .expect("Failed to get resource usage");
         // Rates might still be None if no disk activity, which is valid
         if let Some(read_rate) = usage2.disk_read_bytes_per_sec {
             assert!(read_rate >= 0, "Read rate should be non-negative");
@@ -664,8 +710,14 @@ mod tests {
         let memory = windows.detect_memory().expect("Failed to detect memory");
 
         assert!(memory.total_bytes > 0, "Should detect total memory");
-        assert!(memory.available_bytes <= memory.total_bytes, "Available should not exceed total");
-        assert!(memory.usage_percent >= 0.0 && memory.usage_percent <= 100.0, "Usage percent should be 0-100");
+        assert!(
+            memory.available_bytes <= memory.total_bytes,
+            "Available should not exceed total"
+        );
+        assert!(
+            memory.usage_percent >= 0.0 && memory.usage_percent <= 100.0,
+            "Usage percent should be 0-100"
+        );
     }
 
     #[test]
@@ -688,12 +740,18 @@ mod tests {
         let storage = windows.detect_storage().expect("Failed to detect storage");
 
         // Should have at least one storage device (system drive)
-        assert!(!storage.is_empty(), "Should detect at least one storage device");
+        assert!(
+            !storage.is_empty(),
+            "Should detect at least one storage device"
+        );
 
         for device in storage {
             assert!(!device.device.is_empty(), "Device ID should not be empty");
             assert!(device.total_bytes > 0, "Total storage should be positive");
-            assert!(device.usage_percent >= 0.0 && device.usage_percent <= 100.0, "Usage percent should be 0-100");
+            assert!(
+                device.usage_percent >= 0.0 && device.usage_percent <= 100.0,
+                "Usage percent should be 0-100"
+            );
         }
     }
 }

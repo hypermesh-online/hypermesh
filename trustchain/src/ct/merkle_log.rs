@@ -3,19 +3,19 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Merkle Tree Log Implementation for Certificate Transparency
-//! 
+//!
 //! High-performance merkle tree implementation with batch updates,
 //! inclusion proofs, and consistency proofs for CT logs.
 
-use std::collections::VecDeque;
-use serde::{Serialize, Deserialize};
 use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::VecDeque;
 use tracing::debug;
-use sha2::{Sha256, Digest};
 // use merkletree::{MerkleTree, Proof, Hashable, hash::{Algorithm, Sha256Algorithm}}; // Temporarily commented due to API changes
 
-use crate::errors::{CTError, Result as TrustChainResult};
 use super::LogEntry;
+use crate::errors::{CTError, Result as TrustChainResult};
 
 /// Simplified merkle tree-based CT log
 pub struct MerkleLog {
@@ -79,7 +79,8 @@ impl MerkleLog {
             return Err(CTError::LogFull {
                 log_id: self.log_id.clone(),
                 current_entries: self.entries.len() as u64,
-            }.into());
+            }
+            .into());
         }
 
         // Calculate leaf hash
@@ -99,7 +100,10 @@ impl MerkleLog {
         // Update merkle tree immediately after adding entry
         self.update_merkle_tree().await?;
 
-        debug!("Added entry {} to merkle log {}", entry.sequence_number, self.log_id);
+        debug!(
+            "Added entry {} to merkle log {}",
+            entry.sequence_number, self.log_id
+        );
         Ok(entry)
     }
 
@@ -115,7 +119,7 @@ impl MerkleLog {
         if !self.entries.is_empty() {
             let mut hasher = Sha256::new();
             for entry in &self.entries {
-                hasher.update(&entry.leaf_hash);
+                hasher.update(entry.leaf_hash);
             }
             self.merkle_root = Some(hasher.finalize().into());
         }
@@ -130,7 +134,11 @@ impl MerkleLog {
         self.stats.pending_count = 0;
         self.stats.last_tree_update = std::time::SystemTime::now();
 
-        debug!("Merkle tree updated for log {}: {} entries", self.log_id, self.entries.len());
+        debug!(
+            "Merkle tree updated for log {}: {} entries",
+            self.log_id,
+            self.entries.len()
+        );
         Ok(())
     }
 
@@ -141,27 +149,32 @@ impl MerkleLog {
             return Err(CTError::MerkleTree {
                 operation: "get_inclusion_proof".to_string(),
                 reason: "Merkle tree not initialized".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Find entry index
-        let _entry_index = self.entries.iter()
+        let _entry_index = self
+            .entries
+            .iter()
             .position(|e| e.sequence_number == entry.sequence_number)
             .ok_or_else(|| CTError::EntryNotFound {
                 entry_id: hex::encode(entry.entry_id),
             })?;
 
         // Simplified proof - just return root hash
-        let root_hash = self.merkle_root
-            .ok_or_else(|| CTError::MerkleTree {
-                operation: "generate_inclusion_proof".to_string(),
-                reason: "Merkle root not initialized".to_string(),
-            })?;
+        let root_hash = self.merkle_root.ok_or_else(|| CTError::MerkleTree {
+            operation: "generate_inclusion_proof".to_string(),
+            reason: "Merkle root not initialized".to_string(),
+        })?;
         let proof_hashes = vec![root_hash];
 
-        debug!("Generated simplified inclusion proof for entry {}: {} hashes", 
-               entry.sequence_number, proof_hashes.len());
-        
+        debug!(
+            "Generated simplified inclusion proof for entry {}: {} hashes",
+            entry.sequence_number,
+            proof_hashes.len()
+        );
+
         Ok(proof_hashes)
     }
 
@@ -171,31 +184,43 @@ impl MerkleLog {
             return Err(CTError::MerkleTree {
                 operation: "verify_inclusion".to_string(),
                 reason: "Merkle tree not initialized".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Find entry index
-        let is_present = self.entries.iter()
+        let is_present = self
+            .entries
+            .iter()
             .any(|e| e.sequence_number == entry.sequence_number);
 
         if !is_present {
             return Err(CTError::EntryNotFound {
                 entry_id: hex::encode(entry.entry_id),
-            }.into());
+            }
+            .into());
         }
 
         // Simplified verification - just check if entry exists
-        debug!("Entry {} inclusion verification: {}", entry.sequence_number, is_present);
+        debug!(
+            "Entry {} inclusion verification: {}",
+            entry.sequence_number, is_present
+        );
         Ok(is_present)
     }
 
     /// Get consistency proof between two tree sizes (simplified implementation)
-    pub async fn get_consistency_proof(&self, old_size: u64, new_size: u64) -> TrustChainResult<Vec<[u8; 32]>> {
+    pub async fn get_consistency_proof(
+        &self,
+        old_size: u64,
+        new_size: u64,
+    ) -> TrustChainResult<Vec<[u8; 32]>> {
         if self.merkle_root.is_none() {
             return Err(CTError::MerkleTree {
                 operation: "get_consistency_proof".to_string(),
                 reason: "Merkle tree not initialized".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         if old_size > new_size {
@@ -209,15 +234,14 @@ impl MerkleLog {
         // Simplified consistency proof - calculate hash of old entries
         let mut old_hasher = Sha256::new();
         for entry in self.entries.iter().take(old_size as usize) {
-            old_hasher.update(&entry.leaf_hash);
+            old_hasher.update(entry.leaf_hash);
         }
         let old_root = old_hasher.finalize().into();
-        let new_root = self.merkle_root
-            .ok_or_else(|| CTError::MerkleTree {
-                operation: "generate_consistency_proof".to_string(),
-                reason: "Merkle root not initialized".to_string(),
-            })?;
-        
+        let new_root = self.merkle_root.ok_or_else(|| CTError::MerkleTree {
+            operation: "generate_consistency_proof".to_string(),
+            reason: "Merkle root not initialized".to_string(),
+        })?;
+
         if old_root == new_root {
             // Trees are identical
             Ok(vec![])
@@ -244,13 +268,15 @@ impl MerkleLog {
 
     /// Get entry by sequence number
     pub async fn get_entry(&self, sequence_number: u64) -> Option<&LogEntry> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .find(|entry| entry.sequence_number == sequence_number)
     }
 
     /// Get entries in range
     pub async fn get_entries_range(&self, start: u64, end: u64) -> Vec<&LogEntry> {
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|entry| entry.sequence_number >= start && entry.sequence_number < end)
             .collect()
     }
@@ -264,8 +290,8 @@ impl MerkleLog {
     fn calculate_leaf_hash(&self, entry: &LogEntry) -> [u8; 32] {
         // CT leaf hash includes a prefix to prevent second preimage attacks
         let mut hasher = Sha256::new();
-        hasher.update(&[0x00]); // Leaf prefix
-        hasher.update(&entry.hash());
+        hasher.update([0x00]); // Leaf prefix
+        hasher.update(entry.hash());
         hasher.finalize().into()
     }
 }
@@ -288,19 +314,19 @@ impl MerklePath {
     /// Verify this path leads to the given root hash
     pub fn verify(&self, leaf_hash: &[u8; 32], root_hash: &[u8; 32]) -> bool {
         let mut current_hash = *leaf_hash;
-        
+
         for node in &self.path {
             let mut hasher = Sha256::new();
             if node.is_right {
-                hasher.update(&current_hash);
-                hasher.update(&node.hash);
+                hasher.update(current_hash);
+                hasher.update(node.hash);
             } else {
-                hasher.update(&node.hash);
-                hasher.update(&current_hash);
+                hasher.update(node.hash);
+                hasher.update(current_hash);
             }
             current_hash = hasher.finalize().into();
         }
-        
+
         current_hash == *root_hash
     }
 }
@@ -314,10 +340,10 @@ mod tests {
     async fn create_test_entry(seq_num: u64) -> anyhow::Result<LogEntry> {
         Ok(LogEntry {
             sequence_number: seq_num,
-            certificate_der: format!("cert_{}", seq_num).into_bytes(),
+            certificate_der: format!("cert_{seq_num}").into_bytes(),
             fingerprint: [seq_num as u8; 32],
             timestamp: SystemTime::now(),
-            common_name: format!("test{}.example.com", seq_num),
+            common_name: format!("test{seq_num}.example.com"),
             issuer_ca_id: "test-ca".to_string(),
             consensus_proof: ConsensusProof::generate_from_network("test-node").await?,
             entry_id: [seq_num as u8; 32],
@@ -327,18 +353,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_merkle_log_creation() {
-        let log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
+        let log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
         assert_eq!(log.log_id, "test-log");
         assert_eq!(log.get_tree_size(), 0);
     }
 
     #[tokio::test]
     async fn test_entry_addition() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
-        
-        let entry = create_test_entry(0).await.unwrap();
-        let added_entry = log.add_entry(entry).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+
+        let entry = create_test_entry(0).await.expect("test: async operation");
+        let added_entry = log.add_entry(entry).await.expect("test: async operation");
+
         assert_eq!(added_entry.sequence_number, 0);
         assert_ne!(added_entry.leaf_hash, [0u8; 32]);
         assert_eq!(log.get_tree_size(), 1);
@@ -346,17 +372,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_merkle_tree_update() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+
         // Add entries
         for i in 0..5 {
-            let entry = create_test_entry(i).await.unwrap();
-            log.add_entry(entry).await.unwrap();
+            let entry = create_test_entry(i).await.expect("test: async operation");
+            log.add_entry(entry).await.expect("test: async operation");
         }
-        
+
         // Update merkle tree
-        log.update_merkle_tree().await.unwrap();
-        
+        log.update_merkle_tree().await.expect("test: async operation");
+
         assert_eq!(log.stats.tree_size, 5);
         assert_ne!(log.stats.root_hash, [0u8; 32]);
         assert_eq!(log.stats.pending_count, 0);
@@ -364,79 +390,83 @@ mod tests {
 
     #[tokio::test]
     async fn test_inclusion_proof() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+
         // Add entries
         let mut test_entries = Vec::new();
         for i in 0..5 {
-            let entry = create_test_entry(i).await.unwrap();
-            let added_entry = log.add_entry(entry).await.unwrap();
+            let entry = create_test_entry(i).await.expect("test: async operation");
+            let added_entry = log.add_entry(entry).await.expect("test: async operation");
             test_entries.push(added_entry);
         }
-        
+
         // Update merkle tree
-        log.update_merkle_tree().await.unwrap();
-        
+        log.update_merkle_tree().await.expect("test: async operation");
+
         // Get inclusion proof
-        let proof = log.get_inclusion_proof(&test_entries[2]).await.unwrap();
+        let proof = log.get_inclusion_proof(&test_entries[2]).await.expect("test: async operation");
         assert!(!proof.is_empty());
-        
+
         // Verify inclusion
-        let is_included = log.verify_entry_inclusion(&test_entries[2]).await.unwrap();
+        let is_included = log.verify_entry_inclusion(&test_entries[2]).await.expect("test: async operation");
         assert!(is_included);
     }
 
     #[tokio::test]
     async fn test_consistency_proof() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+
         // Add entries in two batches
         for i in 0..3 {
-            let entry = create_test_entry(i).await.unwrap();
-            log.add_entry(entry).await.unwrap();
+            let entry = create_test_entry(i).await.expect("test: async operation");
+            log.add_entry(entry).await.expect("test: async operation");
         }
-        log.update_merkle_tree().await.unwrap();
-        
+        log.update_merkle_tree().await.expect("test: async operation");
+
         for i in 3..5 {
-            let entry = create_test_entry(i).await.unwrap();
-            log.add_entry(entry).await.unwrap();
+            let entry = create_test_entry(i).await.expect("test: async operation");
+            log.add_entry(entry).await.expect("test: async operation");
         }
-        log.update_merkle_tree().await.unwrap();
-        
+        log.update_merkle_tree().await.expect("test: async operation");
+
         // Get consistency proof
-        let proof = log.get_consistency_proof(3, 5).await.unwrap();
+        let proof = log.get_consistency_proof(3, 5).await.expect("test: async operation");
         assert!(!proof.is_empty());
     }
 
     #[tokio::test]
     async fn test_log_capacity() {
-        let mut log = MerkleLog::new("test-log".to_string(), 2).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 2).await.expect("test: async operation");
+
         // Add entries up to capacity
-        log.add_entry(create_test_entry(0).await.unwrap()).await.unwrap();
-        log.add_entry(create_test_entry(1).await.unwrap()).await.unwrap();
-        
+        log.add_entry(create_test_entry(0).await.expect("test: async operation"))
+            .await
+            .expect("test: expected success");
+        log.add_entry(create_test_entry(1).await.expect("test: async operation"))
+            .await
+            .expect("test: expected success");
+
         assert!(log.is_full());
-        
+
         // Adding beyond capacity should fail
-        let result = log.add_entry(create_test_entry(2).await.unwrap()).await;
+        let result = log.add_entry(create_test_entry(2).await.expect("test: async operation")).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_entry_retrieval() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.unwrap();
-        
+        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+
         // Add entries
         for i in 0..5 {
-            let entry = create_test_entry(i).await.unwrap();
-            log.add_entry(entry).await.unwrap();
+            let entry = create_test_entry(i).await.expect("test: async operation");
+            log.add_entry(entry).await.expect("test: async operation");
         }
-        
+
         // Get specific entry
-        let entry = log.get_entry(2).await.unwrap();
+        let entry = log.get_entry(2).await.expect("test: async operation");
         assert_eq!(entry.sequence_number, 2);
-        
+
         // Get range of entries
         let entries = log.get_entries_range(1, 4).await;
         assert_eq!(entries.len(), 3);

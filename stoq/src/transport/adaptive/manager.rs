@@ -2,14 +2,14 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
+use quinn::Connection as QuinnConnection;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use std::sync::atomic::{AtomicBool, Ordering};
-use quinn::Connection as QuinnConnection;
-use tracing::warn;
 use tokio::time::interval;
+use tracing::warn;
 
-use super::connection::{AdaptiveConnection, AdaptationStats};
+use super::connection::{AdaptationStats, AdaptiveConnection};
 
 pub struct AdaptationManager {
     connections: Arc<dashmap::DashMap<String, Arc<AdaptiveConnection>>>,
@@ -65,8 +65,15 @@ impl AdaptationManager {
         self.enabled.store(enabled, Ordering::Relaxed);
     }
 
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
     pub fn connection_ids(&self) -> Vec<String> {
-        self.connections.iter().map(|entry| entry.key().clone()).collect()
+        self.connections
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 
     pub fn all_stats(&self) -> Vec<(String, AdaptationStats)> {

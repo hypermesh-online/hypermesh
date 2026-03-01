@@ -8,13 +8,13 @@
 //! Integrates with TrustChain for certificate validation and token verification.
 
 use anyhow::Result;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use dashmap::DashMap;
 use tracing::{debug, info};
-use serde::{Serialize, Deserialize};
 
-pub use super::falcon_trustchain::{TrustChainClient, FalconTrustChainClient};
+pub use super::falcon_trustchain::{FalconTrustChainClient, TrustChainClient};
 
 /// Backward compatibility alias for old test API
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,23 +226,33 @@ impl PosTokenValidator {
         let start_time = std::time::Instant::now();
 
         // Update metrics
-        self.metrics.total_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .total_validations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Check cache first
         if let Some(cached) = self.validation_cache.get(&token.id) {
             if cached.expires_at > SystemTime::now() {
-                self.metrics.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .cache_hits
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 debug!("Token validation cache hit for {:?}", token.id);
 
                 return Ok(ValidationResult {
                     is_valid: cached.result,
-                    errors: if cached.result { vec![] } else { vec!["Cached validation failure".to_string()] },
+                    errors: if cached.result {
+                        vec![]
+                    } else {
+                        vec!["Cached validation failure".to_string()]
+                    },
                     validation_time: start_time.elapsed(),
                 });
             }
         }
 
-        self.metrics.cache_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cache_misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         let mut errors = Vec::new();
 
@@ -279,7 +289,7 @@ impl PosTokenValidator {
             match client.verify_signature(
                 &token.proof_of_stake.owner_pubkey,
                 &token_data,
-                &token.signature
+                &token.signature,
             ) {
                 Ok(true) => {
                     debug!("Token signature verified successfully");
@@ -288,7 +298,7 @@ impl PosTokenValidator {
                     errors.push("Invalid token signature".to_string());
                 }
                 Err(e) => {
-                    errors.push(format!("Signature verification failed: {}", e));
+                    errors.push(format!("Signature verification failed: {e}"));
                 }
             }
         } else {
@@ -308,16 +318,23 @@ impl PosTokenValidator {
 
         // Update metrics
         if !is_valid {
-            self.metrics.failed_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .failed_validations
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
         let validation_time = start_time.elapsed();
         let validation_us = validation_time.as_micros() as u64;
 
         // Update average validation time (simple moving average)
-        let current_avg = self.metrics.avg_validation_time_us.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .avg_validation_time_us
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = (current_avg * 9 + validation_us) / 10; // Weighted average
-        self.metrics.avg_validation_time_us.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .avg_validation_time_us
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
 
         Ok(ValidationResult {
             is_valid,
@@ -446,11 +463,26 @@ impl PosTokenValidator {
     /// Get validation metrics
     pub fn get_metrics(&self) -> ValidationStats {
         ValidationStats {
-            total_validations: self.metrics.total_validations.load(std::sync::atomic::Ordering::Relaxed),
-            cache_hits: self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed),
-            cache_misses: self.metrics.cache_misses.load(std::sync::atomic::Ordering::Relaxed),
-            failed_validations: self.metrics.failed_validations.load(std::sync::atomic::Ordering::Relaxed),
-            avg_validation_time_us: self.metrics.avg_validation_time_us.load(std::sync::atomic::Ordering::Relaxed),
+            total_validations: self
+                .metrics
+                .total_validations
+                .load(std::sync::atomic::Ordering::Relaxed),
+            cache_hits: self
+                .metrics
+                .cache_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            cache_misses: self
+                .metrics
+                .cache_misses
+                .load(std::sync::atomic::Ordering::Relaxed),
+            failed_validations: self
+                .metrics
+                .failed_validations
+                .load(std::sync::atomic::Ordering::Relaxed),
+            avg_validation_time_us: self
+                .metrics
+                .avg_validation_time_us
+                .load(std::sync::atomic::Ordering::Relaxed),
             cache_size: self.validation_cache.len(),
         }
     }
@@ -523,7 +555,7 @@ mod tests {
         let validator = PosTokenValidator::new(Duration::from_secs(300));
         let token = create_test_token();
 
-        let result = validator.validate_token(&token).unwrap();
+        let result = validator.validate_token(&token).expect("test: validation");
         assert!(result.is_valid);
         assert!(result.errors.is_empty());
     }
@@ -534,7 +566,7 @@ mod tests {
         let mut token = create_test_token();
         token.expires_at = SystemTime::now() - Duration::from_secs(60);
 
-        let result = validator.validate_token(&token).unwrap();
+        let result = validator.validate_token(&token).expect("test: validation");
         assert!(!result.is_valid);
         assert!(result.errors.iter().any(|e| e.contains("expired")));
     }
@@ -545,7 +577,7 @@ mod tests {
         let token = create_test_token();
 
         // First validation should miss cache
-        let result1 = validator.validate_token(&token).unwrap();
+        let result1 = validator.validate_token(&token).expect("test: validation");
         assert!(result1.is_valid);
 
         let stats = validator.get_metrics();
@@ -553,7 +585,7 @@ mod tests {
         assert_eq!(stats.cache_hits, 0);
 
         // Second validation should hit cache
-        let result2 = validator.validate_token(&token).unwrap();
+        let result2 = validator.validate_token(&token).expect("test: validation");
         assert!(result2.is_valid);
 
         let stats = validator.get_metrics();
@@ -575,5 +607,4 @@ mod tests {
         assert_eq!(stats.total_validations, 5);
         let _ = stats.avg_validation_time_us;
     }
-
 }

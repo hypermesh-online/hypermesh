@@ -7,20 +7,17 @@
 //! Production-ready certificate operations using STOQ transport for
 //! certificate issuance, validation, and revocation through TrustChain CA.
 
+use bytes::Bytes;
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use tracing::{info, debug};
-use bytes::Bytes;
+use tracing::{debug, info};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use crate::stoq_client::{
-    TrustChainStoqClient, ValidationPolicy,
-    ServiceEndpoint, ServiceType
-};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::stoq_client::{ServiceEndpoint, ServiceType, TrustChainStoqClient, ValidationPolicy};
 
 /// CA operations via STOQ transport
 pub struct CaStoqClient {
@@ -204,8 +201,8 @@ pub enum ExtendedKeyUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum KeyAlgorithm {
     // Rsa, // REMOVED: RUSTSEC-2023-0071 - Use FALCON-1024 for protocol layer
-    Falcon1024,  // Post-quantum signature for protocol layer
-    Kyber1024,   // Post-quantum encryption for asset layer
+    Falcon1024, // Post-quantum signature for protocol layer
+    Kyber1024,  // Post-quantum encryption for asset layer
     EcdsaP256,
     EcdsaP384,
     Ed25519,
@@ -230,7 +227,10 @@ pub struct CertificateRequester {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RevocationStatus {
     Valid,
-    Revoked { reason: RevocationReason, revoked_at: SystemTime },
+    Revoked {
+        reason: RevocationReason,
+        revoked_at: SystemTime,
+    },
     Unknown,
 }
 
@@ -256,13 +256,12 @@ impl Default for CaStoqConfig {
             default_validity_days: 365, // 1 year
             enable_auto_renewal: false,
             key_size: 2048,
-            ca_endpoints: vec![
-                ServiceEndpoint::new(
-                    ServiceType::CertificateAuthority,
-                    Ipv6Addr::LOCALHOST,
-                    8443
-                ).with_service_name("ca.trustchain.local".to_string()),
-            ],
+            ca_endpoints: vec![ServiceEndpoint::new(
+                ServiceType::CertificateAuthority,
+                Ipv6Addr::LOCALHOST,
+                8443,
+            )
+            .with_service_name("ca.trustchain.local".to_string())],
         }
     }
 }
@@ -273,7 +272,10 @@ impl CaStoqClient {
         stoq_client: Arc<TrustChainStoqClient>,
         config: CaStoqConfig,
     ) -> TrustChainResult<Self> {
-        info!("Initializing CA STOQ client with {} endpoints", config.ca_endpoints.len());
+        info!(
+            "Initializing CA STOQ client with {} endpoints",
+            config.ca_endpoints.len()
+        );
 
         let client = Self {
             stoq_client,
@@ -288,17 +290,20 @@ impl CaStoqClient {
     }
 
     /// Request certificate issuance via STOQ
-    pub async fn request_certificate(&self, request: StoqCertificateRequest) -> TrustChainResult<StoqCertificateResponse> {
+    pub async fn request_certificate(
+        &self,
+        request: StoqCertificateRequest,
+    ) -> TrustChainResult<StoqCertificateResponse> {
         let start_time = std::time::Instant::now();
-        
+
         debug!("Requesting certificate via STOQ: {}", request.common_name);
 
         // Select CA endpoint
         let ca_endpoint = self.select_ca_endpoint().await?;
 
         // Serialize certificate request
-        let request_data = bincode::serialize(&request)
-            .map_err(|e| TrustChainError::SerializationError {
+        let request_data =
+            bincode::serialize(&request).map_err(|e| TrustChainError::SerializationError {
                 operation: "certificate_request_serialize".to_string(),
                 reason: e.to_string(),
             })?;
@@ -307,10 +312,12 @@ impl CaStoqClient {
         let response_data = self.send_ca_request(&ca_endpoint, &request_data).await?;
 
         // Deserialize response
-        let response: StoqCertificateResponse = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
-                operation: "certificate_response_deserialize".to_string(),
-                reason: e.to_string(),
+        let response: StoqCertificateResponse =
+            bincode::deserialize(&response_data).map_err(|e| {
+                TrustChainError::SerializationError {
+                    operation: "certificate_response_deserialize".to_string(),
+                    reason: e.to_string(),
+                }
             })?;
 
         // Cache the certificate
@@ -318,28 +325,38 @@ impl CaStoqClient {
 
         // Update metrics
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.cert_requests.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cert_requests
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.update_avg_latency(latency);
 
-        info!("Certificate issued successfully: {} ({}μs)", request.common_name, latency);
+        info!(
+            "Certificate issued successfully: {} ({}μs)",
+            request.common_name, latency
+        );
         Ok(response)
     }
 
     /// Validate certificate via STOQ
-    pub async fn validate_certificate(&self, validation: StoqCertificateValidation) -> TrustChainResult<StoqValidationResponse> {
+    pub async fn validate_certificate(
+        &self,
+        validation: StoqCertificateValidation,
+    ) -> TrustChainResult<StoqValidationResponse> {
         let start_time = std::time::Instant::now();
-        
+
         // Calculate certificate fingerprint for caching
         let fingerprint = hex::encode(sha2::Sha256::digest(&validation.certificate));
-        
+
         debug!("Validating certificate via STOQ: {}", fingerprint);
 
         // Check cache first
         if let Some(cached_cert) = self.cert_cache.get(&fingerprint) {
             if cached_cert.expires_at > SystemTime::now() {
                 debug!("Certificate validation cache hit: {}", fingerprint);
-                self.metrics.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                
+                self.metrics
+                    .cache_hits
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
                 return Ok(StoqValidationResponse {
                     is_valid: cached_cert.is_valid,
                     error: None,
@@ -353,14 +370,16 @@ impl CaStoqClient {
             }
         }
 
-        self.metrics.cache_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cache_misses
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // Select CA endpoint
         let ca_endpoint = self.select_ca_endpoint().await?;
 
         // Serialize validation request
-        let request_data = bincode::serialize(&validation)
-            .map_err(|e| TrustChainError::SerializationError {
+        let request_data =
+            bincode::serialize(&validation).map_err(|e| TrustChainError::SerializationError {
                 operation: "certificate_validation_serialize".to_string(),
                 reason: e.to_string(),
             })?;
@@ -369,10 +388,12 @@ impl CaStoqClient {
         let response_data = self.send_ca_request(&ca_endpoint, &request_data).await?;
 
         // Deserialize response
-        let response: StoqValidationResponse = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
-                operation: "certificate_validation_deserialize".to_string(),
-                reason: e.to_string(),
+        let response: StoqValidationResponse =
+            bincode::deserialize(&response_data).map_err(|e| {
+                TrustChainError::SerializationError {
+                    operation: "certificate_validation_deserialize".to_string(),
+                    reason: e.to_string(),
+                }
             })?;
 
         // Cache validation result
@@ -390,26 +411,36 @@ impl CaStoqClient {
 
         // Update metrics
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.cert_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cert_validations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.update_avg_latency(latency);
 
-        debug!("Certificate validation completed: {} -> {} ({}μs)", 
-               fingerprint, response.is_valid, latency);
+        debug!(
+            "Certificate validation completed: {} -> {} ({}μs)",
+            fingerprint, response.is_valid, latency
+        );
         Ok(response)
     }
 
     /// Revoke certificate via STOQ
-    pub async fn revoke_certificate(&self, revocation: StoqRevocationRequest) -> TrustChainResult<bool> {
+    pub async fn revoke_certificate(
+        &self,
+        revocation: StoqRevocationRequest,
+    ) -> TrustChainResult<bool> {
         let start_time = std::time::Instant::now();
-        
-        debug!("Revoking certificate via STOQ: {}", revocation.serial_number);
+
+        debug!(
+            "Revoking certificate via STOQ: {}",
+            revocation.serial_number
+        );
 
         // Select CA endpoint
         let ca_endpoint = self.select_ca_endpoint().await?;
 
         // Serialize revocation request
-        let request_data = bincode::serialize(&revocation)
-            .map_err(|e| TrustChainError::SerializationError {
+        let request_data =
+            bincode::serialize(&revocation).map_err(|e| TrustChainError::SerializationError {
                 operation: "certificate_revocation_serialize".to_string(),
                 reason: e.to_string(),
             })?;
@@ -418,52 +449,76 @@ impl CaStoqClient {
         let response_data = self.send_ca_request(&ca_endpoint, &request_data).await?;
 
         // Deserialize response
-        let success: bool = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let success: bool = bincode::deserialize(&response_data).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "certificate_revocation_deserialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // Invalidate cache entries for revoked certificate
         if success {
-            self.invalidate_certificate_cache(&revocation.serial_number).await;
+            self.invalidate_certificate_cache(&revocation.serial_number)
+                .await;
         }
 
         // Update metrics
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.cert_revocations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .cert_revocations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.update_avg_latency(latency);
 
-        info!("Certificate revocation {}: {} ({}μs)", 
-              if success { "succeeded" } else { "failed" },
-              revocation.serial_number, latency);
+        info!(
+            "Certificate revocation {}: {} ({}μs)",
+            if success { "succeeded" } else { "failed" },
+            revocation.serial_number,
+            latency
+        );
         Ok(success)
     }
 
     /// Send CA request via STOQ transport
-    async fn send_ca_request(&self, endpoint: &ServiceEndpoint, data: &[u8]) -> TrustChainResult<Bytes> {
+    async fn send_ca_request(
+        &self,
+        endpoint: &ServiceEndpoint,
+        data: &[u8],
+    ) -> TrustChainResult<Bytes> {
         // Create STOQ endpoint
-        let stoq_endpoint = stoq::Endpoint::new(endpoint.address, endpoint.port)
-            .with_server_name(endpoint.service_name.clone().unwrap_or_else(|| {
-                "ca.trustchain.local".to_string()
-            }));
+        let stoq_endpoint = stoq::Endpoint::new(endpoint.address, endpoint.port).with_server_name(
+            endpoint
+                .service_name
+                .clone()
+                .unwrap_or_else(|| "ca.trustchain.local".to_string()),
+        );
 
         // Get connection
-        let connection = self.stoq_client.transport().connect(&stoq_endpoint).await
+        let connection = self
+            .stoq_client
+            .transport()
+            .connect(&stoq_endpoint)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ca_stoq_connection".to_string(),
                 reason: e.to_string(),
             })?;
 
         // Send request
-        self.stoq_client.transport().send(&connection, data).await
+        self.stoq_client
+            .transport()
+            .send(&connection, data)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ca_request_send".to_string(),
                 reason: e.to_string(),
             })?;
 
         // Receive response
-        let response = self.stoq_client.transport().receive(&connection).await
+        let response = self
+            .stoq_client
+            .transport()
+            .receive(&connection)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ca_response_receive".to_string(),
                 reason: e.to_string(),
@@ -475,7 +530,8 @@ impl CaStoqClient {
     /// Select best CA endpoint
     async fn select_ca_endpoint(&self) -> TrustChainResult<ServiceEndpoint> {
         let endpoints = self.ca_endpoints.read().await;
-        endpoints.first()
+        endpoints
+            .first()
             .cloned()
             .ok_or_else(|| TrustChainError::ServiceDiscoveryError {
                 service: "certificate_authority".to_string(),
@@ -499,7 +555,8 @@ impl CaStoqClient {
             self.evict_oldest_cache_entry().await;
         }
 
-        self.cert_cache.insert(response.fingerprint.clone(), cache_entry);
+        self.cert_cache
+            .insert(response.fingerprint.clone(), cache_entry);
     }
 
     /// Invalidate certificate cache entries for revoked certificate
@@ -507,7 +564,7 @@ impl CaStoqClient {
         // Remove any cached certificates with this serial number
         // Note: In production, you'd need to track serial number to fingerprint mapping
         let mut to_remove = Vec::new();
-        
+
         for entry in self.cert_cache.iter() {
             // This is a simplified approach - in production you'd need proper serial tracking
             if entry.key().contains(serial_number) {
@@ -539,38 +596,57 @@ impl CaStoqClient {
 
     /// Update average latency metric
     fn update_avg_latency(&self, latency_us: u64) {
-        let current_avg = self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .avg_latency_us
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = if current_avg == 0 {
             latency_us
         } else {
             (current_avg * 9 + latency_us) / 10 // Moving average
         };
-        self.metrics.avg_latency_us.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .avg_latency_us
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get CA client metrics
     pub fn get_metrics(&self) -> CaStoqMetrics {
         CaStoqMetrics {
             cert_requests: std::sync::atomic::AtomicU64::new(
-                self.metrics.cert_requests.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cert_requests
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cert_validations: std::sync::atomic::AtomicU64::new(
-                self.metrics.cert_validations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cert_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cert_revocations: std::sync::atomic::AtomicU64::new(
-                self.metrics.cert_revocations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cert_revocations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_hits: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_hits
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             cache_misses: std::sync::atomic::AtomicU64::new(
-                self.metrics.cache_misses.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .cache_misses
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             failed_operations: std::sync::atomic::AtomicU64::new(
-                self.metrics.failed_operations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .failed_operations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             avg_latency_us: std::sync::atomic::AtomicU64::new(
-                self.metrics.avg_latency_us.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .avg_latency_us
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -578,10 +654,19 @@ impl CaStoqClient {
     /// Get cache statistics
     pub async fn get_cache_stats(&self) -> (usize, usize, f64) {
         let total_entries = self.cert_cache.len();
-        let total_ops = self.metrics.cert_requests.load(std::sync::atomic::Ordering::Relaxed) +
-                       self.metrics.cert_validations.load(std::sync::atomic::Ordering::Relaxed);
-        let cache_hits = self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed);
-        
+        let total_ops = self
+            .metrics
+            .cert_requests
+            .load(std::sync::atomic::Ordering::Relaxed)
+            + self
+                .metrics
+                .cert_validations
+                .load(std::sync::atomic::Ordering::Relaxed);
+        let cache_hits = self
+            .metrics
+            .cache_hits
+            .load(std::sync::atomic::Ordering::Relaxed);
+
         let hit_ratio = if total_ops > 0 {
             cache_hits as f64 / total_ops as f64
         } else {
@@ -616,7 +701,10 @@ impl CaStoqClient {
         let mut endpoints = self.ca_endpoints.write().await;
         if !endpoints.contains(&endpoint) {
             endpoints.push(endpoint.clone());
-            info!("Added CA endpoint: [{}]:{}", endpoint.address, endpoint.port);
+            info!(
+                "Added CA endpoint: [{}]:{}",
+                endpoint.address, endpoint.port
+            );
         }
         Ok(())
     }
@@ -625,7 +713,10 @@ impl CaStoqClient {
     pub async fn remove_ca_endpoint(&self, endpoint: &ServiceEndpoint) -> TrustChainResult<()> {
         let mut endpoints = self.ca_endpoints.write().await;
         endpoints.retain(|e| e != endpoint);
-        info!("Removed CA endpoint: [{}]:{}", endpoint.address, endpoint.port);
+        info!(
+            "Removed CA endpoint: [{}]:{}",
+            endpoint.address, endpoint.port
+        );
         Ok(())
     }
 }
@@ -640,7 +731,7 @@ mod tests {
     #[test]
     fn test_ca_stoq_config_default() {
         let config = CaStoqConfig::default();
-        
+
         assert_eq!(config.request_timeout, Duration::from_secs(30));
         assert_eq!(config.validation_timeout, Duration::from_secs(10));
         assert_eq!(config.cache_ttl, Duration::from_secs(3600));
@@ -655,12 +746,15 @@ mod tests {
     fn test_certificate_request_serialization() {
         let request = StoqCertificateRequest {
             common_name: "test.example.com".to_string(),
-            san_list: vec!["test.example.com".to_string(), "www.test.example.com".to_string()],
+            san_list: vec![
+                "test.example.com".to_string(),
+                "www.test.example.com".to_string(),
+            ],
             key_usage: vec![KeyUsage::DigitalSignature, KeyUsage::KeyEncipherment],
             extended_key_usage: vec![ExtendedKeyUsage::ServerAuth],
             validity_days: 365,
-            key_size: 1024,  // FALCON-1024 key size
-            key_algorithm: KeyAlgorithm::Falcon1024,  // Post-quantum signature
+            key_size: 1024,                          // FALCON-1024 key size
+            key_algorithm: KeyAlgorithm::Falcon1024, // Post-quantum signature
             requester: CertificateRequester {
                 identity: "test-requester".to_string(),
                 organization: Some("Test Org".to_string()),
@@ -671,10 +765,10 @@ mod tests {
             consensus_proof: None,
         };
 
-        let serialized = bincode::serialize(&request)
-            .expect("Failed to serialize certificate request");
-        let deserialized: StoqCertificateRequest = bincode::deserialize(&serialized)
-            .expect("Failed to deserialize certificate request");
+        let serialized =
+            bincode::serialize(&request).expect("Failed to serialize certificate request");
+        let deserialized: StoqCertificateRequest =
+            bincode::deserialize(&serialized).expect("Failed to deserialize certificate request");
 
         assert_eq!(request.common_name, deserialized.common_name);
         assert_eq!(request.san_list, deserialized.san_list);
@@ -684,10 +778,30 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_initialization() {
         let metrics = CaStoqMetrics::default();
-        
-        assert_eq!(metrics.cert_requests.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.cert_validations.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.cert_revocations.load(std::sync::atomic::Ordering::Relaxed), 0);
-        assert_eq!(metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed), 0);
+
+        assert_eq!(
+            metrics
+                .cert_requests
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .cert_validations
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .cert_revocations
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+        assert_eq!(
+            metrics
+                .cache_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
     }
 }

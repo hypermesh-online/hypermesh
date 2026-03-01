@@ -7,16 +7,15 @@
 //! Core Principle: No persistent identity, no trust validation, ephemeral everything.
 //! Similar to Tor hidden services - complete anonymity with no tracking.
 
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 use super::{
-    NetworkHandler, NetworkConfig, NetworkConnection, NetworkType,
-    StoqTransport, PeerInfo, AssetRequest, AssetResponse, EphemeralKey,
-    generate_ephemeral_key, new_random_network_id,
+    generate_ephemeral_key, new_random_network_id, AssetRequest, AssetResponse, EphemeralKey,
+    NetworkConfig, NetworkConnection, NetworkHandler, NetworkType, PeerInfo, StoqTransport,
 };
 
 /// Anonymous network handler - ephemeral connections with no identity
@@ -73,7 +72,10 @@ impl NetworkHandler for AnonymousNetworkHandler {
 
         // Generate ephemeral keys (destroyed on disconnect)
         let ephemeral_key = generate_ephemeral_key();
-        debug!("Generated ephemeral session key: {:?}", ephemeral_key.session_id);
+        debug!(
+            "Generated ephemeral session key: {:?}",
+            ephemeral_key.session_id
+        );
         *self.ephemeral_keys.write().await = Some(ephemeral_key.clone());
 
         // Create STOQ transport in anonymous mode
@@ -85,7 +87,7 @@ impl NetworkHandler for AnonymousNetworkHandler {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_secs()
+                .as_secs(),
         );
 
         let connection = NetworkConnection {
@@ -99,7 +101,10 @@ impl NetworkHandler for AnonymousNetworkHandler {
         let connection_ref = connection.clone();
         *self.connection.write().await = Some(connection_ref);
 
-        info!("Anonymous network bootstrapped with session: {:?}", ephemeral_key.session_id);
+        info!(
+            "Anonymous network bootstrapped with session: {:?}",
+            ephemeral_key.session_id
+        );
         Ok(connection)
     }
 
@@ -144,16 +149,19 @@ impl NetworkHandler for AnonymousNetworkHandler {
         // No identity-based authorization
         let response = AssetResponse {
             asset_id: request.asset_id.clone(),
-            data: None, // Actual data would be fetched if asset is public
+            data: None,       // Actual data would be fetched if asset is public
             authorized: true, // Anonymous users can access public assets
             metadata: {
                 let mut meta = std::collections::HashMap::new();
                 meta.insert("network".to_string(), "anonymous".to_string());
-                meta.insert("session".to_string(),
-                    self.ephemeral_keys.read().await
+                meta.insert(
+                    "session".to_string(),
+                    self.ephemeral_keys
+                        .read()
+                        .await
                         .as_ref()
                         .map(|k| k.session_id.to_string())
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
                 );
                 meta
             },
@@ -172,7 +180,8 @@ impl NetworkHandler for AnonymousNetworkHandler {
                 let duration = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
-                    .as_secs() - start_time;
+                    .as_secs()
+                    - start_time;
                 info!(
                     "Anonymous session ended - Duration: {}s, Requests: {}, Bytes: {}",
                     duration, metadata.request_count, metadata.bytes_transferred
@@ -213,7 +222,7 @@ mod tests {
             proof_of_state: None,
         };
 
-        let connection = handler.bootstrap(config).await.unwrap();
+        let connection = handler.bootstrap(config).await.expect("test: async operation");
         assert_eq!(connection.network_type, NetworkType::Anonymous);
         assert!(connection.certificate.is_none());
 
@@ -233,7 +242,7 @@ mod tests {
             network_type: NetworkType::Anonymous,
         };
 
-        assert!(handler.validate_peer(&peer).await.unwrap());
+        assert!(handler.validate_peer(&peer).await.expect("test: async operation"));
 
         // Non-anonymous peer should be rejected
         let public_peer = PeerInfo {
@@ -243,7 +252,7 @@ mod tests {
             network_type: NetworkType::Public,
         };
 
-        assert!(!handler.validate_peer(&public_peer).await.unwrap());
+        assert!(!handler.validate_peer(&public_peer).await.expect("test: async operation"));
     }
 
     #[tokio::test]
@@ -258,11 +267,11 @@ mod tests {
         };
 
         // Bootstrap and verify keys exist
-        handler.bootstrap(config).await.unwrap();
+        handler.bootstrap(config).await.expect("test: async operation");
         assert!(handler.ephemeral_keys.read().await.is_some());
 
         // Disconnect and verify keys are destroyed
-        handler.disconnect().await.unwrap();
+        handler.disconnect().await.expect("test: async operation");
         assert!(handler.ephemeral_keys.read().await.is_none());
         assert!(handler.connection.read().await.is_none());
     }

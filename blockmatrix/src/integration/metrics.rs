@@ -7,10 +7,10 @@
 //! This module provides metrics collection and reporting for the integration layer,
 //! tracking API calls, service health, bootstrap progress, and system performance.
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 /// Core metrics for the integration layer
@@ -98,7 +98,9 @@ impl IntegrationMetrics {
         }
 
         let micros = duration.as_micros() as u64;
-        self.inner.api_latency_sum.fetch_add(micros, Ordering::Relaxed);
+        self.inner
+            .api_latency_sum
+            .fetch_add(micros, Ordering::Relaxed);
         self.inner.api_latency_count.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -133,7 +135,9 @@ impl IntegrationMetrics {
 
     /// Record service registration
     pub fn record_service_registration(&self) {
-        self.inner.services_registered.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .services_registered
+            .fetch_add(1, Ordering::Relaxed);
         self.inner.services_active.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -154,14 +158,22 @@ impl IntegrationMetrics {
 
     /// Record STOQ message sent
     pub fn record_stoq_send(&self, bytes: usize) {
-        self.inner.stoq_messages_sent.fetch_add(1, Ordering::Relaxed);
-        self.inner.stoq_bytes_sent.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.inner
+            .stoq_messages_sent
+            .fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .stoq_bytes_sent
+            .fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     /// Record STOQ message received
     pub fn record_stoq_receive(&self, bytes: usize) {
-        self.inner.stoq_messages_received.fetch_add(1, Ordering::Relaxed);
-        self.inner.stoq_bytes_received.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.inner
+            .stoq_messages_received
+            .fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .stoq_bytes_received
+            .fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     /// Update coordinator task count
@@ -171,7 +183,9 @@ impl IntegrationMetrics {
 
     /// Record coordinator error
     pub fn record_coordinator_error(&self) {
-        self.inner.coordinator_errors.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .coordinator_errors
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Get current metrics snapshot

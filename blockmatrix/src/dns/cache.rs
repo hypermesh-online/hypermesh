@@ -5,7 +5,7 @@
 //! DNS Cache with TTL Management
 
 use super::{DnsRecord, DnsRecordType, DnsResult};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -55,7 +55,7 @@ impl DnsCache {
 
     /// Get cache key
     fn cache_key(domain: &str, record_type: &DnsRecordType) -> String {
-        format!("{}:{:?}", domain, record_type)
+        format!("{domain}:{record_type:?}")
     }
 
     /// Get cached records
@@ -202,13 +202,13 @@ mod tests {
         cache
             .set("nike", &DnsRecordType::AAAA, vec![record.clone()], 300)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         let cached = cache
             .get("nike", &DnsRecordType::AAAA)
             .await
-            .unwrap()
-            .unwrap();
+            .expect("test: expected success")
+            .expect("test: expected success");
         assert_eq!(cached.len(), 1);
         assert_eq!(cached[0].domain, "nike");
     }
@@ -216,7 +216,10 @@ mod tests {
     #[tokio::test]
     async fn test_cache_miss() {
         let cache = DnsCache::new(100);
-        let result = cache.get("nonexistent", &DnsRecordType::AAAA).await.unwrap();
+        let result = cache
+            .get("nonexistent", &DnsRecordType::AAAA)
+            .await
+            .expect("test: expected success");
         assert!(result.is_none());
     }
 
@@ -229,11 +232,11 @@ mod tests {
         cache
             .set("test", &DnsRecordType::AAAA, vec![record], 0)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let result = cache.get("test", &DnsRecordType::AAAA).await.unwrap();
+        let result = cache.get("test", &DnsRecordType::AAAA).await.expect("test: async operation");
         assert!(result.is_none());
     }
 
@@ -242,16 +245,16 @@ mod tests {
         let cache = DnsCache::new(2);
 
         for i in 0..3 {
-            let record = create_test_record(&format!("domain{}", i));
+            let record = create_test_record(&format!("domain{i}"));
             cache
                 .set(
-                    &format!("domain{}", i),
+                    &format!("domain{i}"),
                     &DnsRecordType::AAAA,
                     vec![record],
                     300,
                 )
                 .await
-                .unwrap();
+                .expect("test: expected success");
         }
 
         let stats = cache.stats().await;
@@ -268,10 +271,10 @@ mod tests {
         cache
             .set("test", &DnsRecordType::AAAA, vec![record], 0)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let removed = cache.cleanup_expired().await.unwrap();
+        let removed = cache.cleanup_expired().await.expect("test: async operation");
         assert_eq!(removed, 1);
     }
 
@@ -283,7 +286,7 @@ mod tests {
         cache
             .set("nike", &DnsRecordType::AAAA, vec![record], 300)
             .await
-            .unwrap();
+            .expect("test: expected success");
 
         // Hit
         let _ = cache.get("nike", &DnsRecordType::AAAA).await;

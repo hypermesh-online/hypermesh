@@ -8,20 +8,22 @@
 //! Software-based certificate authority with four-proof consensus validation,
 //! STOQ protocol integration, and <35ms certificate operations.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use std::collections::HashMap;
-use tokio::sync::{RwLock, Mutex};
-use tracing::{info, warn};
 use hex;
 use rcgen::{CertificateParams, KeyPair};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tokio::sync::{Mutex, RwLock};
+use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult, FourProofValidator};
-use crate::ct::CertificateTransparencyLog;
-use crate::errors::{TrustChainError, Result as TrustChainResult};
-use super::{CertificateRequest, IssuedCertificate, CertificateMetadata, CertificateStatus};
 use super::certificate_store::CertificateStore;
+use super::{CertificateMetadata, CertificateRequest, CertificateStatus, IssuedCertificate};
+use crate::consensus::{
+    ConsensusProof, ConsensusRequirements, ConsensusResult, FourProofValidator,
+};
+use crate::ct::CertificateTransparencyLog;
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.
@@ -135,7 +137,9 @@ impl TrustChainCA {
 
         // AWS CloudHSM dependencies REMOVED - software-only operation
         // Generate root CA using software keys
-        let root_ca = Arc::new(RwLock::new(Self::generate_self_signed_root(&config.ca_id).await?));
+        let root_ca = Arc::new(RwLock::new(
+            Self::generate_self_signed_root(&config.ca_id).await?,
+        ));
 
         // Initialize metrics
         let metrics = Arc::new(CAMetrics::default());
@@ -156,10 +160,16 @@ impl TrustChainCA {
     }
 
     /// Issue certificate with full security validation
-    pub async fn issue_certificate(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
+    pub async fn issue_certificate(
+        &self,
+        request: CertificateRequest,
+    ) -> TrustChainResult<IssuedCertificate> {
         let start_time = std::time::Instant::now();
-        
-        info!("Processing certificate request for: {}", request.common_name);
+
+        info!(
+            "Processing certificate request for: {}",
+            request.common_name
+        );
 
         // Validate consensus proof
         let consensus_result = self.validate_certificate_request(&request).await?;
@@ -178,23 +188,38 @@ impl TrustChainCA {
         info!("Certificate added to CT log: {}", ct_entry.entry_id);
 
         // Store certificate
-        self.certificate_store.store_certificate(&issued_cert).await?;
+        self.certificate_store
+            .store_certificate(&issued_cert)
+            .await?;
 
         // Update metrics
-        self.metrics.certificates_issued.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.ct_log_entries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .certificates_issued
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .ct_log_entries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         let issuance_time = start_time.elapsed().as_millis() as u64;
-        self.metrics.average_issuance_time_ms.store(issuance_time, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .average_issuance_time_ms
+            .store(issuance_time, std::sync::atomic::Ordering::Relaxed);
 
         // Check performance targets
         if issuance_time > self.config.performance_targets.max_issuance_time_ms {
-            warn!("Certificate issuance exceeded target: {}ms > {}ms", 
-                  issuance_time, self.config.performance_targets.max_issuance_time_ms);
-            self.metrics.performance_violations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            warn!(
+                "Certificate issuance exceeded target: {}ms > {}ms",
+                issuance_time, self.config.performance_targets.max_issuance_time_ms
+            );
+            self.metrics
+                .performance_violations
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        info!("Certificate issued successfully: {} ({}ms)", issued_cert.serial_number, issuance_time);
+        info!(
+            "Certificate issued successfully: {} ({}ms)",
+            issued_cert.serial_number, issuance_time
+        );
         Ok(issued_cert)
     }
 
@@ -205,23 +230,25 @@ impl TrustChainCA {
         info!("Generating self-signed root CA for: {}", ca_id);
 
         // rcgen 0.13 API: CertificateParams::new() returns Result
-        let mut params = CertificateParams::new(vec![ca_id.to_string()])
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: format!("Failed to create certificate params: {}", e),
-            })?;
+        let mut params = CertificateParams::new(vec![ca_id.to_string()]).map_err(|e| {
+            TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to create certificate params: {e}"),
+            }
+        })?;
         params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
 
         // rcgen 0.13 API: Generate key pair separately
-        let key_pair = KeyPair::generate()
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: format!("Failed to generate key pair: {}", e),
+        let key_pair =
+            KeyPair::generate().map_err(|e| TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to generate key pair: {e}"),
             })?;
 
         // rcgen 0.13 API: Use self_signed() instead of from_params()
-        let cert = params.self_signed(&key_pair)
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: format!("Failed to create self-signed certificate: {}", e),
-            })?;
+        let cert = params.self_signed(&key_pair).map_err(|e| {
+            TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to create self-signed certificate: {e}"),
+            }
+        })?;
 
         // rcgen 0.13 API: Use der() instead of serialize_der()
         let cert_der = cert.der().to_vec();
@@ -240,13 +267,18 @@ impl TrustChainCA {
     // AWS CloudHSM dependencies REMOVED - generate_certificate_hsm function removed
 
     /// Generate certificate using local signing
-    async fn generate_certificate_local(&self, request: CertificateRequest) -> TrustChainResult<IssuedCertificate> {
+    async fn generate_certificate_local(
+        &self,
+        request: CertificateRequest,
+    ) -> TrustChainResult<IssuedCertificate> {
         let _root_ca = self.root_ca.read().await;
 
         // rcgen 0.13 API: CertificateParams::new() returns Result
-        let mut params = CertificateParams::new(vec![request.common_name.clone()])
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: format!("Failed to create certificate params: {}", e),
+        let mut params =
+            CertificateParams::new(vec![request.common_name.clone()]).map_err(|e| {
+                TrustChainError::CertificateGenerationFailed {
+                    reason: format!("Failed to create certificate params: {e}"),
+                }
             })?;
 
         // Set validity period
@@ -255,16 +287,17 @@ impl TrustChainCA {
         params.not_after = (now + self.config.validity_period).into();
 
         // rcgen 0.13 API: Generate key pair separately
-        let key_pair = KeyPair::generate()
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
-                reason: format!("Failed to generate key pair: {}", e),
+        let key_pair =
+            KeyPair::generate().map_err(|e| TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to generate key pair: {e}"),
             })?;
 
         // rcgen 0.13 API: Use self_signed() for now (TODO: needs CA signing)
-        let cert = params.self_signed(&key_pair)
-            .map_err(|e| TrustChainError::CertificateGenerationFailed {
+        let cert = params.self_signed(&key_pair).map_err(|e| {
+            TrustChainError::CertificateGenerationFailed {
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         // rcgen 0.13 API: Use der() instead of serialize_der()
         let cert_der = cert.der().to_vec();
@@ -286,9 +319,10 @@ impl TrustChainCA {
             issued_at: now,
             expires_at: now + self.config.validity_period,
             issuer_ca_id: self.config.ca_id.clone(),
-            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id).await
+            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id)
+                .await
                 .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {}", e)
+                    reason: format!("Failed to generate consensus proof: {e}"),
                 })?,
             status: CertificateStatus::Valid,
             metadata: CertificateMetadata::default(),
@@ -298,20 +332,33 @@ impl TrustChainCA {
     }
 
     /// Validate certificate request with four-proof consensus
-    async fn validate_certificate_request(&self, request: &CertificateRequest) -> TrustChainResult<ConsensusResult> {
-        info!("Validating certificate request for: {}", request.common_name);
+    async fn validate_certificate_request(
+        &self,
+        request: &CertificateRequest,
+    ) -> TrustChainResult<ConsensusResult> {
+        info!(
+            "Validating certificate request for: {}",
+            request.common_name
+        );
 
         // Validate consensus proof using four-proof validator
         let mut consensus_guard = self.consensus.lock().await;
-        let consensus_result = consensus_guard.validate_consensus(&request.consensus_proof).await?;
-        
+        let consensus_result = consensus_guard
+            .validate_consensus(&request.consensus_proof)
+            .await?;
+
         // Update metrics
-        self.metrics.consensus_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .consensus_validations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         if consensus_result.is_valid() {
             info!("Certificate request validation successful");
         } else {
-            warn!("Certificate request validation failed: {:?}", consensus_result);
+            warn!(
+                "Certificate request validation failed: {:?}",
+                consensus_result
+            );
         }
 
         Ok(consensus_result)
@@ -319,7 +366,7 @@ impl TrustChainCA {
 
     /// Calculate certificate fingerprint
     fn calculate_certificate_fingerprint(&self, cert_der: &[u8]) -> [u8; 32] {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(cert_der);
         hasher.finalize().into()
@@ -328,11 +375,12 @@ impl TrustChainCA {
     /// Execute scheduled key rotations
     pub async fn execute_scheduled_rotations(&self) -> TrustChainResult<()> {
         info!("Executing scheduled certificate rotations");
-        
+
         // AWS CloudHSM dependencies REMOVED - software-only operation
-        let rotation_result = self.rotation.execute_scheduled_rotations(
-            &self.certificate_store
-        ).await?;
+        let rotation_result = self
+            .rotation
+            .execute_scheduled_rotations(&self.certificate_store)
+            .await?;
 
         info!("Scheduled rotations completed: {:?}", rotation_result);
         Ok(())
@@ -342,20 +390,30 @@ impl TrustChainCA {
     pub async fn get_metrics(&self) -> CAMetrics {
         CAMetrics {
             certificates_issued: std::sync::atomic::AtomicU64::new(
-                self.metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .certificates_issued
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             // AWS CloudHSM dependencies REMOVED - hsm_operations removed
             consensus_validations: std::sync::atomic::AtomicU64::new(
-                self.metrics.consensus_validations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .consensus_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             ct_log_entries: std::sync::atomic::AtomicU64::new(
-                self.metrics.ct_log_entries.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .ct_log_entries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
-                self.metrics.average_issuance_time_ms.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .average_issuance_time_ms
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             performance_violations: std::sync::atomic::AtomicU64::new(
-                self.metrics.performance_violations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .performance_violations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -378,7 +436,7 @@ impl CertificateRotationManager {
 
     pub async fn execute_scheduled_rotations(
         &self,
-        _certificate_store: &CertificateStore
+        _certificate_store: &CertificateStore,
     ) -> TrustChainResult<RotationResult> {
         let mut in_progress = self.rotation_in_progress.lock().await;
         if *in_progress {
@@ -418,11 +476,17 @@ mod tests {
     #[tokio::test]
     async fn test_ca_initialization() {
         let config = CAConfiguration::default();
-        let ca = TrustChainCA::new(config).await
+        let ca = TrustChainCA::new(config)
+            .await
             .expect("Failed to initialize CA");
 
         let metrics = ca.get_metrics().await;
-        assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(
+            metrics
+                .certificates_issued
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
     }
 
     // AWS CloudHSM dependencies REMOVED - test_hsm_integration test removed
@@ -430,7 +494,8 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_issuance_with_consensus() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfiguration::default();
-        let ca = TrustChainCA::new(config).await
+        let ca = TrustChainCA::new(config)
+            .await
             .expect("Failed to create CA");
 
         let request = CertificateRequest {
@@ -438,21 +503,29 @@ mod tests {
             san_entries: vec!["test.production.com".to_string()],
             node_id: "prod_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network("test-ca-01").await
+            consensus_proof: ConsensusProof::generate_from_network("test-ca-01")
+                .await
                 .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {}", e)
+                    reason: format!("Failed to generate consensus proof: {e}"),
                 })?,
             timestamp: SystemTime::now(),
         };
 
-        let issued_cert = ca.issue_certificate(request).await
+        let issued_cert = ca
+            .issue_certificate(request)
+            .await
             .expect("Failed to issue certificate");
         assert_eq!(issued_cert.common_name, "test.production.com");
         assert!(!issued_cert.serial_number.is_empty());
 
         // Verify metrics updated
         let metrics = ca.get_metrics().await;
-        assert_eq!(metrics.certificates_issued.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(
+            metrics
+                .certificates_issued
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1
+        );
 
         Ok(())
     }

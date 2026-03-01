@@ -4,8 +4,8 @@
 
 //! Security requirements for privacy allocation types
 
-use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 /// Security requirements for allocation types
 #[derive(Clone, Debug, Serialize, Deserialize)]

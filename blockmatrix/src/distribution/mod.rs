@@ -52,25 +52,19 @@ use crate::assets::pipeline::sharding::Shard;
 use crate::matrix::coordinate::MatrixCoordinate;
 use serde::{Deserialize, Serialize};
 
-pub mod pos_validator;
-pub mod matrix_optimizer;
 pub mod audit_trail;
-pub mod redistribution;
+pub mod matrix_optimizer;
+pub mod pos_validator;
 pub mod rebalancing;
+pub mod redistribution;
 
 // Re-exports
-pub use pos_validator::{
-    StorageAccessValidation, get_eligible_nodes, validate_node_eligibility
-};
+pub use audit_trail::{record_shard_placement_on_chain, AuditRecord, PlacementEvent};
 pub use matrix_optimizer::{
-    distribute_across_octants, calculate_octant_placements, OctantDistribution
+    calculate_octant_placements, distribute_across_octants, OctantDistribution,
 };
-pub use audit_trail::{
-    record_shard_placement_on_chain, AuditRecord, PlacementEvent
-};
-pub use redistribution::{
-    handle_pos_revocation, redistribute_shards, RedistributionStrategy
-};
+pub use pos_validator::{get_eligible_nodes, validate_node_eligibility, StorageAccessValidation};
+pub use redistribution::{handle_pos_revocation, redistribute_shards, RedistributionStrategy};
 
 /// Node information for distribution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,13 +158,8 @@ where
     C: pos_validator::StateAuthenticator,
 {
     // Step 1: Query PoS validation for eligible nodes
-    let eligible_nodes = get_eligible_nodes(
-        asset_id,
-        asset_privacy_level,
-        &shards,
-        all_nodes,
-        consensus
-    ).await?;
+    let eligible_nodes =
+        get_eligible_nodes(asset_id, asset_privacy_level, &shards, all_nodes, consensus).await?;
 
     if eligible_nodes.is_empty() {
         return Err(AssetError::ValidationError {
@@ -179,16 +168,10 @@ where
     }
 
     // Step 2: Apply matrix-aware optimization WITHIN eligible pool
-    let octant_distribution = distribute_across_octants(
-        shards,
-        &eligible_nodes,
-    )?;
+    let octant_distribution = distribute_across_octants(shards, &eligible_nodes)?;
 
     // Step 3: Blockchain records placement (audit trail)
-    record_shard_placement_on_chain(
-        asset_id,
-        &octant_distribution.placements,
-    ).await?;
+    record_shard_placement_on_chain(asset_id, &octant_distribution.placements).await?;
 
     Ok(octant_distribution)
 }
@@ -203,14 +186,14 @@ mod tests {
         let nodes = vec![
             NodeInfo::new(
                 "node1".to_string(),
-                MatrixCoordinate::new(10, 10, 10).unwrap(),
+                MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node2".to_string(),
-                MatrixCoordinate::new(20, 20, 20).unwrap(),
+                MatrixCoordinate::new(20, 20, 20).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
@@ -218,24 +201,16 @@ mod tests {
         ];
 
         // Create test shards
-        let shards = vec![
-            create_test_shard(0),
-            create_test_shard(1),
-        ];
+        let shards = vec![create_test_shard(0), create_test_shard(1)];
 
         let consensus = DefaultStateAuthenticator::for_testing();
 
-        let result = distribute_shards_pos_aware(
-            shards,
-            "test-asset",
-            "PrivateNetwork",
-            &nodes,
-            &consensus,
-        )
-        .await;
+        let result =
+            distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &consensus)
+                .await;
 
         assert!(result.is_ok());
-        let distribution = result.unwrap();
+        let distribution = result.expect("test: expected result");
         assert_eq!(distribution.placements.len(), 2);
     }
 

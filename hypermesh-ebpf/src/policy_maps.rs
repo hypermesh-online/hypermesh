@@ -7,10 +7,10 @@
 //! Provides userspace-to-kernel policy configuration via eBPF maps.
 //! Applications define validation policies, eBPF enforces them at kernel level.
 
-use serde::{Serialize, Deserialize};
-use std::sync::Arc;
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Validation policy for a connection or asset
 #[repr(C)]
@@ -66,7 +66,7 @@ impl ValidationPolicy {
             requires_pos: true,
             validate_asset_hash: true,
             check_matrix_routing: true,
-            privacy_tier: 2, // Private (Bounded+tracked)
+            privacy_tier: 2,       // Private (Bounded+tracked)
             max_packet_size: 9000, // Jumbo frames
             rate_limit_per_sec: 100,
             _reserved: [0u8; 8],
@@ -237,7 +237,10 @@ impl PolicyManager {
             );
         }
 
-        tracing::info!("Policy sync complete: {} entries prepared for BPF map", count);
+        tracing::info!(
+            "Policy sync complete: {} entries prepared for BPF map",
+            count
+        );
         Ok(())
     }
 
@@ -269,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_policy_manager_basic() {
-        let manager = PolicyManager::new().unwrap();
+        let manager = PolicyManager::new().expect("test: creation");
 
         let policy = ValidationPolicy::strict();
         manager.set_policy(123, policy);
@@ -284,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_default_policy() {
-        let manager = PolicyManager::new().unwrap();
+        let manager = PolicyManager::new().expect("test: creation");
 
         let policy = manager.get_policy(999); // Unknown connection
         assert!(policy.requires_pos); // Should use default
@@ -338,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_tier_policy_manager_integration() {
-        let manager = PolicyManager::new().unwrap();
+        let manager = PolicyManager::new().expect("test: creation");
 
         // Set different tier policies
         manager.set_policy(100, ValidationPolicy::for_privacy_tier(0));
@@ -439,8 +442,7 @@ mod tests {
             assert_eq!(bytes.len(), 32);
 
             // Read back privacy_tier field at offset 12
-            let tier_bytes: [u8; 4] = bytes[12..16].try_into()
-                .expect("test: slice to array");
+            let tier_bytes: [u8; 4] = bytes[12..16].try_into().expect("test: slice to array");
             let read_tier = u32::from_le_bytes(tier_bytes);
             assert_eq!(read_tier, u32::from(policy.privacy_tier));
         }

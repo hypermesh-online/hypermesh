@@ -26,7 +26,10 @@ fn test_security_module_exists() {
 
     assert_eq!(config.default_trust_policy, TrustLevel::Moderate);
     assert!(config.enable_pqc_signatures);
-    assert_eq!(config.trustchain_endpoint, "https://trust.hypermesh.online:8443");
+    assert_eq!(
+        config.trustchain_endpoint,
+        "https://trust.hypermesh.online:8443"
+    );
 }
 
 #[test]
@@ -41,9 +44,9 @@ fn test_trust_levels() {
 
     for level in levels {
         match level {
-            TrustLevel::Strict => assert_eq!(format!("{:?}", level), "Strict"),
-            TrustLevel::Moderate => assert_eq!(format!("{:?}", level), "Moderate"),
-            TrustLevel::Permissive => assert_eq!(format!("{:?}", level), "Permissive"),
+            TrustLevel::Strict => assert_eq!(format!("{level:?}"), "Strict"),
+            TrustLevel::Moderate => assert_eq!(format!("{level:?}"), "Moderate"),
+            TrustLevel::Permissive => assert_eq!(format!("{level:?}"), "Permissive"),
             _ => {}
         }
     }
@@ -53,7 +56,7 @@ fn test_trust_levels() {
 fn test_publisher_types() {
     use catalog::security::PublisherType;
 
-    let types = vec![
+    let types = [
         PublisherType::Individual,
         PublisherType::Organization,
         PublisherType::Community,
@@ -77,13 +80,13 @@ fn test_signature_algorithms() {
     for algo in algorithms {
         match algo {
             SignatureAlgorithm::Falcon1024 => {
-                assert_eq!(format!("{:?}", algo), "Falcon1024");
+                assert_eq!(format!("{algo:?}"), "Falcon1024");
             }
             SignatureAlgorithm::Ed25519 => {
-                assert_eq!(format!("{:?}", algo), "Ed25519");
+                assert_eq!(format!("{algo:?}"), "Ed25519");
             }
             SignatureAlgorithm::HybridFalconEd25519 => {
-                assert_eq!(format!("{:?}", algo), "HybridFalconEd25519");
+                assert_eq!(format!("{algo:?}"), "HybridFalconEd25519");
             }
         }
     }
@@ -97,7 +100,10 @@ fn test_distribution_config_with_security() {
 
     assert!(config.require_signatures);
     assert!(!config.allow_unverified_publishers);
-    assert_eq!(config.security.trustchain_endpoint, "https://trust.hypermesh.online:8443");
+    assert_eq!(
+        config.security.trustchain_endpoint,
+        "https://trust.hypermesh.online:8443"
+    );
     assert!(config.security.enable_pqc_signatures);
 }
 
@@ -114,7 +120,7 @@ fn test_security_severity_ordering() {
 fn test_violation_types() {
     use catalog::security::ViolationType;
 
-    let violations = vec![
+    let violations = [
         ViolationType::InvalidSignature,
         ViolationType::InvalidCertificate,
         ViolationType::BlacklistedPublisher,
@@ -136,12 +142,18 @@ async fn test_binary_publisher_verification() {
     let auth = PublisherAuthenticator::new();
 
     // Non-revoked publisher is authenticated
-    let result = auth.verify("fp-abc").await.expect("test: verify should succeed");
+    let result = auth
+        .verify("fp-abc")
+        .await
+        .expect("test: verify should succeed");
     assert!(result.authenticated);
 
     // Revoked publisher is not authenticated
     auth.revoke("fp-abc", "test revocation").await;
-    let result = auth.verify("fp-abc").await.expect("test: verify should succeed");
+    let result = auth
+        .verify("fp-abc")
+        .await
+        .expect("test: verify should succeed");
     assert!(!result.authenticated);
 }
 
@@ -159,14 +171,24 @@ fn test_falcon_1024_keypair_generation_and_signing() {
     // Sign test data
     let data = b"catalog package content for signing verification";
     let signed_msg = falcon1024::sign(data, &sk);
-    assert!(signed_msg.len() > data.len(), "Signed message should be larger than original");
+    assert!(
+        signed_msg.len() > data.len(),
+        "Signed message should be larger than original"
+    );
 
     // Verify signature
     let opened = falcon1024::open(&signed_msg, &pk);
-    assert!(opened.is_ok(), "FALCON-1024 signature verification should succeed");
+    assert!(
+        opened.is_ok(),
+        "FALCON-1024 signature verification should succeed"
+    );
 
     let recovered = opened.unwrap();
-    assert_eq!(recovered.as_slice(), data, "Recovered data should match original");
+    assert_eq!(
+        recovered.as_slice(),
+        data,
+        "Recovered data should match original"
+    );
 }
 
 #[test]
@@ -186,7 +208,7 @@ fn test_falcon_1024_wrong_key_fails_verification() {
 
 #[tokio::test]
 async fn test_trustchain_integration_creation() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -195,12 +217,15 @@ async fn test_trustchain_integration_creation() {
     };
 
     let integration = TrustChainIntegration::new(config).await;
-    assert!(integration.is_ok(), "TrustChainIntegration should initialize successfully");
+    assert!(
+        integration.is_ok(),
+        "TrustChainIntegration should initialize successfully"
+    );
 }
 
 #[tokio::test]
 async fn test_trustchain_validate_certificate() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -213,14 +238,17 @@ async fn test_trustchain_validate_certificate() {
     // Validate a test certificate (placeholder returns valid)
     let cert_bytes = b"test-certificate-data";
     let validation = integration.validate_certificate(cert_bytes).await.unwrap();
-    assert!(validation.valid, "Placeholder validation should return valid");
+    assert!(
+        validation.valid,
+        "Placeholder validation should return valid"
+    );
     assert!(validation.chain_valid);
     assert!(!validation.revoked);
 }
 
 #[tokio::test]
 async fn test_trustchain_issue_certificate_requires_stoq() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -231,18 +259,23 @@ async fn test_trustchain_issue_certificate_requires_stoq() {
     let integration = TrustChainIntegration::new(config).await.unwrap();
 
     // Issue certificate should fail because STOQ transport is not configured
-    let result = integration.issue_certificate(
-        "test-publisher".to_string(),
-        Some("Test Org".to_string()),
-    ).await;
-    assert!(result.is_err(), "issue_certificate should fail without STOQ transport");
+    let result = integration
+        .issue_certificate("test-publisher".to_string(), Some("Test Org".to_string()))
+        .await;
+    assert!(
+        result.is_err(),
+        "issue_certificate should fail without STOQ transport"
+    );
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("STOQ"), "Error should mention STOQ transport");
+    assert!(
+        err_msg.contains("STOQ"),
+        "Error should mention STOQ transport"
+    );
 }
 
 #[tokio::test]
 async fn test_trustchain_check_revocation() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -253,13 +286,16 @@ async fn test_trustchain_check_revocation() {
     let integration = TrustChainIntegration::new(config).await.unwrap();
 
     // Revocation check (placeholder returns not revoked)
-    let revoked = integration.check_revocation("test-fingerprint-abc").await.unwrap();
+    let revoked = integration
+        .check_revocation("test-fingerprint-abc")
+        .await
+        .unwrap();
     assert!(!revoked, "Placeholder should return not revoked");
 }
 
 #[tokio::test]
 async fn test_trustchain_verify_chain() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig, Certificate};
+    use catalog::security::trustchain::{Certificate, TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -285,12 +321,15 @@ async fn test_trustchain_verify_chain() {
 
     // Single cert chain where issuer matches CA root common_name
     let result = integration.verify_chain(&[leaf]).await.unwrap();
-    assert!(result, "Single cert chain with matching issuer should verify");
+    assert!(
+        result,
+        "Single cert chain with matching issuer should verify"
+    );
 }
 
 #[tokio::test]
 async fn test_trustchain_verify_empty_chain_fails() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "https://trust.hypermesh.online:8443".to_string(),
@@ -306,7 +345,7 @@ async fn test_trustchain_verify_empty_chain_fails() {
 
 #[tokio::test]
 async fn test_trustchain_pqc_enabled() {
-    use catalog::security::trustchain::{TrustChainIntegration, TrustChainConfig};
+    use catalog::security::trustchain::{TrustChainConfig, TrustChainIntegration};
 
     let config = TrustChainConfig {
         endpoint: "test".to_string(),
@@ -330,7 +369,10 @@ async fn test_vulnerability_scanner_detects_credentials() {
     // The default test package has clean content, so score should be 100
     let result = scanner.scan(&package).await.unwrap();
     assert_eq!(result.score, 100, "Clean package should have score 100");
-    assert!(result.rule_failures.is_empty(), "Clean package should have no rule failures");
+    assert!(
+        result.rule_failures.is_empty(),
+        "Clean package should have no rule failures"
+    );
 }
 
 #[tokio::test]
@@ -345,8 +387,14 @@ async fn test_vulnerability_scanner_detects_command_injection() {
     package.content.main_content = "system(user_input)".to_string();
 
     let result = scanner.scan(&package).await.unwrap();
-    assert!(!result.injection_risks.is_empty(), "Should detect command injection risk");
-    assert!(result.score < 100, "Score should be reduced for injection risks");
+    assert!(
+        !result.injection_risks.is_empty(),
+        "Should detect command injection risk"
+    );
+    assert!(
+        result.score < 100,
+        "Score should be reduced for injection risks"
+    );
 }
 
 #[tokio::test]
@@ -360,21 +408,27 @@ async fn test_vulnerability_scanner_detects_path_traversal() {
     package.content.main_content = "open(\"../../etc/passwd\")".to_string();
 
     let result = scanner.scan(&package).await.unwrap();
-    assert!(!result.injection_risks.is_empty(), "Should detect path traversal");
+    assert!(
+        !result.injection_risks.is_empty(),
+        "Should detect path traversal"
+    );
 }
 
 #[tokio::test]
 async fn test_security_manager_creation() {
-    use catalog::security::{SecurityManager, SecurityConfig};
+    use catalog::security::{SecurityConfig, SecurityManager};
 
     let config = SecurityConfig::default();
     let manager = SecurityManager::new(config).await;
-    assert!(manager.is_ok(), "SecurityManager should initialize with default config");
+    assert!(
+        manager.is_ok(),
+        "SecurityManager should initialize with default config"
+    );
 }
 
 #[tokio::test]
 async fn test_security_manager_verify_unsigned_package() {
-    use catalog::security::{SecurityManager, SecurityConfig};
+    use catalog::security::{SecurityConfig, SecurityManager};
 
     let config = SecurityConfig::default();
     let manager = SecurityManager::new(config).await.unwrap();
@@ -384,10 +438,19 @@ async fn test_security_manager_verify_unsigned_package() {
     let result = manager.verify_package(&package).await;
     // verify_package calls verifier.verify_package which expects a signature
     // Since there is none, it should return an error about missing signature
-    assert!(result.is_ok(), "verify_package should return Ok(VerificationResult)");
+    assert!(
+        result.is_ok(),
+        "verify_package should return Ok(VerificationResult)"
+    );
     let verification = result.unwrap();
-    assert!(!verification.verified, "Unsigned package should not be verified");
-    assert!(!verification.errors.is_empty(), "Should have errors about missing signature");
+    assert!(
+        !verification.verified,
+        "Unsigned package should not be verified"
+    );
+    assert!(
+        !verification.errors.is_empty(),
+        "Should have errors about missing signature"
+    );
 }
 
 fn main() {

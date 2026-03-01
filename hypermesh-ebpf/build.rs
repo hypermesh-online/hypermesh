@@ -33,7 +33,10 @@ fn compile_ebpf_programs() {
     }
 
     if let Err(e) = std::fs::create_dir_all(out_dir) {
-        println!("cargo:warning=Failed to create output dir {:?}: {}", out_dir, e);
+        println!(
+            "cargo:warning=Failed to create output dir {:?}: {}",
+            out_dir, e
+        );
         return;
     }
 

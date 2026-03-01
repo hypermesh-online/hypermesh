@@ -4,13 +4,11 @@
 
 //! Tests for adaptive connection optimization
 
-use std::time::Duration;
-use stoq::transport::{
-    TransportConfig, StoqTransport, NetworkTier, Endpoint
-};
 use std::net::Ipv6Addr;
+use std::time::Duration;
+use stoq::transport::{Endpoint, NetworkTier, StoqTransport, TransportConfig};
 use tokio::time::{sleep, timeout};
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 /// Test that configuration changes affect live connections
 #[tokio::test]
@@ -18,10 +16,11 @@ async fn test_live_connection_adaptation() {
     let _ = tracing_subscriber::fmt::try_init();
 
     // Create transport with initial config
-    let mut config = TransportConfig::default();
-    config.bind_address = Ipv6Addr::UNSPECIFIED;
-    config.port = 0; // Random port
-    config.send_buffer_size = 1024 * 1024; // 1MB initial
+    let config = TransportConfig {
+        port: 0,                       // Random port
+        send_buffer_size: 1024 * 1024, // 1MB initial
+        ..Default::default()
+    };
 
     let mut transport = StoqTransport::new(config.clone()).await.unwrap();
 
@@ -50,8 +49,12 @@ async fn test_live_connection_adaptation() {
 
     // Connect to server
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
@@ -77,15 +80,22 @@ async fn test_live_connection_adaptation() {
 
     // Verify adaptation occurred
     let updated_stats = transport.adaptation_stats();
-    let conn_stats = updated_stats.iter()
+    let conn_stats = updated_stats
+        .iter()
         .find(|(id, _)| id == &conn_id)
         .map(|(_, stats)| stats);
 
     assert!(conn_stats.is_some(), "Should have stats for connection");
     let stats = conn_stats.unwrap();
-    assert!(stats.adaptation_count > 0, "Should have adapted at least once");
+    assert!(
+        stats.adaptation_count > 0,
+        "Should have adapted at least once"
+    );
 
-    info!("Test passed: Live connection adapted {} times", stats.adaptation_count);
+    info!(
+        "Test passed: Live connection adapted {} times",
+        stats.adaptation_count
+    );
 }
 
 /// Test automatic network tier detection
@@ -93,7 +103,10 @@ async fn test_live_connection_adaptation() {
 async fn test_tier_detection() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let config = TransportConfig::default();
+    let config = TransportConfig {
+        port: 0,
+        ..TransportConfig::default()
+    };
     let transport = StoqTransport::new(config).await.unwrap();
 
     // Start adaptation
@@ -114,8 +127,12 @@ async fn test_tier_detection() {
 
     // Connect with different simulated conditions
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
@@ -134,9 +151,9 @@ async fn test_tier_detection() {
 
         // Should detect at least standard tier for localhost
         match tier {
-            NetworkTier::Standard { .. } |
-            NetworkTier::Performance { .. } |
-            NetworkTier::DataCenter { .. } => {
+            NetworkTier::Standard { .. }
+            | NetworkTier::Performance { .. }
+            | NetworkTier::DataCenter { .. } => {
                 info!("Correctly detected high-performance tier for localhost");
             }
             _ => {
@@ -152,7 +169,10 @@ async fn test_tier_detection() {
 async fn test_hysteresis() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let config = TransportConfig::default();
+    let config = TransportConfig {
+        port: 0,
+        ..TransportConfig::default()
+    };
     let transport = StoqTransport::new(config).await.unwrap();
 
     transport.start_adaptation().await;
@@ -170,22 +190,27 @@ async fn test_hysteresis() {
     });
 
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
     let conn_id = connection.id();
 
     // Force multiple rapid adaptations
-    for i in 0..5 {
+    for _i in 0..5 {
         transport.force_connection_adaptation(&conn_id).await.ok();
         sleep(Duration::from_millis(100)).await; // Rapid changes
     }
 
     // Get stats
     let stats = transport.adaptation_stats();
-    let conn_stats = stats.iter()
+    let conn_stats = stats
+        .iter()
         .find(|(id, _)| id == &conn_id)
         .map(|(_, stats)| stats);
 
@@ -194,8 +219,14 @@ async fn test_hysteresis() {
         info!("Adaptations with hysteresis: {}", stats.adaptation_count);
 
         // Should have some adaptations but not every attempt
-        assert!(stats.adaptation_count > 0, "Should have at least one adaptation");
-        assert!(stats.adaptation_count <= 5, "Hysteresis should limit adaptations");
+        assert!(
+            stats.adaptation_count > 0,
+            "Should have at least one adaptation"
+        );
+        assert!(
+            stats.adaptation_count <= 5,
+            "Hysteresis should limit adaptations"
+        );
     }
 }
 
@@ -204,7 +235,10 @@ async fn test_hysteresis() {
 async fn test_disable_adaptation() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let config = TransportConfig::default();
+    let config = TransportConfig {
+        port: 0,
+        ..TransportConfig::default()
+    };
     let transport = StoqTransport::new(config).await.unwrap();
 
     // Start but then disable adaptation
@@ -224,8 +258,12 @@ async fn test_disable_adaptation() {
     });
 
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
@@ -237,7 +275,8 @@ async fn test_disable_adaptation() {
     sleep(Duration::from_secs(2)).await;
 
     let stats = transport.adaptation_stats();
-    let conn_stats = stats.iter()
+    let conn_stats = stats
+        .iter()
         .find(|(id, _)| id == &conn_id)
         .map(|(_, stats)| stats);
 
@@ -252,7 +291,10 @@ async fn test_disable_adaptation() {
 async fn test_manual_tier_setting() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let config = TransportConfig::default();
+    let config = TransportConfig {
+        port: 0,
+        ..TransportConfig::default()
+    };
     let transport = StoqTransport::new(config).await.unwrap();
 
     transport.start_adaptation().await;
@@ -269,8 +311,12 @@ async fn test_manual_tier_setting() {
     });
 
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
@@ -278,15 +324,24 @@ async fn test_manual_tier_setting() {
 
     // Set specific tier
     let tier = NetworkTier::DataCenter { gbps: 100.0 };
-    transport.set_connection_tier(&conn_id, tier.clone()).await.unwrap();
+    transport
+        .set_connection_tier(&conn_id, tier.clone())
+        .await
+        .unwrap();
 
     // Verify parameters were applied
     if let Some(adaptive_conn) = transport.get_adaptive_connection(&conn_id) {
         let params = adaptive_conn.parameters();
 
         // DataCenter tier should have maximum parameters
-        assert!(params.stream_window >= 32 * 1024 * 1024, "Should have large stream window");
-        assert!(params.max_streams >= 1000, "Should have many concurrent streams");
+        assert!(
+            params.stream_window >= 32 * 1024 * 1024,
+            "Should have large stream window"
+        );
+        assert!(
+            params.max_streams >= 1000,
+            "Should have many concurrent streams"
+        );
         info!("Manual tier setting applied correct parameters");
     }
 }
@@ -296,8 +351,10 @@ async fn test_manual_tier_setting() {
 async fn test_real_network_simulation() {
     let _ = tracing_subscriber::fmt::try_init();
 
-    let mut config = TransportConfig::default();
-    config.bind_address = Ipv6Addr::UNSPECIFIED;
+    let config = TransportConfig {
+        port: 0,
+        ..Default::default()
+    };
 
     let transport = StoqTransport::new(config.clone()).await.unwrap();
 
@@ -329,8 +386,12 @@ async fn test_real_network_simulation() {
     ];
 
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     for (name, tier) in scenarios {
@@ -351,7 +412,7 @@ async fn test_real_network_simulation() {
             info!("Connection adapted to: {:?}", current);
 
             let stats = adaptive.adaptation_stats();
-            assert!(stats.adaptation_count > 0, "Should have adapted for {}", name);
+            assert!(stats.adaptation_count > 0, "Should have adapted for {name}");
         }
     }
 
@@ -369,7 +430,10 @@ async fn test_adaptation_overhead() {
 
     let _ = tracing_subscriber::fmt::try_init();
 
-    let config = TransportConfig::default();
+    let config = TransportConfig {
+        port: 0,
+        ..TransportConfig::default()
+    };
     let transport = StoqTransport::new(config).await.unwrap();
 
     transport.start_adaptation().await;
@@ -386,8 +450,12 @@ async fn test_adaptation_overhead() {
     });
 
     let endpoint = Endpoint::new(
-        server_addr.ip().to_string().parse::<Ipv6Addr>().unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port()
+        server_addr
+            .ip()
+            .to_string()
+            .parse::<Ipv6Addr>()
+            .unwrap_or(Ipv6Addr::LOCALHOST),
+        server_addr.port(),
     );
 
     let connection = transport.connect(&endpoint).await.unwrap();
@@ -395,7 +463,10 @@ async fn test_adaptation_overhead() {
 
     // Measure adaptation time
     let start = Instant::now();
-    transport.force_connection_adaptation(&conn_id).await.unwrap();
+    transport
+        .force_connection_adaptation(&conn_id)
+        .await
+        .unwrap();
     let adaptation_time = start.elapsed();
 
     info!("Adaptation took: {:?}", adaptation_time);
@@ -403,8 +474,7 @@ async fn test_adaptation_overhead() {
     // Should be very fast
     assert!(
         adaptation_time < Duration::from_millis(100),
-        "Adaptation should be fast, took {:?}",
-        adaptation_time
+        "Adaptation should be fast, took {adaptation_time:?}"
     );
 
     // Measure multiple adaptations

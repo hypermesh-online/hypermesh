@@ -4,8 +4,8 @@
 
 //! Network adapter types: allocation records, interface info, QoS, and statistics.
 
-use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
 use crate::assets::core::{AssetRegistration, PrivacyMode, ProxyAddress};
 

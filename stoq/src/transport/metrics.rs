@@ -10,12 +10,12 @@
 //! - Performance metrics (latency, error rates, packet loss)
 //! - Resource utilization (memory pools, CPU usage)
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Instant, Duration};
-use std::collections::VecDeque;
 use parking_lot::RwLock;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// Core transport metrics with native collection
 pub struct TransportMetrics {
@@ -98,6 +98,12 @@ struct ErrorMetrics {
     token_validation_failures: u64,
 }
 
+impl Default for TransportMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransportMetrics {
     pub fn new() -> Self {
         Self {
@@ -122,7 +128,8 @@ impl TransportMetrics {
     }
 
     pub fn record_bytes_received(&self, bytes: usize) {
-        self.bytes_received.fetch_add(bytes as u64, Ordering::Relaxed);
+        self.bytes_received
+            .fetch_add(bytes as u64, Ordering::Relaxed);
     }
 
     pub fn record_connection_established(&self) {
@@ -139,7 +146,8 @@ impl TransportMetrics {
     }
 
     pub fn record_packet_sharded(&self, shard_count: u32) {
-        self.packets_sharded.fetch_add(shard_count as u64, Ordering::Relaxed);
+        self.packets_sharded
+            .fetch_add(shard_count as u64, Ordering::Relaxed);
     }
 
     pub fn record_shards_reassembled(&self) {
@@ -236,9 +244,11 @@ impl TransportMetrics {
 
         IntervalMetrics {
             duration_secs: elapsed,
-            throughput_gbps: ((bytes_sent + bytes_received) as f64 * 8.0) / (elapsed * 1_000_000_000.0),
+            throughput_gbps: ((bytes_sent + bytes_received) as f64 * 8.0)
+                / (elapsed * 1_000_000_000.0),
             packets_per_sec: self.packets_tokenized.load(Ordering::Relaxed) as f64 / elapsed,
-            connections_per_sec: self.connections_established.load(Ordering::Relaxed) as f64 / elapsed,
+            connections_per_sec: self.connections_established.load(Ordering::Relaxed) as f64
+                / elapsed,
         }
     }
 }

@@ -3,17 +3,17 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Simplified Certificate Transparency Storage
-//! 
+//!
 //! In-memory storage implementation for CT logs (for initial build success)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::errors::Result as TrustChainResult;
 use super::LogEntry;
+use crate::errors::Result as TrustChainResult;
 
 /// Simplified CT storage using in-memory storage
 pub struct SimpleCTStorage {
@@ -50,13 +50,19 @@ impl SimpleCTStorage {
     }
 
     /// Get entry by sequence number
-    pub async fn get_entry_by_sequence(&self, sequence_number: u64) -> TrustChainResult<Option<LogEntry>> {
+    pub async fn get_entry_by_sequence(
+        &self,
+        sequence_number: u64,
+    ) -> TrustChainResult<Option<LogEntry>> {
         let entries = self.entries.read().await;
         Ok(entries.get(&sequence_number).cloned())
     }
 
     /// Get entry by fingerprint
-    pub async fn get_entry_by_fingerprint(&self, fingerprint: &[u8; 32]) -> TrustChainResult<Option<LogEntry>> {
+    pub async fn get_entry_by_fingerprint(
+        &self,
+        fingerprint: &[u8; 32],
+    ) -> TrustChainResult<Option<LogEntry>> {
         let fingerprint_index = self.fingerprint_index.read().await;
         let entries = self.entries.read().await;
 
@@ -96,7 +102,10 @@ impl SimpleCTStorage {
     }
 
     /// Get entries by common name
-    pub async fn get_entries_by_common_name(&self, common_name: &str) -> TrustChainResult<Vec<LogEntry>> {
+    pub async fn get_entries_by_common_name(
+        &self,
+        common_name: &str,
+    ) -> TrustChainResult<Vec<LogEntry>> {
         let entries = self.entries.read().await;
         let mut result = Vec::new();
 
@@ -129,9 +138,7 @@ impl SimpleCTStorage {
         let total_entries = entries.len() as u64;
 
         // Find last entry timestamp
-        let last_entry_timestamp = entries.values()
-            .map(|entry| entry.timestamp)
-            .max();
+        let last_entry_timestamp = entries.values().map(|entry| entry.timestamp).max();
 
         Ok(StorageStats {
             total_entries,

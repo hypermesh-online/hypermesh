@@ -15,15 +15,15 @@
 //! Implements peer discovery, service registration, and network topology
 //! management for the HyperMesh multi-node system.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddrV6;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetResult, AssetError};
-use super::{PeerIdentity, NodeCapabilities};
+use super::{NodeCapabilities, PeerIdentity};
+use crate::assets::core::{AssetError, AssetResult};
 
 /// Node discovery service
 pub struct NodeDiscovery {
@@ -120,7 +120,11 @@ pub struct ServiceAnnouncement {
 
 impl NodeDiscovery {
     /// Create new node discovery service
-    pub fn new(local_node: PeerIdentity, protocol: DiscoveryProtocol, config: DiscoveryConfig) -> Self {
+    pub fn new(
+        local_node: PeerIdentity,
+        protocol: DiscoveryProtocol,
+        config: DiscoveryConfig,
+    ) -> Self {
         Self {
             local_node,
             discovered_nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -169,7 +173,8 @@ impl NodeDiscovery {
     /// Announce service
     pub async fn announce_service(&self, announcement: ServiceAnnouncement) -> AssetResult<()> {
         let mut registry = self.service_registry.write().await;
-        registry.entry(announcement.service_name.clone())
+        registry
+            .entry(announcement.service_name.clone())
             .or_insert_with(Vec::new)
             .push(announcement);
         Ok(())
@@ -178,9 +183,7 @@ impl NodeDiscovery {
     /// Discover services
     pub async fn discover_services(&self, service_name: &str) -> Vec<ServiceAnnouncement> {
         let registry = self.service_registry.read().await;
-        registry.get(service_name)
-            .cloned()
-            .unwrap_or_default()
+        registry.get(service_name).cloned().unwrap_or_default()
     }
 
     /// Get discovered nodes
@@ -209,7 +212,8 @@ impl NodeDiscovery {
         let now = SystemTime::now();
         let timeout = self.config.node_timeout;
 
-        let stale_nodes: Vec<PeerIdentity> = nodes.iter()
+        let stale_nodes: Vec<PeerIdentity> = nodes
+            .iter()
             .filter(|(_, node)| {
                 now.duration_since(node.last_seen)
                     .map(|d| d > timeout)

@@ -8,15 +8,16 @@ use std::time::SystemTime;
 // BLAKE3 used for sync hashing
 use chrono::{DateTime, Utc};
 
-use crate::{AssetPackage, AssetMetadata};
-use super::types::*;
 use super::super::ConflictResolution;
+use super::types::*;
+use crate::{AssetMetadata, AssetPackage};
 
 impl super::SyncManager {
     pub(super) async fn update_sync_state(&self, peer_id: &str, state: SyncState) -> Result<()> {
         let mut peer_states = self.peer_states.write().await;
-        let metadata = peer_states.entry(peer_id.to_string()).or_insert_with(|| {
-            SyncMetadata {
+        let metadata = peer_states
+            .entry(peer_id.to_string())
+            .or_insert_with(|| SyncMetadata {
                 peer_id: peer_id.to_string(),
                 last_sync: None,
                 state: SyncState::NotSynced,
@@ -24,8 +25,7 @@ impl super::SyncManager {
                 package_versions: HashMap::new(),
                 conflicts_resolved: 0,
                 bytes_transferred: 0,
-            }
-        });
+            });
         metadata.state = state;
         Ok(())
     }
@@ -89,7 +89,7 @@ impl super::SyncManager {
 
     pub(super) async fn calculate_current_merkle_root(&self) -> Result<String> {
         let tree = self.merkle_tree.read().await;
-        Ok(self.calculate_merkle_root(&*tree))
+        Ok(self.calculate_merkle_root(&tree))
     }
 
     pub(super) async fn request_merkle_root(&self, _peer_id: &str) -> Result<String> {
@@ -103,7 +103,10 @@ impl super::SyncManager {
         self.calculate_current_merkle_root().await
     }
 
-    pub(super) async fn request_package_list(&self, _peer_merkle: &str) -> Result<HashMap<String, AssetMetadata>> {
+    pub(super) async fn request_package_list(
+        &self,
+        _peer_merkle: &str,
+    ) -> Result<HashMap<String, AssetMetadata>> {
         // Local-first: return local package index as id->metadata map.
         // A real P2P call would fetch the remote peer's list over STOQ.
         let packages = self.package_index.read().await;
@@ -118,11 +121,9 @@ impl super::SyncManager {
         // Local-first: look up in local index. If not found, the caller
         // would need a P2P fetch over STOQ (network-dependent).
         let packages = self.package_index.read().await;
-        packages.get(id)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!(
-                "Package '{}' not found locally; requires P2P fetch over STOQ", id
-            ))
+        packages.get(id).cloned().ok_or_else(|| {
+            anyhow::anyhow!("Package '{id}' not found locally; requires P2P fetch over STOQ")
+        })
     }
 
     pub(super) async fn get_packages_since(&self, since: SystemTime) -> Result<Vec<AssetPackage>> {
@@ -130,33 +131,52 @@ impl super::SyncManager {
         // Filter by updated field from AssetMetadata (if it exists)
         // Convert SystemTime to DateTime<Utc> for comparison
         let since_dt = DateTime::<Utc>::from(since);
-        Ok(packages.values()
+        Ok(packages
+            .values()
             .filter(|p| p.metadata().updated.map(|u| u > since_dt).unwrap_or(false))
             .cloned()
             .collect())
     }
 
-    pub(super) async fn get_packages_by_category(&self, categories: Vec<String>) -> Result<Vec<AssetPackage>> {
+    pub(super) async fn get_packages_by_category(
+        &self,
+        categories: Vec<String>,
+    ) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
         // Filter by tags since AssetMetadata doesn't have category field
-        Ok(packages.values()
+        Ok(packages
+            .values()
             .filter(|p| p.metadata().tags.iter().any(|tag| categories.contains(tag)))
             .cloned()
             .collect())
     }
 
-    pub(super) async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetPackage>> {
+    pub(super) async fn get_high_priority_packages(
+        &self,
+        min_priority: f64,
+    ) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
-        let mut scored: Vec<(f64, AssetPackage)> = packages.values()
+        let mut scored: Vec<(f64, AssetPackage)> = packages
+            .values()
             .map(|pkg| {
                 let meta = &pkg.spec.metadata;
                 // Score from metadata completeness: author, license, description, tags
                 let mut score = 0.0;
-                if meta.author.is_some() { score += 0.2; }
-                if meta.license.is_some() { score += 0.2; }
-                if meta.description.is_some() { score += 0.2; }
-                if !meta.tags.is_empty() { score += 0.2; }
-                if !meta.keywords.is_empty() { score += 0.2; }
+                if meta.author.is_some() {
+                    score += 0.2;
+                }
+                if meta.license.is_some() {
+                    score += 0.2;
+                }
+                if meta.description.is_some() {
+                    score += 0.2;
+                }
+                if !meta.tags.is_empty() {
+                    score += 0.2;
+                }
+                if !meta.keywords.is_empty() {
+                    score += 0.2;
+                }
                 (score, pkg.clone())
             })
             .filter(|(score, _)| *score >= min_priority)
@@ -167,7 +187,8 @@ impl super::SyncManager {
 
     pub(super) async fn get_package(&self, id: &str) -> Result<AssetPackage> {
         let packages = self.package_index.read().await;
-        packages.get(id)
+        packages
+            .get(id)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("Package not found"))
     }
@@ -180,9 +201,12 @@ impl super::SyncManager {
             None => return Ok(false),
         };
         let peer_states = self.peer_states.read().await;
-        let peer_version = peer_states.get(peer_id)
+        let peer_version = peer_states
+            .get(peer_id)
             .and_then(|state| {
-                state.package_versions.iter()
+                state
+                    .package_versions
+                    .iter()
                     .find(|(reg, _)| reg.to_hex_string() == id)
                     .map(|(_, v)| v.clone())
             })
@@ -202,7 +226,11 @@ impl super::SyncManager {
         Ok(())
     }
 
-    pub(super) async fn send_package_update(&self, package: &AssetPackage, _peer_id: &str) -> Result<()> {
+    pub(super) async fn send_package_update(
+        &self,
+        package: &AssetPackage,
+        _peer_id: &str,
+    ) -> Result<()> {
         // Local-first: update in local index. Network send deferred.
         let mut index = self.package_index.write().await;
         index.insert(package.package_hash.clone(), package.clone());
@@ -221,7 +249,8 @@ impl super::SyncManager {
             return Ok(Vec::new());
         }
         let tree = self.merkle_tree.read().await;
-        let diff_hashes: Vec<String> = tree.values()
+        let diff_hashes: Vec<String> = tree
+            .values()
             .filter(|node| !node.packages.is_empty())
             .map(|node| node.hash.clone())
             .collect();
@@ -232,16 +261,36 @@ impl super::SyncManager {
         // Score based on metadata completeness and trust signals.
         let mut score = 0.0;
         let mut factors = 0;
-        if metadata.author.is_some() { score += 1.0; } factors += 1;
-        if metadata.license.is_some() { score += 1.0; } factors += 1;
-        if metadata.description.is_some() { score += 1.0; } factors += 1;
-        if !metadata.tags.is_empty() { score += 1.0; } factors += 1;
-        if metadata.homepage.is_some() { score += 1.0; } factors += 1;
-        if metadata.repository.is_some() { score += 1.0; } factors += 1;
+        if metadata.author.is_some() {
+            score += 1.0;
+        }
+        factors += 1;
+        if metadata.license.is_some() {
+            score += 1.0;
+        }
+        factors += 1;
+        if metadata.description.is_some() {
+            score += 1.0;
+        }
+        factors += 1;
+        if !metadata.tags.is_empty() {
+            score += 1.0;
+        }
+        factors += 1;
+        if metadata.homepage.is_some() {
+            score += 1.0;
+        }
+        factors += 1;
+        if metadata.repository.is_some() {
+            score += 1.0;
+        }
+        factors += 1;
         // Version maturity: higher major versions imply more trust
         let version_parts: Vec<&str> = metadata.version.split('.').collect();
         if let Some(major) = version_parts.first().and_then(|v| v.parse::<u32>().ok()) {
-            if major >= 1 { score += 1.0; }
+            if major >= 1 {
+                score += 1.0;
+            }
         }
         factors += 1;
         Ok(score / factors as f64)
@@ -265,21 +314,22 @@ impl super::SyncManager {
             }
         }
         Err(anyhow::anyhow!(
-            "Merge winner '{}' not found in local index", winner_name
+            "Merge winner '{winner_name}' not found in local index"
         ))
     }
 
     pub(super) async fn can_safely_delete(&self, id: &str) -> Result<bool> {
         // Check if any other packages depend on this one.
         let packages = self.package_index.read().await;
-        let target_name = packages.get(id)
-            .map(|p| p.spec.metadata.name.clone());
+        let target_name = packages.get(id).map(|p| p.spec.metadata.name.clone());
         let target_name = match target_name {
             Some(name) => name,
             None => return Ok(true), // Already absent
         };
         for (pkg_id, pkg) in packages.iter() {
-            if pkg_id == id { continue; }
+            if pkg_id == id {
+                continue;
+            }
             for dep in &pkg.spec.spec.dependencies {
                 if dep.name == target_name {
                     return Ok(false);

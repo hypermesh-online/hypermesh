@@ -122,8 +122,10 @@ impl ConsensusProof {
                     validation.all_valid = false;
                     validation.add_error(
                         super::validation::ProofType::Space,
-                        format!("Asset {} requires minimum storage {} bytes",
-                            context.asset_id, min_storage),
+                        format!(
+                            "Asset {} requires minimum storage {} bytes",
+                            context.asset_id, min_storage
+                        ),
                         super::validation::ErrorCode::StorageCommitmentInvalid,
                     );
                 }
@@ -143,8 +145,10 @@ impl ConsensusProof {
                     validation.all_valid = false;
                     validation.add_error(
                         super::validation::ProofType::Stake,
-                        format!("Asset {} requires minimum stake {} tokens",
-                            context.asset_id, min_stake),
+                        format!(
+                            "Asset {} requires minimum stake {} tokens",
+                            context.asset_id, min_stake
+                        ),
                         super::validation::ErrorCode::InsufficientStake,
                     );
                 }
@@ -164,8 +168,10 @@ impl ConsensusProof {
                     validation.all_valid = false;
                     validation.add_error(
                         super::validation::ProofType::Work,
-                        format!("Asset {} requires minimum compute power {}",
-                            context.asset_id, min_compute),
+                        format!(
+                            "Asset {} requires minimum compute power {}",
+                            context.asset_id, min_compute
+                        ),
                         super::validation::ErrorCode::InsufficientWork,
                     );
                 }
@@ -193,11 +199,10 @@ impl ConsensusProof {
         }
 
         // Recalculate all_valid based on required proofs
-        validation.all_valid =
-            (!reqs.require_space || validation.space_valid) &&
-            (!reqs.require_stake || validation.stake_valid) &&
-            (!reqs.require_work || validation.work_valid) &&
-            (!reqs.require_time || validation.time_valid);
+        validation.all_valid = (!reqs.require_space || validation.space_valid)
+            && (!reqs.require_stake || validation.stake_valid)
+            && (!reqs.require_work || validation.work_valid)
+            && (!reqs.require_time || validation.time_valid);
 
         // Recalculate confidence score based on what was actually validated
         let mut required_count = 0;
@@ -205,19 +210,27 @@ impl ConsensusProof {
 
         if reqs.require_space {
             required_count += 1;
-            if validation.space_valid { passed_count += 1; }
+            if validation.space_valid {
+                passed_count += 1;
+            }
         }
         if reqs.require_stake {
             required_count += 1;
-            if validation.stake_valid { passed_count += 1; }
+            if validation.stake_valid {
+                passed_count += 1;
+            }
         }
         if reqs.require_work {
             required_count += 1;
-            if validation.work_valid { passed_count += 1; }
+            if validation.work_valid {
+                passed_count += 1;
+            }
         }
         if reqs.require_time {
             required_count += 1;
-            if validation.time_valid { passed_count += 1; }
+            if validation.time_valid {
+                passed_count += 1;
+            }
         }
 
         validation.confidence_score = if required_count > 0 {
@@ -233,7 +246,6 @@ impl ConsensusProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_asset_validation_all_proofs_required() {
@@ -243,7 +255,7 @@ mod tests {
             AssetProofRequirements::all(),
         );
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(validation.all_valid);
         assert_eq!(validation.confidence_score, 1.0);
     }
@@ -258,7 +270,7 @@ mod tests {
             AssetProofRequirements::custom(true, true, false, false),
         );
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(validation.all_valid);
         // Confidence is 100% because we passed the 2 required proofs
         assert_eq!(validation.confidence_score, 1.0);
@@ -271,9 +283,10 @@ mod tests {
         let context = AssetValidationContext::new(
             "test_asset_789".to_string(),
             AssetProofRequirements::all(),
-        ).with_min_stake(5000); // Require 5000 tokens
+        )
+        .with_min_stake(5000); // Require 5000 tokens
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(validation.all_valid); // new_for_testing has 10000 stake
     }
 
@@ -284,9 +297,10 @@ mod tests {
         let context = AssetValidationContext::new(
             "test_asset_999".to_string(),
             AssetProofRequirements::all(),
-        ).with_min_stake(1_000_000); // Require 1M tokens (too high)
+        )
+        .with_min_stake(1_000_000); // Require 1M tokens (too high)
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(!validation.all_valid);
         assert!(!validation.stake_valid);
     }
@@ -304,7 +318,7 @@ mod tests {
             AssetProofRequirements::minimal(),
         );
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         // Should still pass because work and time aren't required
         assert!(validation.all_valid);
     }
@@ -321,7 +335,7 @@ mod tests {
         .with_min_storage(10 * 1024 * 1024) // 10MB
         .with_min_compute(500);
 
-        let validation = proof.validate_for_asset(&context).unwrap();
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(validation.all_valid);
     }
 }

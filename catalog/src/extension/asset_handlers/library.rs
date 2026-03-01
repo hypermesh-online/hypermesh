@@ -3,12 +3,10 @@
 // See the LICENSE file in the repository root for full license text.
 
 use super::{
-    async_trait, HashMap, Arc, RwLock,
-    AssetExtensionHandler, ExtensionResult, ExtensionError,
-    AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
-    AssetOperation, OperationResult, DeploymentResult,
-    AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, ApplicationDomain,
-    ConsensusProof,
+    async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
+    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetUpdate, ConsensusProof, DeploymentResult, ExtensionError, ExtensionResult, HashMap,
+    NetworkScope, OperationResult, RwLock,
 };
 
 /// Handler for Library assets (packages, frameworks, dependencies)
@@ -25,6 +23,12 @@ struct LibraryPackage {
     pub language: String,
     pub dependencies: Vec<String>,
     pub size_bytes: u64,
+}
+
+impl Default for LibraryHandler {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LibraryHandler {
@@ -60,11 +64,15 @@ impl AssetExtensionHandler for LibraryHandler {
         let package = LibraryPackage {
             _id: asset_id.clone(),
             name: spec.name.clone(),
-            version: spec.metadata.get("version")
+            version: spec
+                .metadata
+                .get("version")
                 .and_then(|v| v.as_str())
                 .unwrap_or("1.0.0")
                 .to_string(),
-            language: spec.metadata.get("language")
+            language: spec
+                .metadata
+                .get("language")
                 .and_then(|v| v.as_str())
                 .unwrap_or("lua")
                 .to_string(),
@@ -78,12 +86,17 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(asset_id)
     }
 
-    async fn update_asset(&self, id: &AssetRegistration, update: AssetUpdate) -> ExtensionResult<()> {
+    async fn update_asset(
+        &self,
+        id: &AssetRegistration,
+        update: AssetUpdate,
+    ) -> ExtensionResult<()> {
         let mut packages = self.packages.write().await;
 
-        let package = packages.get_mut(id)
+        let package = packages
+            .get_mut(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Library package not found: {}", id)
+                message: format!("Library package not found: {id}"),
             })?;
 
         if let Some(name) = update.name {
@@ -101,9 +114,10 @@ impl AssetExtensionHandler for LibraryHandler {
 
     async fn delete_asset(&self, id: &AssetRegistration) -> ExtensionResult<()> {
         let mut packages = self.packages.write().await;
-        packages.remove(id)
+        packages
+            .remove(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Library package not found: {}", id)
+                message: format!("Library package not found: {id}"),
             })?;
 
         Ok(())
@@ -135,15 +149,22 @@ impl AssetExtensionHandler for LibraryHandler {
     async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
         let packages = self.packages.read().await;
 
-        let package = packages.get(id)
+        let package = packages
+            .get(id)
             .ok_or_else(|| ExtensionError::RuntimeError {
-                message: format!("Library package not found: {}", id)
+                message: format!("Library package not found: {id}"),
             })?;
 
         let mut metadata_map = HashMap::new();
-        metadata_map.insert("version".to_string(), serde_json::json!(package.version.clone()));
+        metadata_map.insert(
+            "version".to_string(),
+            serde_json::json!(package.version.clone()),
+        );
         metadata_map.insert("language".to_string(), serde_json::json!(package.language));
-        metadata_map.insert("dependencies".to_string(), serde_json::json!(package.dependencies.clone()));
+        metadata_map.insert(
+            "dependencies".to_string(),
+            serde_json::json!(package.dependencies.clone()),
+        );
 
         Ok(AssetMetadata {
             id: id.clone(),
@@ -166,7 +187,11 @@ impl AssetExtensionHandler for LibraryHandler {
         })
     }
 
-    async fn validate_asset(&self, id: &AssetRegistration, proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(
+        &self,
+        id: &AssetRegistration,
+        proof: ConsensusProof,
+    ) -> ExtensionResult<bool> {
         let packages = self.packages.read().await;
         if !packages.contains_key(id) {
             return Ok(false);
@@ -191,7 +216,11 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(true)
     }
 
-    async fn handle_operation(&self, id: &AssetRegistration, operation: AssetOperation) -> ExtensionResult<OperationResult> {
+    async fn handle_operation(
+        &self,
+        id: &AssetRegistration,
+        operation: AssetOperation,
+    ) -> ExtensionResult<OperationResult> {
         match operation {
             AssetOperation::Deploy(_) => {
                 // Libraries are deployed by installing them
@@ -199,7 +228,7 @@ impl AssetExtensionHandler for LibraryHandler {
 
                 if !packages.contains_key(id) {
                     return Err(ExtensionError::RuntimeError {
-                        message: format!("Library package not found: {}", id)
+                        message: format!("Library package not found: {id}"),
                     });
                 }
 
@@ -211,11 +240,11 @@ impl AssetExtensionHandler for LibraryHandler {
                 };
 
                 Ok(OperationResult::Deployed(result))
-            },
+            }
 
             _ => Err(ExtensionError::RuntimeError {
-                message: "Operation not supported for Library assets".to_string()
-            })
+                message: "Operation not supported for Library assets".to_string(),
+            }),
         }
     }
 }
@@ -243,7 +272,9 @@ mod tests {
             tags: vec!["library".to_string()],
         };
 
-        let asset_id = handler.create_asset(spec).await
+        let asset_id = handler
+            .create_asset(spec)
+            .await
             .expect("Library asset creation should succeed with valid spec");
         // Check that asset_id is valid (not empty)
         assert!(!asset_id.to_string().is_empty());

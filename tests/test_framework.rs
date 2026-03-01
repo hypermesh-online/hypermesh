@@ -42,6 +42,7 @@ pub struct TestResult {
 
 /// Test framework configuration
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TestConfig {
     pub parallel_execution: bool,
     pub max_threads: usize,
@@ -184,7 +185,7 @@ impl TestExecutor {
         };
 
         Ok(TestResult {
-            name: format!("{}::{}", component, test_type),
+            name: format!("{component}::{test_type}"),
             component: component.to_string(),
             passed,
             duration: start.elapsed(),

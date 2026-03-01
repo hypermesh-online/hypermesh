@@ -6,17 +6,17 @@
 //!
 //! Tests error handling, fault tolerance, and graceful degradation.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
 use std::net::Ipv6Addr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use tracing::info;
 
-use trustchain::ca::{CertificateRequest};
+use trustchain::ca::CertificateRequest;
 use trustchain::consensus::{
+    hypermesh_client::{HyperMeshClientConfig, HyperMeshConsensusClient},
     ConsensusProof, ConsensusRequirements,
-    hypermesh_client::{HyperMeshConsensusClient, HyperMeshClientConfig},
 };
 
 /// Initialize tracing for failure tests
@@ -69,9 +69,10 @@ async fn test_server_unavailable() -> Result<()> {
     // Check that retries were attempted (error message should indicate this)
     let error_msg = error.to_string();
     assert!(
-        error_msg.contains("failed") || error_msg.contains("error") || error_msg.contains("timeout"),
-        "Error message should indicate failure: {}",
-        error_msg
+        error_msg.contains("failed")
+            || error_msg.contains("error")
+            || error_msg.contains("timeout"),
+        "Error message should indicate failure: {error_msg}"
     );
 
     info!("✅ Server unavailable handled gracefully");
@@ -116,8 +117,7 @@ async fn test_network_timeout() -> Result<()> {
     assert!(result.is_err(), "Should timeout");
     assert!(
         elapsed < Duration::from_secs(2),
-        "Should timeout quickly, took {:?}",
-        elapsed
+        "Should timeout quickly, took {elapsed:?}"
     );
 
     info!("Timeout occurred in {:?} (expected)", elapsed);
@@ -137,9 +137,9 @@ async fn test_malformed_request() -> Result<()> {
     // Create request with invalid/empty data
     let cert_request = CertificateRequest {
         common_name: "".to_string(), // Empty common name
-        san_entries: vec![], // Empty SAN entries
-        node_id: "".to_string(), // Empty node ID
-        ipv6_addresses: vec![], // No IP addresses
+        san_entries: vec![],         // Empty SAN entries
+        node_id: "".to_string(),     // Empty node ID
+        ipv6_addresses: vec![],      // No IP addresses
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
     };
@@ -182,15 +182,18 @@ async fn test_resource_exhaustion() -> Result<()> {
     let concurrent_requests = 500; // Large number
     let mut handles = vec![];
 
-    info!("Submitting {} concurrent requests to test backpressure...", concurrent_requests);
+    info!(
+        "Submitting {} concurrent requests to test backpressure...",
+        concurrent_requests
+    );
 
     for i in 0..concurrent_requests {
         let client = hypermesh_client.clone();
         let handle = tokio::spawn(async move {
             let cert_request = CertificateRequest {
-                common_name: format!("exhaustion-test-{}.hypermesh.online", i),
+                common_name: format!("exhaustion-test-{i}.hypermesh.online"),
                 san_entries: vec![format!("exhaustion-test-{}.hypermesh.online", i)],
-                node_id: format!("test_node_{:03}", i),
+                node_id: format!("test_node_{i:03}"),
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
@@ -217,7 +220,10 @@ async fn test_resource_exhaustion() -> Result<()> {
         }
     }
 
-    info!("Results: {} succeeded, {} failed", success_count, error_count);
+    info!(
+        "Results: {} succeeded, {} failed",
+        success_count, error_count
+    );
     info!("✅ Resource exhaustion test completed");
     info!("Note: Without server, all should fail gracefully");
 
@@ -312,8 +318,7 @@ async fn test_retry_exhaustion() -> Result<()> {
     let min_expected = Duration::from_millis(100); // At least one timeout
     assert!(
         elapsed >= min_expected,
-        "Should have taken time for retries: {:?}",
-        elapsed
+        "Should have taken time for retries: {elapsed:?}"
     );
 
     info!("✅ Retry exhaustion handled correctly");
@@ -340,10 +345,10 @@ async fn test_invalid_consensus_requirements() -> Result<()> {
 
     // Invalid requirements (extremely strict)
     let consensus_requirements = ConsensusRequirements {
-        minimum_stake: 1_000_000_000, // Unrealistically high stake
-        max_time_offset: Duration::from_millis(1), // Impossibly short time sync
+        minimum_stake: 1_000_000_000,               // Unrealistically high stake
+        max_time_offset: Duration::from_millis(1),  // Impossibly short time sync
         minimum_storage: 1024 * 1024 * 1024 * 1024, // 1 TB minimum
-        minimum_compute: 1_000_000, // Unrealistically high compute
+        minimum_compute: 1_000_000,                 // Unrealistically high compute
         byzantine_tolerance: 0.0,
     };
 
@@ -384,15 +389,18 @@ async fn test_concurrent_failures() -> Result<()> {
     let concurrent_requests = 50;
     let mut handles = vec![];
 
-    info!("Submitting {} concurrent requests (all will fail)...", concurrent_requests);
+    info!(
+        "Submitting {} concurrent requests (all will fail)...",
+        concurrent_requests
+    );
 
     for i in 0..concurrent_requests {
         let client = hypermesh_client.clone();
         let handle = tokio::spawn(async move {
             let cert_request = CertificateRequest {
-                common_name: format!("concurrent-fail-{}.hypermesh.online", i),
+                common_name: format!("concurrent-fail-{i}.hypermesh.online"),
                 san_entries: vec![format!("concurrent-fail-{}.hypermesh.online", i)],
-                node_id: format!("test_node_{:03}", i),
+                node_id: format!("test_node_{i:03}"),
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
@@ -452,9 +460,9 @@ async fn test_metrics_during_failures() -> Result<()> {
     // Make failing requests
     for i in 0..5 {
         let cert_request = CertificateRequest {
-            common_name: format!("metrics-fail-{}.hypermesh.online", i),
+            common_name: format!("metrics-fail-{i}.hypermesh.online"),
             san_entries: vec![format!("metrics-fail-{}.hypermesh.online", i)],
-            node_id: format!("test_node_{:03}", i),
+            node_id: format!("test_node_{i:03}"),
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
@@ -472,8 +480,14 @@ async fn test_metrics_during_failures() -> Result<()> {
 
     info!("Metrics after failures:");
     info!("  Total requests: {}", updated_metrics.total_requests);
-    info!("  Failed validations: {}", updated_metrics.failed_validations);
-    info!("  Successful validations: {}", updated_metrics.successful_validations);
+    info!(
+        "  Failed validations: {}",
+        updated_metrics.failed_validations
+    );
+    info!(
+        "  Successful validations: {}",
+        updated_metrics.successful_validations
+    );
 
     // Metrics should be tracked even during failures
     // Note: Might be 0 if errors happen before metrics are updated
@@ -521,7 +535,10 @@ async fn test_graceful_degradation() -> Result<()> {
         .validate_certificate_request(&cert_request, &consensus_requirements)
         .await;
 
-    assert!(result2.is_err(), "Second request should also fail (cache not implemented)");
+    assert!(
+        result2.is_err(),
+        "Second request should also fail (cache not implemented)"
+    );
 
     info!("✅ Graceful degradation test completed");
     info!("Note: Cache implementation pending for true graceful degradation");

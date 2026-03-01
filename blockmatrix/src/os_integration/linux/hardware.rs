@@ -14,8 +14,8 @@ use super::LinuxAbstraction;
 impl LinuxAbstraction {
     /// Parse /proc/cpuinfo for CPU details
     pub(super) fn parse_cpuinfo(&self) -> Result<CpuInfo> {
-        let content = fs::read_to_string("/proc/cpuinfo")
-            .context("Failed to read /proc/cpuinfo")?;
+        let content =
+            fs::read_to_string("/proc/cpuinfo").context("Failed to read /proc/cpuinfo")?;
 
         let mut cores = 0;
         let mut model = String::from("Unknown");
@@ -89,7 +89,7 @@ impl LinuxAbstraction {
         let mut vendor = String::from("Unknown");
 
         if let Ok(vendor_id) = fs::read_to_string(device_path.join("vendor")) {
-            vendor = self.pci_vendor_name(&vendor_id.trim());
+            vendor = self.pci_vendor_name(vendor_id.trim());
         }
 
         if let Ok(uevent) = fs::read_to_string(device_path.join("uevent")) {
@@ -123,14 +123,14 @@ impl LinuxAbstraction {
             "0x10de" => "NVIDIA".to_string(),
             "0x1002" => "AMD".to_string(),
             "0x8086" => "Intel".to_string(),
-            _ => format!("Vendor {}", vendor_id),
+            _ => format!("Vendor {vendor_id}"),
         }
     }
 
     /// Parse /proc/meminfo for memory details
     pub(super) fn parse_meminfo(&self) -> Result<MemoryInfo> {
-        let content = fs::read_to_string("/proc/meminfo")
-            .context("Failed to read /proc/meminfo")?;
+        let content =
+            fs::read_to_string("/proc/meminfo").context("Failed to read /proc/meminfo")?;
 
         let mut total_kb = 0u64;
         let mut available_kb = 0u64;
@@ -176,8 +176,7 @@ impl LinuxAbstraction {
     pub(super) fn detect_storage_devices(&self) -> Result<Vec<StorageInfo>> {
         let mut devices = Vec::new();
 
-        let mounts = fs::read_to_string("/proc/mounts")
-            .context("Failed to read /proc/mounts")?;
+        let mounts = fs::read_to_string("/proc/mounts").context("Failed to read /proc/mounts")?;
 
         for line in mounts.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -188,7 +187,7 @@ impl LinuxAbstraction {
 
                 if device.starts_with("/dev/") {
                     if let Ok(stat) = nix::sys::statvfs::statvfs(mount_point) {
-                        let block_size = stat.block_size() as u64;
+                        let block_size = stat.block_size();
                         let total_bytes = stat.blocks() * block_size;
                         let available_bytes = stat.blocks_available() * block_size;
                         let used_bytes = total_bytes - available_bytes;
@@ -225,7 +224,7 @@ impl LinuxAbstraction {
             return StorageType::NVMe;
         }
 
-        let rotational_path = format!("/sys/block/{}/queue/rotational", base_name);
+        let rotational_path = format!("/sys/block/{base_name}/queue/rotational");
         if let Ok(content) = fs::read_to_string(&rotational_path) {
             if content.trim() == "0" {
                 return StorageType::SSD;
@@ -262,8 +261,8 @@ impl LinuxAbstraction {
 
     /// Get load average from /proc/loadavg
     fn get_load_average(&self) -> Result<[f64; 3]> {
-        let content = fs::read_to_string("/proc/loadavg")
-            .context("Failed to read /proc/loadavg")?;
+        let content =
+            fs::read_to_string("/proc/loadavg").context("Failed to read /proc/loadavg")?;
 
         let parts: Vec<&str> = content.split_whitespace().collect();
         if parts.len() >= 3 {
@@ -282,7 +281,8 @@ impl LinuxAbstraction {
             .ok()?
             .filter_map(|entry| entry.ok())
             .filter(|entry| {
-                entry.file_name()
+                entry
+                    .file_name()
                     .to_str()
                     .and_then(|name| name.parse::<u32>().ok())
                     .is_some()

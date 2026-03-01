@@ -6,16 +6,16 @@
 //!
 //! Implements a Kademlia-based DHT for decentralized package discovery
 
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use std::collections::{HashMap, HashSet, BTreeMap};
 use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 // BLAKE3 used via blake3::hash() for DHT node identity
 
+use super::stoq_transport::{PackageAnnouncement, RequestType, ResponseData, StoqTransportLayer};
 use crate::assets::AssetPackageId;
-use super::stoq_transport::{StoqTransportLayer, RequestType, ResponseData, PackageAnnouncement};
 
 /// Kademlia DHT node identity (256-bit, XOR-distance).
 /// Distinct from hypermesh_lib::NodeId which is a human-readable string identifier.
@@ -45,21 +45,23 @@ impl DhtNodeId {
     /// Create node ID from address
     pub fn from_address(addr: &std::net::SocketAddr) -> Self {
         let hash = blake3::hash(addr.to_string().as_bytes());
-        Self { id: *hash.as_bytes() }
+        Self {
+            id: *hash.as_bytes(),
+        }
     }
 
     /// Calculate XOR distance between two node IDs
     pub fn distance(&self, other: &DhtNodeId) -> Distance {
         let mut dist = [0u8; 32];
-        for i in 0..32 {
-            dist[i] = self.id[i] ^ other.id[i];
+        for (i, byte) in dist.iter_mut().enumerate() {
+            *byte = self.id[i] ^ other.id[i];
         }
         Distance(dist)
     }
 
     /// Convert to hex string
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.id)
+        hex::encode(self.id)
     }
 }
 
@@ -128,7 +130,7 @@ impl Default for DhtConfig {
             value_ttl: Duration::from_secs(86400), // 24 hours
             node_ttl: Duration::from_secs(3600),   // 1 hour
             republish_interval: Duration::from_secs(3600), // 1 hour
-            refresh_interval: Duration::from_secs(900),    // 15 minutes
+            refresh_interval: Duration::from_secs(900), // 15 minutes
         }
     }
 }
@@ -284,7 +286,8 @@ impl DhtNetwork {
         }
 
         for node_addr in bootstrap_nodes {
-            let addr = node_addr.parse::<std::net::SocketAddr>()
+            let addr = node_addr
+                .parse::<std::net::SocketAddr>()
                 .context("Invalid bootstrap node address")?;
 
             // Connect to bootstrap node
@@ -394,12 +397,16 @@ impl DhtNetwork {
         };
 
         // Store locally
-        self.value_store.write().await.store(key.clone(), value.clone());
+        self.value_store
+            .write()
+            .await
+            .store(key.clone(), value.clone());
 
         // Store on k closest nodes
         let closest_nodes = self.find_closest_nodes(&key, self.config.k).await?;
         for node in closest_nodes {
-            self.store_value_on_node(&node, key.clone(), value.clone()).await?;
+            self.store_value_on_node(&node, key.clone(), value.clone())
+                .await?;
         }
 
         Ok(())
@@ -414,7 +421,11 @@ impl DhtNetwork {
 
         let mut peers = Vec::new();
         for value in values {
-            if let ValueData::PackagePeers { peers: package_peers, .. } = value.data {
+            if let ValueData::PackagePeers {
+                peers: package_peers,
+                ..
+            } = value.data
+            {
                 peers.extend(package_peers);
             }
         }
@@ -435,7 +446,11 @@ impl DhtNetwork {
 
         let mut packages = Vec::new();
         for value in values {
-            if let ValueData::SearchIndex { packages: found_packages, .. } = value.data {
+            if let ValueData::SearchIndex {
+                packages: found_packages,
+                ..
+            } = value.data
+            {
                 packages.extend(found_packages);
             }
         }
@@ -452,7 +467,10 @@ impl DhtNetwork {
         let key = ValueKey::from_package_id(&package_id);
 
         // Get current peers list
-        let mut peers = self.find_package_peers(&package_id).await.unwrap_or_default();
+        let mut peers = self
+            .find_package_peers(&package_id)
+            .await
+            .unwrap_or_default();
 
         // Add ourselves
         if !peers.contains(&self.local_id) {
@@ -471,12 +489,16 @@ impl DhtNetwork {
         };
 
         // Store locally
-        self.value_store.write().await.store(key.clone(), value.clone());
+        self.value_store
+            .write()
+            .await
+            .store(key.clone(), value.clone());
 
         // Store on k closest nodes
         let closest_nodes = self.find_closest_nodes(&key, self.config.k).await?;
         for node in closest_nodes {
-            self.store_value_on_node(&node, key.clone(), value.clone()).await?;
+            self.store_value_on_node(&node, key.clone(), value.clone())
+                .await?;
         }
 
         Ok(())
@@ -511,7 +533,11 @@ impl DhtNetwork {
     /// Find k closest nodes to a key
     async fn find_closest_nodes(&self, key: &ValueKey, k: usize) -> Result<Vec<NodeInfo>> {
         let target_id = DhtNodeId { id: key.0 };
-        let mut closest = self.routing_table.read().await.get_closest_nodes(&target_id, k);
+        let mut closest = self
+            .routing_table
+            .read()
+            .await
+            .get_closest_nodes(&target_id, k);
 
         // Iterative lookup
         let mut queried = HashSet::new();
@@ -525,16 +551,15 @@ impl DhtNetwork {
             queried.insert(node.id.clone());
 
             // Query node for closer nodes
-            if let Ok(response) = self.transport.send_request(
-                &node.id,
-                RequestType::GetPeers,
-            ).await {
-                if let ResponseData::Peers(peers) = response {
-                    for peer_id in peers {
-                        if !queried.contains(&peer_id) {
-                            // TODO: Get full node info
-                            // to_query.push(node_info);
-                        }
+            if let Ok(ResponseData::Peers(peers)) = self
+                .transport
+                .send_request(&node.id, RequestType::GetPeers)
+                .await
+            {
+                for peer_id in peers {
+                    if !queried.contains(&peer_id) {
+                        // TODO: Get full node info
+                        // to_query.push(node_info);
                     }
                 }
             }
@@ -640,14 +665,11 @@ impl ValueStore {
         if let ValueData::PackageAnnouncement(ref announcement) = value.data {
             self.package_index
                 .entry(announcement.package_id)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(key.clone());
         }
 
-        self.values
-            .entry(key)
-            .or_insert_with(Vec::new)
-            .push(value);
+        self.values.entry(key).or_default().push(value);
     }
 
     fn get(&self, key: &ValueKey) -> Option<Vec<StoredValue>> {

@@ -179,10 +179,7 @@ impl ScopeAwareRouter {
     ) -> Result<ScopeAwareRoute, ScopeRoutingError> {
         // Same-scope: direct route, no gateway
         if from_scope == to_scope {
-            return Ok(self.build_same_scope_route(
-                from_scope,
-                source_position,
-            ));
+            return Ok(self.build_same_scope_route(from_scope, source_position));
         }
 
         // Cross-scope: validate config
@@ -204,12 +201,7 @@ impl ScopeAwareRouter {
         // Pick nearest healthy gateway
         let gateway = self.select_nearest_gateway(&candidates, source_position)?;
 
-        let route = self.build_cross_scope_route(
-            from_scope,
-            to_scope,
-            source_position,
-            gateway,
-        );
+        let route = self.build_cross_scope_route(from_scope, to_scope, source_position, gateway);
 
         // Record statistics and transition
         self.record_transition(from_scope, to_scope, Some(&gateway.node_id));
@@ -345,7 +337,7 @@ impl ScopeAwareRouter {
                 let db = b.position.euclidean_distance(source);
                 da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
             })
-            .ok_or_else(|| ScopeRoutingError::NoGatewayAvailable {
+            .ok_or(ScopeRoutingError::NoGatewayAvailable {
                 from: BlockchainScope::Device,
                 to: BlockchainScope::Network,
             })
@@ -357,7 +349,7 @@ impl ScopeAwareRouter {
         to: BlockchainScope,
         gateway: Option<&str>,
     ) {
-        let key = format!("{}->{}", from, to);
+        let key = format!("{from}->{to}");
         *self.stats.routes_by_scope.entry(key).or_insert(0) += 1;
 
         if from != to {
@@ -397,7 +389,11 @@ mod tests {
         );
         router.register_gateway_node(
             "gw-beta",
-            MatrixCoordinate { x: 100, y: 100, z: 0 },
+            MatrixCoordinate {
+                x: 100,
+                y: 100,
+                z: 0,
+            },
             vec![BlockchainScope::Device, BlockchainScope::Network],
         );
         router
@@ -409,7 +405,12 @@ mod tests {
         let src = MatrixCoordinate { x: 5, y: 5, z: 0 };
 
         let route = router
-            .resolve_route("asset-1", BlockchainScope::Device, BlockchainScope::Device, &src)
+            .resolve_route(
+                "asset-1",
+                BlockchainScope::Device,
+                BlockchainScope::Device,
+                &src,
+            )
             .expect("test: same-scope Device route");
 
         assert_eq!(route.from_scope, BlockchainScope::Device);
@@ -424,7 +425,12 @@ mod tests {
         let src = MatrixCoordinate { x: 20, y: 30, z: 0 };
 
         let route = router
-            .resolve_route("asset-2", BlockchainScope::Network, BlockchainScope::Network, &src)
+            .resolve_route(
+                "asset-2",
+                BlockchainScope::Network,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: same-scope Network route");
 
         assert_eq!(route.from_scope, BlockchainScope::Network);
@@ -438,7 +444,12 @@ mod tests {
         let src = MatrixCoordinate { x: 0, y: 0, z: 0 };
 
         let route = router
-            .resolve_route("asset-3", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "asset-3",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: Device->Network");
 
         assert_eq!(route.from_scope, BlockchainScope::Device);
@@ -454,7 +465,12 @@ mod tests {
         let src = MatrixCoordinate { x: 50, y: 50, z: 0 };
 
         let route = router
-            .resolve_route("asset-4", BlockchainScope::Network, BlockchainScope::Device, &src)
+            .resolve_route(
+                "asset-4",
+                BlockchainScope::Network,
+                BlockchainScope::Device,
+                &src,
+            )
             .expect("test: Network->Device");
 
         assert_eq!(route.from_scope, BlockchainScope::Network);
@@ -472,7 +488,12 @@ mod tests {
         let src = MatrixCoordinate { x: 0, y: 0, z: 0 };
 
         let err = router
-            .resolve_route("asset-5", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "asset-5",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .unwrap_err();
 
         assert!(matches!(err, ScopeRoutingError::CrossScopeDisabled));
@@ -485,7 +506,12 @@ mod tests {
         let src = MatrixCoordinate { x: 0, y: 0, z: 0 };
 
         let err = router
-            .resolve_route("asset-6", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "asset-6",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .unwrap_err();
 
         // Device->Network with no gateways triggers NetworkUnavailable from
@@ -522,7 +548,12 @@ mod tests {
         let src = MatrixCoordinate { x: 8, y: 8, z: 0 };
 
         let route = router
-            .resolve_route("asset-near", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "asset-near",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: nearest gateway");
 
         // gw-alpha at (10,10,0) is closer to (8,8,0) than gw-beta at (100,100,0)
@@ -539,22 +570,26 @@ mod tests {
             .resolve_route("s1", BlockchainScope::Device, BlockchainScope::Device, &src)
             .expect("test: same-scope");
         router
-            .resolve_route("s2", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "s2",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: cross-scope 1");
         router
-            .resolve_route("s3", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "s3",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: cross-scope 2");
 
         let stats = router.get_scope_statistics();
         assert_eq!(stats.cross_scope_transfers, 2);
-        assert_eq!(
-            stats.routes_by_scope.get("Device->Device"),
-            Some(&1)
-        );
-        assert_eq!(
-            stats.routes_by_scope.get("Device->Network"),
-            Some(&2)
-        );
+        assert_eq!(stats.routes_by_scope.get("Device->Device"), Some(&1));
+        assert_eq!(stats.routes_by_scope.get("Device->Network"), Some(&2));
         // Gateway utilization should have entries
         assert!(!stats.gateway_utilization.is_empty());
     }
@@ -577,23 +612,22 @@ mod tests {
     fn validate_device_to_network_needs_gateway() {
         let router = ScopeAwareRouter::new(ScopeRoutingConfig::default());
 
-        let result = router.validate_scope_transition(
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-        );
+        let result =
+            router.validate_scope_transition(BlockchainScope::Device, BlockchainScope::Network);
 
         // No gateways registered -> NetworkUnavailable
-        assert!(matches!(result, Err(ScopeRoutingError::NetworkUnavailable { .. })));
+        assert!(matches!(
+            result,
+            Err(ScopeRoutingError::NetworkUnavailable { .. })
+        ));
     }
 
     #[test]
     fn validate_network_to_device_always_ok() {
         let router = ScopeAwareRouter::new(ScopeRoutingConfig::default());
 
-        let result = router.validate_scope_transition(
-            BlockchainScope::Network,
-            BlockchainScope::Device,
-        );
+        let result =
+            router.validate_scope_transition(BlockchainScope::Network, BlockchainScope::Device);
 
         assert!(result.is_ok());
     }
@@ -616,7 +650,12 @@ mod tests {
         let src = MatrixCoordinate { x: 0, y: 0, z: 0 };
 
         let route = router
-            .resolve_route("enc-asset", BlockchainScope::Device, BlockchainScope::Network, &src)
+            .resolve_route(
+                "enc-asset",
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &src,
+            )
             .expect("test: encryption required");
 
         assert!(route.requires_encryption);
@@ -628,7 +667,12 @@ mod tests {
         let src = MatrixCoordinate { x: 0, y: 0, z: 0 };
 
         let route = router
-            .resolve_route("no-enc", BlockchainScope::Device, BlockchainScope::Device, &src)
+            .resolve_route(
+                "no-enc",
+                BlockchainScope::Device,
+                BlockchainScope::Device,
+                &src,
+            )
             .expect("test: no encryption for same scope");
 
         assert!(!route.requires_encryption);

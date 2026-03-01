@@ -4,7 +4,7 @@
 
 //! Common types for HyperMesh transport layer
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::net::Ipv6Addr;
 
@@ -43,7 +43,12 @@ impl PeerIdentity {
 
     /// Create with full details
     pub fn new(name: String, id: [u8; 32], address: Ipv6Addr, pub_key: Vec<u8>) -> Self {
-        Self { name, id, address, pub_key }
+        Self {
+            name,
+            id,
+            address,
+            pub_key,
+        }
     }
 
     /// Get the string representation

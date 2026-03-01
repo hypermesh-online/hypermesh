@@ -15,14 +15,14 @@
 //! Implements Byzantine fault detection, node health monitoring,
 //! and automatic recovery mechanisms for the multi-node system.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
-use crate::assets::core::{AssetRegistration, AssetResult};
 use super::PeerIdentity;
+use crate::assets::core::{AssetRegistration, AssetResult};
 
 /// Byzantine behavior detector
 pub struct ByzantineDetector {
@@ -77,7 +77,10 @@ pub struct SuspiciousBehavior {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SuspiciousEvent {
     /// Inconsistent state reports
-    InconsistentState { asset_id: AssetRegistration, discrepancy: String },
+    InconsistentState {
+        asset_id: AssetRegistration,
+        discrepancy: String,
+    },
     /// Invalid consensus votes
     InvalidVote { round_id: String, reason: String },
     /// Excessive failures
@@ -258,7 +261,8 @@ impl ByzantineDetector {
     pub async fn report_suspicious_behavior(&self, node_id: PeerIdentity, event: SuspiciousEvent) {
         let mut suspicious = self.suspicious_nodes.write().await;
 
-        let behavior = suspicious.entry(node_id.clone())
+        let behavior = suspicious
+            .entry(node_id.clone())
             .or_insert_with(|| SuspiciousBehavior {
                 node_id,
                 events: Vec::new(),
@@ -273,7 +277,10 @@ impl ByzantineDetector {
 
         // Check if node should be marked as Byzantine
         if behavior.suspicion_score > self.config.confirmation_threshold {
-            self.byzantine_nodes.write().await.insert(behavior.node_id.clone());
+            self.byzantine_nodes
+                .write()
+                .await
+                .insert(behavior.node_id.clone());
         }
     }
 
@@ -307,8 +314,14 @@ impl FaultRecovery {
     }
 
     /// Handle fault
-    pub async fn handle_fault(&self, fault_type: FaultType, affected_nodes: Vec<PeerIdentity>) -> AssetResult<()> {
-        let strategy = self.strategies.get(&fault_type)
+    pub async fn handle_fault(
+        &self,
+        fault_type: FaultType,
+        affected_nodes: Vec<PeerIdentity>,
+    ) -> AssetResult<()> {
+        let strategy = self
+            .strategies
+            .get(&fault_type)
             .cloned()
             .unwrap_or(RecoveryStrategy::Manual);
 
@@ -367,7 +380,8 @@ impl NodeHealthMonitor {
         };
 
         let mut checks = self.health_checks.write().await;
-        checks.entry(node_id.clone())
+        checks
+            .entry(node_id.clone())
             .or_insert_with(Vec::new)
             .push(check);
 

@@ -7,56 +7,54 @@
 //! CRITICAL IMPLEMENTATION: The main proxy manager that coordinates all NAT-like
 //! addressing, routing, forwarding, and security functions.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
-use super::{
-    ProxyNetworkConfig, ProxySystemStats,
-    ProxyRouter, ProxyForwarder, TrustChainIntegration,
-    QuantumSecurity, ShardedDataAccess, NATTranslator
-};
 use super::forwarding::{ForwardingRule, ForwardingRuleType};
+use super::{
+    NATTranslator, ProxyForwarder, ProxyNetworkConfig, ProxyRouter, ProxySystemStats,
+    QuantumSecurity, ShardedDataAccess, TrustChainIntegration,
+};
 
 use crate::assets::core::{
-    ProxyAddress, AssetRegistration, AssetResult, AssetError, PrivacyMode,
-    ProxyNodeInfo
+    AssetError, AssetRegistration, AssetResult, PrivacyMode, ProxyAddress, ProxyNodeInfo,
 };
 
 /// The main Remote Proxy Manager implementing NAT-like addressing
 pub struct RemoteProxyManager {
     /// Network configuration
     config: ProxyNetworkConfig,
-    
+
     /// Router for proxy traffic
     router: Arc<ProxyRouter>,
-    
+
     /// Forwarder for actual traffic handling  
     forwarder: Arc<ProxyForwarder>,
-    
+
     /// Trust integration with TrustChain
     trust_integration: Arc<TrustChainIntegration>,
-    
+
     /// Quantum security handler
     quantum_security: Arc<QuantumSecurity>,
-    
+
     /// Sharded data access handler
     sharded_access: Arc<ShardedDataAccess>,
-    
+
     /// NAT address translator
     nat_translator: Arc<NATTranslator>,
-    
+
     /// Active proxy nodes registry
     proxy_nodes: Arc<RwLock<HashMap<String, ProxyNodeInfo>>>,
-    
+
     /// Proxy address mappings
     address_mappings: Arc<RwLock<HashMap<ProxyAddress, ProxyMapping>>>,
-    
+
     /// System statistics
     stats: Arc<RwLock<ProxySystemStats>>,
-    
+
     /// Port allocation tracking
     port_allocations: Arc<RwLock<HashMap<String, Vec<u16>>>>, // node_id -> allocated_ports
 }
@@ -66,34 +64,34 @@ pub struct RemoteProxyManager {
 struct ProxyMapping {
     /// Source proxy address
     proxy_address: ProxyAddress,
-    
+
     /// Target asset ID
     target_asset_id: AssetRegistration,
-    
+
     /// Target node information
     target_node_id: String,
-    
+
     /// Local address on target node
     local_address: String,
-    
+
     /// Privacy level for access control
     privacy_level: PrivacyMode,
-    
+
     /// Forwarding rules
     forwarding_rules: Vec<ForwardingRule>,
-    
+
     /// Access permissions
     access_permissions: AccessPermissions,
-    
+
     /// Quantum security tokens
     quantum_tokens: Vec<u8>,
-    
+
     /// Creation timestamp
     created_at: SystemTime,
-    
+
     /// Expiry timestamp
     expires_at: SystemTime,
-    
+
     /// Usage statistics
     usage_stats: MappingUsageStats,
 }
@@ -103,19 +101,19 @@ struct ProxyMapping {
 struct AccessPermissions {
     /// HTTP proxy access
     http_proxy: bool,
-    
+
     /// SOCKS5 proxy access
     socks5_proxy: bool,
-    
+
     /// TCP forwarding access
     tcp_forwarding: bool,
-    
+
     /// VPN tunnel access
     vpn_tunnel: bool,
-    
+
     /// Direct memory access
     memory_access: bool,
-    
+
     /// Sharded data access
     sharded_access: bool,
 }
@@ -158,7 +156,7 @@ impl RemoteProxyManager {
         let quantum_security = Arc::new(QuantumSecurity::new().await?);
         let sharded_access = Arc::new(ShardedDataAccess::new().await?);
         let nat_translator = Arc::new(NATTranslator::new().await?);
-        
+
         Ok(Self {
             config,
             router,
@@ -183,16 +181,20 @@ impl RemoteProxyManager {
             port_allocations: Arc::new(RwLock::new(HashMap::new())),
         })
     }
-    
+
     /// Register a new proxy node
     pub async fn register_proxy_node(&self, node_info: ProxyNodeInfo) -> AssetResult<()> {
         // Validate node with TrustChain
-        if !self.trust_integration.validate_node_certificate(&node_info).await? {
+        if !self
+            .trust_integration
+            .validate_node_certificate(&node_info)
+            .await?
+        {
             return Err(AssetError::AdapterError {
-                message: "Node certificate validation failed".to_string()
+                message: "Node certificate validation failed".to_string(),
             });
         }
-        
+
         // Convert node_id to hex string for use as HashMap key
         let node_id_str = hex::encode(node_info.node_id);
 
@@ -206,7 +208,7 @@ impl RemoteProxyManager {
         self.router.add_proxy_node(&node_info).await?;
 
         // Store node info
-        let node_id_for_log = node_info.node_id.clone();
+        let node_id_for_log = node_info.node_id;
         {
             let mut nodes = self.proxy_nodes.write().await;
             nodes.insert(node_id_str, node_info);
@@ -221,7 +223,7 @@ impl RemoteProxyManager {
         tracing::info!("Registered new proxy node: {:?}", node_id_for_log);
         Ok(())
     }
-    
+
     /// Allocate a new proxy address for an asset (CRITICAL NAT functionality)
     pub async fn allocate_proxy_address(
         &self,
@@ -229,29 +231,35 @@ impl RemoteProxyManager {
         privacy_level: PrivacyMode,
         capabilities_required: &[String],
     ) -> AssetResult<ProxyAddress> {
-        
         // Select best proxy node based on trust, capabilities, and load
         let selected_node = self.select_best_proxy_node(capabilities_required).await?;
         let node_id_str = hex::encode(selected_node.node_id);
 
         // Allocate port for this asset type
-        let asset_type_str = asset_id.asset_type()
-            .map(|at| format!("{:?}", at).to_lowercase())
+        let asset_type_str = asset_id
+            .asset_type()
+            .map(|at| format!("{at:?}").to_lowercase())
             .unwrap_or_else(|| "unknown".to_string());
-        let port = self.allocate_port_for_node(&node_id_str, &asset_type_str).await?;
+        let port = self
+            .allocate_port_for_node(&node_id_str, &asset_type_str)
+            .await?;
 
         // Generate global proxy address using NAT-like addressing
-        let proxy_address = self.nat_translator.generate_global_address(
-            &node_id_str,
-            asset_id,
-            port,
-        ).await?;
+        let proxy_address = self
+            .nat_translator
+            .generate_global_address(&node_id_str, asset_id, port)
+            .await?;
 
         // Create quantum security tokens
-        let quantum_tokens = self.quantum_security.generate_access_tokens(&proxy_address).await?;
+        let quantum_tokens = self
+            .quantum_security
+            .generate_access_tokens(&proxy_address)
+            .await?;
 
         // Create forwarding rules based on privacy level
-        let forwarding_rules = self.create_forwarding_rules(&privacy_level, &asset_type_str).await?;
+        let forwarding_rules = self
+            .create_forwarding_rules(&privacy_level, &asset_type_str)
+            .await?;
 
         // Create access permissions
         let access_permissions = self.create_access_permissions(&privacy_level).await?;
@@ -270,53 +278,58 @@ impl RemoteProxyManager {
             expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour default
             usage_stats: MappingUsageStats::default(),
         };
-        
+
         // Install forwarding rules in the forwarder
         for rule in &mapping.forwarding_rules {
             self.forwarder.install_rule(&proxy_address, rule).await?;
         }
-        
+
         // Store mapping
         {
             let mut mappings = self.address_mappings.write().await;
             mappings.insert(proxy_address.clone(), mapping);
         }
-        
+
         // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.total_mappings += 1;
             stats.nat_translations += 1;
         }
-        
+
         tracing::info!(
             "Allocated proxy address {} for asset {} on node {:?}",
             proxy_address,
             asset_id,
             selected_node.node_id
         );
-        
+
         Ok(proxy_address)
     }
-    
+
     /// Resolve proxy address to local asset information (CRITICAL NAT functionality)
-    pub async fn resolve_proxy_address(&self, proxy_addr: &ProxyAddress) -> AssetResult<AssetRegistration> {
+    pub async fn resolve_proxy_address(
+        &self,
+        proxy_addr: &ProxyAddress,
+    ) -> AssetResult<AssetRegistration> {
         let mappings = self.address_mappings.read().await;
-        let mapping = mappings.get(proxy_addr)
-            .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                address: proxy_addr.clone()
-            })?;
-        
+        let mapping =
+            mappings
+                .get(proxy_addr)
+                .ok_or_else(|| AssetError::ProxyResolutionFailed {
+                    address: proxy_addr.clone(),
+                })?;
+
         // Check if mapping has expired
         if mapping.expires_at < SystemTime::now() {
             return Err(AssetError::AdapterError {
-                message: "Proxy address mapping has expired".to_string()
+                message: "Proxy address mapping has expired".to_string(),
             });
         }
-        
+
         Ok(mapping.target_asset_id.clone())
     }
-    
+
     /// Forward request through proxy system (CRITICAL NAT functionality)
     pub async fn forward_request(
         &self,
@@ -324,137 +337,149 @@ impl RemoteProxyManager {
         request_data: Vec<u8>,
         request_type: ForwardingRuleType,
     ) -> AssetResult<Vec<u8>> {
-        
         // Get mapping
         let mapping = {
             let mappings = self.address_mappings.read().await;
-            mappings.get(proxy_addr)
+            mappings
+                .get(proxy_addr)
                 .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                    address: proxy_addr.clone()
+                    address: proxy_addr.clone(),
                 })?
                 .clone()
         };
-        
+
         // Validate quantum security
         if self.config.quantum_security_enabled {
-            if !self.quantum_security.validate_access_tokens(&mapping.quantum_tokens).await? {
+            if !self
+                .quantum_security
+                .validate_access_tokens(&mapping.quantum_tokens)
+                .await?
+            {
                 return Err(AssetError::AdapterError {
-                    message: "Quantum security validation failed".to_string()
+                    message: "Quantum security validation failed".to_string(),
                 });
             }
-            
+
             // Update quantum validation stats
             {
                 let mut stats = self.stats.write().await;
                 stats.quantum_validations += 1;
             }
         }
-        
+
         // Check privacy level access
-        if !self.check_privacy_access(&mapping.privacy_level, &request_type).await? {
+        if !self
+            .check_privacy_access(&mapping.privacy_level, &request_type)
+            .await?
+        {
             return Err(AssetError::AdapterError {
-                message: "Privacy level access denied".to_string()
+                message: "Privacy level access denied".to_string(),
             });
         }
-        
+
         // Forward the request
-        let response = self.forwarder.forward_request(
-            proxy_addr,
-            &mapping.local_address,
-            request_data,
-            request_type,
-        ).await?;
-        
+        let response = self
+            .forwarder
+            .forward_request(
+                proxy_addr,
+                &mapping.local_address,
+                request_data,
+                request_type,
+            )
+            .await?;
+
         // Update usage statistics
-        self.update_mapping_stats(proxy_addr, response.len() as u64).await?;
-        
+        self.update_mapping_stats(proxy_addr, response.len() as u64)
+            .await?;
+
         // Update global statistics
         {
             let mut stats = self.stats.write().await;
             stats.forwarded_requests += 1;
             stats.total_bytes_transferred += response.len() as u64;
         }
-        
+
         Ok(response)
     }
-    
+
     /// Access sharded data through proxy system
     pub async fn access_sharded_data(
         &self,
         proxy_addr: &ProxyAddress,
         shard_key: &str,
     ) -> AssetResult<Vec<u8>> {
-        
         // Get mapping
         let mapping = {
             let mappings = self.address_mappings.read().await;
-            mappings.get(proxy_addr)
+            mappings
+                .get(proxy_addr)
                 .ok_or_else(|| AssetError::ProxyResolutionFailed {
-                    address: proxy_addr.clone()
+                    address: proxy_addr.clone(),
                 })?
                 .clone()
         };
-        
+
         // Check sharded access permission
         if !mapping.access_permissions.sharded_access {
             return Err(AssetError::AdapterError {
-                message: "Sharded data access not permitted".to_string()
+                message: "Sharded data access not permitted".to_string(),
             });
         }
-        
+
         // Access sharded data
-        let data = self.sharded_access.get_shard_data(
-            &mapping.target_asset_id,
-            shard_key,
-        ).await?;
-        
+        let data = self
+            .sharded_access
+            .get_shard_data(&mapping.target_asset_id, shard_key)
+            .await?;
+
         // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.sharded_requests += 1;
         }
-        
+
         Ok(data)
     }
-    
+
     /// Select best proxy node based on capabilities and trust
     async fn select_best_proxy_node(
         &self,
         required_capabilities: &[String],
     ) -> AssetResult<ProxyNodeInfo> {
         let nodes = self.proxy_nodes.read().await;
-        
+
         let mut best_node: Option<ProxyNodeInfo> = None;
         let mut best_score = 0.0_f32;
-        
+
         for node in nodes.values() {
             // Check authentication status (binary pass/fail)
             if !node.is_authenticated {
                 continue;
             }
-            
+
             // Check required capabilities
-            let has_required_caps = required_capabilities.iter()
+            let has_required_caps = required_capabilities
+                .iter()
                 .all(|cap| node.capabilities.protocols.contains(cap));
-            
+
             if !has_required_caps {
                 continue;
             }
-            
+
             // Calculate composite score
             let score = self.calculate_node_score(node).await;
-            
+
             if score > best_score {
                 best_score = score;
                 best_node = Some(node.clone());
             }
         }
-        
+
         best_node.ok_or_else(|| AssetError::AdapterError {
-            message: "No suitable proxy node found".to_string()
+            message: "No suitable proxy node found".to_string(),
         })
     }
-    
+
     /// Calculate composite score for proxy node selection
     /// Note: only called for authenticated nodes (filtered upstream)
     async fn calculate_node_score(&self, node: &ProxyNodeInfo) -> f32 {
@@ -466,24 +491,29 @@ impl RemoteProxyManager {
         let connection_score = (node.capabilities.max_connections as f32 / 100000.0).min(1.0);
         let latency_score = 0.8; // Placeholder until real measurement
 
-        bandwidth_weight * bandwidth_score +
-        connection_weight * connection_score +
-        latency_weight * latency_score
+        bandwidth_weight * bandwidth_score
+            + connection_weight * connection_score
+            + latency_weight * latency_score
     }
-    
+
     /// Allocate port for a node and asset type
     async fn allocate_port_for_node(&self, node_id: &str, asset_type: &str) -> AssetResult<u16> {
-        let port_range = self.config.port_ranges.get(asset_type)
-            .ok_or_else(|| AssetError::AdapterError {
-                message: format!("No port range configured for asset type: {}", asset_type)
-            })?;
-        
+        let port_range =
+            self.config
+                .port_ranges
+                .get(asset_type)
+                .ok_or_else(|| AssetError::AdapterError {
+                    message: format!("No port range configured for asset type: {asset_type}"),
+                })?;
+
         let mut allocations = self.port_allocations.write().await;
-        let allocated_ports = allocations.get_mut(node_id)
-            .ok_or_else(|| AssetError::AdapterError {
-                message: format!("Node not found in port allocations: {}", node_id)
-            })?;
-        
+        let allocated_ports =
+            allocations
+                .get_mut(node_id)
+                .ok_or_else(|| AssetError::AdapterError {
+                    message: format!("Node not found in port allocations: {node_id}"),
+                })?;
+
         // Find first available port in range
         for port in port_range.start..=port_range.end {
             if !allocated_ports.contains(&port) {
@@ -491,12 +521,12 @@ impl RemoteProxyManager {
                 return Ok(port);
             }
         }
-        
+
         Err(AssetError::AdapterError {
-            message: format!("No available ports in range for asset type: {}", asset_type)
+            message: format!("No available ports in range for asset type: {asset_type}"),
         })
     }
-    
+
     /// Create forwarding rules based on privacy level
     async fn create_forwarding_rules(
         &self,
@@ -504,7 +534,7 @@ impl RemoteProxyManager {
         _asset_type: &str,
     ) -> AssetResult<Vec<ForwardingRule>> {
         let mut rules = Vec::new();
-        
+
         if *privacy_level == PrivacyMode::PRIVATE {
             // Only direct memory access for private assets
             rules.push(ForwardingRule {
@@ -546,12 +576,15 @@ impl RemoteProxyManager {
                 });
             }
         }
-        
+
         Ok(rules)
     }
-    
+
     /// Create access permissions based on privacy level
-    async fn create_access_permissions(&self, privacy_level: &PrivacyMode) -> AssetResult<AccessPermissions> {
+    async fn create_access_permissions(
+        &self,
+        privacy_level: &PrivacyMode,
+    ) -> AssetResult<AccessPermissions> {
         let perms = if *privacy_level == PrivacyMode::PRIVATE {
             AccessPermissions {
                 http_proxy: false,
@@ -583,7 +616,7 @@ impl RemoteProxyManager {
         };
         Ok(perms)
     }
-    
+
     /// Check privacy level access for request type
     async fn check_privacy_access(
         &self,
@@ -591,7 +624,7 @@ impl RemoteProxyManager {
         request_type: &ForwardingRuleType,
     ) -> AssetResult<bool> {
         let permissions = self.create_access_permissions(privacy_level).await?;
-        
+
         Ok(match request_type {
             ForwardingRuleType::Http | ForwardingRuleType::Https => permissions.http_proxy,
             ForwardingRuleType::Socks5 => permissions.socks5_proxy,
@@ -601,9 +634,13 @@ impl RemoteProxyManager {
             ForwardingRuleType::ShardedData => permissions.memory_access, // Treat sharded as memory access
         })
     }
-    
+
     /// Update mapping usage statistics
-    async fn update_mapping_stats(&self, proxy_addr: &ProxyAddress, bytes_transferred: u64) -> AssetResult<()> {
+    async fn update_mapping_stats(
+        &self,
+        proxy_addr: &ProxyAddress,
+        bytes_transferred: u64,
+    ) -> AssetResult<()> {
         let mut mappings = self.address_mappings.write().await;
         if let Some(mapping) = mappings.get_mut(proxy_addr) {
             mapping.usage_stats.total_requests += 1;
@@ -612,50 +649,50 @@ impl RemoteProxyManager {
         }
         Ok(())
     }
-    
+
     /// Get system statistics
     pub async fn get_system_stats(&self) -> AssetResult<ProxySystemStats> {
         let stats = self.stats.read().await;
         Ok(stats.clone())
     }
-    
+
     /// Cleanup expired mappings
     pub async fn cleanup_expired_mappings(&self) -> AssetResult<u64> {
         let mut mappings = self.address_mappings.write().await;
         let now = SystemTime::now();
-        
+
         let initial_count = mappings.len();
         mappings.retain(|_, mapping| mapping.expires_at > now);
         let final_count = mappings.len();
-        
+
         let removed_count = initial_count - final_count;
-        
+
         // Update statistics
         if removed_count > 0 {
             let mut stats = self.stats.write().await;
             stats.total_mappings = stats.total_mappings.saturating_sub(removed_count as u64);
         }
-        
+
         Ok(removed_count as u64)
     }
-    
+
     /// Shutdown proxy manager
     pub async fn shutdown(&self) -> AssetResult<()> {
         // Cleanup all mappings
         self.cleanup_expired_mappings().await?;
-        
+
         // Clear proxy nodes
         {
             let mut nodes = self.proxy_nodes.write().await;
             nodes.clear();
         }
-        
+
         // Clear port allocations
         {
             let mut allocations = self.port_allocations.write().await;
             allocations.clear();
         }
-        
+
         tracing::info!("Remote Proxy Manager shutdown completed");
         Ok(())
     }

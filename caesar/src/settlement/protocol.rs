@@ -95,14 +95,13 @@ impl SettlementProtocol {
     ///
     /// Checks: packet state, tier acceptance, adapter acceptance,
     /// fee tolerance, and settler authorization.
-    pub fn validate_settlement(
-        request: &SettlementRequest,
-    ) -> Result<(), SettlementError> {
+    pub fn validate_settlement(request: &SettlementRequest) -> Result<(), SettlementError> {
         // Terminal state check (Settled/Expired/Dissolved cannot be re-settled)
         if request.packet_state.is_terminal() {
-            return Err(SettlementError::TerminalState(
-                format!("{}", request.packet_id),
-            ));
+            return Err(SettlementError::TerminalState(format!(
+                "{}",
+                request.packet_id
+            )));
         }
 
         // Must be in Delivered state to settle
@@ -122,9 +121,7 @@ impl SettlementProtocol {
 
         // Adapter acceptance
         if !criteria.accepts_adapter(&request.adapter_id) {
-            return Err(SettlementError::AdapterRejected(
-                request.adapter_id.clone(),
-            ));
+            return Err(SettlementError::AdapterRejected(request.adapter_id.clone()));
         }
 
         // Fee tolerance: compute fee as fraction of packet value
@@ -143,7 +140,7 @@ impl SettlementProtocol {
         // Settler authorization
         if !criteria.is_authorized_settler(&request.settler_node) {
             return Err(SettlementError::UnauthorizedSettler(
-                format!("{}", request.settler_node.0),
+                request.settler_node.0.to_string(),
             ));
         }
 
@@ -187,13 +184,13 @@ impl SettlementProtocol {
         let receipt = egress_adapter
             .settle(
                 settled_value,
-                &format!("{}", request.settler_node.0),
+                &request.settler_node.0.to_string(),
                 "CAES",
                 gold_price_usd,
             )
             .await
             .map_err(|e| SettlementError::EgressFailed {
-                reason: format!("{}", e),
+                reason: format!("{e}"),
             })?;
 
         let settlement_result = SettlementResult {
@@ -215,13 +212,9 @@ impl SettlementProtocol {
             }
         } else {
             fee_distributor
-                .distribute_fee(
-                    request.fee,
-                    request.settler_node.clone(),
-                    transit_nodes,
-                )
+                .distribute_fee(request.fee, request.settler_node.clone(), transit_nodes)
                 .map_err(|e| SettlementError::EgressFailed {
-                    reason: format!("fee distribution: {}", e),
+                    reason: format!("fee distribution: {e}"),
                 })?
         };
 
@@ -325,7 +318,10 @@ mod tests {
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: in_transit should fail");
         assert!(
-            matches!(err, SettlementError::NotDelivered(_, PacketState::InTransit)),
+            matches!(
+                err,
+                SettlementError::NotDelivered(_, PacketState::InTransit)
+            ),
             "expected NotDelivered(InTransit), got: {err}"
         );
     }
@@ -336,7 +332,10 @@ mod tests {
         request.packet_state = PacketState::Minted;
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: minted should fail");
-        assert!(matches!(err, SettlementError::NotDelivered(_, PacketState::Minted)));
+        assert!(matches!(
+            err,
+            SettlementError::NotDelivered(_, PacketState::Minted)
+        ));
     }
 
     // -- Tier validation ----------------------------------------------------
@@ -359,8 +358,7 @@ mod tests {
     #[test]
     fn reject_unaccepted_adapter() {
         let mut request = test_request();
-        request.recipient_criteria.accepted_adapters =
-            vec!["uniswap_v3".to_string()];
+        request.recipient_criteria.accepted_adapters = vec!["uniswap_v3".to_string()];
         request.adapter_id = "stripe_us".to_string();
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: stripe_us should be rejected");
@@ -401,8 +399,7 @@ mod tests {
     #[test]
     fn reject_unauthorized_settler() {
         let mut request = test_request();
-        request.recipient_criteria.delegates =
-            vec![NodeId::from("trusted-only")];
+        request.recipient_criteria.delegates = vec![NodeId::from("trusted-only")];
         request.settler_node = NodeId::from("untrusted-settler");
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: unauthorized settler should fail");
@@ -415,8 +412,7 @@ mod tests {
     #[test]
     fn accept_authorized_delegate() {
         let mut request = test_request();
-        request.recipient_criteria.delegates =
-            vec![NodeId::from("settler-node")];
+        request.recipient_criteria.delegates = vec![NodeId::from("settler-node")];
         request.settler_node = NodeId::from("settler-node");
         SettlementProtocol::validate_settlement(&request)
             .expect("test: authorized delegate should pass");
@@ -494,15 +490,10 @@ mod tests {
         let adapter = mock_adapter();
         let distributor = fee_distributor();
 
-        let result = SettlementProtocol::execute_settlement(
-            request,
-            &adapter,
-            &distributor,
-            &[],
-            dec!(75),
-        )
-        .await
-        .expect("test: execute_settlement should succeed");
+        let result =
+            SettlementProtocol::execute_settlement(request, &adapter, &distributor, &[], dec!(75))
+                .await
+                .expect("test: execute_settlement should succeed");
 
         assert_eq!(result.settlement_result.settled_value.0, dec!(4.95));
         assert_eq!(result.settlement_result.fee_collected.0, dec!(0.05));
@@ -518,15 +509,10 @@ mod tests {
         let adapter = MockEgressAdapter::new(GoldGrams::zero());
         let distributor = fee_distributor();
 
-        let err = SettlementProtocol::execute_settlement(
-            request,
-            &adapter,
-            &distributor,
-            &[],
-            dec!(75),
-        )
-        .await
-        .expect_err("test: zero-capacity adapter should fail");
+        let err =
+            SettlementProtocol::execute_settlement(request, &adapter, &distributor, &[], dec!(75))
+                .await
+                .expect_err("test: zero-capacity adapter should fail");
 
         assert!(
             matches!(err, SettlementError::EgressFailed { .. }),
@@ -541,15 +527,10 @@ mod tests {
         let adapter = mock_adapter();
         let distributor = fee_distributor();
 
-        let err = SettlementProtocol::execute_settlement(
-            request,
-            &adapter,
-            &distributor,
-            &[],
-            dec!(75),
-        )
-        .await
-        .expect_err("test: Minted state should be rejected");
+        let err =
+            SettlementProtocol::execute_settlement(request, &adapter, &distributor, &[], dec!(75))
+                .await
+                .expect_err("test: Minted state should be rejected");
 
         assert!(
             matches!(err, SettlementError::NotDelivered(_, PacketState::Minted)),
@@ -564,15 +545,10 @@ mod tests {
         let adapter = mock_adapter();
         let distributor = fee_distributor();
 
-        let result = SettlementProtocol::execute_settlement(
-            request,
-            &adapter,
-            &distributor,
-            &[],
-            dec!(75),
-        )
-        .await
-        .expect("test: zero-fee settlement should succeed");
+        let result =
+            SettlementProtocol::execute_settlement(request, &adapter, &distributor, &[], dec!(75))
+                .await
+                .expect("test: zero-fee settlement should succeed");
 
         assert_eq!(result.settlement_result.settled_value.0, dec!(5));
         assert_eq!(result.settlement_result.fee_collected.0, dec!(0));

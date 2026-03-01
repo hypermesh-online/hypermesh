@@ -16,9 +16,7 @@ mod integration;
 use anyhow::Result;
 
 // Re-export integration test modules
-pub use integration::{
-    test_harness::{IntegrationTestHarness, TestContext, NodeConfig},
-};
+pub use integration::test_harness::{IntegrationTestHarness, NodeConfig, TestContext};
 
 // Test suite entry points
 #[cfg(test)]

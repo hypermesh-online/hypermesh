@@ -10,8 +10,8 @@
 //! erasure coding with recovery capabilities.
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
-use serde::{Serialize, Deserialize};
 use reed_solomon_erasure::galois_8::ReedSolomon;
+use serde::{Deserialize, Serialize};
 
 /// Sharding configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,20 +48,26 @@ impl ShardingConfig {
     /// Validate configuration
     pub fn validate(&self) -> PipelineResult<()> {
         if self.data_shards == 0 {
-            return Err(PipelineError::InvalidConfig("data_shards must be > 0".to_string()));
+            return Err(PipelineError::InvalidConfig(
+                "data_shards must be > 0".to_string(),
+            ));
         }
         if self.parity_shards == 0 {
-            return Err(PipelineError::InvalidConfig("parity_shards must be > 0".to_string()));
+            return Err(PipelineError::InvalidConfig(
+                "parity_shards must be > 0".to_string(),
+            ));
         }
         if self.target_shard_size == 0 {
-            return Err(PipelineError::InvalidConfig("target_shard_size must be > 0".to_string()));
+            return Err(PipelineError::InvalidConfig(
+                "target_shard_size must be > 0".to_string(),
+            ));
         }
         Ok(())
     }
 }
 
 /// Shard metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShardMetadata {
     /// Shard index
     pub index: usize,
@@ -73,18 +79,6 @@ pub struct ShardMetadata {
     pub original_size: usize,
     /// Hash of shard data (for integrity)
     pub hash: String,
-}
-
-impl Default for ShardMetadata {
-    fn default() -> Self {
-        Self {
-            index: 0,
-            is_parity: false,
-            size: 0,
-            original_size: 0,
-            hash: String::new(),
-        }
-    }
 }
 
 /// Individual shard
@@ -174,13 +168,19 @@ impl Sharder {
     pub fn new(config: ShardingConfig) -> PipelineResult<Self> {
         config.validate()?;
 
-        let reed_solomon = ReedSolomon::new(config.data_shards, config.parity_shards)
-            .map_err(|e| PipelineError::ShardingFailed(format!("Failed to create Reed-Solomon codec: {}", e)))?;
+        let reed_solomon =
+            ReedSolomon::new(config.data_shards, config.parity_shards).map_err(|e| {
+                PipelineError::ShardingFailed(format!("Failed to create Reed-Solomon codec: {e}"))
+            })?;
 
-        Ok(Self { config, reed_solomon })
+        Ok(Self {
+            config,
+            reed_solomon,
+        })
     }
 
     /// Create sharder with default configuration
+    #[allow(clippy::should_implement_trait)]
     pub fn default() -> PipelineResult<Self> {
         Self::new(ShardingConfig::default())
     }
@@ -190,7 +190,7 @@ impl Sharder {
         let start = std::time::Instant::now();
 
         // Calculate shard size (round up)
-        let shard_size = (data.len() + self.config.data_shards - 1) / self.config.data_shards;
+        let shard_size = data.len().div_ceil(self.config.data_shards);
         let padded_size = shard_size * self.config.data_shards;
 
         // Pad data to align with shard boundaries
@@ -213,8 +213,9 @@ impl Sharder {
         }
 
         // Encode using Reed-Solomon to generate parity shards
-        self.reed_solomon.encode(&mut rs_shards)
-            .map_err(|e| PipelineError::ShardingFailed(format!("Reed-Solomon encoding failed: {}", e)))?;
+        self.reed_solomon.encode(&mut rs_shards).map_err(|e| {
+            PipelineError::ShardingFailed(format!("Reed-Solomon encoding failed: {e}"))
+        })?;
 
         // Convert to Shard structs with metadata
         let mut shards = Vec::with_capacity(self.config.total_shards());
@@ -260,18 +261,20 @@ impl Sharder {
     pub fn reconstruct(&self, shards: &[Shard]) -> PipelineResult<Vec<u8>> {
         // Verify we have enough shards
         if shards.len() < self.config.data_shards {
-            return Err(PipelineError::ShardingFailed(
-                format!("Not enough shards for reconstruction: have {}, need {}",
-                    shards.len(), self.config.data_shards)
-            ));
+            return Err(PipelineError::ShardingFailed(format!(
+                "Not enough shards for reconstruction: have {}, need {}",
+                shards.len(),
+                self.config.data_shards
+            )));
         }
 
         // Verify shard integrity
         for shard in shards {
             if !shard.verify() {
-                return Err(PipelineError::ShardingFailed(
-                    format!("Shard {} failed integrity check", shard.metadata.index)
-                ));
+                return Err(PipelineError::ShardingFailed(format!(
+                    "Shard {} failed integrity check",
+                    shard.metadata.index
+                )));
             }
         }
 
@@ -297,19 +300,20 @@ impl Sharder {
         }
 
         // Reconstruct missing shards using Reed-Solomon
-        self.reed_solomon.reconstruct(&mut rs_shards)
-            .map_err(|e| PipelineError::ShardingFailed(format!("Reed-Solomon reconstruction failed: {}", e)))?;
+        self.reed_solomon.reconstruct(&mut rs_shards).map_err(|e| {
+            PipelineError::ShardingFailed(format!("Reed-Solomon reconstruction failed: {e}"))
+        })?;
 
         // Combine data shards back into original data
         let mut reconstructed = Vec::with_capacity(original_size);
 
-        for i in 0..self.config.data_shards {
-            if let Some(shard_data) = &rs_shards[i] {
+        for (i, rs_shard) in rs_shards.iter().enumerate().take(self.config.data_shards) {
+            if let Some(shard_data) = rs_shard {
                 reconstructed.extend_from_slice(shard_data);
             } else {
-                return Err(PipelineError::ShardingFailed(
-                    format!("Failed to reconstruct data shard {}", i)
-                ));
+                return Err(PipelineError::ShardingFailed(format!(
+                    "Failed to reconstruct data shard {i}"
+                )));
             }
         }
 
@@ -318,7 +322,6 @@ impl Sharder {
 
         Ok(reconstructed)
     }
-
 
     /// Get sharding configuration
     pub fn config(&self) -> &ShardingConfig {
@@ -354,16 +357,21 @@ mod tests {
         }
 
         // Test 1: Reconstruct from all shards
-        let reconstructed = sharder.reconstruct(&shards).expect("test: reconstruct from all shards");
+        let reconstructed = sharder
+            .reconstruct(&shards)
+            .expect("test: reconstruct from all shards");
         assert_eq!(reconstructed, data);
 
         // Test 2: Reconstruct from minimum data shards (no parity needed)
-        let data_shards: Vec<_> = shards.iter()
+        let data_shards: Vec<_> = shards
+            .iter()
             .filter(|s| !s.metadata.is_parity)
             .cloned()
             .collect();
 
-        let reconstructed = sharder.reconstruct(&data_shards).expect("test: reconstruct from data shards");
+        let reconstructed = sharder
+            .reconstruct(&data_shards)
+            .expect("test: reconstruct from data shards");
         assert_eq!(reconstructed, data);
     }
 
@@ -376,23 +384,25 @@ mod tests {
 
         // Test recovering with 4 missing shards (using parity)
         // Keep first 10 shards (mix of data and parity)
-        let partial_shards: Vec<_> = shards.iter()
-            .take(10)
-            .cloned()
-            .collect();
+        let partial_shards: Vec<_> = shards.iter().take(10).cloned().collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from partial");
+        let reconstructed = sharder
+            .reconstruct(&partial_shards)
+            .expect("test: reconstruct from partial");
         assert_eq!(reconstructed, data);
 
         // Test with different missing shard patterns
         // Missing shards 2, 5, 8, 11 (3 data, 1 parity)
-        let partial_shards: Vec<_> = shards.iter()
+        let partial_shards: Vec<_> = shards
+            .iter()
             .enumerate()
             .filter(|(i, _)| !matches!(i, 2 | 5 | 8 | 11))
             .map(|(_, s)| s.clone())
             .collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from pattern");
+        let reconstructed = sharder
+            .reconstruct(&partial_shards)
+            .expect("test: reconstruct from pattern");
         assert_eq!(reconstructed, data);
     }
 
@@ -410,19 +420,15 @@ mod tests {
 
         // Test with exactly 4 shards missing (maximum allowed)
         // Drop last 4 shards (all parity shards)
-        let partial_shards: Vec<_> = shards.iter()
-            .take(10)
-            .cloned()
-            .collect();
+        let partial_shards: Vec<_> = shards.iter().take(10).cloned().collect();
 
-        let reconstructed = sharder.reconstruct(&partial_shards).expect("test: reconstruct from max loss");
+        let reconstructed = sharder
+            .reconstruct(&partial_shards)
+            .expect("test: reconstruct from max loss");
         assert_eq!(reconstructed, data);
 
         // Test that we can't recover with 5 shards missing
-        let insufficient_shards: Vec<_> = shards.iter()
-            .take(9)
-            .cloned()
-            .collect();
+        let insufficient_shards: Vec<_> = shards.iter().take(9).cloned().collect();
 
         assert!(sharder.reconstruct(&insufficient_shards).is_err());
     }
@@ -479,9 +485,15 @@ mod tests {
             let data = vec![0xABu8; size];
             let (shards, _) = sharder.shard(&data).expect("test: shard");
             let reconstructed = sharder.reconstruct(&shards).expect("test: reconstruct");
-            assert_eq!(reconstructed.len(), data.len(),
-                "Size {} length mismatch: got {} expected {}", size, reconstructed.len(), data.len());
-            assert_eq!(reconstructed, data, "Size {} data mismatch", size);
+            assert_eq!(
+                reconstructed.len(),
+                data.len(),
+                "Size {} length mismatch: got {} expected {}",
+                size,
+                reconstructed.len(),
+                data.len()
+            );
+            assert_eq!(reconstructed, data, "Size {size} data mismatch");
         }
     }
 

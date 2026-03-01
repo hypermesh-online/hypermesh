@@ -3,10 +3,10 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Block Matrix
-//! 
+//!
 //! Block matrix for consensus operations.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Block matrix (placeholder)
 #[derive(Clone, Debug, Serialize, Deserialize)]

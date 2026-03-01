@@ -5,22 +5,22 @@
 //! Performance benchmarks for tensor operations
 
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::matrix::tensor::{
-    Vector3D, Matrix3x3, calculate_routing_vector, PathFinder,
-};
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use blockmatrix::matrix::tensor::{calculate_routing_vector, Matrix3x3, PathFinder, Vector3D};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 fn bench_vector_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("vector_ops");
 
     // Benchmark vector magnitude
     group.bench_function("magnitude", |b| {
+        #[allow(clippy::approx_constant)]
         let vec = Vector3D::new(3.14, 2.71, 1.41);
         b.iter(|| black_box(vec.magnitude()))
     });
 
     // Benchmark normalization
     group.bench_function("normalize", |b| {
+        #[allow(clippy::approx_constant)]
         let vec = Vector3D::new(3.14, 2.71, 1.41);
         b.iter(|| black_box(vec.normalize()))
     });
@@ -94,17 +94,16 @@ fn bench_pathfinding(c: &mut Criterion) {
     fn grid_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
         let mut neighbors = Vec::new();
         let offsets = [
-            (-1, 0, 0), (1, 0, 0),
-            (0, -1, 0), (0, 1, 0),
-            (0, 0, -1), (0, 0, 1),
+            (-1, 0, 0),
+            (1, 0, 0),
+            (0, -1, 0),
+            (0, 1, 0),
+            (0, 0, -1),
+            (0, 0, 1),
         ];
 
         for (dx, dy, dz) in offsets.iter() {
-            if let Ok(neighbor) = MatrixCoordinate::new(
-                coord.x + dx,
-                coord.y + dy,
-                coord.z + dz,
-            ) {
+            if let Ok(neighbor) = MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz) {
                 neighbors.push(neighbor);
             }
         }
@@ -120,10 +119,8 @@ fn bench_pathfinding(c: &mut Criterion) {
                 let finder = PathFinder::new();
                 let start = MatrixCoordinate::new(0, 0, 0).unwrap();
                 let goal = MatrixCoordinate::new(dist, dist, 0).unwrap();
-                b.iter(|| {
-                    black_box(finder.find_path(&start, &goal, grid_neighbors))
-                })
-            }
+                b.iter(|| black_box(finder.find_path(&start, &goal, grid_neighbors)))
+            },
         );
     }
 

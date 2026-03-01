@@ -16,8 +16,8 @@ use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::consensus::validation::DefaultStateAuthenticator;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::transfer::{
-    create_transfer_intent, compute_receipt_hash, proof_to_bytes,
-    StateProofBytes, TransferEngine, TransferError, TransferValidation,
+    compute_receipt_hash, create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
+    TransferError, TransferValidation,
 };
 use hypermesh_lib::{AssetAddress, ContentHash};
 use trustchain::consensus::ConsensusProof;
@@ -70,8 +70,7 @@ fn test_asset_address_roundtrip() {
     let coord = MatrixCoordinate::new(42, -17, 99).expect("test: valid coord");
     let hash = ContentHash::from_bytes([0xDE; 32]);
 
-    let addr = AssetAddress::new(coord.x, coord.y, coord.z, &hash)
-        .expect("test: valid address");
+    let addr = AssetAddress::new(coord.x, coord.y, coord.z, &hash).expect("test: valid address");
 
     // to_ipv6 -> from_ipv6 roundtrip
     let ipv6 = addr.to_ipv6();
@@ -89,8 +88,8 @@ fn test_asset_address_roundtrip() {
     assert!(recovered.is_hypermesh());
 
     // Display produces valid IPv6 string
-    let display = format!("{}", addr);
-    assert!(display.contains(':'), "Should be colon-hex: {}", display);
+    let display = format!("{addr}");
+    assert!(display.contains(':'), "Should be colon-hex: {display}");
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +112,10 @@ fn test_shard_sub_addressing() {
     }
 
     // All shard addresses are unique
-    let unique_count = shard_addrs.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique_count = shard_addrs
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     assert_eq!(unique_count, 14, "All 14 shard addresses should be unique");
 
     // Shard 15 is valid (max nibble)
@@ -147,7 +149,9 @@ async fn test_transfer_node0_to_node9() {
     .expect("test: valid asset address");
 
     // Register asset on node 0
-    nodes[0].assets.insert(asset_addr, "simulation-asset".to_string());
+    nodes[0]
+        .assets
+        .insert(asset_addr, "simulation-asset".to_string());
 
     let source_coord = nodes[0].coord;
     let target_coord = nodes[9].coord;
@@ -173,12 +177,18 @@ async fn test_transfer_node0_to_node9() {
         .expect("test: transfer should succeed");
 
     // Verify: source chain has transfer-out block
-    assert_eq!(receipt.source_block_index, 1, "First block after genesis on source");
+    assert_eq!(
+        receipt.source_block_index, 1,
+        "First block after genesis on source"
+    );
     let source_block = nodes[0].chain.get_block(1).await;
     assert!(source_block.is_some(), "Source chain should have block 1");
 
     // Verify: target chain has transfer-in block
-    assert_eq!(receipt.target_block_index, 1, "First block after genesis on target");
+    assert_eq!(
+        receipt.target_block_index, 1,
+        "First block after genesis on target"
+    );
     let target_block = nodes[9].chain.get_block(1).await;
     assert!(target_block.is_some(), "Target chain should have block 1");
 
@@ -294,24 +304,13 @@ async fn test_invalid_proof_rejected() {
     let engine = TransferEngine::new(validator);
 
     let hash = ContentHash::from_bytes([0xFF; 32]);
-    let addr = AssetAddress::new(
-        nodes[0].coord.x,
-        nodes[0].coord.y,
-        nodes[0].coord.z,
-        &hash,
-    )
-    .expect("test: valid address");
+    let addr = AssetAddress::new(nodes[0].coord.x, nodes[0].coord.y, nodes[0].coord.z, &hash)
+        .expect("test: valid address");
 
     // Empty proof bytes = always fails PoS authentication
     let empty_proof = StateProofBytes::new(vec![]);
 
-    let intent = create_transfer_intent(
-        addr,
-        nodes[0].coord,
-        nodes[1].coord,
-        empty_proof,
-        vec![],
-    );
+    let intent = create_transfer_intent(addr, nodes[0].coord, nodes[1].coord, empty_proof, vec![]);
 
     let result = engine
         .execute_transfer(
@@ -327,10 +326,7 @@ async fn test_invalid_proof_rejected() {
         Err(TransferError::ValidationFailed(TransferValidation::InvalidSourceProof(_))) => {
             // Expected: source proof fails authentication
         }
-        other => panic!(
-            "Expected InvalidSourceProof, got: {:?}",
-            other,
-        ),
+        other => panic!("Expected InvalidSourceProof, got: {other:?}",),
     }
 }
 

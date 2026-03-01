@@ -7,14 +7,14 @@
 //! This module implements the core workflows for the Intelligence Layer,
 //! orchestrating the flow of assets through all Phase 2 components.
 
+use anyhow::Result;
+use futures::stream::{self, StreamExt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use std::collections::HashMap;
 use tokio::sync::{RwLock, Semaphore};
-use anyhow::Result;
-use tracing::{info, debug, warn, error, instrument};
-use serde::{Serialize, Deserialize};
-use futures::stream::{self, StreamExt};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::assets::pipeline::{Asset, ProcessedAsset};
 
@@ -91,7 +91,11 @@ pub struct AssetWorkflow {
 
 impl AssetWorkflow {
     /// Create new asset workflow
-    pub fn new(max_concurrent: usize, processing_timeout: Duration, retrieval_timeout: Duration) -> Self {
+    pub fn new(
+        max_concurrent: usize,
+        processing_timeout: Duration,
+        retrieval_timeout: Duration,
+    ) -> Self {
         Self {
             concurrency_limit: Arc::new(Semaphore::new(max_concurrent)),
             metrics: Arc::new(RwLock::new(WorkflowMetrics::default())),
@@ -123,7 +127,9 @@ impl AssetWorkflow {
 
                 async move {
                     // Acquire permit for concurrency control
-                    let _permit = semaphore.acquire().await
+                    let _permit = semaphore
+                        .acquire()
+                        .await
                         .map_err(|e| WorkflowError::ResourceExhausted(e.to_string()))?;
 
                     // Process with timeout
@@ -149,13 +155,15 @@ impl AssetWorkflow {
         }
 
         // Update metrics
-        self.update_metrics(start.elapsed(), errors.is_empty()).await;
+        self.update_metrics(start.elapsed(), errors.is_empty())
+            .await;
 
         if !errors.is_empty() {
             warn!("Batch processing completed with {} errors", errors.len());
-            return Err(WorkflowError::Workflow(
-                anyhow::anyhow!("Batch processing failed with {} errors", errors.len())
-            ));
+            return Err(WorkflowError::Workflow(anyhow::anyhow!(
+                "Batch processing failed with {} errors",
+                errors.len()
+            )));
         }
 
         info!(
@@ -193,7 +201,7 @@ impl AssetWorkflow {
         } else {
             metrics.avg_execution_time_ms =
                 (metrics.avg_execution_time_ms * (metrics.total_executions - 1) + time_ms)
-                / metrics.total_executions;
+                    / metrics.total_executions;
         }
     }
 
@@ -247,6 +255,12 @@ pub struct StageMetrics {
     pub total_retries: u64,
 }
 
+impl Default for ProcessingWorkflow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProcessingWorkflow {
     /// Create new processing workflow
     pub fn new() -> Self {
@@ -291,19 +305,16 @@ impl ProcessingWorkflow {
 
     /// Execute processing workflow with stage tracking
     #[instrument(skip(self, processor))]
-    pub async fn execute<F, Fut, T>(
-        &self,
-        stage_name: &str,
-        processor: F,
-    ) -> WorkflowResult<T>
+    pub async fn execute<F, Fut, T>(&self, stage_name: &str, processor: F) -> WorkflowResult<T>
     where
         F: Fn() -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
     {
-        let stage = self.stages
+        let stage = self
+            .stages
             .iter()
             .find(|s| s.name == stage_name)
-            .ok_or_else(|| WorkflowError::InvalidState(format!("Unknown stage: {}", stage_name)))?;
+            .ok_or_else(|| WorkflowError::InvalidState(format!("Unknown stage: {stage_name}")))?;
 
         let start = Instant::now();
         let mut retries = 0;
@@ -319,7 +330,8 @@ impl ProcessingWorkflow {
             match tokio::time::timeout(stage.timeout, processor()).await {
                 Ok(Ok(result)) => {
                     // Success - update metrics
-                    self.update_stage_metrics(stage_name, start.elapsed(), true, retries).await;
+                    self.update_stage_metrics(stage_name, start.elapsed(), true, retries)
+                        .await;
                     return Ok(result);
                 }
                 Ok(Err(e)) => {
@@ -327,19 +339,23 @@ impl ProcessingWorkflow {
                     retries += 1;
                 }
                 Err(_) => {
-                    last_error = Some(WorkflowError::Timeout(
-                        format!("Stage {} timeout after {:?}", stage_name, stage.timeout)
-                    ));
+                    last_error = Some(WorkflowError::Timeout(format!(
+                        "Stage {} timeout after {:?}",
+                        stage_name, stage.timeout
+                    )));
                     retries += 1;
                 }
             }
         }
 
         // All retries exhausted - update metrics and return error
-        self.update_stage_metrics(stage_name, start.elapsed(), false, retries - 1).await;
+        self.update_stage_metrics(stage_name, start.elapsed(), false, retries - 1)
+            .await;
 
         Err(last_error.unwrap_or_else(|| {
-            WorkflowError::Workflow(anyhow::anyhow!("Stage {} failed after {} retries", stage_name, retries))
+            WorkflowError::Workflow(anyhow::anyhow!(
+                "Stage {stage_name} failed after {retries} retries"
+            ))
         }))
     }
 
@@ -369,7 +385,7 @@ impl ProcessingWorkflow {
         } else {
             stage_metrics.avg_duration_ms =
                 (stage_metrics.avg_duration_ms * (stage_metrics.executions - 1) + duration_ms)
-                / stage_metrics.executions;
+                    / stage_metrics.executions;
         }
     }
 
@@ -434,11 +450,13 @@ impl RetrievalWorkflow {
         debug!("Cache miss for asset {} - retrieving", asset_id);
 
         // Retrieve from source
-        let data = retriever().await
+        let data = retriever()
+            .await
             .map_err(|e| WorkflowError::StorageFailed(e.to_string()))?;
 
         // Store in cache
-        self.store_in_cache(asset_id.to_string(), data.clone()).await;
+        self.store_in_cache(asset_id.to_string(), data.clone())
+            .await;
 
         Ok(data)
     }
@@ -470,11 +488,14 @@ impl RetrievalWorkflow {
             self.evict_lru(&mut cache);
         }
 
-        cache.insert(asset_id, CachedAsset {
-            data,
-            cached_at: Instant::now(),
-            access_count: 1,
-        });
+        cache.insert(
+            asset_id,
+            CachedAsset {
+                data,
+                cached_at: Instant::now(),
+                access_count: 1,
+            },
+        );
     }
 
     /// Evict least recently used entry
@@ -574,7 +595,7 @@ mod tests {
 
         let results = workflow.batch_process(assets, processor).await;
         assert!(results.is_ok());
-        assert_eq!(results.unwrap().len(), 2);
+        assert_eq!(results.expect("test: expected success").len(), 2);
 
         let metrics = workflow.get_metrics().await;
         assert_eq!(metrics.total_executions, 1);
@@ -585,12 +606,14 @@ mod tests {
     async fn test_processing_workflow_stages() {
         let workflow = ProcessingWorkflow::new();
 
-        let result = workflow.execute("validation", || async {
-            Ok::<_, anyhow::Error>("validated")
-        }).await;
+        let result = workflow
+            .execute("validation", || async {
+                Ok::<_, anyhow::Error>("validated")
+            })
+            .await;
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "validated");
+        assert_eq!(result.expect("test: expected success"), "validated");
 
         let metrics = workflow.get_stage_metrics().await;
         assert!(metrics.contains_key("validation"));
@@ -605,19 +628,25 @@ mod tests {
         let mut call_count = 0;
 
         // First call - should retrieve
-        let data1 = workflow.retrieve_with_cache("asset1", || async {
-            call_count += 1;
-            Ok(vec![1, 2, 3])
-        }).await.unwrap();
+        let data1 = workflow
+            .retrieve_with_cache("asset1", || async {
+                call_count += 1;
+                Ok(vec![1, 2, 3])
+            })
+            .await
+            .expect("test: expected success");
 
         assert_eq!(data1, vec![1, 2, 3]);
         assert_eq!(call_count, 1);
 
         // Second call - should use cache
-        let data2 = workflow.retrieve_with_cache("asset1", || async {
-            call_count += 1;
-            Ok(vec![1, 2, 3])
-        }).await.unwrap();
+        let data2 = workflow
+            .retrieve_with_cache("asset1", || async {
+                call_count += 1;
+                Ok(vec![1, 2, 3])
+            })
+            .await
+            .expect("test: expected success");
 
         assert_eq!(data2, vec![1, 2, 3]);
         assert_eq!(call_count, 1); // Should not have called retriever again

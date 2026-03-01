@@ -11,10 +11,9 @@ use anyhow::Result;
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::NetworkManager;
-use std::net::{SocketAddr, Ipv6Addr};
+use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tracing::{info, warn};
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,7 +28,7 @@ async fn main() -> Result<()> {
     info!("");
 
     // Create 3 nodes with different matrix coordinates
-    let nodes = vec![
+    let nodes = [
         (0, 0, 0, 9292), // Bootstrap node
         (1, 2, 0, 9293), // Node 1
         (2, 4, 1, 9294), // Node 2
@@ -39,11 +38,13 @@ async fn main() -> Result<()> {
 
     // Start bootstrap node first
     let (x, y, z, port) = nodes[0];
-    info!("Starting bootstrap node at ({},{},{}) on port {}", x, y, z, port);
+    info!(
+        "Starting bootstrap node at ({},{},{}) on port {}",
+        x, y, z, port
+    );
 
-    let bootstrap_handle = tokio::spawn(async move {
-        start_node(x, y, z, port, None, PrivacyMode::PUBLIC).await
-    });
+    let bootstrap_handle =
+        tokio::spawn(async move { start_node(x, y, z, port, None, PrivacyMode::PUBLIC).await });
     handles.push(bootstrap_handle);
 
     // Wait for bootstrap to initialize
@@ -104,11 +105,14 @@ async fn start_node(
     let coord = MatrixCoordinate::new(x, y, z)?;
 
     // Bootstrap node
-    let bootstrap_mgr = NodeBootstrap::initialize(coord.clone()).await?;
+    let bootstrap_mgr = NodeBootstrap::initialize(coord).await?;
     bootstrap_mgr.verify_self_sufficient().await?;
 
-    info!("Node ({},{},{}) bootstrapped with genesis: {}",
-        x, y, z,
+    info!(
+        "Node ({},{},{}) bootstrapped with genesis: {}",
+        x,
+        y,
+        z,
         &bootstrap_mgr.genesis_block().hash[..8]
     );
 
@@ -117,9 +121,11 @@ async fn start_node(
 
     // Initialize STOQ transport if not private
     if privacy_mode != PrivacyMode::PRIVATE {
-        let mut stoq_config = stoq::TransportConfig::default();
-        stoq_config.port = port;
-        stoq_config.bind_address = Ipv6Addr::UNSPECIFIED;
+        let stoq_config = stoq::TransportConfig {
+            port,
+            bind_address: Ipv6Addr::UNSPECIFIED,
+            ..stoq::TransportConfig::default()
+        };
 
         let transport = Arc::new(stoq::StoqTransport::new(stoq_config).await?);
 
@@ -131,12 +137,7 @@ async fn start_node(
         };
 
         // Create network manager
-        let network = NetworkManager::new(
-            coord,
-            transport,
-            privacy_mode,
-            bootstrap_nodes,
-        ).await?;
+        let network = NetworkManager::new(coord, transport, privacy_mode, bootstrap_nodes).await?;
 
         // Start discovery
         network.start_discovery().await?;
@@ -161,10 +162,9 @@ async fn start_node(
 
                 let neighbors = network_arc.find_matrix_neighbors(10.0).await;
                 for neighbor in neighbors.iter().take(2) {
-                    info!("  → Neighbor at ({},{},{})",
-                        neighbor.coordinate.x,
-                        neighbor.coordinate.y,
-                        neighbor.coordinate.z
+                    info!(
+                        "  → Neighbor at ({},{},{})",
+                        neighbor.coordinate.x, neighbor.coordinate.y, neighbor.coordinate.z
                     );
                 }
             }

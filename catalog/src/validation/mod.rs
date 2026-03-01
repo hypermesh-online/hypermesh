@@ -28,23 +28,25 @@ pub mod validators;
 // Re-export main types for convenience
 pub use config::{
     ComplianceLevel, ComplianceRule, ComplianceStandard, ComplianceValidationConfig,
-    DependencyValidationConfig, LintCategory, LintRule, LintSeverity,
-    PerformanceValidationConfig, SecurityRule, SecuritySeverity, SecurityValidationConfig,
-    SyntaxValidationConfig, ValidationConfig,
+    DependencyValidationConfig, LintCategory, LintRule, LintSeverity, PerformanceValidationConfig,
+    SecurityRule, SecuritySeverity, SecurityValidationConfig, SyntaxValidationConfig,
+    ValidationConfig,
 };
 
-pub use dependency::{Dependency, DependencyGraph, DependencyNode, DependencyResolver, VersionConflict};
+pub use dependency::{
+    Dependency, DependencyGraph, DependencyNode, DependencyResolver, VersionConflict,
+};
 
 pub use results::{
-    BenchmarkResults, BenchmarkStatistics, BestPracticeViolation, CodeLocation,
-    ComplianceIssue, ComplianceRuleFailure, ComplianceValidationResult, ComplexityAnalysis,
-    DataCollectionAnalysis, ExportControlResult, ExportRestriction, HalsteadMetrics,
-    InjectionRisk, InjectionType, LicenseComplianceResult, LicenseCompatibilityIssue,
-    LicenseConflict, LintingIssue, MalwareDetection, PerformanceImpact, PerformanceIssue,
-    PerformanceIssueType, PerformanceValidationResult, PrivacyComplianceResult,
-    PrivacyViolation, ResourceUsage, RiskLevel, SecurityRuleFailure, SecurityValidationResult,
-    StandardComplianceResult, StyleViolation, SyntaxError, SyntaxValidationResult,
-    ThirdPartySharing, ValidationResult, ValidationSummary, ViolationSeverity, Vulnerability,
+    BenchmarkResults, BenchmarkStatistics, BestPracticeViolation, CodeLocation, ComplexityAnalysis,
+    ComplianceIssue, ComplianceRuleFailure, ComplianceValidationResult, DataCollectionAnalysis,
+    ExportControlResult, ExportRestriction, HalsteadMetrics, InjectionRisk, InjectionType,
+    LicenseCompatibilityIssue, LicenseComplianceResult, LicenseConflict, LintingIssue,
+    MalwareDetection, PerformanceImpact, PerformanceIssue, PerformanceIssueType,
+    PerformanceValidationResult, PrivacyComplianceResult, PrivacyViolation, ResourceUsage,
+    RiskLevel, SecurityRuleFailure, SecurityValidationResult, StandardComplianceResult,
+    StyleViolation, SyntaxError, SyntaxValidationResult, ThirdPartySharing, ValidationResult,
+    ValidationSummary, ViolationSeverity, Vulnerability,
 };
 
 pub use traits::{SecurityScanner, TypeValidator};

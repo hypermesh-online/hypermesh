@@ -9,14 +9,14 @@
 //! Gated: uses old struct field names (StakeProof.node_id, etc.) that were refactored.
 #![cfg(feature = "future-tests")]
 
-use blockmatrix::consensus::{
-    ConsensusProof, ConsensusRequirements, ConsensusError,
-    StakeProof, TimeProof, SpaceProof, WorkProof,
-    validation::{StateAuthenticator, DefaultStateAuthenticator, ProductionStateAuthenticator},
-    validation_service::{ValidationService, ConsensusValidationService},
-};
 use anyhow::Result;
-use std::time::{SystemTime, Duration};
+use blockmatrix::consensus::{
+    validation::{DefaultStateAuthenticator, ProductionStateAuthenticator, StateAuthenticator},
+    validation_service::{ConsensusValidationService, ValidationService},
+    ConsensusError, ConsensusProof, ConsensusRequirements, SpaceProof, StakeProof, TimeProof,
+    WorkProof,
+};
+use std::time::{Duration, SystemTime};
 
 /// Helper to create a valid test proof
 fn create_valid_test_proof() -> ConsensusProof {
@@ -104,7 +104,10 @@ async fn test_malformed_proof_rejection() {
 
     let result = validator.validate(&garbage).await;
     assert!(result.is_err(), "Malformed proof should error");
-    assert!(result.unwrap_err().to_string().contains("Invalid proof format"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid proof format"));
 }
 
 #[tokio::test]
@@ -114,7 +117,11 @@ async fn test_oversized_proof_rejection() {
 
     let result = validator.validate(&huge_proof).await;
     assert!(result.is_ok(), "Oversized proof should not error");
-    assert_eq!(result.unwrap(), false, "Oversized proof should return false");
+    assert_eq!(
+        result.unwrap(),
+        false,
+        "Oversized proof should return false"
+    );
 }
 
 #[tokio::test]
@@ -136,7 +143,11 @@ async fn test_excessive_time_offset_rejection() {
 
     let result = validator.validate(&proof_bytes).await;
     assert!(result.is_ok(), "Should not error on time offset");
-    assert_eq!(result.unwrap(), false, "Should reject excessive time offset");
+    assert_eq!(
+        result.unwrap(),
+        false,
+        "Should reject excessive time offset"
+    );
 }
 
 #[tokio::test]
@@ -177,7 +188,11 @@ async fn test_custom_requirements_validation() {
 
     let result = validator.validate(&proof_bytes).await;
     assert!(result.is_ok(), "Should not error");
-    assert_eq!(result.unwrap(), false, "Should reject with stricter requirements");
+    assert_eq!(
+        result.unwrap(),
+        false,
+        "Should reject with stricter requirements"
+    );
 }
 
 #[tokio::test]
@@ -188,7 +203,11 @@ async fn test_production_validator_strict_requirements() {
 
     let result = validator.validate(&proof_bytes).await;
     assert!(result.is_ok(), "Should not error");
-    assert_eq!(result.unwrap(), false, "Should reject with production requirements");
+    assert_eq!(
+        result.unwrap(),
+        false,
+        "Should reject with production requirements"
+    );
 }
 
 #[tokio::test]
@@ -205,7 +224,11 @@ async fn test_testing_requirements_validation() {
 
     let result = validator.validate(&proof_bytes).await;
     assert!(result.is_ok(), "Should not error");
-    assert_eq!(result.unwrap(), true, "Should pass with testing requirements");
+    assert_eq!(
+        result.unwrap(),
+        true,
+        "Should pass with testing requirements"
+    );
 }
 
 #[test]
@@ -234,9 +257,12 @@ fn test_validation_service_production_mode() {
     let proof = create_valid_test_proof(); // Won't meet production requirements
 
     let result = service.validate(&proof);
-    assert!(result.is_err(), "Should reject with production requirements");
+    assert!(
+        result.is_err(),
+        "Should reject with production requirements"
+    );
     match result {
-        Err(ConsensusError::ValidationFailed(_)) => {},
+        Err(ConsensusError::ValidationFailed(_)) => {}
         _ => panic!("Expected ValidationFailed error"),
     }
 }
@@ -264,8 +290,17 @@ async fn test_all_four_proofs_required() {
     for (invalid_proof, proof_type) in test_cases {
         let proof_bytes = invalid_proof.to_bytes().expect("Should serialize");
         let result = validator.validate(&proof_bytes).await;
-        assert!(result.is_ok(), "Should not error for invalid {}", proof_type);
-        assert_eq!(result.unwrap(), false, "Should reject invalid {} proof", proof_type);
+        assert!(
+            result.is_ok(),
+            "Should not error for invalid {}",
+            proof_type
+        );
+        assert_eq!(
+            result.unwrap(),
+            false,
+            "Should reject invalid {} proof",
+            proof_type
+        );
     }
 }
 
@@ -301,12 +336,22 @@ async fn test_validate_with_custom_requirements() {
 
     // Should fail with default requirements
     let result = validator.validate(&proof_bytes).await;
-    assert_eq!(result.unwrap(), false, "Should fail with default requirements");
+    assert_eq!(
+        result.unwrap(),
+        false,
+        "Should fail with default requirements"
+    );
 
     // Should pass with lenient requirements
-    let result = validator.validate_with_requirements(&proof_bytes, &lenient_requirements).await;
+    let result = validator
+        .validate_with_requirements(&proof_bytes, &lenient_requirements)
+        .await;
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), true, "Should pass with lenient requirements");
+    assert_eq!(
+        result.unwrap(),
+        true,
+        "Should pass with lenient requirements"
+    );
 }
 
 #[test]
@@ -361,7 +406,16 @@ async fn test_detailed_failure_reporting() {
         let prod_validator = ProductionStateAuthenticator::new();
         let prod_result = prod_validator.validate(&proof_bytes).await;
 
-        assert!(prod_result.is_ok(), "Should handle {} failure gracefully", expected_failure);
-        assert_eq!(prod_result.unwrap(), false, "Should reject {} failure", expected_failure);
+        assert!(
+            prod_result.is_ok(),
+            "Should handle {} failure gracefully",
+            expected_failure
+        );
+        assert_eq!(
+            prod_result.unwrap(),
+            false,
+            "Should reject {} failure",
+            expected_failure
+        );
     }
 }

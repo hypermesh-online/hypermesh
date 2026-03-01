@@ -11,8 +11,8 @@ use crate::capacity::CapacityMetrics;
 
 use super::privacy_filter::DifferentialPrivacyFilter;
 use super::protocol::{
-    CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame,
-    MetricsPayload, RoutingSnapshot,
+    CapacitySnapshot, CongestionSnapshot, EconomicSnapshot, MetricsFrame, MetricsPayload,
+    RoutingSnapshot,
 };
 
 // ---------------------------------------------------------------------------
@@ -61,10 +61,7 @@ impl MetricsPublisher {
     /// Publish a capacity frame from [`CapacityMetrics`].
     ///
     /// Returns `None` if the privacy filter suppresses the frame.
-    pub fn publish_capacity(
-        &mut self,
-        metrics: &CapacityMetrics,
-    ) -> Option<MetricsFrame> {
+    pub fn publish_capacity(&mut self, metrics: &CapacityMetrics) -> Option<MetricsFrame> {
         let snapshot = CapacitySnapshot::from(metrics);
         let frame = self.build_frame(MetricsPayload::Capacity(snapshot));
         self.filter.filter_frame(frame)
@@ -73,10 +70,7 @@ impl MetricsPublisher {
     /// Publish a congestion snapshot.
     ///
     /// Returns `None` if the privacy filter suppresses the frame.
-    pub fn publish_congestion(
-        &mut self,
-        snapshot: CongestionSnapshot,
-    ) -> Option<MetricsFrame> {
+    pub fn publish_congestion(&mut self, snapshot: CongestionSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Congestion(snapshot));
         self.filter.filter_frame(frame)
     }
@@ -84,10 +78,7 @@ impl MetricsPublisher {
     /// Publish a routing snapshot. Only passed through for Public privacy.
     ///
     /// Returns `None` if the privacy filter suppresses the frame.
-    pub fn publish_routing(
-        &mut self,
-        snapshot: RoutingSnapshot,
-    ) -> Option<MetricsFrame> {
+    pub fn publish_routing(&mut self, snapshot: RoutingSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Routing(snapshot));
         self.filter.filter_frame(frame)
     }
@@ -95,10 +86,7 @@ impl MetricsPublisher {
     /// Publish an economic snapshot. Only passed through for Public privacy.
     ///
     /// Returns `None` if the privacy filter suppresses the frame.
-    pub fn publish_economic(
-        &mut self,
-        snapshot: EconomicSnapshot,
-    ) -> Option<MetricsFrame> {
+    pub fn publish_economic(&mut self, snapshot: EconomicSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Economic(snapshot));
         self.filter.filter_frame(frame)
     }
@@ -145,12 +133,8 @@ mod tests {
 
     #[test]
     fn publish_capacity_anonymous_returns_none() {
-        let mut pub_anon = MetricsPublisher::new(
-            NodeId::from("anon-pub"),
-            PrivacyMode::ANONYMOUS,
-            1.0,
-            10,
-        );
+        let mut pub_anon =
+            MetricsPublisher::new(NodeId::from("anon-pub"), PrivacyMode::ANONYMOUS, 1.0, 10);
         let result = pub_anon.publish_capacity(&test_capacity_metrics());
         assert!(
             result.is_none(),
@@ -160,12 +144,8 @@ mod tests {
 
     #[test]
     fn publish_capacity_public_returns_some() {
-        let mut publisher = MetricsPublisher::new(
-            NodeId::from("pub-node"),
-            PrivacyMode::PUBLIC,
-            1.0,
-            10,
-        );
+        let mut publisher =
+            MetricsPublisher::new(NodeId::from("pub-node"), PrivacyMode::PUBLIC, 1.0, 10);
         let result = publisher.publish_capacity(&test_capacity_metrics());
         assert!(
             result.is_some(),
@@ -181,12 +161,8 @@ mod tests {
 
     #[test]
     fn sequence_numbers_increment() {
-        let mut publisher = MetricsPublisher::new(
-            NodeId::from("seq-node"),
-            PrivacyMode::PUBLIC,
-            1.0,
-            10,
-        );
+        let mut publisher =
+            MetricsPublisher::new(NodeId::from("seq-node"), PrivacyMode::PUBLIC, 1.0, 10);
 
         let f1 = publisher
             .publish_capacity(&test_capacity_metrics())
@@ -205,12 +181,8 @@ mod tests {
 
     #[test]
     fn privacy_filter_applied_to_published_frames() {
-        let mut publisher = MetricsPublisher::new(
-            NodeId::from("filter-node"),
-            PrivacyMode::PRIVATE,
-            1.0,
-            10,
-        );
+        let mut publisher =
+            MetricsPublisher::new(NodeId::from("filter-node"), PrivacyMode::PRIVATE, 1.0, 10);
 
         // Private should pass capacity...
         let cap = publisher.publish_capacity(&test_capacity_metrics());
@@ -222,20 +194,13 @@ mod tests {
             settlement_rate_per_epoch: 5.0,
             active_packets: 3,
         });
-        assert!(
-            econ.is_none(),
-            "Private must suppress Economic payload"
-        );
+        assert!(econ.is_none(), "Private must suppress Economic payload");
     }
 
     #[test]
     fn publish_economic_private_returns_none() {
-        let mut publisher = MetricsPublisher::new(
-            NodeId::from("priv-econ"),
-            PrivacyMode::PRIVATE,
-            1.0,
-            10,
-        );
+        let mut publisher =
+            MetricsPublisher::new(NodeId::from("priv-econ"), PrivacyMode::PRIVATE, 1.0, 10);
         let result = publisher.publish_economic(EconomicSnapshot {
             in_flight_float_grams: 5.0,
             settlement_rate_per_epoch: 2.0,

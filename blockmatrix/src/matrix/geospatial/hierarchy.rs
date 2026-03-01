@@ -69,12 +69,7 @@ pub struct GeographicBounds {
 
 impl GeographicBounds {
     /// Create new bounds
-    pub fn new(
-        min_lat: f64,
-        max_lat: f64,
-        min_lon: f64,
-        max_lon: f64,
-    ) -> Result<Self, GpsError> {
+    pub fn new(min_lat: f64, max_lat: f64, min_lon: f64, max_lon: f64) -> Result<Self, GpsError> {
         if min_lat > max_lat {
             return Err(GpsError::InvalidLatitude(min_lat));
         }
@@ -159,12 +154,7 @@ pub struct GeographicZone {
 
 impl GeographicZone {
     /// Create a new geographic zone
-    pub fn new(
-        id: String,
-        name: String,
-        level: GeographicLevel,
-        bounds: GeographicBounds,
-    ) -> Self {
+    pub fn new(id: String, name: String, level: GeographicLevel, bounds: GeographicBounds) -> Self {
         Self {
             id,
             name,
@@ -227,7 +217,7 @@ impl GeographicHierarchy {
         // Validate parent exists if specified
         if let Some(parent_id) = &zone.parent_id {
             if !self.zones.contains_key(parent_id) {
-                return Err(format!("Parent zone '{}' not found", parent_id));
+                return Err(format!("Parent zone '{parent_id}' not found"));
             }
         }
 
@@ -237,7 +227,7 @@ impl GeographicHierarchy {
         // Add to level index
         self.zones_by_level
             .entry(level)
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(zone_id.clone());
 
         // Update parent's child list
@@ -252,8 +242,10 @@ impl GeographicHierarchy {
 
     /// Remove a zone from the hierarchy
     pub fn remove_zone(&mut self, zone_id: &str) -> Result<GeographicZone, String> {
-        let zone = self.zones.remove(zone_id)
-            .ok_or_else(|| format!("Zone '{}' not found", zone_id))?;
+        let zone = self
+            .zones
+            .remove(zone_id)
+            .ok_or_else(|| format!("Zone '{zone_id}' not found"))?;
 
         // Remove from level index
         if let Some(level_zones) = self.zones_by_level.get_mut(&zone.level) {
@@ -363,7 +355,7 @@ impl GeographicHierarchy {
             GeographicLevel::Global,
             global_bounds,
         );
-        if let Err(_) = self.add_zone(global) {
+        if self.add_zone(global).is_err() {
             return; // If global fails, can't continue
         }
 
@@ -376,31 +368,106 @@ impl GeographicHierarchy {
         self.add_continent("oceania", "Oceania", -47.0, -10.0, 112.0, 180.0);
 
         // Add major countries
-        self.add_country("usa", "United States", "north_america", 24.5, 49.4, -125.0, -66.9);
-        self.add_country("canada", "Canada", "north_america", 41.7, 83.1, -141.0, -52.6);
-        self.add_country("mexico", "Mexico", "north_america", 14.5, 32.7, -118.4, -86.7);
-        self.add_country("brazil", "Brazil", "south_america", -33.8, 5.3, -73.9, -34.8);
+        self.add_country(
+            "usa",
+            "United States",
+            "north_america",
+            24.5,
+            49.4,
+            -125.0,
+            -66.9,
+        );
+        self.add_country(
+            "canada",
+            "Canada",
+            "north_america",
+            41.7,
+            83.1,
+            -141.0,
+            -52.6,
+        );
+        self.add_country(
+            "mexico",
+            "Mexico",
+            "north_america",
+            14.5,
+            32.7,
+            -118.4,
+            -86.7,
+        );
+        self.add_country(
+            "brazil",
+            "Brazil",
+            "south_america",
+            -33.8,
+            5.3,
+            -73.9,
+            -34.8,
+        );
         self.add_country("uk", "United Kingdom", "europe", 49.9, 60.8, -8.6, 1.8);
         self.add_country("germany", "Germany", "europe", 47.3, 55.0, 5.9, 15.0);
         self.add_country("france", "France", "europe", 41.3, 51.1, -5.1, 9.6);
         self.add_country("china", "China", "asia", 18.2, 53.6, 73.6, 134.8);
         self.add_country("japan", "Japan", "asia", 24.0, 46.0, 123.0, 146.0);
         self.add_country("india", "India", "asia", 8.1, 35.5, 68.2, 97.4);
-        self.add_country("australia", "Australia", "oceania", -43.6, -10.7, 113.3, 153.6);
+        self.add_country(
+            "australia",
+            "Australia",
+            "oceania",
+            -43.6,
+            -10.7,
+            113.3,
+            153.6,
+        );
 
         // Add some major cities
-        self.add_city("nyc", "New York City", "usa", 40.4774, 40.9176, -74.2591, -73.7002);
-        self.add_city("la", "Los Angeles", "usa", 33.7037, 34.3373, -118.6682, -117.9886);
+        self.add_city(
+            "nyc",
+            "New York City",
+            "usa",
+            40.4774,
+            40.9176,
+            -74.2591,
+            -73.7002,
+        );
+        self.add_city(
+            "la",
+            "Los Angeles",
+            "usa",
+            33.7037,
+            34.3373,
+            -118.6682,
+            -117.9886,
+        );
         self.add_city("london", "London", "uk", 51.2868, 51.6919, -0.5103, 0.3340);
         self.add_city("paris", "Paris", "france", 48.8156, 48.9022, 2.2241, 2.4699);
-        self.add_city("berlin", "Berlin", "germany", 52.3382, 52.6755, 13.0883, 13.7612);
-        self.add_city("tokyo", "Tokyo", "japan", 35.5329, 35.8174, 139.5651, 139.9213);
-        self.add_city("sydney", "Sydney", "australia", -34.0183, -33.5781, 150.7108, 151.3430);
+        self.add_city(
+            "berlin", "Berlin", "germany", 52.3382, 52.6755, 13.0883, 13.7612,
+        );
+        self.add_city(
+            "tokyo", "Tokyo", "japan", 35.5329, 35.8174, 139.5651, 139.9213,
+        );
+        self.add_city(
+            "sydney",
+            "Sydney",
+            "australia",
+            -34.0183,
+            -33.5781,
+            150.7108,
+            151.3430,
+        );
     }
 
     /// Helper to add continent
-    fn add_continent(&mut self, id: &str, name: &str, min_lat: f64, max_lat: f64,
-                     min_lon: f64, max_lon: f64) {
+    fn add_continent(
+        &mut self,
+        id: &str,
+        name: &str,
+        min_lat: f64,
+        max_lat: f64,
+        min_lon: f64,
+        max_lon: f64,
+    ) {
         let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
             Ok(b) => b,
             Err(_) => return, // Skip invalid bounds
@@ -416,8 +483,16 @@ impl GeographicHierarchy {
     }
 
     /// Helper to add country
-    fn add_country(&mut self, id: &str, name: &str, continent: &str,
-                   min_lat: f64, max_lat: f64, min_lon: f64, max_lon: f64) {
+    fn add_country(
+        &mut self,
+        id: &str,
+        name: &str,
+        continent: &str,
+        min_lat: f64,
+        max_lat: f64,
+        min_lon: f64,
+        max_lon: f64,
+    ) {
         let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
             Ok(b) => b,
             Err(_) => return, // Skip invalid bounds
@@ -433,8 +508,16 @@ impl GeographicHierarchy {
     }
 
     /// Helper to add city
-    fn add_city(&mut self, id: &str, name: &str, country: &str,
-                min_lat: f64, max_lat: f64, min_lon: f64, max_lon: f64) {
+    fn add_city(
+        &mut self,
+        id: &str,
+        name: &str,
+        country: &str,
+        min_lat: f64,
+        max_lat: f64,
+        min_lon: f64,
+        max_lon: f64,
+    ) {
         let bounds = match GeographicBounds::new(min_lat, max_lat, min_lon, max_lon) {
             Ok(b) => b,
             Err(_) => return, // Skip invalid bounds
@@ -470,64 +553,70 @@ mod tests {
 
     #[test]
     fn test_geographic_level_hierarchy() {
-        assert_eq!(GeographicLevel::Country.parent_level(), Some(GeographicLevel::Continent));
-        assert_eq!(GeographicLevel::Country.child_level(), Some(GeographicLevel::Region));
+        assert_eq!(
+            GeographicLevel::Country.parent_level(),
+            Some(GeographicLevel::Continent)
+        );
+        assert_eq!(
+            GeographicLevel::Country.child_level(),
+            Some(GeographicLevel::Region)
+        );
         assert_eq!(GeographicLevel::Global.parent_level(), None);
         assert_eq!(GeographicLevel::Local.child_level(), None);
     }
 
     #[test]
     fn test_geographic_bounds() {
-        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).unwrap();
+        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).expect("test: creation");
 
         // Point inside bounds
-        let inside = GpsCoordinate::at_sea_level(45.0, -75.0).unwrap();
+        let inside = GpsCoordinate::at_sea_level(45.0, -75.0).expect("test: expected success");
         assert!(bounds.contains(&inside));
 
         // Point outside bounds (latitude)
-        let outside_lat = GpsCoordinate::at_sea_level(55.0, -75.0).unwrap();
+        let outside_lat = GpsCoordinate::at_sea_level(55.0, -75.0).expect("test: expected success");
         assert!(!bounds.contains(&outside_lat));
 
         // Point outside bounds (longitude)
-        let outside_lon = GpsCoordinate::at_sea_level(45.0, -60.0).unwrap();
+        let outside_lon = GpsCoordinate::at_sea_level(45.0, -60.0).expect("test: expected success");
         assert!(!bounds.contains(&outside_lon));
     }
 
     #[test]
     fn test_date_line_crossing() {
         // Bounds crossing the date line
-        let bounds = GeographicBounds::new(-10.0, 10.0, 170.0, -170.0).unwrap();
+        let bounds = GeographicBounds::new(-10.0, 10.0, 170.0, -170.0).expect("test: creation");
 
         // Point on west side of date line
-        let west = GpsCoordinate::at_sea_level(0.0, 175.0).unwrap();
+        let west = GpsCoordinate::at_sea_level(0.0, 175.0).expect("test: expected success");
         assert!(bounds.contains(&west));
 
         // Point on east side of date line
-        let east = GpsCoordinate::at_sea_level(0.0, -175.0).unwrap();
+        let east = GpsCoordinate::at_sea_level(0.0, -175.0).expect("test: expected success");
         assert!(bounds.contains(&east));
 
         // Point not in bounds
-        let outside = GpsCoordinate::at_sea_level(0.0, 0.0).unwrap();
+        let outside = GpsCoordinate::at_sea_level(0.0, 0.0).expect("test: expected success");
         assert!(!bounds.contains(&outside));
     }
 
     #[test]
     fn test_bounds_center() {
-        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).unwrap();
-        let center = bounds.center().unwrap();
+        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).expect("test: creation");
+        let center = bounds.center().expect("test: expected success");
         assert_eq!(center.latitude, 45.0);
         assert_eq!(center.longitude, -75.0);
 
         // Date line crossing
-        let bounds2 = GeographicBounds::new(-10.0, 10.0, 170.0, -170.0).unwrap();
-        let center2 = bounds2.center().unwrap();
+        let bounds2 = GeographicBounds::new(-10.0, 10.0, 170.0, -170.0).expect("test: creation");
+        let center2 = bounds2.center().expect("test: expected success");
         assert_eq!(center2.latitude, 0.0);
         assert_eq!(center2.longitude, 180.0);
     }
 
     #[test]
     fn test_zone_creation() {
-        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).unwrap();
+        let bounds = GeographicBounds::new(40.0, 50.0, -80.0, -70.0).expect("test: creation");
         let mut zone = GeographicZone::new(
             "test_zone".to_string(),
             "Test Zone".to_string(),
@@ -563,29 +652,29 @@ mod tests {
             "global".to_string(),
             "Global".to_string(),
             GeographicLevel::Global,
-            GeographicBounds::new(-90.0, 90.0, -180.0, 180.0).unwrap(),
+            GeographicBounds::new(-90.0, 90.0, -180.0, 180.0).expect("test: creation"),
         );
-        hierarchy.add_zone(global).unwrap();
+        hierarchy.add_zone(global).expect("test: insertion");
 
         // Add continent with parent
         let mut continent = GeographicZone::new(
             "continent1".to_string(),
             "Continent 1".to_string(),
             GeographicLevel::Continent,
-            GeographicBounds::new(0.0, 50.0, -100.0, -50.0).unwrap(),
+            GeographicBounds::new(0.0, 50.0, -100.0, -50.0).expect("test: creation"),
         );
         continent.set_parent("global".to_string());
-        hierarchy.add_zone(continent).unwrap();
+        hierarchy.add_zone(continent).expect("test: insertion");
 
         // Verify parent-child relationship
-        let global_zone = hierarchy.get_zone("global").unwrap();
+        let global_zone = hierarchy.get_zone("global").expect("test: expected success");
         assert!(global_zone.child_ids.contains("continent1"));
 
-        let continent_zone = hierarchy.get_zone("continent1").unwrap();
+        let continent_zone = hierarchy.get_zone("continent1").expect("test: expected success");
         assert_eq!(continent_zone.parent_id, Some("global".to_string()));
 
         // Test zone removal
-        let removed = hierarchy.remove_zone("continent1").unwrap();
+        let removed = hierarchy.remove_zone("continent1").expect("test: cleanup");
         assert_eq!(removed.id, "continent1");
         assert!(hierarchy.get_zone("continent1").is_none());
     }
@@ -595,7 +684,7 @@ mod tests {
         let hierarchy = GeographicHierarchy::with_defaults();
 
         // New York coordinates
-        let nyc = GpsCoordinate::at_sea_level(40.7128, -74.0060).unwrap();
+        let nyc = GpsCoordinate::at_sea_level(40.7128, -74.0060).expect("test: expected success");
         let zones = hierarchy.find_zones_containing(&nyc);
 
         // Should be in global, north america, usa, and nyc
@@ -613,7 +702,7 @@ mod tests {
         let hierarchy = GeographicHierarchy::with_defaults();
 
         // Tokyo coordinates
-        let tokyo = GpsCoordinate::at_sea_level(35.6762, 139.6503).unwrap();
+        let tokyo = GpsCoordinate::at_sea_level(35.6762, 139.6503).expect("test: expected success");
 
         // Find country containing Tokyo
         let countries = hierarchy.find_zones_at_level(&tokyo, GeographicLevel::Country);
@@ -631,7 +720,7 @@ mod tests {
         let hierarchy = GeographicHierarchy::with_defaults();
 
         // London coordinates
-        let london = GpsCoordinate::at_sea_level(51.5074, -0.1278).unwrap();
+        let london = GpsCoordinate::at_sea_level(51.5074, -0.1278).expect("test: expected success");
         let path = hierarchy.get_hierarchy_path(&london);
 
         assert!(path.len() >= 4); // global, europe, uk, london

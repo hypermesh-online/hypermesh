@@ -4,10 +4,10 @@
 
 //! Container lifecycle management
 
+use super::error::{ContainerError, Result};
 use crate::{ContainerId, ContainerSpec};
-use super::error::{Result, ContainerError};
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 use tracing::info;
 
@@ -45,7 +45,7 @@ impl std::fmt::Display for ContainerState {
             ContainerState::Resuming => write!(f, "resuming"),
             ContainerState::Stopping => write!(f, "stopping"),
             ContainerState::Stopped => write!(f, "stopped"),
-            ContainerState::Failed { reason } => write!(f, "failed: {}", reason),
+            ContainerState::Failed { reason } => write!(f, "failed: {reason}"),
         }
     }
 }
@@ -58,13 +58,19 @@ pub enum ContainerEvent {
     /// Container started
     Started { timestamp: SystemTime },
     /// Container stopped
-    Stopped { timestamp: SystemTime, exit_code: Option<i32> },
+    Stopped {
+        timestamp: SystemTime,
+        exit_code: Option<i32>,
+    },
     /// Container paused
     Paused { timestamp: SystemTime },
     /// Container resumed
     Resumed { timestamp: SystemTime },
     /// Container failed
-    Failed { timestamp: SystemTime, reason: String },
+    Failed {
+        timestamp: SystemTime,
+        reason: String,
+    },
     /// Container checkpoint created
     CheckpointCreated { timestamp: SystemTime, path: String },
     /// Container restored from checkpoint
@@ -161,40 +167,44 @@ pub trait ContainerLifecycle: Send + Sync {
 
 /// Default container lifecycle implementation
 pub struct DefaultContainerLifecycle {
-    containers: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<ContainerId, ContainerStatus>>>,
+    containers: std::sync::Arc<
+        tokio::sync::RwLock<std::collections::HashMap<ContainerId, ContainerStatus>>,
+    >,
 }
 
 impl DefaultContainerLifecycle {
     /// Create a new lifecycle manager
     pub fn new() -> Self {
         Self {
-            containers: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+            containers: std::sync::Arc::new(tokio::sync::RwLock::new(
+                std::collections::HashMap::new(),
+            )),
         }
     }
-    
+
     /// Validate state transition
     fn can_transition(&self, from: &ContainerState, to: &ContainerState) -> bool {
-        match (from, to) {
-            (ContainerState::Created, ContainerState::Starting) => true,
-            (ContainerState::Starting, ContainerState::Running) => true,
-            (ContainerState::Starting, ContainerState::Failed { .. }) => true,
-            (ContainerState::Running, ContainerState::Pausing) => true,
-            (ContainerState::Running, ContainerState::Stopping) => true,
-            (ContainerState::Running, ContainerState::Failed { .. }) => true,
-            (ContainerState::Pausing, ContainerState::Paused) => true,
-            (ContainerState::Pausing, ContainerState::Failed { .. }) => true,
-            (ContainerState::Paused, ContainerState::Resuming) => true,
-            (ContainerState::Paused, ContainerState::Stopping) => true,
-            (ContainerState::Resuming, ContainerState::Running) => true,
-            (ContainerState::Resuming, ContainerState::Failed { .. }) => true,
-            (ContainerState::Stopping, ContainerState::Stopped) => true,
-            (ContainerState::Stopping, ContainerState::Failed { .. }) => true,
-            (ContainerState::Stopped, ContainerState::Starting) => true,
-            (ContainerState::Failed { .. }, ContainerState::Starting) => true,
-            _ => false,
-        }
+        matches!(
+            (from, to),
+            (ContainerState::Created, ContainerState::Starting)
+                | (ContainerState::Starting, ContainerState::Running)
+                | (ContainerState::Starting, ContainerState::Failed { .. })
+                | (ContainerState::Running, ContainerState::Pausing)
+                | (ContainerState::Running, ContainerState::Stopping)
+                | (ContainerState::Running, ContainerState::Failed { .. })
+                | (ContainerState::Pausing, ContainerState::Paused)
+                | (ContainerState::Pausing, ContainerState::Failed { .. })
+                | (ContainerState::Paused, ContainerState::Resuming)
+                | (ContainerState::Paused, ContainerState::Stopping)
+                | (ContainerState::Resuming, ContainerState::Running)
+                | (ContainerState::Resuming, ContainerState::Failed { .. })
+                | (ContainerState::Stopping, ContainerState::Stopped)
+                | (ContainerState::Stopping, ContainerState::Failed { .. })
+                | (ContainerState::Stopped, ContainerState::Starting)
+                | (ContainerState::Failed { .. }, ContainerState::Starting)
+        )
     }
-    
+
     /// Transition container to new state
     async fn transition_state(&self, id: &ContainerId, new_state: ContainerState) -> Result<()> {
         let mut containers = self.containers.write().await;
@@ -205,41 +215,47 @@ impl DefaultContainerLifecycle {
                     actual: new_state.to_string(),
                 });
             }
-            
+
             let event = match &new_state {
-                ContainerState::Starting => ContainerEvent::Started { timestamp: SystemTime::now() },
-                ContainerState::Stopped => ContainerEvent::Stopped { 
-                    timestamp: SystemTime::now(), 
-                    exit_code: status.exit_code 
+                ContainerState::Starting => ContainerEvent::Started {
+                    timestamp: SystemTime::now(),
                 },
-                ContainerState::Paused => ContainerEvent::Paused { timestamp: SystemTime::now() },
+                ContainerState::Stopped => ContainerEvent::Stopped {
+                    timestamp: SystemTime::now(),
+                    exit_code: status.exit_code,
+                },
+                ContainerState::Paused => ContainerEvent::Paused {
+                    timestamp: SystemTime::now(),
+                },
                 ContainerState::Running if status.state == ContainerState::Resuming => {
-                    ContainerEvent::Resumed { timestamp: SystemTime::now() }
-                },
-                ContainerState::Failed { reason } => ContainerEvent::Failed { 
-                    timestamp: SystemTime::now(), 
-                    reason: reason.clone() 
+                    ContainerEvent::Resumed {
+                        timestamp: SystemTime::now(),
+                    }
+                }
+                ContainerState::Failed { reason } => ContainerEvent::Failed {
+                    timestamp: SystemTime::now(),
+                    reason: reason.clone(),
                 },
                 _ => return Ok(()),
             };
-            
+
             status.state = new_state;
             status.events.push(event);
-            
+
             // Update timestamps
             match &status.state {
                 ContainerState::Running if status.started_at.is_none() => {
                     status.started_at = Some(SystemTime::now());
-                },
+                }
                 ContainerState::Stopped | ContainerState::Failed { .. } => {
                     status.finished_at = Some(SystemTime::now());
-                },
-                _ => {},
+                }
+                _ => {}
             }
-            
+
             info!("Container {} transitioned to state: {}", id, status.state);
         }
-        
+
         Ok(())
     }
 }
@@ -262,7 +278,9 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
             exit_code: None,
             pid: None,
             stats: None,
-            events: vec![ContainerEvent::Created { timestamp: SystemTime::now() }],
+            events: vec![ContainerEvent::Created {
+                timestamp: SystemTime::now(),
+            }],
         };
 
         containers.insert(*id, status);
@@ -333,8 +351,8 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
                         expected: "stopped or failed".to_string(),
                         actual: status.state.to_string(),
                     });
-                },
-                _ => {},
+                }
+                _ => {}
             }
         } else {
             return Err(ContainerError::NotFound { id: id.to_string() });
@@ -347,7 +365,8 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
 
     async fn status(&self, id: &ContainerId) -> Result<ContainerStatus> {
         let containers = self.containers.read().await;
-        containers.get(id)
+        containers
+            .get(id)
             .cloned()
             .ok_or_else(|| ContainerError::NotFound { id: id.to_string() })
     }
@@ -370,10 +389,10 @@ impl ContainerLifecycle for DefaultContainerLifecycle {
             status.events.push(event);
             info!("Created checkpoint for container {} at {}", id, path);
         }
-        
+
         Ok(())
     }
-    
+
     async fn restore(&self, id: &ContainerId, path: &str) -> Result<()> {
         // Simulate restore from checkpoint
         tokio::time::sleep(Duration::from_millis(200)).await;

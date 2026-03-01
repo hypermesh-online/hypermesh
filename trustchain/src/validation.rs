@@ -5,15 +5,14 @@
 //! Input validation module for TrustChain
 //! Provides comprehensive validation for all external inputs
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::net::Ipv6Addr;
-use once_cell::sync::Lazy;
 
 // Compile regex once at startup (safe: static regex pattern)
-static NODE_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^[a-zA-Z0-9-]+$").expect("Invalid node ID regex pattern")
-});
+static NODE_ID_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^[a-zA-Z0-9-]+$").expect("Invalid node ID regex pattern"));
 
 /// Validate node ID format
 pub fn validate_node_id(node_id: &str) -> Result<()> {
@@ -61,7 +60,7 @@ pub fn validate_certificate_request(common_name: &str, san_entries: &[String]) -
 /// Validate IPv6 address
 pub fn validate_ipv6(addr: &str) -> Result<Ipv6Addr> {
     addr.parse::<Ipv6Addr>()
-        .map_err(|_| anyhow!("Invalid IPv6 address: {}", addr))
+        .map_err(|_| anyhow!("Invalid IPv6 address: {addr}"))
 }
 
 /// Validate consensus proof size
@@ -101,6 +100,9 @@ mod tests {
     fn test_sanitize_input() {
         assert_eq!(sanitize_input("hello-world_123"), "hello-world_123");
         assert_eq!(sanitize_input("../../etc/passwd"), "....etcpasswd");
-        assert_eq!(sanitize_input("'; DROP TABLE users; --"), "DROPTABLEusers--");
+        assert_eq!(
+            sanitize_input("'; DROP TABLE users; --"),
+            "DROPTABLEusers--"
+        );
     }
 }

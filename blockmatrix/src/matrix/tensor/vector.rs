@@ -172,9 +172,12 @@ impl Vector3D {
         Ok(other.scale(scalar))
     }
 
-    /// Check if vector is zero (within epsilon)
+    /// Check if vector is zero (within practical tolerance)
+    ///
+    /// Uses 1e-10 as the threshold, which is appropriate for floating-point
+    /// calculations that may accumulate small errors beyond f64::EPSILON.
     pub fn is_zero(&self) -> bool {
-        self.magnitude() < f64::EPSILON
+        self.magnitude() < 1e-10
     }
 
     /// Linear interpolation between two vectors
@@ -209,13 +212,13 @@ impl std::fmt::Display for Vector3D {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::PI;
     use crate::matrix::coordinate::MatrixCoordinate;
+    use std::f64::consts::PI;
 
     #[test]
     fn test_vector_from_coordinates() {
-        let from = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let to = MatrixCoordinate::new(10, 5, 2).unwrap();
+        let from = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let to = MatrixCoordinate::new(10, 5, 2).expect("test: valid coordinate");
         let vec = Vector3D::from_coordinates(&from, &to);
 
         assert_eq!(vec.x, 10.0);
@@ -235,7 +238,7 @@ mod tests {
     #[test]
     fn test_vector_normalize() {
         let vec = Vector3D::new(3.0, 4.0, 0.0);
-        let normalized = vec.normalize().unwrap();
+        let normalized = vec.normalize().expect("test: expected success");
         assert!((normalized.magnitude() - 1.0).abs() < f64::EPSILON);
         assert!((normalized.x - 0.6).abs() < 0.001);
         assert!((normalized.y - 0.8).abs() < 0.001);
@@ -290,7 +293,7 @@ mod tests {
     fn test_vector_projection() {
         let vec1 = Vector3D::new(3.0, 4.0, 0.0);
         let vec2 = Vector3D::new(1.0, 0.0, 0.0);
-        let proj = vec1.project_onto(&vec2).unwrap();
+        let proj = vec1.project_onto(&vec2).expect("test: expected success");
 
         assert_eq!(proj.x, 3.0);
         assert_eq!(proj.y, 0.0);

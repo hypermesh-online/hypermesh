@@ -6,16 +6,16 @@
 //!
 //! Provides certificate authority, DNS, and trust validation services over STOQ protocol.
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
-use tracing::{info, debug, instrument};
+use tracing::{debug, info, instrument};
 use x509_parser::prelude::FromDer;
 
-use stoq::api::{ApiHandler, ApiRequest, ApiResponse, ApiError};
-use stoq::StoqApiServer;
+use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 use stoq::transport::{StoqTransport, TransportConfig};
+use stoq::StoqApiServer;
 
 use crate::ca::TrustChainCA;
 use crate::dns::DnsResolver;
@@ -134,7 +134,7 @@ impl ApiHandler for ValidateCertificateHandler {
 
         // Deserialize request
         let cert_request: ValidateCertificateRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid certificate request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid certificate request: {e}")))?;
 
         // Decode PEM certificate to DER for validation
         // TODO: Implement proper PEM parsing
@@ -142,12 +142,19 @@ impl ApiHandler for ValidateCertificateHandler {
         let cert_der = cert_request.certificate_pem.as_bytes().to_vec();
 
         // Validate certificate through CA
-        let is_valid = self.ca.validate_certificate_chain(&cert_der).await
+        let is_valid = self
+            .ca
+            .validate_certificate_chain(&cert_der)
+            .await
             .map_err(|e| ApiError::HandlerError(e.to_string()))?;
 
         let response = ValidateCertificateResponse {
             valid: is_valid,
-            error: if is_valid { None } else { Some("Certificate validation failed".to_string()) },
+            error: if is_valid {
+                None
+            } else {
+                Some("Certificate validation failed".to_string())
+            },
             details: None, // TODO: Extract certificate details from parsed cert
         };
 
@@ -176,22 +183,23 @@ impl ApiHandler for ValidateCertificateHandler {
 /// or does not contain a CN.
 fn extract_common_name_from_csr(csr_pem: &str) -> std::result::Result<String, String> {
     // Decode PEM to DER bytes
-    let pem_data = pem::parse(csr_pem)
-        .map_err(|e| format!("Invalid PEM encoding: {}", e))?;
+    let pem_data = pem::parse(csr_pem).map_err(|e| format!("Invalid PEM encoding: {e}"))?;
 
     let der_bytes = pem_data.contents();
 
     // Parse the CSR DER to extract the subject distinguished name
-    let (_, csr) = x509_parser::certification_request::X509CertificationRequest::from_der(der_bytes)
-        .map_err(|e| format!("Failed to parse CSR DER: {}", e))?;
+    let (_, csr) =
+        x509_parser::certification_request::X509CertificationRequest::from_der(der_bytes)
+            .map_err(|e| format!("Failed to parse CSR DER: {e}"))?;
 
     // Extract CN from the subject
     for rdn in csr.certification_request_info.subject.iter() {
         for attr in rdn.iter() {
             // OID 2.5.4.3 is the Common Name
             if attr.attr_type().to_id_string() == "2.5.4.3" {
-                let cn = attr.as_str()
-                    .map_err(|e| format!("CN value is not valid UTF-8: {}", e))?;
+                let cn = attr
+                    .as_str()
+                    .map_err(|e| format!("CN value is not valid UTF-8: {e}"))?;
                 return Ok(cn.to_string());
             }
         }
@@ -218,7 +226,7 @@ impl ApiHandler for IssueCertificateHandler {
 
         // Deserialize request
         let issue_request: IssueCertificateRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid issuance request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid issuance request: {e}")))?;
 
         // Build CertificateRequest for CA by parsing the CSR
         use crate::ca::CertificateRequest;
@@ -227,13 +235,13 @@ impl ApiHandler for IssueCertificateHandler {
         // Parse common_name from the CSR PEM
         let common_name = extract_common_name_from_csr(&issue_request.csr_pem)
             .map_err(|e| ApiError::InvalidRequest(format!(
-                "Failed to extract common_name from CSR: {}. A valid CSR with subject CN is required.", e
+                "Failed to extract common_name from CSR: {e}. A valid CSR with subject CN is required."
             )))?;
 
         // Generate a real consensus proof from the local node
         let consensus_proof = ConsensusProof::generate_from_network("api_node").await
             .map_err(|e| ApiError::HandlerError(format!(
-                "Failed to generate consensus proof: {}. A valid consensus proof is required for certificate issuance.", e
+                "Failed to generate consensus proof: {e}. A valid consensus proof is required for certificate issuance."
             )))?;
 
         let cert_request = CertificateRequest {
@@ -246,7 +254,10 @@ impl ApiHandler for IssueCertificateHandler {
         };
 
         // Issue certificate through CA
-        let cert_result = self.ca.issue_certificate(cert_request).await
+        let cert_result = self
+            .ca
+            .issue_certificate(cert_request)
+            .await
             .map_err(|e| ApiError::HandlerError(e.to_string()))?;
 
         let response = IssueCertificateResponse {
@@ -290,7 +301,7 @@ impl ApiHandler for ResolveDnsHandler {
 
         // Deserialize request
         let dns_request: ResolveDnsRequest = serde_json::from_slice(&request.payload)
-            .map_err(|e| ApiError::InvalidRequest(format!("Invalid DNS request: {}", e)))?;
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid DNS request: {e}")))?;
 
         // Parse record type from string
         let record_type = match dns_request.record_type.as_str() {
@@ -300,7 +311,12 @@ impl ApiHandler for ResolveDnsHandler {
             "MX" => trust_dns_proto::rr::RecordType::MX,
             "TXT" => trust_dns_proto::rr::RecordType::TXT,
             "SRV" => trust_dns_proto::rr::RecordType::SRV,
-            _ => return Err(ApiError::InvalidRequest(format!("Unsupported record type: {}", dns_request.record_type))),
+            _ => {
+                return Err(ApiError::InvalidRequest(format!(
+                    "Unsupported record type: {}",
+                    dns_request.record_type
+                )))
+            }
         };
 
         // Build DnsQuery for resolver
@@ -320,11 +336,16 @@ impl ApiHandler for ResolveDnsHandler {
         };
 
         // Resolve DNS through resolver
-        let dns_result = self.resolver.resolve_query(&query).await
+        let dns_result = self
+            .resolver
+            .resolve_query(&query)
+            .await
             .map_err(|e| ApiError::HandlerError(e.to_string()))?;
 
         // Extract records as strings
-        let records: Vec<String> = dns_result.answers.iter()
+        let records: Vec<String> = dns_result
+            .answers
+            .iter()
             .map(|record| format!("{:?}", record.data))
             .collect();
 
@@ -370,8 +391,8 @@ impl ApiHandler for TrustChainHealthHandler {
             version: env!("CARGO_PKG_VERSION").to_string(),
         };
 
-        let payload = serde_json::to_vec(&health)
-            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+        let payload =
+            serde_json::to_vec(&health).map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
         Ok(ApiResponse {
             request_id: request.id,
@@ -404,22 +425,29 @@ impl TrustChainStoqApi {
         resolver: Arc<DnsResolver>,
         config: TrustChainStoqConfig,
     ) -> Result<Self> {
-        info!("Creating TrustChain STOQ API server on {}", config.bind_address);
+        info!(
+            "Creating TrustChain STOQ API server on {}",
+            config.bind_address
+        );
 
         // Parse bind address (supports both "[::1]:9293" and "::1:9293" formats)
         let (bind_addr, port) = if config.bind_address.starts_with('[') {
             // Format: [::1]:9293
             let parts: Vec<&str> = config.bind_address.rsplitn(2, "]:").collect();
             if parts.len() != 2 {
-                return Err(anyhow!("Invalid IPv6 bind address format (expected [addr]:port)"));
+                return Err(anyhow!(
+                    "Invalid IPv6 bind address format (expected [addr]:port)"
+                ));
             }
             let addr_str = parts[1].trim_start_matches('[');
             let port_str = parts[0];
 
-            let bind_addr: std::net::Ipv6Addr = addr_str.parse()
-                .map_err(|_| anyhow!("Invalid IPv6 address: {}", addr_str))?;
-            let port: u16 = port_str.parse()
-                .map_err(|_| anyhow!("Invalid port: {}", port_str))?;
+            let bind_addr: std::net::Ipv6Addr = addr_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid IPv6 address: {addr_str}"))?;
+            let port: u16 = port_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid port: {port_str}"))?;
 
             (bind_addr, port)
         } else {
@@ -431,10 +459,12 @@ impl TrustChainStoqApi {
             let addr_str = parts[1];
             let port_str = parts[0];
 
-            let bind_addr: std::net::Ipv6Addr = addr_str.parse()
-                .map_err(|_| anyhow!("Invalid IPv6 address: {}", addr_str))?;
-            let port: u16 = port_str.parse()
-                .map_err(|_| anyhow!("Invalid port: {}", port_str))?;
+            let bind_addr: std::net::Ipv6Addr = addr_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid IPv6 address: {addr_str}"))?;
+            let port: u16 = port_str
+                .parse()
+                .map_err(|_| anyhow!("Invalid port: {port_str}"))?;
 
             (bind_addr, port)
         };
@@ -459,7 +489,10 @@ impl TrustChainStoqApi {
 
         info!("TrustChain STOQ API handlers registered");
 
-        Ok(Self { server, _config: config })
+        Ok(Self {
+            server,
+            _config: config,
+        })
     }
 
     /// Start the API server
@@ -478,7 +511,6 @@ impl TrustChainStoqApi {
 
 #[cfg(test)]
 mod tests {
-    
 
     // TODO: Add TrustChain STOQ API integration tests
 }

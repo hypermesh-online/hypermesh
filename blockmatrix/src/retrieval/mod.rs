@@ -25,24 +25,24 @@
 //! - Distance optimization: Prioritize nearest replicas
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::matrix::MatrixCoordinate;
 use crate::assets::storage::Hash;
+use crate::matrix::MatrixCoordinate;
 
 // Sub-modules
-pub mod shard_map;
-pub mod instruction_generator;
-pub mod transmission;
 pub mod client_assembly;
 pub mod fallback;
+pub mod instruction_generator;
+pub mod shard_map;
+pub mod transmission;
 
 // Re-exports
-pub use shard_map::{ShardLocation, ShardMapEntry, CompleteShardMap};
-pub use instruction_generator::{InstructionGenerator, GeneratorConfig};
-pub use transmission::{InstructionTransmitter, TransmissionStats, CompressionFormat};
-pub use client_assembly::{ClientAssembler, AssemblyProgress, AssemblyStats};
+pub use client_assembly::{AssemblyProgress, AssemblyStats, ClientAssembler};
 pub use fallback::{FallbackManager, FallbackStrategy, ReplicaSelector};
+pub use instruction_generator::{GeneratorConfig, InstructionGenerator};
+pub use shard_map::{CompleteShardMap, ShardLocation, ShardMapEntry};
+pub use transmission::{CompressionFormat, InstructionTransmitter, TransmissionStats};
 
 /// Retrieval plan with complete instructions for client
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,10 +113,15 @@ impl RetrievalPlan {
     /// Optimize retrieval order for a specific client position
     pub fn optimize_for_position(&mut self, client_position: &MatrixCoordinate) {
         // Sort shard map entries by minimum distance to client
-        let mut indexed: Vec<(usize, f64)> = self.shard_map.entries.iter()
+        let mut indexed: Vec<(usize, f64)> = self
+            .shard_map
+            .entries
+            .iter()
             .enumerate()
             .map(|(idx, entry)| {
-                let min_distance = entry.locations.iter()
+                let min_distance = entry
+                    .locations
+                    .iter()
                     .map(|loc| loc.distance_to(client_position))
                     .fold(f64::INFINITY, f64::min);
                 (idx, min_distance)
@@ -151,7 +156,7 @@ impl RetrievalPlan {
         // Verify each shard has at least one location
         for (idx, entry) in self.shard_map.entries.iter().enumerate() {
             if entry.locations.is_empty() {
-                return Err(anyhow::anyhow!("Shard {} has no locations", idx));
+                return Err(anyhow::anyhow!("Shard {idx} has no locations"));
             }
         }
 
@@ -219,7 +224,7 @@ mod tests {
         // Add valid entries
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
-            let position = MatrixCoordinate::new(i as i64, 0, 0).unwrap();
+            let position = MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate");
             let location = ShardLocation::new(position, 1.0);
 
             let entry = ShardMapEntry {
@@ -240,15 +245,15 @@ mod tests {
         let mut shard_map = CompleteShardMap::new();
 
         // Add shards at different distances
-        let positions = vec![
-            MatrixCoordinate::new(10, 0, 0).unwrap(),
-            MatrixCoordinate::new(0, 0, 0).unwrap(), // Nearest
-            MatrixCoordinate::new(5, 0, 0).unwrap(),
+        let positions = [
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), // Nearest
+            MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate"),
         ];
 
         for (i, pos) in positions.iter().enumerate() {
             let shard_hash = [i as u8; 32];
-            let location = ShardLocation::new(pos.clone(), 1.0);
+            let location = ShardLocation::new(*pos, 1.0);
 
             let entry = ShardMapEntry {
                 shard_hash,
@@ -261,7 +266,7 @@ mod tests {
         let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
 
         // Optimize for origin
-        let client_pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+        let client_pos = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         plan.optimize_for_position(&client_pos);
 
         // Should prioritize nearest shard (index 1)
@@ -276,7 +281,7 @@ mod tests {
         // Add 14 shards (typical for Reed-Solomon 10+4)
         for i in 0..14 {
             let shard_hash = [i as u8; 32];
-            let position = MatrixCoordinate::new(i as i64, 0, 0).unwrap();
+            let position = MatrixCoordinate::new(i as i64, 0, 0).expect("test: valid coordinate");
             let location = ShardLocation::new(position, 1.0);
 
             let entry = ShardMapEntry {
@@ -290,9 +295,9 @@ mod tests {
         let plan = RetrievalPlan::new(content_hash, shard_map, metadata);
 
         let size = plan.estimate_size();
-        println!("Estimated instruction size: {} bytes", size);
+        println!("Estimated instruction size: {size} bytes");
 
         // Should be well under 1KB for 14 shards
-        assert!(size < 1024, "Instruction size {} exceeds 1KB", size);
+        assert!(size < 1024, "Instruction size {size} exceeds 1KB");
     }
 }

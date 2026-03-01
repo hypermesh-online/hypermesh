@@ -14,10 +14,10 @@
 //! - Proof of State binding: PoS requirements tied to asset instantiation
 //! - Security boundaries: System vs application asset separation
 
+use blake3;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::SystemTime;
-use serde::{Deserialize, Serialize};
-use blake3;
 
 use crate::matrix::coordinate::MatrixCoordinate;
 
@@ -153,10 +153,10 @@ impl AssetType {
             AssetType::Container => 5,
             AssetType::Economic => 6,
             AssetType::VirtualMachine => 7, // STUB: Phase 3
-            AssetType::Library => 8, // STUB: Phase 3
+            AssetType::Library => 8,        // STUB: Phase 3
         }
     }
-    
+
     /// Get human-readable asset type name
     pub fn type_name(&self) -> &'static str {
         match self {
@@ -168,7 +168,7 @@ impl AssetType {
             AssetType::Container => "Container",
             AssetType::Economic => "Economic",
             AssetType::VirtualMachine => "VirtualMachine", // STUB: Phase 3
-            AssetType::Library => "Library", // STUB: Phase 3
+            AssetType::Library => "Library",               // STUB: Phase 3
         }
     }
 }
@@ -214,7 +214,6 @@ impl AssetRegistration {
         }
     }
 
-
     /// Create a new asset ID with a random content hash for the given asset type.
     ///
     /// Uses a random hash for convenience in examples and tests.
@@ -259,9 +258,11 @@ impl AssetRegistration {
     /// Create a genesis asset for a node's blockchain
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
         let genesis_data = AssetData {
-            config: format!("Genesis asset for node at ({}, {}, {})",
+            config: format!(
+                "Genesis asset for node at ({}, {}, {})",
                 node_coordinate.x, node_coordinate.y, node_coordinate.z
-            ).into_bytes(),
+            )
+            .into_bytes(),
             definition: b"GENESIS_BLOCK".to_vec(),
             metadata: format!("Created at {:?}", SystemTime::now()).into_bytes(),
         };
@@ -350,7 +351,10 @@ impl AssetRegistration {
         match &self.category {
             AssetCategory::BaseSystem(_) => {
                 // System assets have strict security requirements
-                if !matches!(self.network_scope, NetworkScope::Global | NetworkScope::Registry(_)) {
+                if !matches!(
+                    self.network_scope,
+                    NetworkScope::Global | NetworkScope::Registry(_)
+                ) {
                     return Err(SecurityError::InvalidScope {
                         asset_category: "BaseSystem".to_string(),
                         network_scope: format!("{:?}", self.network_scope),
@@ -365,7 +369,6 @@ impl AssetRegistration {
         }
     }
 
-
     /// Get asset ID as hex string
     pub fn to_hex_string(&self) -> String {
         // New format: scope:category:hash
@@ -377,11 +380,16 @@ impl AssetRegistration {
         };
 
         let category_str = match &self.category {
-            AssetCategory::BaseSystem(sys) => format!("sys:{:?}", sys).to_lowercase(),
+            AssetCategory::BaseSystem(sys) => format!("sys:{sys:?}").to_lowercase(),
             AssetCategory::Application(app) => format!("app:{}", &app.domain_name),
         };
 
-        format!("{}:{}:{}", scope_str, category_str, hex::encode(self.content_hash))
+        format!(
+            "{}:{}:{}",
+            scope_str,
+            category_str,
+            hex::encode(self.content_hash)
+        )
     }
 
     /// Parse asset ID from hex string format
@@ -398,28 +406,25 @@ impl AssetRegistration {
         let network_scope = match parts[0] {
             "global" => NetworkScope::Global,
             scope if scope.starts_with("reg") => {
-                let hash = hex::decode(parts[1])
-                    .map_err(|_| AssetIdError::InvalidFormat {
-                        input: hex_str.to_string(),
-                    })?;
+                let hash = hex::decode(parts[1]).map_err(|_| AssetIdError::InvalidFormat {
+                    input: hex_str.to_string(),
+                })?;
                 let mut id = [0u8; 32];
                 id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
                 NetworkScope::Registry(RegistryId(id))
             }
             scope if scope.starts_with("fed") => {
-                let hash = hex::decode(parts[1])
-                    .map_err(|_| AssetIdError::InvalidFormat {
-                        input: hex_str.to_string(),
-                    })?;
+                let hash = hex::decode(parts[1]).map_err(|_| AssetIdError::InvalidFormat {
+                    input: hex_str.to_string(),
+                })?;
                 let mut id = [0u8; 32];
                 id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
                 NetworkScope::Federated(FederationId(id))
             }
             scope if scope.starts_with("priv") => {
-                let hash = hex::decode(parts[1])
-                    .map_err(|_| AssetIdError::InvalidFormat {
-                        input: hex_str.to_string(),
-                    })?;
+                let hash = hex::decode(parts[1]).map_err(|_| AssetIdError::InvalidFormat {
+                    input: hex_str.to_string(),
+                })?;
                 let mut id = [0u8; 32];
                 id[..hash.len().min(32)].copy_from_slice(&hash[..hash.len().min(32)]);
                 NetworkScope::Private(NodeFingerprint(id))
@@ -428,8 +433,8 @@ impl AssetRegistration {
         };
 
         // Parse content hash (last part)
-        let hash_bytes = hex::decode(parts[parts.len() - 1])
-            .map_err(|_| AssetIdError::InvalidHash {
+        let hash_bytes =
+            hex::decode(parts[parts.len() - 1]).map_err(|_| AssetIdError::InvalidHash {
                 hash_str: parts[parts.len() - 1].to_string(),
             })?;
 
@@ -457,7 +462,6 @@ impl AssetRegistration {
         })
     }
 
-
     /// Get short identifier
     pub fn short_id(&self) -> String {
         let scope_prefix = match &self.network_scope {
@@ -469,10 +473,12 @@ impl AssetRegistration {
 
         format!("{}:{}", scope_prefix, &hex::encode(&self.content_hash[..8]))
     }
-    
+
     /// Get age since creation
     pub fn age(&self) -> Option<std::time::Duration> {
-        SystemTime::now().duration_since(self.creation_timestamp).ok()
+        SystemTime::now()
+            .duration_since(self.creation_timestamp)
+            .ok()
     }
 
     /// Get AssetType from category (for legacy compatibility)
@@ -545,7 +551,7 @@ pub enum SecurityError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_content_based_hashing() {
         // Same data should produce same ID

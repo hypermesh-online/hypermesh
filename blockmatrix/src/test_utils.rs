@@ -4,7 +4,10 @@
 
 //! Test utilities for creating AssetRegistration instances in tests
 
-use crate::assets::core::{AssetRegistration, AssetType, AssetData, NetworkScope, AssetCategory, BaseSystemType, ApplicationDomain};
+use crate::assets::core::{
+    ApplicationDomain, AssetCategory, AssetData, AssetRegistration, AssetType, BaseSystemType,
+    NetworkScope,
+};
 
 /// Create a test AssetRegistration from an AssetType
 pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
@@ -33,9 +36,9 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
 /// Create a vector of test AssetRegistrations for use in Block::new() tests.
 /// The count parameter determines how many AssetRegistrations to generate.
 pub fn test_asset_ids(count: usize) -> Vec<AssetRegistration> {
-    (0..count.max(1)).map(|i| {
-        test_asset_id_with_content(AssetType::Storage, vec![i as u8])
-    }).collect()
+    (0..count.max(1))
+        .map(|i| test_asset_id_with_content(AssetType::Storage, vec![i as u8]))
+        .collect()
 }
 
 /// Create a test AssetRegistration with custom content

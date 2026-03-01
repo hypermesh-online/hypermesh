@@ -4,7 +4,7 @@
 
 //! Shared cryptographic type definitions
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Cryptographic algorithm selection
 /// FALCON-1024 for STOQ protocol signing

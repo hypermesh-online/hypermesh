@@ -4,13 +4,13 @@
 
 //! Cross-chain validation types - validators, rules, ZK proofs, and results
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 
 use crate::assets::core::asset_id::AssetRegistration;
 use crate::assets::matrix_blockchain::{
-    EntityType, ValidationResult, ZKStatement, ProofRequirement,
+    EntityType, ProofRequirement, ValidationResult, ZKStatement,
 };
 use crate::consensus::ConsensusProof;
 
@@ -142,9 +142,15 @@ pub enum ZKStatementType {
     /// Prove equality without revealing value
     EqualTo { field: String, commitment: Vec<u8> },
     /// Prove membership in set
-    SetMembership { field: String, set_commitment: Vec<u8> },
+    SetMembership {
+        field: String,
+        set_commitment: Vec<u8>,
+    },
     /// Custom ZK statement
-    Custom { statement_type: String, parameters: HashMap<String, String> },
+    Custom {
+        statement_type: String,
+        parameters: HashMap<String, String>,
+    },
 }
 
 /// Privacy requirements for cross-chain validation
@@ -294,7 +300,10 @@ pub struct ZKProofConfig {
 pub enum CrossChainValidationError {
     /// Network validation failed
     #[error("Network validation failed for {network_usage}: {error}")]
-    NetworkValidationFailed { network_usage: String, error: String },
+    NetworkValidationFailed {
+        network_usage: String,
+        error: String,
+    },
 
     /// Zero-knowledge proof validation failed
     #[error("ZK proof validation failed for statement {statement_id}: {error}")]

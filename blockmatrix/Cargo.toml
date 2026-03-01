@@ -113,11 +113,6 @@ arc-swap = { workspace = true }
 parking_lot = { workspace = true }
 crossbeam = { workspace = true }
 
-# HTTP/3 support
-h3 = "0.0.8"
-h3-quinn = "0.0.10"
-http = "1.1"
-
 # Time handling
 chrono = { workspace = true }
 

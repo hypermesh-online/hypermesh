@@ -10,15 +10,15 @@
 //!
 //! Implementation based on NIST PQC FALCON specification.
 
-use bytes::{BytesMut, BufMut};
-use serde::{Serialize, Deserialize};
+use anyhow::{anyhow, Result};
+use bytes::{BufMut, BytesMut};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use sha2::{Sha256, Digest};
-use anyhow::{Result, anyhow};
 
 // Real FALCON cryptography imports
-use pqcrypto_falcon::{falcon512, falcon1024};
-use pqcrypto_traits::sign::{PublicKey as _, SecretKey as _, DetachedSignature as _};
+use pqcrypto_falcon::{falcon1024, falcon512};
+use pqcrypto_traits::sign::{DetachedSignature as _, PublicKey as _, SecretKey as _};
 
 /// FALCON signature algorithm parameters for STOQ transport
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,7 +125,11 @@ pub struct FalconPrivateKey {
 
 impl FalconPrivateKey {
     /// Create a new FALCON private key
-    pub fn new(variant: FalconVariant, key_data: Vec<u8>, public_key: FalconPublicKey) -> Result<Self> {
+    pub fn new(
+        variant: FalconVariant,
+        key_data: Vec<u8>,
+        public_key: FalconPublicKey,
+    ) -> Result<Self> {
         if key_data.len() != variant.private_key_size() {
             return Err(anyhow!(
                 "Invalid private key size: expected {}, got {}",
@@ -162,7 +166,11 @@ pub struct FalconSignature {
 
 impl FalconSignature {
     /// Create a new FALCON signature
-    pub fn new(variant: FalconVariant, signature_data: Vec<u8>, message_hash: [u8; 32]) -> Result<Self> {
+    pub fn new(
+        variant: FalconVariant,
+        signature_data: Vec<u8>,
+        message_hash: [u8; 32],
+    ) -> Result<Self> {
         if signature_data.len() > variant.signature_size() {
             return Err(anyhow!(
                 "Invalid signature size: expected <= {}, got {}",
@@ -207,15 +215,16 @@ impl FalconEngine {
             FalconVariant::Falcon512 => {
                 let (pk, sk) = falcon512::keypair();
                 (pk.as_bytes().to_vec(), sk.as_bytes().to_vec())
-            },
+            }
             FalconVariant::Falcon1024 => {
                 let (pk, sk) = falcon1024::keypair();
                 (pk.as_bytes().to_vec(), sk.as_bytes().to_vec())
-            },
+            }
         };
 
         let public_key = FalconPublicKey::new(self.variant, public_key_data)?;
-        let private_key = FalconPrivateKey::new(self.variant, private_key_data, public_key.clone())?;
+        let private_key =
+            FalconPrivateKey::new(self.variant, private_key_data, public_key.clone())?;
 
         Ok((private_key, public_key))
     }
@@ -230,24 +239,29 @@ impl FalconEngine {
         // Sign with real FALCON algorithm
         let signature_data = match private_key.variant {
             FalconVariant::Falcon512 => {
-                let sk = falcon512::SecretKey::from_bytes(&private_key.key_data())
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 secret key: {}", e))?;
+                let sk = falcon512::SecretKey::from_bytes(private_key.key_data())
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 secret key: {e}"))?;
                 let sig = falcon512::detached_sign(&message_hash, &sk);
                 sig.as_bytes().to_vec()
-            },
+            }
             FalconVariant::Falcon1024 => {
-                let sk = falcon1024::SecretKey::from_bytes(&private_key.key_data())
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 secret key: {}", e))?;
+                let sk = falcon1024::SecretKey::from_bytes(private_key.key_data())
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 secret key: {e}"))?;
                 let sig = falcon1024::detached_sign(&message_hash, &sk);
                 sig.as_bytes().to_vec()
-            },
+            }
         };
 
         FalconSignature::new(private_key.variant, signature_data, message_hash)
     }
 
     /// Verify a FALCON signature
-    pub fn verify(&self, public_key: &FalconPublicKey, signature: &FalconSignature, data: &[u8]) -> Result<bool> {
+    pub fn verify(
+        &self,
+        public_key: &FalconPublicKey,
+        signature: &FalconSignature,
+        data: &[u8],
+    ) -> Result<bool> {
         // Verify signature variant matches key variant
         if public_key.variant != signature.variant {
             return Ok(false);
@@ -266,18 +280,18 @@ impl FalconEngine {
         let result = match signature.variant {
             FalconVariant::Falcon512 => {
                 let pk = falcon512::PublicKey::from_bytes(&public_key.key_data)
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 public key: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 public key: {e}"))?;
                 let sig = falcon512::DetachedSignature::from_bytes(&signature.signature_data)
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 signature: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon512 signature: {e}"))?;
                 falcon512::verify_detached_signature(&sig, &computed_hash, &pk).is_ok()
-            },
+            }
             FalconVariant::Falcon1024 => {
                 let pk = falcon1024::PublicKey::from_bytes(&public_key.key_data)
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 public key: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 public key: {e}"))?;
                 let sig = falcon1024::DetachedSignature::from_bytes(&signature.signature_data)
-                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 signature: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to reconstruct Falcon1024 signature: {e}"))?;
                 falcon1024::verify_detached_signature(&sig, &computed_hash, &pk).is_ok()
-            },
+            }
         };
 
         Ok(result)
@@ -337,7 +351,11 @@ impl FalconTransport {
     }
 
     /// Set local key pair
-    pub fn set_local_keypair(&mut self, private_key: FalconPrivateKey, public_key: FalconPublicKey) {
+    pub fn set_local_keypair(
+        &mut self,
+        private_key: FalconPrivateKey,
+        public_key: FalconPublicKey,
+    ) {
         self.private_key = Some(private_key);
         self.public_key = Some(public_key);
     }
@@ -350,15 +368,24 @@ impl FalconTransport {
 
     /// Sign QUIC handshake data
     pub fn sign_handshake_data(&self, data: &[u8]) -> Result<FalconSignature> {
-        let private_key = self.private_key.as_ref()
+        let private_key = self
+            .private_key
+            .as_ref()
             .ok_or_else(|| anyhow!("No private key available for signing"))?;
         self.engine.sign(private_key, data)
     }
 
     /// Verify QUIC handshake signature
-    pub fn verify_handshake_signature(&self, key_id: &str, signature: &FalconSignature, data: &[u8]) -> Result<bool> {
-        let public_key = self.trusted_keys.get(key_id)
-            .ok_or_else(|| anyhow!("Unknown public key: {}", key_id))?;
+    pub fn verify_handshake_signature(
+        &self,
+        key_id: &str,
+        signature: &FalconSignature,
+        data: &[u8],
+    ) -> Result<bool> {
+        let public_key = self
+            .trusted_keys
+            .get(key_id)
+            .ok_or_else(|| anyhow!("Unknown public key: {key_id}"))?;
         self.engine.verify(public_key, signature, data)
     }
 
@@ -394,30 +421,32 @@ impl FalconTransport {
 
     /// Import FALCON signature from QUIC wire format
     pub fn import_signature(&self, data: &[u8]) -> Result<FalconSignature> {
-        if data.len() < 43 {  // Minimum: 1 (variant) + 2 (length) + 32 (hash) + 8 (timestamp)
+        if data.len() < 43 {
+            // Minimum: 1 (variant) + 2 (length) + 32 (hash) + 8 (timestamp)
             return Err(anyhow!("Signature data too short: {} bytes", data.len()));
         }
 
         let variant = match data[0] {
             0 => FalconVariant::Falcon512,
             1 => FalconVariant::Falcon1024,
-            v => return Err(anyhow!("Unknown FALCON variant: {}", v)),
+            v => return Err(anyhow!("Unknown FALCON variant: {v}")),
         };
 
         let sig_len = u16::from_be_bytes([data[1], data[2]]) as usize;
 
-        if data.len() < 3 + sig_len + 40 {  // 3 (header) + sig_len + 32 (hash) + 8 (timestamp)
+        if data.len() < 3 + sig_len + 40 {
+            // 3 (header) + sig_len + 32 (hash) + 8 (timestamp)
             return Err(anyhow!("Signature data truncated"));
         }
 
-        let signature_data = data[3..3+sig_len].to_vec();
-        let message_hash: [u8; 32] = data[3+sig_len..3+sig_len+32]
+        let signature_data = data[3..3 + sig_len].to_vec();
+        let message_hash: [u8; 32] = data[3 + sig_len..3 + sig_len + 32]
             .try_into()
             .map_err(|_| anyhow!("Invalid message hash"))?;
         let signed_at = u64::from_be_bytes(
-            data[3+sig_len+32..3+sig_len+40]
+            data[3 + sig_len + 32..3 + sig_len + 40]
                 .try_into()
-                .map_err(|_| anyhow!("Invalid timestamp"))?
+                .map_err(|_| anyhow!("Invalid timestamp"))?,
         );
 
         Ok(FalconSignature {
@@ -439,7 +468,7 @@ mod tests {
         let result = engine.generate_keypair();
         assert!(result.is_ok());
 
-        let (private_key, public_key) = result.unwrap();
+        let (private_key, public_key) = result.expect("test: expected result");
         assert_eq!(private_key.variant, FalconVariant::Falcon1024);
         assert_eq!(public_key.variant, FalconVariant::Falcon1024);
         assert_eq!(public_key.key_data.len(), falcon1024::public_key_bytes());
@@ -463,7 +492,10 @@ mod tests {
         // Test with wrong message
         let wrong_message = b"Different message";
         let verification = engine.verify(&public_key, &signature, wrong_message)?;
-        assert!(!verification, "Signature verification should fail for wrong message");
+        assert!(
+            !verification,
+            "Signature verification should fail for wrong message"
+        );
         Ok(())
     }
 
@@ -476,13 +508,18 @@ mod tests {
         let signature = transport.sign_handshake_data(handshake_data)?;
 
         // Add local public key as trusted for testing
-        let public_key = transport.get_local_public_key()
+        let public_key = transport
+            .get_local_public_key()
             .ok_or("No local public key")?
             .clone();
         transport.add_trusted_key("test_key".to_string(), public_key);
 
-        let verification = transport.verify_handshake_signature("test_key", &signature, handshake_data)?;
-        assert!(verification, "Handshake signature verification should succeed");
+        let verification =
+            transport.verify_handshake_signature("test_key", &signature, handshake_data)?;
+        assert!(
+            verification,
+            "Handshake signature verification should succeed"
+        );
         Ok(())
     }
 

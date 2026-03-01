@@ -4,7 +4,7 @@
 
 //! STOQ Transport Configuration
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{debug, warn};
 
@@ -66,7 +66,10 @@ impl NetworkTier {
         NetworkTier::Slow { mbps: 1.0 }
     }
 
-    #[deprecated(since = "0.1.0", note = "network isolation is now in NetworkIsolationManager")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "network isolation is now in NetworkIsolationManager"
+    )]
     pub fn anonymous() -> Self {
         NetworkTier::Slow { mbps: 10.0 }
     }
@@ -178,19 +181,19 @@ impl Default for TransportConfig {
             enable_zero_copy: true, // Zero-copy optimization
             max_datagram_size: 65507, // Maximum UDP datagram
             congestion_control: CongestionControl::default(),
-            enable_memory_pool: true, // Memory pool optimization
-            memory_pool_size: 1024, // 1024 buffers per pool
-            frame_batch_size: 64, // Batch 64 frames per syscall
-            health_check_interval: 10, // Health check every 10 seconds
-            connection_idle_timeout: 30, // Mark connections unhealthy after 30s idle
-            enable_cpu_affinity: true, // CPU affinity optimization
+            enable_memory_pool: true,        // Memory pool optimization
+            memory_pool_size: 1024,          // 1024 buffers per pool
+            frame_batch_size: 64,            // Batch 64 frames per syscall
+            health_check_interval: 10,       // Health check every 10 seconds
+            connection_idle_timeout: 30,     // Mark connections unhealthy after 30s idle
+            enable_cpu_affinity: true,       // CPU affinity optimization
             enable_large_send_offload: true, // LSO for large transfers
-            enable_falcon_crypto: true, // Quantum-resistant FALCON cryptography
+            enable_falcon_crypto: true,      // Quantum-resistant FALCON cryptography
             falcon_variant: FalconVariant::Falcon1024, // Maximum security level
-            ebpf_interface: None, // Auto-detect from bind_address
-            ewma_alpha: 0.125,              // Conservative smoothing
-            mtu_probe_interval_secs: 30,    // Probe every 30 seconds
-            loss_window_size: 10,           // Average over 10 observations
+            ebpf_interface: None,            // Auto-detect from bind_address
+            ewma_alpha: 0.125,               // Conservative smoothing
+            mtu_probe_interval_secs: 30,     // Probe every 30 seconds
+            loss_window_size: 10,            // Average over 10 observations
         }
     }
 }
@@ -208,7 +211,7 @@ impl TransportConfig {
                 self.enable_zero_copy = false;
                 self.max_datagram_size = 1200; // Conservative MTU
                 debug!("Adapted config for slow network tier");
-            },
+            }
             NetworkTier::Home { .. } => {
                 // Standard home broadband (100 Mbps - 1 Gbps)
                 self.send_buffer_size = 2 * 1024 * 1024; // 2MB
@@ -218,7 +221,7 @@ impl TransportConfig {
                 self.enable_zero_copy = true;
                 self.max_datagram_size = 1500;
                 debug!("Adapted config for home network tier");
-            },
+            }
             NetworkTier::Standard { .. } => {
                 // Gigabit networks (1-2.5 Gbps)
                 self.send_buffer_size = 8 * 1024 * 1024; // 8MB
@@ -229,8 +232,10 @@ impl TransportConfig {
                 self.enable_large_send_offload = true;
                 self.max_datagram_size = 9000; // Jumbo frames
                 debug!("Adapted config for standard gigabit network tier");
-            },
-            NetworkTier::Performance { .. } | NetworkTier::Enterprise { .. } | NetworkTier::DataCenter { .. } => {
+            }
+            NetworkTier::Performance { .. }
+            | NetworkTier::Enterprise { .. }
+            | NetworkTier::DataCenter { .. } => {
                 // High-performance networks (2.5+ Gbps)
                 self.send_buffer_size = 16 * 1024 * 1024; // 16MB
                 self.receive_buffer_size = 16 * 1024 * 1024;

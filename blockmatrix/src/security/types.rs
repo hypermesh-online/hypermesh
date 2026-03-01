@@ -20,16 +20,16 @@
 #![deny(unsafe_code)]
 
 // Re-exports from sibling modules
-pub use super::ebpf::{EBPFSecurityManager, EBPFProgram, SecurityEvent};
-pub use super::capabilities::{CapabilitySystem, Capability, PermissionSet};
-pub use super::certificates::{PKIManager, CertificateRotationManager};
-pub use super::intrusion::{IntrusionDetectionSystem, ThreatIndicator};
-pub use super::policies::{SecurityPolicy, PolicyEngine};
-pub use super::monitoring::{SecurityMonitor, SecurityMetrics};
+pub use super::capabilities::{Capability, CapabilitySystem, PermissionSet};
+pub use super::certificates::{CertificateRotationManager, PKIManager};
 pub use super::config::SecurityConfig;
-pub use super::error::{SecurityError, Result};
+pub use super::ebpf::{EBPFProgram, EBPFSecurityManager, SecurityEvent};
+pub use super::error::{Result, SecurityError};
+pub use super::intrusion::{IntrusionDetectionSystem, ThreatIndicator};
+pub use super::monitoring::{SecurityMetrics, SecurityMonitor};
+pub use super::policies::{PolicyEngine, SecurityPolicy};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
 
@@ -60,7 +60,7 @@ impl HyperMeshSecurity {
         let ids = IntrusionDetectionSystem::new();
         let policy_engine = PolicyEngine::new();
         let monitor = SecurityMonitor::new();
-        
+
         Ok(Self {
             ebpf_manager,
             capability_system,
@@ -71,25 +71,25 @@ impl HyperMeshSecurity {
             _config: config,
         })
     }
-    
+
     /// Initialize all security components
     pub async fn initialize(&mut self) -> Result<()> {
         // Load eBPF security programs
         self.ebpf_manager.load_default_programs().await?;
-        
+
         // Initialize certificate infrastructure
         self.pki_manager.initialize().await?;
-        
+
         // Start security monitoring
         self.monitor.start().await?;
-        
+
         // Load security policies
         self.policy_engine.load_default_policies().await?;
-        
+
         tracing::info!("HyperMesh security framework initialized");
         Ok(())
     }
-    
+
     /// Shutdown security framework
     pub async fn shutdown(&mut self) -> Result<()> {
         self.monitor.stop().await?;
@@ -139,9 +139,15 @@ pub enum Resource {
     /// Memory resource
     Memory { address_range: (u64, u64) },
     /// Device resource
-    Device { device_type: String, device_id: String },
+    Device {
+        device_type: String,
+        device_id: String,
+    },
     /// Service resource
-    Service { service_name: String, method: Option<String> },
+    Service {
+        service_name: String,
+        method: Option<String>,
+    },
 }
 
 /// Operation being performed

@@ -136,8 +136,7 @@ impl CaesPacket {
     /// Delivered | Settling -> Settled (TERMINAL)
     pub fn settle(&mut self) -> Result<(), PacketError> {
         self.require_non_terminal()?;
-        let valid =
-            self.state == PacketState::Delivered || self.state == PacketState::Settling;
+        let valid = self.state == PacketState::Delivered || self.state == PacketState::Settling;
         if !valid {
             return Err(PacketError::InvalidTransition {
                 from: self.state,
@@ -199,8 +198,7 @@ impl CaesPacket {
     /// InTransit | Held -> Stalled
     pub fn stall(&mut self) -> Result<(), PacketError> {
         self.require_non_terminal()?;
-        let valid =
-            self.state == PacketState::InTransit || self.state == PacketState::Held;
+        let valid = self.state == PacketState::InTransit || self.state == PacketState::Held;
         if !valid {
             return Err(PacketError::InvalidTransition {
                 from: self.state,
@@ -230,8 +228,7 @@ impl CaesPacket {
     /// Held | Stalled -> Dissolved (TERMINAL)
     pub fn dissolve(&mut self) -> Result<(), PacketError> {
         self.require_non_terminal()?;
-        let valid =
-            self.state == PacketState::Held || self.state == PacketState::Stalled;
+        let valid = self.state == PacketState::Held || self.state == PacketState::Stalled;
         if !valid {
             return Err(PacketError::InvalidTransition {
                 from: self.state,
@@ -264,11 +261,7 @@ impl CaesPacket {
             .signed_duration_since(self.created_at)
             .num_seconds()
             .max(0) as u64;
-        DemurrageEngine::calculate_remaining(
-            self.initial_value,
-            elapsed,
-            &self.demurrage_rate,
-        )
+        DemurrageEngine::calculate_remaining(self.initial_value, elapsed, &self.demurrage_rate)
     }
 
     /// Current value using a caller-supplied timestamp (useful for testing).
@@ -277,11 +270,7 @@ impl CaesPacket {
             .signed_duration_since(self.created_at)
             .num_seconds()
             .max(0) as u64;
-        DemurrageEngine::calculate_remaining(
-            self.initial_value,
-            elapsed,
-            &self.demurrage_rate,
-        )
+        DemurrageEngine::calculate_remaining(self.initial_value, elapsed, &self.demurrage_rate)
     }
 
     /// Whether this packet has exceeded its TTL.
@@ -302,11 +291,7 @@ impl CaesPacket {
         Ok(())
     }
 
-    fn require_state(
-        &self,
-        expected: PacketState,
-        target: PacketState,
-    ) -> Result<(), PacketError> {
+    fn require_state(&self, expected: PacketState, target: PacketState) -> Result<(), PacketError> {
         if self.state != expected {
             return Err(PacketError::InvalidTransition {
                 from: self.state,
@@ -651,7 +636,8 @@ mod tests {
     #[test]
     fn happy_path_with_settling() {
         let mut pkt = test_packet();
-        pkt.advance_to_transit().expect("test: minted -> in_transit");
+        pkt.advance_to_transit()
+            .expect("test: minted -> in_transit");
         pkt.deliver().expect("test: in_transit -> delivered");
         pkt.begin_settling().expect("test: delivered -> settling");
         assert_eq!(pkt.state, PacketState::Settling);

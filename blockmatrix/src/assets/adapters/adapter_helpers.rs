@@ -10,13 +10,15 @@
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use crate::assets::core::{
-    AssetRegistration, AssetAllocationRequest,
-    PrivacyMode, AssetAllocation, AssetStatus, AssetState,
-    ResourceUsage, ProxyAddress,
+use crate::assets::core::privacy::{
+    AccessConfig, AccessPermissions, AllocationConfig, AuthRequirements, ConcurrencyLimits,
+    ConsensusRequirements, DurationConfig, RateLimits, ResourceAllocationConfig,
 };
-use crate::assets::core::privacy::{AllocationConfig, AccessConfig, ResourceAllocationConfig, ConcurrencyLimits, DurationConfig, ConsensusRequirements, AccessPermissions, RateLimits, AuthRequirements};
 use crate::assets::core::status::{AssetHealthStatus, AssetPerformanceMetrics};
+use crate::assets::core::{
+    AssetAllocation, AssetAllocationRequest, AssetRegistration, AssetState, AssetStatus,
+    PrivacyMode, ProxyAddress, ResourceUsage,
+};
 
 /// Create a standard AssetAllocation for adapter responses
 pub fn _create_asset_allocation(
@@ -29,34 +31,34 @@ pub fn _create_asset_allocation(
     let mut status = AssetStatus::new(
         asset_id.clone(),
         request.certificate_fingerprint.clone(),
-        request.privacy_level.clone(),
+        request.privacy_level,
     );
-    
+
     // Set state to allocated
     status.state = AssetState::Allocated;
-    
+
     // Add metadata
     for (key, value) in metadata {
         status.add_metadata(key, value);
     }
-    
+
     // Set proxy address if provided
     if let Some(proxy_addr) = proxy_address {
         status.set_proxy_address(proxy_addr);
     }
-    
+
     // Add consensus proof
     status.add_consensus_proof(request.consensus_proof.clone());
-    
+
     // Create allocation config
     let allocation_config = AllocationConfig {
-        privacy_level: request.privacy_level.clone(),
+        privacy_level: request.privacy_level,
         resource_allocation: ResourceAllocationConfig::default(),
         concurrency_limits: ConcurrencyLimits::default(),
         duration_config: DurationConfig::default(),
         consensus_requirements: ConsensusRequirements::default(),
     };
-    
+
     // Create access config
     let access_config = AccessConfig {
         allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -65,7 +67,7 @@ pub fn _create_asset_allocation(
         rate_limits: RateLimits::default(),
         auth_requirements: AuthRequirements::default(),
     };
-    
+
     let mut allocation = AssetAllocation {
         asset_id,
         status,
@@ -74,14 +76,17 @@ pub fn _create_asset_allocation(
         allocated_at: SystemTime::now(),
         expires_at: request.duration_limit.map(|d| SystemTime::now() + d),
     };
-    
+
     // Add allowed certificates from tags if present
     for (key, value) in &request.tags {
         if key == "allowed_certificates" {
-            allocation.access_config.allowed_certificates.push(value.clone());
+            allocation
+                .access_config
+                .allowed_certificates
+                .push(value.clone());
         }
     }
-    
+
     allocation
 }
 
@@ -96,13 +101,13 @@ pub fn _create_asset_status(
     metadata: HashMap<String, String>,
 ) -> AssetStatus {
     let now = SystemTime::now();
-    
-    let status = AssetStatus {
+
+    AssetStatus {
         asset_id,
         state,
         allocated_at: now,
         last_accessed: now,
-        resource_usage: resource_usage.unwrap_or_else(|| ResourceUsage {
+        resource_usage: resource_usage.unwrap_or(ResourceUsage {
             cpu_usage: None,
             gpu_usage: None,
             memory_usage: None,
@@ -117,9 +122,7 @@ pub fn _create_asset_status(
         metadata,
         health_status: AssetHealthStatus::default(),
         performance_metrics: AssetPerformanceMetrics::default(),
-    };
-    
-    status
+    }
 }
 
 /// Get supported privacy levels for all adapters

@@ -6,12 +6,12 @@
 //!
 //! Provides certificate validation and CA integration for package signing
 
-use anyhow::{Result, anyhow};
-use serde::{Serialize, Deserialize};
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
 // Import TrustChain types (will be available when integrated)
 // use trustchain::{TrustChainCA, CertificateRequest, IssuedCertificate};
@@ -221,10 +221,7 @@ impl TrustChainIntegration {
     }
 
     /// Validate a certificate
-    pub async fn validate_certificate(
-        &self,
-        cert_bytes: &[u8],
-    ) -> Result<CertificateValidation> {
+    pub async fn validate_certificate(&self, cert_bytes: &[u8]) -> Result<CertificateValidation> {
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(cert_bytes);
 
@@ -276,7 +273,8 @@ impl TrustChainIntegration {
 
         // Cache the result
         if let Some(cert_info) = validation_response.certificate_info {
-            self.cache_certificate(cert_info.clone(), validation_response.validation.clone()).await;
+            self.cache_certificate(cert_info.clone(), validation_response.validation.clone())
+                .await;
         }
 
         Ok(validation_response.validation)
@@ -294,9 +292,7 @@ impl TrustChainIntegration {
         let _request = IssueCertificateRequest {
             common_name: common_name.clone(),
             organization: organization.clone(),
-            san_entries: vec![
-                format!("catalog.{}.hypermesh.online", common_name),
-            ],
+            san_entries: vec![format!("catalog.{}.hypermesh.online", common_name)],
             validity_days: 365,
             use_pqc: self.config.enable_pqc,
         };
@@ -349,7 +345,10 @@ impl TrustChainIntegration {
         };
 
         if status.revoked {
-            warn!("Certificate {} is revoked: {:?}", cert_fingerprint, status.reason);
+            warn!(
+                "Certificate {} is revoked: {:?}",
+                cert_fingerprint, status.reason
+            );
         }
 
         Ok(status.revoked)
@@ -382,8 +381,8 @@ impl TrustChainIntegration {
             _cached_at: std::time::Instant::now(),
         };
 
-        let expiry = std::time::Instant::now() +
-                     std::time::Duration::from_secs(self.config.cert_cache_ttl);
+        let expiry =
+            std::time::Instant::now() + std::time::Duration::from_secs(self.config.cert_cache_ttl);
 
         cache.certificates.insert(fingerprint.clone(), cached_cert);
         cache.expiry_times.insert(fingerprint, expiry);
@@ -408,7 +407,7 @@ impl TrustChainIntegration {
 
     /// Calculate certificate fingerprint
     fn calculate_fingerprint(&self, cert_bytes: &[u8]) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(cert_bytes);
         let result = hasher.finalize();
@@ -431,7 +430,8 @@ impl TrustChainIntegration {
 
         // Get CA root certificate
         let ca_root = self.ca_root_cert.read().await;
-        let root_cert = ca_root.as_ref()
+        let root_cert = ca_root
+            .as_ref()
             .ok_or_else(|| anyhow!("CA root certificate not available"))?;
 
         // Verify each certificate in the chain
@@ -496,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_fingerprint_calculation() {
-        let config = TrustChainConfig {
+        let _config = TrustChainConfig {
             endpoint: "test".to_string(),
             enable_pqc: false,
             cert_cache_ttl: 60,
@@ -505,7 +505,7 @@ mod tests {
         // This would need proper initialization in real tests
         // Just testing the fingerprint calculation logic
         let test_bytes = b"test certificate data";
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(test_bytes);
         let result = hasher.finalize();

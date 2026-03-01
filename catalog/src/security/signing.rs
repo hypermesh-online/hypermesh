@@ -6,16 +6,16 @@
 //!
 //! Implements quantum-resistant package signing using FALCON-1024 and ED25519
 
-use anyhow::{Result, Context, anyhow};
-use serde::{Serialize, Deserialize};
-use std::sync::Arc;
-use tracing::{info, debug, warn};
-use sha2::{Sha256, Digest as ShaDigest};
+use anyhow::{anyhow, Context, Result};
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_traits::sign::SignedMessage;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest as ShaDigest, Sha256};
+use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 use super::trustchain::TrustChainIntegration;
-use super::{PublisherIdentity, PublisherType, CertificateValidity};
+use super::{CertificateValidity, PublisherIdentity, PublisherType};
 use crate::assets::{AssetPackage, AssetPackageId};
 
 /// Package signature with quantum-resistant algorithms
@@ -111,7 +111,10 @@ impl PackageSigner {
         };
 
         // Generate FALCON keypair for quantum-resistant signing
-        let falcon_keypair = if matches!(preferred_algorithm, SignatureAlgorithm::Falcon1024 | SignatureAlgorithm::HybridFalconEd25519) {
+        let falcon_keypair = if matches!(
+            preferred_algorithm,
+            SignatureAlgorithm::Falcon1024 | SignatureAlgorithm::HybridFalconEd25519
+        ) {
             let (pk, sk) = falcon1024::keypair();
             Some((pk, sk))
         } else {
@@ -132,7 +135,11 @@ impl PackageSigner {
         certificate: &[u8],
         private_key: &[u8],
     ) -> Result<PackageSignature> {
-        info!("Signing package {} with {:?}", package.get_package_id(), self.preferred_algorithm);
+        info!(
+            "Signing package {} with {:?}",
+            package.get_package_id(),
+            self.preferred_algorithm
+        );
 
         // Calculate package hash
         let package_hash = self.calculate_package_hash(package)?;
@@ -151,13 +158,17 @@ impl PackageSigner {
         };
 
         // Validate certificate with TrustChain
-        let validation = self.trustchain
+        let validation = self
+            .trustchain
             .validate_certificate(certificate)
             .await
             .context("Failed to validate signing certificate")?;
 
         if !validation.valid {
-            return Err(anyhow!("Signing certificate is not valid: {:?}", validation.errors));
+            return Err(anyhow!(
+                "Signing certificate is not valid: {:?}",
+                validation.errors
+            ));
         }
 
         // Create signature object
@@ -224,20 +235,24 @@ impl PackageSigner {
         };
 
         // Use canonical JSON serialization
-        serde_json::to_vec(&signable)
-            .context("Failed to serialize package for signing")
+        serde_json::to_vec(&signable).context("Failed to serialize package for signing")
     }
 
     /// Sign with FALCON-1024
     fn sign_with_falcon(&self, hash: &[u8], _private_key: &[u8]) -> Result<Vec<u8>> {
         // Use the FALCON keypair from instance
-        let (_, sk) = self.falcon_keypair.as_ref()
+        let (_, sk) = self
+            .falcon_keypair
+            .as_ref()
             .ok_or_else(|| anyhow!("FALCON keypair not initialized"))?;
 
         // Sign the hash with FALCON-1024
         let signed_msg = falcon1024::sign(hash, sk);
 
-        info!("Signed with FALCON-1024, signature size: {} bytes", signed_msg.len());
+        info!(
+            "Signed with FALCON-1024, signature size: {} bytes",
+            signed_msg.len()
+        );
 
         Ok(signed_msg.as_bytes().to_vec())
     }
@@ -314,14 +329,19 @@ impl SignatureVerifier {
         };
 
         // Get signature from package
-        let signature = package.get_signature()
+        let signature = package
+            .get_signature()
             .ok_or_else(|| anyhow!("Package is not signed"))?;
 
-        debug!("Verifying signature for package {} with algorithm {:?}",
-               package.get_package_id(), signature.algorithm);
+        debug!(
+            "Verifying signature for package {} with algorithm {:?}",
+            package.get_package_id(),
+            signature.algorithm
+        );
 
         // Validate certificate
-        let cert_validation = self.trustchain
+        let cert_validation = self
+            .trustchain
             .validate_certificate(&signature.certificate)
             .await
             .context("Failed to validate certificate")?;
@@ -329,8 +349,10 @@ impl SignatureVerifier {
         result.certificate_valid = cert_validation.valid;
 
         if !cert_validation.valid {
-            result.errors.push(format!("Certificate validation failed: {:?}",
-                                      cert_validation.errors));
+            result.errors.push(format!(
+                "Certificate validation failed: {:?}",
+                cert_validation.errors
+            ));
             return Ok(result);
         }
 
@@ -345,7 +367,9 @@ impl SignatureVerifier {
                 return Ok(result);
             }
             if now < publisher.cert_validity.not_before {
-                result.errors.push("Certificate is not yet valid".to_string());
+                result
+                    .errors
+                    .push("Certificate is not yet valid".to_string());
                 return Ok(result);
             }
         }
@@ -355,37 +379,43 @@ impl SignatureVerifier {
 
         // Compare hashes
         if expected_hash != signature.package_hash.hash {
-            result.errors.push("Package content has been modified after signing".to_string());
+            result
+                .errors
+                .push("Package content has been modified after signing".to_string());
             return Ok(result);
         }
 
         // Verify signature based on algorithm
         let sig_valid = match signature.algorithm {
-            SignatureAlgorithm::Falcon1024 => {
-                self.verify_falcon_signature(&signature.package_hash.hash,
-                                            &signature.signature,
-                                            &signature.certificate)?
-            }
-            SignatureAlgorithm::Ed25519 => {
-                self.verify_ed25519_signature(&signature.package_hash.hash,
-                                             &signature.signature,
-                                             &signature.certificate)?
-            }
-            SignatureAlgorithm::HybridFalconEd25519 => {
-                self.verify_hybrid_signature(&signature.package_hash.hash,
-                                            &signature.signature,
-                                            &signature.certificate)?
-            }
+            SignatureAlgorithm::Falcon1024 => self.verify_falcon_signature(
+                &signature.package_hash.hash,
+                &signature.signature,
+                &signature.certificate,
+            )?,
+            SignatureAlgorithm::Ed25519 => self.verify_ed25519_signature(
+                &signature.package_hash.hash,
+                &signature.signature,
+                &signature.certificate,
+            )?,
+            SignatureAlgorithm::HybridFalconEd25519 => self.verify_hybrid_signature(
+                &signature.package_hash.hash,
+                &signature.signature,
+                &signature.certificate,
+            )?,
         };
 
         result.valid = sig_valid && result.certificate_valid;
 
         if result.valid {
-            info!("Successfully verified signature for package {}",
-                  package.get_package_id());
+            info!(
+                "Successfully verified signature for package {}",
+                package.get_package_id()
+            );
         } else {
-            warn!("Signature verification failed for package {}",
-                  package.get_package_id());
+            warn!(
+                "Signature verification failed for package {}",
+                package.get_package_id()
+            );
         }
 
         Ok(result)
@@ -413,16 +443,17 @@ impl SignatureVerifier {
     }
 
     /// Calculate expected package hash for integrity verification
-    fn calculate_package_hash(&self, package: &AssetPackage,
-                             hash_info: &PackageHash) -> Result<Vec<u8>> {
+    fn calculate_package_hash(
+        &self,
+        package: &AssetPackage,
+        hash_info: &PackageHash,
+    ) -> Result<Vec<u8>> {
         // Serialize package
         let package_bytes = self.serialize_package_for_signing(package)?;
 
         // Calculate hash using same algorithm
         let hash = match hash_info.algorithm {
-            HashAlgorithm::Blake3 => {
-                blake3::hash(&package_bytes).as_bytes().to_vec()
-            }
+            HashAlgorithm::Blake3 => blake3::hash(&package_bytes).as_bytes().to_vec(),
             HashAlgorithm::Sha256 => {
                 let mut hasher = Sha256::new();
                 hasher.update(&package_bytes);
@@ -458,13 +489,16 @@ impl SignatureVerifier {
             total_size: package.calculate_size(),
         };
 
-        serde_json::to_vec(&signable)
-            .context("Failed to serialize package for verification")
+        serde_json::to_vec(&signable).context("Failed to serialize package for verification")
     }
 
     /// Verify FALCON-1024 signature
-    fn verify_falcon_signature(&self, _hash: &[u8], signature: &[u8],
-                              _certificate: &[u8]) -> Result<bool> {
+    fn verify_falcon_signature(
+        &self,
+        _hash: &[u8],
+        signature: &[u8],
+        _certificate: &[u8],
+    ) -> Result<bool> {
         // Extract public key from certificate
         // TODO: Parse X.509 certificate to extract FALCON public key
         // For now, we'll need to reconstruct the public key from certificate
@@ -477,19 +511,28 @@ impl SignatureVerifier {
         // This would need the public key from the certificate
         // For now, we verify the signature structure
 
-        info!("Verifying FALCON-1024 signature of {} bytes", signature.len());
+        info!(
+            "Verifying FALCON-1024 signature of {} bytes",
+            signature.len()
+        );
 
         // TODO: Complete implementation once certificate parsing is done
         // This requires extracting the FALCON public key from the X.509 certificate
-        warn!("FALCON verification requires certificate parsing - using structural validation only");
+        warn!(
+            "FALCON verification requires certificate parsing - using structural validation only"
+        );
 
         // Basic structural validation
         Ok(signature.len() >= falcon1024::signature_bytes())
     }
 
     /// Verify ED25519 signature
-    fn verify_ed25519_signature(&self, hash: &[u8], signature: &[u8],
-                               _certificate: &[u8]) -> Result<bool> {
+    fn verify_ed25519_signature(
+        &self,
+        hash: &[u8],
+        signature: &[u8],
+        _certificate: &[u8],
+    ) -> Result<bool> {
         // TODO: Implement actual ED25519 verification
         warn!("ED25519 verification not yet implemented, using placeholder");
 
@@ -502,16 +545,19 @@ impl SignatureVerifier {
     }
 
     /// Verify hybrid signature
-    fn verify_hybrid_signature(&self, hash: &[u8], signature: &[u8],
-                              certificate: &[u8]) -> Result<bool> {
+    fn verify_hybrid_signature(
+        &self,
+        hash: &[u8],
+        signature: &[u8],
+        certificate: &[u8],
+    ) -> Result<bool> {
         if signature.len() < 8 {
             return Err(anyhow!("Invalid hybrid signature format"));
         }
 
         // Extract FALCON signature
-        let falcon_len = u32::from_le_bytes([
-            signature[0], signature[1], signature[2], signature[3]
-        ]) as usize;
+        let falcon_len =
+            u32::from_le_bytes([signature[0], signature[1], signature[2], signature[3]]) as usize;
 
         if signature.len() < 8 + falcon_len {
             return Err(anyhow!("Invalid hybrid signature: FALCON part truncated"));
@@ -542,7 +588,6 @@ impl SignatureVerifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn test_signature_algorithm_selection() {
@@ -593,8 +638,8 @@ mod tests {
     }
 
     fn create_test_package() -> AssetPackage {
-        use chrono::Utc;
         use crate::assets::*;
+        use chrono::Utc;
         use std::collections::HashMap;
 
         AssetPackage {

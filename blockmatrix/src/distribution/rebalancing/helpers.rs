@@ -135,9 +135,7 @@ pub(super) fn pick_replica_removals(
         })
         .collect();
 
-    scored.sort_by(|a, b| {
-        a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-    });
+    scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     scored.into_iter().take(count).map(|(nid, _)| nid).collect()
 }

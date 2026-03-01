@@ -9,11 +9,10 @@
 
 mod common;
 
-use catalog::distribution::{
-    P2PDistribution, DistributionConfig,
-    TransferDirection, TransferStatus,
-};
 use catalog::assets::AssetPackage;
+use catalog::distribution::{
+    DistributionConfig, P2PDistribution, TransferDirection, TransferStatus,
+};
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio;
@@ -26,10 +25,18 @@ async fn test_p2p_distribution_creation() {
     config.storage_dir = temp_dir.path().to_path_buf();
 
     let distribution = P2PDistribution::new(config).await;
-    assert!(distribution.is_ok(), "Failed to create P2P distribution: {:?}", distribution.err());
+    assert!(
+        distribution.is_ok(),
+        "Failed to create P2P distribution: {:?}",
+        distribution.err()
+    );
 
     let dist = distribution.unwrap();
-    assert_eq!(dist.get_peer_count().await, 0, "Should have no peers initially");
+    assert_eq!(
+        dist.get_peer_count().await,
+        0,
+        "Should have no peers initially"
+    );
 }
 
 /// Test package publishing to P2P network
@@ -47,14 +54,23 @@ async fn test_package_publishing() {
 
     // Publish the package
     let package_id = distribution.publish(package.clone()).await;
-    assert!(package_id.is_ok(), "Failed to publish package: {:?}", package_id.err());
+    assert!(
+        package_id.is_ok(),
+        "Failed to publish package: {:?}",
+        package_id.err()
+    );
 
     let id = package_id.unwrap();
     assert_eq!(id, package.get_package_id(), "Package ID mismatch");
 
     // Check metrics
     let metrics = distribution.get_metrics();
-    assert!(metrics.bytes_uploaded.load(std::sync::atomic::Ordering::Relaxed) > 0);
+    assert!(
+        metrics
+            .bytes_uploaded
+            .load(std::sync::atomic::Ordering::Relaxed)
+            > 0
+    );
 }
 
 /// Test package search functionality
@@ -115,7 +131,10 @@ async fn test_content_addressing() {
     let addr1 = ContentAddress::from_data(data1);
     let addr2 = ContentAddress::from_data(data2);
 
-    assert_ne!(addr1, addr2, "Different data should have different addresses");
+    assert_ne!(
+        addr1, addr2,
+        "Different data should have different addresses"
+    );
 
     // Test Merkle tree
     let chunks = vec![data1.to_vec(), data2.to_vec()];
@@ -130,7 +149,7 @@ async fn test_content_addressing() {
 #[tokio::test]
 async fn test_dht_node_id() {
     use catalog::distribution::dht::DhtNodeId;
-    use std::net::{SocketAddr, IpAddr, Ipv6Addr};
+    use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 
     let id1 = DhtNodeId::random();
     let id2 = DhtNodeId::random();
@@ -149,7 +168,10 @@ async fn test_dht_node_id() {
 
     // Test distance calculation
     let distance = id1.distance(&id2);
-    assert!(distance > id1.distance(&id1), "Distance to self should be minimal");
+    assert!(
+        distance > id1.distance(&id1),
+        "Distance to self should be minimal"
+    );
 }
 
 /// Test bandwidth management
@@ -181,7 +203,10 @@ async fn test_incremental_updates() {
     let new_data = b"Hello, World! This is version 2.0";
 
     let diff = BinaryDiff::create_diff(old_data, new_data).unwrap();
-    assert!(diff.len() < new_data.len(), "Diff should be smaller than full data");
+    assert!(
+        diff.len() < new_data.len(),
+        "Diff should be smaller than full data"
+    );
 
     let result = BinaryDiff::apply_diff(old_data, &diff).unwrap();
     assert_eq!(result, new_data, "Applied diff should produce new data");
@@ -206,7 +231,7 @@ async fn test_nat_traversal() {
 /// Test peer discovery mechanisms
 #[tokio::test]
 async fn test_peer_discovery() {
-    use catalog::distribution::peer_discovery::{PeerDiscovery, PeerCapability};
+    use catalog::distribution::peer_discovery::{PeerCapability, PeerDiscovery};
 
     let temp_dir = TempDir::new().unwrap();
     let mut config = DistributionConfig::default();
@@ -268,5 +293,10 @@ async fn test_concurrent_operations() {
 
     // Verify metrics
     let metrics = distribution.get_metrics();
-    assert!(metrics.successful_transfers.load(std::sync::atomic::Ordering::Relaxed) > 0);
+    assert!(
+        metrics
+            .successful_transfers
+            .load(std::sync::atomic::Ordering::Relaxed)
+            > 0
+    );
 }

@@ -27,7 +27,11 @@ items = [
 ]
 
 [features.in_development]
-items = []
+items = [
+    "Real network metrics collection (replace hardcoded stubs in tests)",
+    "Caesar in-transit/holding amount tracking integration",
+    "Collective network intelligence aggregation",
+]
 
 [features.planned]
 items = [
@@ -36,4 +40,7 @@ items = [
     "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
     "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
     "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
+    "Self-node metrics vs network-wide metrics separation",
+    "Real-time routing intelligence feed to STOQ adaptive tiers",
+    "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)",
 ]

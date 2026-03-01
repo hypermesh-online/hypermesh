@@ -4,18 +4,16 @@
 
 //! STOQ Client operations and implementations
 
+use dashmap::DashMap;
+use sha2::Digest;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use dashmap::DashMap;
-use tracing::{info, debug};
-use sha2::Digest;
+use tracing::{debug, info};
 
-use crate::errors::{TrustChainError, Result as TrustChainResult};
+use crate::errors::{Result as TrustChainResult, TrustChainError};
 
-use stoq::{
-    StoqTransport, Endpoint, Connection
-};
 use stoq::transport::TransportConfig;
+use stoq::{Connection, Endpoint, StoqTransport};
 
 use super::types::*;
 
@@ -69,11 +67,12 @@ impl TrustChainStoqClient {
             loss_window_size: 10,
         };
 
-        let transport = Arc::new(StoqTransport::new(transport_config).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let transport = Arc::new(StoqTransport::new(transport_config).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "stoq_transport_init".to_string(),
                 reason: e.to_string(),
-            })?);
+            }
+        })?);
 
         let client = Self {
             transport,
@@ -90,47 +89,68 @@ impl TrustChainStoqClient {
     /// Perform DNS resolution over STOQ transport
     pub async fn resolve_dns(&self, query: StoqDnsQuery) -> TrustChainResult<StoqDnsResponse> {
         let start_time = std::time::Instant::now();
-        debug!("Resolving DNS query over STOQ: {} (type: {})", query.domain, query.query_type);
+        debug!(
+            "Resolving DNS query over STOQ: {} (type: {})",
+            query.domain, query.query_type
+        );
 
         let resolver_endpoint = self.select_dns_resolver().await?;
         let connection = self.get_or_create_connection(&resolver_endpoint).await?;
 
-        let query_data = bincode::serialize(&query)
-            .map_err(|e| TrustChainError::SerializationError {
+        let query_data =
+            bincode::serialize(&query).map_err(|e| TrustChainError::SerializationError {
                 operation: "dns_query_serialize".to_string(),
                 reason: e.to_string(),
             })?;
 
-        self.transport.send(&connection, &query_data).await
+        self.transport
+            .send(&connection, &query_data)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "dns_query_send".to_string(),
                 reason: e.to_string(),
             })?;
 
-        let response_data = self.transport.receive(&connection).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let response_data = self.transport.receive(&connection).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "dns_response_receive".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
-        let response: StoqDnsResponse = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let response: StoqDnsResponse = bincode::deserialize(&response_data).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "dns_response_deserialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.dns_queries.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_sent.fetch_add(query_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_received.fetch_add(response_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .dns_queries
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics.bytes_sent.fetch_add(
+            query_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.metrics.bytes_received.fetch_add(
+            response_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         self.update_average_latency(latency);
 
-        debug!("DNS query resolved successfully: {} ({}us)", query.domain, latency);
+        debug!(
+            "DNS query resolved successfully: {} ({}us)",
+            query.domain, latency
+        );
         Ok(response)
     }
 
     /// Validate certificate over STOQ transport
-    pub async fn validate_certificate(&self, request: CertificateValidationRequest) -> TrustChainResult<bool> {
+    pub async fn validate_certificate(
+        &self,
+        request: CertificateValidationRequest,
+    ) -> TrustChainResult<bool> {
         let start_time = std::time::Instant::now();
 
         let fingerprint = hex::encode(sha2::Sha256::digest(&request.certificate_der));
@@ -149,29 +169,33 @@ impl TrustChainStoqClient {
         let ca_endpoint = self.select_ca_endpoint().await?;
         let connection = self.get_or_create_connection(&ca_endpoint).await?;
 
-        let request_data = bincode::serialize(&request)
-            .map_err(|e| TrustChainError::SerializationError {
+        let request_data =
+            bincode::serialize(&request).map_err(|e| TrustChainError::SerializationError {
                 operation: "cert_validation_serialize".to_string(),
                 reason: e.to_string(),
             })?;
 
-        self.transport.send(&connection, &request_data).await
+        self.transport
+            .send(&connection, &request_data)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "cert_validation_send".to_string(),
                 reason: e.to_string(),
             })?;
 
-        let response_data = self.transport.receive(&connection).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let response_data = self.transport.receive(&connection).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "cert_validation_receive".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
-        let is_valid: bool = bincode::deserialize(&response_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let is_valid: bool = bincode::deserialize(&response_data).map_err(|e| {
+            TrustChainError::SerializationError {
                 operation: "cert_validation_deserialize".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         let cache_entry = CertificateValidationResult {
             is_valid,
@@ -183,59 +207,89 @@ impl TrustChainStoqClient {
         self.cert_cache.insert(fingerprint, cache_entry);
 
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.certificate_validations.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_sent.fetch_add(request_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_received.fetch_add(response_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .certificate_validations
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics.bytes_sent.fetch_add(
+            request_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.metrics.bytes_received.fetch_add(
+            response_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
         self.update_average_latency(latency);
 
-        debug!("Certificate validation completed: {} -> {} ({}us)", fingerprint_for_log, is_valid, latency);
+        debug!(
+            "Certificate validation completed: {} -> {} ({}us)",
+            fingerprint_for_log, is_valid, latency
+        );
         Ok(is_valid)
     }
 
     /// Submit certificate to CT log over STOQ transport
     pub async fn submit_to_ct_log(&self, submission: CtLogSubmission) -> TrustChainResult<String> {
         let start_time = std::time::Instant::now();
-        debug!("Submitting certificate to CT log over STOQ: {}", submission.log_id);
+        debug!(
+            "Submitting certificate to CT log over STOQ: {}",
+            submission.log_id
+        );
 
         let ct_endpoint = self.select_ct_log().await?;
         let connection = self.get_or_create_connection(&ct_endpoint).await?;
 
-        let submission_data = bincode::serialize(&submission)
-            .map_err(|e| TrustChainError::SerializationError {
+        let submission_data =
+            bincode::serialize(&submission).map_err(|e| TrustChainError::SerializationError {
                 operation: "ct_submission_serialize".to_string(),
                 reason: e.to_string(),
             })?;
 
-        self.transport.send(&connection, &submission_data).await
+        self.transport
+            .send(&connection, &submission_data)
+            .await
             .map_err(|e| TrustChainError::NetworkError {
                 operation: "ct_submission_send".to_string(),
                 reason: e.to_string(),
             })?;
 
-        let sct_data = self.transport.receive(&connection).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let sct_data = self.transport.receive(&connection).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "ct_sct_receive".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
-        let sct_id: String = bincode::deserialize(&sct_data)
-            .map_err(|e| TrustChainError::SerializationError {
+        let sct_id: String =
+            bincode::deserialize(&sct_data).map_err(|e| TrustChainError::SerializationError {
                 operation: "ct_sct_deserialize".to_string(),
                 reason: e.to_string(),
             })?;
 
         let latency = start_time.elapsed().as_micros() as u64;
-        self.metrics.ct_submissions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_sent.fetch_add(submission_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
-        self.metrics.bytes_received.fetch_add(sct_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .ct_submissions
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics.bytes_sent.fetch_add(
+            submission_data.len() as u64,
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.metrics
+            .bytes_received
+            .fetch_add(sct_data.len() as u64, std::sync::atomic::Ordering::Relaxed);
         self.update_average_latency(latency);
 
-        debug!("CT log submission completed: {} -> {} ({}us)", submission.log_id, sct_id, latency);
+        debug!(
+            "CT log submission completed: {} -> {} ({}us)",
+            submission.log_id, sct_id, latency
+        );
         Ok(sct_id)
     }
 
     /// Get or create connection to service endpoint
-    async fn get_or_create_connection(&self, endpoint: &ServiceEndpoint) -> TrustChainResult<Arc<Connection>> {
+    async fn get_or_create_connection(
+        &self,
+        endpoint: &ServiceEndpoint,
+    ) -> TrustChainResult<Arc<Connection>> {
         if let Some(existing_conn) = self.connections.get(endpoint) {
             if existing_conn.is_active() {
                 return Ok(existing_conn.clone());
@@ -244,32 +298,46 @@ impl TrustChainStoqClient {
             }
         }
 
-        let stoq_endpoint = Endpoint::new(endpoint.address, endpoint.port)
-            .with_server_name(endpoint.service_name.clone().unwrap_or_else(|| {
-                format!("{}.trustchain.local", endpoint.service_type.as_str())
-            }));
+        let stoq_endpoint = Endpoint::new(endpoint.address, endpoint.port).with_server_name(
+            endpoint
+                .service_name
+                .clone()
+                .unwrap_or_else(|| format!("{}.trustchain.local", endpoint.service_type.as_str())),
+        );
 
-        debug!("Creating new STOQ connection to: [{}]:{}", endpoint.address, endpoint.port);
+        debug!(
+            "Creating new STOQ connection to: [{}]:{}",
+            endpoint.address, endpoint.port
+        );
 
-        let connection = self.transport.connect(&stoq_endpoint).await
-            .map_err(|e| TrustChainError::NetworkError {
+        let connection = self.transport.connect(&stoq_endpoint).await.map_err(|e| {
+            TrustChainError::NetworkError {
                 operation: "stoq_connection".to_string(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
 
         if self.config.enable_connection_pooling {
-            self.connections.insert(endpoint.clone(), connection.clone());
+            self.connections
+                .insert(endpoint.clone(), connection.clone());
         }
 
-        self.metrics.connections_established.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .connections_established
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        debug!("STOQ connection established successfully: [{}]:{}", endpoint.address, endpoint.port);
+        debug!(
+            "STOQ connection established successfully: [{}]:{}",
+            endpoint.address, endpoint.port
+        );
         Ok(connection)
     }
 
     /// Select best DNS resolver endpoint
     async fn select_dns_resolver(&self) -> TrustChainResult<ServiceEndpoint> {
-        self.config.service_discovery.dns_resolvers
+        self.config
+            .service_discovery
+            .dns_resolvers
             .first()
             .cloned()
             .ok_or_else(|| TrustChainError::ServiceDiscoveryError {
@@ -280,7 +348,9 @@ impl TrustChainStoqClient {
 
     /// Select best CA endpoint
     async fn select_ca_endpoint(&self) -> TrustChainResult<ServiceEndpoint> {
-        self.config.service_discovery.ca_endpoints
+        self.config
+            .service_discovery
+            .ca_endpoints
             .first()
             .cloned()
             .ok_or_else(|| TrustChainError::ServiceDiscoveryError {
@@ -291,7 +361,9 @@ impl TrustChainStoqClient {
 
     /// Select best CT log endpoint
     async fn select_ct_log(&self) -> TrustChainResult<ServiceEndpoint> {
-        self.config.service_discovery.ct_logs
+        self.config
+            .service_discovery
+            .ct_logs
             .first()
             .cloned()
             .ok_or_else(|| TrustChainError::ServiceDiscoveryError {
@@ -302,41 +374,62 @@ impl TrustChainStoqClient {
 
     /// Update average latency metric
     fn update_average_latency(&self, latency_us: u64) {
-        let current_avg = self.metrics.average_latency_us.load(std::sync::atomic::Ordering::Relaxed);
+        let current_avg = self
+            .metrics
+            .average_latency_us
+            .load(std::sync::atomic::Ordering::Relaxed);
         let new_avg = if current_avg == 0 {
             latency_us
         } else {
             (current_avg * 9 + latency_us) / 10
         };
-        self.metrics.average_latency_us.store(new_avg, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .average_latency_us
+            .store(new_avg, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Get client performance metrics
     pub fn get_metrics(&self) -> StoqClientMetrics {
         StoqClientMetrics {
             connections_established: std::sync::atomic::AtomicU64::new(
-                self.metrics.connections_established.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .connections_established
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             bytes_sent: std::sync::atomic::AtomicU64::new(
-                self.metrics.bytes_sent.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .bytes_sent
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             bytes_received: std::sync::atomic::AtomicU64::new(
-                self.metrics.bytes_received.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .bytes_received
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             dns_queries: std::sync::atomic::AtomicU64::new(
-                self.metrics.dns_queries.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .dns_queries
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             certificate_validations: std::sync::atomic::AtomicU64::new(
-                self.metrics.certificate_validations.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .certificate_validations
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             ct_submissions: std::sync::atomic::AtomicU64::new(
-                self.metrics.ct_submissions.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .ct_submissions
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             average_latency_us: std::sync::atomic::AtomicU64::new(
-                self.metrics.average_latency_us.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .average_latency_us
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
             connection_errors: std::sync::atomic::AtomicU64::new(
-                self.metrics.connection_errors.load(std::sync::atomic::Ordering::Relaxed)
+                self.metrics
+                    .connection_errors
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }

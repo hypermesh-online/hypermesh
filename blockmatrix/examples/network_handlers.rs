@@ -5,9 +5,8 @@
 //! Example demonstrating the multi-network trust handlers
 
 use blockmatrix::network::trust::{
-    NetworkHandler, NetworkConfig, NetworkType, ProofOfState,
-    AnonymousNetworkHandler, P2PNetworkHandler,
-    FederatedNetworkHandler, PublicNetworkHandler,
+    AnonymousNetworkHandler, FederatedNetworkHandler, NetworkConfig, NetworkHandler, NetworkType,
+    P2PNetworkHandler, ProofOfState, PublicNetworkHandler,
 };
 
 #[tokio::main]
@@ -29,9 +28,16 @@ async fn main() -> anyhow::Result<()> {
         Ok(conn) => {
             println!("   ✓ Anonymous network bootstrapped");
             println!("   - Network ID: {}", conn.network_id);
-            println!("   - Certificate: {}", if conn.certificate.is_some() { "Present" } else { "None (as expected)" });
+            println!(
+                "   - Certificate: {}",
+                if conn.certificate.is_some() {
+                    "Present"
+                } else {
+                    "None (as expected)"
+                }
+            );
         }
-        Err(e) => println!("   ✗ Failed: {}", e),
+        Err(e) => println!("   ✗ Failed: {e}"),
     }
 
     // 2. P2P Network
@@ -49,12 +55,19 @@ async fn main() -> anyhow::Result<()> {
         Ok(conn) => {
             println!("   ✓ P2P network bootstrapped");
             println!("   - Network ID: {}", conn.network_id);
-            println!("   - Certificate: {}", if conn.certificate.is_some() { "Self-signed" } else { "None" });
+            println!(
+                "   - Certificate: {}",
+                if conn.certificate.is_some() {
+                    "Self-signed"
+                } else {
+                    "None"
+                }
+            );
             if let Some(cert) = conn.certificate {
                 println!("   - Self-signed: {}", cert.is_self_signed());
             }
         }
-        Err(e) => println!("   ✗ Failed: {}", e),
+        Err(e) => println!("   ✗ Failed: {e}"),
     }
 
     // 3. Federated Network
@@ -62,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     let fed_handler = FederatedNetworkHandler::new();
     let fed_config = NetworkConfig {
         network_type: NetworkType::Federated {
-            gateway_url: "bank.internal".to_string()
+            gateway_url: "bank.internal".to_string(),
         },
         peer_addresses: vec![],
         federation_gateway: Some("bank.internal".to_string()),
@@ -75,9 +88,16 @@ async fn main() -> anyhow::Result<()> {
             println!("   ✓ Federated network bootstrapped");
             println!("   - Network ID: {}", conn.network_id);
             println!("   - Federation: bank.internal");
-            println!("   - Certificate: {}", if conn.certificate.is_some() { "Federation-issued" } else { "None" });
+            println!(
+                "   - Certificate: {}",
+                if conn.certificate.is_some() {
+                    "Federation-issued"
+                } else {
+                    "None"
+                }
+            );
         }
-        Err(e) => println!("   ✗ Failed: {}", e),
+        Err(e) => println!("   ✗ Failed: {e}"),
     }
 
     // 4. Public Network
@@ -96,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
 
     match public_handler.bootstrap(public_config_no_proof).await {
         Ok(_) => println!("   ✗ Should have failed without proof!"),
-        Err(e) => println!("   ✓ Correctly rejected: {}", e),
+        Err(e) => println!("   ✓ Correctly rejected: {e}"),
     }
 
     // Now with proof
@@ -123,10 +143,13 @@ async fn main() -> anyhow::Result<()> {
             println!("   - DNS: node.hypermesh");
             println!("   - Certificate: Blockchain-registered");
             if let Some(cert) = conn.certificate {
-                println!("   - Blockchain registered: {}", cert.is_blockchain_registered());
+                println!(
+                    "   - Blockchain registered: {}",
+                    cert.is_blockchain_registered()
+                );
             }
         }
-        Err(e) => println!("   ✗ Failed: {}", e),
+        Err(e) => println!("   ✗ Failed: {e}"),
     }
 
     println!("\n=== Summary ===");

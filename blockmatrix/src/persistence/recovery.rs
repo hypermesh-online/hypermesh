@@ -7,17 +7,15 @@
 //! Provides crash recovery, snapshot rollback, and partial recovery
 //! capabilities with comprehensive validation.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 use super::{
-    PersistenceError, PersistenceResult,
-    blockchain_storage::BlockchainStorage,
-    matrix_state::MatrixStateSerializer,
-    topology_backup::TopologyBackup,
-    snapshots::SnapshotManager,
+    blockchain_storage::BlockchainStorage, matrix_state::MatrixStateSerializer,
+    snapshots::SnapshotManager, topology_backup::TopologyBackup, PersistenceError,
+    PersistenceResult,
 };
 
 /// Recovery status
@@ -56,6 +54,12 @@ pub struct RecoveryReport {
     pub warnings: Vec<String>,
 }
 
+impl Default for RecoveryReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecoveryReport {
     /// Create new recovery report
     pub fn new() -> Self {
@@ -79,7 +83,7 @@ impl RecoveryReport {
     /// Mark component as failed
     pub fn mark_failed(&mut self, component: String, error: String) {
         self.failed_components.push(component.clone());
-        self.errors.push(format!("{}: {}", component, error));
+        self.errors.push(format!("{component}: {error}"));
     }
 
     /// Add warning
@@ -154,7 +158,8 @@ impl RecoveryManager {
                 self.report.mark_recovered("blockchain".to_string());
             }
             Err(e) => {
-                self.report.mark_failed("blockchain".to_string(), e.to_string());
+                self.report
+                    .mark_failed("blockchain".to_string(), e.to_string());
             }
         }
 
@@ -165,7 +170,8 @@ impl RecoveryManager {
                 self.report.mark_recovered("matrix_state".to_string());
             }
             Err(e) => {
-                self.report.mark_failed("matrix_state".to_string(), e.to_string());
+                self.report
+                    .mark_failed("matrix_state".to_string(), e.to_string());
             }
         }
 
@@ -176,7 +182,8 @@ impl RecoveryManager {
                 self.report.mark_recovered("topology".to_string());
             }
             Err(e) => {
-                self.report.mark_failed("topology".to_string(), e.to_string());
+                self.report
+                    .mark_failed("topology".to_string(), e.to_string());
             }
         }
 
@@ -187,7 +194,8 @@ impl RecoveryManager {
                 self.report.mark_recovered("snapshots".to_string());
             }
             Err(e) => {
-                self.report.mark_failed("snapshots".to_string(), e.to_string());
+                self.report
+                    .mark_failed("snapshots".to_string(), e.to_string());
             }
         }
 
@@ -207,8 +215,14 @@ impl RecoveryManager {
         self.report.finalize(status);
 
         info!("Recovery completed with status: {:?}", self.report.status);
-        info!("  Recovered: {} components", self.report.recovered_components.len());
-        info!("  Failed: {} components", self.report.failed_components.len());
+        info!(
+            "  Recovered: {} components",
+            self.report.recovered_components.len()
+        );
+        info!(
+            "  Failed: {} components",
+            self.report.failed_components.len()
+        );
         info!("  Duration: {:?}", self.report.duration());
 
         Ok(self.report.clone())
@@ -236,12 +250,14 @@ impl RecoveryManager {
         }
 
         if !temp_files.is_empty() {
-            self.report.add_warning(format!("Found {} temporary files", temp_files.len()));
+            self.report
+                .add_warning(format!("Found {} temporary files", temp_files.len()));
 
             // Clean up temporary files
             for temp_file in temp_files {
                 if let Err(e) = std::fs::remove_file(&temp_file) {
-                    self.report.add_warning(format!("Failed to remove temp file {:?}: {}", temp_file, e));
+                    self.report
+                        .add_warning(format!("Failed to remove temp file {temp_file:?}: {e}"));
                 }
             }
         }
@@ -253,10 +269,8 @@ impl RecoveryManager {
     async fn recover_blockchain(&mut self) -> PersistenceResult<BlockchainRecoveryStats> {
         info!("Recovering blockchain");
 
-        let storage = BlockchainStorage::new(
-            self.storage_dir.clone(),
-            self.node_id.clone(),
-        ).await?;
+        let storage =
+            BlockchainStorage::new(self.storage_dir.clone(), self.node_id.clone()).await?;
 
         // Replay WAL
         let wal_entries = storage.replay_wal().await?;
@@ -298,13 +312,15 @@ impl RecoveryManager {
                             self.report.stats.data_size_recovered += data.len() as u64;
                         }
                         Err(e) => {
-                            self.report.add_warning(format!("Corrupted coordinates.bin: {}", e));
+                            self.report
+                                .add_warning(format!("Corrupted coordinates.bin: {e}"));
                             self.report.stats.corrupted_items += 1;
                         }
                     }
                 }
                 Err(e) => {
-                    self.report.add_warning(format!("Failed to read coordinates.bin: {}", e));
+                    self.report
+                        .add_warning(format!("Failed to read coordinates.bin: {e}"));
                 }
             }
         }
@@ -327,10 +343,7 @@ impl RecoveryManager {
     async fn recover_topology(&mut self) -> PersistenceResult<u32> {
         info!("Recovering topology");
 
-        let backup = TopologyBackup::new(
-            self.storage_dir.clone(),
-            self.node_id.clone(),
-        )?;
+        let backup = TopologyBackup::new(self.storage_dir.clone(), self.node_id.clone())?;
 
         // List available backups
         let backups = backup.list_backups()?;
@@ -347,13 +360,17 @@ impl RecoveryManager {
                 Ok(nodes)
             }
             Err(e) => {
-                self.report.add_warning(format!("Failed to restore topology backup: {}", e));
+                self.report
+                    .add_warning(format!("Failed to restore topology backup: {e}"));
 
                 // Try older backups
                 for backup_info in backups.iter().skip(1).take(2) {
                     match backup.restore_backup(&backup_info.path).await {
                         Ok(data) => {
-                            self.report.add_warning(format!("Restored older backup from {}", backup_info.created));
+                            self.report.add_warning(format!(
+                                "Restored older backup from {}",
+                                backup_info.created
+                            ));
                             return Ok(data.nodes.len() as u32);
                         }
                         Err(_) => continue,
@@ -373,24 +390,30 @@ impl RecoveryManager {
             self.storage_dir.clone(),
             self.node_id.clone(),
             super::snapshots::SnapshotSchedule::Manual,
-        ).await?;
+        )
+        .await?;
 
         let snapshots = snapshot_manager.list_snapshots().await;
         let mut validated = 0;
 
         for snapshot in snapshots {
             // Try to restore to validate
-            match snapshot_manager.restore_snapshot::<HashMap<String, String>>(&snapshot.id).await {
+            match snapshot_manager
+                .restore_snapshot::<HashMap<String, String>>(&snapshot.id)
+                .await
+            {
                 Ok(_) => {
                     validated += 1;
                 }
                 Err(e) => {
-                    self.report.add_warning(format!("Invalid snapshot {}: {}", snapshot.id, e));
+                    self.report
+                        .add_warning(format!("Invalid snapshot {}: {}", snapshot.id, e));
                     self.report.stats.corrupted_items += 1;
 
                     // Delete corrupted snapshot
                     if let Err(e) = snapshot_manager.delete_snapshot(&snapshot.id).await {
-                        self.report.add_warning(format!("Failed to delete corrupted snapshot: {}", e));
+                        self.report
+                            .add_warning(format!("Failed to delete corrupted snapshot: {e}"));
                     }
                 }
             }
@@ -407,23 +430,31 @@ impl RecoveryManager {
             self.storage_dir.clone(),
             self.node_id.clone(),
             super::snapshots::SnapshotSchedule::Manual,
-        ).await?;
+        )
+        .await?;
 
         // Validate snapshot exists and is valid
         let snapshots = snapshot_manager.list_snapshots().await;
-        let _snapshot = snapshots.iter()
+        let _snapshot = snapshots
+            .iter()
             .find(|s| s.id == snapshot_id)
-            .ok_or_else(|| PersistenceError::SnapshotError(
-                format!("Snapshot {} not found", snapshot_id)
-            ))?;
+            .ok_or_else(|| {
+                PersistenceError::SnapshotError(format!("Snapshot {snapshot_id} not found"))
+            })?;
 
         // Create backup of current state before rollback
         info!("Creating backup before rollback");
-        let _backup_id = format!("pre_rollback_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
+        let _backup_id = format!(
+            "pre_rollback_{}",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S")
+        );
         // Would create backup here
 
         // Restore from snapshot
-        match snapshot_manager.restore_snapshot::<HashMap<String, String>>(snapshot_id).await {
+        match snapshot_manager
+            .restore_snapshot::<HashMap<String, String>>(snapshot_id)
+            .await
+        {
             Ok(_) => {
                 info!("Successfully rolled back to snapshot {}", snapshot_id);
                 Ok(())
@@ -449,10 +480,14 @@ impl RecoveryManager {
             self.storage_dir.clone(),
             self.node_id.clone(),
             super::snapshots::SnapshotSchedule::Manual,
-        ).await?;
+        )
+        .await?;
 
         for snapshot in snapshot_manager.list_snapshots().await {
-            match snapshot_manager.restore_snapshot::<HashMap<String, String>>(&snapshot.id).await {
+            match snapshot_manager
+                .restore_snapshot::<HashMap<String, String>>(&snapshot.id)
+                .await
+            {
                 Ok(_) => {
                     debug!("Snapshot {} is valid", snapshot.id);
                 }
@@ -504,11 +539,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_recovery_manager_creation() {
-        let temp_dir = TempDir::new().unwrap();
-        let manager = RecoveryManager::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string(),
-        );
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let manager = RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
         let report = manager.get_report();
         assert_eq!(report.status, RecoveryStatus::InProgress);
@@ -516,20 +548,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_incomplete_writes() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
         let node_dir = temp_dir.path().join("test_node");
-        std::fs::create_dir_all(&node_dir).unwrap();
+        std::fs::create_dir_all(&node_dir).expect("test: expected success");
 
         // Create temp files
-        std::fs::write(node_dir.join(".tmp_test"), "data").unwrap();
-        std::fs::write(node_dir.join("test.tmp"), "data").unwrap();
+        std::fs::write(node_dir.join(".tmp_test"), "data").expect("test: file write");
+        std::fs::write(node_dir.join("test.tmp"), "data").expect("test: file write");
 
-        let mut manager = RecoveryManager::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string(),
-        );
+        let mut manager =
+            RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        manager.detect_incomplete_writes().unwrap();
+        manager.detect_incomplete_writes().expect("test: expected success");
 
         // Temp files should be cleaned up
         assert!(!node_dir.join(".tmp_test").exists());
@@ -541,29 +571,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_recovery() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut manager = RecoveryManager::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string(),
-        );
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let mut manager =
+            RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        let report = manager.recover_all().await.unwrap();
+        let report = manager.recover_all().await.expect("test: async operation");
 
         // Should complete even with no data
-        assert!(report.status == RecoveryStatus::Completed ||
-                report.status == RecoveryStatus::Partial);
+        assert!(
+            report.status == RecoveryStatus::Completed || report.status == RecoveryStatus::Partial
+        );
         assert!(report.end_time.is_some());
     }
 
     #[tokio::test]
     async fn test_verify_integrity() {
-        let temp_dir = TempDir::new().unwrap();
-        let mut manager = RecoveryManager::new(
-            temp_dir.path().to_path_buf(),
-            "test_node".to_string(),
-        );
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let mut manager =
+            RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        let valid = manager.verify_integrity().await.unwrap();
+        let valid = manager.verify_integrity().await.expect("test: async operation");
         assert!(valid); // Should be valid with no data
     }
 

@@ -3,19 +3,19 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! DNS Cache Implementation
-//! 
+//!
 //! High-performance DNS cache with TTL support and automatic cleanup.
 
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
 use dashmap::DashMap;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use trust_dns_proto::rr::RecordType;
+use super::DnsResponse;
 use crate::errors::Result as TrustChainResult;
-use super::{DnsResponse};
+use trust_dns_proto::rr::RecordType;
 
 /// DNS cache entry
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -125,13 +125,17 @@ impl DnsCache {
     }
 
     /// Get cached DNS response
-    pub async fn get(&self, name: &str, record_type: RecordType) -> TrustChainResult<Option<DnsResponse>> {
+    pub async fn get(
+        &self,
+        name: &str,
+        record_type: RecordType,
+    ) -> TrustChainResult<Option<DnsResponse>> {
         let key = CacheKey::new(name, record_type);
-        
+
         if let Some(mut entry) = self.cache.get_mut(&key) {
             if !entry.is_expired() {
                 let response = entry.access();
-                
+
                 // Update stats
                 {
                     let mut stats = self.stats.write().await;
@@ -145,7 +149,10 @@ impl DnsCache {
                 // Remove expired entry
                 drop(entry);
                 self.cache.remove(&key);
-                debug!("Removed expired cache entry for {} ({:?})", name, record_type);
+                debug!(
+                    "Removed expired cache entry for {} ({:?})",
+                    name, record_type
+                );
             }
         }
 
@@ -169,8 +176,12 @@ impl DnsCache {
         ttl: u32,
     ) -> TrustChainResult<()> {
         let key = CacheKey::new(name, record_type);
-        let effective_ttl = if ttl > 0 { ttl } else { self.default_ttl.as_secs() as u32 };
-        
+        let effective_ttl = if ttl > 0 {
+            ttl
+        } else {
+            self.default_ttl.as_secs() as u32
+        };
+
         // Check cache size limit
         if self.cache.len() >= self.max_size {
             self.evict_lru_entry().await;
@@ -186,7 +197,10 @@ impl DnsCache {
             stats.memory_usage_bytes = self.estimate_memory_usage();
         }
 
-        debug!("Cached DNS response for {} ({:?}) with TTL {}", name, record_type, effective_ttl);
+        debug!(
+            "Cached DNS response for {} ({:?}) with TTL {}",
+            name, record_type, effective_ttl
+        );
         Ok(())
     }
 
@@ -225,7 +239,7 @@ impl DnsCache {
         debug!("Starting DNS cache cleanup");
 
         let mut expired_keys = Vec::new();
-        
+
         // Collect expired keys
         for item in self.cache.iter() {
             if item.value().is_expired() {
@@ -246,7 +260,10 @@ impl DnsCache {
             stats.last_cleanup = SystemTime::now();
         }
 
-        debug!("DNS cache cleanup completed: removed {} expired entries", expired_keys.len());
+        debug!(
+            "DNS cache cleanup completed: removed {} expired entries",
+            expired_keys.len()
+        );
         Ok(())
     }
 
@@ -275,13 +292,15 @@ impl DnsCache {
 
         for item in self.cache.iter() {
             // Priority = access_count * 1000 + seconds_since_last_access
-            let seconds_since_access = item.value().last_accessed
+            let seconds_since_access = item
+                .value()
+                .last_accessed
                 .elapsed()
                 .unwrap_or(Duration::ZERO)
                 .as_secs();
-            
+
             let priority = item.value().access_count * 1000 + seconds_since_access;
-            
+
             if priority < min_priority {
                 min_priority = priority;
                 lru_key = Some(item.key().clone());
@@ -304,8 +323,8 @@ impl DnsCache {
 mod tests {
     use super::*;
     use crate::dns::{DnsRecord, DnsRecordData};
-    use trust_dns_proto::op::ResponseCode;
     use std::net::Ipv6Addr;
+    use trust_dns_proto::op::ResponseCode;
 
     fn create_test_response(id: u16, name: &str) -> DnsResponse {
         DnsResponse {
@@ -327,7 +346,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_creation() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
         let stats = cache.get_stats().await;
         assert_eq!(stats.entries, 0);
@@ -335,14 +355,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_set_and_get() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         let response = create_test_response(1234, "test.example.com");
-        cache.set("test.example.com", RecordType::AAAA, &response, 300).await
+        cache
+            .set("test.example.com", RecordType::AAAA, &response, 300)
+            .await
             .expect("Failed to set cache entry");
 
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry");
         assert!(cached.is_some());
 
@@ -353,25 +378,33 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_miss() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
-        let result = cache.get("nonexistent.example.com", RecordType::AAAA).await
+        let result = cache
+            .get("nonexistent.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to query cache");
         assert!(result.is_none());
     }
 
     #[tokio::test]
     async fn test_cache_expiration() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         let response = create_test_response(1234, "test.example.com");
-        cache.set("test.example.com", RecordType::AAAA, &response, 1).await
+        cache
+            .set("test.example.com", RecordType::AAAA, &response, 1)
+            .await
             .expect("Failed to set cache entry with 1s TTL");
 
         // Should be available immediately
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry");
         assert!(cached.is_some());
 
@@ -379,54 +412,72 @@ mod tests {
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         // Should be expired and removed
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry after expiration");
         assert!(cached.is_none());
     }
 
     #[tokio::test]
     async fn test_cache_removal() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         let response = create_test_response(1234, "test.example.com");
-        cache.set("test.example.com", RecordType::AAAA, &response, 300).await
+        cache
+            .set("test.example.com", RecordType::AAAA, &response, 300)
+            .await
             .expect("Failed to set cache entry");
 
         // Verify it's cached
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry");
         assert!(cached.is_some());
 
         // Remove it
-        let removed = cache.remove("test.example.com", RecordType::AAAA).await
+        let removed = cache
+            .remove("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to remove cache entry");
         assert!(removed);
 
         // Verify it's gone
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to verify cache entry removal");
         assert!(cached.is_none());
     }
 
     #[tokio::test]
     async fn test_cache_clear() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         // Add multiple entries
         for i in 0..5 {
-            let response = create_test_response(i, &format!("test{}.example.com", i));
-            cache.set(&format!("test{}.example.com", i), RecordType::AAAA, &response, 300).await
-                .expect(&format!("Failed to set cache entry {}", i));
+            let response = create_test_response(i, &format!("test{i}.example.com"));
+            cache
+                .set(
+                    &format!("test{i}.example.com"),
+                    RecordType::AAAA,
+                    &response,
+                    300,
+                )
+                .await
+                .expect("test: setting cache entry should succeed");
         }
 
         let stats = cache.get_stats().await;
         assert_eq!(stats.entries, 5);
 
         // Clear cache
-        cache.clear().await
-            .expect("Failed to clear cache");
+        cache.clear().await.expect("Failed to clear cache");
 
         let stats = cache.get_stats().await;
         assert_eq!(stats.entries, 0);
@@ -434,19 +485,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_stats() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         let response = create_test_response(1234, "test.example.com");
-        cache.set("test.example.com", RecordType::AAAA, &response, 300).await
+        cache
+            .set("test.example.com", RecordType::AAAA, &response, 300)
+            .await
             .expect("Failed to set cache entry");
 
         // Test hit
-        cache.get("test.example.com", RecordType::AAAA).await
+        cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry for hit test");
 
         // Test miss
-        cache.get("nonexistent.example.com", RecordType::AAAA).await
+        cache
+            .get("nonexistent.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get cache entry for miss test");
 
         let stats = cache.get_stats().await;
@@ -458,16 +516,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_cleanup() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         // Add entries with different TTLs
         let response1 = create_test_response(1, "test1.example.com");
         let response2 = create_test_response(2, "test2.example.com");
 
-        cache.set("test1.example.com", RecordType::AAAA, &response1, 1).await
+        cache
+            .set("test1.example.com", RecordType::AAAA, &response1, 1)
+            .await
             .expect("Failed to set short TTL cache entry");
-        cache.set("test2.example.com", RecordType::AAAA, &response2, 300).await
+        cache
+            .set("test2.example.com", RecordType::AAAA, &response2, 300)
+            .await
             .expect("Failed to set long TTL cache entry");
 
         // Wait for first entry to expire
@@ -477,8 +540,7 @@ mod tests {
         assert_eq!(stats_before.entries, 2);
 
         // Run cleanup
-        cache.cleanup().await
-            .expect("Failed to cleanup cache");
+        cache.cleanup().await.expect("Failed to cleanup cache");
 
         let stats_after = cache.get_stats().await;
         assert_eq!(stats_after.entries, 1);
@@ -486,20 +548,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_case_insensitive_keys() {
-        let cache = DnsCache::new(Duration::from_secs(300)).await
+        let cache = DnsCache::new(Duration::from_secs(300))
+            .await
             .expect("Failed to create DNS cache");
 
         let response = create_test_response(1234, "Test.Example.COM");
-        cache.set("Test.Example.COM", RecordType::AAAA, &response, 300).await
+        cache
+            .set("Test.Example.COM", RecordType::AAAA, &response, 300)
+            .await
             .expect("Failed to set mixed-case cache entry");
 
         // Should find with lowercase
-        let cached = cache.get("test.example.com", RecordType::AAAA).await
+        let cached = cache
+            .get("test.example.com", RecordType::AAAA)
+            .await
             .expect("Failed to get lowercase cache entry");
         assert!(cached.is_some());
 
         // Should find with mixed case
-        let cached = cache.get("TeSt.ExAmPlE.cOm", RecordType::AAAA).await
+        let cached = cache
+            .get("TeSt.ExAmPlE.cOm", RecordType::AAAA)
+            .await
             .expect("Failed to get mixed-case cache entry");
         assert!(cached.is_some());
     }

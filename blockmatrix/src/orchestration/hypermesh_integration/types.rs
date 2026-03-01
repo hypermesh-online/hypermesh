@@ -4,16 +4,15 @@
 
 //! HyperMesh container integration types - config, specs, metrics, and results
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+use std::time::{Duration, SystemTime};
 
-use crate::container::{ContainerId, ContainerStatus};
-use crate::container::runtime::ContainerHandle;
 use crate::assets::core::{
-    AssetType, AssetAllocation, AssetStatus,
-    ConsensusProof, WorkloadType, PrivacyMode,
+    AssetAllocation, AssetStatus, AssetType, ConsensusProof, PrivacyMode, WorkloadType,
 };
+use crate::container::runtime::ContainerHandle;
+use crate::container::{ContainerId, ContainerStatus};
 
 /// Configuration for HyperMesh integration
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

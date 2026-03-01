@@ -13,7 +13,7 @@
 // ---------------------------------------------------------------------------
 
 mod asset_pipeline {
-    use hypermesh_lib::{AssetId, ContentHash, PipelineStage, MatrixPosition, AssetAddress};
+    use hypermesh_lib::{AssetAddress, AssetId, ContentHash, MatrixPosition, PipelineStage};
 
     #[test]
     fn pipeline_stages_follow_correct_order() {
@@ -72,8 +72,7 @@ mod asset_pipeline {
     #[test]
     fn asset_address_encodes_matrix_position_and_hash() {
         let hash = ContentHash::from_bytes([0x42u8; 32]);
-        let addr = AssetAddress::new(10, 20, 30, &hash)
-            .expect("valid coordinates");
+        let addr = AssetAddress::new(10, 20, 30, &hash).expect("valid coordinates");
 
         let (x, y, z) = addr.matrix_coords();
         assert_eq!(x, 10);
@@ -88,8 +87,7 @@ mod asset_pipeline {
     #[test]
     fn asset_address_shard_derivation() {
         let hash = ContentHash::from_bytes([0x42u8; 32]);
-        let parent = AssetAddress::new(1, 2, 3, &hash)
-            .expect("valid coordinates");
+        let parent = AssetAddress::new(1, 2, 3, &hash).expect("valid coordinates");
 
         // Derive shard addresses (Reed-Solomon 10+4 = up to shard 13)
         for shard_idx in 1..=14u8 {
@@ -109,12 +107,10 @@ mod asset_pipeline {
     #[test]
     fn asset_address_ipv6_round_trip() {
         let hash = ContentHash::from_bytes([0xFFu8; 32]);
-        let addr = AssetAddress::new(100, -50, 0, &hash)
-            .expect("valid coordinates");
+        let addr = AssetAddress::new(100, -50, 0, &hash).expect("valid coordinates");
 
         let ipv6 = addr.to_ipv6();
-        let recovered = AssetAddress::from_ipv6(ipv6)
-            .expect("valid HyperMesh address");
+        let recovered = AssetAddress::from_ipv6(ipv6).expect("valid HyperMesh address");
 
         assert_eq!(addr.matrix_coords(), recovered.matrix_coords());
         assert_eq!(addr.shard_index(), recovered.shard_index());
@@ -166,7 +162,7 @@ mod asset_pipeline {
 // ---------------------------------------------------------------------------
 
 mod privacy_mode_consistency {
-    use hypermesh_lib::{PrivacyMode, AccessScope};
+    use hypermesh_lib::{AccessScope, PrivacyMode};
 
     #[test]
     fn three_presets_exist() {
@@ -197,6 +193,7 @@ mod privacy_mode_consistency {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn two_axis_model_scope_and_tracked() {
         // ANONYMOUS: Unbounded, untracked
         assert_eq!(PrivacyMode::ANONYMOUS.scope, AccessScope::Unbounded);
@@ -249,11 +246,15 @@ mod privacy_mode_consistency {
 
     #[test]
     fn serde_round_trip() {
-        for mode in [PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC] {
-            let json = serde_json::to_string(&mode)
-                .unwrap_or_else(|e| panic!("serialize {:?}: {}", mode, e));
+        for mode in [
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PRIVATE,
+            PrivacyMode::PUBLIC,
+        ] {
+            let json =
+                serde_json::to_string(&mode).unwrap_or_else(|e| panic!("serialize {mode:?}: {e}"));
             let back: PrivacyMode = serde_json::from_str(&json)
-                .unwrap_or_else(|e| panic!("deserialize {:?} from '{}': {}", mode, json, e));
+                .unwrap_or_else(|e| panic!("deserialize {mode:?} from '{json}': {e}"));
             assert_eq!(mode, back);
         }
     }
@@ -305,9 +306,9 @@ mod blockchain_scope {
     fn serde_round_trip() {
         for scope in [BlockchainScope::Device, BlockchainScope::Network] {
             let json = serde_json::to_string(&scope)
-                .unwrap_or_else(|e| panic!("serialize {:?}: {}", scope, e));
+                .unwrap_or_else(|e| panic!("serialize {scope:?}: {e}"));
             let back: BlockchainScope = serde_json::from_str(&json)
-                .unwrap_or_else(|e| panic!("deserialize {:?} from '{}': {}", scope, json, e));
+                .unwrap_or_else(|e| panic!("deserialize {scope:?} from '{json}': {e}"));
             assert_eq!(scope, back);
         }
     }
@@ -341,10 +342,10 @@ mod proof_type_system {
     #[test]
     fn four_proof_types_exist() {
         let proofs = [
-            ProofType::Space,  // WHERE
-            ProofType::Stake,  // WHO
-            ProofType::Work,   // WHAT/HOW
-            ProofType::Time,   // WHEN
+            ProofType::Space, // WHERE
+            ProofType::Stake, // WHO
+            ProofType::Work,  // WHAT/HOW
+            ProofType::Time,  // WHEN
         ];
 
         // All four must be distinct
@@ -387,25 +388,29 @@ mod proof_type_system {
 // ---------------------------------------------------------------------------
 
 mod system_asset_kind {
-    use hypermesh_lib::{SystemAssetKind, AssetKind};
+    use hypermesh_lib::{AssetKind, SystemAssetKind};
 
     #[test]
     fn nine_system_kinds_with_stable_ids() {
         let kinds = [
-            (SystemAssetKind::Cpu,        0, "Cpu"),
-            (SystemAssetKind::Gpu,        1, "Gpu"),
-            (SystemAssetKind::Memory,     2, "Memory"),
-            (SystemAssetKind::Storage,    3, "Storage"),
-            (SystemAssetKind::Network,    4, "Network"),
-            (SystemAssetKind::Container,  5, "Container"),
-            (SystemAssetKind::Economic,   6, "Economic"),
+            (SystemAssetKind::Cpu, 0, "Cpu"),
+            (SystemAssetKind::Gpu, 1, "Gpu"),
+            (SystemAssetKind::Memory, 2, "Memory"),
+            (SystemAssetKind::Storage, 3, "Storage"),
+            (SystemAssetKind::Network, 4, "Network"),
+            (SystemAssetKind::Container, 5, "Container"),
+            (SystemAssetKind::Economic, 6, "Economic"),
             (SystemAssetKind::Blockchain, 7, "Blockchain"),
-            (SystemAssetKind::Dns,        8, "Dns"),
+            (SystemAssetKind::Dns, 8, "Dns"),
         ];
 
         for (kind, expected_id, expected_name) in &kinds {
-            assert_eq!(kind.type_id(), *expected_id, "{} type_id", expected_name);
-            assert_eq!(kind.type_name(), *expected_name, "{} type_name", expected_name);
+            assert_eq!(kind.type_id(), *expected_id, "{expected_name} type_id");
+            assert_eq!(
+                kind.type_name(),
+                *expected_name,
+                "{expected_name} type_name"
+            );
         }
     }
 
@@ -420,7 +425,7 @@ mod system_asset_kind {
         let kind: AssetKind = SystemAssetKind::Gpu.into();
         match kind {
             AssetKind::System(SystemAssetKind::Gpu) => {}
-            other => panic!("expected System(Gpu), got {:?}", other),
+            other => panic!("expected System(Gpu), got {other:?}"),
         }
     }
 }
@@ -430,7 +435,7 @@ mod system_asset_kind {
 // ---------------------------------------------------------------------------
 
 mod identifiers {
-    use hypermesh_lib::{NodeId, NetworkId};
+    use hypermesh_lib::{NetworkId, NodeId};
 
     #[test]
     fn node_id_from_str_and_string() {
@@ -442,10 +447,15 @@ mod identifiers {
 
     #[test]
     fn network_id_display_is_hex() {
-        let nid = NetworkId([0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89,
-                             0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]);
+        let nid = NetworkId([
+            0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
+            0x66, 0x77,
+        ]);
         let display = nid.to_string();
-        assert_eq!(display, "abcdef012345678900112233445566​77".replace("\u{200b}", ""));
+        assert_eq!(
+            display,
+            "abcdef012345678900112233445566\u{200B}77".replace("\u{200b}", "")
+        );
         // Just verify length (32 hex chars for 16 bytes)
         assert_eq!(display.len(), 32);
     }

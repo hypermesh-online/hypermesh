@@ -6,12 +6,12 @@
 //!
 //! Configurable trust policies for package installation and verification
 
+use super::{PolicyResult, PolicyViolation, Severity, VerificationResult, ViolationType};
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
-use super::{VerificationResult, PolicyResult, PolicyViolation, ViolationType, Severity};
 
 /// Trust level for package verification
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -179,85 +179,97 @@ impl PolicyEngine {
         let mut policies = self.policies.write().await;
 
         // Strict policy
-        policies.insert("strict".to_string(), TrustPolicy {
-            name: "strict".to_string(),
-            level: TrustLevel::Strict,
-            rules: vec![],
-            required_checks: RequiredChecks {
-                signature: true,
-                certificate: true,
-                certificate_chain: true,
-                revocation_check: true,
-                vulnerability_scan: true,
-                publisher_auth_check: true,
-                consensus_validation: true,
-                pqc_signatures: true,
+        policies.insert(
+            "strict".to_string(),
+            TrustPolicy {
+                name: "strict".to_string(),
+                level: TrustLevel::Strict,
+                rules: vec![],
+                required_checks: RequiredChecks {
+                    signature: true,
+                    certificate: true,
+                    certificate_chain: true,
+                    revocation_check: true,
+                    vulnerability_scan: true,
+                    publisher_auth_check: true,
+                    consensus_validation: true,
+                    pqc_signatures: true,
+                },
+                allowed_publisher_types: vec![
+                    super::PublisherType::Official,
+                    super::PublisherType::Organization,
+                ],
+                require_publisher_auth: true,
+                max_vulnerability_severity: Some(Severity::Low),
+                allow_unsigned: false,
+                allow_expired_certs: false,
+                require_cert_pinning: true,
+                custom_validators: vec![],
             },
-            allowed_publisher_types: vec![
-                super::PublisherType::Official,
-                super::PublisherType::Organization,
-            ],
-            require_publisher_auth: true,
-            max_vulnerability_severity: Some(Severity::Low),
-            allow_unsigned: false,
-            allow_expired_certs: false,
-            require_cert_pinning: true,
-            custom_validators: vec![],
-        });
+        );
 
         // Moderate policy
-        policies.insert("moderate".to_string(), TrustPolicy {
-            name: "moderate".to_string(),
-            level: TrustLevel::Moderate,
-            rules: vec![],
-            required_checks: RequiredChecks::default(),
-            allowed_publisher_types: vec![
-                super::PublisherType::Official,
-                super::PublisherType::Organization,
-                super::PublisherType::Community,
-                super::PublisherType::Individual,
-            ],
-            require_publisher_auth: true,
-            max_vulnerability_severity: Some(Severity::High),
-            allow_unsigned: false,
-            allow_expired_certs: false,
-            require_cert_pinning: false,
-            custom_validators: vec![],
-        });
+        policies.insert(
+            "moderate".to_string(),
+            TrustPolicy {
+                name: "moderate".to_string(),
+                level: TrustLevel::Moderate,
+                rules: vec![],
+                required_checks: RequiredChecks::default(),
+                allowed_publisher_types: vec![
+                    super::PublisherType::Official,
+                    super::PublisherType::Organization,
+                    super::PublisherType::Community,
+                    super::PublisherType::Individual,
+                ],
+                require_publisher_auth: true,
+                max_vulnerability_severity: Some(Severity::High),
+                allow_unsigned: false,
+                allow_expired_certs: false,
+                require_cert_pinning: false,
+                custom_validators: vec![],
+            },
+        );
 
         // Permissive policy
-        policies.insert("permissive".to_string(), TrustPolicy {
-            name: "permissive".to_string(),
-            level: TrustLevel::Permissive,
-            rules: vec![],
-            required_checks: RequiredChecks {
-                signature: false,
-                certificate: false,
-                certificate_chain: false,
-                revocation_check: false,
-                vulnerability_scan: true,
-                publisher_auth_check: false,
-                consensus_validation: false,
-                pqc_signatures: false,
+        policies.insert(
+            "permissive".to_string(),
+            TrustPolicy {
+                name: "permissive".to_string(),
+                level: TrustLevel::Permissive,
+                rules: vec![],
+                required_checks: RequiredChecks {
+                    signature: false,
+                    certificate: false,
+                    certificate_chain: false,
+                    revocation_check: false,
+                    vulnerability_scan: true,
+                    publisher_auth_check: false,
+                    consensus_validation: false,
+                    pqc_signatures: false,
+                },
+                allowed_publisher_types: vec![
+                    super::PublisherType::Official,
+                    super::PublisherType::Organization,
+                    super::PublisherType::Community,
+                    super::PublisherType::Individual,
+                    super::PublisherType::Unknown,
+                ],
+                require_publisher_auth: false,
+                max_vulnerability_severity: None,
+                allow_unsigned: true,
+                allow_expired_certs: true,
+                require_cert_pinning: false,
+                custom_validators: vec![],
             },
-            allowed_publisher_types: vec![
-                super::PublisherType::Official,
-                super::PublisherType::Organization,
-                super::PublisherType::Community,
-                super::PublisherType::Individual,
-                super::PublisherType::Unknown,
-            ],
-            require_publisher_auth: false,
-            max_vulnerability_severity: None,
-            allow_unsigned: true,
-            allow_expired_certs: true,
-            require_cert_pinning: false,
-            custom_validators: vec![],
-        });
+        );
     }
 
     /// Evaluate package against policy
-    pub async fn evaluate_package(&self, verification: &VerificationResult) -> Result<PolicyResult> {
+    pub async fn evaluate_package(
+        &self,
+        verification: &VerificationResult,
+    ) -> Result<PolicyResult> {
         let policy = self.get_active_policy().await;
 
         let mut result = PolicyResult {
@@ -290,12 +302,17 @@ impl PolicyEngine {
 
         // Check publisher type
         if let Some(ref publisher) = verification.publisher {
-            if !policy.allowed_publisher_types.contains(&publisher.publisher_type) {
+            if !policy
+                .allowed_publisher_types
+                .contains(&publisher.publisher_type)
+            {
                 result.violations.push(PolicyViolation {
                     violation_type: ViolationType::UnknownPublisher,
                     severity: Severity::High,
-                    description: format!("Publisher type {:?} not allowed by policy",
-                                       publisher.publisher_type),
+                    description: format!(
+                        "Publisher type {:?} not allowed by policy",
+                        publisher.publisher_type
+                    ),
                     remediation: Some("Use packages from allowed publisher types".to_string()),
                 });
                 result.allowed = false;
@@ -319,20 +336,23 @@ impl PolicyEngine {
                 violation_type: ViolationType::UnauthenticatedPublisher,
                 severity: Severity::High,
                 description: "Publisher is not certificate-authenticated".to_string(),
-                remediation: Some("Publisher must obtain a valid TrustChain certificate".to_string()),
+                remediation: Some(
+                    "Publisher must obtain a valid TrustChain certificate".to_string(),
+                ),
             });
             if policy.level == TrustLevel::Strict {
                 result.allowed = false;
             } else {
-                result.recommendations.push(
-                    "Warning: Publisher is not certificate-authenticated".to_string()
-                );
+                result
+                    .recommendations
+                    .push("Warning: Publisher is not certificate-authenticated".to_string());
             }
         }
 
         // Check vulnerabilities
         if !verification.vulnerabilities.is_empty() {
-            let max_severity = verification.vulnerabilities
+            let max_severity = verification
+                .vulnerabilities
                 .iter()
                 .map(|v| &v.severity)
                 .max()
@@ -344,9 +364,12 @@ impl PolicyEngine {
                         result.violations.push(PolicyViolation {
                             violation_type: ViolationType::Vulnerability,
                             severity: found_severity.clone(),
-                            description: format!("Package contains {:?} severity vulnerabilities",
-                                               found_severity),
-                            remediation: Some("Update to version without vulnerabilities".to_string()),
+                            description: format!(
+                                "Package contains {found_severity:?} severity vulnerabilities"
+                            ),
+                            remediation: Some(
+                                "Update to version without vulnerabilities".to_string(),
+                            ),
                         });
                         result.allowed = false;
                     }
@@ -371,15 +394,15 @@ impl PolicyEngine {
                         result.recommendations.push(message.clone());
                     }
                     RuleAction::RequireConfirmation(message) => {
-                        result.recommendations.push(format!("⚠️  {}", message));
+                        result.recommendations.push(format!("⚠️  {message}"));
                     }
                     RuleAction::Allow => {
                         // No action needed
                     }
                     RuleAction::RunValidator(validator) => {
-                        result.recommendations.push(
-                            format!("Custom validator '{}' needs to be run", validator)
-                        );
+                        result
+                            .recommendations
+                            .push(format!("Custom validator '{validator}' needs to be run"));
                     }
                 }
             }
@@ -387,15 +410,17 @@ impl PolicyEngine {
 
         // Add general recommendations
         if result.allowed {
-            if verification.warnings.len() > 0 {
-                result.recommendations.push(
-                    format!("Package has {} warnings", verification.warnings.len())
-                );
+            if !verification.warnings.is_empty() {
+                result.recommendations.push(format!(
+                    "Package has {} warnings",
+                    verification.warnings.len()
+                ));
             }
 
             if policy.require_cert_pinning && verification.publisher.is_some() {
                 result.recommendations.push(
-                    "Consider pinning this publisher's certificate for enhanced security".to_string()
+                    "Consider pinning this publisher's certificate for enhanced security"
+                        .to_string(),
                 );
             }
         }
@@ -408,18 +433,22 @@ impl PolicyEngine {
         let policies = self.policies.read().await;
 
         match &self.default_level {
-            TrustLevel::Strict => {
-                policies.get("strict").cloned().unwrap_or_else(|| self.default_policy())
-            }
-            TrustLevel::Moderate => {
-                policies.get("moderate").cloned().unwrap_or_else(|| self.default_policy())
-            }
-            TrustLevel::Permissive => {
-                policies.get("permissive").cloned().unwrap_or_else(|| self.default_policy())
-            }
-            TrustLevel::Custom(name) => {
-                policies.get(name).cloned().unwrap_or_else(|| self.default_policy())
-            }
+            TrustLevel::Strict => policies
+                .get("strict")
+                .cloned()
+                .unwrap_or_else(|| self.default_policy()),
+            TrustLevel::Moderate => policies
+                .get("moderate")
+                .cloned()
+                .unwrap_or_else(|| self.default_policy()),
+            TrustLevel::Permissive => policies
+                .get("permissive")
+                .cloned()
+                .unwrap_or_else(|| self.default_policy()),
+            TrustLevel::Custom(name) => policies
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| self.default_policy()),
         }
     }
 
@@ -447,14 +476,12 @@ impl PolicyEngine {
     /// Evaluate a single rule
     fn evaluate_rule(&self, rule: &PolicyRule, verification: &VerificationResult) -> bool {
         match &rule.condition {
-            RuleCondition::PublisherNotAuthenticated => {
-                !verification.publisher_authenticated
-            }
-            RuleCondition::PublisherPattern(pattern) => {
-                verification.publisher.as_ref()
-                    .map(|p| p.common_name.contains(pattern))
-                    .unwrap_or(false)
-            }
+            RuleCondition::PublisherNotAuthenticated => !verification.publisher_authenticated,
+            RuleCondition::PublisherPattern(pattern) => verification
+                .publisher
+                .as_ref()
+                .map(|p| p.common_name.contains(pattern))
+                .unwrap_or(false),
             // TODO: Implement other conditions
             _ => false,
         }
@@ -545,7 +572,7 @@ mod tests {
             custom_validators: vec![],
         };
 
-        engine.add_policy(custom_policy).await.unwrap();
+        engine.add_policy(custom_policy).await.expect("test: async operation");
 
         let policies = engine.list_policies().await;
         assert!(policies.contains(&"custom-test".to_string()));

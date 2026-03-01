@@ -12,24 +12,22 @@
 mod types;
 
 pub use types::{
-    NodeInfo, NodeCapabilities, HardwareFeatures, NodeStatus, NodeLocation,
-    AvailableResources, NodePerformanceMetrics, CoordinatorConfig,
+    AvailableResources, CoordinatorConfig, HardwareFeatures, NodeCapabilities, NodeInfo,
+    NodeLocation, NodePerformanceMetrics, NodeStatus,
 };
 
+use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::sync::{RwLock, mpsc, Mutex};
-use async_trait::async_trait;
+use tokio::sync::{mpsc, Mutex, RwLock};
 
-use crate::assets::core::{
-    AssetRegistration, AssetType, AssetResult, AssetError,
-};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, AssetType};
 
 use super::{
-    PeerIdentity, NetworkTopology, NetworkPartition, DistributedAssetState,
-    AllocationDecision, ResourceSharingRequest, ResourceSharingOffer,
-    MultiNodeEvent, MultiNodeCoordinatorTrait, MultiNodeMetrics,
+    AllocationDecision, DistributedAssetState, MultiNodeCoordinatorTrait, MultiNodeEvent,
+    MultiNodeMetrics, NetworkPartition, NetworkTopology, PeerIdentity, ResourceSharingOffer,
+    ResourceSharingRequest,
 };
 
 /// Multi-node coordinator implementation
@@ -69,7 +67,7 @@ impl MultiNodeCoordinator {
             local_node: Arc::new(RwLock::new(PeerIdentity {
                 name: "local".to_string(),
                 id: [0u8; 32],
-                address: "::1".parse().unwrap(),
+                address: "::1".parse().expect("hardcoded IPv6 loopback is valid"),
                 pub_key: Vec::new(),
             })),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -121,7 +119,9 @@ impl MultiNodeCoordinator {
 
                 for (node_id, node_info) in nodes_write.iter_mut() {
                     if let Ok(elapsed) = now.duration_since(node_info.last_heartbeat) {
-                        if elapsed > config.failure_timeout && node_info.status != NodeStatus::Failed {
+                        if elapsed > config.failure_timeout
+                            && node_info.status != NodeStatus::Failed
+                        {
                             node_info.status = NodeStatus::Failed;
                             failed_nodes.push(node_id.clone());
                         }
@@ -163,7 +163,9 @@ impl MultiNodeCoordinator {
                 let mut partitions_write = partitions.write().await;
                 for partition in partitions_write.iter_mut() {
                     if !partition.healed {
-                        let nodes_connected = partition.nodes.iter()
+                        let nodes_connected = partition
+                            .nodes
+                            .iter()
                             .all(|node| active_nodes.contains(node));
                         if nodes_connected {
                             partition.healed = true;
@@ -202,7 +204,9 @@ impl MultiNodeCoordinator {
                     let mut suspicious_behaviors = 0;
                     for (_, state) in states_read.iter() {
                         if let Some(node_state) = state.node_states.get(node_id) {
-                            let consensus_state = state.node_states.values()
+                            let consensus_state = state
+                                .node_states
+                                .values()
                                 .filter(|s| **s != *node_state)
                                 .count();
                             if consensus_state > state.node_states.len() / 2 {
@@ -215,7 +219,8 @@ impl MultiNodeCoordinator {
                         suspicious_behaviors += 1;
                     }
 
-                    let suspicion_ratio = suspicious_behaviors as f32 / states_read.len().max(1) as f32;
+                    let suspicion_ratio =
+                        suspicious_behaviors as f32 / states_read.len().max(1) as f32;
                     if suspicion_ratio > config.byzantine_threshold {
                         byzantine_nodes.push(node_id.clone());
                     }
@@ -294,7 +299,8 @@ impl MultiNodeCoordinator {
                     node_loads.insert(node_id.clone(), combined_load);
                 }
 
-                let avg_load: f64 = node_loads.values().sum::<f64>() / node_loads.len().max(1) as f64;
+                let avg_load: f64 =
+                    node_loads.values().sum::<f64>() / node_loads.len().max(1) as f64;
                 let load_threshold = 0.2;
 
                 for (node_id, load) in &node_loads {
@@ -302,14 +308,16 @@ impl MultiNodeCoordinator {
                         tracing::info!(
                             "Node {} has imbalanced load: {:.2}% (avg: {:.2}%)",
                             hex::encode(&node_id.id[..8]),
-                            load * 100.0, avg_load * 100.0
+                            load * 100.0,
+                            avg_load * 100.0
                         );
 
                         for (asset_id, state) in states_read.iter() {
                             if state.primary_node == *node_id && *load > avg_load {
-                                if let Some((target_node, _)) = node_loads.iter()
+                                if let Some((target_node, _)) = node_loads
+                                    .iter()
                                     .filter(|(_, l)| **l < avg_load)
-                                    .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                                    .min_by(|a, b| a.1.partial_cmp(b.1).expect("load values should be valid for comparison"))
                                 {
                                     let _ = event_sender.send(MultiNodeEvent::MigrationStarted {
                                         asset_id: asset_id.clone(),
@@ -329,10 +337,11 @@ impl MultiNodeCoordinator {
     /// Select best node for asset allocation
     async fn select_allocation_node(&self, asset_type: AssetType) -> AssetResult<PeerIdentity> {
         let nodes = self.nodes.read().await;
-        let eligible_nodes: Vec<(&PeerIdentity, &NodeInfo)> = nodes.iter()
+        let eligible_nodes: Vec<(&PeerIdentity, &NodeInfo)> = nodes
+            .iter()
             .filter(|(_, info)| {
-                info.status == NodeStatus::Active &&
-                info.capabilities.supported_assets.contains(&asset_type)
+                info.status == NodeStatus::Active
+                    && info.capabilities.supported_assets.contains(&asset_type)
             })
             .collect();
 
@@ -342,11 +351,12 @@ impl MultiNodeCoordinator {
             });
         }
 
-        eligible_nodes.iter()
+        eligible_nodes
+            .iter()
             .max_by(|a, b| {
                 let score_a = self.calculate_node_score(a.1);
                 let score_b = self.calculate_node_score(b.1);
-                score_a.partial_cmp(&score_b).unwrap()
+                score_a.partial_cmp(&score_b).expect("node scores should be valid for comparison")
             })
             .map(|(id, _)| (*id).clone())
             .ok_or_else(|| AssetError::AllocationFailed {
@@ -356,17 +366,18 @@ impl MultiNodeCoordinator {
 
     /// Calculate node allocation score
     fn calculate_node_score(&self, node_info: &NodeInfo) -> f64 {
-        let cpu_availability = node_info.available_resources.cpu_cores as f64 /
-                             node_info.capabilities.cpu_cores as f64;
-        let mem_availability = node_info.available_resources.memory_bytes as f64 /
-                             node_info.capabilities.memory_bytes as f64;
+        let cpu_availability = node_info.available_resources.cpu_cores as f64
+            / node_info.capabilities.cpu_cores as f64;
+        let mem_availability = node_info.available_resources.memory_bytes as f64
+            / node_info.capabilities.memory_bytes as f64;
         let performance = node_info.performance_metrics.success_rate as f64;
-        let response_time = 1.0 / (1.0 + node_info.performance_metrics.avg_response_time_ms / 1000.0);
+        let response_time =
+            1.0 / (1.0 + node_info.performance_metrics.avg_response_time_ms / 1000.0);
 
-        let score = (cpu_availability * 0.3) +
-                   (mem_availability * 0.3) +
-                   (performance * 0.2) +
-                   (response_time * 0.2);
+        let score = (cpu_availability * 0.3)
+            + (mem_availability * 0.3)
+            + (performance * 0.2)
+            + (response_time * 0.2);
 
         score * 1.0_f64
     }
@@ -382,49 +393,62 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
 
     async fn join_network(&self) -> AssetResult<()> {
         let local_node = self.local_node.read().await.clone();
-        self.event_sender.send(MultiNodeEvent::NodeJoined {
-            node: local_node.clone(),
-            capabilities: NodeCapabilities {
-                cpu_cores: 8,
-                memory_bytes: 16 * 1024 * 1024 * 1024,
-                gpu_devices: 1,
-                storage_bytes: 1024 * 1024 * 1024 * 1024,
-                bandwidth_mbps: 1000,
-                supported_assets: vec![
-                    AssetType::Cpu, AssetType::Memory,
-                    AssetType::Gpu, AssetType::Storage,
-                ],
-                hardware_features: HardwareFeatures {
-                    sgx_enabled: false, sev_enabled: false,
-                    tpm_available: true, hw_rng: true,
-                    nvme_storage: true, rdma_capable: false,
-                    sriov_enabled: false,
+        self.event_sender
+            .send(MultiNodeEvent::NodeJoined {
+                node: local_node.clone(),
+                capabilities: NodeCapabilities {
+                    cpu_cores: 8,
+                    memory_bytes: 16 * 1024 * 1024 * 1024,
+                    gpu_devices: 1,
+                    storage_bytes: 1024 * 1024 * 1024 * 1024,
+                    bandwidth_mbps: 1000,
+                    supported_assets: vec![
+                        AssetType::Cpu,
+                        AssetType::Memory,
+                        AssetType::Gpu,
+                        AssetType::Storage,
+                    ],
+                    hardware_features: HardwareFeatures {
+                        sgx_enabled: false,
+                        sev_enabled: false,
+                        tpm_available: true,
+                        hw_rng: true,
+                        nvme_storage: true,
+                        rdma_capable: false,
+                        sriov_enabled: false,
+                    },
+                    software_capabilities: vec![
+                        "docker".to_string(),
+                        "kubernetes".to_string(),
+                        "hypermesh".to_string(),
+                    ],
                 },
-                software_capabilities: vec![
-                    "docker".to_string(), "kubernetes".to_string(),
-                    "hypermesh".to_string(),
-                ],
-            },
-        }).map_err(|_| AssetError::NetworkError {
-            message: "Failed to send join event".to_string(),
-        })?;
+            })
+            .map_err(|_| AssetError::NetworkError {
+                message: "Failed to send join event".to_string(),
+            })?;
         Ok(())
     }
 
     async fn leave_network(&self) -> AssetResult<()> {
         let local_node = self.local_node.read().await.clone();
-        self.event_sender.send(MultiNodeEvent::NodeLeft {
-            node: local_node, reason: "Graceful shutdown".to_string(),
-        }).map_err(|_| AssetError::NetworkError {
-            message: "Failed to send leave event".to_string(),
-        })?;
+        self.event_sender
+            .send(MultiNodeEvent::NodeLeft {
+                node: local_node,
+                reason: "Graceful shutdown".to_string(),
+            })
+            .map_err(|_| AssetError::NetworkError {
+                message: "Failed to send leave event".to_string(),
+            })?;
         Ok(())
     }
 
     async fn allocate_asset(&self, asset_id: AssetRegistration) -> AssetResult<AllocationDecision> {
-        let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
-            message: "AssetRegistration missing asset_type field".to_string(),
-        })?;
+        let asset_type = asset_id
+            .asset_type()
+            .ok_or_else(|| AssetError::AdapterError {
+                message: "AssetRegistration missing asset_type field".to_string(),
+            })?;
         let target_node = self.select_allocation_node(asset_type).await?;
         let decision = AllocationDecision {
             asset_id: asset_id.clone(),
@@ -434,42 +458,61 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
             participants: vec![target_node.clone()],
             signatures: Vec::new(),
         };
-        self.pending_allocations.write().await.insert(asset_id, decision.clone());
+        self.pending_allocations
+            .write()
+            .await
+            .insert(asset_id, decision.clone());
         Ok(decision)
     }
 
-    async fn migrate_asset(&self, asset_id: AssetRegistration, target_node: PeerIdentity) -> AssetResult<()> {
+    async fn migrate_asset(
+        &self,
+        asset_id: AssetRegistration,
+        target_node: PeerIdentity,
+    ) -> AssetResult<()> {
         let states = self.asset_states.read().await;
-        let current_state = states.get(&asset_id)
-            .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })?;
+        let current_state = states
+            .get(&asset_id)
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string(),
+            })?;
 
-        self.event_sender.send(MultiNodeEvent::MigrationStarted {
-            asset_id: asset_id.clone(),
-            from: current_state.primary_node.clone(),
-            to: target_node.clone(),
-        }).map_err(|_| AssetError::NetworkError {
-            message: "Failed to send migration event".to_string(),
-        })?;
+        self.event_sender
+            .send(MultiNodeEvent::MigrationStarted {
+                asset_id: asset_id.clone(),
+                from: current_state.primary_node.clone(),
+                to: target_node.clone(),
+            })
+            .map_err(|_| AssetError::NetworkError {
+                message: "Failed to send migration event".to_string(),
+            })?;
 
-        self.event_sender.send(MultiNodeEvent::MigrationCompleted {
-            asset_id, new_node: target_node,
-        }).map_err(|_| AssetError::NetworkError {
-            message: "Failed to send migration complete event".to_string(),
-        })?;
+        self.event_sender
+            .send(MultiNodeEvent::MigrationCompleted {
+                asset_id,
+                new_node: target_node,
+            })
+            .map_err(|_| AssetError::NetworkError {
+                message: "Failed to send migration complete event".to_string(),
+            })?;
         Ok(())
     }
 
     async fn handle_node_failure(&self, failed_node: PeerIdentity) -> AssetResult<()> {
         let states = self.asset_states.read().await;
-        let affected_assets: Vec<AssetRegistration> = states.iter()
+        let affected_assets: Vec<AssetRegistration> = states
+            .iter()
             .filter(|(_, state)| state.primary_node == failed_node)
             .map(|(id, _)| id.clone())
             .collect();
 
         for asset_id in affected_assets {
-            let asset_type = asset_id.asset_type().ok_or_else(|| AssetError::AdapterError {
-                message: "AssetRegistration missing asset_type field during migration".to_string(),
-            })?;
+            let asset_type = asset_id
+                .asset_type()
+                .ok_or_else(|| AssetError::AdapterError {
+                    message: "AssetRegistration missing asset_type field during migration"
+                        .to_string(),
+                })?;
             let new_node = self.select_allocation_node(asset_type).await?;
             self.migrate_asset(asset_id, new_node).await?;
         }
@@ -478,22 +521,34 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
 
     async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>> {
         let nodes = self.nodes.read().await;
-        Ok(nodes.iter()
+        Ok(nodes
+            .iter()
             .filter(|(_, info)| info.status == NodeStatus::Suspected)
             .map(|(id, _)| id.clone())
             .collect())
     }
 
-    async fn sync_asset_state(&self, asset_id: AssetRegistration) -> AssetResult<DistributedAssetState> {
+    async fn sync_asset_state(
+        &self,
+        asset_id: AssetRegistration,
+    ) -> AssetResult<DistributedAssetState> {
         let states = self.asset_states.read().await;
-        states.get(&asset_id).cloned()
-            .ok_or_else(|| AssetError::AssetNotFound { asset_id: asset_id.to_string() })
+        states
+            .get(&asset_id)
+            .cloned()
+            .ok_or_else(|| AssetError::AssetNotFound {
+                asset_id: asset_id.to_string(),
+            })
     }
 
-    async fn request_resources(&self, request: ResourceSharingRequest) -> AssetResult<Vec<ResourceSharingOffer>> {
+    async fn request_resources(
+        &self,
+        request: ResourceSharingRequest,
+    ) -> AssetResult<Vec<ResourceSharingOffer>> {
         self.sharing_requests.write().await.push(request.clone());
         let offers = self.sharing_offers.read().await;
-        Ok(offers.iter()
+        Ok(offers
+            .iter()
             .filter(|offer| offer.valid_until > SystemTime::now())
             .cloned()
             .collect())
@@ -509,7 +564,8 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
     }
 
     async fn handle_event(&self, event: MultiNodeEvent) -> AssetResult<()> {
-        self.event_sender.send(event)
+        self.event_sender
+            .send(event)
             .map_err(|_| AssetError::NetworkError {
                 message: "Failed to send event".to_string(),
             })?;

@@ -13,9 +13,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use tracing::{debug, warn};
 
+use super::ebpf::ExtensionValidator;
 use crate::protocol::pos_fast_validator::{FastValidationResult, PosFastValidator};
 use crate::protocol::pos_validator::PosToken;
-use super::ebpf::ExtensionValidator;
 
 /// STOQ_TOKEN extension type used in eBPF extension headers.
 ///
@@ -52,11 +52,7 @@ impl ExtensionValidator for StoqPosExtensionValidator {
     /// and runs the fast structural pre-check. Tokens that pass structural
     /// checks are allowed through; full crypto is deferred to the protocol
     /// layer based on privacy tier.
-    async fn validate(
-        &self,
-        extension_type: u16,
-        extension_data: &[u8],
-    ) -> Result<()> {
+    async fn validate(&self, extension_type: u16, extension_data: &[u8]) -> Result<()> {
         if extension_type != STOQ_POS_EXTENSION_TYPE {
             // Not our extension type; skip silently
             return Ok(());
@@ -67,7 +63,7 @@ impl ExtensionValidator for StoqPosExtensionValidator {
             Ok(t) => t,
             Err(e) => {
                 warn!("Failed to deserialize PoS token extension: {}", e);
-                anyhow::bail!("Invalid PoS token extension data: {}", e);
+                anyhow::bail!("Invalid PoS token extension data: {e}");
             }
         };
 
@@ -83,7 +79,7 @@ impl ExtensionValidator for StoqPosExtensionValidator {
             }
             FastValidationResult::Rejected(reason) => {
                 warn!("eBPF extension: PoS token rejected: {}", reason);
-                anyhow::bail!("PoS token rejected at line rate: {}", reason);
+                anyhow::bail!("PoS token rejected at line rate: {reason}");
             }
         }
     }
@@ -104,7 +100,7 @@ mod tests {
     use super::*;
     use crate::protocol::pos_fast_validator::FastValidationConfig;
     use crate::protocol::pos_validator::{
-        PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfWork, ProofOfTime,
+        PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
     };
     use std::time::{Duration, SystemTime};
 
@@ -139,10 +135,7 @@ mod tests {
 
     fn make_ext_validator() -> StoqPosExtensionValidator {
         let full = Arc::new(PosTokenValidator::new(Duration::from_secs(300)));
-        let fast = Arc::new(PosFastValidator::new(
-            FastValidationConfig::default(),
-            full,
-        ));
+        let fast = Arc::new(PosFastValidator::new(FastValidationConfig::default(), full));
         StoqPosExtensionValidator::new(fast)
     }
 
@@ -153,7 +146,10 @@ mod tests {
         let data = bincode::serialize(&token).expect("test: serialize token");
 
         let result = v.validate(STOQ_POS_EXTENSION_TYPE, &data).await;
-        assert!(result.is_ok(), "Valid token should pass extension validation");
+        assert!(
+            result.is_ok(),
+            "Valid token should pass extension validation"
+        );
     }
 
     #[tokio::test]

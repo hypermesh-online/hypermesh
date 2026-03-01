@@ -23,7 +23,12 @@ items = [
 
 [features.in_development]
 items = [
-    "BlockMatrix/TrustChain migration to canonical asset types",
+    "Replace trustchain SpaceProof/StakeProof/WorkProof/TimeProof with lib canonical types",
+    "Replace trustchain NodeId/AssetId structs with lib newtypes",
+    "Remove AssetType::VirtualMachine and AssetType::Library from blockmatrix",
+    "Add Dns variant to blockmatrix BaseSystemType",
+    "Consolidate AssetMetadata duplicates across crates",
+    "Resolve PacketId type conflict (lib [u8;32] vs blockmatrix Uuid)",
 ]
 
 [features.planned]

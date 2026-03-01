@@ -10,10 +10,10 @@
 //! - Device capability estimation
 //! - Serial number reading from sysfs
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::assets::core::{StorageType, AssetRegistration};
+use crate::assets::core::{AssetRegistration, StorageType};
 use crate::os_integration::{create_os_abstraction, StorageType as OsStorageType};
 
 /// Storage device information
@@ -119,7 +119,8 @@ pub async fn detect_storage_configuration() -> (u64, HashMap<String, StorageDevi
                         };
 
                         // Estimate device capabilities based on storage type
-                        let (max_iops, max_throughput_mbps) = estimate_device_capabilities(&storage_type);
+                        let (max_iops, max_throughput_mbps) =
+                            estimate_device_capabilities(&storage_type);
 
                         // Try to read serial number from sysfs
                         let serial_number = read_device_serial(&device_id);
@@ -127,20 +128,26 @@ pub async fn detect_storage_configuration() -> (u64, HashMap<String, StorageDevi
                         // Try to read SMART data
                         let smart_data = read_smart_data(&device_id);
 
-                        storage_devices.insert(device_id.clone(), StorageDevice {
-                            device_id: device_id.clone(),
-                            device_name: format!("{} ({})", storage_info.mount_point, storage_info.filesystem),
-                            storage_type,
-                            total_capacity_bytes: storage_info.total_bytes,
-                            available_capacity_bytes: storage_info.available_bytes,
-                            max_iops,
-                            max_throughput_mbps,
-                            serial_number,
-                            status: StorageStatus::Available,
-                            allocated_to: None,
-                            health_metrics: calculate_health_metrics(&smart_data),
-                            smart_data,
-                        });
+                        storage_devices.insert(
+                            device_id.clone(),
+                            StorageDevice {
+                                device_id: device_id.clone(),
+                                device_name: format!(
+                                    "{} ({})",
+                                    storage_info.mount_point, storage_info.filesystem
+                                ),
+                                storage_type,
+                                total_capacity_bytes: storage_info.total_bytes,
+                                available_capacity_bytes: storage_info.available_bytes,
+                                max_iops,
+                                max_throughput_mbps,
+                                serial_number,
+                                status: StorageStatus::Available,
+                                allocated_to: None,
+                                health_metrics: calculate_health_metrics(&smart_data),
+                                smart_data,
+                            },
+                        );
 
                         total_capacity += storage_info.total_bytes;
                     }
@@ -175,66 +182,72 @@ fn create_fallback_storage_configuration() -> (u64, HashMap<String, StorageDevic
 
     // Simulate NVMe device
     let nvme_capacity = 1024 * 1024 * 1024 * 1024; // 1TB
-    storage_devices.insert("/dev/nvme0n1".to_string(), StorageDevice {
-        device_id: "/dev/nvme0n1".to_string(),
-        device_name: "Samsung SSD 980 PRO 1TB".to_string(),
-        storage_type: StorageType::Nvme,
-        total_capacity_bytes: nvme_capacity,
-        available_capacity_bytes: nvme_capacity,
-        max_iops: 1000000,
-        max_throughput_mbps: 7000,
-        serial_number: "S5GXNX0T000001".to_string(),
-        status: StorageStatus::Available,
-        allocated_to: None,
-        health_metrics: StorageHealthMetrics {
-            temperature_celsius: Some(45.0),
-            power_on_hours: 1200,
-            cycle_count: 15000,
-            error_count: 0,
-            wear_level: Some(95),
-            health_percentage: 98,
+    storage_devices.insert(
+        "/dev/nvme0n1".to_string(),
+        StorageDevice {
+            device_id: "/dev/nvme0n1".to_string(),
+            device_name: "Samsung SSD 980 PRO 1TB".to_string(),
+            storage_type: StorageType::Nvme,
+            total_capacity_bytes: nvme_capacity,
+            available_capacity_bytes: nvme_capacity,
+            max_iops: 1000000,
+            max_throughput_mbps: 7000,
+            serial_number: "S5GXNX0T000001".to_string(),
+            status: StorageStatus::Available,
+            allocated_to: None,
+            health_metrics: StorageHealthMetrics {
+                temperature_celsius: Some(45.0),
+                power_on_hours: 1200,
+                cycle_count: 15000,
+                error_count: 0,
+                wear_level: Some(95),
+                health_percentage: 98,
+            },
+            smart_data: Some(SmartData {
+                read_error_rate: 0,
+                spin_up_time: None,
+                reallocated_sectors: 0,
+                power_cycle_count: 150,
+                runtime_bad_blocks: 0,
+                program_erase_count: Some(15000),
+            }),
         },
-        smart_data: Some(SmartData {
-            read_error_rate: 0,
-            spin_up_time: None,
-            reallocated_sectors: 0,
-            power_cycle_count: 150,
-            runtime_bad_blocks: 0,
-            program_erase_count: Some(15000),
-        }),
-    });
+    );
     total_capacity += nvme_capacity;
 
     // Simulate SSD device
     let ssd_capacity = 2 * 1024 * 1024 * 1024 * 1024; // 2TB
-    storage_devices.insert("/dev/sda".to_string(), StorageDevice {
-        device_id: "/dev/sda".to_string(),
-        device_name: "Crucial MX4 2TB".to_string(),
-        storage_type: StorageType::Ssd,
-        total_capacity_bytes: ssd_capacity,
-        available_capacity_bytes: ssd_capacity,
-        max_iops: 95000,
-        max_throughput_mbps: 560,
-        serial_number: "CT2000MX500SSD1".to_string(),
-        status: StorageStatus::Available,
-        allocated_to: None,
-        health_metrics: StorageHealthMetrics {
-            temperature_celsius: Some(40.0),
-            power_on_hours: 2500,
-            cycle_count: 25000,
-            error_count: 0,
-            wear_level: Some(90),
-            health_percentage: 95,
+    storage_devices.insert(
+        "/dev/sda".to_string(),
+        StorageDevice {
+            device_id: "/dev/sda".to_string(),
+            device_name: "Crucial MX4 2TB".to_string(),
+            storage_type: StorageType::Ssd,
+            total_capacity_bytes: ssd_capacity,
+            available_capacity_bytes: ssd_capacity,
+            max_iops: 95000,
+            max_throughput_mbps: 560,
+            serial_number: "CT2000MX500SSD1".to_string(),
+            status: StorageStatus::Available,
+            allocated_to: None,
+            health_metrics: StorageHealthMetrics {
+                temperature_celsius: Some(40.0),
+                power_on_hours: 2500,
+                cycle_count: 25000,
+                error_count: 0,
+                wear_level: Some(90),
+                health_percentage: 95,
+            },
+            smart_data: Some(SmartData {
+                read_error_rate: 0,
+                spin_up_time: None,
+                reallocated_sectors: 0,
+                power_cycle_count: 200,
+                runtime_bad_blocks: 0,
+                program_erase_count: Some(25000),
+            }),
         },
-        smart_data: Some(SmartData {
-            read_error_rate: 0,
-            spin_up_time: None,
-            reallocated_sectors: 0,
-            power_cycle_count: 200,
-            runtime_bad_blocks: 0,
-            program_erase_count: Some(25000),
-        }),
-    });
+    );
     total_capacity += ssd_capacity;
 
     (total_capacity, storage_devices)
@@ -243,10 +256,10 @@ fn create_fallback_storage_configuration() -> (u64, HashMap<String, StorageDevic
 /// Estimate device capabilities based on storage type
 pub fn estimate_device_capabilities(storage_type: &StorageType) -> (u32, u32) {
     match storage_type {
-        StorageType::Nvme => (1000000, 7000),     // NVMe: ~1M IOPS, ~7GB/s
-        StorageType::Ssd => (95000, 560),         // SATA SSD: ~95K IOPS, ~560MB/s
-        StorageType::Hdd => (200, 200),           // HDD: ~200 IOPS, ~200MB/s
-        StorageType::Network => (50000, 1000),    // Network storage varies
+        StorageType::Nvme => (1000000, 7000),  // NVMe: ~1M IOPS, ~7GB/s
+        StorageType::Ssd => (95000, 560),      // SATA SSD: ~95K IOPS, ~560MB/s
+        StorageType::Hdd => (200, 200),        // HDD: ~200 IOPS, ~200MB/s
+        StorageType::Network => (50000, 1000), // Network storage varies
         StorageType::Memory => (10000000, 50000), // RAM disk: very high
         StorageType::Distributed => (50000, 1000), // Distributed: network-like
     }
@@ -314,7 +327,7 @@ pub fn read_smart_data(device_id: &str) -> Option<SmartData> {
 
         // Fallback: try reading from sysfs (limited data)
         let dev_name = device_id.trim_start_matches("/dev/");
-        let hwmon_path = format!("/sys/block/{}/device/hwmon", dev_name);
+        let hwmon_path = format!("/sys/block/{dev_name}/device/hwmon");
 
         if std::path::Path::new(&hwmon_path).exists() {
             // Some basic health info may be available
@@ -350,19 +363,23 @@ fn parse_smart_data(smartctl_output: &str) -> Option<SmartData> {
         if parts.len() >= 10 {
             match parts.get(1) {
                 Some(&"Raw_Read_Error_Rate") => {
-                    smart_data.read_error_rate = parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    smart_data.read_error_rate =
+                        parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
                 }
                 Some(&"Spin_Up_Time") => {
                     smart_data.spin_up_time = parts.get(9).and_then(|s| s.parse().ok());
                 }
                 Some(&"Reallocated_Sector_Ct") => {
-                    smart_data.reallocated_sectors = parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    smart_data.reallocated_sectors =
+                        parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
                 }
                 Some(&"Power_Cycle_Count") => {
-                    smart_data.power_cycle_count = parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    smart_data.power_cycle_count =
+                        parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
                 }
                 Some(&"Runtime_Bad_Block") => {
-                    smart_data.runtime_bad_blocks = parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
+                    smart_data.runtime_bad_blocks =
+                        parts.get(9).and_then(|s| s.parse().ok()).unwrap_or(0);
                 }
                 Some(&"Wear_Leveling_Count") | Some(&"Total_LBAs_Written") => {
                     smart_data.program_erase_count = parts.get(9).and_then(|s| s.parse().ok());
@@ -403,7 +420,7 @@ pub fn calculate_health_metrics(smart_data: &Option<SmartData>) -> StorageHealth
 
         StorageHealthMetrics {
             temperature_celsius: None, // Would need separate sensor reading
-            power_on_hours: 0, // Would need to parse from SMART
+            power_on_hours: 0,         // Would need to parse from SMART
             cycle_count: 0,
             error_count: smart.read_error_rate,
             wear_level: smart.program_erase_count.map(|pe| {
@@ -446,19 +463,23 @@ pub fn get_io_stats(devices: &[String]) -> (u32, u32, f32, f32) {
                         if let Some(device_name) = parts.get(2) {
                             if device_name == &dev_name {
                                 // Field 3: reads completed
-                                if let Some(val) = parts.get(3).and_then(|s| s.parse::<u64>().ok()) {
+                                if let Some(val) = parts.get(3).and_then(|s| s.parse::<u64>().ok())
+                                {
                                     total_read_ops += val;
                                 }
                                 // Field 5: sectors read
-                                if let Some(val) = parts.get(5).and_then(|s| s.parse::<u64>().ok()) {
+                                if let Some(val) = parts.get(5).and_then(|s| s.parse::<u64>().ok())
+                                {
                                     total_read_sectors += val;
                                 }
                                 // Field 7: writes completed
-                                if let Some(val) = parts.get(7).and_then(|s| s.parse::<u64>().ok()) {
+                                if let Some(val) = parts.get(7).and_then(|s| s.parse::<u64>().ok())
+                                {
                                     total_write_ops += val;
                                 }
                                 // Field 9: sectors written
-                                if let Some(val) = parts.get(9).and_then(|s| s.parse::<u64>().ok()) {
+                                if let Some(val) = parts.get(9).and_then(|s| s.parse::<u64>().ok())
+                                {
                                     total_write_sectors += val;
                                 }
                             }

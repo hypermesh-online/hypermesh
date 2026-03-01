@@ -26,16 +26,16 @@
 //! - `validation` - PoS and asset hash validators
 //! - `metrics` - Unified intelligence + transport metrics
 
-pub mod capabilities;
-pub mod xdp;
 pub mod af_xdp;
-pub mod queue_balancer;
-pub mod loader;
+pub mod capabilities;
 pub mod hooks;
-pub mod policy_maps;
 pub mod hypermesh_headers;
-pub mod validation;
+pub mod loader;
 pub mod metrics;
+pub mod policy_maps;
+pub mod queue_balancer;
+pub mod validation;
+pub mod xdp;
 
 /// Re-export aya when kernel-attach is enabled, allowing downstream crates
 /// to use the same aya version for BPF operations.
@@ -43,48 +43,44 @@ pub mod metrics;
 pub use aya;
 
 // Re-export key types for convenience
+pub use af_xdp::{AfXdpManager, AfXdpSocket, AfXdpStats, RingConfig, UmemConfig};
 pub use capabilities::{EbpfCapabilities, NicCapabilities};
-pub use xdp::{XdpManager, PacketDecision, FilterAction, XdpAttachMode, XdpStats, XdpFilterConfig, OffloadPolicy, KernelPosConfig};
-pub use af_xdp::{AfXdpManager, AfXdpSocket, AfXdpStats, UmemConfig, RingConfig};
-pub use queue_balancer::{
-    QueueBalancer, PacketHint, QueueMetrics, MultiQueueManager,
-    RoundRobinBalancer, LeastLoadedBalancer, FlowHashBalancer,
+pub use hooks::{
+    CertificateValidator, ExtensionValidator, PacketValidator, PassThroughValidator,
+    ValidationHooks,
+};
+pub use hypermesh_headers::{
+    AssetHashHeader, MatrixCoordinate, MatrixRoutingHeader, PrivacyTierHeader, ProofOfStateHeader,
+    EXT_ASSET_HASH, EXT_MATRIX_ROUTING, EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE,
 };
 pub use loader::{EbpfLoader, ProgramType};
-pub use hooks::{
-    CertificateValidator, PacketValidator, ExtensionValidator,
-    ValidationHooks, PassThroughValidator,
-};
-pub use policy_maps::{ValidationPolicy, PolicyManager};
-pub use hypermesh_headers::{
-    ProofOfStateHeader,
-    AssetHashHeader,
-    MatrixRoutingHeader,
-    PrivacyTierHeader,
-    MatrixCoordinate,
-    EXT_PROOF_OF_STATE,
-    EXT_ASSET_HASH,
-    EXT_MATRIX_ROUTING,
-    EXT_PRIVACY_TIER,
+pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
+pub use policy_maps::{PolicyManager, ValidationPolicy};
+pub use queue_balancer::{
+    FlowHashBalancer, LeastLoadedBalancer, MultiQueueManager, PacketHint, QueueBalancer,
+    QueueMetrics, RoundRobinBalancer,
 };
 pub use validation::{
-    ProofOfStateValidator, AssetHashValidator, FastValidationResult,
-    ALG_FALCON_1024, ALG_ED25519, ALG_ECDSA,
+    AssetHashValidator, FastValidationResult, ProofOfStateValidator, ALG_ECDSA, ALG_ED25519,
+    ALG_FALCON_1024,
 };
-pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
+pub use xdp::{
+    FilterAction, KernelPosConfig, OffloadPolicy, PacketDecision, XdpAttachMode, XdpFilterConfig,
+    XdpManager, XdpStats,
+};
 
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use parking_lot::RwLock;
 
-use hypermesh_lib::{NetworkId, MatrixPosition, ContentHash, PrivacyMode};
+use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, PrivacyMode};
 
 // -----------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------
 
 /// Configuration for the HyperMesh eBPF subsystem
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct EbpfConfig {
     /// XDP filter configuration
     pub xdp_config: XdpFilterConfig,
@@ -92,16 +88,6 @@ pub struct EbpfConfig {
     pub umem_config: UmemConfig,
     /// Ring buffer configuration for AF_XDP sockets
     pub ring_config: RingConfig,
-}
-
-impl Default for EbpfConfig {
-    fn default() -> Self {
-        Self {
-            xdp_config: XdpFilterConfig::default(),
-            umem_config: UmemConfig::default(),
-            ring_config: RingConfig::default(),
-        }
-    }
 }
 
 // -----------------------------------------------------------------------
@@ -198,16 +184,12 @@ impl HyperMeshEbpf {
     /// Create a new HyperMesh eBPF orchestrator with default configuration
     pub fn new(config: EbpfConfig) -> Result<Self, EbpfError> {
         let caps = EbpfCapabilities::detect();
-        let policy_manager = PolicyManager::new()
-            .map_err(|e| EbpfError::Policy(e.to_string()))?;
+        let policy_manager = PolicyManager::new().map_err(|e| EbpfError::Policy(e.to_string()))?;
 
-        let af_xdp_manager = AfXdpManager::with_config(
-            config.umem_config,
-            config.ring_config,
-        ).map_err(|e| EbpfError::AfXdp(e.to_string()))?;
+        let af_xdp_manager = AfXdpManager::with_config(config.umem_config, config.ring_config)
+            .map_err(|e| EbpfError::AfXdp(e.to_string()))?;
 
-        let metrics_collector = HyperMeshMetricsCollector::new()
-            .map_err(|e| EbpfError::Other(e))?;
+        let metrics_collector = HyperMeshMetricsCollector::new().map_err(EbpfError::Other)?;
 
         let loader = EbpfLoader::new();
 
@@ -255,26 +237,25 @@ impl HyperMeshEbpf {
 
     /// Set privacy tier policy for a network
     #[allow(unused_variables)]
-    pub fn set_privacy_tier(
-        &self,
-        network: NetworkId,
-        tier: PrivacyMode,
-    ) -> Result<(), EbpfError> {
+    pub fn set_privacy_tier(&self, network: NetworkId, tier: PrivacyMode) -> Result<(), EbpfError> {
         let ebpf_tier = tier.to_ebpf_u8();
         let policy = ValidationPolicy::for_privacy_tier(ebpf_tier);
 
         // Use first 8 bytes of NetworkId as connection key
         let net_bytes = &network.0;
         let key = u64::from_le_bytes([
-            net_bytes[0], net_bytes[1], net_bytes[2], net_bytes[3],
-            net_bytes[4], net_bytes[5], net_bytes[6], net_bytes[7],
+            net_bytes[0],
+            net_bytes[1],
+            net_bytes[2],
+            net_bytes[3],
+            net_bytes[4],
+            net_bytes[5],
+            net_bytes[6],
+            net_bytes[7],
         ]);
 
         self.policy_manager.set_policy(key, policy);
-        tracing::debug!(
-            "Privacy tier set for network: ebpf_u8={}",
-            ebpf_tier
-        );
+        tracing::debug!("Privacy tier set for network: ebpf_u8={}", ebpf_tier);
         Ok(())
     }
 
@@ -294,8 +275,12 @@ impl HyperMeshEbpf {
 
         tracing::debug!(
             "Routing rule set: dest=({},{},{}) -> next_hop=({},{},{})",
-            dest.x, dest.y, dest.z,
-            next_hop.x, next_hop.y, next_hop.z
+            dest.x,
+            dest.y,
+            dest.z,
+            next_hop.x,
+            next_hop.y,
+            next_hop.z
         );
 
         // When kernel-attach is enabled, also prepare the BPF map update
@@ -303,7 +288,9 @@ impl HyperMeshEbpf {
         {
             tracing::debug!(
                 "Routing rule for ({},{},{}) prepared for BPF forwarding map sync",
-                dest.x, dest.y, dest.z
+                dest.x,
+                dest.y,
+                dest.z
             );
             // BPF map key: MatrixPositionKey as 3x i64 LE bytes (24 bytes)
             // BPF map value: next_hop MatrixPosition as 3x f64 LE bytes (24 bytes)
@@ -353,17 +340,10 @@ impl HyperMeshEbpf {
     /// current value of `bpf_ktime_get_ns()` (kernel monotonic clock),
     /// which the XDP program uses for TTL enforcement when
     /// `pos_config_map.validation_ttl_ns > 0`.
-    pub fn set_pos_validation(
-        &self,
-        hash: ContentHash,
-        valid: bool,
-    ) -> Result<(), EbpfError> {
+    pub fn set_pos_validation(&self, hash: ContentHash, valid: bool) -> Result<(), EbpfError> {
         self.pos_validations.write().insert(hash.0, valid);
 
-        tracing::debug!(
-            "PoS validation status set: valid={}",
-            valid
-        );
+        tracing::debug!("PoS validation status set: valid={}", valid);
 
         #[cfg(feature = "kernel-attach")]
         {
@@ -391,10 +371,7 @@ impl HyperMeshEbpf {
     ///
     /// Delegates to `XdpManager::set_kernel_pos_config()` when the XDP
     /// manager is attached.  Returns Ok if no XDP manager is present.
-    pub fn set_kernel_pos_config(
-        &mut self,
-        config: &KernelPosConfig,
-    ) -> Result<(), EbpfError> {
+    pub fn set_kernel_pos_config(&mut self, config: &KernelPosConfig) -> Result<(), EbpfError> {
         if let Some(ref mut xdp) = self.xdp_manager {
             xdp.set_kernel_pos_config(config)
                 .map_err(|e| EbpfError::Xdp(e.to_string()))?;
@@ -447,10 +424,7 @@ impl HyperMeshEbpf {
     // -------------------------------------------------------------------
 
     /// Attach XDP program to a network interface
-    pub fn attach_xdp(
-        &mut self,
-        interface: &str,
-    ) -> Result<(), EbpfError> {
+    pub fn attach_xdp(&mut self, interface: &str) -> Result<(), EbpfError> {
         let mut xdp = XdpManager::new(self.policy_manager.clone())
             .map_err(|e| EbpfError::Xdp(e.to_string()))?;
         xdp.attach(interface)
@@ -491,13 +465,8 @@ impl HyperMeshEbpf {
         queue_count: u32,
         balancer: Box<dyn QueueBalancer>,
     ) -> Result<MultiQueueManager, EbpfError> {
-        MultiQueueManager::new(
-            &mut self.af_xdp_manager,
-            balancer,
-            interface,
-            queue_count,
-        )
-        .map_err(|e| EbpfError::AfXdp(e.to_string()))
+        MultiQueueManager::new(&mut self.af_xdp_manager, balancer, interface, queue_count)
+            .map_err(|e| EbpfError::AfXdp(e.to_string()))
     }
 
     // -------------------------------------------------------------------
@@ -591,8 +560,7 @@ impl HyperMeshEbpf {
 
 impl Default for HyperMeshEbpf {
     fn default() -> Self {
-        Self::new(EbpfConfig::default())
-            .expect("ebpf: failed to create default HyperMeshEbpf")
+        Self::new(EbpfConfig::default()).expect("ebpf: failed to create default HyperMeshEbpf")
     }
 }
 
@@ -716,8 +684,16 @@ mod tests {
     #[test]
     fn test_set_routing_rule() {
         let ebpf = HyperMeshEbpf::default();
-        let dest = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
-        let next_hop = MatrixPosition { x: 4.0, y: 5.0, z: 6.0 };
+        let dest = MatrixPosition {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+        let next_hop = MatrixPosition {
+            x: 4.0,
+            y: 5.0,
+            z: 6.0,
+        };
         let result = ebpf.set_routing_rule(dest, next_hop);
         assert!(result.is_ok());
     }
@@ -729,7 +705,11 @@ mod tests {
         let metadata = ShardMetadata {
             shard_index: 0,
             shard_count: 10,
-            position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+            position: MatrixPosition {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
         };
         let result = ebpf.register_asset_hash(hash, metadata);
         assert!(result.is_ok());
@@ -742,8 +722,16 @@ mod tests {
     #[test]
     fn test_routing_rule_stores_and_retrieves() {
         let ebpf = HyperMeshEbpf::default();
-        let dest = MatrixPosition { x: 10.0, y: 20.0, z: 30.0 };
-        let next_hop = MatrixPosition { x: 11.0, y: 21.0, z: 31.0 };
+        let dest = MatrixPosition {
+            x: 10.0,
+            y: 20.0,
+            z: 30.0,
+        };
+        let next_hop = MatrixPosition {
+            x: 11.0,
+            y: 21.0,
+            z: 31.0,
+        };
 
         assert_eq!(ebpf.routing_rule_count(), 0);
 
@@ -761,22 +749,42 @@ mod tests {
         assert_eq!(hop.z, 31.0);
 
         // Non-existent destination returns None
-        let missing = MatrixPosition { x: 99.0, y: 99.0, z: 99.0 };
+        let missing = MatrixPosition {
+            x: 99.0,
+            y: 99.0,
+            z: 99.0,
+        };
         assert!(ebpf.get_routing_rule(&missing).is_none());
     }
 
     #[test]
     fn test_routing_rule_overwrites() {
         let ebpf = HyperMeshEbpf::default();
-        let dest = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
-        let hop_a = MatrixPosition { x: 4.0, y: 5.0, z: 6.0 };
-        let hop_b = MatrixPosition { x: 7.0, y: 8.0, z: 9.0 };
+        let dest = MatrixPosition {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+        let hop_a = MatrixPosition {
+            x: 4.0,
+            y: 5.0,
+            z: 6.0,
+        };
+        let hop_b = MatrixPosition {
+            x: 7.0,
+            y: 8.0,
+            z: 9.0,
+        };
 
-        ebpf.set_routing_rule(dest, hop_a).expect("test: set first rule");
-        ebpf.set_routing_rule(dest, hop_b).expect("test: set second rule");
+        ebpf.set_routing_rule(dest, hop_a)
+            .expect("test: set first rule");
+        ebpf.set_routing_rule(dest, hop_b)
+            .expect("test: set second rule");
 
         assert_eq!(ebpf.routing_rule_count(), 1);
-        let hop = ebpf.get_routing_rule(&dest).expect("test: get overwritten rule");
+        let hop = ebpf
+            .get_routing_rule(&dest)
+            .expect("test: get overwritten rule");
         assert_eq!(hop.x, 7.0);
     }
 
@@ -787,7 +795,11 @@ mod tests {
         let metadata = ShardMetadata {
             shard_index: 3,
             shard_count: 14,
-            position: MatrixPosition { x: 5.0, y: 6.0, z: 7.0 },
+            position: MatrixPosition {
+                x: 5.0,
+                y: 6.0,
+                z: 7.0,
+            },
         };
 
         assert_eq!(ebpf.asset_hash_count(), 0);
@@ -838,11 +850,13 @@ mod tests {
         let ebpf = HyperMeshEbpf::default();
         let hash = ContentHash::from_bytes([0x10u8; 32]);
 
-        ebpf.set_pos_validation(hash, true).expect("test: set valid");
+        ebpf.set_pos_validation(hash, true)
+            .expect("test: set valid");
         assert_eq!(ebpf.get_pos_validation(&hash), Some(true));
 
         // Overwrite with false
-        ebpf.set_pos_validation(hash, false).expect("test: set invalid");
+        ebpf.set_pos_validation(hash, false)
+            .expect("test: set invalid");
         assert_eq!(ebpf.get_pos_validation(&hash), Some(false));
         assert_eq!(ebpf.pos_validation_count(), 1);
     }

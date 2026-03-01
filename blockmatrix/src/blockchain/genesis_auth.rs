@@ -11,8 +11,11 @@
 //! - Matrix coordinate integration
 //! - Self-authentication without external CA
 
-use anyhow::{Result, anyhow};
-use argon2::{Argon2, password_hash::{PasswordHasher, SaltString, PasswordHash, PasswordVerifier}};
+use anyhow::{anyhow, Result};
+use argon2::{
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+    Argon2,
+};
 use blake3::Hasher;
 use chacha20poly1305::{
     aead::{Aead, KeyInit, OsRng},
@@ -21,7 +24,7 @@ use chacha20poly1305::{
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 
@@ -76,9 +79,7 @@ pub struct GenesisAuthManager {
 impl GenesisAuthManager {
     /// Create new authentication manager
     pub fn new() -> Self {
-        Self {
-            credentials: None,
-        }
+        Self { credentials: None }
     }
 
     /// Initialize genesis authentication with user credentials
@@ -131,13 +132,13 @@ impl GenesisAuthManager {
         let argon2 = Argon2::default();
         let password_hash = argon2
             .hash_password(passphrase.as_bytes(), &salt)
-            .map_err(|e| anyhow!("Password hashing failed: {}", e))?
+            .map_err(|e| anyhow!("Password hashing failed: {e}"))?
             .to_string();
 
         let nonce = rand::thread_rng().gen::<[u8; 12]>();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| anyhow!("System time error: {}", e))?
+            .map_err(|e| anyhow!("System time error: {e}"))?
             .as_secs();
 
         self.credentials = Some(GenesisCredentials {
@@ -156,10 +157,7 @@ impl GenesisAuthManager {
 
         info!(
             "Genesis authentication initialized for {} at matrix ({}, {}, {})",
-            user_id,
-            node_coordinate.x,
-            node_coordinate.y,
-            node_coordinate.z
+            user_id, node_coordinate.x, node_coordinate.y, node_coordinate.z
         );
 
         Ok((totp_secret_base32, recovery_codes))
@@ -173,12 +171,10 @@ impl GenesisAuthManager {
     ///
     /// # Returns
     /// Decrypted private key if authentication successful
-    pub fn authenticate(
-        &mut self,
-        passphrase: &str,
-        totp_code: &str,
-    ) -> Result<Vec<u8>> {
-        let creds = self.credentials.as_mut()
+    pub fn authenticate(&mut self, passphrase: &str, totp_code: &str) -> Result<Vec<u8>> {
+        let creds = self
+            .credentials
+            .as_mut()
             .ok_or_else(|| anyhow!("Genesis authentication not initialized"))?;
 
         debug!("Authenticating user: {}", creds.user_id);
@@ -190,12 +186,18 @@ impl GenesisAuthManager {
 
         // Verify passphrase
         let parsed_hash = PasswordHash::new(&creds.password_hash)
-            .map_err(|e| anyhow!("Invalid password hash: {}", e))?;
+            .map_err(|e| anyhow!("Invalid password hash: {e}"))?;
 
         let argon2 = Argon2::default();
-        if argon2.verify_password(passphrase.as_bytes(), &parsed_hash).is_err() {
+        if argon2
+            .verify_password(passphrase.as_bytes(), &parsed_hash)
+            .is_err()
+        {
             creds.failed_attempts += 1;
-            warn!("Invalid passphrase for user: {} (attempt {})", creds.user_id, creds.failed_attempts);
+            warn!(
+                "Invalid passphrase for user: {} (attempt {})",
+                creds.user_id, creds.failed_attempts
+            );
             return Err(anyhow!("Authentication failed: invalid credentials"));
         }
 
@@ -211,10 +213,15 @@ impl GenesisAuthManager {
 
         // Verify TOTP code
         if !self.verify_totp(&totp_secret_base32, totp_code)? {
-            let creds = self.credentials.as_mut()
+            let creds = self
+                .credentials
+                .as_mut()
                 .ok_or_else(|| anyhow!("No credentials configured"))?;
             creds.failed_attempts += 1;
-            warn!("Invalid TOTP code for user: {} (attempt {})", creds.user_id, creds.failed_attempts);
+            warn!(
+                "Invalid TOTP code for user: {} (attempt {})",
+                creds.user_id, creds.failed_attempts
+            );
             return Err(anyhow!("Authentication failed: invalid TOTP code"));
         }
 
@@ -225,14 +232,16 @@ impl GenesisAuthManager {
         let private_key = self.decrypt_data(&encrypted_private_key, &auth_key)?;
 
         // Reset failed attempts and update last auth
-        let creds = self.credentials.as_mut()
+        let creds = self
+            .credentials
+            .as_mut()
             .ok_or_else(|| anyhow!("No credentials configured"))?;
         creds.failed_attempts = 0;
         creds.last_auth = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .map_err(|e| anyhow!("System time error: {}", e))?
-                .as_secs()
+                .map_err(|e| anyhow!("System time error: {e}"))?
+                .as_secs(),
         );
         let user_id = creds.user_id.clone();
 
@@ -248,25 +257,26 @@ impl GenesisAuthManager {
     ///
     /// # Returns
     /// New TOTP secret (user must save this)
-    pub fn recover_with_code(
-        &mut self,
-        passphrase: &str,
-        recovery_code: &str,
-    ) -> Result<String> {
+    pub fn recover_with_code(&mut self, passphrase: &str, recovery_code: &str) -> Result<String> {
         // Hash recovery code before taking mutable borrow
         let code_hash = self.hash_recovery_code(recovery_code);
 
-        let creds = self.credentials.as_mut()
+        let creds = self
+            .credentials
+            .as_mut()
             .ok_or_else(|| anyhow!("Genesis authentication not initialized"))?;
 
         info!("Recovery attempt for user: {}", creds.user_id);
 
         // Verify passphrase
         let parsed_hash = PasswordHash::new(&creds.password_hash)
-            .map_err(|e| anyhow!("Invalid password hash: {}", e))?;
+            .map_err(|e| anyhow!("Invalid password hash: {e}"))?;
 
         let argon2 = Argon2::default();
-        if argon2.verify_password(passphrase.as_bytes(), &parsed_hash).is_err() {
+        if argon2
+            .verify_password(passphrase.as_bytes(), &parsed_hash)
+            .is_err()
+        {
             return Err(anyhow!("Recovery failed: invalid passphrase"));
         }
 
@@ -296,7 +306,9 @@ impl GenesisAuthManager {
         // This implementation updates only the TOTP secret (safe approach).
 
         // Update credentials
-        let creds = self.credentials.as_mut()
+        let creds = self
+            .credentials
+            .as_mut()
             .ok_or_else(|| anyhow!("No credentials configured"))?;
         creds.encrypted_totp_secret = encrypted_totp_secret;
         creds.failed_attempts = 0;
@@ -356,11 +368,11 @@ impl GenesisAuthManager {
     /// Derive key from passphrase using Argon2id
     fn derive_password_key(&self, passphrase: &str) -> Result<[u8; 32]> {
         let salt = SaltString::encode_b64(b"genesis_auth_salt_fixed_for_derivation")
-            .map_err(|e| anyhow!("Salt encoding failed: {}", e))?;
+            .map_err(|e| anyhow!("Salt encoding failed: {e}"))?;
         let argon2 = Argon2::default();
         let hash = argon2
             .hash_password(passphrase.as_bytes(), &salt)
-            .map_err(|e| anyhow!("Key derivation failed: {}", e))?;
+            .map_err(|e| anyhow!("Key derivation failed: {e}"))?;
 
         // Extract 32 bytes from hash
         let hash_bytes = hash.hash.ok_or_else(|| anyhow!("No hash output"))?;
@@ -371,13 +383,13 @@ impl GenesisAuthManager {
 
     /// Derive authentication key from passphrase + TOTP secret
     fn derive_auth_key(&self, passphrase: &str, totp_secret: &str) -> Result<[u8; 32]> {
-        let combined = format!("{}{}", passphrase, totp_secret);
+        let combined = format!("{passphrase}{totp_secret}");
         let salt = SaltString::encode_b64(b"auth_key_salt_fixed_for_derivation")
-            .map_err(|e| anyhow!("Salt encoding failed: {}", e))?;
+            .map_err(|e| anyhow!("Salt encoding failed: {e}"))?;
         let argon2 = Argon2::default();
         let hash = argon2
             .hash_password(combined.as_bytes(), &salt)
-            .map_err(|e| anyhow!("Auth key derivation failed: {}", e))?;
+            .map_err(|e| anyhow!("Auth key derivation failed: {e}"))?;
 
         let hash_bytes = hash.hash.ok_or_else(|| anyhow!("No hash output"))?;
         let mut key = [0u8; 32];
@@ -393,7 +405,7 @@ impl GenesisAuthManager {
 
         let mut ciphertext = cipher
             .encrypt(nonce, data)
-            .map_err(|e| anyhow!("Encryption failed: {}", e))?;
+            .map_err(|e| anyhow!("Encryption failed: {e}"))?;
 
         // Prepend nonce to ciphertext
         let mut result = nonce_bytes.to_vec();
@@ -413,7 +425,7 @@ impl GenesisAuthManager {
 
         cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|e| anyhow!("Decryption failed: {}", e))
+            .map_err(|e| anyhow!("Decryption failed: {e}"))
     }
 
     /// Verify TOTP code
@@ -425,7 +437,7 @@ impl GenesisAuthManager {
         // Get current time
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| anyhow!("System time error: {}", e))?
+            .map_err(|e| anyhow!("System time error: {e}"))?
             .as_secs();
 
         // Calculate time step
@@ -458,7 +470,7 @@ impl GenesisAuthManager {
 
         // Compute HMAC-SHA1 using KeyInit trait
         let mut mac = <HmacSha1 as hmac::Mac>::new_from_slice(secret)
-            .map_err(|e| anyhow!("HMAC initialization failed: {}", e))?;
+            .map_err(|e| anyhow!("HMAC initialization failed: {e}"))?;
         mac.update(&time_bytes);
         let result = mac.finalize();
         let hash = result.into_bytes();
@@ -474,7 +486,7 @@ impl GenesisAuthManager {
 
         // Generate 6-digit code
         let code = binary % 1_000_000;
-        Ok(format!("{:06}", code))
+        Ok(format!("{code:06}"))
     }
 
     /// Generate keypair (placeholder - would be FALCON-1024 in production)
@@ -511,7 +523,7 @@ mod tests {
     use super::*;
 
     fn test_coordinate() -> MatrixCoordinate {
-        MatrixCoordinate::new(1, 2, 3).unwrap()
+        MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate")
     }
 
     #[test]
@@ -524,7 +536,7 @@ mod tests {
         );
 
         assert!(result.is_ok());
-        let (totp_secret, recovery_codes) = result.unwrap();
+        let (totp_secret, recovery_codes) = result.expect("test: expected success");
 
         assert!(!totp_secret.is_empty());
         assert_eq!(recovery_codes.len(), RECOVERY_CODE_COUNT);
@@ -534,26 +546,28 @@ mod tests {
     #[test]
     fn test_authentication_flow() {
         let mut auth = GenesisAuthManager::new();
-        let (totp_secret, _) = auth.initialize(
-            "user@example.com".to_string(),
-            "strong_passphrase_123",
-            test_coordinate(),
-        ).unwrap();
+        let (totp_secret, _) = auth
+            .initialize(
+                "user@example.com".to_string(),
+                "strong_passphrase_123",
+                test_coordinate(),
+            )
+            .expect("test: expected success");
 
         // Compute current TOTP code
-        let secret = auth.decode_base32(&totp_secret).unwrap();
+        let secret = auth.decode_base32(&totp_secret).expect("test: expected success");
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("test: expected success")
             .as_secs();
         let time_step = now / TOTP_PERIOD;
-        let totp_code = auth.compute_totp(&secret, time_step).unwrap();
+        let totp_code = auth.compute_totp(&secret, time_step).expect("test: expected success");
 
         // Authenticate
         let result = auth.authenticate("strong_passphrase_123", &totp_code);
         assert!(result.is_ok());
 
-        let private_key = result.unwrap();
+        let private_key = result.expect("test: expected success");
         assert!(!private_key.is_empty());
     }
 
@@ -564,7 +578,8 @@ mod tests {
             "user@example.com".to_string(),
             "strong_passphrase_123",
             test_coordinate(),
-        ).unwrap();
+        )
+        .expect("test: expected success");
 
         // Wrong passphrase
         let result = auth.authenticate("wrong_passphrase", "123456");
@@ -578,20 +593,26 @@ mod tests {
     #[test]
     fn test_recovery_code() {
         let mut auth = GenesisAuthManager::new();
-        let (_, recovery_codes) = auth.initialize(
-            "user@example.com".to_string(),
-            "strong_passphrase_123",
-            test_coordinate(),
-        ).unwrap();
+        let (_, recovery_codes) = auth
+            .initialize(
+                "user@example.com".to_string(),
+                "strong_passphrase_123",
+                test_coordinate(),
+            )
+            .expect("test: expected success");
 
         // Use first recovery code
         let result = auth.recover_with_code("strong_passphrase_123", &recovery_codes[0]);
         if let Err(e) = &result {
-            eprintln!("Recovery failed: {}", e);
+            eprintln!("Recovery failed: {e}");
         }
-        assert!(result.is_ok(), "Recovery code test failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Recovery code test failed: {:?}",
+            result.err()
+        );
 
-        let new_totp_secret = result.unwrap();
+        let new_totp_secret = result.expect("test: expected success");
         assert!(!new_totp_secret.is_empty());
     }
 
@@ -603,15 +624,15 @@ mod tests {
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .expect("test: expected success")
             .as_secs();
         let time_step = now / TOTP_PERIOD;
 
-        let code = auth.compute_totp(&secret, time_step).unwrap();
+        let code = auth.compute_totp(&secret, time_step).expect("test: expected success");
         assert_eq!(code.len(), TOTP_DIGITS);
-        assert!(auth.verify_totp(&secret_base32, &code).unwrap());
+        assert!(auth.verify_totp(&secret_base32, &code).expect("test: assertion value"));
 
         // Wrong code should fail
-        assert!(!auth.verify_totp(&secret_base32, "000000").unwrap());
+        assert!(!auth.verify_totp(&secret_base32, "000000").expect("test: assertion value"));
     }
 }

@@ -56,12 +56,14 @@ impl LibraryAssetPackage {
     }
 
     pub fn author(&self) -> Option<&str> {
-        self.metadata.as_ref()
+        self.metadata
+            .as_ref()
             .and_then(|m| m.author.as_ref().map(|a| a.as_ref()))
     }
 
     pub fn license(&self) -> Option<&str> {
-        self.metadata.as_ref()
+        self.metadata
+            .as_ref()
             .and_then(|m| m.license.as_ref().map(|l| l.as_ref()))
     }
 

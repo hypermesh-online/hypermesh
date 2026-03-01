@@ -5,19 +5,22 @@
 //! Integration tests for native monitoring system
 
 use trustchain::monitoring::{
-    MonitoringSystem, MonitoringConfig, MetricsExporter,
     export::{JsonExporter, PrometheusExporter},
+    MetricsExporter, MonitoringConfig, MonitoringSystem,
 };
 
 #[tokio::test]
 async fn test_native_monitoring_system() {
     // Create monitoring system with default config
     let config = MonitoringConfig::default();
-    let monitoring = MonitoringSystem::new(config).await
+    let monitoring = MonitoringSystem::new(config)
+        .await
         .expect("Failed to create monitoring system");
 
     // Start the monitoring system
-    monitoring.start().await
+    monitoring
+        .start()
+        .await
         .expect("Failed to start monitoring");
 
     // Record some test metrics
@@ -65,7 +68,8 @@ async fn test_native_monitoring_system() {
 #[tokio::test]
 async fn test_health_check_system() {
     let config = MonitoringConfig::default();
-    let monitoring = MonitoringSystem::new(config).await
+    let monitoring = MonitoringSystem::new(config)
+        .await
         .expect("Failed to create monitoring system");
 
     // Get initial health status
@@ -76,7 +80,7 @@ async fn test_health_check_system() {
     assert_eq!(health.components.len(), 6); // ca, ct, dns, consensus, stoq, api
 
     for (name, component_health) in &health.components {
-        assert!(component_health.is_healthy, "{} should be healthy", name);
+        assert!(component_health.is_healthy, "{name} should be healthy");
     }
 
     println!("Health check system test passed!");
@@ -85,7 +89,8 @@ async fn test_health_check_system() {
 #[tokio::test]
 async fn test_metrics_export_formats() {
     let config = MonitoringConfig::default();
-    let monitoring = MonitoringSystem::new(config).await
+    let monitoring = MonitoringSystem::new(config)
+        .await
         .expect("Failed to create monitoring system");
 
     // Record some metrics
@@ -96,14 +101,18 @@ async fn test_metrics_export_formats() {
 
     // Test JSON export
     let json_exporter = JsonExporter;
-    let json_output = json_exporter.export(&metrics).await
+    let json_output = json_exporter
+        .export(&metrics)
+        .await
         .expect("Failed to export JSON metrics");
     assert!(json_output.contains("\"ca\""));
     assert!(json_output.contains("\"dns\""));
 
     // Test Prometheus export
     let prom_exporter = PrometheusExporter::new("trustchain");
-    let prom_output = prom_exporter.export(&metrics).await
+    let prom_output = prom_exporter
+        .export(&metrics)
+        .await
         .expect("Failed to export Prometheus metrics");
     assert!(prom_output.contains("# HELP"));
     assert!(prom_output.contains("# TYPE"));
@@ -125,10 +134,13 @@ async fn test_monitoring_without_external_dependencies() {
         alert_thresholds: Default::default(),
     };
 
-    let monitoring = MonitoringSystem::new(config).await
+    let monitoring = MonitoringSystem::new(config)
+        .await
         .expect("Failed to create monitoring system");
 
-    monitoring.start().await
+    monitoring
+        .start()
+        .await
         .expect("Failed to start monitoring");
 
     // Wait a bit for the monitoring to collect data

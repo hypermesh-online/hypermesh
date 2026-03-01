@@ -3,19 +3,19 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! SCT (Signed Certificate Timestamp) Manager
-//! 
+//!
 //! Generates and manages SCTs for Certificate Transparency logs
 //! with cryptographic signatures and timestamp validation.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
-use tracing::debug;
-use sha2::{Sha256, Digest};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer};
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use ring::rand::SystemRandom;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::debug;
 
-use crate::errors::{CTError, CryptoError, Result as TrustChainResult};
 use super::{LogEntry, SignedCertificateTimestamp};
+use crate::errors::{CTError, CryptoError, Result as TrustChainResult};
 
 /// SCT Manager for generating and validating Signed Certificate Timestamps
 pub struct SCTManager {
@@ -85,7 +85,11 @@ impl SCTManager {
     }
 
     /// Generate SCT for a log entry
-    pub async fn generate_sct(&self, entry: &LogEntry, _log_id: &str) -> TrustChainResult<SignedCertificateTimestamp> {
+    pub async fn generate_sct(
+        &self,
+        entry: &LogEntry,
+        _log_id: &str,
+    ) -> TrustChainResult<SignedCertificateTimestamp> {
         debug!("Generating SCT for entry {}", entry.sequence_number);
 
         // Create SCT request from log entry
@@ -99,18 +103,24 @@ impl SCTManager {
         // Generate SCT
         let sct = self.generate_sct_from_request(&sct_request).await?;
 
-        debug!("Generated SCT for entry {} successfully", entry.sequence_number);
+        debug!(
+            "Generated SCT for entry {} successfully",
+            entry.sequence_number
+        );
         Ok(sct)
     }
 
     /// Generate SCT from a request
-    pub async fn generate_sct_from_request(&self, request: &SCTRequest) -> TrustChainResult<SignedCertificateTimestamp> {
+    pub async fn generate_sct_from_request(
+        &self,
+        request: &SCTRequest,
+    ) -> TrustChainResult<SignedCertificateTimestamp> {
         // Create signature input
         let signature_input = self.create_signature_input(request)?;
-        
+
         // Serialize signature input
         let serialized_input = self.serialize_signature_input(&signature_input)?;
-        
+
         // Generate signature
         let signature = self.sign_sct_data(&serialized_input)?;
 
@@ -124,7 +134,11 @@ impl SCTManager {
     }
 
     /// Verify an SCT signature
-    pub async fn verify_sct(&self, sct: &SignedCertificateTimestamp, certificate_der: &[u8]) -> TrustChainResult<bool> {
+    pub async fn verify_sct(
+        &self,
+        sct: &SignedCertificateTimestamp,
+        certificate_der: &[u8],
+    ) -> TrustChainResult<bool> {
         debug!("Verifying SCT signature");
 
         // Recreate the original signature input
@@ -139,16 +153,19 @@ impl SCTManager {
         let serialized_input = self.serialize_signature_input(&signature_input)?;
 
         // Parse signature
-        let signature_bytes: [u8; 64] = sct.signature.clone()
-            .try_into()
-            .map_err(|_| CryptoError::SignatureVerification {
-                reason: "Invalid signature length".to_string(),
-            })?;
-        
-        let signature = Signature::try_from(signature_bytes.as_slice())
-            .map_err(|e| CryptoError::SignatureVerification {
-                reason: format!("Invalid signature format: {}", e),
-            })?;
+        let signature_bytes: [u8; 64] =
+            sct.signature
+                .clone()
+                .try_into()
+                .map_err(|_| CryptoError::SignatureVerification {
+                    reason: "Invalid signature length".to_string(),
+                })?;
+
+        let signature = Signature::try_from(signature_bytes.as_slice()).map_err(|e| {
+            CryptoError::SignatureVerification {
+                reason: format!("Invalid signature format: {e}"),
+            }
+        })?;
 
         // Verify signature
         use ed25519_dalek::Verifier;
@@ -183,12 +200,12 @@ impl SCTManager {
 
     fn generate_keypair(rng: &SystemRandom) -> TrustChainResult<(SigningKey, VerifyingKey)> {
         use ring::signature::Ed25519KeyPair;
-        
+
         // Generate Ed25519 key pair using ring
-        let _key_pair = Ed25519KeyPair::generate_pkcs8(rng)
-            .map_err(|e| CryptoError::KeyGeneration {
+        let _key_pair =
+            Ed25519KeyPair::generate_pkcs8(rng).map_err(|e| CryptoError::KeyGeneration {
                 algorithm: "Ed25519".to_string(),
-                reason: format!("Key generation failed: {}", e),
+                reason: format!("Key generation failed: {e}"),
             })?;
 
         // Generate a proper Ed25519 key pair for CT log signing
@@ -204,10 +221,11 @@ impl SCTManager {
     }
 
     fn create_signature_input(&self, request: &SCTRequest) -> TrustChainResult<SCTSignatureInput> {
-        let timestamp_ms = request.timestamp
+        let timestamp_ms = request
+            .timestamp
             .duration_since(UNIX_EPOCH)
             .map_err(|e| CTError::SCTGeneration {
-                reason: format!("Invalid timestamp: {}", e),
+                reason: format!("Invalid timestamp: {e}"),
             })?
             .as_millis() as u64;
 
@@ -241,9 +259,10 @@ impl SCTManager {
         if cert_len > 0xFFFFFF {
             return Err(CTError::SCTGeneration {
                 reason: "Certificate too large for SCT".to_string(),
-            }.into());
+            }
+            .into());
         }
-        
+
         buffer.push((cert_len >> 16) as u8);
         buffer.push((cert_len >> 8) as u8);
         buffer.push(cert_len as u8);
@@ -254,9 +273,10 @@ impl SCTManager {
         if ext_len > 0xFFFF {
             return Err(CTError::SCTGeneration {
                 reason: "Extensions too large for SCT".to_string(),
-            }.into());
+            }
+            .into());
         }
-        
+
         buffer.extend_from_slice(&(ext_len as u16).to_be_bytes());
         buffer.extend_from_slice(&input.extensions);
 
@@ -265,7 +285,10 @@ impl SCTManager {
 
     fn sign_sct_data(&self, data: &[u8]) -> TrustChainResult<Signature> {
         let signature = self.signing_key.sign(data);
-        debug!("Generated SCT signature: {} bytes", signature.to_bytes().len());
+        debug!(
+            "Generated SCT signature: {} bytes",
+            signature.to_bytes().len()
+        );
         Ok(signature)
     }
 }
@@ -284,7 +307,9 @@ pub struct SCTUtils;
 
 impl SCTUtils {
     /// Parse SCT from TLS extension bytes
-    pub fn parse_sct_extension(extension_data: &[u8]) -> TrustChainResult<Vec<SignedCertificateTimestamp>> {
+    pub fn parse_sct_extension(
+        extension_data: &[u8],
+    ) -> TrustChainResult<Vec<SignedCertificateTimestamp>> {
         let mut scts = Vec::new();
         let mut offset = 0;
 
@@ -292,7 +317,8 @@ impl SCTUtils {
         if extension_data.len() < 2 {
             return Err(CTError::SCTGeneration {
                 reason: "SCT extension too short".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         let list_length = u16::from_be_bytes([extension_data[0], extension_data[1]]) as usize;
@@ -301,7 +327,8 @@ impl SCTUtils {
         if extension_data.len() < 2 + list_length {
             return Err(CTError::SCTGeneration {
                 reason: "SCT extension length mismatch".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Parse individual SCTs
@@ -316,14 +343,16 @@ impl SCTUtils {
     }
 
     /// Serialize SCT to TLS extension format
-    pub fn serialize_sct_extension(scts: &[SignedCertificateTimestamp]) -> TrustChainResult<Vec<u8>> {
+    pub fn serialize_sct_extension(
+        scts: &[SignedCertificateTimestamp],
+    ) -> TrustChainResult<Vec<u8>> {
         let mut buffer = Vec::new();
         let mut sct_data = Vec::new();
 
         // Serialize each SCT
         for sct in scts {
             let serialized_sct = Self::serialize_single_sct(sct)?;
-            
+
             // SCT length (2 bytes) + SCT data
             sct_data.extend_from_slice(&(serialized_sct.len() as u16).to_be_bytes());
             sct_data.extend_from_slice(&serialized_sct);
@@ -343,7 +372,8 @@ impl SCTUtils {
         if data.len() < 2 {
             return Err(CTError::SCTGeneration {
                 reason: "SCT data too short".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         let sct_length = u16::from_be_bytes([data[0], data[1]]) as usize;
@@ -352,7 +382,8 @@ impl SCTUtils {
         if data.len() < 2 + sct_length {
             return Err(CTError::SCTGeneration {
                 reason: "SCT length mismatch".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         let sct_data = &data[offset..offset + sct_length];
@@ -362,7 +393,8 @@ impl SCTUtils {
         if sct_data.len() < 1 + 32 + 8 {
             return Err(CTError::SCTGeneration {
                 reason: "SCT data incomplete".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         // Version (1 byte)
@@ -376,8 +408,14 @@ impl SCTUtils {
 
         // Timestamp (8 bytes)
         let timestamp_ms = u64::from_be_bytes([
-            sct_data[offset], sct_data[offset + 1], sct_data[offset + 2], sct_data[offset + 3],
-            sct_data[offset + 4], sct_data[offset + 5], sct_data[offset + 6], sct_data[offset + 7],
+            sct_data[offset],
+            sct_data[offset + 1],
+            sct_data[offset + 2],
+            sct_data[offset + 3],
+            sct_data[offset + 4],
+            sct_data[offset + 5],
+            sct_data[offset + 6],
+            sct_data[offset + 7],
         ]);
         let timestamp = UNIX_EPOCH + std::time::Duration::from_millis(timestamp_ms);
         offset += 8;
@@ -386,7 +424,8 @@ impl SCTUtils {
         if sct_data.len() < offset + 2 {
             return Err(CTError::SCTGeneration {
                 reason: "SCT extensions length missing".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         let ext_length = u16::from_be_bytes([sct_data[offset], sct_data[offset + 1]]) as usize;
@@ -396,7 +435,8 @@ impl SCTUtils {
         if sct_data.len() < offset + ext_length {
             return Err(CTError::SCTGeneration {
                 reason: "SCT extensions data incomplete".to_string(),
-            }.into());
+            }
+            .into());
         }
 
         let extensions = sct_data[offset..offset + ext_length].to_vec();
@@ -424,13 +464,14 @@ impl SCTUtils {
         buffer.extend_from_slice(&sct.log_id);
 
         // Timestamp (8 bytes)
-        let timestamp_ms = sct.timestamp
+        let timestamp_ms = sct
+            .timestamp
             .duration_since(UNIX_EPOCH)
             .map_err(|e| CTError::SCTGeneration {
-                reason: format!("Invalid timestamp: {}", e),
+                reason: format!("Invalid timestamp: {e}"),
             })?
             .as_millis() as u64;
-        
+
         buffer.extend_from_slice(&timestamp_ms.to_be_bytes());
 
         // Extensions length (2 bytes) + extensions
@@ -461,15 +502,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_sct_manager_creation() {
-        let manager = SCTManager::new("test-log".to_string()).await.unwrap();
+        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
         assert_eq!(manager._log_id, "test-log");
         assert_ne!(manager.log_id_hash, [0u8; 32]);
     }
 
     #[tokio::test]
     async fn test_sct_generation() {
-        let manager = SCTManager::new("test-log".to_string()).await.unwrap();
-        
+        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+
         let request = SCTRequest {
             certificate_der: b"test certificate".to_vec(),
             timestamp: SystemTime::now(),
@@ -477,8 +518,8 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.unwrap();
-        
+        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+
         assert_eq!(sct.version, 1);
         assert_eq!(sct.log_id, manager.log_id_hash);
         assert!(!sct.signature.is_empty());
@@ -486,8 +527,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_sct_verification() {
-        let manager = SCTManager::new("test-log".to_string()).await.unwrap();
-        
+        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+
         let cert_data = b"test certificate for verification";
         let request = SCTRequest {
             certificate_der: cert_data.to_vec(),
@@ -496,16 +537,16 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.unwrap();
-        let is_valid = manager.verify_sct(&sct, cert_data).await.unwrap();
-        
+        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+        let is_valid = manager.verify_sct(&sct, cert_data).await.expect("test: async operation");
+
         assert!(is_valid);
     }
 
     #[tokio::test]
     async fn test_sct_verification_invalid() {
-        let manager = SCTManager::new("test-log".to_string()).await.unwrap();
-        
+        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+
         let cert_data = b"test certificate for verification";
         let request = SCTRequest {
             certificate_der: cert_data.to_vec(),
@@ -514,19 +555,19 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.unwrap();
-        
+        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+
         // Try to verify with different certificate data
         let wrong_cert_data = b"wrong certificate data";
-        let is_valid = manager.verify_sct(&sct, wrong_cert_data).await.unwrap();
-        
+        let is_valid = manager.verify_sct(&sct, wrong_cert_data).await.expect("test: async operation");
+
         assert!(!is_valid);
     }
 
     #[tokio::test]
     async fn test_sct_serialization() {
-        let manager = SCTManager::new("test-log".to_string()).await.unwrap();
-        
+        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+
         let request = SCTRequest {
             certificate_der: b"test certificate".to_vec(),
             timestamp: SystemTime::now(),
@@ -534,12 +575,12 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.unwrap();
-        
+        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+
         // Test extension serialization/parsing
-        let extension_data = SCTUtils::serialize_sct_extension(&[sct.clone()]).unwrap();
-        let parsed_scts = SCTUtils::parse_sct_extension(&extension_data).unwrap();
-        
+        let extension_data = SCTUtils::serialize_sct_extension(&[sct.clone()]).expect("test: expected success");
+        let parsed_scts = SCTUtils::parse_sct_extension(&extension_data).expect("test: expected success");
+
         assert_eq!(parsed_scts.len(), 1);
         assert_eq!(parsed_scts[0].version, sct.version);
         assert_eq!(parsed_scts[0].log_id, sct.log_id);

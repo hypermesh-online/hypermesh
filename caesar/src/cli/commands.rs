@@ -108,8 +108,7 @@ pub fn parse_tier(s: &str) -> Result<String, String> {
         "l2" => Ok("L2".into()),
         "l3" => Ok("L3".into()),
         other => Err(format!(
-            "Unknown market tier '{}'. Expected 'l0', 'l1', 'l2', or 'l3'.",
-            other,
+            "Unknown market tier '{other}'. Expected 'l0', 'l1', 'l2', or 'l3'.",
         )),
     }
 }
@@ -137,9 +136,8 @@ pub fn parse_packet_state(s: &str) -> Result<String, String> {
         "dispersed" => Ok("Dispersed".into()),
         "dissolved" => Ok("Dissolved".into()),
         other => Err(format!(
-            "Unknown packet state '{}'. Expected one of: minted, in_transit, delivered, \
+            "Unknown packet state '{other}'. Expected one of: minted, in_transit, delivered, \
              settling, settled, expired, refunded, held, stalled, dispersed, dissolved.",
-            other,
         )),
     }
 }
@@ -206,10 +204,10 @@ mod tests {
         let oracle = CliCommand::Oracle(OracleCommand::Price);
 
         // Verify Debug works (no panic)
-        let _ = format!("{:?}", packet);
-        let _ = format!("{:?}", node);
-        let _ = format!("{:?}", gov);
-        let _ = format!("{:?}", oracle);
+        let _ = format!("{packet:?}");
+        let _ = format!("{node:?}");
+        let _ = format!("{gov:?}");
+        let _ = format!("{oracle:?}");
     }
 
     #[test]

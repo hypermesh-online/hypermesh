@@ -4,13 +4,13 @@
 
 //! STOQ Transport connection management - connect, accept, pool, shutdown
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
-use crate::transport::connection::{Connection, Endpoint};
 use crate::transport::adaptive::AdaptiveConnection;
+use crate::transport::connection::{Connection, Endpoint};
 
 use super::StoqTransport;
 
@@ -26,17 +26,26 @@ impl StoqTransport {
 
             // Try to get a healthy connection
             if let Some(pooled_conn) = pool.pop() {
-                debug!("Reusing pooled connection to [{}]:{}", endpoint.address, endpoint.port);
+                debug!(
+                    "Reusing pooled connection to [{}]:{}",
+                    endpoint.address, endpoint.port
+                );
                 pooled_conn.update_activity(); // Mark as recently used
                 self.performance_stats.read().record_connection_reuse();
                 return Ok(pooled_conn);
             }
         }
 
-        debug!("Creating new connection to [{}]:{}", endpoint.address, endpoint.port);
+        debug!(
+            "Creating new connection to [{}]:{}",
+            endpoint.address, endpoint.port
+        );
 
         let socket_addr = endpoint.to_socket_addr();
-        let connecting = self.endpoint.connect(socket_addr, endpoint.server_name.as_deref().unwrap_or("localhost"))?;
+        let connecting = self.endpoint.connect(
+            socket_addr,
+            endpoint.server_name.as_deref().unwrap_or("localhost"),
+        )?;
 
         let quinn_conn = connecting.await?;
 
@@ -55,15 +64,22 @@ impl StoqTransport {
         self.connections.insert(conn_id.clone(), connection.clone());
 
         // Register connection with adaptation manager
-        self.adaptation_manager.register_connection(conn_id.clone(), quinn_conn_arc.clone());
+        self.adaptation_manager
+            .register_connection(conn_id.clone(), quinn_conn_arc.clone());
 
-        // Create and store adaptive connection wrapper
+        // Create and store adaptive connection wrapper, inheriting global enabled state
         let adaptive_conn = Arc::new(AdaptiveConnection::new(quinn_conn_arc));
+        if !self.adaptation_manager.is_enabled() {
+            adaptive_conn.set_adaptation_enabled(false);
+        }
         self.adaptive_connections.insert(conn_id, adaptive_conn);
 
         self.metrics.record_connection_established();
 
-        info!("Connected to {} with adaptive optimization (pool_size={})", socket_addr, self.config.connection_pool_size);
+        info!(
+            "Connected to {} with adaptive optimization (pool_size={})",
+            socket_addr, self.config.connection_pool_size
+        );
         Ok(connection)
     }
 
@@ -73,8 +89,12 @@ impl StoqTransport {
             return; // Don't pool inactive connections
         }
 
-        let pool_key = format!("{}:{}", connection.endpoint().address, connection.endpoint().port);
-        let mut pool = self.connection_pool.entry(pool_key).or_insert_with(Vec::new);
+        let pool_key = format!(
+            "{}:{}",
+            connection.endpoint().address,
+            connection.endpoint().port
+        );
+        let mut pool = self.connection_pool.entry(pool_key).or_default();
 
         // Update activity before returning to pool
         connection.update_activity();
@@ -120,29 +140,44 @@ impl StoqTransport {
             let removed = initial_size - pool.len();
 
             if removed > 0 {
-                debug!("Removed {} unhealthy connections from pool {}", removed, pool_key);
+                debug!(
+                    "Removed {} unhealthy connections from pool {}",
+                    removed, pool_key
+                );
                 total_removed += removed;
             }
             total_remaining += pool.len();
         }
 
         if total_removed > 0 {
-            info!("Health check removed {} unhealthy connections, {} remaining in pools",
-                  total_removed, total_remaining);
-            self.performance_stats.read().record_unhealthy_removed(total_removed);
+            info!(
+                "Health check removed {} unhealthy connections, {} remaining in pools",
+                total_removed, total_remaining
+            );
+            self.performance_stats
+                .read()
+                .record_unhealthy_removed(total_removed);
         }
     }
 
     /// Accept incoming connections
     pub async fn accept(&self) -> Result<Arc<Connection>> {
-        let incoming = self.endpoint.accept().await.ok_or_else(|| anyhow!("No incoming connection"))?;
+        let incoming = self
+            .endpoint
+            .accept()
+            .await
+            .ok_or_else(|| anyhow!("No incoming connection"))?;
         let quinn_conn = incoming.await?;
 
         let remote_addr = quinn_conn.remote_address();
         let endpoint = Endpoint::new(
             match remote_addr {
                 SocketAddr::V6(addr) => *addr.ip(),
-                SocketAddr::V4(_) => return Err(anyhow!("IPv4 connections are not supported - STOQ is IPv6-only")),
+                SocketAddr::V4(_) => {
+                    return Err(anyhow!(
+                        "IPv4 connections are not supported - STOQ is IPv6-only"
+                    ))
+                }
             },
             remote_addr.port(),
         );

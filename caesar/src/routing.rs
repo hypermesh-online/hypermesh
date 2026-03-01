@@ -12,8 +12,8 @@ use std::collections::HashMap;
 
 use hypermesh_lib::economic::{GoldGrams, MarketTier};
 use hypermesh_lib::NodeId;
-use rust_decimal::Decimal;
 use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 
@@ -99,10 +99,9 @@ impl PacketRouter {
             .iter()
             .enumerate()
             .map(|(i, m)| {
-                let buffer_dec = Decimal::from_u64(m.buffer_capacity_packets)
-                    .unwrap_or(Decimal::ZERO);
-                let active_dec = Decimal::from_u64(m.active_packet_count)
-                    .unwrap_or(Decimal::ZERO);
+                let buffer_dec =
+                    Decimal::from_u64(m.buffer_capacity_packets).unwrap_or(Decimal::ZERO);
+                let active_dec = Decimal::from_u64(m.active_packet_count).unwrap_or(Decimal::ZERO);
 
                 let score = WEIGHT_BANDWIDTH * m.available_bandwidth_mbps
                     + WEIGHT_BUFFER * buffer_dec
@@ -187,10 +186,9 @@ impl PacketRouter {
             .iter()
             .enumerate()
             .map(|(i, m)| {
-                let buffer_dec = Decimal::from_u64(m.buffer_capacity_packets)
-                    .unwrap_or(Decimal::ZERO);
-                let active_dec = Decimal::from_u64(m.active_packet_count)
-                    .unwrap_or(Decimal::ZERO);
+                let buffer_dec =
+                    Decimal::from_u64(m.buffer_capacity_packets).unwrap_or(Decimal::ZERO);
+                let active_dec = Decimal::from_u64(m.active_packet_count).unwrap_or(Decimal::ZERO);
 
                 let mut score = WEIGHT_BANDWIDTH * m.available_bandwidth_mbps
                     + WEIGHT_BUFFER * buffer_dec
@@ -207,9 +205,8 @@ impl PacketRouter {
                         };
                         score *= tier_weight;
 
-                        let outside_range =
-                            packet_value.0 < prefs.preferred_min_packet.0
-                                || packet_value.0 > prefs.preferred_max_packet.0;
+                        let outside_range = packet_value.0 < prefs.preferred_min_packet.0
+                            || packet_value.0 > prefs.preferred_max_packet.0;
                         if outside_range {
                             score *= dec!(0.5);
                         }
@@ -346,11 +343,17 @@ mod tests {
         let mut prefs = HashMap::new();
         prefs.insert(
             NodeId::from("a"),
-            OperatorPreferences { auto_mode: true, ..Default::default() },
+            OperatorPreferences {
+                auto_mode: true,
+                ..Default::default()
+            },
         );
         prefs.insert(
             NodeId::from("b"),
-            OperatorPreferences { auto_mode: true, ..Default::default() },
+            OperatorPreferences {
+                auto_mode: true,
+                ..Default::default()
+            },
         );
 
         let result = router
@@ -490,7 +493,11 @@ mod tests {
         let high = engauge::CapacityReport::new(
             NodeId::from("high-cap"),
             engauge::CapacityMetrics::new(
-                1_073_741_824, 1_000_000, 10_737_418_240, 1_000_000_000, 1.0,
+                1_073_741_824,
+                1_000_000,
+                10_737_418_240,
+                1_000_000_000,
+                1.0,
             ),
             1,
         );

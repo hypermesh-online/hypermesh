@@ -5,10 +5,10 @@
 // STOQ Phase 5: Comprehensive Performance Benchmarking Suite
 // Validates 10+ Gbps throughput, <1ms latency, and scalability claims
 
-use stoq::transport::{StoqTransport, TransportConfig, NetworkTier, Endpoint};
 use std::net::Ipv6Addr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
+use stoq::transport::{Endpoint, NetworkTier, StoqTransport, TransportConfig};
 use tokio::time::{Duration, Instant};
 
 mod throughput_benchmarks {
@@ -19,8 +19,10 @@ mod throughput_benchmarks {
     async fn benchmark_single_connection_throughput() {
         println!("\n=== Single Connection Throughput Benchmark ===");
 
-        let mut config = TransportConfig::default();
-        config.port = 0;
+        let mut config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
         config.adapt_for_network_tier(&NetworkTier::Standard { gbps: 1.0 });
 
         let server = Arc::new(StoqTransport::new(config.clone()).await.unwrap());
@@ -48,7 +50,11 @@ mod throughput_benchmarks {
         });
 
         // Client send loop
-        let client = Arc::new(StoqTransport::new(TransportConfig::default()).await.unwrap());
+        let client = Arc::new(
+            StoqTransport::new(TransportConfig::default())
+                .await
+                .unwrap(),
+        );
         let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, server_addr.port());
         let conn = client.connect(&endpoint).await.unwrap();
         let mut stream = conn.open_stream().await.unwrap();
@@ -60,7 +66,7 @@ mod throughput_benchmarks {
 
         println!("Sending data for 10 seconds...");
         while start.elapsed() < test_duration {
-            if let Ok(_) = stream.send(&data).await {
+            if stream.send(&data).await.is_ok() {
                 bytes_sent += data.len() as u64;
             } else {
                 break;
@@ -77,10 +83,10 @@ mod throughput_benchmarks {
         println!("Bytes sent: {} MB", bytes_sent / (1024 * 1024));
         println!("Bytes received: {} MB", total_bytes / (1024 * 1024));
         println!("Duration: {:.2}s", elapsed.as_secs_f64());
-        println!("Throughput: {:.2} Gbps", gbps);
+        println!("Throughput: {gbps:.2} Gbps");
 
         // Verify minimum throughput
-        assert!(gbps > 0.5, "Expected >0.5 Gbps, got {:.2} Gbps", gbps);
+        assert!(gbps > 0.5, "Expected >0.5 Gbps, got {gbps:.2} Gbps");
     }
 
     #[tokio::test]
@@ -90,9 +96,11 @@ mod throughput_benchmarks {
 
         const NUM_STREAMS: usize = 10;
 
-        let mut config = TransportConfig::default();
-        config.port = 0;
-        config.max_concurrent_streams = NUM_STREAMS as u32 * 2;
+        let mut config = TransportConfig {
+            port: 0,
+            max_concurrent_streams: NUM_STREAMS as u32 * 2,
+            ..Default::default()
+        };
         config.adapt_for_network_tier(&NetworkTier::Performance { gbps: 10.0 });
 
         let server = Arc::new(StoqTransport::new(config.clone()).await.unwrap());
@@ -113,13 +121,8 @@ mod throughput_benchmarks {
 
                 let handle = tokio::spawn(async move {
                     let mut stream = conn_clone.accept_stream().await.unwrap();
-                    loop {
-                        match stream.receive().await {
-                            Ok(data) => {
-                                bytes.fetch_add(data.len() as u64, Ordering::Relaxed);
-                            }
-                            Err(_) => break,
-                        }
+                    while let Ok(data) = stream.receive().await {
+                        bytes.fetch_add(data.len() as u64, Ordering::Relaxed);
                     }
                 });
                 handles.push(handle);
@@ -131,7 +134,11 @@ mod throughput_benchmarks {
         });
 
         // Client send on multiple streams
-        let client = Arc::new(StoqTransport::new(TransportConfig::default()).await.unwrap());
+        let client = Arc::new(
+            StoqTransport::new(TransportConfig::default())
+                .await
+                .unwrap(),
+        );
         let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, server_addr.port());
         let conn = client.connect(&endpoint).await.unwrap();
 
@@ -141,7 +148,7 @@ mod throughput_benchmarks {
 
         for _ in 0..NUM_STREAMS {
             let conn_clone = Arc::clone(&conn);
-            let duration = test_duration.clone();
+            let duration = test_duration;
 
             let handle = tokio::spawn(async move {
                 let mut stream = conn_clone.open_stream().await.unwrap();
@@ -170,12 +177,12 @@ mod throughput_benchmarks {
         let bytes = total_bytes.load(Ordering::Relaxed);
         let gbps = (bytes as f64 * 8.0) / (elapsed.as_secs_f64() * 1_000_000_000.0);
 
-        println!("Streams: {}", NUM_STREAMS);
+        println!("Streams: {NUM_STREAMS}");
         println!("Total bytes: {} MB", bytes / (1024 * 1024));
         println!("Duration: {:.2}s", elapsed.as_secs_f64());
-        println!("Aggregate throughput: {:.2} Gbps", gbps);
+        println!("Aggregate throughput: {gbps:.2} Gbps");
 
-        assert!(gbps > 1.0, "Expected >1 Gbps aggregate, got {:.2} Gbps", gbps);
+        assert!(gbps > 1.0, "Expected >1 Gbps aggregate, got {gbps:.2} Gbps");
     }
 }
 
@@ -186,8 +193,10 @@ mod latency_benchmarks {
     async fn benchmark_round_trip_latency() {
         println!("\n=== Round-Trip Latency Benchmark ===");
 
-        let mut config = TransportConfig::default();
-        config.port = 0;
+        let config = TransportConfig {
+            port: 0,
+            ..Default::default()
+        };
 
         let server = Arc::new(StoqTransport::new(config.clone()).await.unwrap());
         let server_addr = server.local_addr().unwrap();
@@ -208,7 +217,11 @@ mod latency_benchmarks {
         });
 
         // Client ping-pong
-        let client = Arc::new(StoqTransport::new(TransportConfig::default()).await.unwrap());
+        let client = Arc::new(
+            StoqTransport::new(TransportConfig::default())
+                .await
+                .unwrap(),
+        );
         let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, server_addr.port());
         let conn = client.connect(&endpoint).await.unwrap();
         let mut stream = conn.open_stream().await.unwrap();
@@ -243,13 +256,16 @@ mod latency_benchmarks {
         let max = latencies[latencies.len() - 1];
 
         println!("RTT Latency (μs):");
-        println!("  Min: {} μs", min);
-        println!("  Median: {} μs", median);
-        println!("  P99: {} μs", p99);
-        println!("  Max: {} μs", max);
+        println!("  Min: {min} μs");
+        println!("  Median: {median} μs");
+        println!("  P99: {p99} μs");
+        println!("  Max: {max} μs");
 
         // Verify sub-millisecond median latency
-        assert!(median < 1000, "Expected <1ms median latency, got {} μs", median);
+        assert!(
+            median < 1000,
+            "Expected <1ms median latency, got {median} μs"
+        );
     }
 }
 
@@ -263,9 +279,11 @@ mod scalability_benchmarks {
 
         let target_connections = 1000;
 
-        let mut config = TransportConfig::default();
-        config.port = 0;
-        config.max_connections = Some(target_connections);
+        let config = TransportConfig {
+            port: 0,
+            max_connections: Some(target_connections),
+            ..Default::default()
+        };
 
         let server = Arc::new(StoqTransport::new(config).await.unwrap());
         let server_addr = server.local_addr().unwrap();
@@ -307,7 +325,9 @@ mod scalability_benchmarks {
             let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, server_addr.port());
 
             let handle = tokio::spawn(async move {
-                let client = StoqTransport::new(TransportConfig::default()).await.unwrap();
+                let client = StoqTransport::new(TransportConfig::default())
+                    .await
+                    .unwrap();
                 if let Ok(conn) = client.connect(&endpoint).await {
                     // Keep alive
                     tokio::time::sleep(Duration::from_secs(20)).await;
@@ -329,10 +349,13 @@ mod scalability_benchmarks {
         let established = active_connections.load(Ordering::Relaxed);
         let elapsed = start.elapsed();
 
-        println!("Target connections: {}", target_connections);
-        println!("Established connections: {}", established);
+        println!("Target connections: {target_connections}");
+        println!("Established connections: {established}");
         println!("Time to establish: {:.2}s", elapsed.as_secs_f64());
-        println!("Connection rate: {:.0} conn/s", established as f64 / elapsed.as_secs_f64());
+        println!(
+            "Connection rate: {:.0} conn/s",
+            established as f64 / elapsed.as_secs_f64()
+        );
 
         // Cleanup
         server_handle.abort();
@@ -341,16 +364,18 @@ mod scalability_benchmarks {
         }
 
         // Verify we can handle many connections
-        assert!(established as u32 > target_connections * 8 / 10,
+        assert!(
+            established as u32 > target_connections * 8 / 10,
             "Expected >80% success rate, got {}%",
-            (established as u32) * 100 / target_connections);
+            (established as u32) * 100 / target_connections
+        );
     }
 }
 
 #[cfg(test)]
 mod benchmark_utils {
-    
 
+    #[allow(dead_code)]
     pub fn calculate_percentiles(mut values: Vec<u128>) -> (u128, u128, u128, u128) {
         values.sort_unstable();
         let min = values[0];

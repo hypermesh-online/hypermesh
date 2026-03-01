@@ -6,8 +6,8 @@
 //!
 //! Provides structured error types for better error handling and debugging.
 
-use thiserror::Error;
 use std::io;
+use thiserror::Error;
 
 /// Error type for blockchain operations
 #[derive(Error, Debug)]

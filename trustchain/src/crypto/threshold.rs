@@ -283,7 +283,10 @@ impl ThresholdScheme {
             secret.push(value);
         }
 
-        debug!("reconstructed secret ({} bytes) from {} shares", secret_len, t);
+        debug!(
+            "reconstructed secret ({} bytes) from {} shares",
+            secret_len, t
+        );
         Ok(secret)
     }
 }
@@ -344,11 +347,7 @@ impl ThresholdSigner {
     ///
     /// The reconstructed key is never persisted — it exists only for the
     /// duration of this call.
-    pub fn reconstruct_and_sign(
-        &self,
-        shares: &[KeyShare],
-        message: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn reconstruct_and_sign(&self, shares: &[KeyShare], message: &[u8]) -> Result<Vec<u8>> {
         if shares.is_empty() {
             return Err(anyhow!("no key shares provided"));
         }
@@ -357,7 +356,9 @@ impl ThresholdSigner {
         let expected_fp = shares[0].key_fingerprint;
         for ks in shares.iter().skip(1) {
             if ks.key_fingerprint != expected_fp {
-                return Err(anyhow!("key share fingerprint mismatch: shares belong to different keys"));
+                return Err(anyhow!(
+                    "key share fingerprint mismatch: shares belong to different keys"
+                ));
             }
         }
 
@@ -367,7 +368,7 @@ impl ThresholdSigner {
 
         // Re-hydrate the FALCON-1024 secret key.
         let secret_key = falcon1024::SecretKey::from_bytes(&reconstructed_key_bytes)
-            .map_err(|e| anyhow!("failed to reconstruct FALCON-1024 secret key: {}", e))?;
+            .map_err(|e| anyhow!("failed to reconstruct FALCON-1024 secret key: {e}"))?;
 
         // Hash the message (matching FalconCrypto::sign convention).
         let message_hash = sha256_hash(message);
@@ -518,11 +519,7 @@ mod tests {
             let reconstructed = scheme
                 .reconstruct_secret(&subset)
                 .expect("test: reconstruct combo");
-            assert_eq!(
-                reconstructed, secret,
-                "failed for combination {:?}",
-                combo
-            );
+            assert_eq!(reconstructed, secret, "failed for combination {combo:?}");
         }
     }
 
@@ -631,17 +628,21 @@ mod tests {
 
         // Division: a / a == 1 for all nonzero a.
         for a in 1..=255u8 {
-            assert_eq!(gf_div(a, a), 1, "a/a should be 1 for a={}", a);
+            assert_eq!(gf_div(a, a), 1, "a/a should be 1 for a={a}");
         }
 
         // Inverse round-trip: inv(inv(a)) == a.
         for a in 1..=255u8 {
-            assert_eq!(gf_inv(gf_inv(a)), a, "double inverse of {} should be identity", a);
+            assert_eq!(
+                gf_inv(gf_inv(a)),
+                a,
+                "double inverse of {a} should be identity"
+            );
         }
 
         // mul(a, inv(a)) == 1.
         for a in 1..=255u8 {
-            assert_eq!(gf_mul(a, gf_inv(a)), 1, "a * inv(a) should be 1 for a={}", a);
+            assert_eq!(gf_mul(a, gf_inv(a)), 1, "a * inv(a) should be 1 for a={a}");
         }
     }
 

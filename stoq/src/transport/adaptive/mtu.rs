@@ -62,7 +62,10 @@ impl MtuDiscovery {
             self.probe_state = MtuProbeState::Confirmed;
             info!("MTU discovery converged at {} bytes", self.current_mtu);
         } else {
-            debug!("MTU probe succeeded at {}, searching [{}, {}]", mtu, self.search_low, self.search_high);
+            debug!(
+                "MTU probe succeeded at {}, searching [{}, {}]",
+                mtu, self.search_low, self.search_high
+            );
         }
     }
 
@@ -74,9 +77,15 @@ impl MtuDiscovery {
         if self.search_high <= self.search_low || self.search_high <= self.min_mtu {
             self.current_mtu = self.min_mtu;
             self.probe_state = MtuProbeState::Failed;
-            info!("MTU discovery failed, fell back to minimum {} bytes", self.min_mtu);
+            info!(
+                "MTU discovery failed, fell back to minimum {} bytes",
+                self.min_mtu
+            );
         } else {
-            debug!("MTU probe failed, narrowing to [{}, {}]", self.search_low, self.search_high);
+            debug!(
+                "MTU probe failed, narrowing to [{}, {}]",
+                self.search_low, self.search_high
+            );
         }
     }
 
@@ -151,8 +160,7 @@ mod tests {
         let third_probe = mtu.next_probe_size();
         assert!(
             third_probe >= first_mid && third_probe <= second_mid,
-            "binary search should narrow: {} in [{}, {}]",
-            third_probe, first_mid, second_mid
+            "binary search should narrow: {third_probe} in [{first_mid}, {second_mid}]"
         );
     }
 }

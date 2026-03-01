@@ -7,17 +7,17 @@
 //! This server provides TrustChain services over STOQ protocol (QUIC/IPv6).
 //! No HTTP dependencies - pure STOQ transport for all certificate operations.
 
-use std::sync::Arc;
 use anyhow::Result;
-use tracing::{info, error};
+use std::sync::Arc;
 use tokio::signal;
+use tracing::{error, info};
 
 use trustchain::{
-    ca::{TrustChainCA, CAConfig, CAMode},
+    api::stoq_api::{TrustChainStoqApi, TrustChainStoqConfig},
+    ca::{CAConfig, CAMode, TrustChainCA},
+    config::DnsConfig,
     consensus::{ConsensusRequirements, HyperMeshClientConfig},
     dns::DnsResolver,
-    config::DnsConfig,
-    api::stoq_api::{TrustChainStoqApi, TrustChainStoqConfig},
 };
 
 #[tokio::main]
@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,trustchain=debug,stoq=debug".into())
+                .unwrap_or_else(|_| "info,trustchain=debug,stoq=debug".into()),
         )
         .init();
 
@@ -132,10 +132,7 @@ async fn main() -> Result<()> {
     api.stop();
 
     // Wait for server task to complete
-    let _ = tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        server_task
-    ).await;
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), server_task).await;
 
     info!("👋 TrustChain STOQ server shutdown complete");
 

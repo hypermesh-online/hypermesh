@@ -220,7 +220,7 @@ impl SyncManager {
         now_unix_secs: u64,
     ) -> Result<(), String> {
         if self.network_memberships.contains_key(&network_id) {
-            return Err(format!("Already a member of network {}", network_id));
+            return Err(format!("Already a member of network {network_id}"));
         }
 
         if self.network_memberships.len() >= self.config.max_networks {
@@ -246,8 +246,7 @@ impl SyncManager {
 
         self.network_memberships
             .insert(network_id.clone(), membership);
-        self.sync_states
-            .insert(network_id, SyncState::Discovering);
+        self.sync_states.insert(network_id, SyncState::Discovering);
 
         Ok(())
     }
@@ -257,7 +256,7 @@ impl SyncManager {
     /// Returns an error string if the node is not a member of the network.
     pub fn leave_network(&mut self, network_id: &str) -> Result<(), String> {
         if self.network_memberships.remove(network_id).is_none() {
-            return Err(format!("Not a member of network {}", network_id));
+            return Err(format!("Not a member of network {network_id}"));
         }
 
         self.sync_states.remove(network_id);
@@ -288,13 +287,9 @@ impl SyncManager {
     }
 
     /// Update the sync state for a network
-    pub fn update_sync_state(
-        &mut self,
-        network_id: &str,
-        state: SyncState,
-    ) -> Result<(), String> {
+    pub fn update_sync_state(&mut self, network_id: &str, state: SyncState) -> Result<(), String> {
         if !self.network_memberships.contains_key(network_id) {
-            return Err(format!("Not a member of network {}", network_id));
+            return Err(format!("Not a member of network {network_id}"));
         }
 
         debug!(
@@ -320,10 +315,7 @@ impl SyncManager {
     /// When a `BlockProvider` is supplied, `SyncRequest` responses are
     /// populated with real block hashes from the local chain.  Without a
     /// provider the response contains an empty hash list (legacy behaviour).
-    pub fn process_sync_message(
-        &mut self,
-        msg: SyncMessage,
-    ) -> Option<SyncMessage> {
+    pub fn process_sync_message(&mut self, msg: SyncMessage) -> Option<SyncMessage> {
         self.process_sync_message_with_provider(msg, None)
     }
 
@@ -338,25 +330,19 @@ impl SyncManager {
                 network_id,
                 from_height,
                 max_blocks,
-            } => {
-                self.handle_sync_request(&network_id, from_height, max_blocks, provider)
-            }
+            } => self.handle_sync_request(&network_id, from_height, max_blocks, provider),
 
             SyncMessage::Announce {
                 network_id,
                 block_height,
                 block_hash,
-            } => {
-                self.handle_sync_announce(&network_id, block_height, &block_hash)
-            }
+            } => self.handle_sync_announce(&network_id, block_height, &block_hash),
 
             SyncMessage::Response {
                 network_id,
                 block_hashes,
                 peer_height,
-            } => {
-                self.handle_sync_response(&network_id, block_hashes, peer_height)
-            }
+            } => self.handle_sync_response(&network_id, block_hashes, peer_height),
         }
     }
 
@@ -483,13 +469,11 @@ impl SyncManager {
         let state = self.sync_states.get(network_id)?;
 
         match state {
-            SyncState::Discovering | SyncState::Syncing { .. } => {
-                Some(SyncMessage::Request {
-                    network_id: network_id.to_string(),
-                    from_height: local_height,
-                    max_blocks: 50,
-                })
-            }
+            SyncState::Discovering | SyncState::Syncing { .. } => Some(SyncMessage::Request {
+                network_id: network_id.to_string(),
+                from_height: local_height,
+                max_blocks: 50,
+            }),
             _ => None,
         }
     }
@@ -499,10 +483,7 @@ impl SyncManager {
         self.sync_states
             .iter()
             .filter(|(_, state)| {
-                matches!(
-                    state,
-                    SyncState::Discovering | SyncState::Syncing { .. }
-                )
+                matches!(state, SyncState::Discovering | SyncState::Syncing { .. })
             })
             .map(|(id, _)| id.as_str())
             .collect()
@@ -534,17 +515,14 @@ mod tests {
         let mut mgr = SyncManager::new("dev-chain".to_string(), default_config());
 
         // Join a network
-        let result = mgr.join_network(
-            "net-alpha".to_string(),
-            PrivacyMode::PUBLIC,
-            1000,
-        );
+        let result = mgr.join_network("net-alpha".to_string(), PrivacyMode::PUBLIC, 1000);
         assert!(result.is_ok());
         assert_eq!(mgr.active_network_count(), 1);
         assert!(mgr.is_member("net-alpha"));
 
         // Verify initial state is Discovering
-        let state = mgr.sync_state("net-alpha")
+        let state = mgr
+            .sync_state("net-alpha")
             .expect("test: sync state should exist");
         assert_eq!(*state, SyncState::Discovering);
 
@@ -565,8 +543,7 @@ mod tests {
         let result = mgr.join_network("net-1".to_string(), PrivacyMode::PRIVATE, 200);
         assert!(result.is_err());
         assert!(result
-            .err()
-            .expect("test: should have error")
+            .expect_err("test: should have error")
             .contains("Already a member"));
     }
 
@@ -586,8 +563,7 @@ mod tests {
         let result = mgr.join_network("n3".to_string(), PrivacyMode::PUBLIC, 3);
         assert!(result.is_err());
         assert!(result
-            .err()
-            .expect("test: should have error")
+            .expect_err("test: should have error")
             .contains("Maximum network memberships"));
     }
 
@@ -607,13 +583,20 @@ mod tests {
             .expect("test: join");
 
         // Transition: Discovering -> Syncing
-        mgr.update_sync_state("net", SyncState::Syncing {
-            progress: 0.5,
-            peer_count: 3,
-        })
+        mgr.update_sync_state(
+            "net",
+            SyncState::Syncing {
+                progress: 0.5,
+                peer_count: 3,
+            },
+        )
         .expect("test: update to syncing");
 
-        if let Some(SyncState::Syncing { progress, peer_count }) = mgr.sync_state("net") {
+        if let Some(SyncState::Syncing {
+            progress,
+            peer_count,
+        }) = mgr.sync_state("net")
+        {
             assert!((*progress - 0.5).abs() < f64::EPSILON);
             assert_eq!(*peer_count, 3);
         } else {
@@ -621,14 +604,19 @@ mod tests {
         }
 
         // Transition: Syncing -> Synchronized
-        mgr.update_sync_state("net", SyncState::Synchronized {
-            last_block_height: 42,
-        })
+        mgr.update_sync_state(
+            "net",
+            SyncState::Synchronized {
+                last_block_height: 42,
+            },
+        )
         .expect("test: update to synchronized");
 
         assert_eq!(
             mgr.sync_state("net"),
-            Some(&SyncState::Synchronized { last_block_height: 42 })
+            Some(&SyncState::Synchronized {
+                last_block_height: 42
+            })
         );
     }
 
@@ -642,9 +630,12 @@ mod tests {
 
         mgr.join_network("net".to_string(), PrivacyMode::PUBLIC, 100)
             .expect("test: join");
-        mgr.update_sync_state("net", SyncState::Synchronized {
-            last_block_height: 50,
-        })
+        mgr.update_sync_state(
+            "net",
+            SyncState::Synchronized {
+                last_block_height: 50,
+            },
+        )
         .expect("test: set synchronized");
 
         // Announce a block far ahead -- should trigger resync
@@ -688,9 +679,12 @@ mod tests {
         }
 
         // Should NOT generate request when Synchronized
-        mgr.update_sync_state("net", SyncState::Synchronized {
-            last_block_height: 42,
-        })
+        mgr.update_sync_state(
+            "net",
+            SyncState::Synchronized {
+                last_block_height: 42,
+            },
+        )
         .expect("test: set synchronized");
 
         let req = mgr.generate_sync_request("net", 42);
@@ -711,9 +705,12 @@ mod tests {
         assert_eq!(needing.len(), 2);
 
         // Synchronize n1
-        mgr.update_sync_state("n1", SyncState::Synchronized {
-            last_block_height: 100,
-        })
+        mgr.update_sync_state(
+            "n1",
+            SyncState::Synchronized {
+                last_block_height: 100,
+            },
+        )
         .expect("test: synchronize n1");
 
         let needing = mgr.networks_needing_sync();

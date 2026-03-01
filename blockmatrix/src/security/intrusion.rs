@@ -4,8 +4,8 @@
 
 //! Intrusion detection and threat analysis
 
-use super::{NetworkPacket, SeverityLevel, error::Result};
-use serde::{Serialize, Deserialize};
+use super::{error::Result, NetworkPacket, SeverityLevel};
+use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 use tracing::warn;
@@ -58,6 +58,12 @@ pub struct IDSStats {
     pub total_analyzed: u64,
 }
 
+impl Default for IntrusionDetectionSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IntrusionDetectionSystem {
     pub fn new() -> Self {
         Self {
@@ -66,10 +72,10 @@ impl IntrusionDetectionSystem {
             statistics: RwLock::new(IDSStats::default()),
         }
     }
-    
+
     pub async fn analyze_traffic(&self, packet: &NetworkPacket) -> Vec<ThreatIndicator> {
         let mut threats = Vec::new();
-        
+
         // Simulate threat detection
         if packet.payload_size > 1400 {
             threats.push(ThreatIndicator {
@@ -82,21 +88,24 @@ impl IntrusionDetectionSystem {
                 source: "network_analyzer".to_string(),
             });
         }
-        
+
         // Update statistics
         let mut stats = self.statistics.write().await;
         stats.total_analyzed += 1;
         stats.threats_detected += threats.len() as u64;
-        
+
         threats
     }
-    
+
     pub async fn report_threat(&self, indicator: ThreatIndicator) -> Result<()> {
-        warn!("Threat detected: {} - {}", indicator.indicator_type, indicator.description);
-        
+        warn!(
+            "Threat detected: {} - {}",
+            indicator.indicator_type, indicator.description
+        );
+
         let mut indicators = self.threat_indicators.write().await;
         indicators.push(indicator);
-        
+
         Ok(())
     }
 }

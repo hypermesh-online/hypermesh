@@ -91,6 +91,12 @@ pub struct QuorumState {
     total_peers: usize,
 }
 
+impl Default for QuorumState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QuorumState {
     /// Create an empty quorum state.
     pub fn new() -> Self {
@@ -274,11 +280,7 @@ impl SyncProtocol {
     // -- Sync flow -----------------------------------------------------------
 
     /// Send a sync request to a specific peer.
-    pub fn request_sync(
-        &self,
-        target_node: &str,
-        from_height: u64,
-    ) -> anyhow::Result<()> {
+    pub fn request_sync(&self, target_node: &str, from_height: u64) -> anyhow::Result<()> {
         let msg = ReflectorMessage::SyncRequest {
             network_id: self.network_id,
             from_height,
@@ -312,11 +314,7 @@ impl SyncProtocol {
     /// Broadcast a block announcement to all connected reflectors.
     ///
     /// Returns the number of reflectors the announcement was sent to.
-    pub fn announce_block(
-        &self,
-        block_height: u64,
-        block_hash: [u8; 32],
-    ) -> anyhow::Result<usize> {
+    pub fn announce_block(&self, block_height: u64, block_hash: [u8; 32]) -> anyhow::Result<usize> {
         let msg = ReflectorMessage::BlockAnnounce {
             network_id: self.network_id,
             block_height,
@@ -548,8 +546,8 @@ mod tests {
 
         // 4 peers, threshold 0.67 -> required = ceil(4 * 0.67) = ceil(2.68) = 3
         for i in 1..=4 {
-            let id = format!("p{}", i);
-            t.connect_reflector(id.clone(), format!("[::1]:900{}", i), test_position(i as f64))
+            let id = format!("p{i}");
+            t.connect_reflector(id.clone(), format!("[::1]:900{i}"), test_position(i as f64))
                 .expect("test: connect");
             p.process_heartbeat(&id, 50, 1.0, test_position(i as f64));
         }
@@ -610,7 +608,10 @@ mod tests {
             .expect("test: connect");
         p.process_heartbeat("ahead", 100, 1.0, test_position(1.0));
 
-        assert!(p.needs_sync(), "peer at 100 vs local at 50 should need sync");
+        assert!(
+            p.needs_sync(),
+            "peer at 100 vs local at 50 should need sync"
+        );
 
         // Bring local up to date
         p.set_block_height(100);
@@ -626,9 +627,7 @@ mod tests {
             .expect("test: connect r2");
 
         let p = make_protocol(t.clone());
-        let count = p
-            .announce_block(99, [0xFF; 32])
-            .expect("test: announce");
+        let count = p.announce_block(99, [0xFF; 32]).expect("test: announce");
         assert_eq!(count, 2);
 
         let outbox = t.drain_outbox();

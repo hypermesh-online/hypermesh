@@ -4,19 +4,19 @@
 
 //! TrustChain client for certificate operations over QUIC
 
+use anyhow::{anyhow, Result};
+use base64::prelude::*;
+use quinn;
+use rcgen::generate_simple_self_signed;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use sha2::{Digest, Sha256};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
-use anyhow::{Result, anyhow};
-use quinn;
-use base64::prelude::*;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rcgen::generate_simple_self_signed;
-use sha2::{Sha256, Digest};
-use tracing::{info, debug, warn};
+use tracing::{debug, info, warn};
 
-use crate::protocol::STOQ_ALPN;
 use super::types::StoqNodeCertificate;
+use crate::protocol::STOQ_ALPN;
 
 /// TrustChain client for certificate operations
 #[derive(Clone)]
@@ -42,7 +42,10 @@ impl TrustChainClient {
             return self.generate_local_certificate(common_name, ipv6_addresses, metadata);
         }
 
-        info!("Requesting certificate from TrustChain CA: {}", self.endpoint);
+        info!(
+            "Requesting certificate from TrustChain CA: {}",
+            self.endpoint
+        );
 
         let (host, port) = self.parse_endpoint()?;
         let ipv6_addr = self.resolve_ipv6(host, port).await?;
@@ -56,9 +59,10 @@ impl TrustChainClient {
 
         // Connect to TrustChain CA
         info!("Connecting to TrustChain CA at {}", ipv6_addr);
-        let connection = endpoint.connect(ipv6_addr, host)?
+        let connection = endpoint
+            .connect(ipv6_addr, host)?
             .await
-            .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {}", e))?;
+            .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {e}"))?;
 
         // Open bidirectional stream
         let (mut send_stream, mut recv_stream) = connection.open_bi().await?;
@@ -95,10 +99,12 @@ impl TrustChainClient {
         let response_json: serde_json::Value = serde_json::from_str(response_body)?;
 
         // Extract certificate from response
-        let certificate = response_json.get("certificate")
+        let certificate = response_json
+            .get("certificate")
             .ok_or_else(|| anyhow!("No certificate in TrustChain response"))?;
 
-        let certificate_der_b64 = certificate.get("certificate_der")
+        let certificate_der_b64 = certificate
+            .get("certificate_der")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("No certificate_der in TrustChain response"))?;
 
@@ -115,14 +121,17 @@ impl TrustChainClient {
             node_id: self.node_id.clone(),
             certificate: CertificateDer::from(certificate_der),
             private_key: PrivateKeyDer::try_from(private_key)
-                .map_err(|e| anyhow!("Failed to create private key: {}", e))?,
+                .map_err(|e| anyhow!("Failed to create private key: {e}"))?,
             issued_at: now,
             expires_at,
             fingerprint_sha256: fingerprint,
             metadata: metadata.map(|m| m.to_vec()),
         };
 
-        info!("Certificate obtained from TrustChain CA: {}", stoq_cert.fingerprint());
+        info!(
+            "Certificate obtained from TrustChain CA: {}",
+            stoq_cert.fingerprint()
+        );
         Ok(stoq_cert)
     }
 
@@ -131,9 +140,22 @@ impl TrustChainClient {
         // Local TrustChain: do local structure validation only (no remote CT check)
         if self.endpoint.starts_with("local://") {
             info!("Local TrustChain: validating certificate structure locally");
-            return self.validate_certificate_structure(cert_der)
-                .and_then(|ok| if ok { self.validate_certificate_expiration(cert_der) } else { Ok(false) })
-                .and_then(|ok| if ok { self.validate_certificate_crypto_strength(cert_der) } else { Ok(false) });
+            return self
+                .validate_certificate_structure(cert_der)
+                .and_then(|ok| {
+                    if ok {
+                        self.validate_certificate_expiration(cert_der)
+                    } else {
+                        Ok(false)
+                    }
+                })
+                .and_then(|ok| {
+                    if ok {
+                        self.validate_certificate_crypto_strength(cert_der)
+                    } else {
+                        Ok(false)
+                    }
+                });
         }
 
         info!("Validating certificate with TrustChain CT logs (hardened validation)");
@@ -159,13 +181,14 @@ impl TrustChainClient {
         let mut endpoint = quinn::Endpoint::client("[::]:0".parse()?)?;
         endpoint.set_default_client_config(quinn_config);
 
-        let connection = endpoint.connect(ipv6_addr, host)?
+        let connection = endpoint
+            .connect(ipv6_addr, host)?
             .await
-            .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {}", e))?;
+            .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {e}"))?;
 
         let (mut send_stream, mut recv_stream) = connection.open_bi().await?;
 
-        let request_data = format!("GET /ct/proof/{} HTTP/1.1\r\nHost: {}\r\n\r\n", fingerprint, host);
+        let request_data = format!("GET /ct/proof/{fingerprint} HTTP/1.1\r\nHost: {host}\r\n\r\n");
         send_stream.write_all(request_data.as_bytes()).await?;
         send_stream.finish()?;
 
@@ -202,47 +225,51 @@ impl TrustChainClient {
             .with_no_client_auth();
 
         let quinn_config = quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?
+            quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
         ));
 
         let mut endpoint = quinn::Endpoint::client("[::]:0".parse()?)?;
         endpoint.set_default_client_config(quinn_config);
 
-        let connection = tokio::time::timeout(
-            Duration::from_secs(10),
-            endpoint.connect(ipv6_addr, host)?
-        ).await
-        .map_err(|_| anyhow!("TrustChain connection timeout"))?
-        .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {}", e))?;
+        let connection =
+            tokio::time::timeout(Duration::from_secs(10), endpoint.connect(ipv6_addr, host)?)
+                .await
+                .map_err(|_| anyhow!("TrustChain connection timeout"))?
+                .map_err(|e| anyhow!("Failed to connect to TrustChain CA: {e}"))?;
 
         let (mut send_stream, mut recv_stream) = connection.open_bi().await?;
 
-        let request_data = format!("GET /ca/revocation/{} HTTP/1.1\r\nHost: {}\r\n\r\n", fingerprint, host);
+        let request_data =
+            format!("GET /ca/revocation/{fingerprint} HTTP/1.1\r\nHost: {host}\r\n\r\n");
 
         tokio::time::timeout(
             Duration::from_secs(5),
-            send_stream.write_all(request_data.as_bytes())
-        ).await
+            send_stream.write_all(request_data.as_bytes()),
+        )
+        .await
         .map_err(|_| anyhow!("TrustChain request timeout"))??;
 
         send_stream.finish()?;
 
-        let response = tokio::time::timeout(
-            Duration::from_secs(5),
-            recv_stream.read_to_end(16 * 1024)
-        ).await
-        .map_err(|_| anyhow!("TrustChain response timeout"))??;
+        let response =
+            tokio::time::timeout(Duration::from_secs(5), recv_stream.read_to_end(16 * 1024))
+                .await
+                .map_err(|_| anyhow!("TrustChain response timeout"))??;
 
         let response_str = String::from_utf8(response)?;
         let response_body = self.extract_http_body(&response_str)?;
         let response_json: serde_json::Value = serde_json::from_str(response_body)?;
 
-        let is_not_revoked = response_json.get("status")
+        let is_not_revoked = response_json
+            .get("status")
             .and_then(|s| s.as_str())
             .map(|s| s == "not_found" || s == "valid")
             .unwrap_or(false);
 
-        debug!("Certificate revocation check: not_revoked={}", is_not_revoked);
+        debug!(
+            "Certificate revocation check: not_revoked={}",
+            is_not_revoked
+        );
         Ok(is_not_revoked)
     }
 
@@ -255,17 +282,20 @@ impl TrustChainClient {
         ipv6_addresses: &[Ipv6Addr],
         metadata: Option<&[u8]>,
     ) -> Result<StoqNodeCertificate> {
-        info!("Local TrustChain: generating self-signed certificate for {}", common_name);
+        info!(
+            "Local TrustChain: generating self-signed certificate for {}",
+            common_name
+        );
 
         let mut san_entries = vec![common_name.to_string()];
         for addr in ipv6_addresses {
-            san_entries.push(format!("{}", addr));
+            san_entries.push(format!("{addr}"));
         }
 
         let cert_key = generate_simple_self_signed(san_entries)?;
         let cert_der = cert_key.cert.der().clone();
         let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
-            .map_err(|e| anyhow!("Failed to serialize private key: {}", e))?;
+            .map_err(|e| anyhow!("Failed to serialize private key: {e}"))?;
 
         let fingerprint = self.calculate_fingerprint(cert_der.as_ref());
         let now = SystemTime::now();
@@ -281,7 +311,10 @@ impl TrustChainClient {
             metadata: metadata.map(|m| m.to_vec()),
         };
 
-        info!("Local TrustChain certificate generated: {}", stoq_cert.fingerprint());
+        info!(
+            "Local TrustChain certificate generated: {}",
+            stoq_cert.fingerprint()
+        );
         Ok(stoq_cert)
     }
 
@@ -302,35 +335,42 @@ impl TrustChainClient {
 
     /// Parse endpoint URL into host and port
     fn parse_endpoint(&self) -> Result<(&str, u16)> {
-        let endpoint_url = self.endpoint.strip_prefix("quic://").unwrap_or(&self.endpoint);
+        let endpoint_url = self
+            .endpoint
+            .strip_prefix("quic://")
+            .unwrap_or(&self.endpoint);
 
         let (host, port_str) = if endpoint_url.starts_with('[') {
-            let close_bracket = endpoint_url.find(']')
+            let close_bracket = endpoint_url
+                .find(']')
                 .ok_or_else(|| anyhow!("Invalid IPv6 endpoint format: {}", self.endpoint))?;
             let ipv6_addr = &endpoint_url[1..close_bracket];
-            let port_part = &endpoint_url[close_bracket+1..];
+            let port_part = &endpoint_url[close_bracket + 1..];
             (ipv6_addr, port_part.trim_start_matches(':'))
         } else {
             let parts: Vec<&str> = endpoint_url.split(':').collect();
             if parts.len() != 2 {
-                return Err(anyhow!("Invalid TrustChain endpoint format: {}", self.endpoint));
+                return Err(anyhow!(
+                    "Invalid TrustChain endpoint format: {}",
+                    self.endpoint
+                ));
             }
             (parts[0], parts[1])
         };
 
-        let port = port_str.parse::<u16>()
-            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {}", port_str))?;
+        let port = port_str
+            .parse::<u16>()
+            .map_err(|_| anyhow!("Invalid port in TrustChain endpoint: {port_str}"))?;
 
         Ok((host, port))
     }
 
     /// Resolve hostname to IPv6 address
     async fn resolve_ipv6(&self, host: &str, port: u16) -> Result<std::net::SocketAddr> {
-        let socket_addrs = tokio::net::lookup_host((host, port)).await?;
+        let mut socket_addrs = tokio::net::lookup_host((host, port)).await?;
         socket_addrs
-            .filter(|addr| addr.is_ipv6())
-            .next()
-            .ok_or_else(|| anyhow!("No IPv6 address found for TrustChain host: {}", host))
+            .find(|addr| addr.is_ipv6())
+            .ok_or_else(|| anyhow!("No IPv6 address found for TrustChain host: {host}"))
     }
 
     /// Build quinn client config with STOQ ALPN
@@ -342,13 +382,10 @@ impl TrustChainClient {
             .with_root_certificates(roots)
             .with_no_client_auth();
 
-        client_config.alpn_protocols = vec![
-            STOQ_ALPN.to_vec(),
-            b"h3".to_vec(),
-        ];
+        client_config.alpn_protocols = vec![STOQ_ALPN.to_vec(), b"h3".to_vec()];
 
         Ok(quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?
+            quinn::crypto::rustls::QuicClientConfig::try_from(client_config)?,
         )))
     }
 
@@ -419,13 +456,19 @@ impl TrustChainClient {
             Ok((_, cert)) => {
                 let sig_alg = &cert.signature_algorithm.algorithm;
 
-                if sig_alg == &x509_parser::oid_registry::OID_PKCS1_MD5WITHRSAENC ||
-                   sig_alg == &x509_parser::oid_registry::OID_PKCS1_SHA1WITHRSA {
+                if sig_alg == &x509_parser::oid_registry::OID_PKCS1_MD5WITHRSAENC
+                    || sig_alg == &x509_parser::oid_registry::OID_PKCS1_SHA1WITHRSA
+                {
                     debug!("Certificate uses weak signature algorithm");
                     return Ok(false);
                 }
 
-                let alg_oid = cert.tbs_certificate.subject_pki.algorithm.algorithm.to_id_string();
+                let alg_oid = cert
+                    .tbs_certificate
+                    .subject_pki
+                    .algorithm
+                    .algorithm
+                    .to_id_string();
                 if alg_oid.contains("1.2.840.113549.1.1") {
                     debug!("RSA algorithm detected: {}", alg_oid);
                 }

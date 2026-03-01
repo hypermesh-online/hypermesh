@@ -5,7 +5,7 @@
 //! Comprehensive tests for Matrix3x3 operations
 
 use crate::matrix::tensor::matrix_ops::Matrix3x3;
-use crate::matrix::tensor::vector::{Vector3D, TensorError};
+use crate::matrix::tensor::vector::{TensorError, Vector3D};
 use std::f64::consts::PI;
 
 const EPSILON: f64 = 1e-10;
@@ -26,6 +26,7 @@ fn test_identity_matrix_creation() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)]
 fn test_identity_matrix_transform() {
     let identity = Matrix3x3::identity();
     let vec = Vector3D::new(3.14, 2.71, 1.41);
@@ -125,11 +126,7 @@ fn test_matrix_multiplication_identity() {
 
 #[test]
 fn test_transpose() {
-    let mat = Matrix3x3::new([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ]);
+    let mat = Matrix3x3::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
 
     let transposed = mat.transpose();
 
@@ -142,11 +139,7 @@ fn test_transpose() {
 
 #[test]
 fn test_transpose_twice_is_identity() {
-    let mat = Matrix3x3::new([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ]);
+    let mat = Matrix3x3::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
 
     let twice_transposed = mat.transpose().transpose();
 
@@ -165,28 +158,20 @@ fn test_determinant_identity() {
 
 #[test]
 fn test_determinant_singular_matrix() {
-    let singular = Matrix3x3::new([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ]);
+    let singular = Matrix3x3::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
     assert!(singular.determinant().abs() < EPSILON);
 }
 
 #[test]
 fn test_determinant_known_value() {
-    let mat = Matrix3x3::new([
-        [2.0, 1.0, 3.0],
-        [1.0, 0.0, 1.0],
-        [0.0, 2.0, 4.0],
-    ]);
-    assert!((mat.determinant() - 2.0).abs() < EPSILON);
+    let mat = Matrix3x3::new([[2.0, 1.0, 3.0], [1.0, 0.0, 1.0], [0.0, 2.0, 4.0]]);
+    assert!((mat.determinant() - (-2.0)).abs() < EPSILON);
 }
 
 #[test]
 fn test_inverse_identity() {
     let identity = Matrix3x3::identity();
-    let inverse = identity.inverse().unwrap();
+    let inverse = identity.inverse().expect("test: expected success");
 
     for i in 0..3 {
         for j in 0..3 {
@@ -197,13 +182,9 @@ fn test_inverse_identity() {
 
 #[test]
 fn test_inverse_product_is_identity() {
-    let mat = Matrix3x3::new([
-        [2.0, 1.0, 3.0],
-        [1.0, 0.0, 1.0],
-        [0.0, 2.0, 4.0],
-    ]);
+    let mat = Matrix3x3::new([[2.0, 1.0, 3.0], [1.0, 0.0, 1.0], [0.0, 2.0, 4.0]]);
 
-    let inverse = mat.inverse().unwrap();
+    let inverse = mat.inverse().expect("test: expected success");
     let product = mat.multiply(&inverse);
 
     for i in 0..3 {
@@ -216,11 +197,7 @@ fn test_inverse_product_is_identity() {
 
 #[test]
 fn test_inverse_singular_matrix_error() {
-    let singular = Matrix3x3::new([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ]);
+    let singular = Matrix3x3::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
 
     let result = singular.inverse();
     assert!(matches!(result, Err(TensorError::SingularMatrix)));
@@ -240,11 +217,7 @@ fn test_non_orthogonal_scaling_matrix() {
 
 #[test]
 fn test_get_element() {
-    let mat = Matrix3x3::new([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0],
-    ]);
+    let mat = Matrix3x3::new([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
 
     assert_eq!(mat.get(0, 0), Some(1.0));
     assert_eq!(mat.get(1, 1), Some(5.0));
@@ -257,7 +230,7 @@ fn test_get_element() {
 fn test_set_element() {
     let mut mat = Matrix3x3::identity();
 
-    mat.set(0, 1, 5.0).unwrap();
+    mat.set(0, 1, 5.0).expect("test: expected success");
     assert_eq!(mat.data[0][1], 5.0);
 
     let result = mat.set(3, 0, 1.0);
@@ -268,7 +241,7 @@ fn test_set_element() {
 fn test_rotation_axis_angle_z_axis() {
     let axis = Vector3D::new(0.0, 0.0, 1.0);
     let angle = PI / 2.0;
-    let rot = Matrix3x3::rotation_axis_angle(&axis, angle).unwrap();
+    let rot = Matrix3x3::rotation_axis_angle(&axis, angle).expect("test: expected success");
 
     let vec = Vector3D::new(1.0, 0.0, 0.0);
     let rotated = rot.transform_vector(&vec);
@@ -280,9 +253,9 @@ fn test_rotation_axis_angle_z_axis() {
 
 #[test]
 fn test_rotation_axis_angle_arbitrary() {
-    let axis = Vector3D::new(1.0, 1.0, 1.0).normalize().unwrap();
+    let axis = Vector3D::new(1.0, 1.0, 1.0).normalize().expect("test: creation");
     let angle = 2.0 * PI / 3.0;
-    let rot = Matrix3x3::rotation_axis_angle(&axis, angle).unwrap();
+    let rot = Matrix3x3::rotation_axis_angle(&axis, angle).expect("test: expected success");
 
     // Rotating a vector 120 degrees around (1,1,1) axis
     let vec = Vector3D::new(1.0, 0.0, 0.0);
@@ -316,7 +289,7 @@ fn test_matrix_default() {
 #[test]
 fn test_matrix_display() {
     let mat = Matrix3x3::identity();
-    let display = format!("{}", mat);
+    let display = format!("{mat}");
 
     assert!(display.contains("1.000"));
     assert!(display.contains("0.000"));
@@ -357,10 +330,9 @@ fn test_scaling_then_rotation() {
 
 #[test]
 fn test_rotation_preserves_length() {
-    let rot = Matrix3x3::rotation_axis_angle(
-        &Vector3D::new(1.0, 2.0, 3.0).normalize().unwrap(),
-        1.234,
-    ).unwrap();
+    let rot =
+        Matrix3x3::rotation_axis_angle(&Vector3D::new(1.0, 2.0, 3.0).normalize().expect("test: creation"), 1.234)
+            .expect("test: expected success");
 
     let vec = Vector3D::new(3.0, 4.0, 5.0);
     let rotated = rot.transform_vector(&vec);

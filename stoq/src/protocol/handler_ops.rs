@@ -10,13 +10,13 @@
 
 use std::time::Duration;
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use quinn::VarInt;
 use tracing::{debug, warn};
 
-use crate::extensions::{PacketToken, PacketShard};
 use super::frames;
 use super::StoqProtocolHandler;
+use crate::extensions::{PacketShard, PacketToken};
 
 /// Shard storage for reassembly
 #[derive(Debug, Clone)]
@@ -81,7 +81,11 @@ impl StoqProtocolHandler {
     }
 
     /// Update connection state with validated token
-    pub(super) fn update_connection_state(&self, stream_id: Option<VarInt>, token: PacketToken) -> Result<()> {
+    pub(super) fn update_connection_state(
+        &self,
+        stream_id: Option<VarInt>,
+        token: PacketToken,
+    ) -> Result<()> {
         if let Some(stream_id) = stream_id {
             let mut states = self.connection_states.write();
             let state = states.entry(stream_id).or_insert_with(|| ConnectionState {
@@ -130,7 +134,10 @@ impl StoqProtocolHandler {
 
         // Check if shard already exists
         if entry.shards.iter().any(|s| s.sequence == shard.sequence) {
-            debug!("Duplicate shard received: id={}, seq={}", shard_id, shard.sequence);
+            debug!(
+                "Duplicate shard received: id={}, seq={}",
+                shard_id, shard.sequence
+            );
             return Ok(());
         }
 
@@ -146,7 +153,10 @@ impl StoqProtocolHandler {
 
         // Check if we have all shards for reassembly
         if entry.shards.len() == total_shards as usize {
-            debug!("All shards received for id {}, triggering reassembly", shard_id);
+            debug!(
+                "All shards received for id {}, triggering reassembly",
+                shard_id
+            );
 
             // Clone shards for reassembly
             let shards = entry.shards.clone();
@@ -157,7 +167,10 @@ impl StoqProtocolHandler {
             // Attempt reassembly
             match self.extensions.reassemble_shards(shards) {
                 Ok(_data) => {
-                    debug!("Successfully reassembled packet from {} shards", total_shards);
+                    debug!(
+                        "Successfully reassembled packet from {} shards",
+                        total_shards
+                    );
                     // Here you could trigger further processing of the reassembled data
                 }
                 Err(e) => {
@@ -207,17 +220,18 @@ impl StoqProtocolHandler {
 
             Ok(())
         } else {
-            Err(anyhow!("FALCON transport not enabled for signature verification"))
+            Err(anyhow!(
+                "FALCON transport not enabled for signature verification"
+            ))
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
     use crate::extensions::{DefaultStoqExtensions, StoqProtocolExtension};
+    use std::sync::Arc;
 
     #[test]
     fn test_token_validation() {
@@ -232,15 +246,15 @@ mod tests {
             sequence: 123,
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("test: expected success")
                 .as_secs(),
         };
 
         // Test valid token
-        assert!(handler.validate_token(&token).unwrap());
+        assert!(handler.validate_token(&token).expect("test: validation"));
 
         // Test replay detection (second validation should fail)
-        assert!(!handler.validate_token(&token).unwrap());
+        assert!(!handler.validate_token(&token).expect("test: validation"));
 
         // Test expired token
         let expired_token = PacketToken {
@@ -248,10 +262,11 @@ mod tests {
             sequence: 456,
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs() - 400, // 400 seconds ago (more than 5 minutes)
+                .expect("test: expected success")
+                .as_secs()
+                - 400, // 400 seconds ago (more than 5 minutes)
         };
-        assert!(!handler.validate_token(&expired_token).unwrap());
+        assert!(!handler.validate_token(&expired_token).expect("test: validation"));
     }
 
     #[test]
@@ -260,11 +275,11 @@ mod tests {
         let handler = StoqProtocolHandler::new(extensions.clone(), None, 10);
 
         let data = b"test data for sharding and reassembly";
-        let shards = extensions.shard_packet(data, 10).unwrap();
+        let shards = extensions.shard_packet(data, 10).expect("test: shard operation");
 
         // Store all shards for reassembly
         for shard in shards {
-            handler.store_shard_for_reassembly(shard).unwrap();
+            handler.store_shard_for_reassembly(shard).expect("test: shard operation");
         }
 
         // Verify shards were stored and reassembled (check storage is empty)
@@ -285,13 +300,15 @@ mod tests {
         };
 
         // Update connection state
-        handler.update_connection_state(Some(stream_id), token.clone()).unwrap();
+        handler
+            .update_connection_state(Some(stream_id), token.clone())
+            .expect("test: expected success");
 
         // Verify state was updated
         let states = handler.connection_states.read();
         assert!(states.contains_key(&stream_id));
 
-        let state = states.get(&stream_id).unwrap();
+        let state = states.get(&stream_id).expect("test: map lookup");
         assert_eq!(state.last_token, Some(token));
         assert_eq!(state.validated_tokens.len(), 1);
     }

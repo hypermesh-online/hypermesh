@@ -83,7 +83,7 @@ fn bench_binary_auth_revoked(c: &mut Criterion) {
     // Pre-populate 1000 revoked nodes so the lookup is non-trivial
     rt.block_on(async {
         for i in 0..1000 {
-            let node = format!("revoked_node_{}", i);
+            let node = format!("revoked_node_{i}");
             // Use is_revoked just to confirm map access works;
             // we need to revoke via the available API
             authenticator
@@ -131,8 +131,7 @@ fn bench_pos_validate_with_requirements(c: &mut Criterion) {
 
     c.bench_function("pos_validate_requirements", |b| {
         b.iter(|| {
-            let valid = black_box(&proof)
-                .validate_with_requirements(black_box(&requirements));
+            let valid = black_box(&proof).validate_with_requirements(black_box(&requirements));
             black_box(valid);
         });
     });

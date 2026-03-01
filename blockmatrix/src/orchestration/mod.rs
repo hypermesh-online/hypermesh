@@ -7,26 +7,19 @@
 //! This module provides orchestration capabilities for containers and services
 //! within the HyperMesh distributed computing platform.
 
-pub mod hypermesh_integration;
 pub mod container;
+pub mod hypermesh_integration;
 // integration module removed - was MFN bridge simulation layer
 pub mod service_mesh;
 
 // Re-export main types
 pub use hypermesh_integration::{
-    HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
-    ContainerDeploymentResult, OrchestrationMetrics,
-    HyperMeshIntegrationConfig,
+    ContainerDeploymentResult, HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
+    HyperMeshIntegrationConfig, OrchestrationMetrics,
 };
 
-pub use container::{
-    ContainerOrchestrator,
-};
+pub use container::ContainerOrchestrator;
 
-pub use crate::integration::{
-    IntegrationManager,
-};
+pub use crate::integration::IntegrationManager;
 
-pub use service_mesh::{
-    ServiceMesh,
-};
+pub use service_mesh::ServiceMesh;

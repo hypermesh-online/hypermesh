@@ -4,7 +4,7 @@
 
 //! AF_XDP socket single-packet I/O: send, receive, and accessors.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 #[cfg(feature = "kernel-attach")]
@@ -63,9 +63,10 @@ impl AfXdpSocket {
     /// Real kernel-backed send: allocate frame, copy data, enqueue TX, kick kernel.
     #[cfg(feature = "kernel-attach")]
     fn send_kernel(&self, data: &[u8]) -> Result<()> {
-        let ks = self.kernel_state.as_ref().ok_or_else(|| {
-            anyhow!("kernel_backed=true but no kernel state")
-        })?;
+        let ks = self
+            .kernel_state
+            .as_ref()
+            .ok_or_else(|| anyhow!("kernel_backed=true but no kernel state"))?;
 
         let max_payload = ks.frame_size as usize - ks.headroom as usize;
         if data.len() > max_payload {
@@ -171,9 +172,10 @@ impl AfXdpSocket {
     /// Real kernel-backed receive: check RX ring, copy from UMEM, refill.
     #[cfg(feature = "kernel-attach")]
     fn receive_kernel(&self) -> Result<Bytes> {
-        let ks = self.kernel_state.as_ref().ok_or_else(|| {
-            anyhow!("kernel_backed=true but no kernel state")
-        })?;
+        let ks = self
+            .kernel_state
+            .as_ref()
+            .ok_or_else(|| anyhow!("kernel_backed=true but no kernel state"))?;
 
         // Check RX ring for available descriptors
         let cons = ks.rx_ring.load_consumer();
@@ -222,11 +224,7 @@ impl AfXdpSocket {
         // Copy packet data from UMEM
         let mut buf = vec![0u8; len];
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                ks.umem_area.add(addr),
-                buf.as_mut_ptr(),
-                len,
-            );
+            std::ptr::copy_nonoverlapping(ks.umem_area.add(addr), buf.as_mut_ptr(), len);
         }
 
         // Advance RX consumer

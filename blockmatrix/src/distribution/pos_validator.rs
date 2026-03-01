@@ -94,7 +94,7 @@ where
     let shard_id = if !shards.is_empty() {
         format!("{}-shard-{}", asset_id, shards[0].metadata.index)
     } else {
-        format!("{}-shard-0", asset_id)
+        format!("{asset_id}-shard-0")
     };
 
     for node in all_nodes {
@@ -152,7 +152,7 @@ where
     }
 
     // Consensus validation
-    let shard_id = format!("{}-shard-0", asset_id);
+    let shard_id = format!("{asset_id}-shard-0");
     let validation = consensus
         .validate_storage_access(node_id, asset_id, &shard_id)
         .await?;
@@ -279,7 +279,7 @@ impl StateAuthenticator for crate::consensus::validation::DefaultStateAuthentica
                 DistributionProofType::PoTime,
             ],
             validation_timestamp: SystemTime::now(),
-            validator_node_id: format!("validator-for-{}", node_id),
+            validator_node_id: format!("validator-for-{node_id}"),
         })
     }
 
@@ -312,7 +312,10 @@ mod tests {
             "PrivateNetwork",
             "PrivateNetwork"
         ));
-        assert!(!privacy_level_allows_node("PrivateNetwork", "PublicNetwork"));
+        assert!(!privacy_level_allows_node(
+            "PrivateNetwork",
+            "PublicNetwork"
+        ));
 
         // Public network compatibility
         assert!(privacy_level_allows_node("PublicNetwork", "PublicNetwork"));
@@ -332,14 +335,14 @@ mod tests {
         let nodes = vec![
             NodeInfo::new(
                 "node1".to_string(),
-                MatrixCoordinate::new(10, 10, 10).unwrap(),
+                MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate"),
                 "PrivateNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
             ),
             NodeInfo::new(
                 "node2".to_string(),
-                MatrixCoordinate::new(20, 20, 20).unwrap(),
+                MatrixCoordinate::new(20, 20, 20).expect("test: valid coordinate"),
                 "PublicNetwork".to_string(),
                 1_000_000_000,
                 "network1".to_string(),
@@ -350,15 +353,10 @@ mod tests {
         let consensus = MockStateAuthenticator::new(true);
 
         // Test PrivateNetwork asset
-        let eligible = get_eligible_nodes(
-            "test-asset",
-            "PrivateNetwork",
-            &shards,
-            &nodes,
-            &consensus,
-        )
-        .await
-        .unwrap();
+        let eligible =
+            get_eligible_nodes("test-asset", "PrivateNetwork", &shards, &nodes, &consensus)
+                .await
+                .expect("test: expected success");
 
         // Only node1 should be eligible (PrivateNetwork)
         assert_eq!(eligible.len(), 1);
@@ -377,7 +375,7 @@ mod tests {
             &consensus,
         )
         .await
-        .unwrap();
+        .expect("test: expected success");
 
         assert!(result);
 
@@ -390,7 +388,7 @@ mod tests {
             &consensus,
         )
         .await
-        .unwrap();
+        .expect("test: expected success");
 
         assert!(!result);
     }

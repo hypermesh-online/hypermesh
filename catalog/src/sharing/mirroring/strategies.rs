@@ -6,8 +6,8 @@ use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
-use crate::AssetRegistration;
 use super::types::*;
+use crate::AssetRegistration;
 
 impl super::MirrorManager {
     /// Mirror popular packages
@@ -31,12 +31,15 @@ impl super::MirrorManager {
         }
 
         // Sort by priority
-        candidates.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
+        candidates.sort_by(|a, b| b.priority.partial_cmp(&a.priority).expect("priority values should be valid for comparison"));
 
         // Mirror top packages
         let mut mirrored = 0;
         for candidate in candidates.iter().take(max_mirrors as usize) {
-            if self.queue_for_mirroring(&candidate.asset_id, candidate.priority).await? {
+            if self
+                .queue_for_mirroring(&candidate.asset_id, candidate.priority)
+                .await?
+            {
                 mirrored += 1;
             }
         }
@@ -60,8 +63,9 @@ impl super::MirrorManager {
         for (node_id, node) in nodes.iter() {
             if let Some(location) = &node.location {
                 if regions.contains(&location.region) {
-                    regional_nodes.entry(location.region.clone())
-                        .or_insert_with(Vec::new)
+                    regional_nodes
+                        .entry(location.region.clone())
+                        .or_default()
                         .push(node_id.clone());
                 }
             }
@@ -74,7 +78,11 @@ impl super::MirrorManager {
 
             for package_id in packages_to_mirror.iter().take(mirrors_per_region as usize) {
                 for node_id in node_ids.iter().take(mirrors_per_region as usize) {
-                    if self.replicate_to_specific_node(package_id, node_id).await.is_ok() {
+                    if self
+                        .replicate_to_specific_node(package_id, node_id)
+                        .await
+                        .is_ok()
+                    {
                         total_mirrored += 1;
                     }
                 }
@@ -131,7 +139,11 @@ impl super::MirrorManager {
             let nodes = self.select_mirror_nodes(0, replication_factor).await?;
 
             for node_id in nodes {
-                if self.replicate_to_specific_node(&asset_id, &node_id).await.is_ok() {
+                if self
+                    .replicate_to_specific_node(&asset_id, &node_id)
+                    .await
+                    .is_ok()
+                {
                     mirrored += 1;
                 }
             }
@@ -169,14 +181,16 @@ impl super::MirrorManager {
         let mut mirrored = 0;
         for asset_id in packages_to_mirror {
             // Select nodes to improve metrics
-            let optimal_nodes = self.select_optimal_nodes(
-                &asset_id,
-                target_availability,
-                max_latency_ms,
-            ).await?;
+            let optimal_nodes = self
+                .select_optimal_nodes(&asset_id, target_availability, max_latency_ms)
+                .await?;
 
             for node_id in optimal_nodes {
-                if self.replicate_to_specific_node(&asset_id, &node_id).await.is_ok() {
+                if self
+                    .replicate_to_specific_node(&asset_id, &node_id)
+                    .await
+                    .is_ok()
+                {
                     mirrored += 1;
                 }
             }
@@ -206,8 +220,8 @@ impl super::MirrorManager {
             let mut score = 0.0;
 
             // Factor 1: Available storage
-            let storage_ratio = (node.storage_capacity - node.storage_used) as f64
-                / node.storage_capacity as f64;
+            let storage_ratio =
+                (node.storage_capacity - node.storage_used) as f64 / node.storage_capacity as f64;
             score += storage_ratio * 0.3;
 
             // Factor 2: Uptime
@@ -227,7 +241,7 @@ impl super::MirrorManager {
         }
 
         // Sort by score
-        node_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        node_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("node scores should be valid for comparison"));
 
         // Select top nodes
         let selected: Vec<String> = node_scores
@@ -239,7 +253,11 @@ impl super::MirrorManager {
         Ok(selected)
     }
 
-    pub(super) async fn queue_for_mirroring(&self, asset_id: &AssetRegistration, priority: f64) -> Result<bool> {
+    pub(super) async fn queue_for_mirroring(
+        &self,
+        asset_id: &AssetRegistration,
+        priority: f64,
+    ) -> Result<bool> {
         let mut queue = self.mirror_queue.write().await;
 
         // Check if already queued
@@ -341,8 +359,8 @@ impl super::MirrorManager {
 
         for node_id in node_ids {
             if let Some(node) = nodes.get(node_id) {
-                let score = node.uptime * 0.5 +
-                    (1.0 / (1.0 + node.avg_response_time as f64 / 1000.0)) * 0.5;
+                let score = node.uptime * 0.5
+                    + (1.0 / (1.0 + node.avg_response_time as f64 / 1000.0)) * 0.5;
                 total_score += score;
                 count += 1;
             }
@@ -360,10 +378,10 @@ impl super::MirrorManager {
         status: &MirrorStatus,
         nodes: &HashMap<String, MirrorNode>,
     ) -> f64 {
-        let online_count = status.mirror_nodes.iter()
-            .filter(|id| {
-                nodes.get(*id).map(|n| n.uptime > 0.9).unwrap_or(false)
-            })
+        let online_count = status
+            .mirror_nodes
+            .iter()
+            .filter(|id| nodes.get(*id).map(|n| n.uptime > 0.9).unwrap_or(false))
             .count();
 
         online_count as f64 / status.mirror_nodes.len().max(1) as f64
@@ -374,7 +392,9 @@ impl super::MirrorManager {
         status: &MirrorStatus,
         nodes: &HashMap<String, MirrorNode>,
     ) -> u64 {
-        let total_latency: u64 = status.mirror_nodes.iter()
+        let total_latency: u64 = status
+            .mirror_nodes
+            .iter()
             .filter_map(|id| nodes.get(id).map(|n| n.avg_response_time))
             .sum();
 
@@ -389,23 +409,29 @@ impl super::MirrorManager {
     ) -> Result<Vec<String>> {
         let nodes = self.mirror_nodes.read().await;
         let mirrors = self.package_mirrors.read().await;
-        let existing: HashSet<String> = mirrors.get(asset_id)
+        let existing: HashSet<String> = mirrors
+            .get(asset_id)
             .map(|s| s.mirror_nodes.iter().cloned().collect())
             .unwrap_or_default();
 
         let mut scored: Vec<(String, f64)> = Vec::new();
         for (node_id, node) in nodes.iter() {
-            if existing.contains(node_id) { continue; }
-            if node.avg_response_time > max_latency_ms { continue; }
+            if existing.contains(node_id) {
+                continue;
+            }
+            if node.avg_response_time > max_latency_ms {
+                continue;
+            }
 
             let storage_ratio = if node.storage_capacity > 0 {
-                (node.storage_capacity - node.storage_used) as f64
-                    / node.storage_capacity as f64
-            } else { 0.0 };
+                (node.storage_capacity - node.storage_used) as f64 / node.storage_capacity as f64
+            } else {
+                0.0
+            };
             let latency_score = 1.0 / (1.0 + node.avg_response_time as f64 / 1000.0);
             let load_score = 1.0 - (node.mirrored_packages.len() as f64 / 1000.0).min(1.0);
-            let score = storage_ratio * 0.3 + node.uptime * 0.3
-                + latency_score * 0.2 + load_score * 0.2;
+            let score =
+                storage_ratio * 0.3 + node.uptime * 0.3 + latency_score * 0.2 + load_score * 0.2;
             scored.push((node_id.clone(), score));
         }
 
@@ -414,9 +440,13 @@ impl super::MirrorManager {
         Ok(scored.into_iter().take(top_n).map(|(id, _)| id).collect())
     }
 
-    pub(super) async fn get_high_priority_packages(&self, min_priority: f64) -> Result<Vec<AssetRegistration>> {
+    pub(super) async fn get_high_priority_packages(
+        &self,
+        min_priority: f64,
+    ) -> Result<Vec<AssetRegistration>> {
         let popularity = self.popularity_metrics.read().await;
-        let mut scored: Vec<(AssetRegistration, f64)> = popularity.iter()
+        let mut scored: Vec<(AssetRegistration, f64)> = popularity
+            .iter()
             .map(|(id, metrics)| (id.clone(), self.calculate_popularity_score(metrics)))
             .filter(|(_, score)| *score >= min_priority)
             .collect();
@@ -424,14 +454,18 @@ impl super::MirrorManager {
         Ok(scored.into_iter().map(|(id, _)| id).collect())
     }
 
-    pub(super) async fn select_regional_packages(&self, region: &str) -> Result<Vec<AssetRegistration>> {
+    pub(super) async fn select_regional_packages(
+        &self,
+        region: &str,
+    ) -> Result<Vec<AssetRegistration>> {
         let mirrors = self.package_mirrors.read().await;
         let nodes = self.mirror_nodes.read().await;
         let mut regional: Vec<AssetRegistration> = Vec::new();
 
         for (asset_id, status) in mirrors.iter() {
             let has_regional_seeder = status.mirror_nodes.iter().any(|nid| {
-                nodes.get(nid)
+                nodes
+                    .get(nid)
                     .and_then(|n| n.location.as_ref())
                     .map(|loc| loc.region == region)
                     .unwrap_or(false)

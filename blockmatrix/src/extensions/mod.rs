@@ -59,40 +59,35 @@ pub mod registry;
 pub mod security;
 
 // Internal modules
-mod types;
 mod asset_types;
+mod extension_manager;
 mod package_types;
 mod traits;
-mod extension_manager;
+mod types;
 
 // Re-export main types
 pub use types::{
-    ExtensionError, ExtensionResult, ExtensionMetadata, ExtensionCategory,
-    ExtensionDependency, ExtensionCapability, ExtensionConfig, ResourceLimits,
-    ExtensionStatus, ExtensionState, ExtensionHealth, ResourceUsageReport,
-    ValidationReport, ValidationError, ValidationWarning, ExtensionStateData,
-    ExtensionRequest, ExtensionResponse, ExtensionManagerConfig,
+    ExtensionCapability, ExtensionCategory, ExtensionConfig, ExtensionDependency, ExtensionError,
+    ExtensionHealth, ExtensionManagerConfig, ExtensionMetadata, ExtensionRequest,
+    ExtensionResponse, ExtensionResult, ExtensionState, ExtensionStateData, ExtensionStatus,
+    ResourceLimits, ResourceUsageReport, ValidationError, ValidationReport, ValidationWarning,
 };
 
 pub use asset_types::{
-    AssetCreationSpec, AssetUpdate, AssetQuery, AssetMetadata,
-    AssetOperation, OperationResult, DeploymentSpec, ExecutionSpec,
-    TransferSpec, SharingSpec, ConsensusRequirements, ConsensusStatus,
-    ResourceRequirements, CpuRequirement, MemoryRequirement,
-    StorageRequirement, GpuRequirement, NetworkConfig, PortMapping,
-    VolumeMount, DeploymentResult, ExecutionResult, TransferResult,
-    SharingResult,
+    AssetCreationSpec, AssetMetadata, AssetOperation, AssetQuery, AssetUpdate,
+    ConsensusRequirements, ConsensusStatus, CpuRequirement, DeploymentResult, DeploymentSpec,
+    ExecutionResult, ExecutionSpec, GpuRequirement, MemoryRequirement, NetworkConfig,
+    OperationResult, PortMapping, ResourceRequirements, SharingResult, SharingSpec,
+    StorageRequirement, TransferResult, TransferSpec, VolumeMount,
 };
 
 pub use package_types::{
-    AssetPackage, PackageFilter, PackageDependency, InstallOptions,
-    InstallResult, UpdateResult, SearchOptions, AssetPackageSpec,
-    AssetManifest, PublishResult, VerificationResult, SecurityIssue,
+    AssetManifest, AssetPackage, AssetPackageSpec, InstallOptions, InstallResult,
+    PackageDependency, PackageFilter, PublishResult, SearchOptions, SecurityIssue, UpdateResult,
+    VerificationResult,
 };
 
-pub use traits::{
-    HyperMeshExtension, AssetExtensionHandler, AssetLibraryExtension,
-};
+pub use traits::{AssetExtensionHandler, AssetLibraryExtension, HyperMeshExtension};
 
 pub use extension_manager::ExtensionManager;
 pub use manager::UnifiedExtensionManager;
@@ -145,13 +140,13 @@ mod tests {
         let metadata = ExtensionMetadata {
             id: "catalog".to_string(),
             name: "HyperMesh Catalog".to_string(),
-            version: Version::parse("1.0.0").unwrap(),
+            version: Version::parse("1.0.0").expect("test: expected success"),
             description: "Decentralized asset library for HyperMesh".to_string(),
             author: "HyperMesh Team".to_string(),
             license: "MIT".to_string(),
             homepage: Some("https://hypermesh.online/catalog".to_string()),
             category: ExtensionCategory::AssetLibrary,
-            hypermesh_version: Version::parse("1.0.0").unwrap(),
+            hypermesh_version: Version::parse("1.0.0").expect("test: expected success"),
             dependencies: vec![],
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
@@ -170,7 +165,9 @@ mod tests {
 
         assert_eq!(metadata.id, "catalog");
         assert_eq!(metadata.category, ExtensionCategory::AssetLibrary);
-        assert!(metadata.required_capabilities.contains(&ExtensionCapability::AssetManagement));
+        assert!(metadata
+            .required_capabilities
+            .contains(&ExtensionCapability::AssetManagement));
     }
 
     #[test]

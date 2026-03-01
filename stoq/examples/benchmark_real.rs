@@ -6,15 +6,17 @@
 //!
 //! Run with: cargo run --example benchmark_real --release
 
-use stoq::transport::{StoqTransport, TransportConfig, Endpoint};
 use std::net::Ipv6Addr;
 use std::time::{Duration, Instant};
-use tokio;
+use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize crypto provider
-    if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
         // Already installed, ignore error
     }
 
@@ -27,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         bind_address: Ipv6Addr::LOCALHOST,
         port: 19292,
         max_concurrent_streams: 1000,
-        send_buffer_size: 128 * 1024 * 1024, // 128MB
+        send_buffer_size: 128 * 1024 * 1024,    // 128MB
         receive_buffer_size: 128 * 1024 * 1024, // 128MB
         enable_zero_copy: true,
         enable_memory_pool: true,
@@ -45,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         loop {
             if let Ok(conn) = server_clone.accept().await {
-                let server_clone2 = server_clone.clone();
+                let _server_clone2 = server_clone.clone();
                 tokio::spawn(async move {
                     while let Ok(mut stream) = conn.accept_stream().await {
                         tokio::spawn(async move {
@@ -111,7 +113,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         (500 * 1024 * 1024, "500 MB"),
     ];
 
-    println!("│ {:^12} │ {:^10} │ {:^12} │ {:^12} │", "Size", "Time", "Throughput", "Speed");
+    println!(
+        "│ {:^12} │ {:^10} │ {:^12} │ {:^12} │",
+        "Size", "Time", "Throughput", "Speed"
+    );
     println!("├──────────────┼────────────┼──────────────┼──────────────┤");
 
     let mut peak_gbps = 0.0f64;
@@ -162,7 +167,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cold_times = Vec::new();
     let mut warm_times = Vec::new();
 
-    for i in 0..10 {
+    for _i in 0..10 {
         let start = Instant::now();
         let conn = client.connect(&endpoint).await?;
         let cold_time = start.elapsed();
@@ -183,9 +188,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let avg_cold = cold_times.iter().sum::<u128>() / cold_times.len() as u128;
     let avg_warm = warm_times.iter().sum::<u128>() / warm_times.len() as u128;
 
-    println!("│ Cold connection (avg): {:>8} μs                        │", avg_cold);
-    println!("│ Pooled connection (avg): {:>6} μs                        │", avg_warm);
-    println!("│ Speedup: {:>6.1}x                                          │", avg_cold as f64 / avg_warm as f64);
+    println!("│ Cold connection (avg): {avg_cold:>8} μs                        │");
+    println!("│ Pooled connection (avg): {avg_warm:>6} μs                        │");
+    println!(
+        "│ Speedup: {:>6.1}x                                          │",
+        avg_cold as f64 / avg_warm as f64
+    );
     println!("└─────────────────────────────────────────────────────────┘\n");
 
     // Concurrent streams test
@@ -249,14 +257,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Send using multiplexed connections
     for _ in 0..10 {
-        client.send_multiplexed(&endpoint, &test_data[0..10*1024*1024]).await?;
+        client
+            .send_multiplexed(&endpoint, &test_data[0..10 * 1024 * 1024])
+            .await?;
     }
 
     let duration = start.elapsed();
     let total_bytes = 10 * 10 * 1024 * 1024; // 100MB total
     let gbps = (total_bytes as f64 * 8.0) / (duration.as_secs_f64() * 1_000_000_000.0);
 
-    println!("│ 10x multiplexed: {:>8.2}ms, {:>8.3} Gbps              │", duration.as_millis(), gbps);
+    println!(
+        "│ 10x multiplexed: {:>8.2}ms, {:>8.3} Gbps              │",
+        duration.as_millis(),
+        gbps
+    );
 
     if gbps > peak_gbps {
         peak_gbps = gbps;
@@ -271,11 +285,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("                 PERFORMANCE SUMMARY");
     println!("═══════════════════════════════════════════════════════════");
     println!();
-    println!("  Peak Throughput:     {:.3} Gbps", peak_gbps);
-    println!("  Recorded Peak:       {:.3} Gbps", stats_peak);
-    println!("  Zero-copy ops:       {}", zero_copy);
-    println!("  Memory pool hits:    {}", pool_hits);
-    println!("  Frame batches:       {}", batches);
+    println!("  Peak Throughput:     {peak_gbps:.3} Gbps");
+    println!("  Recorded Peak:       {stats_peak:.3} Gbps");
+    println!("  Zero-copy ops:       {zero_copy}");
+    println!("  Memory pool hits:    {pool_hits}");
+    println!("  Frame batches:       {batches}");
     println!();
 
     // Determine network tier
@@ -291,12 +305,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Limited (<100 Mbps)"
     };
 
-    println!("  Detected Network Tier: {}", tier);
+    println!("  Detected Network Tier: {tier}");
     println!();
 
     if peak_gbps < 10.0 {
         println!("⚠️  WARNING: Performance below 10 Gbps target!");
-        println!("  Current: {:.3} Gbps", peak_gbps);
+        println!("  Current: {peak_gbps:.3} Gbps");
         println!("  Target:  10+ Gbps");
         println!();
         println!("  Possible bottlenecks:");

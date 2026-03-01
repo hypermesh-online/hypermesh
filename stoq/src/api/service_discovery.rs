@@ -7,14 +7,14 @@
 //! Integrates with TrustChain DNS for service resolution.
 //! Provides fallback chain: DNS → Cache → Hardcoded
 
-use anyhow::{Result, anyhow};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-use std::net::Ipv6Addr;
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
-use serde::{Serialize, Deserialize};
 
 /// Service type enumeration for discovery
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ impl std::fmt::Display for ServiceType {
             ServiceType::Stoq => "stoq",
             ServiceType::HyperMesh => "hypermesh",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -243,12 +243,16 @@ impl ServiceDiscovery {
     /// Resolve service name to endpoint
     /// Fallback chain: DNS → Cache → Hardcoded
     pub fn resolve(&self, service_name: &str) -> Result<ServiceEndpoint> {
-        self.metrics.total_resolutions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.metrics
+            .total_resolutions
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         // 1. Check cache first
         if let Some(cached) = self.cache.get(service_name) {
             if cached.cached_at + cached.ttl > SystemTime::now() {
-                self.metrics.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.metrics
+                    .cache_hits
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 debug!("Service '{}' resolved from cache", service_name);
                 return Ok(cached.endpoint.clone());
             }
@@ -259,18 +263,23 @@ impl ServiceDiscovery {
             if dns.is_available() {
                 match dns.resolve(service_name) {
                     Ok(endpoints) if !endpoints.is_empty() => {
-                        self.metrics.dns_resolutions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        self.metrics
+                            .dns_resolutions
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                         // Use the highest priority (lowest number) endpoint
                         // Safety: endpoints is non-empty (checked above), so min_by_key always returns Some
-                        let best_endpoint = match endpoints.into_iter().min_by_key(|e| e.metadata.priority) {
-                            Some(endpoint) => endpoint,
-                            None => {
-                                // This should never happen since we verified endpoints is non-empty
-                                warn!("Unexpected: min_by_key returned None for non-empty endpoints");
-                                return Err(anyhow!("Failed to select best endpoint"));
-                            }
-                        };
+                        let best_endpoint =
+                            match endpoints.into_iter().min_by_key(|e| e.metadata.priority) {
+                                Some(endpoint) => endpoint,
+                                None => {
+                                    // This should never happen since we verified endpoints is non-empty
+                                    warn!(
+                                    "Unexpected: min_by_key returned None for non-empty endpoints"
+                                );
+                                    return Err(anyhow!("Failed to select best endpoint"));
+                                }
+                            };
 
                         // Cache the result
                         let cached = CachedService {
@@ -280,16 +289,24 @@ impl ServiceDiscovery {
                         };
                         self.cache.insert(service_name.to_string(), cached);
 
-                        info!("Service '{}' resolved via TrustChain DNS: [{}]:{}",
-                            service_name, best_endpoint.address, best_endpoint.port);
+                        info!(
+                            "Service '{}' resolved via TrustChain DNS: [{}]:{}",
+                            service_name, best_endpoint.address, best_endpoint.port
+                        );
 
                         return Ok(best_endpoint);
                     }
                     Ok(_) => {
-                        warn!("TrustChain DNS returned no endpoints for '{}'", service_name);
+                        warn!(
+                            "TrustChain DNS returned no endpoints for '{}'",
+                            service_name
+                        );
                     }
                     Err(e) => {
-                        debug!("TrustChain DNS resolution failed for '{}': {}", service_name, e);
+                        debug!(
+                            "TrustChain DNS resolution failed for '{}': {}",
+                            service_name, e
+                        );
                     }
                 }
             }
@@ -297,7 +314,9 @@ impl ServiceDiscovery {
 
         // 3. Fall back to hardcoded endpoints
         if let Some(endpoint) = self.hardcoded_endpoints.read().get(service_name) {
-            self.metrics.fallback_resolutions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.metrics
+                .fallback_resolutions
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
             // Cache the hardcoded result with shorter TTL
             let cached = CachedService {
@@ -307,20 +326,25 @@ impl ServiceDiscovery {
             };
             self.cache.insert(service_name.to_string(), cached);
 
-            debug!("Service '{}' resolved from hardcoded fallback: [{}]:{}",
-                service_name, endpoint.address, endpoint.port);
+            debug!(
+                "Service '{}' resolved from hardcoded fallback: [{}]:{}",
+                service_name, endpoint.address, endpoint.port
+            );
 
             return Ok(endpoint.clone());
         }
 
         // 4. Resolution failed
-        self.metrics.failed_resolutions.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Err(anyhow!("Service '{}' not found", service_name))
+        self.metrics
+            .failed_resolutions
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Err(anyhow!("Service '{service_name}' not found"))
     }
 
     /// Resolve multiple services
     pub fn resolve_multiple(&self, service_names: &[&str]) -> Vec<Result<ServiceEndpoint>> {
-        service_names.iter()
+        service_names
+            .iter()
             .map(|name| self.resolve(name))
             .collect()
     }
@@ -334,35 +358,47 @@ impl ServiceDiscovery {
     /// Add or update a hardcoded endpoint
     pub fn add_hardcoded_endpoint(&self, endpoint: ServiceEndpoint) {
         let name = endpoint.name.clone();
-        self.hardcoded_endpoints.write().insert(name.clone(), endpoint);
+        self.hardcoded_endpoints
+            .write()
+            .insert(name.clone(), endpoint);
         info!("Added/updated hardcoded endpoint for service '{}'", name);
     }
 
     /// Get discovery metrics
     pub fn get_metrics(&self) -> DiscoveryStats {
         DiscoveryStats {
-            total_resolutions: self.metrics.total_resolutions.load(std::sync::atomic::Ordering::Relaxed),
-            cache_hits: self.metrics.cache_hits.load(std::sync::atomic::Ordering::Relaxed),
-            dns_resolutions: self.metrics.dns_resolutions.load(std::sync::atomic::Ordering::Relaxed),
-            fallback_resolutions: self.metrics.fallback_resolutions.load(std::sync::atomic::Ordering::Relaxed),
-            failed_resolutions: self.metrics.failed_resolutions.load(std::sync::atomic::Ordering::Relaxed),
+            total_resolutions: self
+                .metrics
+                .total_resolutions
+                .load(std::sync::atomic::Ordering::Relaxed),
+            cache_hits: self
+                .metrics
+                .cache_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            dns_resolutions: self
+                .metrics
+                .dns_resolutions
+                .load(std::sync::atomic::Ordering::Relaxed),
+            fallback_resolutions: self
+                .metrics
+                .fallback_resolutions
+                .load(std::sync::atomic::Ordering::Relaxed),
+            failed_resolutions: self
+                .metrics
+                .failed_resolutions
+                .load(std::sync::atomic::Ordering::Relaxed),
             cache_size: self.cache.len(),
         }
     }
 
     /// List all cached services
     pub fn list_cached_services(&self) -> Vec<String> {
-        self.cache.iter()
-            .map(|entry| entry.key().clone())
-            .collect()
+        self.cache.iter().map(|entry| entry.key().clone()).collect()
     }
 
     /// List all hardcoded services
     pub fn list_hardcoded_services(&self) -> Vec<String> {
-        self.hardcoded_endpoints.read()
-            .keys()
-            .cloned()
-            .collect()
+        self.hardcoded_endpoints.read().keys().cloned().collect()
     }
 
     /// Backward compatibility: resolve_service -> resolve
@@ -392,16 +428,16 @@ mod tests {
         let discovery = ServiceDiscovery::new(Duration::from_secs(300));
 
         // Test hardcoded services
-        let trustchain = discovery.resolve("trustchain").unwrap();
+        let trustchain = discovery.resolve("trustchain").expect("test: expected success");
         assert_eq!(trustchain.port, 9293);
 
-        let hypermesh = discovery.resolve("hypermesh").unwrap();
+        let hypermesh = discovery.resolve("hypermesh").expect("test: expected success");
         assert_eq!(hypermesh.port, 9292);
 
-        let caesar = discovery.resolve("caesar").unwrap();
+        let caesar = discovery.resolve("caesar").expect("test: expected success");
         assert_eq!(caesar.port, 9294);
 
-        let catalog = discovery.resolve("catalog").unwrap();
+        let catalog = discovery.resolve("catalog").expect("test: expected success");
         assert_eq!(catalog.port, 9295);
     }
 
@@ -410,13 +446,13 @@ mod tests {
         let discovery = ServiceDiscovery::new(Duration::from_secs(300));
 
         // First resolution should use fallback
-        let _ = discovery.resolve("trustchain").unwrap();
+        let _ = discovery.resolve("trustchain").expect("test: expected success");
         let stats = discovery.get_metrics();
         assert_eq!(stats.fallback_resolutions, 1);
         assert_eq!(stats.cache_hits, 0);
 
         // Second resolution should use cache
-        let _ = discovery.resolve("trustchain").unwrap();
+        let _ = discovery.resolve("trustchain").expect("test: expected success");
         let stats = discovery.get_metrics();
         assert_eq!(stats.fallback_resolutions, 1);
         assert_eq!(stats.cache_hits, 1);
@@ -448,7 +484,7 @@ mod tests {
 
         discovery.add_hardcoded_endpoint(new_endpoint);
 
-        let resolved = discovery.resolve("custom").unwrap();
+        let resolved = discovery.resolve("custom").expect("test: expected success");
         assert_eq!(resolved.port, 9999);
     }
 

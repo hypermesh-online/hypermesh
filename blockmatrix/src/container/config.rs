@@ -4,12 +4,12 @@
 
 //! Container runtime configuration
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
 /// Container runtime configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContainerConfig {
     /// Runtime configuration
     pub runtime: RuntimeConfig,
@@ -177,19 +177,6 @@ pub struct GarbageCollectionPolicy {
     pub cleanup_interval: Duration,
 }
 
-impl Default for ContainerConfig {
-    fn default() -> Self {
-        Self {
-            runtime: RuntimeConfig::default(),
-            storage_usage: StorageConfig::default(),
-            network_usage: NetworkConfig::default(),
-            security: SecurityConfig::default(),
-            limits: ResourceLimits::default(),
-            monitoring: MonitoringConfig::default(),
-        }
-    }
-}
-
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
@@ -291,8 +278,8 @@ impl Default for GarbageCollectionPolicy {
     fn default() -> Self {
         Self {
             max_age: Duration::from_secs(30 * 24 * 3600), // 30 days
-            max_size: 100 * 1024 * 1024 * 1024, // 100GB
-            min_free_space: 10 * 1024 * 1024 * 1024, // 10GB
+            max_size: 100 * 1024 * 1024 * 1024,           // 100GB
+            min_free_space: 10 * 1024 * 1024 * 1024,      // 10GB
             auto_cleanup: true,
             cleanup_interval: Duration::from_secs(24 * 3600), // 24 hours
         }

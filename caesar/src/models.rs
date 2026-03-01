@@ -333,12 +333,11 @@ mod tests {
         ];
 
         for (variant, expected_json) in &variants {
-            let serialized = serde_json::to_string(variant)
-                .expect("test: serialization should succeed");
+            let serialized =
+                serde_json::to_string(variant).expect("test: serialization should succeed");
             assert_eq!(
                 &serialized, expected_json,
-                "TransactionType::{:?} serialized to {} but expected {}",
-                variant, serialized, expected_json
+                "TransactionType::{variant:?} serialized to {serialized} but expected {expected_json}"
             );
         }
     }

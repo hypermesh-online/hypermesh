@@ -50,7 +50,7 @@ impl Default for KernelPosConfig {
         Self {
             min_difficulty: 8, // Match userspace default (first byte must be 0x00)
             max_timestamp_skew_ns: 5 * 60 * 1_000_000_000, // 5 minutes
-            validation_ttl_ns: 60 * 60 * 1_000_000_000,    // 1 hour
+            validation_ttl_ns: 60 * 60 * 1_000_000_000, // 1 hour
             enabled: true,
         }
     }
@@ -81,20 +81,15 @@ impl KernelPosConfig {
             return None;
         }
         Some(Self {
-            min_difficulty: u32::from_le_bytes([
-                bytes[0], bytes[1], bytes[2], bytes[3],
-            ]),
+            min_difficulty: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
             max_timestamp_skew_ns: u64::from_le_bytes([
-                bytes[4], bytes[5], bytes[6], bytes[7],
-                bytes[8], bytes[9], bytes[10], bytes[11],
+                bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11],
             ]),
             validation_ttl_ns: u64::from_le_bytes([
-                bytes[12], bytes[13], bytes[14], bytes[15],
-                bytes[16], bytes[17], bytes[18], bytes[19],
+                bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17], bytes[18],
+                bytes[19],
             ]),
-            enabled: u32::from_le_bytes([
-                bytes[20], bytes[21], bytes[22], bytes[23],
-            ]) != 0,
+            enabled: u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) != 0,
         })
     }
 }

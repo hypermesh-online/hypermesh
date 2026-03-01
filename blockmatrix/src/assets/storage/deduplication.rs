@@ -6,15 +6,15 @@
 //!
 //! Core deduplication logic with O(1) HashMap lookups and matrix-aware shard placement.
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
-use anyhow::Result;
 
-use crate::matrix::MatrixCoordinate;
+use super::{compute_hash, BucketId, BucketMapper, Hash, HashBucket, ShardMetadata};
 use crate::assets::pipeline::Shard;
-use super::{Hash, BucketId, HashBucket, ShardMetadata, BucketMapper, compute_hash};
+use crate::matrix::MatrixCoordinate;
 
 /// Deduplication result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -127,14 +127,18 @@ impl DeduplicationEngine {
 
         // O(1) bucket lookup
         let mut buckets = self.buckets.write().await;
-        let bucket = buckets.get_mut(&bucket_id)
-            .ok_or_else(|| anyhow::anyhow!(
-                "Bucket {:?} not found - deduplication engine may not be properly initialized", bucket_id
-            ))?;
+        let bucket = buckets.get_mut(&bucket_id).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Bucket {bucket_id:?} not found - deduplication engine may not be properly initialized"
+            )
+        })?;
 
         // Record metrics
         let mut metrics = self.metrics.write().await;
-        *metrics.bucket_accesses.entry(bucket_id.clone()).or_insert(0) += 1;
+        *metrics
+            .bucket_accesses
+            .entry(bucket_id.clone())
+            .or_insert(0) += 1;
 
         // Check if shard exists (O(1) HashMap lookup)
         let result = if bucket.contains(&shard_hash) {
@@ -142,10 +146,13 @@ impl DeduplicationEngine {
             metrics.cache_hits += 1;
 
             // Record deduplication
-            let metadata = bucket.record_deduplication(&shard_hash, shard_size)
-                .ok_or_else(|| anyhow::anyhow!(
-                    "Failed to record deduplication for shard - hash may not exist in bucket"
-                ))?;
+            let metadata = bucket
+                .record_deduplication(&shard_hash, shard_size)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Failed to record deduplication for shard - hash may not exist in bucket"
+                    )
+                })?;
 
             DeduplicationResult {
                 deduplicated: true,
@@ -194,7 +201,8 @@ impl DeduplicationEngine {
 
         // Calculate deduplication rate
         if stats.total_processed > 0 {
-            stats.deduplication_rate = stats.deduplicated_count as f64 / stats.total_processed as f64;
+            stats.deduplication_rate =
+                stats.deduplicated_count as f64 / stats.total_processed as f64;
         }
 
         // Update average lookup time
@@ -205,7 +213,8 @@ impl DeduplicationEngine {
         };
 
         // Count active buckets
-        stats.active_buckets = buckets.values()
+        stats.active_buckets = buckets
+            .values()
             .filter(|b| !b.shard_hashes.is_empty())
             .count();
 
@@ -218,7 +227,9 @@ impl DeduplicationEngine {
         let mut buckets = self.buckets.write().await;
 
         if let Some(bucket) = buckets.get_mut(&bucket_id) {
-            bucket.get_metadata(&shard_hash).map(|m| m.positions.clone())
+            bucket
+                .get_metadata(&shard_hash)
+                .map(|m| m.positions.clone())
         } else {
             None
         }
@@ -226,7 +237,8 @@ impl DeduplicationEngine {
 
     /// Get shard positions
     pub async fn get_shard_positions(&self, shard_hash: Hash) -> Result<Vec<MatrixCoordinate>> {
-        self.check_exists(shard_hash).await
+        self.check_exists(shard_hash)
+            .await
             .ok_or_else(|| anyhow::anyhow!("Shard not found"))
     }
 
@@ -252,17 +264,25 @@ impl DeduplicationEngine {
     }
 
     /// Store content to shard mapping
-    pub async fn store_content_mapping(&mut self, content_hash: Hash, shard_hashes: Vec<Hash>) -> Result<()> {
+    pub async fn store_content_mapping(
+        &mut self,
+        content_hash: Hash,
+        shard_hashes: Vec<Hash>,
+    ) -> Result<()> {
         let mut content_map = self.content_map.write().await;
         content_map.insert(content_hash, shard_hashes);
         Ok(())
     }
 
     /// Get retrieval instructions for content
-    pub async fn get_retrieval_instructions(&self, content_hash: Hash) -> Result<super::RetrievalInstructions> {
+    pub async fn get_retrieval_instructions(
+        &self,
+        content_hash: Hash,
+    ) -> Result<super::RetrievalInstructions> {
         let content_map = self.content_map.read().await;
 
-        let shard_hashes = content_map.get(&content_hash)
+        let shard_hashes = content_map
+            .get(&content_hash)
             .ok_or_else(|| anyhow::anyhow!("Content not found"))?;
 
         let mut shard_map = Vec::new();
@@ -278,9 +298,7 @@ impl DeduplicationEngine {
     pub fn get_stats(&self) -> DeduplicationStats {
         // Using block_on to avoid async in a non-async context
         // In production, this should be made async
-        futures::executor::block_on(async {
-            self.stats.read().await.clone()
-        })
+        futures::executor::block_on(async { self.stats.read().await.clone() })
     }
 
     /// Get performance metrics
@@ -316,7 +334,8 @@ impl DeduplicationEngine {
 
         // Sort by popularity score
         popular.sort_by(|a, b| {
-            b.1.popularity_score.partial_cmp(&a.1.popularity_score)
+            b.1.popularity_score
+                .partial_cmp(&a.1.popularity_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -331,13 +350,17 @@ impl DeduplicationEngine {
         }
 
         // Calculate standard deviation
-        let avg = metrics.lookup_times.iter().sum::<u64>() as f64 / metrics.lookup_times.len() as f64;
-        let variance = metrics.lookup_times.iter()
+        let avg =
+            metrics.lookup_times.iter().sum::<u64>() as f64 / metrics.lookup_times.len() as f64;
+        let variance = metrics
+            .lookup_times
+            .iter()
             .map(|&t| {
                 let diff = t as f64 - avg;
                 diff * diff
             })
-            .sum::<f64>() / metrics.lookup_times.len() as f64;
+            .sum::<f64>()
+            / metrics.lookup_times.len() as f64;
         let std_dev = variance.sqrt();
 
         // O(1) means lookup time should be relatively constant
@@ -365,8 +388,12 @@ mod tests {
     use crate::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
 
     async fn create_test_engine() -> DeduplicationEngine {
-        let foundation = Arc::new(MatrixFoundation::new(MatrixFoundationConfig::default()).await.unwrap());
-        let mapper = Arc::new(BucketMapper::new(foundation).await.unwrap());
+        let foundation = Arc::new(
+            MatrixFoundation::new(MatrixFoundationConfig::default())
+                .await
+                .expect("test: expected success"),
+        );
+        let mapper = Arc::new(BucketMapper::new(foundation).await.expect("test: async operation"));
         DeduplicationEngine::new(mapper)
     }
 
@@ -379,7 +406,7 @@ mod tests {
             metadata: Default::default(),
         };
 
-        let result = engine.process_shard(shard).await.unwrap();
+        let result = engine.process_shard(shard).await.expect("test: async operation");
         assert!(!result.deduplicated);
         assert_eq!(result.reference_count, 1);
         assert!(!result.positions.is_empty());
@@ -400,11 +427,11 @@ mod tests {
         };
 
         // First shard - new
-        let result1 = engine.process_shard(shard1).await.unwrap();
+        let result1 = engine.process_shard(shard1).await.expect("test: async operation");
         assert!(!result1.deduplicated);
 
         // Second shard - deduplicated
-        let result2 = engine.process_shard(shard2).await.unwrap();
+        let result2 = engine.process_shard(shard2).await.expect("test: async operation");
         assert!(result2.deduplicated);
         assert_eq!(result2.reference_count, 2);
         assert_eq!(result2.positions, result1.positions); // Same positions
@@ -421,7 +448,7 @@ mod tests {
                 data,
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.unwrap();
+            engine.process_shard(shard).await.expect("test: async operation");
         }
 
         let stats = engine.get_stats();
@@ -443,7 +470,7 @@ mod tests {
                 data,
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.unwrap();
+            engine.process_shard(shard).await.expect("test: async operation");
         }
 
         let stats = engine.get_stats();
@@ -461,7 +488,7 @@ mod tests {
                 data: vec![i as u8; 100],
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.unwrap();
+            engine.process_shard(shard).await.expect("test: async operation");
         }
 
         // Verify O(1) performance

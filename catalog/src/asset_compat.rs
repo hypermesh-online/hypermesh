@@ -7,8 +7,8 @@
 //!
 //! These are standalone functions (not trait impls) to avoid orphan-rule issues.
 
-use hypermesh_lib::{AssetKind, SystemAssetKind, UserAssetKind, ContentHash};
-use blockmatrix::assets::core::{AssetType, AssetCategory, BaseSystemType};
+use blockmatrix::assets::core::{AssetCategory, AssetType, BaseSystemType};
+use hypermesh_lib::{AssetKind, ContentHash, SystemAssetKind, UserAssetKind};
 
 /// Convert canonical `AssetKind` -> blockmatrix `AssetType`.
 ///
@@ -133,7 +133,7 @@ mod tests {
             let asset_kind = AssetKind::System(*kind);
             let bm = _asset_kind_to_bm_asset_type(&asset_kind);
             let back = _bm_asset_type_to_asset_kind(&bm);
-            assert_eq!(back, asset_kind, "Roundtrip failed for {:?}", kind);
+            assert_eq!(back, asset_kind, "Roundtrip failed for {kind:?}");
         }
     }
 

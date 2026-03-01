@@ -8,13 +8,13 @@
 //! Each entity (DMV, Dealer, Insurance, Bank, Manufacturer, etc.) operates
 //! their own blockchain while enabling privacy-preserving cross-chain validation.
 
-use std::collections::HashMap;
-use std::time::{SystemTime, Duration};
-use serde::{Serialize, Deserialize};
+pub use super::blockchain::{AssetRecordType, HyperMeshAssetRecord};
 use crate::assets::core::asset_id::AssetRegistration;
-use hypermesh_lib::PrivacyMode;
-pub use super::blockchain::{HyperMeshAssetRecord, AssetRecordType};
 use crate::consensus::ConsensusProof;
+use hypermesh_lib::PrivacyMode;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
 
 /// Blockchain-specific matrix coordinate with geographic/organizational dimensions.
 /// Unlike hypermesh_lib::MatrixCoordinate (simple x,y,z integers), this type captures
@@ -228,9 +228,7 @@ pub enum ValidationType {
         expected_value: ValidationValue,
     },
     /// Zero-knowledge proof validation
-    ZKProof {
-        statement: ZKStatement,
-    },
+    ZKProof { statement: ZKStatement },
     /// Multi-field validation
     MultiField {
         required_fields: Vec<String>,
@@ -250,23 +248,10 @@ pub enum ValidationValue {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ZKStatement {
-    GreaterThan {
-        field: String,
-        threshold: f64,
-    },
-    LessThan {
-        field: String,
-        threshold: f64,
-    },
-    InRange {
-        field: String,
-        min: f64,
-        max: f64,
-    },
-    EqualTo {
-        field: String,
-        value: String,
-    },
+    GreaterThan { field: String, threshold: f64 },
+    LessThan { field: String, threshold: f64 },
+    InRange { field: String, min: f64, max: f64 },
+    EqualTo { field: String, value: String },
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -389,23 +374,25 @@ impl EntityBlockchain {
 
         // Create new block
         let block_index = self.chain.len() as u64;
-        let previous_hash = self.chain.last()
+        let previous_hash = self
+            .chain
+            .last()
             .ok_or_else(|| "Cannot add block to empty chain - genesis block missing".to_string())?
             .hash;
-        
+
         let block = EntityBlock {
             index: block_index,
             previous_hash,
             timestamp: SystemTime::now(),
             data: EntityBlockData::AssetRecord(asset_record),
             consensus_proof,
-            hash: [0u8; 32], // Would be calculated properly
+            hash: [0u8; 32],          // Would be calculated properly
             entity_signature: vec![], // Would be signed by entity
         };
 
         self.chain.push(block);
         self.last_validated_index = block_index;
-        
+
         Ok(block_index)
     }
 
@@ -417,11 +404,15 @@ impl EntityBlockchain {
     ) -> Result<PublicValidationResponse, String> {
         // Check if target entity is in our network
         if !self.neighbor_entities.contains_key(target_entity) {
-            return Err(format!("Unknown target entity: {}", target_entity));
+            return Err(format!("Unknown target entity: {target_entity}"));
         }
 
         // Check cache first
-        let cache_key = format!("{}:{}", target_entity, serde_json::to_string(&validation_request).unwrap_or_default());
+        let cache_key = format!(
+            "{}:{}",
+            target_entity,
+            serde_json::to_string(&validation_request).unwrap_or_default()
+        );
         if let Some(cached_result) = self.validation_cache.get(&cache_key) {
             if cached_result.expires_at > SystemTime::now() {
                 return Ok(cached_result.response.clone());
@@ -444,35 +435,50 @@ impl EntityBlockchain {
     }
 
     /// Get public asset information that can be shared
-    pub fn get_public_asset_info(&self, asset_id: &AssetRegistration) -> Option<HashMap<String, String>> {
+    pub fn get_public_asset_info(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> Option<HashMap<String, String>> {
         for block in &self.chain {
             if let EntityBlockData::AssetRecord(record) = &block.data {
                 if record.asset_id == *asset_id {
                     // Only return fields marked as public in privacy policy
                     let mut public_info = HashMap::new();
-                    
+
                     for field in &self.config.privacy_policies.public_fields {
                         match field.as_str() {
                             "asset_type" => {
                                 if let Some(asset_type) = record.asset_id.asset_type() {
-                                    public_info.insert("asset_type".to_string(), format!("{:?}", asset_type));
+                                    public_info.insert(
+                                        "asset_type".to_string(),
+                                        format!("{asset_type:?}"),
+                                    );
                                 }
-                            },
+                            }
                             "record_type" => {
-                                public_info.insert("record_type".to_string(), record.record_type.to_string());
-                            },
+                                public_info.insert(
+                                    "record_type".to_string(),
+                                    record.record_type.to_string(),
+                                );
+                            }
                             "timestamp" => {
-                                public_info.insert("timestamp".to_string(), format!("{:?}", record.timestamp));
-                            },
+                                public_info.insert(
+                                    "timestamp".to_string(),
+                                    format!("{:?}", record.timestamp),
+                                );
+                            }
                             "privacy_level" => {
-                                public_info.insert("privacy_level".to_string(), format!("{:?}", record.privacy_level));
-                            },
+                                public_info.insert(
+                                    "privacy_level".to_string(),
+                                    format!("{:?}", record.privacy_level),
+                                );
+                            }
                             _ => {
                                 // Custom field handling would go here
                             }
                         }
                     }
-                    
+
                     return Some(public_info);
                 }
             }
@@ -481,8 +487,13 @@ impl EntityBlockchain {
     }
 
     /// Add trusted partner entity
-    pub fn add_trusted_partner(&mut self, partner_domain: String, coordinate: BlockchainMatrixCoordinate) {
-        self.neighbor_entities.insert(partner_domain.clone(), coordinate);
+    pub fn add_trusted_partner(
+        &mut self,
+        partner_domain: String,
+        coordinate: BlockchainMatrixCoordinate,
+    ) {
+        self.neighbor_entities
+            .insert(partner_domain.clone(), coordinate);
         if !self.config.trusted_partners.contains(&partner_domain) {
             self.config.trusted_partners.push(partner_domain);
         }
@@ -515,6 +526,12 @@ pub struct ValidationRule {
     pub validation_logic: String, // Could be more sophisticated
 }
 
+impl Default for MatrixBlockchainManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MatrixBlockchainManager {
     pub fn new() -> Self {
         Self {
@@ -544,7 +561,7 @@ impl MatrixBlockchainManager {
         validation_chain: Vec<String>, // e.g., ["honda.hypermesh.online", "dealer.hypermesh.online", "bank.hypermesh.online"]
     ) -> Result<HashMap<String, PublicValidationResponse>, String> {
         let mut results = HashMap::new();
-        
+
         for entity_domain in validation_chain {
             if let Some(entity_chain) = self.entity_chains.get(&entity_domain) {
                 if let Some(public_info) = entity_chain.get_public_asset_info(&asset_id) {
@@ -558,7 +575,7 @@ impl MatrixBlockchainManager {
                 }
             }
         }
-        
+
         Ok(results)
     }
 }
@@ -632,16 +649,19 @@ mod tests {
         };
 
         let blockchain = EntityBlockchain::new(config);
-        
+
         assert_eq!(blockchain.chain.len(), 1); // Genesis block
         assert_eq!(blockchain.config.network_domain, "honda.hypermesh.online");
-        assert!(matches!(blockchain.config.entity_type, EntityType::Manufacturer));
+        assert!(matches!(
+            blockchain.config.entity_type,
+            EntityType::Manufacturer
+        ));
     }
 
     #[test]
     fn test_matrix_manager() {
         let mut manager = MatrixBlockchainManager::new();
-        
+
         let dmv_config = EntityConfig {
             network_domain: "dmv.hypermesh.online".to_string(),
             entity_type: EntityType::DMV,

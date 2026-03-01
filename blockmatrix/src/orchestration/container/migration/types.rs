@@ -4,8 +4,8 @@
 
 //! Type definitions for container migration.
 
-use crate::{NodeId, ContainerId};
 use super::super::ResourceRequirements;
+use crate::{ContainerId, NodeId};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
@@ -28,14 +28,32 @@ pub struct MigrationDecision {
 /// Migration reasons
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MigrationReason {
-    NodeMaintenance { maintenance_window: Duration },
-    LoadBalancing { current_load: f64, target_load: f64 },
-    ResourceOptimization { resource_type: String, improvement: f64 },
-    PerformanceOptimization { expected_improvement: f64 },
-    NodeFailure { failure_type: String },
-    CostOptimization { cost_savings: f64 },
-    SecurityCompliance { policy_violation: String },
-    Manual { reason: String },
+    NodeMaintenance {
+        maintenance_window: Duration,
+    },
+    LoadBalancing {
+        current_load: f64,
+        target_load: f64,
+    },
+    ResourceOptimization {
+        resource_type: String,
+        improvement: f64,
+    },
+    PerformanceOptimization {
+        expected_improvement: f64,
+    },
+    NodeFailure {
+        failure_type: String,
+    },
+    CostOptimization {
+        cost_savings: f64,
+    },
+    SecurityCompliance {
+        policy_violation: String,
+    },
+    Manual {
+        reason: String,
+    },
 }
 
 /// Migration strategies
@@ -73,18 +91,35 @@ pub struct MigrationPhase {
 /// Migration operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MigrationOperation {
-    PrepareTarget { resource_allocation: ResourceRequirements },
-    BeginMigration { migration_type: String },
-    SyncState { sync_type: StateSync },
-    UpdateNetworking { routing_changes: Vec<String> },
-    SwitchTraffic { traffic_percentage: f64 },
+    PrepareTarget {
+        resource_allocation: ResourceRequirements,
+    },
+    BeginMigration {
+        migration_type: String,
+    },
+    SyncState {
+        sync_type: StateSync,
+    },
+    UpdateNetworking {
+        routing_changes: Vec<String>,
+    },
+    SwitchTraffic {
+        traffic_percentage: f64,
+    },
     CleanupSource,
-    Validate { validation_type: String },
+    Validate {
+        validation_type: String,
+    },
 }
 
 /// State synchronization types
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StateSync { MemorySync, StorageSync, NetworkSync, ApplicationSync }
+pub enum StateSync {
+    MemorySync,
+    StorageSync,
+    NetworkSync,
+    ApplicationSync,
+}
 
 /// Pre-migration check
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +171,11 @@ pub struct RollbackPlan {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RollbackStrategy { Automatic, Manual, None }
+pub enum RollbackStrategy {
+    Automatic,
+    Manual,
+    None,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RollbackTrigger {
@@ -155,7 +194,12 @@ pub struct RollbackStep {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RollbackOperation { RestoreOriginal, RevertNetworking, CleanupTarget, RestoreTraffic }
+pub enum RollbackOperation {
+    RestoreOriginal,
+    RevertNetworking,
+    CleanupTarget,
+    RestoreTraffic,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationResourceRequirements {
@@ -175,22 +219,47 @@ pub struct NetworkMigrationPlan {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DnsUpdate { pub record_name: String, pub old_value: String, pub new_value: String, pub ttl: Duration }
+pub struct DnsUpdate {
+    pub record_name: String,
+    pub old_value: String,
+    pub new_value: String,
+    pub ttl: Duration,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoadBalancerUpdate { pub lb_id: String, pub update_type: LoadBalancerUpdateType, pub endpoints: Vec<String> }
+pub struct LoadBalancerUpdate {
+    pub lb_id: String,
+    pub update_type: LoadBalancerUpdateType,
+    pub endpoints: Vec<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LoadBalancerUpdateType { AddEndpoint, RemoveEndpoint, UpdateWeight { weight: f64 } }
+pub enum LoadBalancerUpdateType {
+    AddEndpoint,
+    RemoveEndpoint,
+    UpdateWeight { weight: f64 },
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FirewallChange { pub rule_id: String, pub change_type: FirewallChangeType, pub rule_spec: String }
+pub struct FirewallChange {
+    pub rule_id: String,
+    pub change_type: FirewallChangeType,
+    pub rule_spec: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FirewallChangeType { AddRule, RemoveRule, ModifyRule }
+pub enum FirewallChangeType {
+    AddRule,
+    RemoveRule,
+    ModifyRule,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LatencyImpact { pub expected_increase_ms: f64, pub impact_duration: Duration, pub mitigations: Vec<String> }
+pub struct LatencyImpact {
+    pub expected_increase_ms: f64,
+    pub impact_duration: Duration,
+    pub mitigations: Vec<String>,
+}
 
 /// Migration execution state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -206,8 +275,15 @@ pub struct MigrationExecution {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MigrationStatus {
-    Planned, PreChecks, InProgress, Validating, Completed,
-    Failed { error: String }, Cancelled { reason: String }, RollingBack, RolledBack,
+    Planned,
+    PreChecks,
+    InProgress,
+    Validating,
+    Completed,
+    Failed { error: String },
+    Cancelled { reason: String },
+    RollingBack,
+    RolledBack,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -220,7 +296,12 @@ pub struct MigrationLogEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LogLevel { Info, Warning, Error, Debug }
+pub enum LogLevel {
+    Info,
+    Warning,
+    Error,
+    Debug,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationPerformanceMetrics {
@@ -232,19 +313,42 @@ pub struct MigrationPerformanceMetrics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DataTransferMetrics { pub total_bytes: u64, pub transfer_rate: u64, pub transfer_duration: Duration }
+pub struct DataTransferMetrics {
+    pub total_bytes: u64,
+    pub transfer_rate: u64,
+    pub transfer_duration: Duration,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceUsageDuringMigration { pub peak_cpu_usage: f64, pub peak_memory_usage: f64, pub network_bandwidth_used: u64 }
+pub struct ResourceUsageDuringMigration {
+    pub peak_cpu_usage: f64,
+    pub peak_memory_usage: f64,
+    pub network_bandwidth_used: u64,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MigrationRecord { pub execution: MigrationExecution, pub outcome: MigrationOutcome, pub lessons_learned: Vec<String> }
+pub struct MigrationRecord {
+    pub execution: MigrationExecution,
+    pub outcome: MigrationOutcome,
+    pub lessons_learned: Vec<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MigrationOutcome {
-    Success { total_duration: Duration, downtime: Duration, performance_improvement: f64 },
-    Failure { reason: String, failed_phase: String, recovery_action: String },
-    Cancelled { reason: String, cleanup_completed: bool },
+    Success {
+        total_duration: Duration,
+        downtime: Duration,
+        performance_improvement: f64,
+    },
+    Failure {
+        reason: String,
+        failed_phase: String,
+        recovery_action: String,
+    },
+    Cancelled {
+        reason: String,
+        cleanup_completed: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -7,10 +7,10 @@
 //! Manages hash buckets for content-addressed storage with O(1) lookups.
 //! Each bucket represents a range of hash values (256 total buckets).
 
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use crate::matrix::MatrixCoordinate;
 use super::Hash;
+use crate::matrix::MatrixCoordinate;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Bucket ID (00 to ff)
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -23,6 +23,7 @@ impl BucketId {
     }
 
     /// Create bucket ID from string
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(id: &str) -> Result<Self, String> {
         if id.len() != 2 {
             return Err("Bucket ID must be exactly 2 hex characters".to_string());
@@ -38,7 +39,7 @@ impl BucketId {
 
     /// Get all possible bucket IDs (00 to ff)
     pub fn all_buckets() -> Vec<Self> {
-        (0u8..=255).map(|i| Self(format!("{:02x}", i))).collect()
+        (0u8..=255).map(|i| Self(format!("{i:02x}"))).collect()
     }
 
     /// Get bucket ID as string
@@ -90,9 +91,9 @@ impl ShardMetadata {
 
         // Calculate popularity based on access frequency
         // More accesses in shorter time = higher popularity
-        if time_since_creation > 0.0 {
-            self.popularity_score = self.reference_count as f64 / time_since_creation.sqrt();
-        }
+        // Use max(1.0) to handle sub-second test scenarios where created_at == now
+        let effective_age = time_since_creation.max(1.0);
+        self.popularity_score = self.reference_count as f64 / effective_age.sqrt();
 
         self.last_accessed = now;
     }
@@ -175,7 +176,12 @@ impl HashBucket {
     }
 
     /// Add new shard to bucket
-    pub fn add_shard(&mut self, hash: Hash, positions: Vec<MatrixCoordinate>, size: usize) -> ShardMetadata {
+    pub fn add_shard(
+        &mut self,
+        hash: Hash,
+        positions: Vec<MatrixCoordinate>,
+        size: usize,
+    ) -> ShardMetadata {
         let metadata = ShardMetadata::new(positions, size);
         self.shard_hashes.insert(hash, metadata.clone());
         self.total_size += size;
@@ -245,7 +251,7 @@ mod tests {
         assert_eq!(bucket_id.as_str(), "ab");
 
         // Test from string
-        let bucket_id = BucketId::from_str("ff").unwrap();
+        let bucket_id = BucketId::from_str("ff").expect("test: expected success");
         assert_eq!(bucket_id.as_str(), "ff");
 
         // Test invalid
@@ -263,7 +269,7 @@ mod tests {
 
     #[test]
     fn test_shard_metadata_popularity() {
-        let positions = vec![MatrixCoordinate::new(1, 2, 3).unwrap()];
+        let positions = vec![MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate")];
         let mut metadata = ShardMetadata::new(positions, 1024);
 
         // Add references
@@ -277,11 +283,11 @@ mod tests {
 
     #[test]
     fn test_hash_bucket_operations() {
-        let bucket_id = BucketId::from_str("ab").unwrap();
+        let bucket_id = BucketId::from_str("ab").expect("test: expected success");
         let mut bucket = HashBucket::new(bucket_id);
 
         let hash: Hash = [0xab; 32];
-        let positions = vec![MatrixCoordinate::new(1, 2, 3).unwrap()];
+        let positions = vec![MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate")];
 
         // Add shard
         bucket.add_shard(hash, positions.clone(), 1024);

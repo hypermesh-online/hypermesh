@@ -18,9 +18,9 @@
 //! - BlockMatrix: Adapter instances registered as assets with Proof of State
 //! - Caesar UPI: Each provider implements IngressAdapter + EgressAdapter traits
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::{Utc, Duration};
+use chrono::{Duration, Utc};
 // REMOVED: reqwest::Client - migrating to STOQ protocol
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -50,7 +50,7 @@ pub struct StripeProvider {
 impl StripeProvider {
     pub fn new(api_key: String, is_sandbox: bool) -> Self {
         let base_url = if is_sandbox {
-            "https://api.stripe.com/v1".to_string()
+            "https://api.sandbox.stripe.com/v1".to_string()
         } else {
             "https://api.stripe.com/v1".to_string()
         };
@@ -75,27 +75,46 @@ impl BankingApiProvider for StripeProvider {
         })
     }
 
-    async fn get_account_balance(&self, _auth: &AuthToken, account_id: &str) -> Result<AccountBalance> {
+    async fn get_account_balance(
+        &self,
+        _auth: &AuthToken,
+        account_id: &str,
+    ) -> Result<AccountBalance> {
         // TODO: Implement with STOQ protocol
-        Err(anyhow!("Stripe provider pending STOQ migration - account: {}", account_id))
+        Err(anyhow!(
+            "Stripe provider pending STOQ migration - account: {account_id}"
+        ))
     }
 
-    async fn initiate_payment(&self, _auth: &AuthToken, _payment: &PaymentRequest) -> Result<PaymentResponse> {
+    async fn initiate_payment(
+        &self,
+        _auth: &AuthToken,
+        _payment: &PaymentRequest,
+    ) -> Result<PaymentResponse> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("Stripe provider pending STOQ migration"))
     }
 
-    async fn get_transaction_history(&self, _auth: &AuthToken, _account_id: &str, _params: &HistoryParams) -> Result<Vec<BankTransaction>> {
+    async fn get_transaction_history(
+        &self,
+        _auth: &AuthToken,
+        _account_id: &str,
+        _params: &HistoryParams,
+    ) -> Result<Vec<BankTransaction>> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("Stripe provider pending STOQ migration"))
     }
 
-    async fn verify_account(&self, _auth: &AuthToken, account_details: &AccountDetails) -> Result<VerificationResult> {
+    async fn verify_account(
+        &self,
+        _auth: &AuthToken,
+        account_details: &AccountDetails,
+    ) -> Result<VerificationResult> {
         // Stripe account verification would use their identity verification APIs
         // For now, implementing a basic verification check
 
-        let is_valid = !account_details.account_number.is_empty()
-            && !account_details.bank_name.is_empty();
+        let is_valid =
+            !account_details.account_number.is_empty() && !account_details.bank_name.is_empty();
 
         Ok(VerificationResult {
             is_valid,
@@ -121,7 +140,11 @@ impl BankingApiProvider for StripeProvider {
         ])
     }
 
-    async fn get_exchange_rates(&self, base: &str, targets: &[String]) -> Result<HashMap<String, Decimal>> {
+    async fn get_exchange_rates(
+        &self,
+        base: &str,
+        targets: &[String],
+    ) -> Result<HashMap<String, Decimal>> {
         // Stripe doesn't provide exchange rates directly, would integrate with a rate provider
         let mut rates = HashMap::new();
 
@@ -182,23 +205,42 @@ impl BankingApiProvider for PlaidProvider {
         })
     }
 
-    async fn get_account_balance(&self, _auth: &AuthToken, account_id: &str) -> Result<AccountBalance> {
+    async fn get_account_balance(
+        &self,
+        _auth: &AuthToken,
+        account_id: &str,
+    ) -> Result<AccountBalance> {
         // TODO: Implement with STOQ protocol
-        Err(anyhow!("Plaid provider pending STOQ migration - account: {}", account_id))
+        Err(anyhow!(
+            "Plaid provider pending STOQ migration - account: {account_id}"
+        ))
     }
 
-    async fn initiate_payment(&self, _auth: &AuthToken, _payment: &PaymentRequest) -> Result<PaymentResponse> {
+    async fn initiate_payment(
+        &self,
+        _auth: &AuthToken,
+        _payment: &PaymentRequest,
+    ) -> Result<PaymentResponse> {
         // Plaid is primarily read-only for account information and transactions
         // Payment initiation would require additional services like Plaid's Payment Initiation product
         Err(anyhow!("Payment initiation not available through Plaid"))
     }
 
-    async fn get_transaction_history(&self, _auth: &AuthToken, _account_id: &str, _params: &HistoryParams) -> Result<Vec<BankTransaction>> {
+    async fn get_transaction_history(
+        &self,
+        _auth: &AuthToken,
+        _account_id: &str,
+        _params: &HistoryParams,
+    ) -> Result<Vec<BankTransaction>> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("Plaid provider pending STOQ migration"))
     }
 
-    async fn verify_account(&self, _auth: &AuthToken, _account_details: &AccountDetails) -> Result<VerificationResult> {
+    async fn verify_account(
+        &self,
+        _auth: &AuthToken,
+        _account_details: &AccountDetails,
+    ) -> Result<VerificationResult> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("Plaid provider pending STOQ migration"))
     }
@@ -213,7 +255,11 @@ impl BankingApiProvider for PlaidProvider {
         ])
     }
 
-    async fn get_exchange_rates(&self, _base: &str, _targets: &[String]) -> Result<HashMap<String, Decimal>> {
+    async fn get_exchange_rates(
+        &self,
+        _base: &str,
+        _targets: &[String],
+    ) -> Result<HashMap<String, Decimal>> {
         // Plaid doesn't provide exchange rate services
         Err(anyhow!("Exchange rates not available through Plaid"))
     }
@@ -245,22 +291,41 @@ impl BankingApiProvider for OpenBankingProvider {
         Err(anyhow!("OpenBanking provider pending STOQ migration"))
     }
 
-    async fn get_account_balance(&self, _auth: &AuthToken, account_id: &str) -> Result<AccountBalance> {
+    async fn get_account_balance(
+        &self,
+        _auth: &AuthToken,
+        account_id: &str,
+    ) -> Result<AccountBalance> {
         // TODO: Implement with STOQ protocol
-        Err(anyhow!("OpenBanking provider pending STOQ migration - account: {}", account_id))
+        Err(anyhow!(
+            "OpenBanking provider pending STOQ migration - account: {account_id}"
+        ))
     }
 
-    async fn initiate_payment(&self, _auth: &AuthToken, _payment: &PaymentRequest) -> Result<PaymentResponse> {
+    async fn initiate_payment(
+        &self,
+        _auth: &AuthToken,
+        _payment: &PaymentRequest,
+    ) -> Result<PaymentResponse> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("OpenBanking provider pending STOQ migration"))
     }
 
-    async fn get_transaction_history(&self, _auth: &AuthToken, _account_id: &str, _params: &HistoryParams) -> Result<Vec<BankTransaction>> {
+    async fn get_transaction_history(
+        &self,
+        _auth: &AuthToken,
+        _account_id: &str,
+        _params: &HistoryParams,
+    ) -> Result<Vec<BankTransaction>> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("OpenBanking provider pending STOQ migration"))
     }
 
-    async fn verify_account(&self, _auth: &AuthToken, _account_details: &AccountDetails) -> Result<VerificationResult> {
+    async fn verify_account(
+        &self,
+        _auth: &AuthToken,
+        _account_details: &AccountDetails,
+    ) -> Result<VerificationResult> {
         // TODO: Implement with STOQ protocol
         Err(anyhow!("OpenBanking provider pending STOQ migration"))
     }
@@ -274,7 +339,11 @@ impl BankingApiProvider for OpenBankingProvider {
         ])
     }
 
-    async fn get_exchange_rates(&self, _base: &str, _targets: &[String]) -> Result<HashMap<String, Decimal>> {
+    async fn get_exchange_rates(
+        &self,
+        _base: &str,
+        _targets: &[String],
+    ) -> Result<HashMap<String, Decimal>> {
         // OpenBanking doesn't typically provide exchange rate services
         Err(anyhow!("Exchange rates not available through OpenBanking"))
     }
@@ -295,17 +364,21 @@ mod test_mocks {
             let mut accounts = HashMap::new();
             let mut transactions = HashMap::new();
 
-            accounts.insert("account_1".to_string(), AccountBalance {
-                account_id: "account_1".to_string(),
-                available: dec!(5000),
-                current: dec!(5250),
-                pending: dec!(250),
-                currency: "USD".to_string(),
-                last_updated: Utc::now(),
-            });
+            accounts.insert(
+                "account_1".to_string(),
+                AccountBalance {
+                    account_id: "account_1".to_string(),
+                    available: dec!(5000),
+                    current: dec!(5250),
+                    pending: dec!(250),
+                    currency: "USD".to_string(),
+                    last_updated: Utc::now(),
+                },
+            );
 
-            transactions.insert("account_1".to_string(), vec![
-                BankTransaction {
+            transactions.insert(
+                "account_1".to_string(),
+                vec![BankTransaction {
                     transaction_id: "tx_1".to_string(),
                     amount: dec!(-150),
                     currency: "USD".to_string(),
@@ -313,8 +386,8 @@ mod test_mocks {
                     description: "Online purchase".to_string(),
                     timestamp: Utc::now() - Duration::hours(2),
                     balance_after: dec!(5250),
-                }
-            ]);
+                }],
+            );
 
             Self {
                 accounts,
@@ -334,13 +407,22 @@ mod test_mocks {
             })
         }
 
-        async fn get_account_balance(&self, _auth: &AuthToken, account_id: &str) -> Result<AccountBalance> {
-            self.accounts.get(account_id)
+        async fn get_account_balance(
+            &self,
+            _auth: &AuthToken,
+            account_id: &str,
+        ) -> Result<AccountBalance> {
+            self.accounts
+                .get(account_id)
                 .cloned()
                 .ok_or_else(|| anyhow!("Account not found"))
         }
 
-        async fn initiate_payment(&self, _auth: &AuthToken, payment: &PaymentRequest) -> Result<PaymentResponse> {
+        async fn initiate_payment(
+            &self,
+            _auth: &AuthToken,
+            payment: &PaymentRequest,
+        ) -> Result<PaymentResponse> {
             Ok(PaymentResponse {
                 payment_id: format!("mock_payment_{}", Utc::now().timestamp()),
                 status: "processing".to_string(),
@@ -349,13 +431,24 @@ mod test_mocks {
             })
         }
 
-        async fn get_transaction_history(&self, _auth: &AuthToken, account_id: &str, _params: &HistoryParams) -> Result<Vec<BankTransaction>> {
-            Ok(self.transactions.get(account_id)
+        async fn get_transaction_history(
+            &self,
+            _auth: &AuthToken,
+            account_id: &str,
+            _params: &HistoryParams,
+        ) -> Result<Vec<BankTransaction>> {
+            Ok(self
+                .transactions
+                .get(account_id)
                 .cloned()
                 .unwrap_or_default())
         }
 
-        async fn verify_account(&self, _auth: &AuthToken, _account_details: &AccountDetails) -> Result<VerificationResult> {
+        async fn verify_account(
+            &self,
+            _auth: &AuthToken,
+            _account_details: &AccountDetails,
+        ) -> Result<VerificationResult> {
             Ok(VerificationResult {
                 is_valid: true,
                 verification_id: "mock_verification".to_string(),
@@ -368,7 +461,11 @@ mod test_mocks {
             Ok(vec!["USD".to_string(), "EUR".to_string()])
         }
 
-        async fn get_exchange_rates(&self, _base: &str, targets: &[String]) -> Result<HashMap<String, Decimal>> {
+        async fn get_exchange_rates(
+            &self,
+            _base: &str,
+            targets: &[String],
+        ) -> Result<HashMap<String, Decimal>> {
             let mut rates = HashMap::new();
             for target in targets {
                 rates.insert(target.clone(), dec!(1.1));

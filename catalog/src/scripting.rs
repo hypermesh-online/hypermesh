@@ -16,19 +16,19 @@ use std::time::Instant;
 pub trait ScriptingEngine: Send + Sync {
     /// Engine name
     fn name(&self) -> &str;
-    
+
     /// Supported script language
     fn language(&self) -> &str;
-    
+
     /// Execute script code
     async fn execute(&self, code: &str, context: ScriptContext) -> Result<ScriptResult>;
-    
+
     /// Execute script file
     async fn execute_file(&self, file_path: &str, context: ScriptContext) -> Result<ScriptResult>;
-    
+
     /// Validate script syntax
     async fn validate_syntax(&self, code: &str) -> Result<SyntaxValidation>;
-    
+
     /// Get engine capabilities
     fn capabilities(&self) -> EngineCapabilities;
 }
@@ -213,11 +213,11 @@ impl LuaEngine {
     pub fn new(config: LuaEngineConfig) -> Self {
         Self { config }
     }
-    
+
     /// Create Lua instance with configuration
     fn create_lua(&self, context: &ScriptContext) -> Result<mlua::Lua> {
         let lua = mlua::Lua::new();
-        
+
         // Set up security restrictions
         if !context.security.allow_file_access {
             // Disable file access functions
@@ -225,23 +225,28 @@ impl LuaEngine {
             lua.globals().set("loadfile", mlua::Nil)?;
             lua.globals().set("dofile", mlua::Nil)?;
         }
-        
+
         if !context.security.allow_system_calls {
             // Disable system access
             lua.globals().set("os", mlua::Nil)?;
         }
-        
+
         // Set global variables from context
         for (key, value) in &context.globals {
             let lua_value = self.json_to_lua_value(&lua, value)?;
             lua.globals().set(key.as_str(), lua_value)?;
         }
-        
+
         Ok(lua)
     }
-    
+
     /// Convert JSON value to Lua value
-    fn json_to_lua_value<'lua>(&self, lua: &'lua mlua::Lua, value: &serde_json::Value) -> Result<mlua::Value<'lua>> {
+    #[allow(clippy::only_used_in_recursion)]
+    fn json_to_lua_value<'lua>(
+        &self,
+        lua: &'lua mlua::Lua,
+        value: &serde_json::Value,
+    ) -> Result<mlua::Value<'lua>> {
         match value {
             serde_json::Value::Null => Ok(mlua::Value::Nil),
             serde_json::Value::Bool(b) => Ok(mlua::Value::Boolean(*b)),
@@ -273,8 +278,9 @@ impl LuaEngine {
             }
         }
     }
-    
+
     /// Convert Lua value to JSON value
+    #[allow(clippy::only_used_in_recursion)]
     fn lua_value_to_json(&self, value: mlua::Value) -> Result<serde_json::Value> {
         match value {
             mlua::Value::Nil => Ok(serde_json::Value::Null),
@@ -307,57 +313,64 @@ impl ScriptingEngine for LuaEngine {
     fn name(&self) -> &str {
         "Lua Engine"
     }
-    
+
     fn language(&self) -> &str {
         "lua"
     }
-    
+
     async fn execute(&self, code: &str, context: ScriptContext) -> Result<ScriptResult> {
         // For now, use synchronous execution to avoid Send trait issues
         let start_time = Instant::now();
         let lua = self.create_lua(&context)?;
-        
+
         let mut errors = Vec::new();
-        
+
         // Set up print function to capture output
         let output_capture = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let output_capture_clone = output_capture.clone();
-        
+
         let print_fn = lua.create_function(move |_, args: mlua::MultiValue| {
-            let mut output_guard = output_capture_clone.lock().unwrap();
-            let output_str = args.iter()
-                .map(|v| format!("{:?}", v))
+            let mut output_guard = output_capture_clone.lock().expect("mutex should not be poisoned");
+            let output_str = args
+                .iter()
+                .map(|v| format!("{v:?}"))
                 .collect::<Vec<_>>()
                 .join("\t");
             output_guard.push(output_str);
             Ok(())
         })?;
-        
+
         lua.globals().set("print", print_fn)?;
-        
+
         // Execute the code synchronously for now
         let result = lua.load(code).exec();
-        
+
         // Get captured output
-        let output = output_capture.lock().unwrap().clone();
-        
+        let output = output_capture.lock().expect("mutex should not be poisoned").clone();
+
         let execution_time = start_time.elapsed().as_millis() as u64;
-        
+
         let (success, return_value) = match result {
             Ok(_) => {
                 // Try to get return value if it's an expression
                 let return_result = lua.load(code).eval::<mlua::Value>();
                 match return_result {
-                    Ok(value) => (true, Some(self.lua_value_to_json(value).unwrap_or(serde_json::Value::Null))),
+                    Ok(value) => (
+                        true,
+                        Some(
+                            self.lua_value_to_json(value)
+                                .unwrap_or(serde_json::Value::Null),
+                        ),
+                    ),
                     Err(_) => (true, None),
                 }
             }
             Err(e) => {
-                errors.push(format!("Lua error: {}", e));
+                errors.push(format!("Lua error: {e}"));
                 (false, None)
             }
         };
-        
+
         Ok(ScriptResult {
             success,
             return_value,
@@ -373,15 +386,15 @@ impl ScriptingEngine for LuaEngine {
             },
         })
     }
-    
+
     async fn execute_file(&self, file_path: &str, context: ScriptContext) -> Result<ScriptResult> {
         let code = tokio::fs::read_to_string(file_path).await?;
         self.execute(&code, context).await
     }
-    
+
     async fn validate_syntax(&self, code: &str) -> Result<SyntaxValidation> {
         let lua = mlua::Lua::new();
-        
+
         // Try to load the code without executing it
         let result = lua.load(code).into_function();
         match result {
@@ -391,14 +404,14 @@ impl ScriptingEngine for LuaEngine {
                 warnings: vec![],
             }),
             Err(e) => {
-                let error_msg = format!("{}", e);
+                let error_msg = format!("{e}");
                 let syntax_error = SyntaxError {
                     message: error_msg,
-                    line: 1, // TODO: Parse line number from error
+                    line: 1,   // TODO: Parse line number from error
                     column: 1, // TODO: Parse column number from error
                     error_type: "SyntaxError".to_string(),
                 };
-                
+
                 Ok(SyntaxValidation {
                     is_valid: false,
                     errors: vec![syntax_error],
@@ -407,7 +420,7 @@ impl ScriptingEngine for LuaEngine {
             }
         }
     }
-    
+
     fn capabilities(&self) -> EngineCapabilities {
         EngineCapabilities {
             supports_sandboxing: true,
@@ -429,57 +442,78 @@ impl ScriptingEngine for LuaEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_lua_engine_execution() {
         let config = LuaEngineConfig::default();
         let engine = LuaEngine::new(config);
         let context = ScriptContext::default();
-        
-        let result = engine.execute("return 2 + 2", context).await.unwrap();
-        
+
+        let result = engine.execute("return 2 + 2", context).await.expect("test: async operation");
+
         assert!(result.success);
-        assert_eq!(result.return_value, Some(serde_json::Value::Number(serde_json::Number::from(4))));
+        assert_eq!(
+            result.return_value,
+            Some(serde_json::Value::Number(serde_json::Number::from(4)))
+        );
     }
-    
+
     #[tokio::test]
     async fn test_lua_engine_print_capture() {
         let config = LuaEngineConfig::default();
         let engine = LuaEngine::new(config);
         let context = ScriptContext::default();
-        
-        let result = engine.execute("print('Hello, Lua!')", context).await.unwrap();
-        
+
+        let result = engine
+            .execute("print('Hello, Lua!')", context)
+            .await
+            .expect("test: expected success");
+
         assert!(result.success);
         assert!(!result.output.is_empty());
         assert!(result.output[0].contains("Hello, Lua!"));
     }
-    
+
     #[tokio::test]
     async fn test_lua_engine_globals() {
         let config = LuaEngineConfig::default();
         let engine = LuaEngine::new(config);
-        
+
         let mut context = ScriptContext::default();
-        context.globals.insert("test_var".to_string(), serde_json::Value::Number(serde_json::Number::from(42)));
-        
-        let result = engine.execute("return test_var * 2", context).await.unwrap();
-        
+        context.globals.insert(
+            "test_var".to_string(),
+            serde_json::Value::Number(serde_json::Number::from(42)),
+        );
+
+        let result = engine
+            .execute("return test_var * 2", context)
+            .await
+            .expect("test: expected success");
+
         assert!(result.success);
-        assert_eq!(result.return_value, Some(serde_json::Value::Number(serde_json::Number::from(84))));
+        assert_eq!(
+            result.return_value,
+            Some(serde_json::Value::Number(serde_json::Number::from(84)))
+        );
     }
-    
+
     #[tokio::test]
     async fn test_lua_syntax_validation() {
         let config = LuaEngineConfig::default();
         let engine = LuaEngine::new(config);
-        
+
         // Valid syntax
-        let valid_result = engine.validate_syntax("local x = 5; return x").await.unwrap();
+        let valid_result = engine
+            .validate_syntax("local x = 5; return x")
+            .await
+            .expect("test: expected success");
         assert!(valid_result.is_valid);
-        
+
         // Invalid syntax
-        let invalid_result = engine.validate_syntax("local x = ; return x").await.unwrap();
+        let invalid_result = engine
+            .validate_syntax("local x = ; return x")
+            .await
+            .expect("test: expected success");
         assert!(!invalid_result.is_valid);
         assert!(!invalid_result.errors.is_empty());
     }

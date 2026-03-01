@@ -60,42 +60,49 @@ async fn test_capability_based_security() {
     let quotas = ResourceQuotas::default();
 
     // Create context with limited capabilities
-    security_manager.create_context(
-        "catalog".to_string(),
-        &metadata,
-        limited_capabilities.clone(),
-        quotas,
-    ).await.unwrap();
+    security_manager
+        .create_context(
+            "catalog".to_string(),
+            &metadata,
+            limited_capabilities.clone(),
+            quotas,
+        )
+        .await
+        .unwrap();
 
     // Test allowed capability
-    assert!(security_manager.check_capability(
-        "catalog",
-        &ExtensionCapability::AssetManagement,
-        "register_asset"
-    ).await.is_ok());
+    assert!(security_manager
+        .check_capability(
+            "catalog",
+            &ExtensionCapability::AssetManagement,
+            "register_asset"
+        )
+        .await
+        .is_ok());
 
     // Test denied capability
-    assert!(security_manager.check_capability(
-        "catalog",
-        &ExtensionCapability::VMExecution,
-        "execute_code"
-    ).await.is_err());
+    assert!(security_manager
+        .check_capability("catalog", &ExtensionCapability::VMExecution, "execute_code")
+        .await
+        .is_err());
 
     // Test with all required capabilities
-    security_manager.create_context(
-        "catalog-full".to_string(),
-        &metadata,
-        metadata.required_capabilities.clone(),
-        quotas,
-    ).await.unwrap();
+    security_manager
+        .create_context(
+            "catalog-full".to_string(),
+            &metadata,
+            metadata.required_capabilities.clone(),
+            quotas,
+        )
+        .await
+        .unwrap();
 
     // All should be allowed
     for capability in &metadata.required_capabilities {
-        assert!(security_manager.check_capability(
-            "catalog-full",
-            capability,
-            "test_operation"
-        ).await.is_ok());
+        assert!(security_manager
+            .check_capability("catalog-full", capability, "test_operation")
+            .await
+            .is_ok());
     }
 
     info!("Capability-based security test passed");
@@ -167,7 +174,10 @@ async fn test_asset_registration() {
     assert!(!handlers.is_empty());
 
     // Extend asset manager
-    extension.extend_manager(asset_manager.clone()).await.unwrap();
+    extension
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Verify asset types are registered
     let asset_types = asset_manager.list_asset_types().await;
@@ -175,15 +185,17 @@ async fn test_asset_registration() {
     assert!(asset_types.iter().any(|t| t.name == "package"));
 
     // Test creating assets of new types
-    let library_asset = asset_manager.create_asset(
-        AssetType::Custom("library".to_string()),
-        json!({
-            "name": "test-library",
-            "version": "1.0.0",
-            "dependencies": []
-        }),
-        PrivacyMode::PRIVATE,
-    ).await;
+    let library_asset = asset_manager
+        .create_asset(
+            AssetType::Custom("library".to_string()),
+            json!({
+                "name": "test-library",
+                "version": "1.0.0",
+                "dependencies": []
+            }),
+            PrivacyMode::PRIVATE,
+        )
+        .await;
 
     assert!(library_asset.is_ok());
 
@@ -208,7 +220,10 @@ async fn test_asset_handlers() {
     let extension = loader.get_extension(&extension_id).await.unwrap();
 
     extension.register_assets().await.unwrap();
-    extension.extend_manager(asset_manager.clone()).await.unwrap();
+    extension
+        .extend_manager(asset_manager.clone())
+        .await
+        .unwrap();
 
     // Test library asset handler
     let library_request = ExtensionRequest {

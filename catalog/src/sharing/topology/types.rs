@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::time::SystemTime;
 
@@ -28,15 +28,21 @@ pub struct NodeLocation {
 impl NodeLocation {
     /// Calculate distance to another location (in km)
     pub fn distance_to(&self, other: &NodeLocation) -> f64 {
-        if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) =
-            (self.latitude, self.longitude, other.latitude, other.longitude) {
+        if let (Some(lat1), Some(lon1), Some(lat2), Some(lon2)) = (
+            self.latitude,
+            self.longitude,
+            other.latitude,
+            other.longitude,
+        ) {
             // Haversine formula
             let r = 6371.0; // Earth radius in km
             let dlat = (lat2 - lat1).to_radians();
             let dlon = (lon2 - lon1).to_radians();
-            let a = (dlat / 2.0).sin() * (dlat / 2.0).sin() +
-                    lat1.to_radians().cos() * lat2.to_radians().cos() *
-                    (dlon / 2.0).sin() * (dlon / 2.0).sin();
+            let a = (dlat / 2.0).sin() * (dlat / 2.0).sin()
+                + lat1.to_radians().cos()
+                    * lat2.to_radians().cos()
+                    * (dlon / 2.0).sin()
+                    * (dlon / 2.0).sin();
             let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
             r * c
         } else {

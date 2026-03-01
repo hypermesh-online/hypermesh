@@ -2,12 +2,12 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use crate::{AssetRegistration, AssetMetadata};
 use super::super::ConflictResolution;
+use crate::{AssetMetadata, AssetRegistration};
 
 /// Synchronization strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]

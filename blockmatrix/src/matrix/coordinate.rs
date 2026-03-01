@@ -72,9 +72,12 @@ impl MatrixCoordinate {
 
     /// Validate that coordinate is within bounds
     pub fn validate(&self) -> Result<(), CoordinateError> {
-        if self.x < MIN_COORD || self.x > MAX_COORD
-            || self.y < MIN_COORD || self.y > MAX_COORD
-            || self.z < MIN_COORD || self.z > MAX_COORD
+        if self.x < MIN_COORD
+            || self.x > MAX_COORD
+            || self.y < MIN_COORD
+            || self.y > MAX_COORD
+            || self.z < MIN_COORD
+            || self.z > MAX_COORD
         {
             return Err(CoordinateError::OutOfBounds(self.x, self.y, self.z));
         }
@@ -131,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_coordinate_creation() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         assert_eq!(coord.x, 10);
         assert_eq!(coord.y, 20);
         assert_eq!(coord.z, 30);
@@ -159,42 +162,42 @@ mod tests {
 
     #[test]
     fn test_euclidean_distance() {
-        let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let b = MatrixCoordinate::new(3, 4, 0).unwrap();
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
         assert_eq!(a.euclidean_distance(&b), 5.0);
 
-        let c = MatrixCoordinate::new(1, 2, 3).unwrap();
-        let d = MatrixCoordinate::new(4, 6, 8).unwrap();
+        let c = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let d = MatrixCoordinate::new(4, 6, 8).expect("test: valid coordinate");
         let dist = c.euclidean_distance(&d);
         assert!((dist - 7.0710678).abs() < 0.0001);
     }
 
     #[test]
     fn test_manhattan_distance() {
-        let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let b = MatrixCoordinate::new(3, 4, 5).unwrap();
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(3, 4, 5).expect("test: valid coordinate");
         assert_eq!(a.manhattan_distance(&b), 12);
 
-        let c = MatrixCoordinate::new(-1, -2, -3).unwrap();
-        let d = MatrixCoordinate::new(1, 2, 3).unwrap();
+        let c = MatrixCoordinate::new(-1, -2, -3).expect("test: valid coordinate");
+        let d = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         assert_eq!(c.manhattan_distance(&d), 12);
     }
 
     #[test]
     fn test_chebyshev_distance() {
-        let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let b = MatrixCoordinate::new(3, 4, 2).unwrap();
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(3, 4, 2).expect("test: valid coordinate");
         assert_eq!(a.chebyshev_distance(&b), 4);
 
-        let c = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let d = MatrixCoordinate::new(15, 22, 35).unwrap();
+        let c = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let d = MatrixCoordinate::new(15, 22, 35).expect("test: valid coordinate");
         assert_eq!(c.chebyshev_distance(&d), 5);
     }
 
     #[test]
     fn test_is_within_distance() {
-        let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let b = MatrixCoordinate::new(3, 4, 0).unwrap();
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
 
         assert!(a.is_within_distance(&b, 10.0));
         assert!(a.is_within_distance(&b, 5.0));
@@ -203,16 +206,16 @@ mod tests {
 
     #[test]
     fn test_squared_euclidean_distance() {
-        let a = MatrixCoordinate::new(0, 0, 0).unwrap();
-        let b = MatrixCoordinate::new(3, 4, 0).unwrap();
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(3, 4, 0).expect("test: valid coordinate");
         assert_eq!(a.squared_euclidean_distance(&b), 25);
     }
 
     #[test]
     fn test_coordinate_equality() {
-        let a = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let b = MatrixCoordinate::new(10, 20, 30).unwrap();
-        let c = MatrixCoordinate::new(10, 20, 31).unwrap();
+        let a = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
+        let c = MatrixCoordinate::new(10, 20, 31).expect("test: valid coordinate");
 
         assert_eq!(a, b);
         assert_ne!(a, c);
@@ -220,15 +223,15 @@ mod tests {
 
     #[test]
     fn test_coordinate_display() {
-        let coord = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         // hypermesh_lib Display uses no-space format: (10,20,30)
-        assert_eq!(format!("{}", coord), "(10,20,30)");
+        assert_eq!(format!("{coord}"), "(10,20,30)");
     }
 
     #[test]
     fn test_negative_coordinates() {
-        let a = MatrixCoordinate::new(-10, -20, -30).unwrap();
-        let b = MatrixCoordinate::new(10, 20, 30).unwrap();
+        let a = MatrixCoordinate::new(-10, -20, -30).expect("test: valid coordinate");
+        let b = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
 
         let dist = a.euclidean_distance(&b);
         // sqrt(20^2 + 40^2 + 60^2) = sqrt(5600) = 74.83315...

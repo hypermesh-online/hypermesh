@@ -36,8 +36,8 @@ pub mod output;
 
 // Re-export primary public API
 pub use commands::{
-    CliCommand, GovernorCommand, NodeCommand, OracleCommand, PacketCommand,
-    parse_packet_state, parse_tier,
+    parse_packet_state, parse_tier, CliCommand, GovernorCommand, NodeCommand, OracleCommand,
+    PacketCommand,
 };
 pub use executor::CommandExecutor;
 pub use output::{CliError, CliOutput, CliTable};
@@ -98,7 +98,7 @@ mod tests {
         let mut runner = CliRunner::new();
         let cmd = CliCommand::Governor(GovernorCommand::Params);
         let output = runner.execute(cmd).expect("test: execute");
-        let text = format!("{}", output);
+        let text = format!("{output}");
         assert!(text.contains("Kp"));
     }
 
@@ -107,7 +107,7 @@ mod tests {
         let mut runner = CliRunner::default();
         let cmd = CliCommand::Oracle(OracleCommand::Price);
         let output = runner.execute(cmd).expect("test: oracle price");
-        assert!(format!("{}", output).contains("Gold price"));
+        assert!(format!("{output}").contains("Gold price"));
     }
 
     #[test]

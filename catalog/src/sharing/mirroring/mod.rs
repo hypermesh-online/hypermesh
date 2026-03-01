@@ -6,19 +6,19 @@
 //!
 //! Migrated to use BlockMatrix instruction-based retrieval
 
-mod types;
 mod strategies;
+mod types;
 
 pub use types::*;
 
 use anyhow::Result;
-use std::collections::{HashMap, HashSet, BinaryHeap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, SystemTime};
+use tokio::sync::RwLock;
 
-use crate::{AssetRegistration, AssetMetadata};
 use crate::registry::CatalogRegistry;
+use crate::{AssetMetadata, AssetRegistration};
 
 /// Mirror manager for package replication
 pub struct MirrorManager {
@@ -68,15 +68,18 @@ impl MirrorManager {
         let metadata_size = serde_json::to_vec(metadata)
             .map(|v| v.len() as u64)
             .unwrap_or(256);
-        let selected_nodes = self.select_mirror_nodes(
-            metadata_size,
-            self.replication_factor,
-        ).await?;
+        let selected_nodes = self
+            .select_mirror_nodes(metadata_size, self.replication_factor)
+            .await?;
 
         // Replicate to selected nodes
         let mut successful_mirrors = Vec::new();
         for node_id in &selected_nodes {
-            if self.replicate_to_node(asset_id, metadata, node_id).await.is_ok() {
+            if self
+                .replicate_to_node(asset_id, metadata, node_id)
+                .await
+                .is_ok()
+            {
                 successful_mirrors.push(node_id.clone());
             }
         }
@@ -101,26 +104,43 @@ impl MirrorManager {
     /// Apply mirroring strategy
     pub async fn apply_strategy(&self, strategy: MirrorStrategy) -> Result<u32> {
         match strategy {
-            MirrorStrategy::Popularity { threshold, max_mirrors } => {
-                self.mirror_popular_packages(threshold, max_mirrors).await
+            MirrorStrategy::Popularity {
+                threshold,
+                max_mirrors,
+            } => self.mirror_popular_packages(threshold, max_mirrors).await,
+            MirrorStrategy::Geographic {
+                regions,
+                mirrors_per_region,
+            } => self.mirror_by_geography(regions, mirrors_per_region).await,
+            MirrorStrategy::AccessPattern {
+                min_accesses,
+                time_window,
+            } => {
+                self.mirror_by_access_pattern(min_accesses, time_window)
+                    .await
             }
-            MirrorStrategy::Geographic { regions, mirrors_per_region } => {
-                self.mirror_by_geography(regions, mirrors_per_region).await
+            MirrorStrategy::Priority {
+                min_priority,
+                replication_factor,
+            } => {
+                self.mirror_by_priority(min_priority, replication_factor)
+                    .await
             }
-            MirrorStrategy::AccessPattern { min_accesses, time_window } => {
-                self.mirror_by_access_pattern(min_accesses, time_window).await
-            }
-            MirrorStrategy::Priority { min_priority, replication_factor } => {
-                self.mirror_by_priority(min_priority, replication_factor).await
-            }
-            MirrorStrategy::Adaptive { target_availability, max_latency_ms } => {
-                self.adaptive_mirroring(target_availability, max_latency_ms).await
+            MirrorStrategy::Adaptive {
+                target_availability,
+                max_latency_ms,
+            } => {
+                self.adaptive_mirroring(target_availability, max_latency_ms)
+                    .await
             }
         }
     }
 
     /// Get mirror status
-    pub async fn get_mirror_status(&self, asset_id: &AssetRegistration) -> Result<Option<MirrorStatus>> {
+    pub async fn get_mirror_status(
+        &self,
+        asset_id: &AssetRegistration,
+    ) -> Result<Option<MirrorStatus>> {
         let mirrors = self.package_mirrors.read().await;
         Ok(mirrors.get(asset_id).cloned())
     }
@@ -140,8 +160,9 @@ impl MirrorManager {
         user_id: Option<String>,
     ) -> Result<()> {
         let mut metrics = self.popularity_metrics.write().await;
-        let entry = metrics.entry(asset_id.clone()).or_insert_with(|| {
-            PopularityMetrics {
+        let entry = metrics
+            .entry(asset_id.clone())
+            .or_insert_with(|| PopularityMetrics {
                 downloads: 0,
                 downloads_24h: 0,
                 downloads_7d: 0,
@@ -149,8 +170,7 @@ impl MirrorManager {
                 avg_rating: 0.0,
                 score: 0.0,
                 trend: 0.0,
-            }
-        });
+            });
 
         if download_event {
             entry.downloads += 1;
@@ -175,7 +195,8 @@ impl MirrorManager {
         let stale_threshold = Duration::from_secs(300);
 
         for (_node_id, node) in nodes.iter_mut() {
-            let elapsed = now.duration_since(node.last_health_check)
+            let elapsed = now
+                .duration_since(node.last_health_check)
                 .unwrap_or(Duration::from_secs(0));
             let is_stale = elapsed > stale_threshold;
 
@@ -206,7 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_mirror_manager_creation() {
-        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 
         let registry = Arc::new(CatalogRegistry::new(
             hypermesh_lib::PrivacyMode::PUBLIC,
@@ -220,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_node_selection() {
-        use crate::registry::{CatalogRegistry, TrustPolicy, RegistryConfig};
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 
         let registry = Arc::new(CatalogRegistry::new(
             hypermesh_lib::PrivacyMode::PUBLIC,
@@ -228,7 +249,9 @@ mod tests {
             RegistryConfig::default(),
         ));
 
-        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry).await.unwrap();
+        let manager = MirrorManager::new(10 * 1024 * 1024 * 1024, 3, registry)
+            .await
+            .expect("test: expected success");
         let nodes = manager.select_mirror_nodes(1024 * 1024, 3).await;
         assert!(nodes.is_ok());
     }
