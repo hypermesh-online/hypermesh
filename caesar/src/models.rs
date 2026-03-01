@@ -245,12 +245,12 @@ mod tests {
             hop_count: 0,
             hop_limit: 10,
             demurrage_cost: GoldGrams::zero(),
-            route: vec![NodeId::from("ingress-node")],
+            route: vec![NodeId::from_public_key(b"ingress-node")],
             created_at: now,
             updated_at: now,
             settled_at: None,
-            sender: NodeId::from("sender-node"),
-            recipient: NodeId::from("recipient-node"),
+            sender: NodeId::from_public_key(b"sender-node"),
+            recipient: NodeId::from_public_key(b"recipient-node"),
             demurrage_rate: MarketTier::L0.default_demurrage_rate(),
         };
 
@@ -271,14 +271,14 @@ mod tests {
         let record = SettlementRecord {
             settlement_id: "settle-001".to_string(),
             packet_id: PacketId::new([1u8; 32]),
-            egress_node: NodeId::from("egress-node-42"),
+            egress_node: NodeId::from_public_key(b"egress-node-42"),
             finality_type: "instant".to_string(),
             fee_collected: GoldGrams::from_decimal(Decimal::new(250, 2)),
             settled_at: now,
         };
 
         assert_eq!(record.settlement_id, "settle-001");
-        assert_eq!(record.egress_node.0, "egress-node-42");
+        assert_eq!(record.egress_node, NodeId::from_public_key(b"egress-node-42"));
         assert_eq!(record.finality_type, "instant");
         assert_eq!(record.fee_collected.0, Decimal::new(250, 2));
     }
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn node_status_defaults() {
         let status = NodeStatus {
-            node_id: NodeId::from("test-node"),
+            node_id: NodeId::from_public_key(b"test-node"),
             active_packets: 0,
             settled_count: 0,
             total_fees_earned: GoldGrams::zero(),

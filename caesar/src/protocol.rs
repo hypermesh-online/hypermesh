@@ -331,8 +331,8 @@ mod tests {
 
         let packet_id = protocol
             .mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
+                hypermesh_lib::NodeId::from_public_key(b"sender"),
+                hypermesh_lib::NodeId::from_public_key(b"recipient"),
                 GoldGrams::from_decimal(dec!(100)),
                 GoldGrams::from_decimal(dec!(0.1)),
                 hypermesh_lib::economic::MarketTier::L0,
@@ -363,8 +363,8 @@ mod tests {
 
         let packet_id = protocol
             .mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
+                hypermesh_lib::NodeId::from_public_key(b"sender"),
+                hypermesh_lib::NodeId::from_public_key(b"recipient"),
                 GoldGrams::from_decimal(dec!(100)),
                 GoldGrams::from_decimal(dec!(0.1)),
                 hypermesh_lib::economic::MarketTier::L0,
@@ -423,8 +423,8 @@ mod tests {
 
         let packet_id = protocol
             .mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
+                hypermesh_lib::NodeId::from_public_key(b"sender"),
+                hypermesh_lib::NodeId::from_public_key(b"recipient"),
                 GoldGrams::from_decimal(dec!(50)),
                 GoldGrams::from_decimal(dec!(0.05)),
                 hypermesh_lib::economic::MarketTier::L1,
@@ -483,8 +483,8 @@ mod tests {
 
         let packet_id = protocol
             .mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
+                hypermesh_lib::NodeId::from_public_key(b"sender"),
+                hypermesh_lib::NodeId::from_public_key(b"recipient"),
                 GoldGrams::from_decimal(dec!(100)),
                 GoldGrams::from_decimal(dec!(0.1)),
                 hypermesh_lib::economic::MarketTier::L0,
@@ -495,7 +495,7 @@ mod tests {
             .expect("test: mint");
 
         let candidates = vec![routing::CapacityMetrics {
-            node_id: hypermesh_lib::NodeId::from("relay-1"),
+            node_id: hypermesh_lib::NodeId::from_public_key(b"relay-1"),
             available_bandwidth_mbps: dec!(500),
             buffer_capacity_packets: 200,
             avg_latency_ms: dec!(5),
@@ -520,7 +520,7 @@ mod tests {
 
         assert_eq!(
             result.to_node,
-            hypermesh_lib::NodeId::from("relay-1"),
+            hypermesh_lib::NodeId::from_public_key(b"relay-1"),
             "should route to the only candidate"
         );
         assert_eq!(result.hop_count, 1, "hop count should be 1");

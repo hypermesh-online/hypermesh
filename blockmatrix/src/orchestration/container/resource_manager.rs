@@ -305,7 +305,7 @@ impl IfrResourceManager {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         // Mock traditional lookup result
-        Ok(vec![NodeId::from("node-1"), NodeId::from("node-2")])
+        Ok(vec![NodeId::from_public_key(b"node-1"), NodeId::from_public_key(b"node-2")])
     }
 
     /// Allocate resources on a node

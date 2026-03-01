@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn test_basic_types() {
-        let _node_id: NodeId = NodeId::from("node1");
+        let _node_id: NodeId = NodeId::from_public_key(b"node1");
         let _service_id: ServiceId = "service1".to_string();
         let config = HyperMeshConfig::default();
         assert!(!config.enabled);

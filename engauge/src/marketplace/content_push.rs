@@ -39,7 +39,7 @@ pub struct ContentPushManager {
     /// Push statuses by content_id string.
     statuses: HashMap<String, PushStatus>,
     /// Opt-in recipients (node IDs that accept content push).
-    opted_in: HashSet<String>,
+    opted_in: HashSet<NodeId>,
 }
 
 impl ContentPushManager {
@@ -53,17 +53,17 @@ impl ContentPushManager {
 
     /// Register a node as opted-in for content push.
     pub fn opt_in(&mut self, node_id: &NodeId) {
-        self.opted_in.insert(node_id.0.clone());
+        self.opted_in.insert(*node_id);
     }
 
     /// Remove a node's content push opt-in.
     pub fn opt_out(&mut self, node_id: &NodeId) {
-        self.opted_in.remove(&node_id.0);
+        self.opted_in.remove(node_id);
     }
 
     /// Check if a node has opted in.
     pub fn is_opted_in(&self, node_id: &NodeId) -> bool {
-        self.opted_in.contains(&node_id.0)
+        self.opted_in.contains(node_id)
     }
 
     /// Submit a content push request.
@@ -76,7 +76,7 @@ impl ContentPushManager {
         let actual_recipients: Vec<NodeId> = request
             .target_recipients
             .iter()
-            .filter(|n| self.opted_in.contains(&n.0))
+            .filter(|n| self.opted_in.contains(n))
             .cloned()
             .collect();
 
@@ -150,7 +150,7 @@ mod tests {
     fn test_request(targets: Vec<NodeId>) -> ContentPushRequest {
         ContentPushRequest {
             content_id: AssetId::from("content-001"),
-            publisher: NodeId::from("publisher-node"),
+            publisher: NodeId::from_public_key(b"publisher-node"),
             fee_budget: GoldGrams::from_decimal(Decimal::new(1, 2)), // 0.01g
             target_recipients: targets,
             settlement_evp: None,
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn opt_in_and_verify() {
         let mut mgr = ContentPushManager::new();
-        let node = NodeId::from("node-a");
+        let node = NodeId::from_public_key(b"node-a");
 
         assert!(!mgr.is_opted_in(&node));
         mgr.opt_in(&node);
@@ -173,11 +173,11 @@ mod tests {
     fn submit_push_filters_to_opted_in_only() {
         let mut mgr = ContentPushManager::new();
 
-        let opted = NodeId::from("opted-node");
-        let not_opted = NodeId::from("not-opted-node");
+        let opted = NodeId::from_public_key(b"opted-node");
+        let not_opted = NodeId::from_public_key(b"not-opted-node");
         mgr.opt_in(&opted);
 
-        let request = test_request(vec![opted.clone(), not_opted]);
+        let request = test_request(vec![opted, not_opted]);
         let recipients = mgr.submit_push(request);
 
         assert_eq!(recipients.len(), 1);
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn mark_delivered_and_failed() {
         let mut mgr = ContentPushManager::new();
-        let node = NodeId::from("recipient");
+        let node = NodeId::from_public_key(b"recipient");
         mgr.opt_in(&node);
 
         let request = test_request(vec![node]);
@@ -208,7 +208,10 @@ mod tests {
         let mut mgr = ContentPushManager::new();
 
         // No one opted in.
-        let request = test_request(vec![NodeId::from("node-x"), NodeId::from("node-y")]);
+        let request = test_request(vec![
+            NodeId::from_public_key(b"node-x"),
+            NodeId::from_public_key(b"node-y"),
+        ]);
         let recipients = mgr.submit_push(request);
 
         assert!(recipients.is_empty());

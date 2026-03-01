@@ -124,7 +124,7 @@ mod tests {
     use super::*;
 
     fn test_node() -> NodeId {
-        NodeId::from("pool-test-node")
+        NodeId::from_public_key(b"pool-test-node")
     }
 
     #[test]

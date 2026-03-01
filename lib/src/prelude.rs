@@ -17,6 +17,9 @@ pub use crate::types::{MatrixPosition, PipelineStage};
 // Privacy & scope
 pub use crate::types::{PrivacyMode, AccessScope, BlockchainScope};
 
+// Identity types
+pub use crate::types::{WorkloadType, IdentityScope, ScopedIdentity};
+
 // Asset system
 pub use crate::asset::{
     AssetKind, SystemAssetKind, UserAssetKind,

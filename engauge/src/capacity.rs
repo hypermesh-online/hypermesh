@@ -145,7 +145,7 @@ mod tests {
     use super::*;
 
     fn test_node() -> NodeId {
-        NodeId::from("capacity-node-001")
+        NodeId::from_public_key(b"capacity-node-001")
     }
 
     fn full_metrics() -> CapacityMetrics {

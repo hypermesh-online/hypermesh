@@ -16,8 +16,8 @@ use super::resource_pool::{LeaseableResource, ResourcePool};
 
 /// Manages provider pools and lease contracts.
 pub struct LeaseManager {
-    /// Provider pools: node_id string -> ResourcePool.
-    pools: HashMap<String, ResourcePool>,
+    /// Provider pools keyed by NodeId.
+    pools: HashMap<NodeId, ResourcePool>,
     /// All leases by lease_id string.
     leases: HashMap<String, LeaseContract>,
 }
@@ -32,7 +32,7 @@ impl LeaseManager {
 
     /// Register a provider's resource pool.
     pub fn register_pool(&mut self, pool: ResourcePool) {
-        self.pools.insert(pool.node_id.0.clone(), pool);
+        self.pools.insert(pool.node_id, pool);
     }
 
     /// Create a lease proposal between consumer and provider.
@@ -53,8 +53,8 @@ impl LeaseManager {
     ) -> Result<String, ManagerError> {
         let pool = self
             .pools
-            .get(&provider_id.0)
-            .ok_or_else(|| ManagerError::ProviderNotFound(provider_id.0.clone()))?;
+            .get(provider_id)
+            .ok_or_else(|| ManagerError::ProviderNotFound(provider_id.to_hex()))?;
 
         let alloc = pool
             .get_allocation(&resource)
@@ -72,7 +72,7 @@ impl LeaseManager {
         }
 
         let contract = LeaseContract::propose(
-            provider_id.clone(),
+            *provider_id,
             consumer_id,
             resource,
             allocation_pct,
@@ -102,18 +102,18 @@ impl LeaseManager {
     }
 
     /// List active leases for a provider.
-    pub fn active_leases_for_provider(&self, provider_id: &str) -> Vec<&LeaseContract> {
+    pub fn active_leases_for_provider(&self, provider_id: &NodeId) -> Vec<&LeaseContract> {
         self.leases
             .values()
-            .filter(|l| l.provider.0 == provider_id && l.state == LeaseState::Active)
+            .filter(|l| l.provider == *provider_id && l.state == LeaseState::Active)
             .collect()
     }
 
     /// List active leases for a consumer.
-    pub fn active_leases_for_consumer(&self, consumer_id: &str) -> Vec<&LeaseContract> {
+    pub fn active_leases_for_consumer(&self, consumer_id: &NodeId) -> Vec<&LeaseContract> {
         self.leases
             .values()
-            .filter(|l| l.consumer.0 == consumer_id && l.state == LeaseState::Active)
+            .filter(|l| l.consumer == *consumer_id && l.state == LeaseState::Active)
             .collect()
     }
 
@@ -171,8 +171,8 @@ mod tests {
 
     fn setup_manager() -> (LeaseManager, NodeId) {
         let mut mgr = LeaseManager::new();
-        let provider = NodeId::from("provider-node");
-        let mut pool = ResourcePool::new(provider.clone());
+        let provider = NodeId::from_public_key(b"provider-node");
+        let mut pool = ResourcePool::new(provider);
         let config = AllocationConfig::new(50, PrivacyMode::PUBLIC);
         pool.set_allocation(LeaseableResource::Cpu, config)
             .expect("test: set CPU allocation");
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn register_pool_and_propose_lease() {
         let (mut mgr, provider) = setup_manager();
-        let consumer = NodeId::from("consumer-node");
+        let consumer = NodeId::from_public_key(b"consumer-node");
         let lease_id = mgr
             .propose_lease(
                 &provider,
@@ -208,8 +208,8 @@ mod tests {
     #[test]
     fn propose_fails_with_unregistered_provider() {
         let mut mgr = LeaseManager::new();
-        let unknown = NodeId::from("unknown-provider");
-        let consumer = NodeId::from("consumer-node");
+        let unknown = NodeId::from_public_key(b"unknown-provider");
+        let consumer = NodeId::from_public_key(b"consumer-node");
 
         let result = mgr.propose_lease(
             &unknown,
@@ -221,16 +221,13 @@ mod tests {
             chrono::Duration::hours(1),
         );
         assert!(result.is_err());
-        match result {
-            Err(ManagerError::ProviderNotFound(id)) => assert_eq!(id, "unknown-provider"),
-            other => unreachable!("test: expected ProviderNotFound, got {other:?}"),
-        }
+        assert!(matches!(result, Err(ManagerError::ProviderNotFound(_))));
     }
 
     #[test]
     fn propose_fails_with_unconfigured_resource() {
         let (mut mgr, provider) = setup_manager();
-        let consumer = NodeId::from("consumer-node");
+        let consumer = NodeId::from_public_key(b"consumer-node");
 
         let result = mgr.propose_lease(
             &provider,
@@ -253,7 +250,7 @@ mod tests {
     #[test]
     fn propose_fails_when_allocation_exceeds_pool_limit() {
         let (mut mgr, provider) = setup_manager();
-        let consumer = NodeId::from("consumer-node");
+        let consumer = NodeId::from_public_key(b"consumer-node");
 
         let result = mgr.propose_lease(
             &provider,
@@ -282,11 +279,11 @@ mod tests {
         let (mut mgr, provider) = setup_manager();
         assert_eq!(mgr.active_lease_count(), 0);
 
-        let consumer = NodeId::from("consumer-node");
+        let consumer = NodeId::from_public_key(b"consumer-node");
         let lease_id = mgr
             .propose_lease(
                 &provider,
-                consumer.clone(),
+                consumer,
                 LeaseableResource::Cpu,
                 20,
                 test_price(),
@@ -301,10 +298,10 @@ mod tests {
         mgr.activate_lease(&lease_id).expect("test: activate lease");
         assert_eq!(mgr.active_lease_count(), 1);
 
-        let provider_leases = mgr.active_leases_for_provider("provider-node");
+        let provider_leases = mgr.active_leases_for_provider(&provider);
         assert_eq!(provider_leases.len(), 1);
 
-        let consumer_leases = mgr.active_leases_for_consumer("consumer-node");
+        let consumer_leases = mgr.active_leases_for_consumer(&consumer);
         assert_eq!(consumer_leases.len(), 1);
 
         mgr.cancel_lease(&lease_id).expect("test: cancel lease");

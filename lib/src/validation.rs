@@ -16,26 +16,12 @@ use crate::types::{AssetId, MatrixPosition, NetworkId, NodeId};
 
 impl NodeId {
     /// Validate this node identifier.
-    /// Rules: non-empty, max 128 chars, alphanumeric + hyphen/underscore/dot.
+    /// Rule: must not be all-zero (uninitialized).
     pub fn validate(&self) -> Result<(), HypermeshError> {
-        if self.0.is_empty() {
-            return Err(HypermeshError::Asset("NodeId is empty".into()));
-        }
-        if self.0.len() > 128 {
-            return Err(HypermeshError::Asset(format!(
-                "NodeId too long: {} > 128 chars",
-                self.0.len()
-            )));
-        }
-        if !self
-            .0
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
-        {
-            return Err(HypermeshError::Asset(format!(
-                "NodeId contains invalid characters: '{}'",
-                self.0
-            )));
+        if self.0 == [0u8; 32] {
+            return Err(HypermeshError::Asset(
+                "NodeId is all-zero (uninitialized)".into(),
+            ));
         }
         Ok(())
     }
@@ -200,7 +186,7 @@ mod tests {
 
     fn valid_space() -> SpaceProof {
         SpaceProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             matrix_position: MatrixPosition {
                 x: 1.0,
                 y: 2.0,
@@ -215,7 +201,7 @@ mod tests {
 
     fn valid_stake() -> StakeProof {
         StakeProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             asset_id: Some(AssetId::from("asset-001")),
             stake_amount: 500,
             signature: vec![0xDE, 0xAD],
@@ -225,7 +211,7 @@ mod tests {
 
     fn valid_work() -> WorkProof {
         WorkProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             compute_units: 42,
             work_category: WorkCategory::Compute,
             challenge_proof: vec![0xCA, 0xFE],
@@ -246,23 +232,20 @@ mod tests {
 
     #[test]
     fn node_id_valid() {
-        assert!(NodeId::from("node-alpha_01.test").validate().is_ok());
+        let id = NodeId::from_public_key(b"test-key");
+        assert!(id.validate().is_ok());
     }
 
     #[test]
-    fn node_id_empty() {
-        assert!(NodeId::from("").validate().is_err());
+    fn node_id_zeroed_invalid() {
+        let id = NodeId::zeroed();
+        assert!(id.validate().is_err());
     }
 
     #[test]
-    fn node_id_too_long() {
-        let long = "a".repeat(129);
-        assert!(NodeId::from(long.as_str()).validate().is_err());
-    }
-
-    #[test]
-    fn node_id_invalid_chars() {
-        assert!(NodeId::from("node alpha!").validate().is_err());
+    fn node_id_nonzero_valid() {
+        let id = NodeId::from_bytes([1u8; 32]);
+        assert!(id.validate().is_ok());
     }
 
     // --- AssetId ---

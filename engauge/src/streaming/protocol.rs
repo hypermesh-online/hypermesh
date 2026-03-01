@@ -181,7 +181,7 @@ mod tests {
     use super::*;
 
     fn test_node() -> NodeId {
-        NodeId::from("stream-node-001")
+        NodeId::from_public_key(b"stream-node-001")
     }
 
     fn capacity_frame() -> MetricsFrame {
@@ -425,7 +425,7 @@ mod tests {
     #[test]
     fn zero_values_handle_correctly() {
         let frame = MetricsFrame {
-            source_node: NodeId::from("zero-node"),
+            source_node: NodeId::from_public_key(b"zero-node"),
             timestamp_us: 0,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Capacity(CapacitySnapshot {

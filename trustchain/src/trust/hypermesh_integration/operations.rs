@@ -267,7 +267,7 @@ impl RemoteProxyManager {
         _candidates: &[ProxyCandidate],
     ) -> TrustChainResult<AuthenticatedNode> {
         Ok(AuthenticatedNode {
-            node_id: hypermesh_lib::NodeId::from("placeholder"),
+            node_id: hypermesh_lib::NodeId::from_public_key(b"placeholder"),
             public_key: "placeholder".to_string(),
             network_address: Ipv6Addr::LOCALHOST,
             node_type: NodeType::Proxy,

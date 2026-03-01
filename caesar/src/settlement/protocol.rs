@@ -140,7 +140,7 @@ impl SettlementProtocol {
         // Settler authorization
         if !criteria.is_authorized_settler(&request.settler_node) {
             return Err(SettlementError::UnauthorizedSettler(
-                request.settler_node.0.to_string(),
+                request.settler_node.to_hex(),
             ));
         }
 
@@ -184,7 +184,7 @@ impl SettlementProtocol {
         let receipt = egress_adapter
             .settle(
                 settled_value,
-                &request.settler_node.0.to_string(),
+                &request.settler_node.to_hex(),
                 "CAES",
                 gold_price_usd,
             )
@@ -247,7 +247,7 @@ mod tests {
     use rust_decimal_macros::dec;
 
     fn test_criteria() -> AcceptanceCriteria {
-        AcceptanceCriteria::new(NodeId::from("recipient-node"))
+        AcceptanceCriteria::new(NodeId::from_public_key(b"recipient-node"))
     }
 
     fn test_request() -> SettlementRequest {
@@ -257,7 +257,7 @@ mod tests {
             packet_tier: MarketTier::L0,
             packet_value: GoldGrams::from_decimal(dec!(5)),
             fee: GoldGrams::from_decimal(dec!(0.05)), // 1% fee on 5g
-            settler_node: NodeId::from("settler-node"),
+            settler_node: NodeId::from_public_key(b"settler-node"),
             adapter_id: "stripe_us".to_string(),
             recipient_criteria: test_criteria(),
         }
@@ -399,8 +399,8 @@ mod tests {
     #[test]
     fn reject_unauthorized_settler() {
         let mut request = test_request();
-        request.recipient_criteria.delegates = vec![NodeId::from("trusted-only")];
-        request.settler_node = NodeId::from("untrusted-settler");
+        request.recipient_criteria.delegates = vec![NodeId::from_public_key(b"trusted-only")];
+        request.settler_node = NodeId::from_public_key(b"untrusted-settler");
         let err = SettlementProtocol::validate_settlement(&request)
             .expect_err("test: unauthorized settler should fail");
         assert!(
@@ -412,8 +412,8 @@ mod tests {
     #[test]
     fn accept_authorized_delegate() {
         let mut request = test_request();
-        request.recipient_criteria.delegates = vec![NodeId::from("settler-node")];
-        request.settler_node = NodeId::from("settler-node");
+        request.recipient_criteria.delegates = vec![NodeId::from_public_key(b"settler-node")];
+        request.settler_node = NodeId::from_public_key(b"settler-node");
         SettlementProtocol::validate_settlement(&request)
             .expect("test: authorized delegate should pass");
     }
@@ -499,7 +499,7 @@ mod tests {
         assert_eq!(result.settlement_result.fee_collected.0, dec!(0.05));
         assert_eq!(
             result.fee_distribution.egress_payment.node_id,
-            NodeId::from("settler-node"),
+            NodeId::from_public_key(b"settler-node"),
         );
     }
 
@@ -564,8 +564,8 @@ mod tests {
         let adapter = mock_adapter();
         let distributor = fee_distributor();
         let transit = vec![
-            (NodeId::from("relay-a"), 500_u64),
-            (NodeId::from("relay-b"), 500_u64),
+            (NodeId::from_public_key(b"relay-a"), 500_u64),
+            (NodeId::from_public_key(b"relay-b"), 500_u64),
         ];
 
         let result = SettlementProtocol::execute_settlement(
@@ -581,11 +581,11 @@ mod tests {
         assert_eq!(result.fee_distribution.transit_payments.len(), 2);
         assert_eq!(
             result.fee_distribution.transit_payments[0].node_id,
-            NodeId::from("relay-a"),
+            NodeId::from_public_key(b"relay-a"),
         );
         assert_eq!(
             result.fee_distribution.transit_payments[1].node_id,
-            NodeId::from("relay-b"),
+            NodeId::from_public_key(b"relay-b"),
         );
     }
 
@@ -597,8 +597,8 @@ mod tests {
         let adapter = mock_adapter();
         let distributor = fee_distributor();
         let transit = vec![
-            (NodeId::from("relay-1"), 500_u64),
-            (NodeId::from("relay-2"), 500_u64),
+            (NodeId::from_public_key(b"relay-1"), 500_u64),
+            (NodeId::from_public_key(b"relay-2"), 500_u64),
         ];
 
         let result = SettlementProtocol::execute_settlement(

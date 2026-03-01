@@ -340,15 +340,11 @@ pub fn validate_blake3_hash(hash: &ContentHash, data: &[u8]) -> bool {
     hash.0 == *computed.as_bytes()
 }
 
-/// Check NodeId format validity.
+/// Check NodeId validity.
 ///
-/// Valid: non-empty, max 128 chars, alphanumeric + hyphen/underscore/dot.
+/// Valid: must not be all-zero (uninitialized).
 pub fn validate_node_id(id: &NodeId) -> bool {
-    if id.0.is_empty() || id.0.len() > 128 {
-        return false;
-    }
-    id.0.chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+    id.0 != [0u8; 32]
 }
 
 /// Check AssetId format validity.
@@ -615,26 +611,13 @@ mod tests {
 
     #[test]
     fn validate_node_id_valid() {
-        assert!(validate_node_id(&NodeId::from("node-alpha_01.test")));
-        assert!(validate_node_id(&NodeId::from("a")));
-        assert!(validate_node_id(&NodeId::from("node123")));
+        assert!(validate_node_id(&NodeId::from_public_key(b"test-key")));
+        assert!(validate_node_id(&NodeId::from_bytes([1u8; 32])));
     }
 
     #[test]
-    fn validate_node_id_empty() {
-        assert!(!validate_node_id(&NodeId::from("")));
-    }
-
-    #[test]
-    fn validate_node_id_too_long() {
-        let long = "a".repeat(129);
-        assert!(!validate_node_id(&NodeId::from(long.as_str())));
-    }
-
-    #[test]
-    fn validate_node_id_invalid_chars() {
-        assert!(!validate_node_id(&NodeId::from("node alpha!")));
-        assert!(!validate_node_id(&NodeId::from("node@host")));
+    fn validate_node_id_zeroed() {
+        assert!(!validate_node_id(&NodeId::zeroed()));
     }
 
     #[test]

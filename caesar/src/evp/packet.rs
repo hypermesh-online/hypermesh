@@ -319,8 +319,8 @@ fn generate_packet_id(
     nonce: Uuid,
 ) -> PacketId {
     let mut hasher = Sha256::new();
-    hasher.update(sender.0.as_bytes());
-    hasher.update(recipient.0.as_bytes());
+    hasher.update(sender.as_bytes());
+    hasher.update(recipient.as_bytes());
     hasher.update(value.0.to_string().as_bytes());
     hasher.update(timestamp.to_rfc3339().as_bytes());
     hasher.update(nonce.as_bytes());
@@ -340,11 +340,11 @@ mod tests {
     use rust_decimal_macros::dec;
 
     fn test_sender() -> NodeId {
-        NodeId::from("node-sender")
+        NodeId::from_public_key(b"node-sender")
     }
 
     fn test_recipient() -> NodeId {
-        NodeId::from("node-recipient")
+        NodeId::from_public_key(b"node-recipient")
     }
 
     fn test_packet() -> CaesPacket {

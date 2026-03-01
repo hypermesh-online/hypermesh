@@ -73,7 +73,7 @@ mod tests {
 
     fn test_frame() -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from("test-node"),
+            source_node: NodeId::from_public_key(b"test-node"),
             timestamp_us: 1000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Capacity(CapacitySnapshot {

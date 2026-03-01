@@ -120,7 +120,7 @@ pub mod testing {
                 source_denomination: denomination.into(),
                 source_amount: amount,
                 gold_price_at_lock: gold_price_usd,
-                locking_node: NodeId("mock-node".into()),
+                locking_node: NodeId::from_public_key(b"mock-node"),
                 locked_at: now,
                 expires_at: now + chrono::Duration::hours(1),
                 external_reference: "mock-tx-ref".into(),

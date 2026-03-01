@@ -182,7 +182,7 @@ mod tests {
 
     fn qualified_node(id: &str) -> GravityQualification {
         GravityQualification {
-            node_id: NodeId::from(id),
+            node_id: NodeId::from_public_key(id.as_bytes()),
             upi_active: true,
             ngauge_active: true,
             kyc_attested: true,
@@ -194,7 +194,7 @@ mod tests {
 
     fn unqualified_node(id: &str) -> GravityQualification {
         GravityQualification {
-            node_id: NodeId::from(id),
+            node_id: NodeId::from_public_key(id.as_bytes()),
             upi_active: true,
             ngauge_active: false, // missing ngauge
             kyc_attested: true,
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn shard_holders_get_2x_weight() {
         let nodes = vec![qualified_node("holder"), qualified_node("non-holder")];
-        let shard_holders = vec![NodeId::from("holder")];
+        let shard_holders = vec![NodeId::from_public_key(b"holder")];
 
         let result = GravityDissolution::dissolve(
             PacketId::zero(),
@@ -323,12 +323,12 @@ mod tests {
         let holder_dist = result
             .distributions
             .iter()
-            .find(|d| d.node_id == NodeId::from("holder"))
+            .find(|d| d.node_id == NodeId::from_public_key(b"holder"))
             .expect("test: holder should be in distributions");
         let non_holder_dist = result
             .distributions
             .iter()
-            .find(|d| d.node_id == NodeId::from("non-holder"))
+            .find(|d| d.node_id == NodeId::from_public_key(b"non-holder"))
             .expect("test: non-holder should be in distributions");
 
         assert_eq!(holder_dist.amount.0, dec!(60));
@@ -365,7 +365,7 @@ mod tests {
 
         // Only qualified node receives the full amount
         assert_eq!(result.distributions.len(), 1);
-        assert_eq!(result.distributions[0].node_id, NodeId::from("good"));
+        assert_eq!(result.distributions[0].node_id, NodeId::from_public_key(b"good"));
         assert_eq!(result.distributions[0].amount.0, dec!(100));
     }
 
@@ -403,7 +403,7 @@ mod tests {
             qualified_node("h2"),
             qualified_node("n1"),
         ];
-        let shard_holders = vec![NodeId::from("h1"), NodeId::from("h2")];
+        let shard_holders = vec![NodeId::from_public_key(b"h1"), NodeId::from_public_key(b"h2")];
 
         let result = GravityDissolution::dissolve(
             PacketId::zero(),
@@ -420,17 +420,17 @@ mod tests {
         let h1 = result
             .distributions
             .iter()
-            .find(|d| d.node_id == NodeId::from("h1"))
+            .find(|d| d.node_id == NodeId::from_public_key(b"h1"))
             .expect("test: h1 should be in distributions");
         let h2 = result
             .distributions
             .iter()
-            .find(|d| d.node_id == NodeId::from("h2"))
+            .find(|d| d.node_id == NodeId::from_public_key(b"h2"))
             .expect("test: h2 should be in distributions");
         let n1 = result
             .distributions
             .iter()
-            .find(|d| d.node_id == NodeId::from("n1"))
+            .find(|d| d.node_id == NodeId::from_public_key(b"n1"))
             .expect("test: n1 should be in distributions");
 
         assert_eq!(h1.amount.0, dec!(40));

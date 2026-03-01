@@ -670,8 +670,8 @@ mod tests {
             let mut protocol = app.protocol.write().await;
             protocol
                 .mint_packet(
-                    hypermesh_lib::NodeId::from("sender"),
-                    hypermesh_lib::NodeId::from("recipient"),
+                    hypermesh_lib::NodeId::from_public_key(b"sender"),
+                    hypermesh_lib::NodeId::from_public_key(b"recipient"),
                     hypermesh_lib::economic::GoldGrams::from_decimal(dec!(100)),
                     hypermesh_lib::economic::GoldGrams::from_decimal(dec!(0.1)),
                     hypermesh_lib::economic::MarketTier::L0,

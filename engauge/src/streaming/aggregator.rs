@@ -6,6 +6,8 @@
 //! Wraps a [`MetricsSubscriber`] and exposes aggregation queries that fold
 //! latest frames from multiple sources into a single [`RegionalAggregate`].
 
+use hypermesh_lib::NodeId;
+
 use super::protocol::{MetricsFrame, MetricsPayload};
 use super::subscriber::MetricsSubscriber;
 
@@ -74,12 +76,12 @@ impl RegionalAggregator {
 
     /// Aggregate latest frames across **all** tracked sources.
     pub fn aggregate(&self) -> RegionalAggregate {
-        let sources: Vec<String> = self.subscriber.sources().into_iter().cloned().collect();
+        let sources: Vec<NodeId> = self.subscriber.sources().into_iter().copied().collect();
         self.aggregate_for_sources(&sources)
     }
 
     /// Aggregate latest frames for a specific set of source node IDs.
-    pub fn aggregate_for_sources(&self, sources: &[String]) -> RegionalAggregate {
+    pub fn aggregate_for_sources(&self, sources: &[NodeId]) -> RegionalAggregate {
         if sources.is_empty() {
             return RegionalAggregate::empty();
         }
@@ -210,7 +212,7 @@ mod tests {
 
     fn cap_frame(node: &str, bytes: u64, bw: u64) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Capacity(CapacitySnapshot {
@@ -226,7 +228,7 @@ mod tests {
 
     fn routing_frame(node: &str, latency: u64, throughput: u64) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Routing(RoutingSnapshot {
@@ -241,7 +243,7 @@ mod tests {
 
     fn congestion_frame(node: &str, fullness: f64) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Congestion(CongestionSnapshot {
@@ -306,7 +308,9 @@ mod tests {
         agg.ingest(routing_frame("medium", 5000, 250_000_000));
 
         // Only aggregate fast + medium (exclude slow).
-        let subset = vec!["fast".to_string(), "medium".to_string()];
+        let fast = NodeId::from_public_key(b"fast");
+        let medium = NodeId::from_public_key(b"medium");
+        let subset = vec![fast, medium];
         let result = agg.aggregate_for_sources(&subset);
 
         assert_eq!(result.node_count, 2);
@@ -327,7 +331,8 @@ mod tests {
     #[test]
     fn aggregate_for_unknown_sources_returns_empty() {
         let agg = RegionalAggregator::new(10);
-        let result = agg.aggregate_for_sources(&["ghost".to_string()]);
+        let ghost = NodeId::from_public_key(b"ghost");
+        let result = agg.aggregate_for_sources(&[ghost]);
         assert_eq!(result.node_count, 0);
     }
 
@@ -337,7 +342,7 @@ mod tests {
 
         let mut agg = RegionalAggregator::new(10);
         agg.ingest(MetricsFrame {
-            source_node: NodeId::from("verif-a"),
+            source_node: NodeId::from_public_key(b"verif-a"),
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Verification(VerificationSnapshot {
@@ -350,7 +355,7 @@ mod tests {
             sequence: 0,
         });
         agg.ingest(MetricsFrame {
-            source_node: NodeId::from("verif-b"),
+            source_node: NodeId::from_public_key(b"verif-b"),
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Verification(VerificationSnapshot {

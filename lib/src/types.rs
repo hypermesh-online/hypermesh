@@ -7,25 +7,49 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Unique node identifier in the Block-MATRIX topology
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct NodeId(pub String);
+/// Cryptographic node identity -- BLAKE3 hash of FALCON-1024 public key.
+///
+/// Derivation: hardware assessment -> BLAKE3(capabilities) -> FALCON-1024 keypair
+/// -> BLAKE3(pubkey) -> NodeId
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct NodeId(pub [u8; 32]);
+
+impl NodeId {
+    /// Derive a NodeId from a FALCON-1024 public key by BLAKE3-hashing it.
+    pub fn from_public_key(pubkey_bytes: &[u8]) -> Self {
+        let hash = blake3::hash(pubkey_bytes);
+        NodeId(*hash.as_bytes())
+    }
+
+    /// Create from raw 32-byte identity.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        NodeId(bytes)
+    }
+
+    /// Get the raw 32-byte identity.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Hex-encode the full 32-byte identity.
+    pub fn to_hex(&self) -> String {
+        self.0.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    /// Create an all-zero NodeId (for defaults/tests).
+    pub fn zeroed() -> Self {
+        NodeId([0u8; 32])
+    }
+}
 
 impl fmt::Display for NodeId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<String> for NodeId {
-    fn from(s: String) -> Self {
-        NodeId(s)
-    }
-}
-
-impl From<&str> for NodeId {
-    fn from(s: &str) -> Self {
-        NodeId(s.to_string())
+        // Show first 8 hex chars (4 bytes) followed by ellipsis
+        write!(
+            f,
+            "{:02x}{:02x}{:02x}{:02x}\u{2026}",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
     }
 }
 
@@ -345,6 +369,122 @@ pub enum PipelineStage {
     Distribute,
 }
 
+// ---------------------------------------------------------------------------
+// ScopedIdentity types
+// ---------------------------------------------------------------------------
+
+/// What kind of workload this identity represents.
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum WorkloadType {
+    /// Physical/virtual node in the mesh
+    Node,
+    /// Long-running service on a node
+    Service,
+    /// Autonomous agent operating on behalf of a node
+    Agent,
+}
+
+impl fmt::Display for WorkloadType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WorkloadType::Node => write!(f, "Node"),
+            WorkloadType::Service => write!(f, "Service"),
+            WorkloadType::Agent => write!(f, "Agent"),
+        }
+    }
+}
+
+/// How this identity is scoped and traced.
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct IdentityScope {
+    /// Blockchain scope: Device (local only) or Network (distributed)
+    pub blockchain_scope: BlockchainScope,
+    /// Whether this identity is traceable (Anonymous = false, Private/Public = true)
+    pub tracked: bool,
+}
+
+impl IdentityScope {
+    /// Anonymous device scope: local chain, untracked.
+    pub fn anonymous_device() -> Self {
+        Self {
+            blockchain_scope: BlockchainScope::Device,
+            tracked: false,
+        }
+    }
+
+    /// Private network scope: synced chain, tracked.
+    pub fn private_network() -> Self {
+        Self {
+            blockchain_scope: BlockchainScope::Network,
+            tracked: true,
+        }
+    }
+
+    /// Public network scope: synced chain, tracked.
+    pub fn public_network() -> Self {
+        Self {
+            blockchain_scope: BlockchainScope::Network,
+            tracked: true,
+        }
+    }
+}
+
+impl fmt::Display for IdentityScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tracking = if self.tracked { "tracked" } else { "untracked" };
+        write!(f, "{}:{}", self.blockchain_scope, tracking)
+    }
+}
+
+/// A fully-qualified identity with scope awareness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopedIdentity {
+    /// The cryptographic node identity
+    pub node_id: NodeId,
+    /// What kind of workload this identity represents
+    pub workload_type: WorkloadType,
+    /// How this identity is scoped
+    pub scope: IdentityScope,
+    /// Optional human-readable label (not authoritative)
+    pub label: Option<String>,
+}
+
+impl ScopedIdentity {
+    /// Create a Node workload identity with the given scope.
+    pub fn new_node(node_id: NodeId, scope: IdentityScope) -> Self {
+        Self {
+            node_id,
+            workload_type: WorkloadType::Node,
+            scope,
+            label: None,
+        }
+    }
+
+    /// Create a Node workload identity with a label.
+    pub fn new_node_with_label(
+        node_id: NodeId,
+        scope: IdentityScope,
+        label: impl Into<String>,
+    ) -> Self {
+        Self {
+            node_id,
+            workload_type: WorkloadType::Node,
+            scope,
+            label: Some(label.into()),
+        }
+    }
+}
+
+impl fmt::Display for ScopedIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}[{}@{}]", self.workload_type, self.node_id, self.scope)?;
+        if let Some(ref label) = self.label {
+            write!(f, " \"{}\"", label)?;
+        }
+        Ok(())
+    }
+}
+
 /// HyperMesh ULA prefix: fd48:4d00 (fd + 'H'=0x48, 'M'=0x4d + reserved)
 pub const HYPERMESH_PREFIX: [u8; 4] = [0xfd, 0x48, 0x4d, 0x00];
 
@@ -500,6 +640,145 @@ impl fmt::Display for AssetAddress {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- NodeId ---
+
+    #[test]
+    fn node_id_from_public_key() {
+        let pubkey = b"test-falcon-1024-public-key-data";
+        let id1 = NodeId::from_public_key(pubkey);
+        let id2 = NodeId::from_public_key(pubkey);
+        assert_eq!(id1, id2, "from_public_key must be deterministic");
+
+        // Different key must produce different id
+        let id3 = NodeId::from_public_key(b"different-key");
+        assert_ne!(id1, id3);
+    }
+
+    #[test]
+    fn node_id_from_bytes_roundtrip() {
+        let bytes = [0xAB; 32];
+        let id = NodeId::from_bytes(bytes);
+        assert_eq!(id.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn node_id_display() {
+        let mut bytes = [0u8; 32];
+        bytes[0] = 0xDE;
+        bytes[1] = 0xAD;
+        bytes[2] = 0xBE;
+        bytes[3] = 0xEF;
+        let id = NodeId::from_bytes(bytes);
+        let display = format!("{}", id);
+        assert_eq!(display, "deadbeef\u{2026}");
+    }
+
+    #[test]
+    fn node_id_to_hex() {
+        let id = NodeId::from_bytes([0xFF; 32]);
+        let hex = id.to_hex();
+        assert_eq!(hex.len(), 64);
+        assert!(hex.chars().all(|c| c == 'f'));
+    }
+
+    #[test]
+    fn node_id_zeroed() {
+        let id = NodeId::zeroed();
+        assert_eq!(id.as_bytes(), &[0u8; 32]);
+    }
+
+    #[test]
+    fn node_id_serde_roundtrip() {
+        let id = NodeId::from_public_key(b"test-key");
+        let json = serde_json::to_string(&id).expect("test: serialize");
+        let back: NodeId = serde_json::from_str(&json).expect("test: deserialize");
+        assert_eq!(id, back);
+    }
+
+    #[test]
+    fn node_id_copy_semantics() {
+        let id = NodeId::from_bytes([1u8; 32]);
+        let copied = id; // Copy
+        assert_eq!(id, copied); // Original still usable
+    }
+
+    // --- ScopedIdentity ---
+
+    #[test]
+    fn scoped_identity_anonymous_device() {
+        let scope = IdentityScope::anonymous_device();
+        assert_eq!(scope.blockchain_scope, BlockchainScope::Device);
+        assert!(!scope.tracked);
+    }
+
+    #[test]
+    fn scoped_identity_private_network() {
+        let scope = IdentityScope::private_network();
+        assert_eq!(scope.blockchain_scope, BlockchainScope::Network);
+        assert!(scope.tracked);
+    }
+
+    #[test]
+    fn scoped_identity_public_network() {
+        let scope = IdentityScope::public_network();
+        assert_eq!(scope.blockchain_scope, BlockchainScope::Network);
+        assert!(scope.tracked);
+    }
+
+    #[test]
+    fn scoped_identity_new_node() {
+        let node_id = NodeId::from_public_key(b"test-key");
+        let scope = IdentityScope::anonymous_device();
+        let identity = ScopedIdentity::new_node(node_id, scope);
+        assert_eq!(identity.node_id, node_id);
+        assert_eq!(identity.workload_type, WorkloadType::Node);
+        assert_eq!(identity.scope, scope);
+        assert!(identity.label.is_none());
+    }
+
+    #[test]
+    fn scoped_identity_serde_roundtrip() {
+        let node_id = NodeId::from_public_key(b"serde-test-key");
+        let identity = ScopedIdentity::new_node_with_label(
+            node_id,
+            IdentityScope::private_network(),
+            "my-node",
+        );
+        let json = serde_json::to_string(&identity).expect("test: serialize");
+        let back: ScopedIdentity = serde_json::from_str(&json).expect("test: deserialize");
+        assert_eq!(identity.node_id, back.node_id);
+        assert_eq!(identity.workload_type, back.workload_type);
+        assert_eq!(identity.scope, back.scope);
+        assert_eq!(identity.label, back.label);
+    }
+
+    #[test]
+    fn workload_type_display() {
+        assert_eq!(WorkloadType::Node.to_string(), "Node");
+        assert_eq!(WorkloadType::Service.to_string(), "Service");
+        assert_eq!(WorkloadType::Agent.to_string(), "Agent");
+    }
+
+    #[test]
+    fn identity_scope_display() {
+        let scope = IdentityScope::anonymous_device();
+        assert_eq!(scope.to_string(), "Device:untracked");
+
+        let scope = IdentityScope::private_network();
+        assert_eq!(scope.to_string(), "Network:tracked");
+    }
+
+    #[test]
+    fn scoped_identity_display() {
+        let node_id = NodeId::from_bytes([0xAB; 32]);
+        let identity = ScopedIdentity::new_node(node_id, IdentityScope::anonymous_device());
+        let display = format!("{}", identity);
+        assert!(display.contains("Node"), "got: {display}");
+        assert!(display.contains("abababab"), "got: {display}");
+    }
+
+    // --- ContentHash ---
 
     #[test]
     fn content_hash_roundtrip() {

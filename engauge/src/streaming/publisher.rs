@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn publish_capacity_anonymous_returns_none() {
         let mut pub_anon =
-            MetricsPublisher::new(NodeId::from("anon-pub"), PrivacyMode::ANONYMOUS, 1.0, 10);
+            MetricsPublisher::new(NodeId::from_public_key(b"anon-pub"), PrivacyMode::ANONYMOUS, 1.0, 10);
         let result = pub_anon.publish_capacity(&test_capacity_metrics());
         assert!(
             result.is_none(),
@@ -145,14 +145,14 @@ mod tests {
     #[test]
     fn publish_capacity_public_returns_some() {
         let mut publisher =
-            MetricsPublisher::new(NodeId::from("pub-node"), PrivacyMode::PUBLIC, 1.0, 10);
+            MetricsPublisher::new(NodeId::from_public_key(b"pub-node"), PrivacyMode::PUBLIC, 1.0, 10);
         let result = publisher.publish_capacity(&test_capacity_metrics());
         assert!(
             result.is_some(),
             "Public publisher must return capacity frames"
         );
         let frame = result.expect("test: capacity frame expected");
-        assert_eq!(frame.source_node, NodeId::from("pub-node"));
+        assert_eq!(frame.source_node, NodeId::from_public_key(b"pub-node"));
         match &frame.payload {
             MetricsPayload::Capacity(_) => {}
             _ => panic!("test: expected Capacity payload"),
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn sequence_numbers_increment() {
         let mut publisher =
-            MetricsPublisher::new(NodeId::from("seq-node"), PrivacyMode::PUBLIC, 1.0, 10);
+            MetricsPublisher::new(NodeId::from_public_key(b"seq-node"), PrivacyMode::PUBLIC, 1.0, 10);
 
         let f1 = publisher
             .publish_capacity(&test_capacity_metrics())
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn privacy_filter_applied_to_published_frames() {
         let mut publisher =
-            MetricsPublisher::new(NodeId::from("filter-node"), PrivacyMode::PRIVATE, 1.0, 10);
+            MetricsPublisher::new(NodeId::from_public_key(b"filter-node"), PrivacyMode::PRIVATE, 1.0, 10);
 
         // Private should pass capacity...
         let cap = publisher.publish_capacity(&test_capacity_metrics());
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn publish_economic_private_returns_none() {
         let mut publisher =
-            MetricsPublisher::new(NodeId::from("priv-econ"), PrivacyMode::PRIVATE, 1.0, 10);
+            MetricsPublisher::new(NodeId::from_public_key(b"priv-econ"), PrivacyMode::PRIVATE, 1.0, 10);
         let result = publisher.publish_economic(EconomicSnapshot {
             in_flight_float_grams: 5.0,
             settlement_rate_per_epoch: 2.0,

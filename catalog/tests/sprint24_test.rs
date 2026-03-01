@@ -278,7 +278,7 @@ use hypermesh_lib::{GoldGrams, NodeId};
 use rust_decimal::Decimal;
 
 fn test_node() -> NodeId {
-    NodeId("test-catalog-node".to_string())
+    NodeId::from_public_key(b"test-catalog-node")
 }
 
 fn test_pool() -> GoldGrams {

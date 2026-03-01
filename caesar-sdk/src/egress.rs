@@ -115,7 +115,7 @@ pub mod testing {
                 destination_denomination: denomination.into(),
                 destination_amount: dest_amount,
                 gold_price_at_settlement: gold_price_usd,
-                settling_node: NodeId("mock-node".into()),
+                settling_node: NodeId::from_public_key(b"mock-node"),
                 settled_at: Utc::now(),
                 external_reference: format!("mock-ref-{destination}"),
                 finality: SettlementFinality::Attested,

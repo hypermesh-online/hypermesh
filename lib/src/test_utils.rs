@@ -16,9 +16,9 @@ use crate::proof::{
 };
 use std::time::Duration;
 
-/// Create a test [`NodeId`] with the given name.
+/// Create a test [`NodeId`] by hashing the given name.
 pub fn test_node_id(name: &str) -> NodeId {
-    NodeId::from(name)
+    NodeId::from_public_key(name.as_bytes())
 }
 
 /// Create a test [`AssetId`] with the given name.
@@ -117,6 +117,7 @@ mod tests {
 
     #[test]
     fn test_factories_produce_valid_types() {
+        // test_node_id produces a non-zero BLAKE3 hash, so it's always valid
         assert!(test_node_id("node-1").validate().is_ok());
         assert!(test_asset_id("asset-1").validate().is_ok());
         assert!(test_matrix_position(0.0, 0.0, 0.0).is_finite());

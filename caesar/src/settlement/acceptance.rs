@@ -118,7 +118,7 @@ mod tests {
     use rust_decimal_macros::dec;
 
     fn test_node() -> NodeId {
-        NodeId::from("test-recipient-node")
+        NodeId::from_public_key(b"test-recipient-node")
     }
 
     #[test]
@@ -171,16 +171,16 @@ mod tests {
     #[test]
     fn empty_delegates_authorizes_anyone() {
         let criteria = AcceptanceCriteria::new(test_node());
-        assert!(criteria.is_authorized_settler(&NodeId::from("random-node")));
-        assert!(criteria.is_authorized_settler(&NodeId::from("another-node")));
+        assert!(criteria.is_authorized_settler(&NodeId::from_public_key(b"random-node")));
+        assert!(criteria.is_authorized_settler(&NodeId::from_public_key(b"another-node")));
     }
 
     #[test]
     fn restricted_delegates_reject_unauthorized() {
         let mut criteria = AcceptanceCriteria::new(test_node());
-        criteria.delegates = vec![NodeId::from("trusted-node")];
-        assert!(criteria.is_authorized_settler(&NodeId::from("trusted-node")));
-        assert!(!criteria.is_authorized_settler(&NodeId::from("untrusted-node")));
+        criteria.delegates = vec![NodeId::from_public_key(b"trusted-node")];
+        assert!(criteria.is_authorized_settler(&NodeId::from_public_key(b"trusted-node")));
+        assert!(!criteria.is_authorized_settler(&NodeId::from_public_key(b"untrusted-node")));
     }
 
     #[test]

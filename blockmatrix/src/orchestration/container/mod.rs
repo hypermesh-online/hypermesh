@@ -66,7 +66,7 @@ mod tests {
 
         // Register a test node
         let node_state = NodeState {
-            node_id: hypermesh_lib::NodeId::from("test-node-1"),
+            node_id: hypermesh_lib::NodeId::from_public_key(b"test-node-1"),
             available: true,
             total_resources: NodeResources {
                 cpu_cores: 4.0,

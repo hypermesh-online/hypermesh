@@ -146,8 +146,8 @@ mod tests {
     #[test]
     fn propose_creates_proposed_state() {
         let contract = LeaseContract::propose(
-            NodeId::from("provider-1"),
-            NodeId::from("consumer-1"),
+            NodeId::from_public_key(b"provider-1"),
+            NodeId::from_public_key(b"consumer-1"),
             LeaseableResource::Cpu,
             50,
             test_price(),
@@ -162,8 +162,8 @@ mod tests {
     #[test]
     fn activate_transitions_proposed_to_active() {
         let mut contract = LeaseContract::propose(
-            NodeId::from("provider-1"),
-            NodeId::from("consumer-1"),
+            NodeId::from_public_key(b"provider-1"),
+            NodeId::from_public_key(b"consumer-1"),
             LeaseableResource::Gpu,
             30,
             test_price(),
@@ -178,8 +178,8 @@ mod tests {
     #[test]
     fn complete_transitions_active_to_completed() {
         let mut contract = LeaseContract::propose(
-            NodeId::from("provider-1"),
-            NodeId::from("consumer-1"),
+            NodeId::from_public_key(b"provider-1"),
+            NodeId::from_public_key(b"consumer-1"),
             LeaseableResource::Memory,
             60,
             test_price(),
@@ -195,8 +195,8 @@ mod tests {
     #[test]
     fn cancel_from_active_succeeds() {
         let mut contract = LeaseContract::propose(
-            NodeId::from("provider-1"),
-            NodeId::from("consumer-1"),
+            NodeId::from_public_key(b"provider-1"),
+            NodeId::from_public_key(b"consumer-1"),
             LeaseableResource::Storage,
             40,
             test_price(),
@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn invalid_transitions_return_errors() {
         let mut contract = LeaseContract::propose(
-            NodeId::from("provider-1"),
-            NodeId::from("consumer-1"),
+            NodeId::from_public_key(b"provider-1"),
+            NodeId::from_public_key(b"consumer-1"),
             LeaseableResource::Bandwidth,
             20,
             test_price(),

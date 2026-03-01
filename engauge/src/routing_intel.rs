@@ -148,13 +148,11 @@ impl RoutingIntelligence {
     /// Compute a weight modifier for a single candidate based on its
     /// latest metrics in the subscriber window.
     fn weight_for_candidate(&self, candidate: &NodeId) -> TensorWeightModifier {
-        let node_key = &candidate.0;
-
-        let latest = match self.subscriber.latest(node_key) {
+        let latest = match self.subscriber.latest(candidate) {
             Some(frame) => frame,
             None => {
                 return TensorWeightModifier {
-                    node_id: candidate.clone(),
+                    node_id: *candidate,
                     weight_factor: 1.0,
                     reason: WeightReason::NoData,
                 };
@@ -170,7 +168,7 @@ impl RoutingIntelligence {
         };
 
         TensorWeightModifier {
-            node_id: candidate.clone(),
+            node_id: *candidate,
             weight_factor,
             reason,
         }
@@ -300,7 +298,7 @@ mod tests {
 
     fn make_frame(node: &str, payload: MetricsPayload) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload,
@@ -363,7 +361,7 @@ mod tests {
     #[test]
     fn no_data_returns_neutral_weight() {
         let intel = RoutingIntelligence::new(30);
-        let candidates = vec![NodeId::from("unknown-node")];
+        let candidates = vec![NodeId::from_public_key(b"unknown-node")];
 
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
         assert_eq!(weights.len(), 1);
@@ -376,7 +374,7 @@ mod tests {
         let mut intel = RoutingIntelligence::new(30);
         intel.ingest(make_congestion_frame("congested", 0.9));
 
-        let candidates = vec![NodeId::from("congested")];
+        let candidates = vec![NodeId::from_public_key(b"congested")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert_eq!(weights.len(), 1);
@@ -392,7 +390,7 @@ mod tests {
         let mut intel = RoutingIntelligence::new(30);
         intel.ingest(make_congestion_frame("clear", 0.1));
 
-        let candidates = vec![NodeId::from("clear")];
+        let candidates = vec![NodeId::from_public_key(b"clear")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert!(
@@ -407,7 +405,7 @@ mod tests {
         let mut intel = RoutingIntelligence::new(30);
         intel.ingest(make_routing_frame("slow", 100_000, 500_000_000));
 
-        let candidates = vec![NodeId::from("slow")];
+        let candidates = vec![NodeId::from_public_key(b"slow")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert!(
@@ -422,7 +420,7 @@ mod tests {
         let mut intel = RoutingIntelligence::new(30);
         intel.ingest(make_routing_frame("fast", 1_000, 2_000_000_000));
 
-        let candidates = vec![NodeId::from("fast")];
+        let candidates = vec![NodeId::from_public_key(b"fast")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert!(
@@ -438,7 +436,7 @@ mod tests {
         intel.ingest(make_capacity_frame("high-bw", 2_000_000_000)); // 2 Gbps
         intel.ingest(make_capacity_frame("low-bw", 10_000_000)); // 10 Mbps
 
-        let candidates = vec![NodeId::from("high-bw"), NodeId::from("low-bw")];
+        let candidates = vec![NodeId::from_public_key(b"high-bw"), NodeId::from_public_key(b"low-bw")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert!(
@@ -453,7 +451,7 @@ mod tests {
         intel.ingest(make_congestion_frame("a", 0.1));
         intel.ingest(make_congestion_frame("b", 0.9));
 
-        let candidates = vec![NodeId::from("a"), NodeId::from("b"), NodeId::from("c")];
+        let candidates = vec![NodeId::from_public_key(b"a"), NodeId::from_public_key(b"b"), NodeId::from_public_key(b"c")];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert_eq!(weights.len(), 3);

@@ -545,7 +545,7 @@ mod tests {
                         z: 3.0,
                     },
                     shard_hash: [0xAA; 32],
-                    target_node_id: hypermesh_lib::NodeId::from("node-a"),
+                    target_node_id: hypermesh_lib::NodeId::from_public_key(b"node-a"),
                 },
                 VerifPlacement {
                     shard_index: 1,
@@ -556,7 +556,7 @@ mod tests {
                         z: 6.0,
                     },
                     shard_hash: [0xBB; 32],
-                    target_node_id: hypermesh_lib::NodeId::from("node-b"),
+                    target_node_id: hypermesh_lib::NodeId::from_public_key(b"node-b"),
                 },
             ],
         );
@@ -590,7 +590,7 @@ mod tests {
                     z: 3.0,
                 },
                 shard_hash: [0xAA; 32],
-                target_node_id: hypermesh_lib::NodeId::from("node-a"),
+                target_node_id: hypermesh_lib::NodeId::from_public_key(b"node-a"),
             }],
         );
 

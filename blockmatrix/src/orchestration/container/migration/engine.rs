@@ -62,7 +62,7 @@ impl ContainerMigrator {
         let decision = MigrationDecision {
             migration_id,
             container_id: *container_id,
-            source_node: NodeId::from("source-node"),
+            source_node: NodeId::from_public_key(b"source-node"),
             target_node: target_node.clone(),
             reason,
             strategy,

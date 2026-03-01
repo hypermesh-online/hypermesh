@@ -271,7 +271,7 @@ mod tests {
         let uptime = fraction.clamp(0.0, 1.0);
 
         let metrics = CapacityMetrics::new(bytes, compute, storage, bandwidth, uptime);
-        CapacityReport::new(NodeId::from("trend-node"), metrics, 0)
+        CapacityReport::new(NodeId::from_public_key(b"trend-node"), metrics, 0)
     }
 
     #[test]

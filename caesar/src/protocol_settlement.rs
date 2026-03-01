@@ -317,7 +317,7 @@ mod tests {
     }
 
     fn make_criteria() -> settlement::acceptance::AcceptanceCriteria {
-        settlement::acceptance::AcceptanceCriteria::new(hypermesh_lib::NodeId::from("recipient"))
+        settlement::acceptance::AcceptanceCriteria::new(hypermesh_lib::NodeId::from_public_key(b"recipient"))
     }
 
     /// Helper: mint a packet and force it to a specific state with a route.
@@ -327,8 +327,8 @@ mod tests {
     ) -> hypermesh_lib::economic::PacketId {
         let packet_id = protocol
             .mint_packet(
-                hypermesh_lib::NodeId::from("sender"),
-                hypermesh_lib::NodeId::from("recipient"),
+                hypermesh_lib::NodeId::from_public_key(b"sender"),
+                hypermesh_lib::NodeId::from_public_key(b"recipient"),
                 GoldGrams::from_decimal(dec!(100)),
                 GoldGrams::from_decimal(dec!(0.1)),
                 hypermesh_lib::economic::MarketTier::L0,
@@ -348,7 +348,7 @@ mod tests {
 
         let updated = models::PacketRecord {
             state,
-            route: vec![hypermesh_lib::NodeId::from("relay-1")],
+            route: vec![hypermesh_lib::NodeId::from_public_key(b"relay-1")],
             ..record
         };
         protocol

@@ -196,7 +196,7 @@ mod tests {
 
     fn make_frame(privacy: PrivacyMode, payload: MetricsPayload) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from("filter-test-node"),
+            source_node: NodeId::from_public_key(b"filter-test-node"),
             timestamp_us: 1_700_000_000_000_000,
             privacy_mode: privacy,
             payload,

@@ -188,7 +188,7 @@ mod tests {
     use chrono::Duration;
 
     fn test_node() -> NodeId {
-        NodeId::from("test-node-001")
+        NodeId::from_public_key(b"test-node-001")
     }
 
     #[test]

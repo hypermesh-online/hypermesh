@@ -299,7 +299,7 @@ mod tests {
 
     fn sample_space() -> SpaceProof {
         SpaceProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             matrix_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
             stored_bytes: 1024,
             committed_bytes: 4096,
@@ -310,7 +310,7 @@ mod tests {
 
     fn sample_stake() -> StakeProof {
         StakeProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             asset_id: Some(AssetId::from("asset-001")),
             stake_amount: 500,
             signature: vec![0xDE, 0xAD],
@@ -320,7 +320,7 @@ mod tests {
 
     fn sample_work() -> WorkProof {
         WorkProof {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             compute_units: 42,
             work_category: WorkCategory::Compute,
             challenge_proof: vec![0xCA, 0xFE],
@@ -344,7 +344,7 @@ mod tests {
         let p = sample_space();
         let s = format!("{}", p);
         assert!(s.contains("SpaceProof"));
-        assert!(s.contains("node-alpha"));
+        assert!(s.contains("\u{2026}"), "NodeId display should contain ellipsis");
         assert!(s.contains("1024"));
     }
 

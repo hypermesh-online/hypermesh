@@ -377,9 +377,9 @@ mod tests {
             hop_count: 0,
             hop_limit: 10,
             demurrage_cost: GoldGrams::zero(),
-            route: vec![NodeId::from("node-a")],
-            sender: NodeId::from("node-sender"),
-            recipient: NodeId::from("node-recipient"),
+            route: vec![NodeId::from_public_key(b"node-a")],
+            sender: NodeId::from_public_key(b"node-sender"),
+            recipient: NodeId::from_public_key(b"node-recipient"),
             demurrage_rate: MarketTier::L0.default_demurrage_rate(),
             created_at: now,
             updated_at: now,
@@ -488,7 +488,7 @@ mod tests {
         let settlement = SettlementRecord {
             settlement_id: "s-001".to_string(),
             packet_id: PacketId::new([42u8; 32]),
-            egress_node: NodeId::from("egress-1"),
+            egress_node: NodeId::from_public_key(b"egress-1"),
             finality_type: "instant".to_string(),
             fee_collected: GoldGrams::from_decimal(Decimal::new(50, 1)),
             settled_at: Utc::now(),
@@ -620,7 +620,7 @@ mod tests {
             .expect("test: storage init");
 
         let status = crate::models::NodeStatus {
-            node_id: NodeId::from("node-alpha"),
+            node_id: NodeId::from_public_key(b"node-alpha"),
             active_packets: 5,
             settled_count: 10,
             total_fees_earned: GoldGrams::from_decimal(Decimal::new(42, 0)),
@@ -634,12 +634,12 @@ mod tests {
             .expect("test: update node status");
 
         let retrieved = storage
-            .get_node_status(&NodeId::from("node-alpha"))
+            .get_node_status(&NodeId::from_public_key(b"node-alpha"))
             .await
             .expect("test: get node status");
         assert!(retrieved.is_some());
         let r = retrieved.expect("test: node status should exist");
-        assert_eq!(r.node_id, NodeId::from("node-alpha"));
+        assert_eq!(r.node_id, NodeId::from_public_key(b"node-alpha"));
         assert_eq!(r.active_packets, 5);
         assert_eq!(r.settled_count, 10);
         assert_eq!(r.total_fees_earned.0, Decimal::new(42, 0));
@@ -653,7 +653,7 @@ mod tests {
             .expect("test: storage init");
 
         let status = crate::models::NodeStatus {
-            node_id: NodeId::from("node-beta"),
+            node_id: NodeId::from_public_key(b"node-beta"),
             active_packets: 0,
             settled_count: 0,
             total_fees_earned: GoldGrams::zero(),
@@ -667,16 +667,16 @@ mod tests {
 
         let fee = GoldGrams::from_decimal(Decimal::new(10, 0));
         storage
-            .increment_node_settled(&NodeId::from("node-beta"), fee)
+            .increment_node_settled(&NodeId::from_public_key(b"node-beta"), fee)
             .await
             .expect("test: increment 1");
         storage
-            .increment_node_settled(&NodeId::from("node-beta"), fee)
+            .increment_node_settled(&NodeId::from_public_key(b"node-beta"), fee)
             .await
             .expect("test: increment 2");
 
         let r = storage
-            .get_node_status(&NodeId::from("node-beta"))
+            .get_node_status(&NodeId::from_public_key(b"node-beta"))
             .await
             .expect("test: get")
             .expect("test: node should exist");
@@ -692,7 +692,7 @@ mod tests {
             .expect("test: storage init");
 
         let result = storage
-            .get_node_status(&NodeId::from("unknown-node"))
+            .get_node_status(&NodeId::from_public_key(b"unknown-node"))
             .await
             .expect("test: get should succeed");
         assert!(result.is_none(), "unknown node should return None");

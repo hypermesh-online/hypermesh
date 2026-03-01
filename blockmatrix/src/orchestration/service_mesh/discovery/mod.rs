@@ -370,7 +370,8 @@ impl CpeServiceDiscovery {
 
     /// Extract node ID from endpoint (simplified)
     fn extract_node_id(&self, endpoint: &ServiceEndpoint) -> Option<NodeId> {
-        Some(NodeId::from(endpoint.address.ip().to_string().as_str()))
+        let ip_str = endpoint.address.ip().to_string();
+        Some(NodeId::from_public_key(ip_str.as_bytes()))
     }
 
     // Cache management methods

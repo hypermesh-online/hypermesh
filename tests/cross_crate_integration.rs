@@ -438,11 +438,14 @@ mod identifiers {
     use hypermesh_lib::{NetworkId, NodeId};
 
     #[test]
-    fn node_id_from_str_and_string() {
-        let from_str = NodeId::from("node-alpha");
-        let from_string = NodeId::from("node-alpha".to_string());
-        assert_eq!(from_str, from_string);
-        assert_eq!(from_str.to_string(), "node-alpha");
+    fn node_id_from_public_key_deterministic() {
+        let id1 = NodeId::from_public_key(b"node-alpha");
+        let id2 = NodeId::from_public_key(b"node-alpha");
+        assert_eq!(id1, id2);
+        // Display shows first 4 bytes as hex + ellipsis
+        let display = id1.to_string();
+        assert!(display.ends_with('\u{2026}'), "got: {display}");
+        assert_eq!(display.len(), 9); // 8 hex chars + 1 ellipsis char
     }
 
     #[test]
@@ -464,10 +467,10 @@ mod identifiers {
     fn node_id_hash_equality() {
         use std::collections::HashMap;
         let mut map = HashMap::new();
-        map.insert(NodeId::from("a"), 1);
-        map.insert(NodeId::from("b"), 2);
-        assert_eq!(map.get(&NodeId::from("a")), Some(&1));
-        assert_eq!(map.get(&NodeId::from("b")), Some(&2));
-        assert_eq!(map.get(&NodeId::from("c")), None);
+        map.insert(NodeId::from_public_key(b"a"), 1);
+        map.insert(NodeId::from_public_key(b"b"), 2);
+        assert_eq!(map.get(&NodeId::from_public_key(b"a")), Some(&1));
+        assert_eq!(map.get(&NodeId::from_public_key(b"b")), Some(&2));
+        assert_eq!(map.get(&NodeId::from_public_key(b"c")), None);
     }
 }

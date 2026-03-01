@@ -1,10 +1,12 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! MetricsSubscriber — receives [`MetricsFrame`]s from peers and maintains
+//! MetricsSubscriber -- receives [`MetricsFrame`]s from peers and maintains
 //! per-source rolling windows for downstream analysis.
 
 use std::collections::{HashMap, VecDeque};
+
+use hypermesh_lib::NodeId;
 
 use super::protocol::{MetricsFrame, MetricsPayload};
 
@@ -18,7 +20,7 @@ use super::protocol::{MetricsFrame, MetricsPayload};
 /// the limit, the oldest frame for that source is discarded.
 pub struct MetricsSubscriber {
     /// Per-source-node rolling window of received frames.
-    windows: HashMap<String, VecDeque<MetricsFrame>>,
+    windows: HashMap<NodeId, VecDeque<MetricsFrame>>,
     /// Maximum frames retained per source.
     max_window_size: usize,
 }
@@ -41,7 +43,7 @@ impl MetricsSubscriber {
     ///
     /// Automatically prunes the oldest frame when the window exceeds capacity.
     pub fn receive(&mut self, frame: MetricsFrame) {
-        let key = frame.source_node.0.clone();
+        let key = frame.source_node;
         let window = self.windows.entry(key).or_default();
         window.push_back(frame);
         while window.len() > self.max_window_size {
@@ -50,12 +52,12 @@ impl MetricsSubscriber {
     }
 
     /// Most recent frame from a given source, or `None` if not tracked.
-    pub fn latest(&self, source_node: &str) -> Option<&MetricsFrame> {
+    pub fn latest(&self, source_node: &NodeId) -> Option<&MetricsFrame> {
         self.windows.get(source_node).and_then(|w| w.back())
     }
 
     /// Full rolling window for a given source.
-    pub fn window(&self, source_node: &str) -> Option<&VecDeque<MetricsFrame>> {
+    pub fn window(&self, source_node: &NodeId) -> Option<&VecDeque<MetricsFrame>> {
         self.windows.get(source_node)
     }
 
@@ -68,7 +70,7 @@ impl MetricsSubscriber {
     ///
     /// Only considers frames that carry a [`MetricsPayload::Capacity`] variant.
     /// Returns `None` if the source has no Capacity frames.
-    pub fn avg_capacity_score(&self, source_node: &str) -> Option<f64> {
+    pub fn avg_capacity_score(&self, source_node: &NodeId) -> Option<f64> {
         let window = self.windows.get(source_node)?;
         let mut sum = 0.0_f64;
         let mut count = 0_usize;
@@ -104,7 +106,7 @@ impl MetricsSubscriber {
     }
 
     /// All tracked source node identifiers.
-    pub fn sources(&self) -> Vec<&String> {
+    pub fn sources(&self) -> Vec<&NodeId> {
         self.windows.keys().collect()
     }
 }
@@ -117,11 +119,11 @@ impl MetricsSubscriber {
 mod tests {
     use super::*;
     use crate::streaming::protocol::{CapacitySnapshot, CongestionSnapshot, MetricsPayload};
-    use hypermesh_lib::{NodeId, PrivacyMode};
+    use hypermesh_lib::PrivacyMode;
 
     fn cap_frame(node: &str, seq: u64, bytes: u64) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1_000_000 + seq,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Capacity(CapacitySnapshot {
@@ -137,7 +139,7 @@ mod tests {
 
     fn congestion_frame(node: &str, seq: u64) -> MetricsFrame {
         MetricsFrame {
-            source_node: NodeId::from(node),
+            source_node: NodeId::from_public_key(node.as_bytes()),
             timestamp_us: 1_000_000 + seq,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Congestion(CongestionSnapshot {
@@ -153,10 +155,11 @@ mod tests {
     #[test]
     fn receive_and_retrieve_latest() {
         let mut sub = MetricsSubscriber::new(10);
+        let node_a = NodeId::from_public_key(b"node-a");
         sub.receive(cap_frame("node-a", 0, 100));
         sub.receive(cap_frame("node-a", 1, 200));
 
-        let latest = sub.latest("node-a").expect("test: latest should exist");
+        let latest = sub.latest(&node_a).expect("test: latest should exist");
         assert_eq!(latest.sequence, 1);
     }
 
@@ -166,7 +169,8 @@ mod tests {
         for i in 0..5 {
             sub.receive(cap_frame("pruner", i, 100 * (i + 1)));
         }
-        let window = sub.window("pruner").expect("test: window should exist");
+        let pruner = NodeId::from_public_key(b"pruner");
+        let window = sub.window(&pruner).expect("test: window should exist");
         assert_eq!(window.len(), 3, "window must be bounded at max_window_size");
         // Oldest surviving frame should be sequence 2 (0 and 1 pruned).
         assert_eq!(window.front().expect("test: front").sequence, 2);
@@ -181,10 +185,13 @@ mod tests {
 
         assert_eq!(sub.source_count(), 2);
 
-        let alpha_latest = sub.latest("alpha").expect("test: alpha latest");
+        let alpha = NodeId::from_public_key(b"alpha");
+        let beta = NodeId::from_public_key(b"beta");
+
+        let alpha_latest = sub.latest(&alpha).expect("test: alpha latest");
         assert_eq!(alpha_latest.sequence, 1);
 
-        let beta_latest = sub.latest("beta").expect("test: beta latest");
+        let beta_latest = sub.latest(&beta).expect("test: beta latest");
         assert_eq!(beta_latest.sequence, 0);
     }
 
@@ -192,9 +199,10 @@ mod tests {
     fn avg_capacity_score_computation() {
         let mut sub = MetricsSubscriber::new(10);
 
+        let full_node = NodeId::from_public_key(b"full-node");
         // Full-baseline capacity: score should be ~1.0
         sub.receive(MetricsFrame {
-            source_node: NodeId::from("full-node"),
+            source_node: full_node,
             timestamp_us: 1_000_000,
             privacy_mode: PrivacyMode::PUBLIC,
             payload: MetricsPayload::Capacity(CapacitySnapshot {
@@ -208,7 +216,7 @@ mod tests {
         });
 
         let score = sub
-            .avg_capacity_score("full-node")
+            .avg_capacity_score(&full_node)
             .expect("test: score should exist");
         assert!(
             (score - 1.0).abs() < 1e-6,
@@ -221,8 +229,9 @@ mod tests {
         let mut sub = MetricsSubscriber::new(10);
         sub.receive(congestion_frame("cong-only", 0));
 
+        let cong_only = NodeId::from_public_key(b"cong-only");
         assert!(
-            sub.avg_capacity_score("cong-only").is_none(),
+            sub.avg_capacity_score(&cong_only).is_none(),
             "no Capacity frames means avg_capacity_score should be None"
         );
     }
@@ -230,9 +239,10 @@ mod tests {
     #[test]
     fn empty_subscriber_returns_none() {
         let sub = MetricsSubscriber::new(10);
-        assert!(sub.latest("ghost").is_none());
-        assert!(sub.window("ghost").is_none());
-        assert!(sub.avg_capacity_score("ghost").is_none());
+        let ghost = NodeId::from_public_key(b"ghost");
+        assert!(sub.latest(&ghost).is_none());
+        assert!(sub.window(&ghost).is_none());
+        assert!(sub.avg_capacity_score(&ghost).is_none());
         assert_eq!(sub.source_count(), 0);
     }
 }

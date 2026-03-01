@@ -226,10 +226,10 @@ mod tests {
         let result = dist
             .distribute_fee(
                 GoldGrams(dec!(10)),
-                NodeId::from("egress"),
+                NodeId::from_public_key(b"egress"),
                 &[
-                    (NodeId::from("relay-1"), 500),
-                    (NodeId::from("relay-2"), 500),
+                    (NodeId::from_public_key(b"relay-1"), 500),
+                    (NodeId::from_public_key(b"relay-2"), 500),
                 ],
             )
             .expect("test: should distribute");
@@ -244,7 +244,7 @@ mod tests {
     fn distribute_no_transit_nodes() {
         let dist = distributor();
         let result = dist
-            .distribute_fee(GoldGrams(dec!(10)), NodeId::from("egress"), &[])
+            .distribute_fee(GoldGrams(dec!(10)), NodeId::from_public_key(b"egress"), &[])
             .expect("test: egress-only distribution");
 
         assert_eq!(result.egress_payment.amount, GoldGrams(dec!(10)));
@@ -257,10 +257,10 @@ mod tests {
         let result = dist
             .distribute_fee(
                 GoldGrams(dec!(100)),
-                NodeId::from("egress"),
+                NodeId::from_public_key(b"egress"),
                 &[
-                    (NodeId::from("relay-1"), 750),
-                    (NodeId::from("relay-2"), 250),
+                    (NodeId::from_public_key(b"relay-1"), 750),
+                    (NodeId::from_public_key(b"relay-2"), 250),
                 ],
             )
             .expect("test: weighted distribution");
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn distribute_zero_fee_error() {
         let dist = distributor();
-        let err = dist.distribute_fee(GoldGrams::zero(), NodeId::from("egress"), &[]);
+        let err = dist.distribute_fee(GoldGrams::zero(), NodeId::from_public_key(b"egress"), &[]);
         assert!(
             matches!(err, Err(FeeError::ZeroFee)),
             "expected ZeroFee, got {err:?}"
@@ -287,8 +287,8 @@ mod tests {
         let result = dist
             .distribute_fee(
                 GoldGrams(dec!(10)),
-                NodeId::from("egress"),
-                &[(NodeId::from("relay-1"), 1000)],
+                NodeId::from_public_key(b"egress"),
+                &[(NodeId::from_public_key(b"relay-1"), 1000)],
             )
             .expect("test: single transit node");
 
@@ -306,8 +306,8 @@ mod tests {
         let result = dist
             .distribute_fee(
                 GoldGrams(dec!(100)),
-                NodeId::from("egress"),
-                &[(NodeId::from("relay-1"), 100)],
+                NodeId::from_public_key(b"egress"),
+                &[(NodeId::from_public_key(b"relay-1"), 100)],
             )
             .expect("test: custom 70/30 split");
 
@@ -330,10 +330,10 @@ mod tests {
         let result = dist
             .distribute_with_capacity_weights(
                 GoldGrams(dec!(100)),
-                NodeId::from("egress"),
+                NodeId::from_public_key(b"egress"),
                 &[
-                    (NodeId::from("high-cap"), high_cap),
-                    (NodeId::from("low-cap"), low_cap),
+                    (NodeId::from_public_key(b"high-cap"), high_cap),
+                    (NodeId::from_public_key(b"low-cap"), low_cap),
                 ],
             )
             .expect("test: capacity-weighted distribution");

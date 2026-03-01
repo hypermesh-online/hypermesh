@@ -247,7 +247,7 @@ mod tests {
         active: u64,
     ) -> CapacityMetrics {
         CapacityMetrics {
-            node_id: NodeId::from(id),
+            node_id: NodeId::from_public_key(id.as_bytes()),
             available_bandwidth_mbps: bw,
             buffer_capacity_packets: buffer,
             avg_latency_ms: latency,
@@ -268,7 +268,7 @@ mod tests {
             .find_route(&candidates, MarketTier::L0)
             .expect("test: should select best");
 
-        assert_eq!(result.next_hop, NodeId::from("best"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"best"));
     }
 
     #[test]
@@ -294,7 +294,7 @@ mod tests {
             .find_route(&candidates, MarketTier::L1)
             .expect("test: should prefer low latency");
 
-        assert_eq!(result.next_hop, NodeId::from("low-lat"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"low-lat"));
     }
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
             .find_route(&candidates, MarketTier::L2)
             .expect("test: should prefer high bandwidth");
 
-        assert_eq!(result.next_hop, NodeId::from("high-bw"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"high-bw"));
     }
 
     #[test]
@@ -326,7 +326,7 @@ mod tests {
             .find_route(&candidates, MarketTier::L0)
             .expect("test: should avoid high load");
 
-        assert_eq!(result.next_hop, NodeId::from("idle"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"idle"));
     }
 
     #[test]
@@ -342,14 +342,14 @@ mod tests {
         // Both nodes in auto_mode — preferences ignored, highest capacity wins
         let mut prefs = HashMap::new();
         prefs.insert(
-            NodeId::from("a"),
+            NodeId::from_public_key(b"a"),
             OperatorPreferences {
                 auto_mode: true,
                 ..Default::default()
             },
         );
         prefs.insert(
-            NodeId::from("b"),
+            NodeId::from_public_key(b"b"),
             OperatorPreferences {
                 auto_mode: true,
                 ..Default::default()
@@ -366,7 +366,7 @@ mod tests {
             .expect("test: auto_mode routing should succeed");
 
         // Same result as find_route — node "b" has higher base score
-        assert_eq!(result.next_hop, NodeId::from("b"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"b"));
     }
 
     #[test]
@@ -382,7 +382,7 @@ mod tests {
 
         let mut prefs = HashMap::new();
         prefs.insert(
-            NodeId::from("high-w"),
+            NodeId::from_public_key(b"high-w"),
             OperatorPreferences {
                 tier_weights: TierWeights {
                     l0: dec!(2.0),
@@ -393,7 +393,7 @@ mod tests {
             },
         );
         prefs.insert(
-            NodeId::from("low-w"),
+            NodeId::from_public_key(b"low-w"),
             OperatorPreferences {
                 tier_weights: TierWeights {
                     l0: dec!(0.5),
@@ -413,7 +413,7 @@ mod tests {
             )
             .expect("test: tier weight routing should succeed");
 
-        assert_eq!(result.next_hop, NodeId::from("high-w"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"high-w"));
     }
 
     #[test]
@@ -430,7 +430,7 @@ mod tests {
         let mut prefs = HashMap::new();
         // "strict" prefers packets >= 50g, packet is only 10g → penalty
         prefs.insert(
-            NodeId::from("strict"),
+            NodeId::from_public_key(b"strict"),
             OperatorPreferences {
                 preferred_min_packet: GoldGrams::from_decimal(dec!(50)),
                 preferred_max_packet: GoldGrams::from_decimal(dec!(1000)),
@@ -440,7 +440,7 @@ mod tests {
         );
         // "open" accepts anything
         prefs.insert(
-            NodeId::from("open"),
+            NodeId::from_public_key(b"open"),
             OperatorPreferences {
                 preferred_min_packet: GoldGrams::from_decimal(dec!(1)),
                 preferred_max_packet: GoldGrams::from_decimal(dec!(1000)),
@@ -459,7 +459,7 @@ mod tests {
             .expect("test: value penalty routing should succeed");
 
         // "strict" gets 0.5x penalty, "open" does not → "open" wins
-        assert_eq!(result.next_hop, NodeId::from("open"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"open"));
     }
 
     #[test]
@@ -483,7 +483,7 @@ mod tests {
             .expect("test: no-prefs routing should succeed");
 
         // Same as find_route — node "b" has higher base score
-        assert_eq!(result.next_hop, NodeId::from("b"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"b"));
     }
 
     #[cfg(feature = "engauge")]
@@ -491,7 +491,7 @@ mod tests {
     fn route_with_capacity_selects_highest() {
         let router = PacketRouter::default();
         let high = engauge::CapacityReport::new(
-            NodeId::from("high-cap"),
+            NodeId::from_public_key(b"high-cap"),
             engauge::CapacityMetrics::new(
                 1_073_741_824,
                 1_000_000,
@@ -502,7 +502,7 @@ mod tests {
             1,
         );
         let low = engauge::CapacityReport::new(
-            NodeId::from("low-cap"),
+            NodeId::from_public_key(b"low-cap"),
             engauge::CapacityMetrics::new(100, 100, 100, 100, 0.1),
             1,
         );
@@ -511,6 +511,6 @@ mod tests {
             .route_with_capacity(&[low, high], MarketTier::L0)
             .expect("test: capacity routing");
 
-        assert_eq!(result.next_hop, NodeId::from("high-cap"));
+        assert_eq!(result.next_hop, NodeId::from_public_key(b"high-cap"));
     }
 }

@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn roundtrip_node_id() {
-        let node = NodeId("test-node-42".to_string());
+        let node = NodeId::from_public_key(b"test-node-42");
         let bytes = encode(&node).expect("test: encode NodeId");
         let decoded: NodeId = decode(&bytes).expect("test: decode NodeId");
         assert_eq!(node, decoded);
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     fn roundtrip_space_proof() {
         let proof = SpaceProof {
-            node_id: NodeId("node-1".to_string()),
+            node_id: NodeId::from_public_key(b"node-1"),
             matrix_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
             stored_bytes: 1000,
             committed_bytes: 5000,
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn roundtrip_stake_proof() {
         let proof = StakeProof {
-            node_id: NodeId("node-1".to_string()),
+            node_id: NodeId::from_public_key(b"node-1"),
             asset_id: Some(AssetId("asset-001".to_string())),
             stake_amount: 10000,
             signature: vec![1, 2, 3],
@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn roundtrip_stake_proof_no_asset() {
         let proof = StakeProof {
-            node_id: NodeId("node-2".to_string()),
+            node_id: NodeId::from_public_key(b"node-2"),
             asset_id: None,
             stake_amount: 0,
             signature: vec![],
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn roundtrip_work_proof() {
         let proof = WorkProof {
-            node_id: NodeId("node-1".to_string()),
+            node_id: NodeId::from_public_key(b"node-1"),
             compute_units: 1000000,
             work_category: WorkCategory::Compute,
             challenge_proof: vec![0xCA, 0xFE],
@@ -273,7 +273,7 @@ mod tests {
     fn roundtrip_proof_of_state() {
         let pos = ProofOfState {
             space: SpaceProof {
-                node_id: NodeId("node-1".to_string()),
+                node_id: NodeId::from_public_key(b"node-1"),
                 matrix_position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
                 stored_bytes: 1000,
                 committed_bytes: 5000,
@@ -281,14 +281,14 @@ mod tests {
                 timestamp_ms: 12345,
             },
             stake: StakeProof {
-                node_id: NodeId("node-1".to_string()),
+                node_id: NodeId::from_public_key(b"node-1"),
                 asset_id: Some(AssetId("asset-001".to_string())),
                 stake_amount: 10000,
                 signature: vec![1, 2, 3],
                 timestamp_ms: 12345,
             },
             work: WorkProof {
-                node_id: NodeId("node-1".to_string()),
+                node_id: NodeId::from_public_key(b"node-1"),
                 compute_units: 1000000,
                 work_category: WorkCategory::Compute,
                 challenge_proof: vec![0xCA, 0xFE],
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn encoded_size_matches_encode_len() {
-        let node = NodeId("test".to_string());
+        let node = NodeId::from_public_key(b"test");
         let size = encoded_size(&node).expect("test: encoded_size");
         let bytes = encode(&node).expect("test: encode");
         assert_eq!(size, bytes.len());

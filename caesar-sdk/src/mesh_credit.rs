@@ -162,7 +162,7 @@ impl IngressAdapter for MeshCreditAdapter {
 
         let value = GoldGrams::from_decimal(amount); // 1:1 for CAES
                                                      // Debit the node's own account as the "source"
-        let source = self.node_id.0.to_string();
+        let source = self.node_id.to_hex();
         self.debit(&source, value).await?;
 
         let now = Utc::now();
@@ -223,7 +223,7 @@ mod tests {
     use rust_decimal_macros::dec;
 
     fn adapter() -> MeshCreditAdapter {
-        MeshCreditAdapter::new(NodeId::from("test-node"))
+        MeshCreditAdapter::new(NodeId::from_public_key(b"test-node"))
     }
 
     #[tokio::test]
@@ -258,8 +258,9 @@ mod tests {
     #[tokio::test]
     async fn mesh_credit_lock_and_verify() {
         let a = adapter();
-        // Fund the node's account first
-        a.credit("test-node", GoldGrams::from_decimal(dec!(100)))
+        // Fund the node's account first (use hex key to match debit lookup)
+        let node_key = a.node_id.to_hex();
+        a.credit(&node_key, GoldGrams::from_decimal(dec!(100)))
             .await;
 
         let proof = a
@@ -267,7 +268,7 @@ mod tests {
             .await
             .expect("test: lock should succeed");
 
-        assert_eq!(a.balance("test-node").await.0, dec!(50));
+        assert_eq!(a.balance(&node_key).await.0, dec!(50));
         assert_eq!(proof.value.0, dec!(50));
 
         let valid = a
