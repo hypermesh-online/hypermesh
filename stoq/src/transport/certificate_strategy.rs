@@ -91,6 +91,11 @@ impl AnonymousCertificateStrategy {
         }
     }
 
+    /// Return the identity scope for anonymous connections: Device scope, untracked.
+    pub fn identity_scope(&self) -> hypermesh_lib::IdentityScope {
+        hypermesh_lib::IdentityScope::anonymous_device()
+    }
+
     /// Generate a fresh ephemeral self-signed certificate.
     fn generate_ephemeral(&self) -> Result<StoqNodeCertificate> {
         let cn = match &self.tunnel_id {
@@ -202,6 +207,18 @@ impl AuthenticatedCertificateStrategy {
             label,
             common_name,
             ipv6_addresses,
+        }
+    }
+
+    /// Return the identity scope for authenticated connections: Network scope, tracked.
+    ///
+    /// Authenticated strategies (Private, Federated, Public) all produce
+    /// tracked identities on the Network blockchain scope because they
+    /// involve TrustChain CA-issued certificates.
+    pub fn identity_scope(&self) -> hypermesh_lib::IdentityScope {
+        hypermesh_lib::IdentityScope {
+            blockchain_scope: hypermesh_lib::BlockchainScope::Network,
+            tracked: true,
         }
     }
 
@@ -422,6 +439,46 @@ mod tests {
         let anon = NetworkType::Anonymous.create_strategy(node_id, cn, addrs)?;
         assert_eq!(anon.strategy_name(), "Anonymous");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_anonymous_identity_scope() {
+        let strategy = AnonymousCertificateStrategy::new();
+        let scope = strategy.identity_scope();
+        assert_eq!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Device);
+        assert!(!scope.tracked);
+    }
+
+    #[test]
+    fn test_authenticated_identity_scope() {
+        let strategy = AuthenticatedCertificateStrategy::new(
+            "quic://trust.hypermesh.online".to_string(),
+            "test-node".to_string(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+            "Public".to_string(),
+        );
+        let scope = strategy.identity_scope();
+        assert_eq!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Network);
+        assert!(scope.tracked);
+    }
+
+    #[tokio::test]
+    async fn test_extract_node_id_from_certificate() -> Result<()> {
+        let strategy = AnonymousCertificateStrategy::new();
+        let cert = strategy
+            .get_certificate()
+            .await?
+            .expect("test: anonymous cert should exist");
+
+        // extract_node_id parses X.509 SPKI and BLAKE3-hashes it
+        let node_id = cert.extract_node_id();
+        assert!(node_id.is_some(), "should extract node_id from valid cert");
+
+        // Two calls on the same cert must return the same NodeId
+        let node_id2 = cert.extract_node_id();
+        assert_eq!(node_id, node_id2);
         Ok(())
     }
 

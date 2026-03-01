@@ -34,6 +34,14 @@ pub enum NetworkScope {
     Private(NodeFingerprint),
 }
 
+impl NetworkScope {
+    /// Create a Private scope from a `ScopedIdentity`, using its node_id
+    /// as the `NodeFingerprint`.
+    pub fn from_identity(identity: &hypermesh_lib::ScopedIdentity) -> Self {
+        NetworkScope::Private(NodeFingerprint::from(identity.node_id))
+    }
+}
+
 /// Registry identifier (content hash of registry configuration)
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegistryId(pub [u8; 32]);
@@ -43,11 +51,17 @@ pub struct RegistryId(pub [u8; 32]);
 pub struct FederationId(pub [u8; 32]);
 
 /// BlockMatrix's domain-specific node fingerprint (32-byte blockchain ID).
-/// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries a
+/// Unlike hypermesh_lib::NodeId (a bare 32-byte BLAKE3 hash), this carries a
 /// cryptographic 32-byte identifier suitable for blockchain operations,
 /// consensus proof binding, and content-addressed lookups.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeFingerprint(pub [u8; 32]);
+
+impl From<hypermesh_lib::NodeId> for NodeFingerprint {
+    fn from(node_id: hypermesh_lib::NodeId) -> Self {
+        NodeFingerprint(*node_id.as_bytes())
+    }
+}
 
 /// Asset category for security boundary enforcement
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -779,5 +793,40 @@ mod tests {
         );
         let short_id = asset_id.short_id();
         assert!(short_id.starts_with("G:")); // Global scope
+    }
+
+    #[test]
+    fn test_node_fingerprint_from_node_id() {
+        let node_id = hypermesh_lib::NodeId::from_public_key(b"test-falcon-key");
+        let fingerprint = NodeFingerprint::from(node_id);
+        assert_eq!(&fingerprint.0, node_id.as_bytes());
+    }
+
+    #[test]
+    fn test_network_scope_from_identity() {
+        let node_id = hypermesh_lib::NodeId::from_bytes([0xBB; 32]);
+        let scope = hypermesh_lib::IdentityScope::private_network();
+        let identity = hypermesh_lib::ScopedIdentity::new_node(node_id, scope);
+
+        let net_scope = NetworkScope::from_identity(&identity);
+        match net_scope {
+            NetworkScope::Private(fp) => {
+                assert_eq!(&fp.0, node_id.as_bytes());
+            }
+            other => unreachable!("Expected NetworkScope::Private, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_network_scope_from_identity_preserves_bytes() {
+        let node_id = hypermesh_lib::NodeId::from_public_key(b"some-key-material");
+        let identity = hypermesh_lib::ScopedIdentity::new_node(
+            node_id,
+            hypermesh_lib::IdentityScope::anonymous_device(),
+        );
+
+        let net_scope = NetworkScope::from_identity(&identity);
+        let expected_fp = NodeFingerprint::from(node_id);
+        assert_eq!(net_scope, NetworkScope::Private(expected_fp));
     }
 }

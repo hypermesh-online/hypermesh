@@ -28,6 +28,43 @@ pub enum TrustAssetKind {
     Economic,
     Blockchain,
     Dns,
+    /// Mesh relay bandwidth as a first-class asset (R10)
+    Transmission,
+}
+
+impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
+    fn from(kind: hypermesh_lib::asset::SystemAssetKind) -> Self {
+        use hypermesh_lib::asset::SystemAssetKind;
+        match kind {
+            SystemAssetKind::Cpu => Self::Cpu,
+            SystemAssetKind::Gpu => Self::Gpu,
+            SystemAssetKind::Memory => Self::Memory,
+            SystemAssetKind::Storage => Self::Storage,
+            SystemAssetKind::Network => Self::Network,
+            SystemAssetKind::Container => Self::Container,
+            SystemAssetKind::Economic => Self::Economic,
+            SystemAssetKind::Blockchain => Self::Blockchain,
+            SystemAssetKind::Dns => Self::Dns,
+            SystemAssetKind::Transmission => Self::Transmission,
+        }
+    }
+}
+
+impl From<TrustAssetKind> for hypermesh_lib::asset::SystemAssetKind {
+    fn from(kind: TrustAssetKind) -> Self {
+        match kind {
+            TrustAssetKind::Cpu => Self::Cpu,
+            TrustAssetKind::Gpu => Self::Gpu,
+            TrustAssetKind::Memory => Self::Memory,
+            TrustAssetKind::Storage => Self::Storage,
+            TrustAssetKind::Network => Self::Network,
+            TrustAssetKind::Container => Self::Container,
+            TrustAssetKind::Economic => Self::Economic,
+            TrustAssetKind::Blockchain => Self::Blockchain,
+            TrustAssetKind::Dns => Self::Dns,
+            TrustAssetKind::Transmission => Self::Transmission,
+        }
+    }
 }
 
 /// Authenticated asset in HyperMesh trust layer
@@ -60,6 +97,20 @@ pub struct AuthenticatedNode {
     pub network_address: Ipv6Addr,
     /// Node's role in the network
     pub node_type: NodeType,
+}
+
+impl AuthenticatedNode {
+    /// Convert to a `ScopedIdentity` with the given scope.
+    ///
+    /// The `AuthenticatedNode` carries the cryptographic `NodeId`; callers
+    /// supply the `IdentityScope` that matches the context the node is
+    /// operating in (device-local, private network, public network, etc.).
+    pub fn to_scoped_identity(
+        &self,
+        scope: hypermesh_lib::IdentityScope,
+    ) -> hypermesh_lib::ScopedIdentity {
+        hypermesh_lib::ScopedIdentity::new_node(self.node_id, scope)
+    }
 }
 
 /// Entity ID for authentication (assets or nodes)
@@ -242,6 +293,172 @@ pub(crate) struct NodeBehavior {
     pub(crate) is_authenticated: bool,
     pub(crate) is_byzantine: bool,
     pub(crate) last_seen: SystemTime,
+}
+
+// ---------------------------------------------------------------------------
+// Workload Identity Types (Items 1.6-1.8)
+// ---------------------------------------------------------------------------
+
+/// A node's complete identity record in TrustChain.
+///
+/// Combines the authenticated node with its blockchain/privacy scope and
+/// an optional certificate fingerprint linking it to a TrustChain certificate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeIdentity {
+    pub node: AuthenticatedNode,
+    pub scope: hypermesh_lib::IdentityScope,
+    pub certificate_fingerprint: Option<[u8; 32]>,
+}
+
+/// A service running on a node.
+///
+/// Services are identified by an `AssetId` (since everything in HyperMesh
+/// is an asset) and scoped to a host node.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceIdentity {
+    pub service_id: hypermesh_lib::AssetId,
+    pub host_node: hypermesh_lib::NodeId,
+    pub scope: hypermesh_lib::IdentityScope,
+    pub service_name: String,
+}
+
+/// An autonomous agent acting on behalf of a node.
+///
+/// Agents carry a list of capability strings describing what operations
+/// they are authorized to perform on the controlling node's behalf.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentIdentity {
+    pub agent_id: hypermesh_lib::AssetId,
+    pub controlling_node: hypermesh_lib::NodeId,
+    pub scope: hypermesh_lib::IdentityScope,
+    pub capabilities: Vec<String>,
+}
+
+/// What entity a certificate authenticates.
+///
+/// Embedded in X.509 certificates via [`IdentityScopeExtension`] so that
+/// relying parties know what kind of workload they are speaking to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CertificateSubjectType {
+    Node,
+    Service,
+    Agent,
+}
+
+impl From<hypermesh_lib::WorkloadType> for CertificateSubjectType {
+    fn from(wt: hypermesh_lib::WorkloadType) -> Self {
+        match wt {
+            hypermesh_lib::WorkloadType::Node => Self::Node,
+            hypermesh_lib::WorkloadType::Service => Self::Service,
+            hypermesh_lib::WorkloadType::Agent => Self::Agent,
+        }
+    }
+}
+
+impl From<CertificateSubjectType> for hypermesh_lib::WorkloadType {
+    fn from(cst: CertificateSubjectType) -> Self {
+        match cst {
+            CertificateSubjectType::Node => Self::Node,
+            CertificateSubjectType::Service => Self::Service,
+            CertificateSubjectType::Agent => Self::Agent,
+        }
+    }
+}
+
+/// Custom X.509 extension for HyperMesh identity scope.
+///
+/// OID: 1.3.6.1.4.1.XXXXX.1 (placeholder pending IANA private enterprise number).
+///
+/// Encodes the workload type, blockchain scope, tracking flag, and workload
+/// type into a compact binary format suitable for embedding in X.509
+/// certificate extensions.
+///
+/// Wire format (4 bytes):
+/// ```text
+/// byte 0: subject_type  (0=Node, 1=Service, 2=Agent)
+/// byte 1: blockchain_scope (0=Device, 1=Network)
+/// byte 2: tracked (0=false, 1=true)
+/// byte 3: workload_type (0=Node, 1=Service, 2=Agent)
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentityScopeExtension {
+    pub subject_type: CertificateSubjectType,
+    pub blockchain_scope: hypermesh_lib::BlockchainScope,
+    pub tracked: bool,
+    pub workload_type: hypermesh_lib::WorkloadType,
+}
+
+/// Placeholder OID for HyperMesh identity scope extension.
+/// Format: 1.3.6.1.4.1.{PEN}.1 where PEN is the private enterprise number.
+pub const IDENTITY_SCOPE_EXTENSION_OID: &str = "1.3.6.1.4.1.99999.1";
+
+impl IdentityScopeExtension {
+    /// Encode this extension to a 4-byte representation for X.509 embedding.
+    pub fn to_bytes(&self) -> [u8; 4] {
+        let subject = match self.subject_type {
+            CertificateSubjectType::Node => 0u8,
+            CertificateSubjectType::Service => 1u8,
+            CertificateSubjectType::Agent => 2u8,
+        };
+        let scope = match self.blockchain_scope {
+            hypermesh_lib::BlockchainScope::Device => 0u8,
+            hypermesh_lib::BlockchainScope::Network => 1u8,
+        };
+        let tracked = u8::from(self.tracked);
+        let workload = match self.workload_type {
+            hypermesh_lib::WorkloadType::Node => 0u8,
+            hypermesh_lib::WorkloadType::Service => 1u8,
+            hypermesh_lib::WorkloadType::Agent => 2u8,
+        };
+        [subject, scope, tracked, workload]
+    }
+
+    /// Decode from a 4-byte representation.
+    ///
+    /// Returns `None` if any byte value is out of range.
+    pub fn from_bytes(bytes: &[u8; 4]) -> Option<Self> {
+        let subject_type = match bytes[0] {
+            0 => CertificateSubjectType::Node,
+            1 => CertificateSubjectType::Service,
+            2 => CertificateSubjectType::Agent,
+            _ => return None,
+        };
+        let blockchain_scope = match bytes[1] {
+            0 => hypermesh_lib::BlockchainScope::Device,
+            1 => hypermesh_lib::BlockchainScope::Network,
+            _ => return None,
+        };
+        let tracked = match bytes[2] {
+            0 => false,
+            1 => true,
+            _ => return None,
+        };
+        let workload_type = match bytes[3] {
+            0 => hypermesh_lib::WorkloadType::Node,
+            1 => hypermesh_lib::WorkloadType::Service,
+            2 => hypermesh_lib::WorkloadType::Agent,
+            _ => return None,
+        };
+        Some(Self {
+            subject_type,
+            blockchain_scope,
+            tracked,
+            workload_type,
+        })
+    }
+
+    /// Create from an `IdentityScope` and `WorkloadType`.
+    pub fn from_scope(
+        scope: &hypermesh_lib::IdentityScope,
+        workload_type: hypermesh_lib::WorkloadType,
+    ) -> Self {
+        Self {
+            subject_type: CertificateSubjectType::from(workload_type),
+            blockchain_scope: scope.blockchain_scope,
+            tracked: scope.tracked,
+            workload_type,
+        }
+    }
 }
 
 // Supporting type stubs

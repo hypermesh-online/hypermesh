@@ -9,7 +9,7 @@ use std::fmt;
 use std::net::Ipv6Addr;
 
 /// BlockMatrix's transport-layer peer identity with network addressing.
-/// Unlike hypermesh_lib::NodeId (simple String wrapper), this carries the full
+/// Unlike hypermesh_lib::NodeId (a bare 32-byte BLAKE3 hash), this carries the full
 /// transport context: human-readable name, 32-byte cryptographic ID, IPv6 address,
 /// and public key for peer verification during STOQ connections.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -55,6 +55,11 @@ impl PeerIdentity {
     pub fn as_str(&self) -> &str {
         &self.name
     }
+
+    /// Extract the canonical `NodeId` from this peer's 32-byte cryptographic ID.
+    pub fn to_node_id(&self) -> hypermesh_lib::NodeId {
+        hypermesh_lib::NodeId::from_bytes(self.id)
+    }
 }
 
 impl fmt::Display for PeerIdentity {
@@ -72,5 +77,64 @@ impl From<String> for PeerIdentity {
 impl From<&str> for PeerIdentity {
     fn from(name: &str) -> Self {
         Self::from_name(name)
+    }
+}
+
+impl From<&hypermesh_lib::ScopedIdentity> for PeerIdentity {
+    fn from(identity: &hypermesh_lib::ScopedIdentity) -> Self {
+        let node_id = identity.node_id;
+        let label = identity
+            .label
+            .clone()
+            .unwrap_or_else(|| node_id.to_string());
+        Self {
+            name: label,
+            id: *node_id.as_bytes(),
+            address: Ipv6Addr::LOCALHOST,
+            pub_key: Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hypermesh_lib::{IdentityScope, NodeId, ScopedIdentity};
+
+    #[test]
+    fn peer_identity_to_node_id_roundtrip() {
+        let bytes = [0xAB; 32];
+        let peer = PeerIdentity::new(
+            "test-peer".into(),
+            bytes,
+            Ipv6Addr::LOCALHOST,
+            Vec::new(),
+        );
+        let node_id = peer.to_node_id();
+        assert_eq!(node_id.as_bytes(), &bytes);
+    }
+
+    #[test]
+    fn peer_identity_from_scoped_identity() {
+        let node_id = NodeId::from_public_key(b"falcon-key-data");
+        let scope = IdentityScope::private_network();
+        let identity = ScopedIdentity::new_node_with_label(node_id, scope, "my-node");
+
+        let peer = PeerIdentity::from(&identity);
+        assert_eq!(peer.name, "my-node");
+        assert_eq!(&peer.id, node_id.as_bytes());
+        assert_eq!(peer.to_node_id(), node_id);
+    }
+
+    #[test]
+    fn peer_identity_from_scoped_identity_no_label() {
+        let node_id = NodeId::from_bytes([0xCD; 32]);
+        let scope = IdentityScope::anonymous_device();
+        let identity = ScopedIdentity::new_node(node_id, scope);
+
+        let peer = PeerIdentity::from(&identity);
+        // Without a label, name falls back to NodeId display
+        assert_eq!(&peer.id, node_id.as_bytes());
+        assert_eq!(peer.to_node_id(), node_id);
     }
 }

@@ -157,6 +157,19 @@ impl StoqNodeCertificate {
             true // Already expired
         }
     }
+
+    /// Extract a `NodeId` from this certificate by BLAKE3-hashing the Subject
+    /// Public Key Info (SPKI) from the X.509 DER.
+    ///
+    /// Returns `None` if the certificate cannot be parsed.
+    pub fn extract_node_id(&self) -> Option<hypermesh_lib::NodeId> {
+        x509_parser::parse_x509_certificate(self.certificate.as_ref())
+            .ok()
+            .map(|(_, cert)| {
+                let spki_bytes = &cert.tbs_certificate.subject_pki.subject_public_key.data;
+                hypermesh_lib::NodeId::from_public_key(spki_bytes)
+            })
+    }
 }
 
 /// Certificate verifier that accepts all certificates (for localhost testing only)
