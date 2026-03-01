@@ -208,6 +208,129 @@ impl fmt::Display for HardwareCapabilities {
 }
 
 // ---------------------------------------------------------------------------
+// Shard commitment (R12)
+// ---------------------------------------------------------------------------
+
+/// Shard commitment hash — BLAKE3 of sorted shard placements (R12).
+///
+/// Used in block headers to commit to the exact set of shard locations.
+/// Placements must be sorted by shard index before hashing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ShardCommitment([u8; 32]);
+
+impl ShardCommitment {
+    /// Create from raw bytes.
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    /// Compute commitment from sorted placement data.
+    pub fn compute(sorted_placement_data: &[u8]) -> Self {
+        let hash = blake3::hash(sorted_placement_data);
+        Self(*hash.as_bytes())
+    }
+
+    /// Get the raw bytes.
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Verify that given placement data matches this commitment.
+    pub fn verify(&self, sorted_placement_data: &[u8]) -> bool {
+        Self::compute(sorted_placement_data) == *self
+    }
+}
+
+impl fmt::Display for ShardCommitment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ShardCommit({:02x}{:02x}{:02x}{:02x}…)",
+            self.0[0], self.0[1], self.0[2], self.0[3]
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Genesis capability detail types (R1)
+// ---------------------------------------------------------------------------
+
+/// CPU capabilities assessed at genesis (R1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CpuCapabilities {
+    /// Number of physical cores.
+    pub core_count: u32,
+    /// Base clock speed in MHz.
+    pub clock_mhz: u32,
+    /// Architecture identifier (e.g., "x86_64", "aarch64").
+    pub architecture: String,
+}
+
+/// GPU capabilities assessed at genesis (R1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GpuCapabilities {
+    /// GPU model identifier.
+    pub model: String,
+    /// VRAM in bytes.
+    pub vram_bytes: u64,
+    /// Compute units (CUDA cores, shader units, etc.).
+    pub compute_units: u32,
+}
+
+/// Storage capabilities assessed at genesis (R1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorageCapabilities {
+    /// Total available storage in bytes.
+    pub total_bytes: u64,
+    /// Storage type.
+    pub storage_type: StorageType,
+    /// Estimated sequential read speed in bytes/sec.
+    pub read_speed_bps: u64,
+    /// Estimated sequential write speed in bytes/sec.
+    pub write_speed_bps: u64,
+}
+
+/// Storage medium type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StorageType {
+    Hdd,
+    Ssd,
+    Nvme,
+    Unknown,
+}
+
+impl fmt::Display for StorageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hdd => write!(f, "HDD"),
+            Self::Ssd => write!(f, "SSD"),
+            Self::Nvme => write!(f, "NVMe"),
+            Self::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+/// Network capabilities assessed at genesis (R1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NetworkCapabilities {
+    /// Measured bandwidth in bits per second.
+    pub bandwidth_bps: u64,
+    /// Average latency to nearest peers in microseconds.
+    pub latency_us: u64,
+    /// Whether IPv6 is natively supported.
+    pub ipv6_native: bool,
+}
+
+/// Memory capabilities assessed at genesis (R1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryCapabilities {
+    /// Total RAM in bytes.
+    pub total_bytes: u64,
+    /// Available RAM in bytes at time of assessment.
+    pub available_bytes: u64,
+}
+
+// ---------------------------------------------------------------------------
 // Cross-crate validation helpers (R4)
 // ---------------------------------------------------------------------------
 
@@ -522,5 +645,48 @@ mod tests {
     #[test]
     fn validate_asset_id_empty() {
         assert!(!validate_asset_id(&AssetId::from("")));
+    }
+
+    // --- ShardCommitment ---
+
+    #[test]
+    fn shard_commitment_compute_and_verify() {
+        let data = b"shard0:node-a,shard1:node-b,shard2:node-c";
+        let commitment = ShardCommitment::compute(data);
+        assert!(commitment.verify(data));
+        assert!(!commitment.verify(b"different placements"));
+    }
+
+    #[test]
+    fn shard_commitment_deterministic() {
+        let data = b"sorted placement data";
+        let c1 = ShardCommitment::compute(data);
+        let c2 = ShardCommitment::compute(data);
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn shard_commitment_from_bytes_roundtrip() {
+        let data = b"test";
+        let commitment = ShardCommitment::compute(data);
+        let rebuilt = ShardCommitment::from_bytes(*commitment.as_bytes());
+        assert_eq!(commitment, rebuilt);
+    }
+
+    #[test]
+    fn shard_commitment_display() {
+        let commitment = ShardCommitment::compute(b"test");
+        let s = commitment.to_string();
+        assert!(s.starts_with("ShardCommit("), "got: {s}");
+    }
+
+    // --- StorageType ---
+
+    #[test]
+    fn storage_type_display() {
+        assert_eq!(StorageType::Nvme.to_string(), "NVMe");
+        assert_eq!(StorageType::Ssd.to_string(), "SSD");
+        assert_eq!(StorageType::Hdd.to_string(), "HDD");
+        assert_eq!(StorageType::Unknown.to_string(), "Unknown");
     }
 }

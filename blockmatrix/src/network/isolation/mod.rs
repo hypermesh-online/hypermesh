@@ -33,12 +33,12 @@ pub use default::DefaultIsolationManager;
 
 /// Packet identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct PacketId(Uuid);
+pub struct IsolationPacketId(Uuid);
 
-impl PacketId {
+impl IsolationPacketId {
     /// Create new unique packet ID
     pub fn new_v4() -> Self {
-        PacketId(Uuid::new_v4())
+        IsolationPacketId(Uuid::new_v4())
     }
 
     /// Get UUID representation
@@ -47,7 +47,7 @@ impl PacketId {
     }
 }
 
-impl std::fmt::Display for PacketId {
+impl std::fmt::Display for IsolationPacketId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -92,7 +92,7 @@ pub trait IsolationManager: Send + Sync {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Packet {
     /// Unique packet identifier
-    pub id: PacketId,
+    pub id: IsolationPacketId,
     /// Source network
     pub source_network: NetworkId,
     /// Destination network
@@ -107,7 +107,7 @@ impl Packet {
     /// Create new packet
     pub fn new(source: NetworkId, destination: NetworkId, payload_hash: Hash) -> Self {
         Packet {
-            id: PacketId::new_v4(),
+            id: IsolationPacketId::new_v4(),
             source_network: source,
             destination_network: destination,
             payload_hash,
@@ -133,7 +133,7 @@ pub struct IsolationViolation {
     /// When violation occurred
     pub timestamp: Timestamp,
     /// Optional packet ID if related to specific packet
-    pub packet_id: Option<PacketId>,
+    pub packet_id: Option<IsolationPacketId>,
     /// Additional context about the violation
     pub details: String,
 }

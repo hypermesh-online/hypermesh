@@ -329,14 +329,14 @@ mod tests {
     #[tokio::test]
     async fn test_reconstruct_with_pipeline_roundtrip() {
         use crate::assets::pipeline::{
-            Asset, AssetMetadata as PipelineAssetMetadata, AssetPipeline,
+            Asset, PipelineInputMetadata, AssetPipeline,
         };
 
         let original_data = b"Hello, HyperMesh instruction-based retrieval! ".repeat(200);
         let asset = Asset {
             id: "test-pipeline-roundtrip".to_string(),
             data: original_data.clone(),
-            metadata: PipelineAssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: "test.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: original_data.len(),
@@ -412,14 +412,14 @@ mod tests {
     #[tokio::test]
     async fn test_reconstruct_with_pipeline_aes_fallback() {
         use crate::assets::pipeline::{
-            Asset, AssetMetadata as PipelineAssetMetadata, AssetPipeline, PipelineConfig,
+            Asset, PipelineInputMetadata, AssetPipeline, PipelineConfig,
         };
 
         let original_data = b"AES fallback test data ".repeat(100);
         let asset = Asset {
             id: "test-aes-roundtrip".to_string(),
             data: original_data.clone(),
-            metadata: PipelineAssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: "test.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: original_data.len(),

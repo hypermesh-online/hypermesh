@@ -228,7 +228,7 @@ fn create_test_asset_package(id: &str, name: &str, version: &str) -> AssetPackag
 
     AssetPackage {
         spec: AssetSpec {
-            metadata: AssetMetadata {
+            metadata: PackageSpecMetadata {
                 name: name.to_string(),
                 version: version.to_string(),
                 description: Some(format!("Test package: {}", name)),

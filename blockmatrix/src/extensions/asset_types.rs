@@ -49,9 +49,14 @@ pub struct AssetQuery {
     pub offset: Option<usize>,
 }
 
-/// Asset metadata returned by extensions
+/// Rich asset record returned by extension queries.
+///
+/// This is distinct from `hypermesh_lib::AssetMetadata` (the canonical
+/// cross-crate metadata). `ExtensionAssetRecord` is a blockmatrix-specific
+/// view containing runtime state like privacy level, allocation, and
+/// consensus status that only exist within the extension system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetMetadata {
+pub struct ExtensionAssetRecord {
     pub id: AssetRegistration,
     pub asset_type: AssetType,
     pub name: String,

@@ -33,7 +33,7 @@ mod tests {
 
         // Create packet attempting to cross network boundary
         let packet = Packet {
-            id: PacketId::new_v4(),
+            id: IsolationPacketId::new_v4(),
             source_network: net1,
             destination_network: net2,
             payload_hash: zero_hash(),
@@ -77,7 +77,7 @@ mod tests {
 
         // Packet within same network should be allowed
         let packet = Packet {
-            id: PacketId::new_v4(),
+            id: IsolationPacketId::new_v4(),
             source_network: net_id,
             destination_network: net_id,
             payload_hash: zero_hash(),
@@ -293,7 +293,7 @@ mod tests {
         // Create 10 violations
         for _i in 0..10 {
             let packet = Packet {
-                id: PacketId::new_v4(),
+                id: IsolationPacketId::new_v4(),
                 source_network: net1,
                 destination_network: net2,
                 payload_hash: zero_hash(),

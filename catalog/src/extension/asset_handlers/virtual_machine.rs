@@ -4,7 +4,7 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
     AssetUpdate, ConsensusProof, DeploymentResult, ExecutionResult, ExtensionError,
     ExtensionResult, HashMap, NetworkScope, OperationResult, ResourceUsageReport, RwLock,
 };
@@ -171,7 +171,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord> {
         let instances = self.instances.read().await;
 
         let instance = instances
@@ -188,7 +188,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             serde_json::json!(format!("{:?}", instance.status)),
         );
 
-        Ok(AssetMetadata {
+        Ok(ExtensionAssetRecord {
             id: id.clone(),
             asset_type: AssetType::Blockchain,
             name: format!("{} VM", instance.language),

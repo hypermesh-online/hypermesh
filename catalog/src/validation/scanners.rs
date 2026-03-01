@@ -133,7 +133,7 @@ impl StaticSecurityScanner {
         // In production, this would query a real vulnerability database
 
         // Check for dependencies in asset metadata
-        // STUB: AssetMetadata doesn't have a get method - would need full content
+        // STUB: PackageSpecMetadata doesn't have a get method - would need full content
         // This block is disabled until metadata dependency access is implemented
         #[allow(unreachable_code)]
         if false {
@@ -236,7 +236,7 @@ impl SecurityScanner for StaticSecurityScanner {
         vulnerabilities.extend(self.check_vulnerabilities(asset));
 
         // Scan code for security issues from BlockMatrix Asset metadata
-        // STUB: AssetMetadata doesn't have code - would need to check content
+        // STUB: PackageSpecMetadata doesn't have code - would need to check content
         // if let Some(code) = asset.metadata().get("code") {
         if !asset.content.main_content.is_empty() {
             let code_str = &asset.content.main_content;

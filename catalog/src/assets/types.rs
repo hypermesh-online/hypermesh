@@ -52,13 +52,13 @@ pub struct AssetSpec {
     #[serde(rename = "apiVersion")]
     pub api_version: String,
     pub kind: String,
-    pub metadata: AssetMetadata,
+    pub metadata: PackageSpecMetadata,
     pub spec: AssetSpecification,
 }
 
 /// Asset metadata section
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AssetMetadata {
+pub struct PackageSpecMetadata {
     pub name: String,
     pub version: String,
     pub tags: Vec<String>,

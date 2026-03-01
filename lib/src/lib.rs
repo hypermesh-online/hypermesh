@@ -10,6 +10,7 @@
 pub mod asset;
 pub mod crypto;
 pub mod economic;
+pub mod encoding;
 pub mod error;
 pub mod http;
 pub mod protocol;
@@ -18,6 +19,7 @@ pub mod types;
 // Re-export commonly used types at crate root
 pub use asset::*;
 pub use economic::*;
+pub use encoding::{decode, encode, encode_bounded, EncodingError};
 pub use error::HypermeshError;
 pub use protocol::*;
 pub use types::*;

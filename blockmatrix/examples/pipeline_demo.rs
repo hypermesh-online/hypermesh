@@ -12,7 +12,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::pipeline::{
-    Asset, AssetMetadata, AssetPipeline, CompressionAlgorithm, CompressionConfig,
+    Asset, PipelineInputMetadata, AssetPipeline, CompressionAlgorithm, CompressionConfig,
     DistributionConfig, MatrixConstraints, PipelineConfig, ShardingConfig,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     let asset = Asset {
         id: "demo-asset-001".to_string(),
         data: data.clone(),
-        metadata: AssetMetadata {
+        metadata: PipelineInputMetadata {
             name: "demo.txt".to_string(),
             content_type: "text/plain".to_string(),
             size: data.len(),

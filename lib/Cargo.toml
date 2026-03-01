@@ -16,6 +16,7 @@ chrono = { workspace = true }
 anyhow = { workspace = true }
 rust_decimal = { workspace = true }
 blake3 = { workspace = true }
+postcard = { workspace = true }
 
 [dev-dependencies]
 

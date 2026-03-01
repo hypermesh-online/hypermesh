@@ -4,7 +4,7 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
     AssetUpdate, ConsensusProof, DeploymentResult, ExtensionError, ExtensionResult, HashMap,
     NetworkScope, OperationResult, RwLock,
 };
@@ -146,7 +146,7 @@ impl AssetExtensionHandler for LibraryHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord> {
         let packages = self.packages.read().await;
 
         let package = packages
@@ -166,7 +166,7 @@ impl AssetExtensionHandler for LibraryHandler {
             serde_json::json!(package.dependencies.clone()),
         );
 
-        Ok(AssetMetadata {
+        Ok(ExtensionAssetRecord {
             id: id.clone(),
             asset_type: AssetType::Dns,
             name: package.name.clone(),

@@ -646,7 +646,7 @@ mod tests {
             spec: AssetSpec {
                 api_version: "catalog.v1".to_string(),
                 kind: "Asset".to_string(),
-                metadata: AssetMetadata {
+                metadata: PackageSpecMetadata {
                     name: "test-package".to_string(),
                     version: "1.0.0".to_string(),
                     tags: vec!["test".to_string()],

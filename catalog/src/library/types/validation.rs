@@ -137,7 +137,7 @@ impl LibraryAssetPackage {
             spec: AssetSpec {
                 api_version: "v1".to_string(),
                 kind: self.asset_type.clone(),
-                metadata: AssetMetadata {
+                metadata: PackageSpecMetadata {
                     name: self.name.clone(),
                     version: self.version.clone(),
                     tags: self.tags(),

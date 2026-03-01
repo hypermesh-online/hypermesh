@@ -8,6 +8,7 @@
 //! Adapted for TrustChain certificate operations with IPv6-only networking
 
 use anyhow::{anyhow, Result};
+use hypermesh_lib::ProofType;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -121,6 +122,11 @@ pub struct StakeProof {
 }
 
 impl StakeProof {
+    /// Returns the canonical proof type discriminant from hypermesh_lib
+    pub fn proof_type() -> ProofType {
+        ProofType::Stake
+    }
+
     pub fn new(stake_holder: String, stake_holder_id: String, stake_amount: u64) -> Self {
         Self {
             stake_holder,
@@ -242,6 +248,11 @@ pub struct TimeProof {
 }
 
 impl TimeProof {
+    /// Returns the canonical proof type discriminant from hypermesh_lib
+    pub fn proof_type() -> ProofType {
+        ProofType::Time
+    }
+
     pub fn new(network_time_offset: Duration) -> Self {
         let time_verification_timestamp = SystemTime::now();
         let nonce = rand::thread_rng().gen::<u64>();
@@ -417,6 +428,11 @@ pub struct SpaceProof {
 }
 
 impl SpaceProof {
+    /// Returns the canonical proof type discriminant from hypermesh_lib
+    pub fn proof_type() -> ProofType {
+        ProofType::Space
+    }
+
     pub fn new(node_id: String, storage_path: String, total_storage: u64) -> Self {
         Self {
             node_id,
@@ -550,6 +566,11 @@ pub enum WorkState {
 }
 
 impl WorkProof {
+    /// Returns the canonical proof type discriminant from hypermesh_lib
+    pub fn proof_type() -> ProofType {
+        ProofType::Work
+    }
+
     pub fn new(
         owner_id: String,
         workload_id: String,

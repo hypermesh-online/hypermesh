@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use super::{PeerInfo, SharePermission};
-use crate::{AssetMetadata, AssetPackage, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
 
 /// Discovery service for asset search and indexing
 pub struct DiscoveryService {
@@ -57,7 +57,7 @@ impl DiscoveryService {
     pub async fn register_package(
         &self,
         asset_id: &AssetRegistration,
-        metadata: &AssetMetadata,
+        metadata: &PackageSpecMetadata,
         permissions: SharePermission,
     ) -> Result<()> {
         let index_entry = AssetIndex {
@@ -67,9 +67,9 @@ impl DiscoveryService {
             permissions,
             indexed_at: SystemTime::now(),
             keywords: self.extract_keywords(metadata),
-            // STUB: AssetMetadata doesn't have category field, use tags as categories
+            // STUB: PackageSpecMetadata doesn't have category field, use tags as categories
             categories: metadata.tags.clone(),
-            // STUB: AssetMetadata doesn't have dependencies field
+            // STUB: PackageSpecMetadata doesn't have dependencies field
             dependencies: vec![],
             usage_stats: UsageStats::default(),
         };
@@ -93,7 +93,7 @@ impl DiscoveryService {
     pub async fn search_local(
         &self,
         query: &str,
-    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
         let index = self.local_index.read().await;
         let mut results = Vec::new();
 
@@ -140,7 +140,7 @@ impl DiscoveryService {
     }
 
     /// Construct a minimal AssetPackage from metadata and hash.
-    fn build_package_from_metadata(metadata: &AssetMetadata, hash: &str) -> AssetPackage {
+    fn build_package_from_metadata(metadata: &PackageSpecMetadata, hash: &str) -> AssetPackage {
         AssetPackage {
             spec: crate::AssetSpec {
                 api_version: "v1".to_string(),
@@ -257,7 +257,7 @@ impl DiscoveryService {
     pub async fn get_popular_packages(
         &self,
         threshold: f64,
-    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
         let index = self.local_index.read().await;
         let mut popular = Vec::new();
 
@@ -351,7 +351,7 @@ impl DiscoveryService {
         format!("node_{}", hex::encode(&hash.as_bytes()[..8]))
     }
 
-    pub(super) fn extract_keywords(&self, metadata: &AssetMetadata) -> Vec<String> {
+    pub(super) fn extract_keywords(&self, metadata: &PackageSpecMetadata) -> Vec<String> {
         let mut keywords = Vec::new();
 
         // Extract from name

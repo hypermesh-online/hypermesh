@@ -73,7 +73,7 @@ use crate::assets::multi_node::{CrossNetworkValidator, MultiNetworkCoordinator, 
 // Import Sprint 2.4: Asset Pipeline
 use crate::assets::pipeline::orchestrator::PipelineStages;
 use crate::assets::pipeline::{
-    Asset, AssetMetadata, AssetPipeline, CompressionConfig, DistributionConfig, EncryptionConfig,
+    Asset, PipelineInputMetadata, AssetPipeline, CompressionConfig, DistributionConfig, EncryptionConfig,
     ProcessedAsset, ShardingConfig,
 };
 
@@ -514,7 +514,7 @@ impl IntelligenceLayer {
         let reconstructed = Asset {
             id: handle.asset_id.clone(),
             data: retrieved_shards.into_iter().flatten().collect(),
-            metadata: AssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: format!("{}.reconstructed", handle.asset_id),
                 content_type: "application/octet-stream".to_string(),
                 size: 0,

@@ -26,7 +26,7 @@ pub use protocols::{BandwidthAllocation, SharePermission, SharingProtocol};
 pub use synchronization::{SyncManager, SyncState, SyncStrategy};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
-use crate::{AssetMetadata, AssetPackage, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -445,7 +445,7 @@ impl SharingManager {
     pub async fn search_packages(
         &self,
         query: &str,
-    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
         // Search local and cached packages first
         let local_results = self.discovery_service.search_local(query).await?;
 
@@ -535,7 +535,7 @@ impl SharingManager {
     async fn should_mirror_package(
         &self,
         asset_id: &AssetRegistration,
-        _metadata: &AssetMetadata,
+        _metadata: &PackageSpecMetadata,
     ) -> Result<bool> {
         // Check if we already have it
         if self.discovery_service.has_package(asset_id).await? {

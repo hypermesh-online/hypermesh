@@ -8,7 +8,7 @@
 //! Tests all 5 sprints integrated through the IntelligenceLayer.
 
 use blockmatrix::assets::multi_node::{NetworkId, PrivacyMode};
-use blockmatrix::assets::pipeline::{Asset, AssetMetadata};
+use blockmatrix::assets::pipeline::{Asset, PipelineInputMetadata};
 use blockmatrix::integration::phase1_foundation::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::intelligence::{IntelligenceLayer, IntelligenceLayerConfig};
 use blockmatrix::matrix::MatrixCoordinate;
@@ -39,7 +39,7 @@ fn create_test_asset(id: &str, size: usize) -> Asset {
     Asset {
         id: id.to_string(),
         data: vec![42u8; size],
-        metadata: AssetMetadata {
+        metadata: PipelineInputMetadata {
             name: format!("Test Asset {id}"),
             content_type: "application/octet-stream".to_string(),
             size,
@@ -171,7 +171,7 @@ async fn test_pipeline_to_storage_integration() {
         let asset = Asset {
             id: format!("dedup_test_{i}"),
             data: identical_data.clone(), // Same content for all
-            metadata: AssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: format!("Test Asset dedup_{i}"),
                 content_type: "application/octet-stream".to_string(),
                 size: 4096,
@@ -403,7 +403,7 @@ async fn test_e2e_deduplicated_retrieval() {
         let asset = Asset {
             id: format!("duplicate_content_{i}"),
             data: identical_data.clone(), // SAME content for all
-            metadata: AssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: "duplicate_content".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: 20 * 1024,

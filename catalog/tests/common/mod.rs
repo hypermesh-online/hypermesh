@@ -15,7 +15,7 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
         spec: AssetSpec {
             api_version: "catalog.v1".to_string(),
             kind: "Asset".to_string(),
-            metadata: AssetMetadata {
+            metadata: PackageSpecMetadata {
                 name: name.to_string(),
                 version: version.to_string(),
                 tags: vec!["test".to_string()],

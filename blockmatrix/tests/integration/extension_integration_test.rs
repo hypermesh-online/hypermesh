@@ -14,7 +14,7 @@ use blockmatrix::{
         ExtensionCategory, ExtensionConfig, ExtensionRequest, ExtensionResponse,
         ExtensionStatus, ExtensionResult, ValidationReport,
         AssetExtensionHandler, AssetType, AssetCreationSpec, AssetUpdate,
-        AssetQuery, AssetMetadata, AssetOperation, OperationResult,
+        AssetQuery, ExtensionAssetRecord, AssetOperation, OperationResult,
         manager::UnifiedExtensionManager,
     },
     assets::core::{AssetManager, AssetRegistration, PrivacyMode, ConsensusProof},
@@ -28,7 +28,7 @@ use semver::Version;
 /// Mock Catalog extension for testing
 struct MockCatalogExtension {
     initialized: bool,
-    assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, ExtensionAssetRecord>>>,
 }
 
 impl MockCatalogExtension {
@@ -153,11 +153,11 @@ impl HyperMeshExtension for MockCatalogExtension {
 
 /// Mock asset handler for testing
 struct MockAssetHandler {
-    assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>,
+    assets: Arc<RwLock<HashMap<AssetRegistration, ExtensionAssetRecord>>>,
 }
 
 impl MockAssetHandler {
-    fn new(assets: Arc<RwLock<HashMap<AssetRegistration, AssetMetadata>>>) -> Self {
+    fn new(assets: Arc<RwLock<HashMap<AssetRegistration, ExtensionAssetRecord>>>) -> Self {
         Self { assets }
     }
 }
@@ -170,7 +170,7 @@ impl AssetExtensionHandler for MockAssetHandler {
 
     async fn create_asset(&self, spec: AssetCreationSpec) -> ExtensionResult<AssetRegistration> {
         let id = AssetRegistration::new();
-        let metadata = AssetMetadata {
+        let metadata = ExtensionAssetRecord {
             id: id.clone(),
             asset_type: AssetType::Dns,
             name: spec.name,
@@ -244,7 +244,7 @@ impl AssetExtensionHandler for MockAssetHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord> {
         self.assets
             .read()
             .await

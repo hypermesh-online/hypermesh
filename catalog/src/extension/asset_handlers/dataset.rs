@@ -4,7 +4,7 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
     AssetUpdate, ConsensusProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
     OperationResult, RwLock,
 };
@@ -141,7 +141,7 @@ impl AssetExtensionHandler for DatasetHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord> {
         let datasets = self.datasets.read().await;
 
         let dataset = datasets
@@ -157,7 +157,7 @@ impl AssetExtensionHandler for DatasetHandler {
             serde_json::json!(dataset.record_count),
         );
 
-        Ok(AssetMetadata {
+        Ok(ExtensionAssetRecord {
             id: id.clone(),
             // STUB: Dataset no longer exists, using Library
             asset_type: AssetType::Dns,

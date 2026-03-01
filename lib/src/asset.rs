@@ -16,7 +16,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use super::types::{AssetId, ContentHash};
+use super::protocol::HardwareCapabilities;
+use super::types::{AssetAddress, AssetId, ContentHash};
 
 // ---------------------------------------------------------------------------
 // Pillar 1: AssetKind — two-level classification
@@ -386,6 +387,31 @@ pub struct AssetMetadata {
     pub updated_at: i64,
     /// Free-form tags for discovery and filtering.
     pub tags: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// GenesisAssetRecord — sovereign genesis (R1, R10)
+// ---------------------------------------------------------------------------
+
+/// Record of an asset created during genesis — hardware assessed and instantiated
+/// as an IPv6-addressed asset with Proof of State (R1, R10).
+///
+/// Each device resource (CPU, GPU, RAM, Storage, Network, Transmission) gets a
+/// genesis record when the node first boots and assesses its hardware.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisAssetRecord {
+    /// The asset's unique content-addressed identifier.
+    pub asset_id: AssetId,
+    /// The kind of system asset.
+    pub kind: SystemAssetKind,
+    /// IPv6-encoded asset address (matrix position + content hash).
+    pub address: AssetAddress,
+    /// Assessed hardware capabilities for this asset.
+    pub capabilities: HardwareCapabilities,
+    /// BLAKE3 hash of the genesis block that created this asset.
+    pub genesis_block_hash: ContentHash,
+    /// Timestamp of genesis assessment (UTC milliseconds since epoch).
+    pub assessed_at: u64,
 }
 
 // ---------------------------------------------------------------------------

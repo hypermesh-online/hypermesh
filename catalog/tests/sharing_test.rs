@@ -14,7 +14,7 @@ use std::time::Duration;
 use blockmatrix::assets::core::{
     AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
 };
-use catalog::assets::AssetMetadata;
+use catalog::assets::PackageSpecMetadata;
 use catalog::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 use catalog::sharing::{
     DiscoveryService, MirrorManager, NetworkTopology, PeerInfo, SharePermission, SharingConfig,
@@ -47,9 +47,9 @@ fn test_asset_registration(key: &str) -> AssetRegistration {
     )
 }
 
-/// Helper: create a minimal AssetMetadata for discovery tests
-fn test_asset_metadata(name: &str, version: &str) -> AssetMetadata {
-    AssetMetadata {
+/// Helper: create a minimal PackageSpecMetadata for discovery tests
+fn test_asset_metadata(name: &str, version: &str) -> PackageSpecMetadata {
+    PackageSpecMetadata {
         name: name.to_string(),
         version: version.to_string(),
         tags: vec!["test".to_string()],

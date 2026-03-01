@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::{PeerInfo, SharePermission};
 use super::types::*;
-use crate::{AssetMetadata, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetRegistration};
 
 impl super::DiscoveryService {
     /// Search across network
@@ -16,7 +16,7 @@ impl super::DiscoveryService {
         &self,
         query: &str,
         peers: &HashMap<String, PeerInfo>,
-    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
         // Check federated cache first
         if let Some(cached_results) = self.search_cache(query).await? {
             return Ok(cached_results);
@@ -152,7 +152,7 @@ impl super::DiscoveryService {
         false
     }
 
-    pub(super) fn calculate_relevance(&self, metadata: &AssetMetadata, query: &str) -> f64 {
+    pub(super) fn calculate_relevance(&self, metadata: &PackageSpecMetadata, query: &str) -> f64 {
         let query_lower = query.to_lowercase();
         let mut score: f64 = 0.0;
 
@@ -211,7 +211,7 @@ impl super::DiscoveryService {
     pub(super) async fn search_cache(
         &self,
         query: &str,
-    ) -> Result<Option<Vec<(AssetRegistration, AssetMetadata)>>> {
+    ) -> Result<Option<Vec<(AssetRegistration, PackageSpecMetadata)>>> {
         let cache = self.federated_cache.read().await;
         let elapsed = SystemTime::now()
             .duration_since(cache.cached_at)
@@ -235,7 +235,7 @@ impl super::DiscoveryService {
     pub(super) async fn cache_search_results(
         &self,
         _query: &str,
-        results: &[(AssetRegistration, AssetMetadata)],
+        results: &[(AssetRegistration, PackageSpecMetadata)],
     ) -> Result<()> {
         let mut cache = self.federated_cache.write().await;
         for (asset_id, metadata) in results {
@@ -262,8 +262,8 @@ impl super::DiscoveryService {
 
     pub(super) fn deduplicate_results(
         &self,
-        mut results: Vec<(AssetRegistration, AssetMetadata)>,
-    ) -> Vec<(AssetRegistration, AssetMetadata)> {
+        mut results: Vec<(AssetRegistration, PackageSpecMetadata)>,
+    ) -> Vec<(AssetRegistration, PackageSpecMetadata)> {
         results.sort_by(|a, b| a.0.to_hex_string().cmp(&b.0.to_hex_string()));
         results.dedup_by(|a, b| a.0 == b.0);
         results
@@ -271,9 +271,9 @@ impl super::DiscoveryService {
 
     pub(super) fn rank_results(
         &self,
-        mut results: Vec<(AssetRegistration, AssetMetadata)>,
+        mut results: Vec<(AssetRegistration, PackageSpecMetadata)>,
         query: &str,
-    ) -> Vec<(AssetRegistration, AssetMetadata)> {
+    ) -> Vec<(AssetRegistration, PackageSpecMetadata)> {
         results.sort_by(|a, b| {
             let rel_a = self.calculate_relevance(&a.1, query);
             let rel_b = self.calculate_relevance(&b.1, query);
@@ -369,7 +369,7 @@ impl super::DiscoveryService {
         peer_id: &str,
         peer_address: &str,
         query: &str,
-    ) -> Result<Vec<(AssetRegistration, AssetMetadata)>> {
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
         // Network-dependent: requires STOQ wire protocol.
         tracing::debug!(
             peer_id = %peer_id,

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use super::super::ConflictResolution;
-use crate::{AssetMetadata, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetRegistration};
 
 /// Synchronization strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,9 +88,9 @@ pub struct ConflictInfo {
     /// Remote version
     pub remote_version: String,
     /// Local metadata
-    pub local_metadata: AssetMetadata,
+    pub local_metadata: PackageSpecMetadata,
     /// Remote metadata
-    pub remote_metadata: AssetMetadata,
+    pub remote_metadata: PackageSpecMetadata,
     /// Suggested resolution
     pub suggested_resolution: ConflictResolution,
 }

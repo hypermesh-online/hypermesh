@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 
 use super::super::ConflictResolution;
 use super::types::*;
-use crate::{AssetMetadata, AssetPackage};
+use crate::{PackageSpecMetadata, AssetPackage};
 
 impl super::SyncManager {
     pub(super) async fn update_sync_state(&self, peer_id: &str, state: SyncState) -> Result<()> {
@@ -43,8 +43,8 @@ impl super::SyncManager {
 
     pub(super) fn suggest_resolution(
         &self,
-        local: &AssetMetadata,
-        remote: &AssetMetadata,
+        local: &PackageSpecMetadata,
+        remote: &PackageSpecMetadata,
     ) -> ConflictResolution {
         // Simple heuristic for suggesting resolution
         // Compare updated timestamps if they exist
@@ -106,7 +106,7 @@ impl super::SyncManager {
     pub(super) async fn request_package_list(
         &self,
         _peer_merkle: &str,
-    ) -> Result<HashMap<String, AssetMetadata>> {
+    ) -> Result<HashMap<String, PackageSpecMetadata>> {
         // Local-first: return local package index as id->metadata map.
         // A real P2P call would fetch the remote peer's list over STOQ.
         let packages = self.package_index.read().await;
@@ -128,7 +128,7 @@ impl super::SyncManager {
 
     pub(super) async fn get_packages_since(&self, since: SystemTime) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
-        // Filter by updated field from AssetMetadata (if it exists)
+        // Filter by updated field from PackageSpecMetadata (if it exists)
         // Convert SystemTime to DateTime<Utc> for comparison
         let since_dt = DateTime::<Utc>::from(since);
         Ok(packages
@@ -143,7 +143,7 @@ impl super::SyncManager {
         categories: Vec<String>,
     ) -> Result<Vec<AssetPackage>> {
         let packages = self.package_index.read().await;
-        // Filter by tags since AssetMetadata doesn't have category field
+        // Filter by tags since PackageSpecMetadata doesn't have category field
         Ok(packages
             .values()
             .filter(|p| p.metadata().tags.iter().any(|tag| categories.contains(tag)))
@@ -257,7 +257,7 @@ impl super::SyncManager {
         Ok(diff_hashes)
     }
 
-    pub(super) async fn get_consensus_score(&self, metadata: &AssetMetadata) -> Result<f64> {
+    pub(super) async fn get_consensus_score(&self, metadata: &PackageSpecMetadata) -> Result<f64> {
         // Score based on metadata completeness and trust signals.
         let mut score = 0.0;
         let mut factors = 0;
@@ -298,8 +298,8 @@ impl super::SyncManager {
 
     pub(super) async fn merge_packages(
         &self,
-        local: &AssetMetadata,
-        remote: &AssetMetadata,
+        local: &PackageSpecMetadata,
+        remote: &PackageSpecMetadata,
     ) -> Result<AssetPackage> {
         // Last-writer-wins: take the package with the newer timestamp.
         let winner_name = match (local.updated, remote.updated) {

@@ -48,8 +48,9 @@ pub use blockmatrix::consensus::proof_of_state_integration::{
     ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 
-// Canonical asset types from lib (aliased to avoid collision with catalog's own AssetMetadata)
-pub use hypermesh_lib::AssetMetadata as LibAssetMetadata;
+// Canonical asset types from lib -- directly usable now that catalog's
+// local type was renamed to PackageSpecMetadata.
+pub use hypermesh_lib::AssetMetadata;
 pub use hypermesh_lib::BaseState as LibBaseState;
 pub use hypermesh_lib::{
     AssetAdapter as LibAssetAdapter, AssetKind, SystemAssetKind, UserAssetKind,
@@ -80,7 +81,7 @@ pub struct ConsensusContext {
 }
 pub use api::{CatalogAppState, CatalogStoqApi, CatalogStoqConfig};
 pub use assets::{
-    AssetContent, AssetDependency, AssetExecution, AssetMetadata, AssetPackage, AssetResources,
+    AssetContent, AssetDependency, AssetExecution, PackageSpecMetadata, AssetPackage, AssetResources,
     AssetSecurity, AssetSpec,
 };
 pub use distribution::DistributionConfig;

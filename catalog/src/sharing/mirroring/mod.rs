@@ -18,7 +18,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use crate::registry::CatalogRegistry;
-use crate::{AssetMetadata, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetRegistration};
 
 /// Mirror manager for package replication
 pub struct MirrorManager {
@@ -55,7 +55,7 @@ impl MirrorManager {
     pub async fn mirror_package(
         &self,
         asset_id: &AssetRegistration,
-        metadata: &AssetMetadata,
+        metadata: &PackageSpecMetadata,
     ) -> Result<MirrorStatus> {
         // Check if already mirrored sufficiently
         if let Some(status) = self.get_mirror_status(asset_id).await? {

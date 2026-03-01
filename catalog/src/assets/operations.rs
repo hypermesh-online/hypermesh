@@ -208,7 +208,7 @@ impl AssetPackage {
     pub fn asset_type(&self) -> &str {
         &self.spec.spec.asset_type
     }
-    pub fn metadata(&self) -> &AssetMetadata {
+    pub fn metadata(&self) -> &PackageSpecMetadata {
         &self.spec.metadata
     }
     pub fn description(&self) -> Option<&str> {
@@ -324,7 +324,7 @@ spec:
             spec: AssetSpec {
                 api_version: "catalog.v1".to_string(),
                 kind: "Asset".to_string(),
-                metadata: AssetMetadata {
+                metadata: PackageSpecMetadata {
                     name: "test".to_string(),
                     version: "1.0.0".to_string(),
                     tags: vec!["test".to_string()],

@@ -333,7 +333,7 @@ impl HyperMeshAssetRegistry {
         let spec = AssetSpec {
             api_version: "v1".to_string(),
             kind: lib_package.asset_type.clone(),
-            metadata: AssetMetadata {
+            metadata: PackageSpecMetadata {
                 name: lib_package.name.clone(),
                 version: lib_package.version.clone(),
                 tags: lib_package.tags().to_vec(),

@@ -407,7 +407,7 @@ mod tests {
         let asset = Asset {
             id: "test-asset-1".to_string(),
             data: b"Hello, World! ".repeat(1000),
-            metadata: crate::assets::pipeline::AssetMetadata {
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
                 name: "test.txt".to_string(),
                 content_type: "text/plain".to_string(),
                 size: 14000,
@@ -443,7 +443,7 @@ mod tests {
         let asset = Asset {
             id: "large-asset".to_string(),
             data: data.clone(),
-            metadata: crate::assets::pipeline::AssetMetadata {
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
                 name: "large.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: data.len(),
@@ -483,7 +483,7 @@ mod tests {
         let asset = Asset {
             id: "test".to_string(),
             data: b"Test data".to_vec(),
-            metadata: crate::assets::pipeline::AssetMetadata {
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
                 name: "test.txt".to_string(),
                 content_type: "text/plain".to_string(),
                 size: 9,
@@ -508,7 +508,7 @@ mod tests {
         let asset = Asset {
             id: "stats-test".to_string(),
             data: data.clone(),
-            metadata: crate::assets::pipeline::AssetMetadata {
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
                 name: "stats.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: data.len(),
@@ -545,7 +545,7 @@ mod tests {
         let asset = Asset {
             id: "custom-shards".to_string(),
             data: vec![1u8; 5000],
-            metadata: crate::assets::pipeline::AssetMetadata {
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
                 name: "custom.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: 5000,

@@ -632,7 +632,7 @@ mod tests {
             spec: AssetSpec {
                 api_version: "catalog.v1".to_string(),
                 kind: "Asset".to_string(),
-                metadata: AssetMetadata {
+                metadata: PackageSpecMetadata {
                     name: "test-asset".to_string(),
                     version: "1.0.0".to_string(),
                     description: Some("A test asset for documentation generation".to_string()),

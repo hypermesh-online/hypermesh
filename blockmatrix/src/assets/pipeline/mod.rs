@@ -56,12 +56,17 @@ pub struct Asset {
     /// Raw asset data
     pub data: Vec<u8>,
     /// Asset metadata
-    pub metadata: AssetMetadata,
+    pub metadata: PipelineInputMetadata,
 }
 
-/// Asset metadata
+/// Input metadata describing an asset entering the pipeline.
+///
+/// This is intentionally distinct from `hypermesh_lib::AssetMetadata` (the
+/// canonical cross-crate metadata). Pipeline input metadata carries
+/// content-type and a free-form custom map, which are only relevant during
+/// ingestion into the Compress->Encrypt->Shard->Distribute pipeline.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AssetMetadata {
+pub struct PipelineInputMetadata {
     /// Asset name
     pub name: String,
     /// Content type
@@ -74,7 +79,7 @@ pub struct AssetMetadata {
     pub custom: std::collections::HashMap<String, String>,
 }
 
-impl Default for AssetMetadata {
+impl Default for PipelineInputMetadata {
     fn default() -> Self {
         Self {
             name: String::new(),
@@ -128,7 +133,7 @@ mod tests {
         let asset = Asset {
             id: "test-asset-1".to_string(),
             data: vec![1, 2, 3, 4, 5],
-            metadata: AssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: "test.bin".to_string(),
                 content_type: "application/octet-stream".to_string(),
                 size: 5,

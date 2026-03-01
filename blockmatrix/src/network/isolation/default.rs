@@ -97,7 +97,7 @@ pub struct DefaultIsolationManager {
     network_configs: Arc<RwLock<HashMap<NetworkId, NetworkIsolationConfig>>>,
 
     /// Packet origin tracking
-    packet_origins: Arc<RwLock<HashMap<PacketId, NetworkId>>>,
+    packet_origins: Arc<RwLock<HashMap<IsolationPacketId, NetworkId>>>,
 
     /// Per-network connection pools
     connection_pools: Arc<RwLock<HashMap<NetworkId, Arc<ConnectionPool>>>>,

@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 use super::super::SharePermission;
-use crate::{AssetMetadata, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetRegistration};
 
 /// Asset index entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +15,7 @@ pub struct AssetIndex {
     /// Asset ID
     pub asset_id: AssetRegistration,
     /// Asset metadata
-    pub metadata: AssetMetadata,
+    pub metadata: PackageSpecMetadata,
     /// Nodes that have this asset
     pub available_nodes: HashSet<String>,
     /// Share permissions

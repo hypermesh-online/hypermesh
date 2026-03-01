@@ -4,7 +4,7 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, AssetMetadata, AssetOperation, AssetQuery, AssetRegistration, AssetType,
+    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
     AssetUpdate, ConsensusProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
     OperationResult, RwLock,
 };
@@ -138,7 +138,7 @@ impl AssetExtensionHandler for TemplateHandler {
         Ok(results)
     }
 
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata> {
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord> {
         let templates = self.templates.read().await;
 
         let template = templates
@@ -158,7 +158,7 @@ impl AssetExtensionHandler for TemplateHandler {
             serde_json::json!(template.parameters),
         );
 
-        Ok(AssetMetadata {
+        Ok(ExtensionAssetRecord {
             id: id.clone(),
             // STUB: Template no longer exists, using Library
             asset_type: AssetType::Dns,

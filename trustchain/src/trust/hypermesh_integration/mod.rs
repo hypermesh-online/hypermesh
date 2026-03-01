@@ -27,14 +27,15 @@ mod tests {
     }
 
     #[test]
-    fn test_asset_id_creation() {
-        let asset_id = AssetId {
+    fn test_authenticated_asset_creation() {
+        let asset = AuthenticatedAsset {
+            asset_id: hypermesh_lib::AssetId::from("test-asset-001"),
             uuid: Uuid::new_v4(),
-            asset_type: AssetType::Cpu,
+            asset_kind: TrustAssetKind::Cpu,
             network_id: "test-network".to_string(),
         };
-        assert_eq!(asset_id.asset_type, AssetType::Cpu);
-        assert_eq!(asset_id.network_id, "test-network");
+        assert_eq!(asset.asset_kind, TrustAssetKind::Cpu);
+        assert_eq!(asset.network_id, "test-network");
     }
 
     #[test]

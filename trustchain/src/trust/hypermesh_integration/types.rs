@@ -3,15 +3,22 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! HyperMesh Trust Integration types and data structures
+//!
+//! Domain-specific types for TrustChain's trust integration layer.
+//! These wrap the canonical lib identifiers (`hypermesh_lib::NodeId`,
+//! `hypermesh_lib::AssetId`) with TrustChain-specific context.
 
 use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
-/// Universal asset type enumeration
+/// Asset kind for trust-layer classification
+///
+/// Aligned with `hypermesh_lib::SystemAssetKind` variants.
+/// Uses the canonical asset taxonomy (Blockchain/Dns, not VirtualMachine/Library).
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub enum AssetType {
+pub enum TrustAssetKind {
     Cpu,
     Gpu,
     Memory,
@@ -19,31 +26,47 @@ pub enum AssetType {
     Network,
     Container,
     Economic,
-    VirtualMachine,
-    Library,
+    Blockchain,
+    Dns,
 }
 
-/// Asset identification in HyperMesh
+/// Authenticated asset in HyperMesh trust layer
+///
+/// Wraps `hypermesh_lib::AssetId` (the canonical string identifier) with
+/// TrustChain-specific context: UUID, asset kind, and network membership.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct AssetId {
+pub struct AuthenticatedAsset {
+    /// Canonical asset identifier from hypermesh_lib
+    pub asset_id: hypermesh_lib::AssetId,
+    /// UUID for this asset instance
     pub uuid: Uuid,
-    pub asset_type: AssetType,
+    /// Asset kind classification
+    pub asset_kind: TrustAssetKind,
+    /// Network this asset belongs to
     pub network_id: String,
 }
 
-/// Node identification in HyperMesh
+/// Authenticated node in HyperMesh trust layer
+///
+/// Wraps `hypermesh_lib::NodeId` (the canonical string identifier) with
+/// TrustChain-specific context: public key, network address, and node role.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct NodeId {
+pub struct AuthenticatedNode {
+    /// Canonical node identifier from hypermesh_lib
+    pub node_id: hypermesh_lib::NodeId,
+    /// Node's public key for cryptographic verification
     pub public_key: String,
+    /// Node's IPv6 network address
     pub network_address: Ipv6Addr,
+    /// Node's role in the network
     pub node_type: NodeType,
 }
 
 /// Entity ID for authentication (assets or nodes)
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntityId {
-    Asset(AssetId),
-    Node(NodeId),
+    Asset(AuthenticatedAsset),
+    Node(AuthenticatedNode),
 }
 
 /// Proxy connection identifier
@@ -82,7 +105,7 @@ pub struct AuthenticationStatus {
 /// Byzantine fault detection report
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ByzantineReport {
-    pub node_id: NodeId,
+    pub node: AuthenticatedNode,
     pub detection_time: SystemTime,
     pub fault_type: ByzantineFaultType,
     pub evidence: Vec<ByzantineEvidence>,
@@ -111,7 +134,7 @@ pub enum ByzantineFaultType {
 pub struct ByzantineEvidence {
     pub evidence_type: EvidenceType,
     pub data: Vec<u8>,
-    pub witness_nodes: Vec<NodeId>,
+    pub witness_nodes: Vec<AuthenticatedNode>,
     pub timestamp: SystemTime,
     pub cryptographic_proof: Option<Vec<u8>>,
 }
@@ -223,7 +246,7 @@ pub(crate) struct NodeBehavior {
 
 // Supporting type stubs
 pub(crate) struct HyperMeshNetworkClient;
-pub(crate) struct AssetMetadata;
+pub(crate) struct AssetVerificationRecord;
 pub(crate) struct AssetVerificationEngine;
 pub(crate) struct ByzantinePatterns;
 pub(crate) struct DetectionAlgorithms;
@@ -243,7 +266,7 @@ pub(crate) struct ByzantineBehaviorAnalysis {
 
 /// Proxy candidate for selection
 pub(crate) struct ProxyCandidate {
-    pub(crate) _node_id: NodeId,
+    pub(crate) _node: AuthenticatedNode,
     pub(crate) _is_authenticated: bool,
     pub(crate) _performance_metrics: ProxyPerformanceMetrics,
     pub(crate) _distance_hops: u32,

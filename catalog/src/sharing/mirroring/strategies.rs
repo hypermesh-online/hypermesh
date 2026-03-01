@@ -296,7 +296,7 @@ impl super::MirrorManager {
     pub(super) async fn replicate_to_node(
         &self,
         asset_id: &AssetRegistration,
-        _metadata: &crate::AssetMetadata,
+        _metadata: &crate::PackageSpecMetadata,
         node_id: &str,
     ) -> Result<()> {
         // Would implement actual replication protocol
@@ -319,7 +319,7 @@ impl super::MirrorManager {
         node_id: &str,
     ) -> Result<()> {
         // Build minimal metadata for the replication call.
-        let metadata = crate::AssetMetadata {
+        let metadata = crate::PackageSpecMetadata {
             name: asset_id.to_hex_string(),
             version: "0.0.0".to_string(),
             tags: vec![],

@@ -8,7 +8,7 @@
 //! Reed-Solomon sharding, and matrix-aware distribution.
 
 use blockmatrix::assets::pipeline::{
-    orchestrator::AssetPipeline, Asset, AssetMetadata, CompressionAlgorithm, CompressionConfig,
+    orchestrator::AssetPipeline, Asset, PipelineInputMetadata, CompressionAlgorithm, CompressionConfig,
     DistributionConfig, EncryptionConfig, Encryptor, MatrixDistributor, PipelineConfig,
     ShardingConfig,
 };
@@ -293,7 +293,7 @@ async fn test_end_to_end_pipeline() {
     let asset = Asset {
         id: "test-asset-1".to_string(),
         data: test_data.clone(),
-        metadata: AssetMetadata {
+        metadata: PipelineInputMetadata {
             name: "test.bin".to_string(),
             content_type: "application/octet-stream".to_string(),
             size: test_data.len(),
@@ -367,7 +367,7 @@ async fn test_pipeline_performance_benchmark() {
         let asset = Asset {
             id: format!("benchmark-{size}"),
             data: test_data.clone(),
-            metadata: AssetMetadata {
+            metadata: PipelineInputMetadata {
                 name: format!("{label}.bin"),
                 content_type: "application/octet-stream".to_string(),
                 size,
@@ -416,7 +416,7 @@ async fn test_pipeline_1gb_throughput() {
     let asset = Asset {
         id: "throughput-test".to_string(),
         data: test_data.clone(),
-        metadata: AssetMetadata {
+        metadata: PipelineInputMetadata {
             name: "throughput.bin".to_string(),
             content_type: "application/octet-stream".to_string(),
             size: test_size,
@@ -529,7 +529,7 @@ async fn test_integration_with_sprint_2_3_multi_network() {
     let asset = Asset {
         id: "multi-net-asset".to_string(),
         data: test_data.to_vec(),
-        metadata: AssetMetadata {
+        metadata: PipelineInputMetadata {
             name: "multi-net.dat".to_string(),
             content_type: "application/octet-stream".to_string(),
             size: test_data.len(),

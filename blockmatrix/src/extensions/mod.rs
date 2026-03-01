@@ -74,7 +74,7 @@ pub use types::{
 };
 
 pub use asset_types::{
-    AssetCreationSpec, AssetMetadata, AssetOperation, AssetQuery, AssetUpdate,
+    AssetCreationSpec, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetUpdate,
     ConsensusRequirements, ConsensusStatus, CpuRequirement, DeploymentResult, DeploymentSpec,
     ExecutionResult, ExecutionSpec, GpuRequirement, MemoryRequirement, NetworkConfig,
     OperationResult, PortMapping, ResourceRequirements, SharingResult, SharingSpec,

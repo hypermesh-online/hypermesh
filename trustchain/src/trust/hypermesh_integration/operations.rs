@@ -27,13 +27,13 @@ pub struct HyperMeshTrustValidator {
 /// HyperMesh asset client for trust validation
 pub struct HyperMeshAssetClient {
     _network_client: Arc<HyperMeshNetworkClient>,
-    _asset_cache: Arc<DashMap<AssetId, AssetMetadata>>,
+    _asset_cache: Arc<DashMap<AuthenticatedAsset, AssetVerificationRecord>>,
     _verification_engine: Arc<AssetVerificationEngine>,
 }
 
 /// Byzantine fault detector for malicious nodes
 pub struct ByzantineDetector {
-    _node_behaviors: Arc<DashMap<NodeId, NodeBehavior>>,
+    _node_behaviors: Arc<DashMap<AuthenticatedNode, NodeBehavior>>,
     _patterns: Arc<ByzantinePatterns>,
     _algorithms: Arc<DetectionAlgorithms>,
     _alert_system: Arc<AlertSystem>,
@@ -73,19 +73,19 @@ impl HyperMeshTrustValidator {
     /// Authenticate an asset -- binary pass/fail
     pub async fn authenticate_asset(
         &self,
-        asset_id: &AssetId,
+        asset: &AuthenticatedAsset,
     ) -> TrustChainResult<AuthenticationStatus> {
         let start_time = std::time::Instant::now();
-        debug!("Authenticating asset: {:?}", asset_id);
+        debug!("Authenticating asset: {:?}", asset);
 
-        let _asset_metadata = self.asset_client.get_asset_metadata(asset_id).await?;
+        let _asset_metadata = self.asset_client.get_asset_metadata(asset).await?;
         let status = self
             .authenticator
-            .authenticate(&EntityId::Asset(asset_id.clone()))
+            .authenticate(&EntityId::Asset(asset.clone()))
             .await?;
 
         if !status.authenticated {
-            warn!("Asset {} FAILED authentication", asset_id.uuid);
+            warn!("Asset {} FAILED authentication", asset.uuid);
         }
 
         let validation_time = start_time.elapsed().as_millis() as u32;
@@ -107,17 +107,17 @@ impl HyperMeshTrustValidator {
     /// Detect Byzantine behavior for a node
     pub async fn detect_byzantine_behavior(
         &self,
-        node_id: &NodeId,
+        node: &AuthenticatedNode,
     ) -> TrustChainResult<ByzantineReport> {
-        debug!("Analyzing node for Byzantine behavior: {:?}", node_id);
+        debug!("Analyzing node for Byzantine behavior: {:?}", node);
         let behavior_analysis = self
             .byzantine_detector
-            .analyze_node_behavior(node_id)
+            .analyze_node_behavior(node)
             .await?;
 
         if behavior_analysis.is_byzantine {
             let report = ByzantineReport {
-                node_id: node_id.clone(),
+                node: node.clone(),
                 detection_time: SystemTime::now(),
                 fault_type: behavior_analysis.fault_type,
                 evidence: behavior_analysis.evidence,
@@ -141,7 +141,7 @@ impl HyperMeshTrustValidator {
             Ok(report)
         } else {
             Ok(ByzantineReport {
-                node_id: node_id.clone(),
+                node: node.clone(),
                 detection_time: SystemTime::now(),
                 fault_type: ByzantineFaultType::DoubleSigning,
                 evidence: vec![],
@@ -211,9 +211,9 @@ impl HyperMeshAssetClient {
 
     pub(crate) async fn get_asset_metadata(
         &self,
-        _asset_id: &AssetId,
-    ) -> TrustChainResult<AssetMetadata> {
-        Ok(AssetMetadata)
+        _asset: &AuthenticatedAsset,
+    ) -> TrustChainResult<AssetVerificationRecord> {
+        Ok(AssetVerificationRecord)
     }
 }
 
@@ -229,7 +229,7 @@ impl ByzantineDetector {
 
     pub(crate) async fn analyze_node_behavior(
         &self,
-        _node_id: &NodeId,
+        _node: &AuthenticatedNode,
     ) -> TrustChainResult<ByzantineBehaviorAnalysis> {
         Ok(ByzantineBehaviorAnalysis {
             is_byzantine: false,
@@ -265,8 +265,9 @@ impl RemoteProxyManager {
     pub(crate) async fn select_optimal_proxy(
         &self,
         _candidates: &[ProxyCandidate],
-    ) -> TrustChainResult<NodeId> {
-        Ok(NodeId {
+    ) -> TrustChainResult<AuthenticatedNode> {
+        Ok(AuthenticatedNode {
+            node_id: hypermesh_lib::NodeId::from("placeholder"),
             public_key: "placeholder".to_string(),
             network_address: Ipv6Addr::LOCALHOST,
             node_type: NodeType::Proxy,
@@ -275,7 +276,7 @@ impl RemoteProxyManager {
 
     pub(crate) async fn establish_connection(
         &self,
-        _proxy: &NodeId,
+        _proxy: &AuthenticatedNode,
         _target: &Ipv6Addr,
     ) -> TrustChainResult<ProxyConnection> {
         Ok(ProxyConnection {

@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-use crate::{AssetMetadata, AssetPackage, AssetRegistration};
+use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
 
 /// Share permission levels
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -136,7 +136,7 @@ pub enum ProtocolMessage {
     /// Package metadata
     PackageMetadata {
         asset_id: String, // Package hash, not BlockMatrix AssetRegistration
-        metadata: AssetMetadata,
+        metadata: PackageSpecMetadata,
     },
     /// Availability notification
     AvailabilityNotification {

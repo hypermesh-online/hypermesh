@@ -73,8 +73,8 @@ pub trait AssetExtensionHandler: Send + Sync {
     /// Query assets based on criteria
     async fn query_assets(&self, query: AssetQuery) -> ExtensionResult<Vec<AssetRegistration>>;
 
-    /// Get asset metadata
-    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<AssetMetadata>;
+    /// Get asset record
+    async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord>;
 
     /// Validate asset with consensus proofs
     async fn validate_asset(
