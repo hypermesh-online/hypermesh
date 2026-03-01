@@ -49,7 +49,10 @@ export const crateStatuses: CrateStatus[] = [
         "Asset transfer protocol (TransferEngine, StateProofBytes, PoS-authenticated transfers with blockchain receipts)",
         "10-node transfer simulation (helix topology, sequential chain transfers, fingerprint preservation, 6 tests)",
         "Node bootstrap lifecycle (genesis block, self-signed cert, DNS init)",
-        "Real hardware metrics collection (CPU/memory/network/storage from /proc)"
+        "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
+        "PeerIdentity bridges to lib NodeId (to_node_id(), From<&ScopedIdentity>)",
+        "NodeFingerprint From<NodeId> conversion (same 32-byte concept)",
+        "NetworkScope::from_identity() for scope-aware asset access"
       ],
       "inDevelopment": [
         "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
@@ -78,14 +81,11 @@ export const crateStatuses: CrateStatus[] = [
         "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
         "mDNS peer discovery (start_mdns_discovery is explicit stub)",
         "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
-        "Identity-scoped asset access (workload identity → asset permissions)",
         "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
-        "Unified cross-crate identity model (lib::NodeId, trustchain::NodeId, blockmatrix::NodeFingerprint are separate and incompatible)",
-        "Scope-aware identity and certificates (identity/certificate awareness of Device vs Network scope, traceability axis)",
         "Real distributed shard transfer over STOQ (distribution currently computes placements but never sends bytes)"
       ]
     },
-    "completion": 49
+    "completion": 54
   },
   {
     "id": "caesar",
@@ -282,11 +282,11 @@ export const crateStatuses: CrateStatus[] = [
         "Benchmarks — Criterion benchmarks for blockmatrix (5: phase1, retrieval, transfer, tensor, basic), stoq (3: throughput, real_throughput, ebpf), trustchain (certificates)",
         "Full development/contributions pipeline — CONTRIBUTING.md, SECURITY.md, CHANGELOG.md, pre-commit hooks, PR workflow documented",
         "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
-        "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)"
+        "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
+        "Unified cross-crate identity model (NodeId BLAKE3([u8;32]), ScopedIdentity, WorkloadType — all crates use lib canonical types)",
+        "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)"
       ],
-      "inDevelopment": [
-        "Unified cross-crate identity model (three incompatible NodeId types across lib, trustchain, blockmatrix)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
         "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
@@ -295,11 +295,10 @@ export const crateStatuses: CrateStatus[] = [
         "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
         "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
         "Real partition/chaos testing framework",
-        "Scope-aware identity system (certificates and identity respect Device vs Network scope, traceability axis)",
         "Certificate lifecycle per scope (Anonymous=ephemeral, Private=bounded group certs, Public=full transparency chain)"
       ]
     },
-    "completion": 38
+    "completion": 50
   },
   {
     "id": "hypermesh-ebpf",
@@ -365,19 +364,19 @@ export const crateStatuses: CrateStatus[] = [
         "ShardCommitment type (R12 — BLAKE3(sorted placements) compute/verify API)",
         "Genesis asset inventory types (R1 — Cpu/Gpu/Storage/Network/Memory capability structs)",
         "GenesisAssetRecord type (R1+R10 — sovereign genesis with hardware-assessed IPv6 assets)",
-        "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)"
+        "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
+        "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey, replaces opaque String)",
+        "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)"
       ],
       "inDevelopment": [
         "Cross-crate validation helpers",
         "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
         "Common test utilities",
-        "Public SDK types for third-party integration (stable API surface)",
-        "Unified NodeId type (currently opaque String, needs to derive from assessed hardware → keypair → certificate)",
-        "Scope-aware identity types (identity that respects BlockchainScope Device|Network and traceability axis)"
+        "Public SDK types for third-party integration (stable API surface)"
       ],
       "planned": []
     },
-    "completion": 82
+    "completion": 88
   },
   {
     "id": "stoq",
@@ -402,7 +401,8 @@ export const crateStatuses: CrateStatus[] = [
         "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
         "BLAKE3 content hashing (whitepaper-aligned)",
-        "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)"
+        "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
+        "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)"
       ],
       "inDevelopment": [
         "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
@@ -414,14 +414,13 @@ export const crateStatuses: CrateStatus[] = [
         "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements",
-        "Identity-aware connection establishment (cert identity extraction)",
         "Permission enforcement at protocol layer",
         "MetricsFrame protocol wiring to engauge",
         "Certificate store persistence across restarts",
         "Graceful degradation with expired certificates"
       ]
     },
-    "completion": 59
+    "completion": 62
   },
   {
     "id": "trustchain",
@@ -450,7 +449,12 @@ export const crateStatuses: CrateStatus[] = [
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
         "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
         "Persistent revocation storage (JSON on disk, survives restart)",
-        "Canonical ProofType from hypermesh-lib (single source of truth)"
+        "Canonical ProofType from hypermesh-lib (single source of truth)",
+        "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId, to_scoped_identity() bridge)",
+        "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
+        "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
+        "Identity-scoped certificate extensions (IdentityScopeExtension, OID-based, 4-byte encode/decode)",
+        "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)"
       ],
       "inDevelopment": [
         "CA-signed leaf certificates (currently self-signed X.509 with appended FALCON-1024 signature, not true CA-signed X.509)",
@@ -459,23 +463,19 @@ export const crateStatuses: CrateStatus[] = [
         "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate)"
       ],
       "planned": [
-        "Identity-typed certificates (service/agent/node distinction)",
         "KeyUsage/EKU enforcement in issued X.509 certs",
         "Threshold crypto integration with CA initialization",
         "Distributed revocation propagation",
         "Offline device grace period renewal",
-        "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
-        "Identity-scoped certificate extensions (OID-based)",
         "Cascading revocation (parent→child identity propagation)",
         "Real certificate operation metrics (issuance latency, validation throughput)",
         "CRL distribution via blockchain (offline revocation)",
         "Field device bootstrap with intermittent connectivity",
-        "Cross-crate identity integration (trustchain::NodeId is independent struct, not connected to lib::NodeId or blockmatrix::NodeFingerprint)",
-        "Scope-aware certificates (no certificate awareness of Device vs Network scope, no traceability enforcement per scope)",
+        "Scope-aware certificates (certificate awareness of Device vs Network scope, traceability enforcement per scope)",
         "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)"
       ]
     },
-    "completion": 54
+    "completion": 65
   },
   {
     "id": "ui",

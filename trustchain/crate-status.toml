@@ -27,6 +27,11 @@ items = [
     "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
     "Persistent revocation storage (JSON on disk, survives restart)",
     "Canonical ProofType from hypermesh-lib (single source of truth)",
+    "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId, to_scoped_identity() bridge)",
+    "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
+    "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
+    "Identity-scoped certificate extensions (IdentityScopeExtension, OID-based, 4-byte encode/decode)",
+    "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)",
 ]
 
 [features.in_development]
@@ -39,18 +44,14 @@ items = [
 
 [features.planned]
 items = [
-    "Identity-typed certificates (service/agent/node distinction)",
     "KeyUsage/EKU enforcement in issued X.509 certs",
     "Threshold crypto integration with CA initialization",
     "Distributed revocation propagation",
     "Offline device grace period renewal",
-    "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
-    "Identity-scoped certificate extensions (OID-based)",
     "Cascading revocation (parent→child identity propagation)",
     "Real certificate operation metrics (issuance latency, validation throughput)",
     "CRL distribution via blockchain (offline revocation)",
     "Field device bootstrap with intermittent connectivity",
-    "Cross-crate identity integration (trustchain::NodeId is independent struct, not connected to lib::NodeId or blockmatrix::NodeFingerprint)",
-    "Scope-aware certificates (no certificate awareness of Device vs Network scope, no traceability enforcement per scope)",
+    "Scope-aware certificates (certificate awareness of Device vs Network scope, traceability enforcement per scope)",
     "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)",
 ]

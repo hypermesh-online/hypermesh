@@ -34,6 +34,8 @@ items = [
     "Genesis asset inventory types (R1 — Cpu/Gpu/Storage/Network/Memory capability structs)",
     "GenesisAssetRecord type (R1+R10 — sovereign genesis with hardware-assessed IPv6 assets)",
     "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
+    "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey, replaces opaque String)",
+    "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)",
 ]
 
 [features.in_development]
@@ -42,8 +44,6 @@ items = [
     "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
     "Common test utilities",
     "Public SDK types for third-party integration (stable API surface)",
-    "Unified NodeId type (currently opaque String, needs to derive from assessed hardware → keypair → certificate)",
-    "Scope-aware identity types (identity that respects BlockchainScope Device|Network and traceability axis)",
 ]
 
 [features.planned]

@@ -23,6 +23,7 @@ items = [
     "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
     "BLAKE3 content hashing (whitepaper-aligned)",
     "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
+    "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)",
 ]
 
 [features.in_development]
@@ -38,7 +39,6 @@ items = [
     "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
-    "Identity-aware connection establishment (cert identity extraction)",
     "Permission enforcement at protocol layer",
     "MetricsFrame protocol wiring to engauge",
     "Certificate store persistence across restarts",
