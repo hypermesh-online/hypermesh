@@ -24,6 +24,7 @@
 //!
 //! Use [`aggregate_epoch_results`] to compute these values from a batch of [`PoSPingResult`]s.
 
+pub mod min_spec;
 pub mod probe;
 pub mod response;
 pub mod shard_commitment;

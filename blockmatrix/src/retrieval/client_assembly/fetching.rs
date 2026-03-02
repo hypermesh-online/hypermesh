@@ -271,10 +271,31 @@ impl ClientAssembler {
         tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
         Ok(vec![0u8; 1024])
     }
+
+    /// End-to-end asset retrieval via `ShardTransport`.
+    ///
+    /// Performs the full reconstruction pipeline:
+    /// 1. Fetch shards from matrix nodes via transport
+    /// 2. Reed-Solomon reconstruct the encrypted blob
+    /// 3. Decrypt using the provided key
+    /// 4. Decompress to recover original data
+    ///
+    /// This is the primary entry point for instruction-based retrieval.
+    pub async fn retrieve_asset(
+        &self,
+        transport: &dyn ShardTransport,
+        decryption_key: &crate::assets::pipeline::orchestrator::DecryptionKey,
+    ) -> Result<Vec<u8>> {
+        // Step 1: Fetch all shards via the real transport
+        self.fetch_shards_via_transport(transport).await?;
+
+        // Step 2-4: Reconstruct (RS decode -> decrypt -> decompress)
+        self.reconstruct_with_pipeline(decryption_key).await
+    }
 }
 
 /// Derive a `NodeId` from a matrix coordinate (deterministic).
-fn node_id_from_coordinate(coord: &MatrixCoordinate) -> hypermesh_lib::NodeId {
+pub fn node_id_from_coordinate(coord: &MatrixCoordinate) -> hypermesh_lib::NodeId {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&coord.x.to_le_bytes());
     hasher.update(&coord.y.to_le_bytes());

@@ -54,9 +54,11 @@ use serde::{Deserialize, Serialize};
 
 pub mod audit_trail;
 pub mod matrix_optimizer;
+pub mod migration;
 pub mod pos_validator;
 pub mod rebalancing;
 pub mod redistribution;
+pub mod swarm;
 
 // Re-exports
 pub use audit_trail::{record_shard_placement_on_chain, AuditRecord, PlacementEvent};

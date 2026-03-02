@@ -35,6 +35,7 @@ pub mod client_assembly;
 pub mod fallback;
 pub mod instruction_generator;
 pub mod shard_map;
+pub mod streaming;
 pub mod transmission;
 
 // Re-exports

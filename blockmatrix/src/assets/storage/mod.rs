@@ -33,6 +33,7 @@ pub mod bucket_mapper;
 pub mod content_address;
 pub mod deduplication;
 pub mod hash_bucket;
+pub mod privacy_dedup;
 pub mod replication;
 
 // Re-exports

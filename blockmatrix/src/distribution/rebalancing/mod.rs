@@ -340,6 +340,150 @@ impl RebalanceManager {
         replicas.len() < before
     }
 
+    /// Execute rebalance actions using a real `ShardTransport`.
+    ///
+    /// For each action that involves moving data (MoveShard, ReplicateShard),
+    /// the shard bytes are fetched from the source node and sent to the
+    /// destination node via the transport. Internal state is updated only
+    /// after successful transport operations.
+    ///
+    /// `shard_data_provider` maps shard IDs to their byte content (or to
+    /// the node that currently holds them). In practice this would be the
+    /// local shard store; for testing it can be pre-populated.
+    pub async fn execute_actions_via_transport(
+        &mut self,
+        actions: &[RebalanceAction],
+        transport: &dyn crate::network::shard_transport::ShardTransport,
+        shard_data: &std::collections::HashMap<ShardId, Vec<u8>>,
+    ) -> RebalanceResult {
+        let start = Instant::now();
+        let mut executed = 0usize;
+        let mut failed = 0usize;
+
+        for action in actions {
+            match action {
+                RebalanceAction::MoveShard {
+                    shard_id,
+                    from_node,
+                    to_node,
+                } => {
+                    // Fetch shard data from source (local cache or via transport)
+                    let data = match shard_data.get(shard_id) {
+                        Some(d) => d.clone(),
+                        None => {
+                            // Try fetching from the source node via transport
+                            let source_id =
+                                hypermesh_lib::NodeId::from_bytes(blake3::hash(from_node.as_bytes()).into());
+                            let content_hash =
+                                hypermesh_lib::ContentHash(blake3::hash(shard_id.as_bytes()).into());
+                            match transport.fetch_shard(&source_id, &content_hash).await {
+                                Ok(d) => d,
+                                Err(_) => {
+                                    failed += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    };
+
+                    // Send to destination
+                    let target_id =
+                        hypermesh_lib::NodeId::from_bytes(blake3::hash(to_node.as_bytes()).into());
+                    let content_hash =
+                        hypermesh_lib::ContentHash(blake3::hash(shard_id.as_bytes()).into());
+
+                    match transport.send_shard(&target_id, &content_hash, &data).await {
+                        Ok(()) => {
+                            if self.apply_action(action) {
+                                executed += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => {
+                            failed += 1;
+                        }
+                    }
+                }
+                RebalanceAction::ReplicateShard { shard_id, to_node } => {
+                    // Get shard data from any source
+                    let data = match shard_data.get(shard_id) {
+                        Some(d) => d.clone(),
+                        None => {
+                            // Try fetching from the first live replica
+                            let replicas = self.shard_map.get(shard_id);
+                            let fetched = if let Some(reps) = replicas {
+                                let mut result = None;
+                                for (nid, _) in reps {
+                                    if self.nodes.contains_key(nid) {
+                                        let source_id = hypermesh_lib::NodeId::from_bytes(
+                                            blake3::hash(nid.as_bytes()).into(),
+                                        );
+                                        let content_hash = hypermesh_lib::ContentHash(
+                                            blake3::hash(shard_id.as_bytes()).into(),
+                                        );
+                                        if let Ok(d) =
+                                            transport.fetch_shard(&source_id, &content_hash).await
+                                        {
+                                            result = Some(d);
+                                            break;
+                                        }
+                                    }
+                                }
+                                result
+                            } else {
+                                None
+                            };
+
+                            match fetched {
+                                Some(d) => d,
+                                None => {
+                                    failed += 1;
+                                    continue;
+                                }
+                            }
+                        }
+                    };
+
+                    // Send to destination
+                    let target_id =
+                        hypermesh_lib::NodeId::from_bytes(blake3::hash(to_node.as_bytes()).into());
+                    let content_hash =
+                        hypermesh_lib::ContentHash(blake3::hash(shard_id.as_bytes()).into());
+
+                    match transport.send_shard(&target_id, &content_hash, &data).await {
+                        Ok(()) => {
+                            if self.apply_action(action) {
+                                executed += 1;
+                            } else {
+                                failed += 1;
+                            }
+                        }
+                        Err(_) => {
+                            failed += 1;
+                        }
+                    }
+                }
+                RebalanceAction::RemoveReplica { .. } => {
+                    // Remove doesn't need transport (just drop local reference)
+                    if self.apply_action(action) {
+                        executed += 1;
+                    } else {
+                        failed += 1;
+                    }
+                }
+            }
+        }
+
+        self.last_rebalance = Some(Instant::now());
+
+        RebalanceResult {
+            actions_executed: executed,
+            actions_failed: failed,
+            duration: start.elapsed(),
+        }
+    }
+
     fn cooldown_elapsed(&self) -> bool {
         match self.last_rebalance {
             None => true,
@@ -670,5 +814,108 @@ mod tests {
         let dist = mgr.get_shard_distribution();
         assert_eq!(dist.get("node-a").map(|v| v.len()).unwrap_or(0), 2);
         assert_eq!(dist.get("node-b").map(|v| v.len()).unwrap_or(0), 1);
+    }
+
+    // ------------------------------------------------------------------
+    // 5.3 tests: execute_actions_via_transport
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_move_shard_via_transport() {
+        use crate::network::shard_transport::MockShardTransport;
+
+        let mut mgr = make_manager();
+        mgr.register_shard("shard-move".to_string(), "node-a", &coord(10, 10, 10));
+        mgr.register_shard("shard-move".to_string(), "node-b", &coord(-10, 10, 10));
+        mgr.nodes
+            .insert("node-c".to_string(), coord(-10, -10, -10));
+
+        let transport = MockShardTransport::new();
+
+        // Provide shard data for the move
+        let mut shard_data = HashMap::new();
+        shard_data.insert("shard-move".to_string(), vec![0xAB; 2048]);
+
+        let actions = vec![RebalanceAction::MoveShard {
+            shard_id: "shard-move".to_string(),
+            from_node: "node-a".to_string(),
+            to_node: "node-c".to_string(),
+        }];
+
+        let result = mgr
+            .execute_actions_via_transport(&actions, &transport, &shard_data)
+            .await;
+
+        assert_eq!(
+            result.actions_executed, 1,
+            "Move action should succeed via transport"
+        );
+        assert_eq!(result.actions_failed, 0, "No actions should fail");
+
+        // Verify shard was sent to mock transport
+        assert!(
+            transport.shard_count().await >= 1,
+            "Transport should have received the shard"
+        );
+
+        // Verify internal state updated: shard-move no longer on node-a
+        let dist = mgr.get_shard_distribution();
+        let on_a = dist
+            .get("node-a")
+            .map(|s| s.contains(&"shard-move".to_string()))
+            .unwrap_or(false);
+        assert!(!on_a, "shard-move should no longer be on node-a");
+
+        let on_c = dist
+            .get("node-c")
+            .map(|s| s.contains(&"shard-move".to_string()))
+            .unwrap_or(false);
+        assert!(on_c, "shard-move should now be on node-c");
+    }
+
+    #[tokio::test]
+    async fn test_replicate_shard_via_transport_with_unreachable_target() {
+        use crate::network::shard_transport::MockShardTransport;
+
+        let mut mgr = make_manager();
+        mgr.register_shard("shard-rep".to_string(), "node-a", &coord(10, 10, 10));
+        mgr.nodes
+            .insert("node-unreachable".to_string(), coord(-10, -10, -10));
+
+        let transport = MockShardTransport::new();
+
+        // Mark the target node as unreachable in the transport
+        let target_id =
+            hypermesh_lib::NodeId::from_bytes(blake3::hash(b"node-unreachable").into());
+        transport.set_unreachable(&target_id).await;
+
+        let mut shard_data = HashMap::new();
+        shard_data.insert("shard-rep".to_string(), vec![0xCD; 1024]);
+
+        let actions = vec![RebalanceAction::ReplicateShard {
+            shard_id: "shard-rep".to_string(),
+            to_node: "node-unreachable".to_string(),
+        }];
+
+        let result = mgr
+            .execute_actions_via_transport(&actions, &transport, &shard_data)
+            .await;
+
+        assert_eq!(
+            result.actions_executed, 0,
+            "Replication should fail when target is unreachable"
+        );
+        assert_eq!(result.actions_failed, 1, "Should record 1 failure");
+
+        // Internal state should NOT have been updated
+        let dist = mgr.get_shard_distribution();
+        let on_unreachable = dist
+            .get("node-unreachable")
+            .map(|s| s.contains(&"shard-rep".to_string()))
+            .unwrap_or(false);
+        assert!(
+            !on_unreachable,
+            "shard-rep should NOT be on unreachable node"
+        );
     }
 }

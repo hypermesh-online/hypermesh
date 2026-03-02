@@ -502,4 +502,216 @@ mod tests {
             "AES pipeline round-trip: data must match"
         );
     }
+
+    /// 5.1 Test: Full retrieval via MockShardTransport (Kyber pipeline).
+    ///
+    /// Processes an asset through the pipeline, pre-populates shards on a
+    /// MockShardTransport, then uses `retrieve_asset()` to fetch + reconstruct.
+    #[tokio::test]
+    async fn test_retrieve_asset_via_mock_transport_kyber() {
+        use crate::assets::pipeline::{Asset, AssetPipeline, PipelineInputMetadata};
+        use crate::network::shard_transport::MockShardTransport;
+        use crate::retrieval::client_assembly::fetching::node_id_from_coordinate;
+
+        let original_data = b"Instruction-based retrieval via transport! ".repeat(200);
+        let asset = Asset {
+            id: "transport-roundtrip".to_string(),
+            data: original_data.clone(),
+            metadata: PipelineInputMetadata {
+                name: "test.bin".to_string(),
+                content_type: "application/octet-stream".to_string(),
+                size: original_data.len(),
+                created_at: 1234567890,
+                custom: std::collections::HashMap::new(),
+            },
+        };
+
+        let pipeline = AssetPipeline::default().expect("test: create pipeline");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: process asset");
+
+        // Build retrieval plan from processed shards
+        let content_hash = [42u8; 32];
+        let mut shard_map = CompleteShardMap::new();
+        let mock_transport = MockShardTransport::new();
+
+        for (i, shard) in processed.shards.iter().enumerate() {
+            let shard_hash = *blake3::hash(&shard.data).as_bytes();
+            let position =
+                MatrixCoordinate::new(i as i64, 0, 0).expect("test: coordinate");
+            let location = ShardLocation::new(position, 1.0);
+            shard_map.add_entry(ShardMapEntry::new(shard_hash, vec![location]));
+
+            // Pre-populate the mock transport with shard data
+            let node_id = node_id_from_coordinate(&position);
+            let content_hash_val = hypermesh_lib::ContentHash(shard_hash);
+            mock_transport
+                .insert_shard(&node_id, &content_hash_val, shard.data.clone())
+                .await;
+        }
+
+        let data_shards = processed
+            .shards
+            .iter()
+            .filter(|s| !s.metadata.is_parity)
+            .count();
+        let parity_shards = processed
+            .shards
+            .iter()
+            .filter(|s| s.metadata.is_parity)
+            .count();
+
+        let metadata = RetrievalMetadata {
+            erasure_coding: (data_shards, parity_shards),
+            compression: "brotli".to_string(),
+            encryption: "kyber-1024".to_string(),
+            content_type: "application/octet-stream".to_string(),
+            created_at: 1234567890,
+            encrypted_blob_size: processed.stats.encryption.encrypted_size,
+        };
+
+        let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
+        plan.original_size = original_data.len();
+
+        // Use retrieve_asset() for the full pipeline
+        let assembler = ClientAssembler::new(4);
+        assembler
+            .initialize(plan)
+            .await
+            .expect("test: init plan");
+
+        let reconstructed = assembler
+            .retrieve_asset(&mock_transport, &processed.decryption_key)
+            .await
+            .expect("test: retrieve_asset should succeed");
+
+        assert_eq!(
+            reconstructed, original_data,
+            "retrieve_asset round-trip: data must match original"
+        );
+
+        // Verify progress was tracked
+        let progress = assembler.get_progress().await;
+        assert_eq!(
+            progress.fetched_shards,
+            data_shards + parity_shards,
+            "All shards should be marked fetched"
+        );
+        assert!(
+            (progress.percentage - 1.0).abs() < f64::EPSILON,
+            "Progress should be 100%"
+        );
+    }
+
+    /// 5.1 Test: Retrieval with fallback when some locations are unreachable.
+    ///
+    /// Sets up a shard with two locations — one unreachable, one reachable.
+    /// Verifies the transport falls back to the second location.
+    #[tokio::test]
+    async fn test_retrieve_asset_transport_fallback() {
+        use crate::assets::pipeline::{Asset, AssetPipeline, PipelineInputMetadata};
+        use crate::network::shard_transport::MockShardTransport;
+        use crate::retrieval::client_assembly::fetching::node_id_from_coordinate;
+
+        let original_data = b"Fallback transport test data ".repeat(200);
+        let asset = Asset {
+            id: "fallback-test".to_string(),
+            data: original_data.clone(),
+            metadata: PipelineInputMetadata {
+                name: "fallback.bin".to_string(),
+                content_type: "application/octet-stream".to_string(),
+                size: original_data.len(),
+                created_at: 1234567890,
+                custom: std::collections::HashMap::new(),
+            },
+        };
+
+        let pipeline = AssetPipeline::default().expect("test: create pipeline");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: process asset");
+
+        let content_hash = [55u8; 32];
+        let mut shard_map = CompleteShardMap::new();
+        let mock_transport = MockShardTransport::new();
+
+        for (i, shard) in processed.shards.iter().enumerate() {
+            let shard_hash = *blake3::hash(&shard.data).as_bytes();
+
+            // Primary location: unreachable node at (i, 100, 0)
+            let primary_pos =
+                MatrixCoordinate::new(i as i64, 100, 0).expect("test: coordinate");
+            let primary_node = node_id_from_coordinate(&primary_pos);
+
+            // Secondary location: reachable node at (i, 0, 0)
+            let secondary_pos =
+                MatrixCoordinate::new(i as i64, 0, 0).expect("test: coordinate");
+            let secondary_node = node_id_from_coordinate(&secondary_pos);
+
+            // Mark primary as unreachable
+            mock_transport.set_unreachable(&primary_node).await;
+
+            // Pre-populate secondary with shard data
+            let ch = hypermesh_lib::ContentHash(shard_hash);
+            mock_transport
+                .insert_shard(&secondary_node, &ch, shard.data.clone())
+                .await;
+
+            let locations = vec![
+                ShardLocation::new(primary_pos, 0.9),
+                ShardLocation::new(secondary_pos, 0.8),
+            ];
+            shard_map.add_entry(ShardMapEntry::new(shard_hash, locations));
+        }
+
+        let data_shards = processed
+            .shards
+            .iter()
+            .filter(|s| !s.metadata.is_parity)
+            .count();
+        let parity_shards = processed
+            .shards
+            .iter()
+            .filter(|s| s.metadata.is_parity)
+            .count();
+
+        let metadata = RetrievalMetadata {
+            erasure_coding: (data_shards, parity_shards),
+            compression: "brotli".to_string(),
+            encryption: "kyber-1024".to_string(),
+            content_type: "application/octet-stream".to_string(),
+            created_at: 1234567890,
+            encrypted_blob_size: processed.stats.encryption.encrypted_size,
+        };
+
+        let mut plan = RetrievalPlan::new(content_hash, shard_map, metadata);
+        plan.original_size = original_data.len();
+
+        let assembler = ClientAssembler::new(4);
+        assembler
+            .initialize(plan)
+            .await
+            .expect("test: init plan");
+
+        let reconstructed = assembler
+            .retrieve_asset(&mock_transport, &processed.decryption_key)
+            .await
+            .expect("test: retrieve with fallback should succeed");
+
+        assert_eq!(
+            reconstructed, original_data,
+            "Fallback retrieval: data must match original"
+        );
+
+        // Verify fallback attempts were recorded
+        let stats = assembler.get_stats().await;
+        assert!(
+            stats.fallback_attempts > 0,
+            "Should have recorded fallback attempts (was {})",
+            stats.fallback_attempts
+        );
+    }
 }
