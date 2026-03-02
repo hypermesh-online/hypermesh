@@ -20,10 +20,10 @@ items = [
     "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
     "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
     "BLAKE3 content hashing (whitepaper-aligned)",
-    "DHT distribution (XOR-distance bucket indexing, stale eviction, value republish, proper routing table)",
+    "DHT distribution — local data structures (XOR-distance routing table, k-bucket management, stale eviction, value store; remote node I/O pending STOQ transport wiring)",
     "Dependency resolution (topological sort, transitive resolution, circular dependency detection, conflict detection)",
     "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness, type-specific: WASM magic bytes, JSON parse)",
-    "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback)",
+    "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback; local-only until DHT remote I/O is wired)",
     "HyperMesh execution delegation (allocate/query/terminate lifecycle, resource validation, status tracking)",
 ]
 

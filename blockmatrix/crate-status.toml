@@ -60,7 +60,7 @@ items = [
     "Service mesh load balancer (MeshLoadBalancer: RoundRobin + LeastConnections, health-aware endpoint filtering)",
     "User contribution distribution bridge (ContributionDistributionBridge: wired to SwarmProtocol for announce/serve shards)",
     "Intelligence metrics bridge (IntelligenceMetricsCollector: real /proc CPU/memory via hardware module, processing stats)",
-    "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
+    "Performance monitoring integration (MonitoringIntegration with record/flush, AlertingManager with threshold breach detection)",
     "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
     "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
     "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)",

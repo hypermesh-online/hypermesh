@@ -76,7 +76,7 @@ export const crateStatuses: CrateStatus[] = [
         "Service mesh load balancer (MeshLoadBalancer: RoundRobin + LeastConnections, health-aware endpoint filtering)",
         "User contribution distribution bridge (ContributionDistributionBridge: wired to SwarmProtocol for announce/serve shards)",
         "Intelligence metrics bridge (IntelligenceMetricsCollector: real /proc CPU/memory via hardware module, processing stats)",
-        "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
+        "Performance monitoring integration (MonitoringIntegration with record/flush, AlertingManager with threshold breach detection)",
         "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
         "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
         "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)"
@@ -177,10 +177,10 @@ export const crateStatuses: CrateStatus[] = [
         "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
         "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
         "BLAKE3 content hashing (whitepaper-aligned)",
-        "DHT distribution (XOR-distance bucket indexing, stale eviction, value republish, proper routing table)",
+        "DHT distribution — local data structures (XOR-distance routing table, k-bucket management, stale eviction, value store; remote node I/O pending STOQ transport wiring)",
         "Dependency resolution (topological sort, transitive resolution, circular dependency detection, conflict detection)",
         "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness, type-specific: WASM magic bytes, JSON parse)",
-        "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback)",
+        "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback; local-only until DHT remote I/O is wired)",
         "HyperMesh execution delegation (allocate/query/terminate lifecycle, resource validation, status tracking)"
       ],
       "inDevelopment": [],
