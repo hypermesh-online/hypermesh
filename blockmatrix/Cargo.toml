@@ -15,10 +15,6 @@ name = "blockmatrix"
 path = "src/lib.rs"
 
 [[bin]]
-name = "blockmatrix"
-path = "src/main.rs"
-
-[[bin]]
 name = "node"
 path = "src/bin/node.rs"
 

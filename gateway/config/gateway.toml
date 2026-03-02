@@ -1,0 +1,42 @@
+# HyperMesh Gateway — Production Configuration
+#
+# Usage:
+#   gateway --config gateway/config/gateway.toml
+#
+# All fields match GatewayConfig serde names.
+# Duration fields use { secs = N, nanos = 0 } format.
+
+listen_addr = "[::]:8443"
+trustchain_addr = "[::1]:8444"
+blockmatrix_addr = "[::1]:9292"
+caesar_addr = "[::1]:9294"
+catalog_addr = "[::1]:9295"
+
+trustchain_server_name = "trustchain"
+blockmatrix_server_name = "blockmatrix"
+caesar_server_name = "caesar"
+catalog_server_name = "catalog"
+
+cert_path = "/etc/hypermesh/certs/server.crt"
+key_path = "/etc/hypermesh/certs/server.key"
+
+log_level = "info"
+
+[pool]
+max_connections = 10
+idle_timeout = { secs = 300, nanos = 0 }
+connect_timeout = { secs = 10, nanos = 0 }
+keep_alive_interval = { secs = 30, nanos = 0 }
+
+[retry]
+max_attempts = 3
+base_delay = { secs = 0, nanos = 100000000 }
+max_delay = { secs = 5, nanos = 0 }
+multiplier = 2.0
+
+[cors]
+allowed_origins = ["http://localhost:5173"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = ["Content-Type", "Authorization", "X-Request-ID"]
+allow_credentials = true
+max_age = 3600

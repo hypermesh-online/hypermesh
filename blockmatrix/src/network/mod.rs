@@ -15,6 +15,7 @@ pub mod gossip;
 pub mod isolation;
 pub mod multi_network;
 pub mod reflector_pool;
+pub mod shard_store;
 pub mod shard_transport;
 pub mod stoq_integration;
 pub mod sync_dispatch;

@@ -2,9 +2,9 @@
 # High-performance certificate authority with STOQ and HyperMesh integration
 
 [server]
-# IPv6-only production deployment
+# IPv6-only production deployment — behind gateway on 8443
 bind_address = "::"
-port = 8443
+port = 8444
 workers = 4
 enable_http2 = true
 enable_http3 = true
@@ -41,12 +41,9 @@ proof_generation_ms = 100
 verification_time_ms = 50
 max_entries_per_second = 1000
 
-# S3 storage for CT logs
+# CT log storage (local filesystem for alpha, S3 for scale-out)
 [ct.storage]
-bucket_name = "${AWS_S3_CT_LOGS_BUCKET}"
-region = "${AWS_REGION}"
-prefix = "logs/production/"
-encryption_key_id = "${AWS_KMS_KEY_ARN}"
+path = "/var/lib/hypermesh/trustchain/ct-logs"
 
 [dns]
 # DNS-over-QUIC Configuration
@@ -175,15 +172,6 @@ enable_ipv6_dual_stack = false
 [deployment]
 environment = "production"
 service_name = "trustchain-ca"
-namespace = "trustchain"
-replicas = 3
-
-# Resource limits
-[resources]
-cpu_limit = "2000m"
-memory_limit = "4Gi"
-cpu_request = "1000m"
-memory_request = "2Gi"
 
 # Production domain configuration
 [domains]
@@ -194,14 +182,11 @@ alt_domains = [
     "dns.hypermesh.online"
 ]
 
-# Service endpoints
+# Service endpoints (behind gateway on 8443)
 [endpoints]
-ca_service = "https://[::]:8443/ca"
-ct_service = "https://[::]:8443/ct"
+ca_service = "https://[::1]:8444/ca"
+ct_service = "https://[::1]:8444/ct"
 dns_service = "quic://[::]:853"
-api_service = "https://[::]:8446/api"
-metrics_service = "http://[::]:9090/metrics"  # Native monitoring endpoint
-health_service = "http://[::]:9090/health"  # Native health check endpoint
 
 # Certificate configuration
 [certificates]
@@ -213,11 +198,7 @@ renewal_threshold_hours = 6  # Renew when 6 hours left
 
 # Backup and disaster recovery
 [backup]
-enable_continuous_backup = true
-backup_interval_hours = 6
-retention_days = 90
-s3_bucket = "${AWS_S3_BACKUP_BUCKET}"
-encryption_enabled = true
+enable_continuous_backup = false
 
 # Performance tuning
 [performance]

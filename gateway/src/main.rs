@@ -23,6 +23,22 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::config::GatewayConfig;
 use crate::router::GatewayRouter;
 
+/// Parse `--config <path>` from CLI arguments.
+/// Returns `Some(path)` if found, `None` otherwise.
+fn parse_config_path() -> Option<std::path::PathBuf> {
+    let args: Vec<String> = std::env::args().collect();
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--config" {
+            if let Some(path) = args.get(i + 1) {
+                return Some(std::path::PathBuf::from(path));
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize rustls crypto provider
@@ -39,8 +55,14 @@ async fn main() -> Result<()> {
 
     info!("Starting HyperMesh HTTP/3 Gateway");
 
-    // Load configuration
-    let config = GatewayConfig::from_env()?;
+    // Load configuration from --config file or fall back to environment variables
+    let config = if let Some(config_path) = parse_config_path() {
+        info!("Loading configuration from file: {}", config_path.display());
+        GatewayConfig::from_file(&config_path)?
+    } else {
+        info!("Loading configuration from environment variables (defaults)");
+        GatewayConfig::from_env()?
+    };
     info!("Configuration loaded: listening on {}", config.listen_addr);
 
     // Initialize router
@@ -49,6 +71,7 @@ async fn main() -> Result<()> {
     info!("  - TrustChain: {}", config.trustchain_addr);
     info!("  - BlockMatrix: {}", config.blockmatrix_addr);
     info!("  - Caesar: {}", config.caesar_addr);
+    info!("  - Catalog: {}", config.catalog_addr);
 
     // Load TLS certificates
     let (cert, key) = load_certificates(&config.cert_path, &config.key_path).await?;
@@ -68,17 +91,35 @@ async fn main() -> Result<()> {
     let endpoint = quinn::Endpoint::server(server_config, config.listen_addr)?;
     info!("HTTP/3 server listening on {}", config.listen_addr);
 
-    // Accept connections
-    while let Some(incoming) = endpoint.accept().await {
-        let router = router.clone();
-
-        tokio::spawn(async move {
-            if let Err(e) = handle_connection(incoming, router).await {
-                error!("Failed to handle connection: {}", e);
+    // Accept connections with graceful shutdown
+    info!("Gateway ready — press Ctrl+C to stop");
+    loop {
+        tokio::select! {
+            incoming = endpoint.accept() => {
+                match incoming {
+                    Some(conn) => {
+                        let router = router.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = handle_connection(conn, router).await {
+                                error!("Failed to handle connection: {}", e);
+                            }
+                        });
+                    }
+                    None => {
+                        info!("Endpoint closed, shutting down");
+                        break;
+                    }
+                }
             }
-        });
+            _ = tokio::signal::ctrl_c() => {
+                info!("Received shutdown signal, draining connections...");
+                endpoint.close(quinn::VarInt::from_u32(0), b"shutdown");
+                break;
+            }
+        }
     }
 
+    info!("Gateway stopped");
     Ok(())
 }
 
@@ -135,6 +176,10 @@ async fn handle_request<T>(
 where
     T: quic::BidiStream<Bytes>,
 {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
+
     // Read request body if present
     let body = if has_body(&req) {
         let mut body_data = Vec::new();
@@ -157,6 +202,9 @@ where
         }
     };
 
+    let status = response.status().as_u16();
+    let latency = start.elapsed();
+
     // Send response
     let (parts, body) = response.into_parts();
     let response = Response::from_parts(parts, ());
@@ -164,6 +212,14 @@ where
     stream.send_response(response).await?;
     stream.send_data(body).await?;
     stream.finish().await?;
+
+    info!(
+        method = %method,
+        path = %path,
+        status = status,
+        latency_ms = latency.as_millis() as u64,
+        "request"
+    );
 
     Ok(())
 }

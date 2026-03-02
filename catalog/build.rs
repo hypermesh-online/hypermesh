@@ -23,16 +23,7 @@ fn main() {
         .expect("OUT_DIR great-grandparent exists")
         .to_path_buf();
 
-    // Set up linking flags for creating a shared library
-    if cfg!(target_os = "linux") {
-        println!("cargo:rustc-cdylib-link-arg=-Wl,-soname,libcatalog.so");
-        println!(
-            "cargo:rustc-cdylib-link-arg=-Wl,--version-script={}/version.script",
-            env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo")
-        );
-    } else if cfg!(target_os = "macos") {
-        println!("cargo:rustc-cdylib-link-arg=-Wl,-install_name,@rpath/libcatalog.dylib");
-    }
+    // cdylib link args removed — catalog is now rlib-only (no dynamic library target)
 
     // Create extension manifest file
     let manifest = r#"[metadata]
@@ -75,22 +66,7 @@ cpu_cores = 2.0
     let manifest_path = target_dir.join("extension.toml");
     fs::write(&manifest_path, manifest).expect("Failed to write extension manifest");
 
-    // Create version script for Linux to control symbol visibility
-    if cfg!(target_os = "linux") {
-        let version_script = r#"{
-    global:
-        hypermesh_extension_create;
-        hypermesh_extension_destroy;
-        hypermesh_extension_metadata;
-    local:
-        *;
-};
-"#;
-
-        let script_path =
-            PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is always set by cargo")).join("version.script");
-        fs::write(&script_path, version_script).expect("Failed to write version script");
-    }
+    // Version script for symbol visibility removed — no cdylib target
 
     // Inform Cargo about rerun conditions
     println!("cargo:rerun-if-changed=build.rs");

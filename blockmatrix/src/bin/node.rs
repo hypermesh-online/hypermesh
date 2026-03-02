@@ -14,13 +14,23 @@
 //!
 //! Network participation is OPTIONAL based on privacy mode transition.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 use tracing::{info, warn, Level};
 
+use blockmatrix::assets::pipeline::{
+    Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
+    ShardMetadata,
+};
+use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
+use blockmatrix::assets::pipeline::{PipelineStats};
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
+use blockmatrix::network::shard_store::ShardStore;
+use blockmatrix::network::shard_transport::StoqShardTransport;
 use blockmatrix::network::NetworkManager;
+use hypermesh_lib::ContentHash;
 
 #[derive(Parser, Debug)]
 #[clap(name = "blockmatrix-node")]
@@ -54,6 +64,10 @@ struct Cli {
     /// STOQ port
     #[clap(short = 's', long, default_value = "9292")]
     stoq_port: u16,
+
+    /// Run as a reflector (public peer that accepts and relays)
+    #[clap(long)]
+    reflector: bool,
 
     #[clap(subcommand)]
     command: Option<Commands>,
@@ -91,6 +105,233 @@ enum Commands {
         #[clap(value_enum)]
         mode: PrivacyModeArg,
     },
+
+    /// Store a file as a distributed asset
+    Store {
+        /// Path to the file to store
+        path: std::path::PathBuf,
+    },
+
+    /// Fetch a distributed asset
+    Fetch {
+        /// Asset ID to fetch
+        asset_id: String,
+        /// Output path (default: stdout)
+        #[clap(short, long)]
+        output: Option<std::path::PathBuf>,
+    },
+}
+
+/// Shard map persisted to disk after Store, used by Fetch to reconstruct.
+#[derive(Serialize, Deserialize)]
+struct ShardMap {
+    asset_id: String,
+    shard_hashes: Vec<String>,
+    decryption_key: DecryptionKey,
+    shard_count: usize,
+    original_size: usize,
+    /// Per-shard metadata needed for reconstruction.
+    shard_metadata: Vec<ShardMetadata>,
+}
+
+/// Return the directory used for shard map files (`~/.hypermesh/shard_maps/`).
+fn shard_maps_dir() -> Result<std::path::PathBuf> {
+    let home = dirs::home_dir().context("could not determine home directory")?;
+    Ok(home.join(".hypermesh").join("shard_maps"))
+}
+
+/// Run the Store subcommand: ingest a file through the asset pipeline and
+/// persist the resulting shards + shard map locally.
+async fn run_store(path: std::path::PathBuf) -> Result<()> {
+    // 1. Read file
+    let file_data =
+        std::fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unnamed".to_string());
+    let file_size = file_data.len();
+
+    // 2. Derive asset ID from content hash
+    let asset_id = hex::encode(blake3::hash(&file_data).as_bytes());
+
+    info!(
+        "Storing file {} ({} bytes) as asset {}",
+        file_name, file_size, asset_id,
+    );
+
+    // 3. Build pipeline input
+    let asset = Asset {
+        id: asset_id.clone(),
+        data: file_data,
+        metadata: PipelineInputMetadata {
+            name: file_name,
+            content_type: "application/octet-stream".to_string(),
+            size: file_size,
+            created_at: chrono::Utc::now().timestamp(),
+            custom: std::collections::HashMap::new(),
+        },
+    };
+
+    // 4. Process through pipeline
+    let pipeline = AssetPipeline::default().context("failed to create asset pipeline")?;
+    let processed = pipeline
+        .process_asset(asset)
+        .await
+        .context("pipeline processing failed")?;
+
+    // 5. Store each shard in a local ShardStore and collect hashes
+    let shard_store = ShardStore::new();
+    let mut shard_hashes: Vec<String> = Vec::with_capacity(processed.shards.len());
+    let mut shard_metadata: Vec<ShardMetadata> = Vec::with_capacity(processed.shards.len());
+
+    for shard in &processed.shards {
+        let hash_bytes = *blake3::hash(&shard.data).as_bytes();
+        let content_hash = ContentHash(hash_bytes);
+        shard_store.store(content_hash, shard.data.clone()).await;
+        shard_hashes.push(hex::encode(hash_bytes));
+        shard_metadata.push(shard.metadata.clone());
+    }
+
+    info!(
+        "Stored {} shards in local shard store",
+        processed.shards.len()
+    );
+
+    // 6. Persist shard map to disk
+    let map = ShardMap {
+        asset_id: asset_id.clone(),
+        shard_hashes: shard_hashes.clone(),
+        decryption_key: processed.decryption_key,
+        shard_count: processed.shards.len(),
+        original_size: processed.stats.original_size,
+        shard_metadata,
+    };
+
+    let maps_dir = shard_maps_dir()?;
+    std::fs::create_dir_all(&maps_dir)
+        .with_context(|| format!("failed to create {}", maps_dir.display()))?;
+
+    let map_path = maps_dir.join(format!("{}.json", asset_id));
+    let map_json =
+        serde_json::to_string_pretty(&map).context("failed to serialize shard map")?;
+    std::fs::write(&map_path, &map_json)
+        .with_context(|| format!("failed to write {}", map_path.display()))?;
+
+    // 7. Also persist raw shard data alongside the map so Fetch can read them
+    let shards_dir = maps_dir.join(&asset_id);
+    std::fs::create_dir_all(&shards_dir)
+        .with_context(|| format!("failed to create {}", shards_dir.display()))?;
+
+    for (hash_hex, shard) in shard_hashes.iter().zip(processed.shards.iter()) {
+        let shard_path = shards_dir.join(hash_hex);
+        std::fs::write(&shard_path, &shard.data)
+            .with_context(|| format!("failed to write shard {}", shard_path.display()))?;
+    }
+
+    // 8. Print shard map JSON to stdout
+    println!("{map_json}");
+    info!("Asset ID: {}", asset_id);
+
+    Ok(())
+}
+
+/// Run the Fetch subcommand: load a shard map from disk, reconstruct the
+/// original file through the reverse pipeline, and write the output.
+async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Result<()> {
+    // 1. Locate shard map
+    let maps_dir = shard_maps_dir()?;
+    let map_path = maps_dir.join(format!("{}.json", asset_id));
+
+    if !map_path.exists() {
+        anyhow::bail!(
+            "shard map not found at {}. Was the asset stored on this node?",
+            map_path.display()
+        );
+    }
+
+    let map_json = std::fs::read_to_string(&map_path)
+        .with_context(|| format!("failed to read {}", map_path.display()))?;
+    let map: ShardMap =
+        serde_json::from_str(&map_json).context("failed to deserialize shard map")?;
+
+    info!(
+        "Loaded shard map for asset {} ({} shards, {} bytes original)",
+        map.asset_id, map.shard_count, map.original_size,
+    );
+
+    // 2. Load shard data from disk
+    let shards_dir = maps_dir.join(&asset_id);
+    let mut shards: Vec<Shard> = Vec::with_capacity(map.shard_count);
+
+    for (i, hash_hex) in map.shard_hashes.iter().enumerate() {
+        let shard_path = shards_dir.join(hash_hex);
+        let shard_data = std::fs::read(&shard_path)
+            .with_context(|| format!("failed to read shard {}", shard_path.display()))?;
+
+        let metadata = if i < map.shard_metadata.len() {
+            map.shard_metadata[i].clone()
+        } else {
+            ShardMetadata {
+                index: i,
+                is_parity: false,
+                size: shard_data.len(),
+                original_size: shard_data.len(),
+                hash: hash_hex.clone(),
+            }
+        };
+
+        shards.push(Shard {
+            data: shard_data,
+            metadata,
+        });
+    }
+
+    info!("Loaded {} shards from disk", shards.len());
+
+    // 3. Reconstruct ProcessedAsset
+    let processed = ProcessedAsset {
+        asset_id: map.asset_id.clone(),
+        shards,
+        decryption_key: map.decryption_key,
+        distributed: DistributedAsset {
+            asset_id: map.asset_id.clone(),
+            placements: vec![],
+            metadata: DistributionMetadata {
+                total_shards: map.shard_count,
+                networks_used: 0,
+                avg_shard_distance: 0.0,
+                quality_score: 0.0,
+                distributed_at: 0,
+            },
+        },
+        stats: PipelineStats::default(),
+    };
+
+    // 4. Run reverse pipeline
+    let pipeline = AssetPipeline::default().context("failed to create asset pipeline")?;
+    let reconstructed = pipeline
+        .reconstruct_asset(&processed)
+        .await
+        .context("asset reconstruction failed")?;
+
+    // 5. Write output
+    match output {
+        Some(ref out_path) => {
+            std::fs::write(out_path, &reconstructed)
+                .with_context(|| format!("failed to write {}", out_path.display()))?;
+            info!(
+                "Reconstructed {} bytes -> {}",
+                reconstructed.len(),
+                out_path.display()
+            );
+        }
+        None => {
+            info!("Reconstructed {} bytes", reconstructed.len());
+        }
+    }
+
+    Ok(())
 }
 
 #[tokio::main]
@@ -177,6 +418,16 @@ async fn main() -> Result<()> {
                     info!("Bootstrap nodes: {:?}", bootstrap_nodes);
                 }
 
+                // Create shard infrastructure
+                let shard_store = std::sync::Arc::new(ShardStore::new());
+                let shard_transport = std::sync::Arc::new(
+                    StoqShardTransport::new(transport.clone()),
+                );
+                info!(
+                    "Shard store and transport initialized (store={} shards)",
+                    shard_store.count().await
+                );
+
                 // Create network manager
                 let network_manager =
                     NetworkManager::new(coord, transport.clone(), privacy_mode, bootstrap_nodes)
@@ -194,21 +445,45 @@ async fn main() -> Result<()> {
                     }
                 });
 
+                // If reflector, broadcast our position so peers can find us
+                if cli.reflector {
+                    info!("Reflector mode: broadcasting matrix position");
+                    network_clone.broadcast_matrix_position().await?;
+                }
+
                 info!(
                     "Network initialized, accepting connections on port {}",
                     cli.stoq_port
                 );
 
-                // Periodically show connected nodes
+                // Periodically sync peer addresses to shard transport
+                // and show connected node status
                 let network_status = network_clone.clone();
+                let shard_transport_sync = shard_transport.clone();
                 tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+                    let mut interval = tokio::time::interval(
+                        tokio::time::Duration::from_secs(10),
+                    );
                     loop {
                         interval.tick().await;
-                        let node_count = network_status.get_node_count().await;
+
+                        // Sync peer addresses into shard transport for auto-dial
+                        let nodes = network_status.get_connected_nodes().await;
+                        for node in &nodes {
+                            let node_id = hypermesh_lib::NodeId::from_bytes(
+                                *blake3::hash(node.node_id.as_bytes()).as_bytes(),
+                            );
+                            shard_transport_sync
+                                .register_node_address(&node_id, node.address)
+                                .await;
+                        }
+
+                        // Log status every 3rd tick (roughly 30s)
+                        let node_count = nodes.len();
                         if node_count > 0 {
                             info!("Connected nodes: {}", node_count);
-                            let neighbors = network_status.find_matrix_neighbors(10.0).await;
+                            let neighbors =
+                                network_status.find_matrix_neighbors(10.0).await;
                             for neighbor in neighbors.iter().take(3) {
                                 info!(
                                     "  - Node {} at ({},{},{})",
@@ -221,6 +496,10 @@ async fn main() -> Result<()> {
                         }
                     }
                 });
+
+                // Keep shard_store and shard_transport alive for the node's lifetime
+                let _shard_store = shard_store;
+                let _shard_transport = shard_transport;
             }
 
             info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
@@ -245,6 +524,12 @@ async fn main() -> Result<()> {
             info!("Transitioning to {:?} mode...", new_mode);
             bootstrap.set_privacy_mode(new_mode).await?;
             info!("Privacy mode updated successfully");
+        }
+        Some(Commands::Store { path }) => {
+            run_store(path).await?;
+        }
+        Some(Commands::Fetch { asset_id, output }) => {
+            run_fetch(asset_id, output).await?;
         }
         None => {
             // No command - just show bootstrap info

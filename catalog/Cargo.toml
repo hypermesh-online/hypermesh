@@ -99,6 +99,9 @@ rust_decimal = { workspace = true }
 # Dynamic loading support
 libloading = { workspace = true }
 
+# TLS (needed by binary for rustls crypto provider init)
+rustls = { workspace = true }
+
 # P2P Distribution dependencies
 quinn = { workspace = true }
 bytes = { workspace = true }
@@ -131,10 +134,14 @@ trustchain-support = []
 asset-templates = []
 asset-validation = []
 
+[[bin]]
+name = "catalog-server"
+path = "src/bin/catalog_server.rs"
+
 [lib]
 name = "catalog"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 
 # Profiles are managed at workspace level

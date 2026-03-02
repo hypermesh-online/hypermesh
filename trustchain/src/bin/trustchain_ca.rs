@@ -23,6 +23,25 @@ use trustchain::http3::{Http3StoqServer, Router};
 use http::{Response, StatusCode};
 use serde::{Deserialize, Serialize};
 
+/// TOML file configuration (subset of fields that can be loaded from file).
+#[derive(Debug, Clone, Deserialize)]
+struct FileConfig {
+    server: Option<ServerSection>,
+    ca: Option<CaSection>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ServerSection {
+    bind_address: Option<String>,
+    port: Option<u16>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct CaSection {
+    ca_id: Option<String>,
+    mode: Option<String>,
+}
+
 /// CA service configuration
 #[derive(Debug, Clone)]
 struct ServiceConfig {
@@ -35,11 +54,49 @@ struct ServiceConfig {
 impl Default for ServiceConfig {
     fn default() -> Self {
         Self {
-            bind_addr: SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 8443),
+            bind_addr: SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 8444),
             ca_mode: CAMode::LocalhostTesting,
             ca_id: "trustchain-ca-local".to_string(),
             allow_self_signed: true,
         }
+    }
+}
+
+impl ServiceConfig {
+    /// Load from a TOML config file, applying values on top of defaults.
+    fn from_file(path: &std::path::Path) -> Result<Self> {
+        let contents = std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read config file: {}", path.display()))?;
+        let file_config: FileConfig = toml::from_str(&contents)
+            .with_context(|| format!("failed to parse config file: {}", path.display()))?;
+
+        let mut config = Self::default();
+
+        if let Some(server) = file_config.server {
+            if let Some(port) = server.port {
+                config.bind_addr.set_port(port);
+            }
+            if let Some(ref addr) = server.bind_address {
+                // Parse as IPv6 address and update
+                if let Ok(ip) = addr.parse::<Ipv6Addr>() {
+                    config.bind_addr.set_ip(IpAddr::V6(ip));
+                }
+            }
+        }
+
+        if let Some(ca) = file_config.ca {
+            if let Some(ref id) = ca.ca_id {
+                config.ca_id = id.clone();
+            }
+            if let Some(ref mode) = ca.mode {
+                if mode.to_lowercase().contains("production") {
+                    config.ca_mode = CAMode::Production;
+                    config.allow_self_signed = false;
+                }
+            }
+        }
+
+        Ok(config)
     }
 }
 
@@ -157,9 +214,18 @@ async fn main() -> Result<()> {
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
 
-    let mut config = ServiceConfig::default();
+    // Check for --config first (base config from file, then CLI overrides)
+    let mut config = {
+        let config_path = args.windows(2).find(|w| w[0] == "--config").map(|w| &w[1]);
+        if let Some(path) = config_path {
+            info!("Loading configuration from file: {}", path);
+            ServiceConfig::from_file(std::path::Path::new(path))?
+        } else {
+            ServiceConfig::default()
+        }
+    };
 
-    // Parse command line flags
+    // Parse command line flags (override file config)
     for i in 1..args.len() {
         match args[i].as_str() {
             "--production" | "-p" => {
@@ -167,7 +233,7 @@ async fn main() -> Result<()> {
                 config.ca_id = "trustchain-ca-production".to_string();
                 config.allow_self_signed = false;
                 // Bind to all IPv6 interfaces in production
-                config.bind_addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 8443);
+                config.bind_addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 8444);
                 info!("Running in PRODUCTION mode");
             }
             "--port" => {
@@ -181,6 +247,9 @@ async fn main() -> Result<()> {
                     config.bind_addr = args[i + 1].parse().context("Invalid bind address")?;
                 }
             }
+            "--config" => {
+                // Already handled above, skip the value
+            }
             "--help" | "-h" => {
                 println!("TrustChain CA Service");
                 println!();
@@ -188,19 +257,20 @@ async fn main() -> Result<()> {
                 println!();
                 println!("Options:");
                 println!("  --production, -p     Run in production mode");
-                println!("  --port <PORT>        Port to bind to (default: 8443)");
-                println!("  --bind <ADDR>        Address to bind to (default: [::1]:8443)");
+                println!("  --config <PATH>      Load configuration from TOML file");
+                println!("  --port <PORT>        Port to bind to (default: 8444)");
+                println!("  --bind <ADDR>        Address to bind to (default: [::1]:8444)");
                 println!("  --help, -h           Show this help message");
                 println!();
                 println!("Examples:");
                 println!("  # Local development mode");
                 println!("  trustchain_ca");
                 println!();
+                println!("  # Production with config file");
+                println!("  trustchain_ca --config /etc/hypermesh/trustchain.toml");
+                println!();
                 println!("  # Production mode on all interfaces");
                 println!("  trustchain_ca --production");
-                println!();
-                println!("  # Custom port");
-                println!("  trustchain_ca --port 9443");
                 return Ok(());
             }
             _ => {}

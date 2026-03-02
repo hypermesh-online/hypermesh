@@ -11,9 +11,11 @@
 use async_trait::async_trait;
 use hypermesh_lib::{ContentHash, NodeId};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use super::shard_store::ShardStore;
 use crate::transport::error::TransportError;
 
 /// Abstraction for shard-level network operations.
@@ -46,22 +48,24 @@ pub trait ShardTransport: Send + Sync {
 
     /// Check if a node is reachable.
     ///
-    /// A lightweight probe — implementations should avoid heavy handshakes.
+    /// A lightweight probe -- implementations should avoid heavy handshakes.
     async fn is_reachable(&self, node: &NodeId) -> bool;
 }
 
 /// STOQ-backed shard transport.
 ///
 /// Routes shard send/fetch operations through the STOQ protocol layer.
-/// Maintains a connection pool keyed by `NodeId`. When a node is not yet
-/// connected, `send_shard` and `fetch_shard` return a connection error —
-/// the caller must ensure the node is connected via the `NetworkManager`
-/// before issuing shard operations.
+/// Maintains a connection pool keyed by `NodeId` with auto-dial support:
+/// if a peer has a registered address (via `register_node_address`) but no
+/// cached connection, `send_shard` and `fetch_shard` will automatically
+/// establish a STOQ connection on demand.
 pub struct StoqShardTransport {
     /// STOQ transport instance for connection management
     transport: Arc<stoq::StoqTransport>,
     /// Cached connections keyed by node ID hex
     connections: Arc<RwLock<HashMap<String, Arc<stoq::Connection>>>>,
+    /// Known node addresses for auto-dialing
+    node_addresses: Arc<RwLock<HashMap<String, SocketAddr>>>,
 }
 
 impl StoqShardTransport {
@@ -70,6 +74,7 @@ impl StoqShardTransport {
         Self {
             transport,
             connections: Arc::new(RwLock::new(HashMap::new())),
+            node_addresses: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -81,9 +86,63 @@ impl StoqShardTransport {
             .insert(node_id.to_hex(), connection);
     }
 
-    /// Get a connection to a node, if one is registered.
-    async fn get_connection(&self, node_id: &NodeId) -> Option<Arc<stoq::Connection>> {
-        self.connections.read().await.get(&node_id.to_hex()).cloned()
+    /// Register a node's network address for auto-dialing.
+    pub async fn register_node_address(&self, node_id: &NodeId, addr: SocketAddr) {
+        self.node_addresses
+            .write()
+            .await
+            .insert(node_id.to_hex(), addr);
+    }
+
+    /// Get an existing connection or auto-dial the node if we know its address.
+    async fn get_or_connect(
+        &self,
+        node_id: &NodeId,
+    ) -> Result<Arc<stoq::Connection>, TransportError> {
+        let hex = node_id.to_hex();
+
+        // Try cached connection first
+        {
+            let conns = self.connections.read().await;
+            if let Some(conn) = conns.get(&hex) {
+                if conn.is_active() {
+                    return Ok(conn.clone());
+                }
+            }
+        }
+
+        // Try auto-dial if we know the address
+        let addr = {
+            let addrs = self.node_addresses.read().await;
+            addrs.get(&hex).copied()
+        };
+
+        let addr = addr.ok_or_else(|| {
+            TransportError::NoConnection(format!("no address registered for node {hex}"))
+        })?;
+
+        // Connect via STOQ (IPv6 only)
+        let endpoint = stoq::Endpoint::new(
+            match addr {
+                SocketAddr::V6(v6) => *v6.ip(),
+                _ => return Err(TransportError::Network("only IPv6 supported".into())),
+            },
+            addr.port(),
+        );
+
+        let connection = self
+            .transport
+            .connect(&endpoint)
+            .await
+            .map_err(|e| TransportError::Network(format!("auto-dial to {addr} failed: {e}")))?;
+
+        // Cache the connection
+        self.connections
+            .write()
+            .await
+            .insert(hex, connection.clone());
+
+        Ok(connection)
     }
 }
 
@@ -95,9 +154,7 @@ impl ShardTransport for StoqShardTransport {
         shard_id: &ContentHash,
         data: &[u8],
     ) -> Result<(), TransportError> {
-        let connection = self.get_connection(target).await.ok_or_else(|| {
-            TransportError::NoConnection(format!("no connection to node {}", target.to_hex()))
-        })?;
+        let connection = self.get_or_connect(target).await?;
 
         // Open a unidirectional stream and send: [32-byte shard_id][shard data]
         let mut stream = connection
@@ -125,9 +182,7 @@ impl ShardTransport for StoqShardTransport {
         source: &NodeId,
         shard_id: &ContentHash,
     ) -> Result<Vec<u8>, TransportError> {
-        let connection = self.get_connection(source).await.ok_or_else(|| {
-            TransportError::NoConnection(format!("no connection to node {}", source.to_hex()))
-        })?;
+        let connection = self.get_or_connect(source).await?;
 
         // Open stream and request shard
         let mut stream = connection
@@ -155,7 +210,13 @@ impl ShardTransport for StoqShardTransport {
     }
 
     async fn is_reachable(&self, node: &NodeId) -> bool {
-        self.get_connection(node).await.is_some()
+        let hex = node.to_hex();
+        // Check connection cache first
+        if self.connections.read().await.contains_key(&hex) {
+            return true;
+        }
+        // Check if we know the address (we could potentially connect)
+        self.node_addresses.read().await.contains_key(&hex)
     }
 }
 
@@ -250,6 +311,82 @@ impl ShardTransport for MockShardTransport {
     async fn is_reachable(&self, node: &NodeId) -> bool {
         let unreachable = self.unreachable.read().await;
         !unreachable.contains(&node.to_hex())
+    }
+}
+
+/// Handle an incoming shard stream from a peer.
+///
+/// Reads the tag byte, then dispatches:
+/// - 0x01 (SHARD_SEND): peer is pushing a shard to us -- read shard_id(32) + data_len(8) + data, store in ShardStore
+/// - 0x02 (SHARD_FETCH): peer is requesting a shard from us -- read shard_id(32), look up in ShardStore, send data back
+pub async fn handle_incoming_shard_stream(
+    stream: &mut stoq::Stream,
+    store: &ShardStore,
+) -> Result<(), TransportError> {
+    // Read the full message from the stream
+    let data = stream
+        .receive()
+        .await
+        .map_err(|e| TransportError::Network(format!("failed to read stream: {e}")))?;
+
+    if data.is_empty() {
+        return Err(TransportError::Protocol("empty shard stream".into()));
+    }
+
+    let tag = data[0];
+
+    match tag {
+        0x01 => {
+            // SHARD_SEND: tag(1) + shard_id(32) + data_len(8) + data
+            if data.len() < 41 {
+                return Err(TransportError::Protocol("SHARD_SEND too short".into()));
+            }
+            let mut shard_id_bytes = [0u8; 32];
+            shard_id_bytes.copy_from_slice(&data[1..33]);
+            let shard_id = ContentHash(shard_id_bytes);
+
+            let data_len =
+                u64::from_le_bytes(data[33..41].try_into().map_err(|_| {
+                    TransportError::Protocol("SHARD_SEND invalid data_len".into())
+                })?) as usize;
+            if data.len() < 41 + data_len {
+                return Err(TransportError::Protocol("SHARD_SEND data truncated".into()));
+            }
+            let shard_data = data[41..41 + data_len].to_vec();
+
+            store.store(shard_id, shard_data).await;
+            tracing::debug!("Stored shard {} from peer", hex::encode(shard_id_bytes));
+            Ok(())
+        }
+        0x02 => {
+            // SHARD_FETCH: tag(1) + shard_id(32)
+            if data.len() < 33 {
+                return Err(TransportError::Protocol("SHARD_FETCH too short".into()));
+            }
+            let mut shard_id_bytes = [0u8; 32];
+            shard_id_bytes.copy_from_slice(&data[1..33]);
+            let shard_id = ContentHash(shard_id_bytes);
+
+            match store.get(&shard_id).await {
+                Some(shard_data) => {
+                    stream.send(&shard_data).await.map_err(|e| {
+                        TransportError::Network(format!("failed to send shard: {e}"))
+                    })?;
+                    tracing::debug!("Served shard {} to peer", hex::encode(shard_id_bytes));
+                    Ok(())
+                }
+                None => {
+                    // Send empty response to indicate shard not found
+                    stream.send(&[]).await.map_err(|e| {
+                        TransportError::Network(format!("failed to send not-found: {e}"))
+                    })?;
+                    Ok(())
+                }
+            }
+        }
+        _ => Err(TransportError::Protocol(format!(
+            "unknown shard tag: 0x{tag:02x}"
+        ))),
     }
 }
 

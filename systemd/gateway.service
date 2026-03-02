@@ -1,5 +1,5 @@
 [Unit]
-Description=HyperMesh Block-MATRIX Node
+Description=HyperMesh HTTP/3 Gateway
 Documentation=https://github.com/hypermesh-online/core
 After=network-online.target trustchain.service
 Wants=network-online.target
@@ -7,8 +7,8 @@ Requires=trustchain.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/node start --privacy public --stoq-port 9292
-WorkingDirectory=/var/lib/hypermesh/blockmatrix
+ExecStart=/usr/local/bin/gateway --config /etc/hypermesh/gateway.toml
+WorkingDirectory=/var/lib/hypermesh/gateway
 Restart=on-failure
 RestartSec=5
 User=hypermesh
@@ -19,7 +19,7 @@ Environment=RUST_LOG=info
 # Security hardening
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/hypermesh/blockmatrix /var/log/hypermesh
+ReadWritePaths=/var/lib/hypermesh/gateway /var/log/hypermesh /etc/hypermesh/certs
 PrivateTmp=true
 NoNewPrivileges=true
 

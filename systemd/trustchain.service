@@ -5,8 +5,8 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=notify
-ExecStart=/usr/local/bin/trustchain
+Type=simple
+ExecStart=/usr/local/bin/trustchain_ca --production --port 8444
 WorkingDirectory=/var/lib/hypermesh/trustchain
 Restart=on-failure
 RestartSec=5

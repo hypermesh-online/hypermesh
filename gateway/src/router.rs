@@ -21,20 +21,25 @@ pub struct GatewayRouter {
     trustchain_pool: ConnectionPool,
     blockmatrix_pool: ConnectionPool,
     caesar_pool: ConnectionPool,
+    catalog_pool: ConnectionPool,
     trustchain_proxy: Http3Proxy,
     blockmatrix_proxy: Http3Proxy,
     caesar_proxy: Http3Proxy,
+    catalog_proxy: Http3Proxy,
     /// TrustChain service address (retained for health check routing)
     _trustchain_addr: SocketAddr,
     /// BlockMatrix service address (retained for health check routing)
     _blockmatrix_addr: SocketAddr,
     /// Caesar service address (retained for health check routing)
     _caesar_addr: SocketAddr,
+    /// Catalog service address (retained for health check routing)
+    _catalog_addr: SocketAddr,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
     trustchain_breaker: Arc<CircuitBreaker>,
     blockmatrix_breaker: Arc<CircuitBreaker>,
     caesar_breaker: Arc<CircuitBreaker>,
+    catalog_breaker: Arc<CircuitBreaker>,
 }
 
 impl GatewayRouter {
@@ -64,6 +69,14 @@ impl GatewayRouter {
         )
         .await?;
 
+        let catalog_pool = ConnectionPool::new(
+            config.catalog_addr,
+            &config.catalog_server_name,
+            config.pool.max_connections,
+            config.pool.idle_timeout,
+        )
+        .await?;
+
         // Create proxies
         let trustchain_proxy =
             Http3Proxy::new(trustchain_pool.clone(), config.pool.connect_timeout);
@@ -72,6 +85,8 @@ impl GatewayRouter {
             Http3Proxy::new(blockmatrix_pool.clone(), config.pool.connect_timeout);
 
         let caesar_proxy = Http3Proxy::new(caesar_pool.clone(), config.pool.connect_timeout);
+
+        let catalog_proxy = Http3Proxy::new(catalog_pool.clone(), config.pool.connect_timeout);
 
         // Create circuit breakers
         let trustchain_breaker = Arc::new(CircuitBreaker::new(
@@ -83,21 +98,27 @@ impl GatewayRouter {
 
         let caesar_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
+        let catalog_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
+
         Ok(Self {
             trustchain_pool,
             blockmatrix_pool,
             caesar_pool,
+            catalog_pool,
             trustchain_proxy,
             blockmatrix_proxy,
             caesar_proxy,
+            catalog_proxy,
             _trustchain_addr: config.trustchain_addr,
             _blockmatrix_addr: config.blockmatrix_addr,
             _caesar_addr: config.caesar_addr,
+            _catalog_addr: config.catalog_addr,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
             trustchain_breaker,
             blockmatrix_breaker,
             caesar_breaker,
+            catalog_breaker,
         })
     }
 
@@ -211,6 +232,12 @@ impl GatewayRouter {
             ))
         } else if path.starts_with("/api/v1/caesar") {
             Ok((&self.caesar_proxy, &self.caesar_breaker, "/api/v1/caesar"))
+        } else if path.starts_with("/api/v1/catalog") {
+            Ok((
+                &self.catalog_proxy,
+                &self.catalog_breaker,
+                "/api/v1/catalog",
+            ))
         } else {
             Err(anyhow!("No backend found for path: {path}"))
         }
@@ -271,10 +298,28 @@ impl GatewayRouter {
         };
         backends.insert("caesar".to_string(), caesar_status);
 
+        // Check Catalog health
+        let catalog_status = match self.catalog_pool.health_check().await {
+            Ok(latency) => {
+                json!({
+                    "status": "up",
+                    "latency_ms": latency.as_millis()
+                })
+            }
+            Err(_) => {
+                json!({
+                    "status": "down",
+                    "latency_ms": null
+                })
+            }
+        };
+        backends.insert("catalog".to_string(), catalog_status);
+
         // Get pool statistics
         let trustchain_stats = self.trustchain_pool.stats();
         let blockmatrix_stats = self.blockmatrix_pool.stats();
         let caesar_stats = self.caesar_pool.stats();
+        let catalog_stats = self.catalog_pool.stats();
 
         let response_body = json!({
             "status": "healthy",
@@ -296,6 +341,11 @@ impl GatewayRouter {
                     "total_connections": caesar_stats.total_connections,
                     "active_connections": caesar_stats.active_connections,
                     "requests_served": caesar_stats.requests_served,
+                },
+                "catalog": {
+                    "total_connections": catalog_stats.total_connections,
+                    "active_connections": catalog_stats.active_connections,
+                    "requests_served": catalog_stats.requests_served,
                 }
             }
         });
