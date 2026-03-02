@@ -29,6 +29,9 @@ items = [
 
 [features.in_development]
 items = [
+    "Catalog server binary — standalone STOQ API server (catalog.hypermesh.online) with browse/search/publish/install endpoints",
+    "DHT remote I/O — wire store_value_on_node/query_value_from_node to real STOQ transport for cross-node package discovery",
+    "Shared asset library — browse and install packages across nodes on the public network",
 ]
 
 [features.planned]

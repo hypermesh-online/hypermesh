@@ -26,6 +26,9 @@ items = [
 items = [
     "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
     "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)",
+    "Gateway API client — fetch real data from trust.hypermesh.online gateway endpoints (health, node status, cert status, catalog browse)",
+    "Node join flow — UI for connecting to public network (enter bootstrap address, display matrix position, show peer count)",
+    "Catalog browser — browse/search/install shared asset packages from catalog.hypermesh.online",
 ]
 
 [features.planned]

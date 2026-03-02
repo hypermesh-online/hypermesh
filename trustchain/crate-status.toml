@@ -50,6 +50,8 @@ items = [
 
 [features.in_development]
 items = [
+    "Production binary hardening — config file loading, graceful shutdown, health endpoint, signal handling",
+    "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS (initial clearnet bootstrap before self-issued FALCON certs)",
 ]
 
 [features.planned]

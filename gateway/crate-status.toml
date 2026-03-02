@@ -29,7 +29,11 @@ items = [
 ]
 
 [features.in_development]
-items = []
+items = [
+    "Production config loader — TOML/env-based config for listen addresses, cert paths, backend service addresses, rate limits",
+    "Backend service discovery — resolve trustchain/blockmatrix/caesar/catalog backends by address or service registry",
+    "Health check aggregation — /health endpoint that checks all backend services and reports overall status",
+]
 
 [features.planned]
 items = []

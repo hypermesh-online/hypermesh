@@ -19,6 +19,10 @@ items = [
 
 [features.in_development]
 items = [
+    "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
+    "Network MVP — peer discovery, shard transport over QUIC, end-to-end asset store/fetch across nodes",
+    "Systemd unit fixes — correct binary names, port assignments, working directory setup",
+    "Port allocation plan — resolve 8446 conflict between trustchain API and blockmatrix, assign unique ports per service",
 ]
 
 [features.planned]
@@ -26,7 +30,6 @@ items = [
     "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
     "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
     "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
-    "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
     "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
     "Real partition/chaos testing framework",

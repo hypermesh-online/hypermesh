@@ -36,6 +36,8 @@ items = [
 
 [features.in_development]
 items = [
+    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable via StoqTransport connections)",
+    "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
 ]
 
 [features.planned]

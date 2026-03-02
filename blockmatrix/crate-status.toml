@@ -68,6 +68,10 @@ items = [
 
 [features.in_development]
 items = [
+    "Node binary wiring — connect bootstrap → gossip → mDNS peer discovery → StoqShardTransport into runnable server loop",
+    "Asset CLI end-to-end — `node store <file>` (compress→encrypt→shard→distribute) and `node fetch <asset-id>` (retrieve→reconstruct→decrypt→decompress)",
+    "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes",
+    "Merge/replace blockmatrix stub binary with real node binary (fix port conflict with trustchain on 8446)",
 ]
 
 [features.planned]

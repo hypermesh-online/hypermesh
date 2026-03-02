@@ -81,10 +81,15 @@ export const crateStatuses: CrateStatus[] = [
         "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
         "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Node binary wiring — connect bootstrap → gossip → mDNS peer discovery → StoqShardTransport into runnable server loop",
+        "Asset CLI end-to-end — `node store <file>` (compress→encrypt→shard→distribute) and `node fetch <asset-id>` (retrieve→reconstruct→decrypt→decompress)",
+        "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes",
+        "Merge/replace blockmatrix stub binary with real node binary (fix port conflict with trustchain on 8446)"
+      ],
       "planned": []
     },
-    "completion": 100
+    "completion": 94
   },
   {
     "id": "caesar",
@@ -183,10 +188,14 @@ export const crateStatuses: CrateStatus[] = [
         "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback; local-only until DHT remote I/O is wired)",
         "HyperMesh execution delegation (allocate/query/terminate lifecycle, resource validation, status tracking)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Catalog server binary — standalone STOQ API server (catalog.hypermesh.online) with browse/search/publish/install endpoints",
+        "DHT remote I/O — wire store_value_on_node/query_value_from_node to real STOQ transport for cross-node package discovery",
+        "Shared asset library — browse and install packages across nodes on the public network"
+      ],
       "planned": []
     },
-    "completion": 100
+    "completion": 86
   },
   {
     "id": "engauge",
@@ -259,10 +268,14 @@ export const crateStatuses: CrateStatus[] = [
         "Outbound proxy with allowlist filtering",
         "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Production config loader — TOML/env-based config for listen addresses, cert paths, backend service addresses, rate limits",
+        "Backend service discovery — resolve trustchain/blockmatrix/caesar/catalog backends by address or service registry",
+        "Health check aggregation — /health endpoint that checks all backend services and reports overall status"
+      ],
       "planned": []
     },
-    "completion": 100
+    "completion": 87
   },
   {
     "id": "hypermesh",
@@ -281,18 +294,22 @@ export const crateStatuses: CrateStatus[] = [
         "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)",
         "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
+        "Network MVP — peer discovery, shard transport over QUIC, end-to-end asset store/fetch across nodes",
+        "Systemd unit fixes — correct binary names, port assignments, working directory setup",
+        "Port allocation plan — resolve 8446 conflict between trustchain API and blockmatrix, assign unique ports per service"
+      ],
       "planned": [
         "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
         "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
         "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
-        "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
         "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
         "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
         "Real partition/chaos testing framework"
       ]
     },
-    "completion": 56
+    "completion": 47
   },
   {
     "id": "hypermesh-ebpf",
@@ -405,13 +422,16 @@ export const crateStatuses: CrateStatus[] = [
         "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)",
         "Min-spec transport validation (R13 — TransportMinSpec: connection budget, bandwidth checks, 1Mb/s/4GB/2-core limits)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable via StoqTransport connections)",
+        "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure"
+      ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements"
       ]
     },
-    "completion": 93
+    "completion": 87
   },
   {
     "id": "trustchain",
@@ -461,10 +481,13 @@ export const crateStatuses: CrateStatus[] = [
         "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
         "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Production binary hardening — config file loading, graceful shutdown, health endpoint, signal handling",
+        "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS (initial clearnet bootstrap before self-issued FALCON certs)"
+      ],
       "planned": []
     },
-    "completion": 100
+    "completion": 95
   },
   {
     "id": "ui",
@@ -490,7 +513,10 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
-        "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)"
+        "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)",
+        "Gateway API client — fetch real data from trust.hypermesh.online gateway endpoints (health, node status, cert status, catalog browse)",
+        "Node join flow — UI for connecting to public network (enter bootstrap address, display matrix position, show peer count)",
+        "Catalog browser — browse/search/install shared asset packages from catalog.hypermesh.online"
       ],
       "planned": [
         "Live STOQ WebSocket data connections",
@@ -506,6 +532,6 @@ export const crateStatuses: CrateStatus[] = [
         "New node registration experience (not traditional sign-up — sovereign identity bootstrap)"
       ]
     },
-    "completion": 52
+    "completion": 47
   }
 ];
