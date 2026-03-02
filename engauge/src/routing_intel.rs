@@ -256,6 +256,103 @@ impl RoutingAdvisor for RoutingIntelligence {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RoutingUpdate (Item 7.9)
+// ---------------------------------------------------------------------------
+
+/// A routing intelligence update pushed to subscribers (e.g., STOQ).
+#[derive(Debug, Clone)]
+pub struct RoutingUpdate {
+    /// Per-node weight adjustments.
+    pub path_weights: Vec<TensorWeightModifier>,
+    /// Congestion alerts for hotspot nodes.
+    pub congestion_alerts: Vec<NodeId>,
+    /// Recommended scheduling strategy.
+    pub strategy: SchedulingStrategy,
+    /// Unix microsecond timestamp of this update.
+    pub timestamp_us: u64,
+}
+
+/// Callback type for routing update subscribers.
+pub type RoutingUpdateCallback = Box<dyn Fn(&RoutingUpdate) + Send + Sync>;
+
+/// Feed mechanism that periodically generates routing recommendations
+/// and pushes them to registered subscribers (e.g., STOQ path scheduler).
+pub struct RoutingIntelFeed {
+    intelligence: RoutingIntelligence,
+    subscribers: Vec<RoutingUpdateCallback>,
+}
+
+impl RoutingIntelFeed {
+    /// Create a new routing intelligence feed.
+    pub fn new(window_size: usize) -> Self {
+        Self {
+            intelligence: RoutingIntelligence::new(window_size),
+            subscribers: Vec::new(),
+        }
+    }
+
+    /// Subscribe to routing updates.
+    pub fn subscribe(&mut self, callback: RoutingUpdateCallback) {
+        self.subscribers.push(callback);
+    }
+
+    /// Ingest a metrics frame into the underlying intelligence engine.
+    pub fn ingest(&mut self, frame: crate::streaming::MetricsFrame) {
+        self.intelligence.ingest(frame);
+    }
+
+    /// Generate and publish a routing update for the given candidates.
+    ///
+    /// Computes weight adjustments for all candidates, detects congestion
+    /// alerts, and notifies all subscribers.
+    pub fn publish_update(
+        &self,
+        source: &MatrixPosition,
+        destination: &MatrixPosition,
+        candidates: &[NodeId],
+    ) -> RoutingUpdate {
+        let weights = self
+            .intelligence
+            .compute_weight_adjustments(source, destination, candidates);
+
+        let congestion_alerts: Vec<NodeId> = weights
+            .iter()
+            .filter(|w| w.reason == WeightReason::HighCongestion)
+            .map(|w| w.node_id)
+            .collect();
+
+        // Determine strategy from aggregate.
+        let aggregator = crate::streaming::RegionalAggregator::new(10);
+        let agg = aggregator.aggregate();
+        let policy = self.intelligence.recommend_path_policy(&agg);
+
+        let update = RoutingUpdate {
+            path_weights: weights,
+            congestion_alerts,
+            strategy: policy.strategy,
+            timestamp_us: chrono::Utc::now().timestamp_micros() as u64,
+        };
+
+        // Notify all subscribers.
+        for subscriber in &self.subscribers {
+            subscriber(&update);
+        }
+
+        update
+    }
+
+    /// Access the underlying routing intelligence.
+    pub fn intelligence(&self) -> &RoutingIntelligence {
+        &self.intelligence
+    }
+
+    /// Number of registered subscribers.
+    pub fn subscriber_count(&self) -> usize {
+        self.subscribers.len()
+    }
+}
+
 impl PathAdvisor for RoutingIntelligence {
     fn recommend_path_policy(&self, aggregate: &RegionalAggregate) -> PathPolicyRecommendation {
         if aggregate.node_count == 0 {
@@ -538,5 +635,53 @@ mod tests {
         let rec = intel.recommend_path_policy(&agg);
         assert_eq!(rec.strategy, SchedulingStrategy::BandwidthWeighted);
         assert!(!rec.enable_redundant);
+    }
+
+    // -- RoutingIntelFeed tests (7.9) --
+
+    #[test]
+    fn routing_feed_publishes_updates() {
+        let mut feed = RoutingIntelFeed::new(30);
+        feed.ingest(make_congestion_frame("fast", 0.1));
+        feed.ingest(make_congestion_frame("slow", 0.9));
+
+        let candidates = vec![
+            NodeId::from_public_key(b"fast"),
+            NodeId::from_public_key(b"slow"),
+        ];
+
+        let update = feed.publish_update(&origin(), &dest(), &candidates);
+
+        assert_eq!(update.path_weights.len(), 2);
+        // "slow" should have a congestion alert.
+        assert!(
+            update.congestion_alerts.contains(&NodeId::from_public_key(b"slow")),
+            "slow node should be in congestion alerts"
+        );
+    }
+
+    #[test]
+    fn routing_feed_notifies_subscribers() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        use std::sync::Arc;
+
+        let mut feed = RoutingIntelFeed::new(30);
+
+        let counter = Arc::new(AtomicU64::new(0));
+        let counter_clone = counter.clone();
+        feed.subscribe(Box::new(move |_update| {
+            counter_clone.fetch_add(1, Ordering::SeqCst);
+        }));
+
+        assert_eq!(feed.subscriber_count(), 1);
+
+        let candidates = vec![NodeId::from_public_key(b"any")];
+        feed.publish_update(&origin(), &dest(), &candidates);
+
+        assert_eq!(
+            counter.load(Ordering::SeqCst),
+            1,
+            "subscriber should be notified once"
+        );
     }
 }

@@ -17,12 +17,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use hypermesh_lib::{AssetId, BlockchainScope};
+use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, NodeId};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::asset_transfer::{AssetTransfer, TransferStatus, TransferValidator};
 use super::GatewayError;
+use crate::network::shard_transport::ShardTransport;
 
 // ---------------------------------------------------------------------------
 // Bridge message types
@@ -54,6 +55,15 @@ pub enum BridgeMessage {
 // ScopeBridge
 // ---------------------------------------------------------------------------
 
+/// A shard that must be moved between scopes during a transfer.
+#[derive(Debug, Clone)]
+pub struct TransferShard {
+    /// Content hash identifying this shard.
+    pub shard_id: ContentHash,
+    /// Raw shard data.
+    pub data: Vec<u8>,
+}
+
 /// Routes messages and orchestrates the lock-transfer-unlock protocol between
 /// Device and Network blockchain scopes.
 pub struct ScopeBridge {
@@ -61,14 +71,38 @@ pub struct ScopeBridge {
     transfers: Arc<RwLock<HashMap<String, AssetTransfer>>>,
     /// Transfer validator for proof checks.
     validator: Arc<dyn TransferValidator>,
+    /// Optional shard transport for moving data between scopes.
+    transport: Option<Arc<dyn ShardTransport>>,
+    /// Node ID of the target scope gateway (where shards are sent during transit).
+    target_node: Option<NodeId>,
+    /// Shards staged for transfer, keyed by transfer_id.
+    shard_staging: Arc<RwLock<HashMap<String, Vec<TransferShard>>>>,
 }
 
 impl ScopeBridge {
-    /// Create a new bridge with the given validator.
+    /// Create a new bridge with the given validator (no network transport).
     pub fn new(validator: Arc<dyn TransferValidator>) -> Self {
         Self {
             transfers: Arc::new(RwLock::new(HashMap::new())),
             validator,
+            transport: None,
+            target_node: None,
+            shard_staging: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a bridge wired to a shard transport for actual data movement.
+    pub fn with_transport(
+        validator: Arc<dyn TransferValidator>,
+        transport: Arc<dyn ShardTransport>,
+        target_node: NodeId,
+    ) -> Self {
+        Self {
+            transfers: Arc::new(RwLock::new(HashMap::new())),
+            validator,
+            transport: Some(transport),
+            target_node: Some(target_node),
+            shard_staging: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -159,6 +193,28 @@ impl ScopeBridge {
         Ok(active.map(|t| t.status))
     }
 
+    /// Attach shards to a registered transfer so they can be moved during transit.
+    pub async fn attach_shards(
+        &self,
+        transfer_id: &str,
+        shards: Vec<TransferShard>,
+    ) -> Result<(), GatewayError> {
+        let mut transfers = self.transfers.write().await;
+        let _transfer =
+            transfers
+                .get_mut(transfer_id)
+                .ok_or_else(|| GatewayError::TransferNotFound {
+                    transfer_id: transfer_id.to_string(),
+                })?;
+        // Store shards in the shard staging map
+        drop(transfers);
+
+        let mut staging = self.shard_staging.write().await;
+        staging.insert(transfer_id.to_string(), shards);
+        debug!("Attached shards for transfer {}", transfer_id);
+        Ok(())
+    }
+
     /// Return a snapshot of all tracked transfers.
     pub async fn list_transfers(&self) -> Vec<AssetTransfer> {
         self.transfers.read().await.values().cloned().collect()
@@ -206,14 +262,51 @@ impl ScopeBridge {
     }
 
     async fn begin_transit(&self, transfer_id: &str) -> Result<(), GatewayError> {
-        let mut transfers = self.transfers.write().await;
-        let transfer =
-            transfers
-                .get_mut(transfer_id)
-                .ok_or_else(|| GatewayError::TransferNotFound {
-                    transfer_id: transfer_id.to_string(),
-                })?;
-        transfer.begin_transit()?;
+        // Advance state machine to InTransit
+        {
+            let mut transfers = self.transfers.write().await;
+            let transfer =
+                transfers
+                    .get_mut(transfer_id)
+                    .ok_or_else(|| GatewayError::TransferNotFound {
+                        transfer_id: transfer_id.to_string(),
+                    })?;
+            transfer.begin_transit()?;
+        }
+
+        // If we have a transport wired, send the staged shards
+        if let (Some(transport), Some(target_node)) = (&self.transport, &self.target_node) {
+            let shards = {
+                let mut staging = self.shard_staging.write().await;
+                staging.remove(transfer_id).unwrap_or_default()
+            };
+
+            for shard in &shards {
+                transport
+                    .send_shard(target_node, &shard.shard_id, &shard.data)
+                    .await
+                    .map_err(|e| {
+                        warn!(
+                            "Shard transport failed for transfer {}: {}",
+                            transfer_id, e
+                        );
+                        GatewayError::ProofValidationFailed {
+                            scope: "transport".to_string(),
+                            reason: format!("Shard send failed: {e}"),
+                        }
+                    })?;
+            }
+
+            if !shards.is_empty() {
+                info!(
+                    "Transfer {} sent {} shards via transport to {}",
+                    transfer_id,
+                    shards.len(),
+                    target_node.to_hex()
+                );
+            }
+        }
+
         info!("Transfer {} now in transit", transfer_id);
         Ok(())
     }
@@ -257,6 +350,7 @@ impl ScopeBridge {
 mod tests {
     use super::super::asset_transfer::DefaultTransferValidator;
     use super::*;
+    use crate::network::shard_transport::MockShardTransport;
 
     fn make_bridge() -> ScopeBridge {
         ScopeBridge::new(Arc::new(DefaultTransferValidator))
@@ -348,5 +442,95 @@ mod tests {
             .find(|t| t.transfer_id == "tx-300")
             .expect("test: find transfer");
         assert_eq!(t.status, TransferStatus::RolledBack);
+    }
+
+    #[tokio::test]
+    async fn test_bridge_with_transport_sends_shards() {
+        let mock_transport = Arc::new(MockShardTransport::new());
+        let target_node = NodeId::from_bytes([0xAA; 32]);
+
+        let bridge = ScopeBridge::with_transport(
+            Arc::new(DefaultTransferValidator),
+            mock_transport.clone(),
+            target_node.clone(),
+        );
+
+        let transfer = make_transfer("tx-transport-1");
+        bridge.register_transfer(transfer).await;
+
+        // Attach shards to the transfer
+        let shards = vec![
+            TransferShard {
+                shard_id: ContentHash([0x01; 32]),
+                data: vec![0xDE, 0xAD],
+            },
+            TransferShard {
+                shard_id: ContentHash([0x02; 32]),
+                data: vec![0xBE, 0xEF],
+            },
+        ];
+        bridge
+            .attach_shards("tx-transport-1", shards)
+            .await
+            .expect("test: attach shards");
+
+        // Run the full bridge transfer
+        let status = bridge
+            .bridge_transfer("tx-transport-1")
+            .await
+            .expect("test: bridge transfer with transport");
+        assert_eq!(status, TransferStatus::Confirmed);
+
+        // Verify shards were sent via the mock transport
+        assert_eq!(mock_transport.shard_count().await, 2);
+
+        let fetched = mock_transport
+            .fetch_shard(&target_node, &ContentHash([0x01; 32]))
+            .await
+            .expect("test: fetch shard 1");
+        assert_eq!(fetched, vec![0xDE, 0xAD]);
+
+        let fetched2 = mock_transport
+            .fetch_shard(&target_node, &ContentHash([0x02; 32]))
+            .await
+            .expect("test: fetch shard 2");
+        assert_eq!(fetched2, vec![0xBE, 0xEF]);
+    }
+
+    #[tokio::test]
+    async fn test_bridge_transport_failure_during_transit() {
+        let mock_transport = Arc::new(MockShardTransport::new());
+        let target_node = NodeId::from_bytes([0xBB; 32]);
+
+        // Mark the target unreachable so sends fail
+        mock_transport.set_unreachable(&target_node).await;
+
+        let bridge = ScopeBridge::with_transport(
+            Arc::new(DefaultTransferValidator),
+            mock_transport.clone(),
+            target_node,
+        );
+
+        let transfer = make_transfer("tx-fail-transport");
+        bridge.register_transfer(transfer).await;
+
+        // Attach a shard that will fail to send
+        let shards = vec![TransferShard {
+            shard_id: ContentHash([0x03; 32]),
+            data: vec![0xFF],
+        }];
+        bridge
+            .attach_shards("tx-fail-transport", shards)
+            .await
+            .expect("test: attach shards");
+
+        // The bridge_transfer should fail because transit sends fail
+        // The transfer advances to InTransit state then the send fails,
+        // but begin_transit already changed state. The error propagates up.
+        let result = bridge.bridge_transfer("tx-fail-transport").await;
+        assert!(result.is_err(), "Expected transport failure to propagate");
+
+        // No shards should have been stored
+        assert_eq!(mock_transport.shard_count().await, 0);
     }
 }

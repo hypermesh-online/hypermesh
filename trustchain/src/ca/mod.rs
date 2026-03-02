@@ -28,12 +28,16 @@ pub mod certificate_authority;
 pub mod certificate_manager;
 pub mod certificate_store;
 pub mod federation;
+pub mod field_bootstrap;
+pub mod grace_period;
 pub mod policy;
 pub mod security_integration; // Security integration module
 pub mod stoq_ca_client;
 
 pub use certificate_manager::*;
 pub use certificate_store::{CertificateStore as CertStore, CertificateStoreMetrics};
+pub use field_bootstrap::{BootstrapState, FieldBootstrap, FieldBootstrapConfig};
+pub use grace_period::{GracePeriodConfig, GracePeriodManager, GraceScope, RenewalToken};
 pub use policy::*;
 // AWS CloudHSM dependencies REMOVED - software-only operation
 pub use stoq_ca_client::*;

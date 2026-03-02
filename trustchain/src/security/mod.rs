@@ -16,16 +16,24 @@ use crate::consensus::{ConsensusProof, ConsensusResult, FourProofValidator};
 use crate::errors::Result as TrustChainResult;
 
 pub mod alerts;
+pub mod blockchain_crl;
 pub mod byzantine;
+pub mod cascading_revocation;
 pub mod monitoring;
+pub mod revocation_propagation;
 pub mod trust_scoring;
 pub mod types;
 
 #[allow(ambiguous_glob_reexports)]
 pub use alerts::*;
+pub use blockchain_crl::{BlockchainCrl, CrlBlock, CrlBlockEntry, CrlBlockType};
 pub use byzantine::*;
+pub use cascading_revocation::{CascadeResult, CascadeRevocation, CascadingRevocation};
 #[allow(ambiguous_glob_reexports)]
 pub use monitoring::*;
+pub use revocation_propagation::{
+    PropagationMessage, PropagationStatus, RevocationNotice, RevocationPropagator,
+};
 pub use trust_scoring::*;
 pub use types::*;
 

@@ -24,12 +24,14 @@ pub mod scope_bridge;
 pub use asset_transfer::{
     AssetTransfer, DefaultTransferValidator, TransferStatus, TransferValidator,
 };
-pub use scope_bridge::{BridgeMessage, ScopeBridge};
+pub use scope_bridge::{BridgeMessage, ScopeBridge, TransferShard};
 
 use std::sync::Arc;
 
-use hypermesh_lib::{AssetId, BlockchainScope};
+use hypermesh_lib::{AssetId, BlockchainScope, NodeId};
 use tracing::info;
+
+use crate::network::shard_transport::ShardTransport;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -93,6 +95,18 @@ impl GatewayManager {
     pub fn with_validator(validator: Arc<dyn TransferValidator>) -> Self {
         Self {
             bridge: ScopeBridge::new(validator),
+            next_id: Arc::new(tokio::sync::Mutex::new(1)),
+        }
+    }
+
+    /// Create a gateway wired to a shard transport for actual data movement.
+    pub fn with_transport(
+        validator: Arc<dyn TransferValidator>,
+        transport: Arc<dyn ShardTransport>,
+        target_node: NodeId,
+    ) -> Self {
+        Self {
+            bridge: ScopeBridge::with_transport(validator, transport, target_node),
             next_id: Arc::new(tokio::sync::Mutex::new(1)),
         }
     }

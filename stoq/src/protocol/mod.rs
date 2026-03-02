@@ -25,6 +25,8 @@ pub mod pos_integration;
 pub mod pos_validator;
 
 #[cfg(feature = "engauge")]
+pub mod metrics_bridge;
+#[cfg(feature = "engauge")]
 pub mod metrics_frame;
 
 // Re-exports for backward compatibility
