@@ -71,21 +71,21 @@ export const crateStatuses: CrateStatus[] = [
         "Shard migration (R14 — MigrationExecutor: copy-then-redirect, non-blocking reads, rollback on failure)",
         "Privacy-scoped dedup verification (R4 — PrivacyScopedDedup: full tracking Device/Private, hash-only Anonymous, tamper detection)",
         "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)",
-        "Gateway cross-scope transfers wired to ShardTransport (Lock→Transfer→Unlock with real shard movement)"
+        "Gateway cross-scope transfers wired to ShardTransport (Lock→Transfer→Unlock with real shard movement)",
+        "Multi-node deployment wired to gossip+transport (ClusterTransportBridge: sync_from_gossip, probe_health via ShardTransport)",
+        "Service mesh load balancer (MeshLoadBalancer: RoundRobin + LeastConnections, health-aware endpoint filtering)",
+        "User contribution distribution bridge (ContributionDistributionBridge: wired to SwarmProtocol for announce/serve shards)",
+        "Intelligence metrics bridge (IntelligenceMetricsCollector: real /proc CPU/memory via hardware module, processing stats)",
+        "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
+        "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
+        "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)"
       ],
       "inDevelopment": [
-        "Node binary Anonymous certificate strategy fix",
-        "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
-        "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
-        "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
-        "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)"
+        "Node binary Anonymous certificate strategy fix"
       ],
-      "planned": [
-        "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
-        "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)"
-      ]
+      "planned": []
     },
-    "completion": 88
+    "completion": 98
   },
   {
     "id": "caesar",
@@ -126,17 +126,16 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
         "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
         "Caesar CLI — packet operations + node management (commands, executor, output modules)",
-        "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate"
+        "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
+        "Cross-chain bridge (ChainBridge trait, InternalBridge with conservation checks, MockChainBridge for testing)"
       ],
-      "inDevelopment": [
-        "Cross-chain bridge types (structural type definitions only, placeholder implementation, no real chain connections)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
         "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)"
       ]
     },
-    "completion": 92
+    "completion": 94
   },
   {
     "id": "caesar-sdk",
@@ -178,19 +177,17 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar contribution reward integration (CatalogRewardAdapter, ContributionTracker)",
         "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
         "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
-        "BLAKE3 content hashing (whitepaper-aligned)"
+        "BLAKE3 content hashing (whitepaper-aligned)",
+        "DHT distribution (XOR-distance bucket indexing, stale eviction, value republish, proper routing table)",
+        "Dependency resolution (topological sort, transitive resolution, circular dependency detection, conflict detection)",
+        "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness, type-specific: WASM magic bytes, JSON parse)",
+        "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback)",
+        "HyperMesh execution delegation (allocate/query/terminate lifecycle, resource validation, status tracking)"
       ],
-      "inDevelopment": [
-        "Dependency resolution (stub returns empty list, transitive resolution TODO)",
-        "DHT distribution (refresh_routing_table, republish_values, bucket indexing are stubs)",
-        "Asset validation pipeline (scanner bodies and type-specific validation are stubs)",
-        "Peer-to-peer sharing (STOQ transport wired but DHT routing underpinning is stubbed)"
-      ],
-      "planned": [
-        "HyperMesh execution delegation (resource allocation, status query, termination are all stubs/TODOs)"
-      ]
+      "inDevelopment": [],
+      "planned": []
     },
-    "completion": 74
+    "completion": 100
   },
   {
     "id": "engauge",
@@ -464,14 +461,13 @@ export const crateStatuses: CrateStatus[] = [
         "Distributed revocation propagation (federation broadcast, BLAKE3 integrity, status tracking)",
         "CRL distribution via blockchain (hash-linked blocks, full + delta CRLs, chain integrity verification)",
         "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
-        "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)"
+        "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
+        "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)"
       ],
-      "inDevelopment": [
-        "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate — partially wired)"
-      ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 98
+    "completion": 100
   },
   {
     "id": "ui",

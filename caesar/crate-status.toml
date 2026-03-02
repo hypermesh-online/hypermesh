@@ -39,11 +39,11 @@ items = [
     "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
     "Caesar CLI — packet operations + node management (commands, executor, output modules)",
     "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
+    "Cross-chain bridge (ChainBridge trait, InternalBridge with conservation checks, MockChainBridge for testing)",
 ]
 
 [features.in_development]
 items = [
-    "Cross-chain bridge types (structural type definitions only, placeholder implementation, no real chain connections)",
 ]
 
 [features.planned]

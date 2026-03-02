@@ -56,19 +56,20 @@ items = [
     "Privacy-scoped dedup verification (R4 — PrivacyScopedDedup: full tracking Device/Private, hash-only Anonymous, tamper detection)",
     "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)",
     "Gateway cross-scope transfers wired to ShardTransport (Lock→Transfer→Unlock with real shard movement)",
+    "Multi-node deployment wired to gossip+transport (ClusterTransportBridge: sync_from_gossip, probe_health via ShardTransport)",
+    "Service mesh load balancer (MeshLoadBalancer: RoundRobin + LeastConnections, health-aware endpoint filtering)",
+    "User contribution distribution bridge (ContributionDistributionBridge: wired to SwarmProtocol for announce/serve shards)",
+    "Intelligence metrics bridge (IntelligenceMetricsCollector: real /proc CPU/memory via hardware module, processing stats)",
+    "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
+    "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
+    "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
 ]
 
 [features.in_development]
 items = [
     "Node binary Anonymous certificate strategy fix",
-    "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
-    "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
-    "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
-    "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)",
 ]
 
 [features.planned]
 items = [
-    "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
-    "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
 ]

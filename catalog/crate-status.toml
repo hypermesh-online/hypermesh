@@ -20,17 +20,17 @@ items = [
     "catalog.hypermesh.online STOQ API endpoint (browse/search/package/publisher/stats/health)",
     "Binary publisher authentication (whitepaper-aligned, no reputation scoring)",
     "BLAKE3 content hashing (whitepaper-aligned)",
+    "DHT distribution (XOR-distance bucket indexing, stale eviction, value republish, proper routing table)",
+    "Dependency resolution (topological sort, transitive resolution, circular dependency detection, conflict detection)",
+    "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness, type-specific: WASM magic bytes, JSON parse)",
+    "Peer-to-peer sharing wired to DHT (announce via BLAKE3 key, discover with text search fallback)",
+    "HyperMesh execution delegation (allocate/query/terminate lifecycle, resource validation, status tracking)",
 ]
 
 [features.in_development]
 items = [
-    "Dependency resolution (stub returns empty list, transitive resolution TODO)",
-    "DHT distribution (refresh_routing_table, republish_values, bucket indexing are stubs)",
-    "Asset validation pipeline (scanner bodies and type-specific validation are stubs)",
-    "Peer-to-peer sharing (STOQ transport wired but DHT routing underpinning is stubbed)",
 ]
 
 [features.planned]
 items = [
-    "HyperMesh execution delegation (resource allocation, status query, termination are all stubs/TODOs)",
 ]
