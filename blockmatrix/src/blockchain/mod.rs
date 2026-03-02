@@ -20,6 +20,7 @@
 
 pub mod block;
 pub mod errors;
+pub mod genesis_assessor;
 pub mod genesis_auth;
 pub mod node_chain;
 pub mod propagation;
@@ -29,6 +30,9 @@ pub mod validation;
 
 pub use block::Block;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
+pub use genesis_assessor::{
+    GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,
+};
 pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
 pub use node_chain::{ChainStats, NodeBlockchain};
 pub use propagation::{

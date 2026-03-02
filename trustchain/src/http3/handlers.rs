@@ -139,6 +139,8 @@ pub async fn handle_issue_certificate(
         ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
         consensus_proof,
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let issued =

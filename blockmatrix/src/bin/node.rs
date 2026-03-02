@@ -146,12 +146,22 @@ async fn main() -> Result<()> {
             if privacy_mode != PrivacyMode::PRIVATE {
                 info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
-                // Create STOQ config
-                let stoq_config = stoq::TransportConfig {
+                // Configure STOQ transport based on privacy mode.
+                // Anonymous mode: use ephemeral self-signed certs (no CA dependency).
+                // Public mode: standard config (TrustChain CA certs will be used).
+                let mut stoq_config = stoq::TransportConfig {
                     port: cli.stoq_port,
                     bind_address: std::net::Ipv6Addr::UNSPECIFIED,
                     ..stoq::TransportConfig::default()
                 };
+
+                if privacy_mode == PrivacyMode::ANONYMOUS {
+                    // Anonymous mode: disable FALCON requirement (ephemeral certs
+                    // don't need quantum-resistant CA signatures), reduce connection
+                    // tracking for privacy.
+                    stoq_config.enable_falcon_crypto = false;
+                    info!("Anonymous mode: using ephemeral certificates, no CA dependency");
+                }
 
                 // Initialize STOQ
                 let transport = std::sync::Arc::new(stoq::StoqTransport::new(stoq_config).await?);

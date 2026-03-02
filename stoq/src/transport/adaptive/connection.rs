@@ -328,6 +328,20 @@ impl AdaptiveConnection {
         let mut params = self.parameters.write();
 
         match tier {
+            NetworkTier::MinSpec { mbps } => {
+                // R13 minimum spec: 1 Mb/s — most conservative parameters
+                params.stream_window = 64 * 1024;
+                params.connection_window = 128 * 1024;
+                params.max_streams = 4;
+                params.max_datagram_size = 1200;
+                params.keep_alive_interval = Some(Duration::from_secs(120));
+                params.idle_timeout = Duration::from_secs(600);
+                params.congestion_control = CongestionControl::NewReno;
+                params.send_buffer_size = 64 * 1024;
+                params.receive_buffer_size = 64 * 1024;
+
+                debug!("Applied R13 minimum spec parameters ({}Mbps)", mbps);
+            }
             NetworkTier::Slow { mbps } => {
                 params.stream_window = 256 * 1024;
                 params.connection_window = 512 * 1024;

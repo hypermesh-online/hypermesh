@@ -313,6 +313,98 @@ impl NodeBlockchain {
         self.blocks.read().await.values().map(|b| b.size()).sum()
     }
 
+    // === Asset Registration ===
+
+    /// Add a new block with an automatic shard commitment (R12).
+    ///
+    /// When a block carries shard distribution data, the commitment
+    /// `BLAKE3(sorted placements)` is computed and anchored in the block
+    /// header before validation and insertion.
+    ///
+    /// `shard_placement_data` is the canonical byte serialization of the
+    /// sorted placement list (caller is responsible for sorting by shard
+    /// index before serializing).
+    pub async fn add_block_with_shard_commitment(
+        &self,
+        assets: Vec<AssetRegistration>,
+        shard_placement_data: &[u8],
+    ) -> Result<Block, String> {
+        let head = self.head.read().await;
+        let previous = head
+            .as_ref()
+            .ok_or_else(|| "No head block found".to_string())?;
+
+        let new_index = previous.index + 1;
+        let mut new_block = Block::new(
+            new_index,
+            assets,
+            previous.hash.clone(),
+            self.node_coordinate,
+        );
+
+        // Compute shard commitment and set it (recalculates block hash)
+        let commitment = hypermesh_lib::protocol::ShardCommitment::compute(shard_placement_data);
+        new_block.set_shard_commitment(*commitment.as_bytes());
+
+        let previous_clone = previous.clone();
+        drop(head);
+
+        if !self
+            .validator
+            .validate_block(&new_block, Some(&previous_clone))
+        {
+            return Err("Block validation failed".to_string());
+        }
+
+        self.insert_block(new_block.clone()).await?;
+
+        info!(
+            "Added block #{} with shard commitment to node ({},{},{}) chain",
+            new_index,
+            self.node_coordinate.x,
+            self.node_coordinate.y,
+            self.node_coordinate.z,
+        );
+
+        Ok(new_block)
+    }
+
+    /// Register an asset record on this node's blockchain.
+    ///
+    /// Creates a new block containing the [`AssetRegistration`], validates
+    /// it against the chain, and appends it.  Returns the block that was
+    /// produced (callers can inspect its hash for receipts).
+    pub async fn register_asset_record(
+        &self,
+        registration: AssetRegistration,
+    ) -> Result<Block, String> {
+        info!(
+            "Registering asset on blockchain at ({},{},{})",
+            self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z,
+        );
+        self.add_block(vec![registration]).await
+    }
+
+    /// Register multiple asset records in a single block.
+    ///
+    /// Useful during genesis to batch all hardware assets into one block.
+    pub async fn register_asset_records(
+        &self,
+        registrations: Vec<AssetRegistration>,
+    ) -> Result<Block, String> {
+        if registrations.is_empty() {
+            return Err("cannot register empty asset list".to_string());
+        }
+        info!(
+            "Registering {} assets on blockchain at ({},{},{})",
+            registrations.len(),
+            self.node_coordinate.x,
+            self.node_coordinate.y,
+            self.node_coordinate.z,
+        );
+        self.add_block(registrations).await
+    }
+
     // === MFA Genesis Authentication Methods ===
 
     /// Initialize MFA-protected genesis authentication
@@ -584,6 +676,112 @@ mod tests {
         assert!(chain.validate_chain().await);
 
         // TODO: Test invalid chain scenarios (would need to manipulate internals)
+    }
+
+    // === Item 4.2: Asset registration tests ===
+
+    #[tokio::test]
+    async fn test_register_asset_record() {
+        let coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let asset = AssetRegistration::genesis(coord);
+        let block = chain
+            .register_asset_record(asset.clone())
+            .await
+            .expect("test: registration");
+
+        assert_eq!(block.index, 1);
+        assert_eq!(block.assets.len(), 1);
+        assert_eq!(block.assets[0], asset);
+        assert!(chain.validate_chain().await);
+    }
+
+    #[tokio::test]
+    async fn test_register_multiple_asset_records() {
+        let coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let assets = vec![
+            AssetRegistration::genesis(coord),
+            AssetRegistration::genesis(
+                MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+            ),
+        ];
+        let block = chain
+            .register_asset_records(assets.clone())
+            .await
+            .expect("test: batch registration");
+
+        assert_eq!(block.index, 1);
+        assert_eq!(block.assets.len(), 2);
+        assert!(chain.validate_chain().await);
+    }
+
+    #[tokio::test]
+    async fn test_register_empty_assets_fails() {
+        let coord = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let result = chain.register_asset_records(vec![]).await;
+        assert!(result.is_err());
+    }
+
+    // === Item 4.3: Shard commitment tests ===
+
+    #[tokio::test]
+    async fn test_add_block_with_shard_commitment() {
+        let coord = MatrixCoordinate::new(11, 11, 11).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let asset = AssetRegistration::genesis(coord);
+        let placement_data = b"shard0:node-a,shard1:node-b";
+
+        let block = chain
+            .add_block_with_shard_commitment(vec![asset], placement_data)
+            .await
+            .expect("test: block with commitment");
+
+        assert!(
+            block.shard_commitment.is_some(),
+            "block must have shard commitment"
+        );
+
+        // Verify the commitment matches BLAKE3 of the placement data
+        let expected = hypermesh_lib::protocol::ShardCommitment::compute(placement_data);
+        assert_eq!(
+            block.shard_commitment.expect("test: commitment present"),
+            *expected.as_bytes(),
+        );
+
+        assert!(block.verify_hash(), "hash must be valid after commitment");
+        assert!(chain.validate_chain().await);
+    }
+
+    #[tokio::test]
+    async fn test_shard_commitment_changes_block_hash() {
+        let coord = MatrixCoordinate::new(12, 12, 12).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let asset = AssetRegistration::genesis(coord);
+
+        // Block without commitment
+        let block_a = chain
+            .add_block(vec![asset.clone()])
+            .await
+            .expect("test: block without commitment");
+
+        // Block with commitment (different chain to avoid index collision)
+        let chain2 = NodeBlockchain::new(coord);
+        let block_b = chain2
+            .add_block_with_shard_commitment(vec![asset], b"test data")
+            .await
+            .expect("test: block with commitment");
+
+        assert_ne!(
+            block_a.hash, block_b.hash,
+            "commitment must change the block hash"
+        );
     }
 
     #[tokio::test]

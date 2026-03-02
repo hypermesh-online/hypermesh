@@ -10,6 +10,7 @@
 use anyhow::{anyhow, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use quinn::crypto::Session;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
@@ -343,6 +344,115 @@ impl StoqHandshakeExtension {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Cipher Suite Negotiation (R8)
+// ---------------------------------------------------------------------------
+
+/// Cipher suites supported by STOQ.
+///
+/// R8 policy: Standard suite is mandatory on Public networks. Private and
+/// Anonymous networks may negotiate alternative suites by mutual agreement.
+/// Standard is the default for ALL networks unless both peers agree otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CipherSuite {
+    /// Standard suite: FALCON-1024 + Kyber-1024 KEM + AES-256-GCM.
+    /// Mandatory on Public networks. Default for all networks.
+    Standard,
+    /// Lightweight suite: FALCON-512 + Kyber-768 + ChaCha20-Poly1305.
+    /// Allowed on Private/Anonymous only, by mutual agreement.
+    Lightweight,
+    /// Maximum security suite: FALCON-1024 + Kyber-1024 + AES-256-GCM + double-ratchet.
+    /// Available on any network type.
+    MaxSecurity,
+}
+
+impl Default for CipherSuite {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl std::fmt::Display for CipherSuite {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CipherSuite::Standard => write!(f, "FALCON1024-KYBER1024-AES256GCM"),
+            CipherSuite::Lightweight => write!(f, "FALCON512-KYBER768-CHACHA20POLY1305"),
+            CipherSuite::MaxSecurity => write!(f, "FALCON1024-KYBER1024-AES256GCM-DR"),
+        }
+    }
+}
+
+/// Cipher suite negotiation proposal sent during STOQ handshake.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CipherSuiteProposal {
+    /// Suites the proposer supports, in preference order.
+    pub supported: Vec<CipherSuite>,
+    /// Whether the proposer is on a Public network (forces Standard).
+    pub is_public: bool,
+}
+
+impl CipherSuiteProposal {
+    /// Create a proposal for a Public network.
+    /// Only Standard is allowed per R8.
+    pub fn public() -> Self {
+        Self {
+            supported: vec![CipherSuite::Standard],
+            is_public: true,
+        }
+    }
+
+    /// Create a proposal for a Private or Anonymous network.
+    /// All suites are available, Standard is preferred.
+    pub fn private_or_anonymous() -> Self {
+        Self {
+            supported: vec![
+                CipherSuite::Standard,
+                CipherSuite::MaxSecurity,
+                CipherSuite::Lightweight,
+            ],
+            is_public: false,
+        }
+    }
+
+    /// Negotiate with a peer's proposal.
+    ///
+    /// Returns the best mutually-supported cipher suite. If either peer is
+    /// Public, only Standard is acceptable (R8). Otherwise, the first suite
+    /// in the local preference list that the peer also supports is chosen.
+    pub fn negotiate(&self, peer: &CipherSuiteProposal) -> Result<CipherSuite> {
+        // R8: if either side is Public, Standard is mandatory
+        if self.is_public || peer.is_public {
+            if self.supported.contains(&CipherSuite::Standard)
+                && peer.supported.contains(&CipherSuite::Standard)
+            {
+                return Ok(CipherSuite::Standard);
+            }
+            return Err(anyhow!(
+                "R8 violation: Public network requires Standard cipher suite"
+            ));
+        }
+
+        // Find first mutually supported suite (local preference order)
+        for suite in &self.supported {
+            if peer.supported.contains(suite) {
+                return Ok(*suite);
+            }
+        }
+
+        Err(anyhow!("No mutually supported cipher suite"))
+    }
+
+    /// Serialize the proposal for transport parameter exchange.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
+
+    /// Deserialize a proposal from transport parameter bytes.
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        serde_json::from_slice(data).map_err(|e| anyhow!("failed to parse cipher proposal: {e}"))
+    }
+}
+
 /// STOQ-enhanced QUIC crypto session
 pub struct StoqCryptoSession {
     /// Base crypto session (retained for future QUIC crypto trait integration)
@@ -506,5 +616,71 @@ mod tests {
         assert_eq!(params[0].0, transport_params::STOQ_EXTENSIONS_ENABLED);
         assert_eq!(params[1].0, transport_params::FALCON_ENABLED);
         assert_eq!(params[2].0, transport_params::MAX_SHARD_SIZE);
+    }
+
+    // --- Cipher suite negotiation tests (R8) ---
+
+    #[test]
+    fn test_cipher_suite_public_forces_standard() {
+        let local = CipherSuiteProposal::public();
+        let peer = CipherSuiteProposal::private_or_anonymous();
+
+        let result = local.negotiate(&peer);
+        assert!(result.is_ok());
+        assert_eq!(result.expect("test: negotiate"), CipherSuite::Standard);
+    }
+
+    #[test]
+    fn test_cipher_suite_both_private_selects_preference() {
+        let local = CipherSuiteProposal {
+            supported: vec![CipherSuite::MaxSecurity, CipherSuite::Standard],
+            is_public: false,
+        };
+        let peer = CipherSuiteProposal::private_or_anonymous();
+
+        let result = local.negotiate(&peer).expect("test: negotiate");
+        // Local prefers MaxSecurity and peer supports it
+        assert_eq!(result, CipherSuite::MaxSecurity);
+    }
+
+    #[test]
+    fn test_cipher_suite_no_overlap_fails() {
+        let local = CipherSuiteProposal {
+            supported: vec![CipherSuite::Lightweight],
+            is_public: false,
+        };
+        let peer = CipherSuiteProposal {
+            supported: vec![CipherSuite::MaxSecurity],
+            is_public: false,
+        };
+
+        let result = local.negotiate(&peer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cipher_suite_public_without_standard_fails() {
+        let local = CipherSuiteProposal {
+            supported: vec![CipherSuite::Lightweight],
+            is_public: true,
+        };
+        let peer = CipherSuiteProposal {
+            supported: vec![CipherSuite::Lightweight],
+            is_public: false,
+        };
+
+        let result = local.negotiate(&peer);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cipher_suite_proposal_roundtrip() {
+        let proposal = CipherSuiteProposal::private_or_anonymous();
+        let bytes = proposal.to_bytes();
+        let decoded = CipherSuiteProposal::from_bytes(&bytes)
+            .expect("test: proposal round-trip");
+
+        assert_eq!(decoded.supported.len(), 3);
+        assert!(!decoded.is_public);
     }
 }

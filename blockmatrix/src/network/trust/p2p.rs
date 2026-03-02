@@ -63,8 +63,14 @@ impl P2PNetworkHandler {
         }
     }
 
-    /// Generate self-signed certificate for P2P
-    fn generate_self_signed_cert() -> Certificate {
+    /// Generate self-signed certificate for P2P.
+    ///
+    /// Uses BLAKE3 for deterministic key derivation and fingerprinting:
+    /// - Private key: random 32 bytes
+    /// - Public key: BLAKE3(private_key)
+    /// - Signature: BLAKE3(subject || public_key)
+    /// - Fingerprint: hex(BLAKE3(public_key || subject))
+    pub fn generate_self_signed_cert() -> Certificate {
         use rand::Rng;
         use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -74,19 +80,30 @@ impl P2PNetworkHandler {
             .unwrap_or_default()
             .as_secs();
 
-        // Generate random key material (placeholder until FALCON-1024 integration)
+        // Key derivation via BLAKE3
         let mut rng = rand::thread_rng();
-        let mut public_key = vec![0u8; 32];
-        rng.fill(public_key.as_mut_slice());
-        let mut signature = vec![0u8; 64];
-        rng.fill(signature.as_mut_slice());
+        let mut private_key = [0u8; 32];
+        rng.fill(&mut private_key);
+        let public_key = blake3::hash(&private_key).as_bytes().to_vec();
+
+        // Self-signature: BLAKE3(subject || public_key)
+        let mut sig_hasher = blake3::Hasher::new();
+        sig_hasher.update(node_id.as_bytes());
+        sig_hasher.update(&public_key);
+        let signature = sig_hasher.finalize().as_bytes().to_vec();
+
+        // Fingerprint: BLAKE3(public_key || subject)
+        let mut fp_hasher = blake3::Hasher::new();
+        fp_hasher.update(&public_key);
+        fp_hasher.update(node_id.as_bytes());
+        let fingerprint = hex::encode(fp_hasher.finalize().as_bytes());
 
         Certificate {
             subject: node_id.clone(),
-            issuer: node_id.clone(), // Self-signed
+            issuer: node_id, // Self-signed
             public_key,
             signature,
-            fingerprint: format!("fingerprint:{node_id}"),
+            fingerprint,
             expires_at: now + 365 * 24 * 3600, // 1 year
             network_type: NetworkType::P2P,
             blockchain_registered: false,
@@ -185,6 +202,32 @@ impl P2PNetworkHandler {
             .collect()
     }
 
+    /// Verify a self-signed certificate using BLAKE3.
+    ///
+    /// Checks that `signature == BLAKE3(subject || public_key)` and
+    /// `fingerprint == hex(BLAKE3(public_key || subject))`.
+    pub fn verify_self_signed_cert(cert: &Certificate) -> bool {
+        if !cert.is_self_signed() {
+            return false;
+        }
+
+        // Verify signature
+        let mut sig_hasher = blake3::Hasher::new();
+        sig_hasher.update(cert.subject.as_bytes());
+        sig_hasher.update(&cert.public_key);
+        let expected_sig = sig_hasher.finalize().as_bytes().to_vec();
+        if cert.signature != expected_sig {
+            return false;
+        }
+
+        // Verify fingerprint
+        let mut fp_hasher = blake3::Hasher::new();
+        fp_hasher.update(&cert.public_key);
+        fp_hasher.update(cert.subject.as_bytes());
+        let expected_fp = hex::encode(fp_hasher.finalize().as_bytes());
+        cert.fingerprint == expected_fp
+    }
+
     /// Get list of trusted peers
     pub async fn get_trusted_peers(&self) -> Vec<(PeerId, Certificate)> {
         self.trusted_peers
@@ -267,15 +310,20 @@ impl NetworkHandler for P2PNetworkHandler {
             return Ok(false); // Not yet trusted
         }
 
-        // Unknown peer - add to pending if we have their certificate
+        // Unknown peer - add to pending if we have a valid self-signed certificate
         if let Some(cert) = &peer.certificate {
-            if cert.is_self_signed() {
+            if cert.is_self_signed() && Self::verify_self_signed_cert(cert) {
                 drop(pending); // Release read lock
                 self.pending_peers
                     .write()
                     .await
                     .insert(peer.peer_id.clone(), cert.clone());
                 info!("Added peer {} to pending approval list", peer.peer_id);
+            } else if !Self::verify_self_signed_cert(cert) {
+                warn!(
+                    "Peer {} certificate failed BLAKE3 verification",
+                    peer.peer_id
+                );
             }
         }
 
@@ -391,6 +439,52 @@ mod tests {
             .expect("test: expected success");
         assert_eq!(handler.get_pending_peers().await.len(), 0);
         assert_eq!(handler.get_trusted_peers().await.len(), 1);
+    }
+
+    #[test]
+    fn test_blake3_cert_generation_and_verification() {
+        let cert = P2PNetworkHandler::generate_self_signed_cert();
+
+        // Certificate must be self-signed
+        assert!(cert.is_self_signed());
+
+        // Public key must be 32 bytes (BLAKE3 output)
+        assert_eq!(cert.public_key.len(), 32);
+
+        // Signature must be 32 bytes (BLAKE3 output)
+        assert_eq!(cert.signature.len(), 32);
+
+        // Fingerprint must be 64 hex chars (BLAKE3 output)
+        assert_eq!(cert.fingerprint.len(), 64);
+
+        // Verify must pass
+        assert!(
+            P2PNetworkHandler::verify_self_signed_cert(&cert),
+            "generated cert must verify"
+        );
+    }
+
+    #[test]
+    fn test_tampered_cert_fails_verification() {
+        let mut cert = P2PNetworkHandler::generate_self_signed_cert();
+
+        // Tamper with signature
+        cert.signature[0] ^= 0xFF;
+        assert!(
+            !P2PNetworkHandler::verify_self_signed_cert(&cert),
+            "tampered cert must fail"
+        );
+    }
+
+    #[test]
+    fn test_cert_fingerprint_deterministic() {
+        let cert = P2PNetworkHandler::generate_self_signed_cert();
+        // Recompute fingerprint from public_key + subject
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&cert.public_key);
+        hasher.update(cert.subject.as_bytes());
+        let expected = hex::encode(hasher.finalize().as_bytes());
+        assert_eq!(cert.fingerprint, expected);
     }
 
     #[tokio::test]

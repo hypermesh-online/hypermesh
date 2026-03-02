@@ -401,6 +401,57 @@ impl ServiceDiscovery {
         self.hardcoded_endpoints.read().keys().cloned().collect()
     }
 
+    /// Register a local service for discovery by other nodes.
+    ///
+    /// Adds the service endpoint to the hardcoded registry and the cache,
+    /// making it immediately resolvable. Remote registration (announcing
+    /// to peers) requires the gossip or mDNS layer in blockmatrix.
+    pub fn register_service(
+        &self,
+        service_type: ServiceType,
+        address: Ipv6Addr,
+        port: u16,
+        metadata: ServiceMetadata,
+    ) -> Result<()> {
+        let name = service_type.to_string();
+        let endpoint = ServiceEndpoint {
+            name: name.clone(),
+            address,
+            port,
+            server_name: None,
+            metadata,
+            expires_at: SystemTime::now() + self.default_ttl,
+        };
+
+        self.add_hardcoded_endpoint(endpoint);
+        info!("Registered local service '{}' at [{}]:{}", name, address, port);
+        Ok(())
+    }
+
+    /// Unregister a service.
+    pub fn unregister_service(&self, service_name: &str) {
+        self.hardcoded_endpoints.write().remove(service_name);
+        self.cache.remove(service_name);
+        info!("Unregistered service '{}'", service_name);
+    }
+
+    /// Get all registered service types.
+    pub fn registered_service_types(&self) -> Vec<ServiceType> {
+        let hardcoded = self.hardcoded_endpoints.read();
+        hardcoded
+            .keys()
+            .filter_map(|name| match name.as_str() {
+                "caesar" => Some(ServiceType::Caesar),
+                "blockmatrix" => Some(ServiceType::BlockMatrix),
+                "trustchain" => Some(ServiceType::TrustChain),
+                "catalog" => Some(ServiceType::Catalog),
+                "stoq" => Some(ServiceType::Stoq),
+                "hypermesh" => Some(ServiceType::HyperMesh),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Backward compatibility: resolve_service -> resolve
     #[deprecated(since = "0.1.0", note = "use resolve instead")]
     pub fn resolve_service(&self, name: &str) -> Result<ServiceEndpoint> {
@@ -486,6 +537,55 @@ mod tests {
 
         let resolved = discovery.resolve("custom").expect("test: expected success");
         assert_eq!(resolved.port, 9999);
+    }
+
+    #[test]
+    fn test_register_service() {
+        let discovery = ServiceDiscovery::new(Duration::from_secs(300));
+
+        discovery
+            .register_service(
+                ServiceType::Stoq,
+                Ipv6Addr::LOCALHOST,
+                9292,
+                ServiceMetadata {
+                    version: Some("1.0.0".to_string()),
+                    capabilities: vec!["transport".to_string()],
+                    priority: 1,
+                    weight: 100,
+                    matrix_position: Some((5, 10, 15)),
+                },
+            )
+            .expect("test: register should succeed");
+
+        let resolved = discovery.resolve("stoq").expect("test: resolve registered service");
+        assert_eq!(resolved.port, 9292);
+        assert_eq!(resolved.address, Ipv6Addr::LOCALHOST);
+    }
+
+    #[test]
+    fn test_unregister_service() {
+        let discovery = ServiceDiscovery::new(Duration::from_secs(300));
+
+        // Resolve a hardcoded service first
+        let _ = discovery.resolve("caesar").expect("test: resolve caesar");
+
+        // Unregister it
+        discovery.unregister_service("caesar");
+
+        // Should now fail
+        assert!(discovery.resolve("caesar").is_err());
+    }
+
+    #[test]
+    fn test_registered_service_types() {
+        let discovery = ServiceDiscovery::new(Duration::from_secs(300));
+
+        let types = discovery.registered_service_types();
+        assert!(types.contains(&ServiceType::TrustChain));
+        assert!(types.contains(&ServiceType::HyperMesh));
+        assert!(types.contains(&ServiceType::Caesar));
+        assert!(types.contains(&ServiceType::Catalog));
     }
 
     #[test]

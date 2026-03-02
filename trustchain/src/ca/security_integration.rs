@@ -741,6 +741,8 @@ mod tests {
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let result = integrated_ca.issue_certificate_secure(request).await;

@@ -362,8 +362,12 @@ mod tests {
             shard_map.add_entry(entry);
         }
 
+        // Derive actual RS parameters from processed shards (adaptive RS per R14)
+        let data_shards = processed.shards.iter().filter(|s| !s.metadata.is_parity).count();
+        let parity_shards = processed.shards.iter().filter(|s| s.metadata.is_parity).count();
+
         let metadata = RetrievalMetadata {
-            erasure_coding: (10, 4),
+            erasure_coding: (data_shards, parity_shards),
             compression: "brotli".to_string(),
             encryption: "kyber-1024".to_string(),
             content_type: "application/octet-stream".to_string(),
@@ -449,8 +453,12 @@ mod tests {
             shard_map.add_entry(entry);
         }
 
+        // Derive actual RS parameters from processed shards (adaptive RS per R14)
+        let data_shards = processed.shards.iter().filter(|s| !s.metadata.is_parity).count();
+        let parity_shards = processed.shards.iter().filter(|s| s.metadata.is_parity).count();
+
         let metadata = RetrievalMetadata {
-            erasure_coding: (10, 4),
+            erasure_coding: (data_shards, parity_shards),
             compression: "brotli".to_string(),
             encryption: "aes-256-gcm".to_string(),
             content_type: "application/octet-stream".to_string(),

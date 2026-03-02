@@ -166,14 +166,17 @@ pub struct EphemeralKey {
 
 impl EphemeralKey {
     /// Create new ephemeral key with random key material.
-    /// Uses random bytes until FALCON-1024 key generation is integrated.
+    ///
+    /// The public key is the BLAKE3 hash of the random private key,
+    /// providing a deterministic binding between the two halves.
     pub fn generate() -> Self {
         use rand::Rng;
         let mut rng = rand::thread_rng();
-        let mut public_key = vec![0u8; 32];
-        rng.fill(public_key.as_mut_slice());
         let mut private_key = vec![0u8; 32];
         rng.fill(private_key.as_mut_slice());
+
+        // Public key = BLAKE3(private_key) -- deterministic derivation
+        let public_key = blake3::hash(&private_key).as_bytes().to_vec();
 
         EphemeralKey {
             session_id: Uuid::new_v4(),

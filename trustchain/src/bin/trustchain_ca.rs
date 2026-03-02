@@ -336,6 +336,8 @@ async fn main() -> Result<()> {
                         ipv6_addresses,
                         consensus_proof,
                         timestamp: SystemTime::now(),
+                        identity_scope: None,
+                        subject_type: None,
                     };
 
                     // Issue certificate
@@ -485,6 +487,8 @@ async fn main() -> Result<()> {
                             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                             consensus_proof: ConsensusProof::new_for_testing(),
                             timestamp: SystemTime::now(),
+                            identity_scope: None,
+                            subject_type: None,
                         };
 
                         match ca.issue_certificate(cert_request).await {

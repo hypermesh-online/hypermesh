@@ -163,6 +163,44 @@ pub struct CertificateRequest {
     pub consensus_proof: ConsensusProof,
     /// Request timestamp
     pub timestamp: SystemTime,
+    /// Identity scope for scope-aware certificates (Item 2.6/2.7)
+    /// When None, defaults to Device scope, untracked (anonymous)
+    #[serde(default)]
+    pub identity_scope: Option<CertificateIdentityScope>,
+    /// Certificate subject type for KeyUsage/EKU selection (Item 2.4)
+    /// When None, defaults to Node
+    #[serde(default)]
+    pub subject_type: Option<CertificateSubjectType>,
+}
+
+/// Identity scope embedded into certificates (Items 2.6, 2.7)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CertificateIdentityScope {
+    /// Blockchain scope: Device (local) or Network (synced)
+    pub blockchain_scope: hypermesh_lib::BlockchainScope,
+    /// Whether the identity is tracked
+    pub tracked: bool,
+}
+
+/// Certificate subject type for KeyUsage/EKU decisions (Item 2.4)
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CertificateSubjectType {
+    /// Node identity: gets digitalSignature + keyEncipherment + serverAuth + clientAuth
+    Node,
+    /// Service identity: gets digitalSignature + serverAuth
+    Service,
+    /// Agent identity: gets digitalSignature + clientAuth
+    Agent,
+}
+
+impl From<CertificateSubjectType> for hypermesh_lib::WorkloadType {
+    fn from(cst: CertificateSubjectType) -> Self {
+        match cst {
+            CertificateSubjectType::Node => Self::Node,
+            CertificateSubjectType::Service => Self::Service,
+            CertificateSubjectType::Agent => Self::Agent,
+        }
+    }
 }
 
 /// Issued certificate information
@@ -217,41 +255,44 @@ pub enum CertificateStatus {
     Expired,
 }
 
-/// CA metrics for monitoring
+/// CA metrics for monitoring (Item 2.8: real certificate operation metrics)
 #[derive(Default)]
 pub struct CAMetrics {
     pub certificates_issued: std::sync::atomic::AtomicU64,
-    // AWS CloudHSM dependencies REMOVED - software-only operation
-    // hsm_operations metric removed
+    /// Certificates revoked (Item 2.8)
+    pub certificates_revoked: std::sync::atomic::AtomicU64,
     pub consensus_validations: std::sync::atomic::AtomicU64,
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
+    /// Validation latency in milliseconds (Item 2.8)
+    pub validation_latency_ms: std::sync::atomic::AtomicU64,
     pub performance_violations: std::sync::atomic::AtomicU64,
 }
 
 impl Clone for CAMetrics {
     fn clone(&self) -> Self {
+        use std::sync::atomic::Ordering::Relaxed;
         Self {
             certificates_issued: std::sync::atomic::AtomicU64::new(
-                self.certificates_issued
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.certificates_issued.load(Relaxed),
             ),
-            // AWS CloudHSM dependencies REMOVED - hsm_operations removed
+            certificates_revoked: std::sync::atomic::AtomicU64::new(
+                self.certificates_revoked.load(Relaxed),
+            ),
             consensus_validations: std::sync::atomic::AtomicU64::new(
-                self.consensus_validations
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.consensus_validations.load(Relaxed),
             ),
             ct_log_entries: std::sync::atomic::AtomicU64::new(
-                self.ct_log_entries
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.ct_log_entries.load(Relaxed),
             ),
             average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
-                self.average_issuance_time_ms
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.average_issuance_time_ms.load(Relaxed),
+            ),
+            validation_latency_ms: std::sync::atomic::AtomicU64::new(
+                self.validation_latency_ms.load(Relaxed),
             ),
             performance_violations: std::sync::atomic::AtomicU64::new(
-                self.performance_violations
-                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.performance_violations.load(Relaxed),
             ),
         }
     }
@@ -259,38 +300,15 @@ impl Clone for CAMetrics {
 
 impl std::fmt::Debug for CAMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::sync::atomic::Ordering::Relaxed;
         f.debug_struct("CAMetrics")
-            .field(
-                "certificates_issued",
-                &self
-                    .certificates_issued
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            )
-            // AWS CloudHSM dependencies REMOVED - hsm_operations field removed
-            .field(
-                "consensus_validations",
-                &self
-                    .consensus_validations
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            )
-            .field(
-                "ct_log_entries",
-                &self
-                    .ct_log_entries
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            )
-            .field(
-                "average_issuance_time_ms",
-                &self
-                    .average_issuance_time_ms
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            )
-            .field(
-                "performance_violations",
-                &self
-                    .performance_violations
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            )
+            .field("certificates_issued", &self.certificates_issued.load(Relaxed))
+            .field("certificates_revoked", &self.certificates_revoked.load(Relaxed))
+            .field("consensus_validations", &self.consensus_validations.load(Relaxed))
+            .field("ct_log_entries", &self.ct_log_entries.load(Relaxed))
+            .field("average_issuance_time_ms", &self.average_issuance_time_ms.load(Relaxed))
+            .field("validation_latency_ms", &self.validation_latency_ms.load(Relaxed))
+            .field("performance_violations", &self.performance_violations.load(Relaxed))
             .finish()
     }
 }
@@ -301,38 +319,15 @@ impl serde::Serialize for CAMetrics {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("CAMetrics", 5)?; // AWS CloudHSM dependencies REMOVED - reduced field count
-        state.serialize_field(
-            "certificates_issued",
-            &self
-                .certificates_issued
-                .load(std::sync::atomic::Ordering::Relaxed),
-        )?;
-        // AWS CloudHSM dependencies REMOVED - hsm_operations serialization removed
-        state.serialize_field(
-            "consensus_validations",
-            &self
-                .consensus_validations
-                .load(std::sync::atomic::Ordering::Relaxed),
-        )?;
-        state.serialize_field(
-            "ct_log_entries",
-            &self
-                .ct_log_entries
-                .load(std::sync::atomic::Ordering::Relaxed),
-        )?;
-        state.serialize_field(
-            "average_issuance_time_ms",
-            &self
-                .average_issuance_time_ms
-                .load(std::sync::atomic::Ordering::Relaxed),
-        )?;
-        state.serialize_field(
-            "performance_violations",
-            &self
-                .performance_violations
-                .load(std::sync::atomic::Ordering::Relaxed),
-        )?;
+        use std::sync::atomic::Ordering::Relaxed;
+        let mut state = serializer.serialize_struct("CAMetrics", 7)?;
+        state.serialize_field("certificates_issued", &self.certificates_issued.load(Relaxed))?;
+        state.serialize_field("certificates_revoked", &self.certificates_revoked.load(Relaxed))?;
+        state.serialize_field("consensus_validations", &self.consensus_validations.load(Relaxed))?;
+        state.serialize_field("ct_log_entries", &self.ct_log_entries.load(Relaxed))?;
+        state.serialize_field("average_issuance_time_ms", &self.average_issuance_time_ms.load(Relaxed))?;
+        state.serialize_field("validation_latency_ms", &self.validation_latency_ms.load(Relaxed))?;
+        state.serialize_field("performance_violations", &self.performance_violations.load(Relaxed))?;
         state.end()
     }
 }
@@ -345,22 +340,24 @@ impl<'de> serde::Deserialize<'de> for CAMetrics {
         #[derive(serde::Deserialize)]
         struct CAMetricsData {
             certificates_issued: u64,
-            // AWS CloudHSM dependencies REMOVED - hsm_operations field removed
+            #[serde(default)]
+            certificates_revoked: u64,
             consensus_validations: u64,
             ct_log_entries: u64,
             average_issuance_time_ms: u64,
+            #[serde(default)]
+            validation_latency_ms: u64,
             performance_violations: u64,
         }
 
         let data = CAMetricsData::deserialize(deserializer)?;
         Ok(Self {
             certificates_issued: std::sync::atomic::AtomicU64::new(data.certificates_issued),
-            // AWS CloudHSM dependencies REMOVED - software-only operation
+            certificates_revoked: std::sync::atomic::AtomicU64::new(data.certificates_revoked),
             consensus_validations: std::sync::atomic::AtomicU64::new(data.consensus_validations),
             ct_log_entries: std::sync::atomic::AtomicU64::new(data.ct_log_entries),
-            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
-                data.average_issuance_time_ms,
-            ),
+            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(data.average_issuance_time_ms),
+            validation_latency_ms: std::sync::atomic::AtomicU64::new(data.validation_latency_ms),
             performance_violations: std::sync::atomic::AtomicU64::new(data.performance_violations),
         })
     }
@@ -568,6 +565,7 @@ impl TrustChainCA {
 
     /// Validate certificate chain
     pub async fn validate_certificate_chain(&self, cert_der: &[u8]) -> Result<bool> {
+        let start = std::time::Instant::now();
         debug!("Validating certificate chain");
 
         // Parse certificate
@@ -688,13 +686,81 @@ impl TrustChainCA {
                 .push(rcgen::SanType::IpAddress(std::net::IpAddr::V6(*ipv6_addr)));
         }
 
-        // Set validity period
+        // Item 2.7: Set validity period based on identity scope
         let now = SystemTime::now();
-        let expires_at =
-            now + Duration::from_secs(self.config.cert_validity_days as u64 * 24 * 60 * 60);
+        let validity_secs = match &request.identity_scope {
+            Some(scope) if !scope.tracked => {
+                // Anonymous: ephemeral (15 minutes)
+                15 * 60
+            }
+            Some(scope) if scope.tracked && matches!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Device) => {
+                // Private/bounded group: medium validity (7 days)
+                7 * 24 * 60 * 60
+            }
+            Some(scope) if scope.tracked && matches!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Network) => {
+                // Public/network: full chain (90 days)
+                90 * 24 * 60 * 60
+            }
+            _ => {
+                // Default: use configured validity
+                self.config.cert_validity_days as u64 * 24 * 60 * 60
+            }
+        };
+        let expires_at = now + Duration::from_secs(validity_secs);
 
         params.not_before = now.into();
         params.not_after = expires_at.into();
+
+        // Item 2.4: Set KeyUsage and ExtendedKeyUsage based on subject type
+        let subject_type = request.subject_type.unwrap_or(CertificateSubjectType::Node);
+        let mut key_usages = vec![
+            rcgen::KeyUsagePurpose::DigitalSignature,
+        ];
+        let mut eku_purposes = Vec::new();
+
+        match subject_type {
+            CertificateSubjectType::Node => {
+                key_usages.push(rcgen::KeyUsagePurpose::KeyEncipherment);
+                eku_purposes.push(rcgen::ExtendedKeyUsagePurpose::ServerAuth);
+                eku_purposes.push(rcgen::ExtendedKeyUsagePurpose::ClientAuth);
+            }
+            CertificateSubjectType::Service => {
+                eku_purposes.push(rcgen::ExtendedKeyUsagePurpose::ServerAuth);
+            }
+            CertificateSubjectType::Agent => {
+                eku_purposes.push(rcgen::ExtendedKeyUsagePurpose::ClientAuth);
+            }
+        }
+        params.key_usages = key_usages;
+        params.extended_key_usages = eku_purposes;
+
+        // Item 2.6: Embed identity scope extension as custom X.509 extension
+        if let Some(ref scope) = request.identity_scope {
+            let scope_ext = crate::trust::hypermesh_integration::types::IdentityScopeExtension {
+                subject_type: match subject_type {
+                    CertificateSubjectType::Node => crate::trust::hypermesh_integration::types::CertificateSubjectType::Node,
+                    CertificateSubjectType::Service => crate::trust::hypermesh_integration::types::CertificateSubjectType::Service,
+                    CertificateSubjectType::Agent => crate::trust::hypermesh_integration::types::CertificateSubjectType::Agent,
+                },
+                blockchain_scope: scope.blockchain_scope,
+                tracked: scope.tracked,
+                workload_type: hypermesh_lib::WorkloadType::from(subject_type),
+            };
+            let scope_bytes = scope_ext.to_bytes();
+            let oid_parts: Vec<u64> = crate::trust::hypermesh_integration::types::IDENTITY_SCOPE_EXTENSION_OID
+                .split('.')
+                .filter_map(|s| s.parse::<u64>().ok())
+                .collect();
+            if oid_parts.len() >= 2 {
+                params.custom_extensions.push(
+                    rcgen::CustomExtension::from_oid_content(
+                        &oid_parts,
+                        scope_bytes.to_vec(),
+                    ),
+                );
+            }
+            debug!("Added identity scope extension: scope={:?}, tracked={}", scope.blockchain_scope, scope.tracked);
+        }
 
         // Add HyperMesh consensus metadata as certificate extension
         if let Some(proof_hash) = consensus_result.proof_hash {
@@ -703,7 +769,6 @@ impl TrustChainCA {
                 hex::encode(proof_hash),
                 consensus_result.validator_id
             );
-            // Note: In production, this would be added as a proper X.509 extension
             debug!(
                 "Adding HyperMesh consensus metadata: {}",
                 consensus_extension
@@ -862,6 +927,8 @@ mod tests {
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let issued_cert = ca
@@ -887,6 +954,8 @@ mod tests {
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let issued_cert = ca

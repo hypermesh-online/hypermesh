@@ -11,6 +11,9 @@ use tracing::{debug, warn};
 /// Network tier classification for adaptive configuration
 #[derive(Debug, Clone)]
 pub enum NetworkTier {
+    /// R13 minimum spec: 1 Mb/s network, 50GB storage, 4GB RAM, 2-core 1GHz.
+    /// Streaming reconstruction mandatory at this tier.
+    MinSpec { mbps: f64 },
     /// Slow networks (<100 Mbps)
     Slow { mbps: f64 },
     /// Home broadband (100 Mbps - 1 Gbps)
@@ -26,7 +29,11 @@ pub enum NetworkTier {
 }
 
 impl NetworkTier {
-    /// Create network tier from Gbps measurement
+    /// Create network tier from Gbps measurement.
+    ///
+    /// Networks below 10 Mbps are classified as `MinSpec` (R13 minimum
+    /// device spec: 1 Mb/s network). This tier uses extremely conservative
+    /// buffer sizes and streaming reconstruction.
     pub fn from_gbps(gbps: f64) -> Self {
         let mbps = gbps * 1000.0;
         match gbps {
@@ -35,7 +42,8 @@ impl NetworkTier {
             g if g >= 2.5 => NetworkTier::Performance { gbps: g },
             g if g >= 1.0 => NetworkTier::Standard { gbps: g },
             _g if mbps >= 100.0 => NetworkTier::Home { mbps },
-            _ => NetworkTier::Slow { mbps },
+            _g if mbps >= 10.0 => NetworkTier::Slow { mbps },
+            _ => NetworkTier::MinSpec { mbps },
         }
     }
 
@@ -202,6 +210,24 @@ impl TransportConfig {
     /// Adapt configuration based on detected network tier for true adaptive behavior
     pub fn adapt_for_network_tier(&mut self, network_tier: &NetworkTier) {
         match network_tier {
+            NetworkTier::MinSpec { .. } => {
+                // R13 minimum spec: 1 Mb/s network, 4GB RAM, 2-core 1GHz
+                // Extremely conservative to avoid overwhelming the device.
+                // Streaming reconstruction is mandatory at this tier.
+                self.send_buffer_size = 64 * 1024; // 64KB
+                self.receive_buffer_size = 64 * 1024;
+                self.max_concurrent_streams = 2;
+                self.frame_batch_size = 1; // No batching
+                self.enable_zero_copy = false;
+                self.enable_memory_pool = false;
+                self.enable_large_send_offload = false;
+                self.enable_cpu_affinity = false;
+                self.max_datagram_size = 1200; // Conservative MTU
+                self.connection_pool_size = 4; // Minimal pool
+                self.max_connections = Some(8); // Very limited
+                self.congestion_control = CongestionControl::NewReno; // Lightest CC
+                debug!("Adapted config for R13 minimum spec tier");
+            }
             NetworkTier::Slow { .. } => {
                 // Optimize for low bandwidth (<100 Mbps)
                 self.send_buffer_size = 256 * 1024; // 256KB

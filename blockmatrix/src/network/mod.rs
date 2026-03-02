@@ -10,9 +10,12 @@
 pub mod blockchain_integration;
 pub mod cluster;
 pub mod config;
+pub mod discovery;
+pub mod gossip;
 pub mod isolation;
 pub mod multi_network;
 pub mod reflector_pool;
+pub mod shard_transport;
 pub mod stoq_integration;
 pub mod sync_dispatch;
 pub mod trust;
@@ -277,19 +280,82 @@ impl NetworkManager {
         })
     }
 
-    /// Start mDNS discovery for local network
+    /// Start mDNS discovery for local network.
     async fn start_mdns_discovery(&self) -> Result<()> {
-        // TODO: Implement actual mDNS discovery
-        // For now, this is a placeholder
-        debug!("mDNS discovery would start here");
+        let node_id = self.get_node_id();
+        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
+
+        let mdns = discovery::MdnsDiscovery::new(node_id, self.local_coordinate, stoq_port);
+        match mdns.start().await {
+            Ok(()) => {
+                info!("mDNS discovery started on _hypermesh._udp.local");
+            }
+            Err(e) => {
+                // mDNS failure is non-fatal (may lack multicast permissions)
+                warn!("mDNS discovery failed to start: {e}");
+            }
+        }
         Ok(())
     }
 
-    /// Start gossip protocol for network discovery
+    /// Start gossip protocol for network state sharing.
     async fn start_gossip_protocol(&self) -> Result<()> {
-        // TODO: Implement gossip protocol
-        // For now, this is a placeholder
-        debug!("Gossip protocol would start here");
+        let node_id = self.get_node_id();
+        let mode = *self.privacy_mode.read().await;
+        let privacy_str = format!("{mode:?}");
+        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
+
+        let gossip_proto = gossip::GossipProtocol::new(
+            node_id,
+            self.local_coordinate,
+            stoq_port,
+            privacy_str,
+        );
+        gossip_proto.start().await;
+
+        // Spawn a background task that periodically gossips to connected peers
+        let nodes = self.nodes.clone();
+        let gossip_state = gossip_proto.state();
+        let interval = gossip_proto.gossip_interval();
+
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(interval).await;
+
+                let connected = nodes.read().await;
+                if connected.is_empty() {
+                    continue;
+                }
+
+                // Build gossip message
+                let state = gossip_state.read().await;
+                let message = state.build_message();
+                drop(state);
+
+                let data = match serde_json::to_vec(&message) {
+                    Ok(d) => d,
+                    Err(_) => continue,
+                };
+
+                // Send to connected peers (best-effort)
+                for (node_id, node) in connected.iter() {
+                    if let Some(ref conn) = node.connection {
+                        match conn.open_stream().await {
+                            Ok(mut stream) => {
+                                if let Err(e) = stream.send(&data).await {
+                                    debug!("Gossip send to {node_id} failed: {e}");
+                                }
+                            }
+                            Err(e) => {
+                                debug!("Gossip stream to {node_id} failed: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        info!("Gossip protocol started with {} second interval", interval.as_secs());
         Ok(())
     }
 

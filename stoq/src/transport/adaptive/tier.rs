@@ -10,7 +10,7 @@ pub fn congestion_control_for_tier(tier: &NetworkTier) -> CongestionControl {
         | NetworkTier::Enterprise { .. }
         | NetworkTier::DataCenter { .. } => CongestionControl::Bbr2,
         NetworkTier::Standard { .. } | NetworkTier::Home { .. } => CongestionControl::Cubic,
-        NetworkTier::Slow { .. } => CongestionControl::NewReno,
+        NetworkTier::MinSpec { .. } | NetworkTier::Slow { .. } => CongestionControl::NewReno,
     }
 }
 
@@ -21,11 +21,13 @@ pub(crate) fn tier_step_down(tier: &NetworkTier) -> NetworkTier {
         NetworkTier::Performance { .. } => NetworkTier::Standard { gbps: 1.0 },
         NetworkTier::Standard { .. } => NetworkTier::Home { mbps: 100.0 },
         NetworkTier::Home { .. } | NetworkTier::Slow { .. } => NetworkTier::Slow { mbps: 10.0 },
+        NetworkTier::MinSpec { .. } => NetworkTier::MinSpec { mbps: 1.0 },
     }
 }
 
 pub(crate) fn tier_step_up(tier: &NetworkTier) -> NetworkTier {
     match tier {
+        NetworkTier::MinSpec { .. } => NetworkTier::Slow { mbps: 10.0 },
         NetworkTier::Slow { .. } => NetworkTier::Home { mbps: 100.0 },
         NetworkTier::Home { .. } => NetworkTier::Standard { gbps: 1.0 },
         NetworkTier::Standard { .. } => NetworkTier::Performance { gbps: 2.5 },

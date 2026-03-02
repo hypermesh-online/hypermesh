@@ -146,20 +146,44 @@ impl PublicNetworkHandler {
         // 3. Propagate to neighbor nodes via matrix topology
         // 4. Achieve consensus through 4-proof validation
 
-        // For now, create a blockchain-registered certificate
+        // Derive key material from PoS proofs using BLAKE3.
+        // Public key = BLAKE3(proof_of_stake || proof_of_space)
+        // Signature  = BLAKE3(subject || public_key || proof_of_work || proof_of_time)
+        let subject = format!("blockmatrix-node-{}", uuid::Uuid::new_v4());
+        let issuer = "blockmatrix-local-blockchain".to_string();
+
+        let mut pk_hasher = blake3::Hasher::new();
+        pk_hasher.update(&proof.proof_of_stake);
+        pk_hasher.update(&proof.proof_of_space);
+        let public_key = pk_hasher.finalize().as_bytes().to_vec();
+
+        let mut sig_hasher = blake3::Hasher::new();
+        sig_hasher.update(subject.as_bytes());
+        sig_hasher.update(&public_key);
+        sig_hasher.update(&proof.proof_of_work);
+        sig_hasher.update(&proof.proof_of_time);
+        let signature = sig_hasher.finalize().as_bytes().to_vec();
+
+        // Fingerprint = BLAKE3(public_key || subject || issuer)
+        let mut fp_hasher = blake3::Hasher::new();
+        fp_hasher.update(&public_key);
+        fp_hasher.update(subject.as_bytes());
+        fp_hasher.update(issuer.as_bytes());
+        let fingerprint = hex::encode(fp_hasher.finalize().as_bytes());
+
         let cert = Certificate {
-            subject: format!("blockmatrix-node-{}", uuid::Uuid::new_v4()),
-            issuer: "blockmatrix-local-blockchain".to_string(), // LOCAL blockchain, not trust.hypermesh.online
-            public_key: proof.proof_of_stake.clone(),           // Placeholder
-            signature: proof.proof_of_work.clone(),             // Placeholder
-            fingerprint: format!("blockchain:local:{}", blake3::hash(&proof.proof_of_stake)),
+            subject,
+            issuer,
+            public_key,
+            signature,
+            fingerprint,
             expires_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("system time should be after UNIX epoch")
                 .as_secs()
                 + (365 * 24 * 60 * 60), // 1 year
             network_type: super::NetworkType::Public,
-            blockchain_registered: true, // Registered on LOCAL blockchain
+            blockchain_registered: true,
         };
 
         info!(
@@ -520,6 +544,39 @@ mod tests {
             network_type: NetworkType::Public,
         };
         assert!(!handler.validate_peer(&invalid_peer).await.expect("test: async operation"));
+    }
+
+    #[tokio::test]
+    async fn test_blake3_certificate_derivation() {
+        let handler = PublicNetworkHandler::new();
+        let proof = ProofOfState {
+            proof_of_space: vec![1, 2, 3],
+            proof_of_stake: vec![4, 5, 6],
+            proof_of_work: vec![7, 8, 9],
+            proof_of_time: vec![10, 11, 12],
+        };
+
+        let stoq = StoqTransport::new_for_network(NetworkType::Public)
+            .expect("test: create transport");
+        let cert = handler
+            .register_on_local_blockchain(&stoq, &proof)
+            .await
+            .expect("test: register cert");
+
+        // Public key should be BLAKE3(PoStake || PoSpace)
+        let mut pk_hasher = blake3::Hasher::new();
+        pk_hasher.update(&proof.proof_of_stake);
+        pk_hasher.update(&proof.proof_of_space);
+        let expected_pk = pk_hasher.finalize().as_bytes().to_vec();
+        assert_eq!(cert.public_key, expected_pk);
+
+        // Signature should be 32 bytes (BLAKE3 output)
+        assert_eq!(cert.signature.len(), 32);
+
+        // Fingerprint should be 64 hex chars (BLAKE3 output)
+        assert_eq!(cert.fingerprint.len(), 64);
+
+        assert!(cert.is_blockchain_registered());
     }
 
     #[tokio::test]

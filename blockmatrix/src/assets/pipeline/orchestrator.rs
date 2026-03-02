@@ -232,10 +232,33 @@ impl AssetPipeline {
         );
 
         // Stage 3: Sharding (Reed-Solomon)
-        // Shard the encrypted blob into erasure-coded pieces
+        // Shard the encrypted blob into erasure-coded pieces.
+        // When the pipeline config uses the default RS(10,4) AND the asset
+        // size warrants different parameters, we use adaptive RS (R14).
         let (shards, sharding_stats) = if self.config.stages_enabled.sharding {
             tracing::debug!("Stage 3: Sharding");
-            self.sharder.shard(&encrypted_blob)?
+            let adaptive_config =
+                ShardingConfig::adaptive_for_size(original_size as u64);
+            let use_adaptive = self.config.sharding.data_shards
+                == ShardingConfig::default().data_shards
+                && self.config.sharding.parity_shards
+                    == ShardingConfig::default().parity_shards;
+
+            if use_adaptive
+                && (adaptive_config.data_shards != self.config.sharding.data_shards
+                    || adaptive_config.parity_shards != self.config.sharding.parity_shards)
+            {
+                tracing::info!(
+                    "Adaptive RS: RS({},{}) for {} bytes (R14)",
+                    adaptive_config.data_shards,
+                    adaptive_config.parity_shards,
+                    original_size,
+                );
+                let adaptive_sharder = Sharder::new(adaptive_config)?;
+                adaptive_sharder.shard(&encrypted_blob)?
+            } else {
+                self.sharder.shard(&encrypted_blob)?
+            }
         } else {
             // No sharding - create single shard
             let metadata = crate::assets::pipeline::sharding::ShardMetadata {
@@ -332,7 +355,32 @@ impl AssetPipeline {
         // Stage 1: Reconstruct encrypted blob from shards
         let encrypted_blob = if self.config.stages_enabled.sharding {
             tracing::debug!("Stage 1: Shard reconstruction");
-            self.sharder.reconstruct(&processed.shards)?
+            // Detect actual RS parameters from the processed shards (may differ
+            // from pipeline default due to adaptive sizing per R14).
+            // Only override when we have a complete set indicating different RS
+            // config -- partial shard sets (missing parity) should use
+            // the existing sharder which handles reconstruction with fewer shards.
+            let total = processed.shards.len();
+            let data_count = processed.shards.iter().filter(|s| !s.metadata.is_parity).count();
+            let parity_count = total - data_count;
+            let sharder = if parity_count > 0
+                && (data_count != self.config.sharding.data_shards
+                    || parity_count != self.config.sharding.parity_shards)
+            {
+                tracing::info!(
+                    "Adaptive RS reconstruction: RS({},{}) from shard metadata",
+                    data_count,
+                    parity_count,
+                );
+                &Sharder::new(ShardingConfig {
+                    data_shards: data_count,
+                    parity_shards: parity_count,
+                    target_shard_size: self.config.sharding.target_shard_size,
+                })?
+            } else {
+                &self.sharder
+            };
+            sharder.reconstruct(&processed.shards)?
         } else {
             processed
                 .shards

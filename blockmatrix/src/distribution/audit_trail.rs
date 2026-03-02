@@ -158,27 +158,38 @@ pub async fn record_migration(
     Ok(record)
 }
 
-/// Query audit trail for asset
+/// In-process audit ledger keyed by asset ID.
+///
+/// In production this would be backed by the node's blockchain.  For now
+/// we keep an append-only in-memory ledger protected by a global mutex
+/// so that `query_audit_trail` and `verify_placement` return real data
+/// recorded by `record_to_blockchain`.
+static AUDIT_LEDGER: std::sync::LazyLock<
+    tokio::sync::RwLock<std::collections::HashMap<String, Vec<AuditRecord>>>,
+> = std::sync::LazyLock::new(|| tokio::sync::RwLock::new(std::collections::HashMap::new()));
+
+/// Query audit trail for an asset.
+///
+/// Returns all audit records for `asset_id` ordered by timestamp (oldest
+/// first).  Returns an empty list if no records exist.
 pub async fn query_audit_trail(asset_id: &str) -> AssetResult<Vec<AuditRecord>> {
-    // Stub implementation - would query blockchain
     tracing::info!("Querying audit trail for asset: {}", asset_id);
 
-    // In production, this would:
-    // 1. Query blockchain for all placement records
-    // 2. Filter by asset_id
-    // 3. Order by timestamp
-    // 4. Return complete audit history
-
-    Ok(Vec::new())
+    let ledger = AUDIT_LEDGER.read().await;
+    let mut records = ledger.get(asset_id).cloned().unwrap_or_default();
+    records.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    Ok(records)
 }
 
-/// Verify placement against audit trail
+/// Verify that a shard is currently placed on the expected node.
+///
+/// Looks up the latest audit record for (`asset_id`, `shard_index`)
+/// and checks whether its `node_id` matches `expected_node`.
 pub async fn verify_placement(
     asset_id: &str,
     shard_index: usize,
     expected_node: &str,
 ) -> AssetResult<bool> {
-    // Stub implementation - would verify against blockchain
     tracing::info!(
         "Verifying placement: asset={}, shard={}, node={}",
         asset_id,
@@ -186,18 +197,29 @@ pub async fn verify_placement(
         expected_node
     );
 
-    // In production, this would:
-    // 1. Query latest audit record for this shard
-    // 2. Verify node_id matches expected_node
-    // 3. Validate blockchain signature
-    // 4. Check timestamp is recent
+    let ledger = AUDIT_LEDGER.read().await;
+    let records = match ledger.get(asset_id) {
+        Some(r) => r,
+        None => return Ok(false),
+    };
 
-    Ok(true)
+    // Find the latest record for this shard (by timestamp descending)
+    let latest = records
+        .iter()
+        .filter(|r| r.shard_index == shard_index)
+        .max_by_key(|r| r.timestamp);
+
+    match latest {
+        Some(record) => Ok(record.node_id == expected_node),
+        None => Ok(false),
+    }
 }
 
-/// Record audit record to blockchain (stub implementation)
+/// Record an audit record and return a BLAKE3-based transaction hash.
+///
+/// The record is serialized to JSON, hashed with BLAKE3, and stored in the
+/// in-process audit ledger.
 async fn record_to_blockchain(record: &AuditRecord) -> AssetResult<String> {
-    // Stub implementation - would submit blockchain transaction
     tracing::debug!(
         "Recording to blockchain: asset={}, shard={}, node={}",
         record.asset_id,
@@ -205,25 +227,25 @@ async fn record_to_blockchain(record: &AuditRecord) -> AssetResult<String> {
         record.node_id
     );
 
-    // In production, this would:
-    // 1. Serialize audit record
-    // 2. Create blockchain transaction
-    // 3. Sign with node key
-    // 4. Submit to blockchain
-    // 5. Wait for confirmation
-    // 6. Return transaction hash
+    // Serialize the record to produce deterministic input for hashing.
+    let serialized = serde_json::to_vec(record).map_err(|e| {
+        crate::assets::core::AssetError::ValidationError {
+            message: format!("audit record serialization failed: {e}"),
+        }
+    })?;
 
-    // Generate mock transaction hash
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    // BLAKE3 transaction hash (replaces the old DefaultHasher mock)
+    let hash = blake3::hash(&serialized);
+    let tx_hash = format!("0x{}", hex::encode(hash.as_bytes()));
 
-    let mut hasher = DefaultHasher::new();
-    record.asset_id.hash(&mut hasher);
-    record.shard_index.hash(&mut hasher);
-    record.node_id.hash(&mut hasher);
-    let hash_value = hasher.finish();
-
-    let tx_hash = format!("0x{hash_value:016x}");
+    // Append to the in-process ledger
+    let mut ledger = AUDIT_LEDGER.write().await;
+    let mut stored = record.clone();
+    stored.tx_hash = Some(tx_hash.clone());
+    ledger
+        .entry(record.asset_id.clone())
+        .or_default()
+        .push(stored);
 
     Ok(tx_hash)
 }
@@ -314,15 +336,68 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_query_audit_trail() {
-        let result = query_audit_trail("test-asset").await;
-        assert!(result.is_ok());
+    async fn test_query_audit_trail_returns_recorded_entries() {
+        // Use a unique asset ID to avoid cross-test ledger contamination
+        let asset_id = format!("query-test-{}", uuid::Uuid::new_v4());
+        let placements = vec![create_test_placement()];
+
+        // Record something first
+        record_shard_placement_on_chain(&asset_id, &placements)
+            .await
+            .expect("test: record placement");
+
+        // Now query
+        let records = query_audit_trail(&asset_id)
+            .await
+            .expect("test: query audit trail");
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].asset_id, asset_id);
+        assert_eq!(records[0].shard_index, 0);
+        assert!(records[0].tx_hash.is_some());
     }
 
     #[tokio::test]
-    async fn test_verify_placement() {
-        let result = verify_placement("test-asset", 0, "test-node").await;
-        assert!(result.is_ok());
-        assert!(result.expect("test: expected success"));
+    async fn test_verify_placement_matches_recorded_node() {
+        let asset_id = format!("verify-test-{}", uuid::Uuid::new_v4());
+        let placements = vec![create_test_placement()];
+
+        record_shard_placement_on_chain(&asset_id, &placements)
+            .await
+            .expect("test: record placement");
+
+        // Correct node should verify
+        let correct = verify_placement(&asset_id, 0, "test-node")
+            .await
+            .expect("test: verify correct");
+        assert!(correct);
+
+        // Wrong node should fail
+        let wrong = verify_placement(&asset_id, 0, "wrong-node")
+            .await
+            .expect("test: verify wrong");
+        assert!(!wrong);
+    }
+
+    #[tokio::test]
+    async fn test_verify_placement_unknown_asset_returns_false() {
+        let result = verify_placement("nonexistent-asset", 0, "any-node")
+            .await
+            .expect("test: verify unknown");
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn test_record_to_blockchain_uses_blake3() {
+        let asset_id = format!("blake3-test-{}", uuid::Uuid::new_v4());
+        let placements = vec![create_test_placement()];
+        let records = record_shard_placement_on_chain(&asset_id, &placements)
+            .await
+            .expect("test: record");
+
+        let tx_hash = records[0].tx_hash.as_ref().expect("test: tx_hash");
+        // BLAKE3 produces 64-char hex (32 bytes), prefixed with "0x"
+        assert!(tx_hash.starts_with("0x"));
+        assert_eq!(tx_hash.len(), 66, "0x + 64 hex chars");
     }
 }

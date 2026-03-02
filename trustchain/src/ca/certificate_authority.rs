@@ -271,8 +271,6 @@ impl TrustChainCA {
         &self,
         request: CertificateRequest,
     ) -> TrustChainResult<IssuedCertificate> {
-        let _root_ca = self.root_ca.read().await;
-
         // rcgen 0.13 API: CertificateParams::new() returns Result
         let mut params =
             CertificateParams::new(vec![request.common_name.clone()]).map_err(|e| {
@@ -292,8 +290,30 @@ impl TrustChainCA {
                 reason: format!("Failed to generate key pair: {e}"),
             })?;
 
-        // rcgen 0.13 API: Use self_signed() for now (TODO: needs CA signing)
-        let cert = params.self_signed(&key_pair).map_err(|e| {
+        // Build a CA CertificateParams + KeyPair for signing
+        let ca_key_pair = rcgen::KeyPair::generate().map_err(|e| {
+            TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to generate CA key pair for signing: {e}"),
+            }
+        })?;
+        let mut ca_params =
+            CertificateParams::new(vec![self.config.ca_id.clone()]).map_err(|e| {
+                TrustChainError::CertificateGenerationFailed {
+                    reason: format!("Failed to create CA params: {e}"),
+                }
+            })?;
+        ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+        let ca_cert = ca_params.self_signed(&ca_key_pair).map_err(|e| {
+            TrustChainError::CertificateGenerationFailed {
+                reason: format!("Failed to create CA cert for signing: {e}"),
+            }
+        })?;
+
+        // Leaf cert NOT a CA
+        params.is_ca = rcgen::IsCa::NoCa;
+
+        // Sign leaf with CA using signed_by()
+        let cert = params.signed_by(&key_pair, &ca_cert, &ca_key_pair).map_err(|e| {
             TrustChainError::CertificateGenerationFailed {
                 reason: e.to_string(),
             }
@@ -305,10 +325,11 @@ impl TrustChainCA {
         // Calculate fingerprint
         let fingerprint = self.calculate_certificate_fingerprint(&cert_der);
 
-        // Convert to PEM format
-        let certificate_pem = String::from_utf8_lossy(&cert_der).to_string(); // TODO: Proper DER to PEM conversion
-        let chain_pem = String::new(); // TODO: Build proper certificate chain
+        // Convert to proper PEM format with BEGIN/END headers
+        let certificate_pem = cert.pem();
 
+        // Build certificate chain PEM (leaf + root)
+        let chain_pem = format!("{}\n{}", certificate_pem, ca_cert.pem());
         let issued_cert = IssuedCertificate {
             serial_number: hex::encode(&fingerprint[..16]),
             certificate_der: cert_der,
@@ -566,6 +587,8 @@ mod tests {
                     reason: format!("Failed to generate consensus proof: {e}"),
                 })?,
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let issued_cert = ca

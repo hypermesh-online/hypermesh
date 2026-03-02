@@ -478,6 +478,8 @@ mod tests {
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::default_for_testing(),
             timestamp: std::time::SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let cert = trustchain.issue_certificate_secure(request).await.expect("test: async operation");

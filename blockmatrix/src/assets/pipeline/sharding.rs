@@ -35,6 +35,21 @@ impl Default for ShardingConfig {
 }
 
 impl ShardingConfig {
+    /// Create a [`ShardingConfig`] with adaptive RS parameters (R14).
+    ///
+    /// Delegates to [`hypermesh_lib::protocol::ErasureCodingParams::for_asset_size`]
+    /// which selects RS(k, n-k) based on the asset size.
+    pub fn adaptive_for_size(asset_bytes: u64) -> Self {
+        let params = hypermesh_lib::protocol::ErasureCodingParams::for_asset_size(asset_bytes);
+        Self {
+            data_shards: params.data_shards as usize,
+            parity_shards: params.parity_shards as usize,
+            target_shard_size: 1024 * 1024,
+        }
+    }
+}
+
+impl ShardingConfig {
     /// Total number of shards (data + parity)
     pub fn total_shards(&self) -> usize {
         self.data_shards + self.parity_shards
@@ -495,6 +510,40 @@ mod tests {
             );
             assert_eq!(reconstructed, data, "Size {size} data mismatch");
         }
+    }
+
+    #[test]
+    fn test_adaptive_sharding_small_asset() {
+        // < 1MB should get RS(4,2)
+        let config = ShardingConfig::adaptive_for_size(500_000);
+        assert_eq!(config.data_shards, 4);
+        assert_eq!(config.parity_shards, 2);
+
+        let sharder = Sharder::new(config).expect("test: adaptive sharder");
+        let data = vec![0xABu8; 500];
+        let (shards, stats) = sharder.shard(&data).expect("test: shard small");
+        assert_eq!(shards.len(), 6);
+        assert_eq!(stats.data_shards, 4);
+        assert_eq!(stats.parity_shards, 2);
+
+        let reconstructed = sharder.reconstruct(&shards).expect("test: reconstruct");
+        assert_eq!(reconstructed, data);
+    }
+
+    #[test]
+    fn test_adaptive_sharding_medium_asset() {
+        // 50MB should get RS(10,4)
+        let config = ShardingConfig::adaptive_for_size(50_000_000);
+        assert_eq!(config.data_shards, 10);
+        assert_eq!(config.parity_shards, 4);
+    }
+
+    #[test]
+    fn test_adaptive_sharding_large_asset() {
+        // 500MB should get RS(20,8)
+        let config = ShardingConfig::adaptive_for_size(500_000_000);
+        assert_eq!(config.data_shards, 20);
+        assert_eq!(config.parity_shards, 8);
     }
 
     #[test]
