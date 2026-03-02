@@ -21,7 +21,6 @@ items = [
     "Threshold cryptography (Shamir SSS over GF(256))",
     "Deployment quality gates",
     "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-    "HTTP/3 server with 8 real handlers (issue, validate, revoke, list, get, health, metrics, dns_resolve) + 8 stub endpoints (status, dns_zones, dns_register, etc.)",
     "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
     "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
     "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
@@ -32,26 +31,27 @@ items = [
     "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
     "Identity-scoped certificate extensions (IdentityScopeExtension, OID-based, 4-byte encode/decode)",
     "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)",
+    "CA-signed leaf certificates (rcgen signed_by() chain, proper X.509 hierarchy)",
+    "Certificate PEM encoding (rcgen .pem() output, proper base64)",
+    "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs, cert hash search)",
+    "KeyUsage/EKU enforcement in issued X.509 certs (digital signature, key encipherment, server/client auth by subject type)",
+    "Threshold crypto integration with CA initialization (Shamir SSS key splitting at startup)",
+    "Scope-aware certificates (IdentityScopeExtension embedded via custom OID, Device vs Network scope)",
+    "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
+    "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, validation/issuance latency)",
+    "HTTP/3 handlers: list_certificates wired to real cert store",
 ]
 
 [features.in_development]
 items = [
-    "CA-signed leaf certificates (currently self-signed X.509 with appended FALCON-1024 signature, not true CA-signed X.509)",
-    "Certificate Transparency (Merkle tree structure exists, consistency checker and cert hash search are placeholders)",
-    "Certificate PEM encoding (DER bytes cast to UTF-8 lossy instead of proper PEM base64 encoding)",
-    "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate)",
+    "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate — partially wired)",
 ]
 
 [features.planned]
 items = [
-    "KeyUsage/EKU enforcement in issued X.509 certs",
-    "Threshold crypto integration with CA initialization",
     "Distributed revocation propagation",
     "Offline device grace period renewal",
-    "Cascading revocation (parent→child identity propagation)",
-    "Real certificate operation metrics (issuance latency, validation throughput)",
+    "Cascading revocation (parent->child identity propagation)",
     "CRL distribution via blockchain (offline revocation)",
     "Field device bootstrap with intermittent connectivity",
-    "Scope-aware certificates (certificate awareness of Device vs Network scope, traceability enforcement per scope)",
-    "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)",
 ]

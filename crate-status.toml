@@ -14,6 +14,7 @@ items = [
     "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
     "Unified cross-crate identity model (NodeId BLAKE3([u8;32]), ScopedIdentity, WorkloadType — all crates use lib canonical types)",
     "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)",
+    "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)",
 ]
 
 [features.in_development]
@@ -29,5 +30,4 @@ items = [
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
     "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
     "Real partition/chaos testing framework",
-    "Certificate lifecycle per scope (Anonymous=ephemeral, Private=bounded group certs, Public=full transparency chain)",
 ]

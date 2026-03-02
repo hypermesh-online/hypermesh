@@ -34,7 +34,7 @@ export const crateStatuses: CrateStatus[] = [
         "ExtensionValidator for HyperMesh headers (PoS, asset hash, routing, privacy)",
         "Security integration framework (eBPF manager, syscall tracing, metrics collection)",
         "Privacy-eBPF bridge (PrivacyEbpfBridge tier updates, flexibility matrix, sync_to_kernel)",
-        "Asset pipeline (Compress→Encrypt(Kyber-1024)→Shard→Distribute placement calculation, correct order, single-node only)",
+        "Asset pipeline (Compress->Encrypt(Kyber-1024)->Shard->Distribute, adaptive RS parameters by asset size)",
         "Cross-scope proxy routing (ScopeAwareRouter, gateway node selection, encryption enforcement)",
         "Tensor operations for cross-network transaction routing (TransactionRouter, scope-aware pathfinding, relay optimization)",
         "CLI for matrix topology queries, node management, and asset operations (CommandExecutor, CliOutput, 34 tests)",
@@ -52,40 +52,39 @@ export const crateStatuses: CrateStatus[] = [
         "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
         "PeerIdentity bridges to lib NodeId (to_node_id(), From<&ScopedIdentity>)",
         "NodeFingerprint From<NodeId> conversion (same 32-byte concept)",
-        "NetworkScope::from_identity() for scope-aware asset access"
+        "NetworkScope::from_identity() for scope-aware asset access",
+        "Genesis capability assessment (R1, R10 — GenesisAssessor: hardware probe -> GenesisAssetRecord per resource with IPv6 addressing)",
+        "Asset blockchain registration (register_asset_record creates block, validates PoS, appends to chain)",
+        "Automatic shard commitment in block production (R12 — BLAKE3(sorted placements) computed and set on block)",
+        "Distribution audit trail (record_to_blockchain, verify_placement, query_audit_trail — real BLAKE3-based ledger)",
+        "Adaptive erasure coding (R14 — ErasureCodingParams::for_asset_size wired into pipeline, scales RS with asset size)",
+        "Network trust layer (BLAKE3 crypto for p2p/federated/public, NodeId-based auth, PrivacyMode-aware trust)",
+        "ShardTransport trait (send_shard/fetch_shard/is_reachable, MockShardTransport for testing)",
+        "Instruction-based retrieval with ShardTransport integration (fetch_from_location wired to trait)",
+        "mDNS peer discovery (PeerAnnouncement, multicast protocol on _hypermesh._udp.local)",
+        "Gossip protocol for mesh coordination (GossipState, membership tracking, configurable fanout/interval)"
       ],
       "inDevelopment": [
-        "Automatic shard commitment in block production (distribution pipeline → compute_commitment → set on block)",
-        "Instruction-based retrieval client assembly (shard maps work, fetch_from_location is 5ms sleep stub)",
-        "Asset blockchain registration (register_asset_record has TODO — consensus wiring incomplete)",
-        "Distributed shard fetch over STOQ (fetch_from_location placeholder returns zeroed bytes)",
         "Node binary Anonymous certificate strategy fix",
         "Network scope sync + reflector pooling (data structures and state machines implemented, no actual network I/O)",
         "Dynamic shard rebalancing (calculates rebalancing decisions, cannot execute — distribution is calculation-only)",
-        "Gateway cross-scope transfers (protocol logic Lock→Transfer→Unlock implemented, no network transport wired)",
-        "Multi-node deployment (ClusterManager exists, network trust modules are heavily placeholder-based)",
+        "Gateway cross-scope transfers (protocol logic Lock->Transfer->Unlock implemented, no network transport wired)",
+        "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
         "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
         "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
-        "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)",
-        "Distribution audit trail (record_to_blockchain is stub, verify_placement always returns true, query_audit_trail returns empty)",
-        "Network trust layer (p2p, federated, public trust modules have placeholder crypto and validation)"
+        "Intelligence layer (structure exists, depends on trustchain stub, monitoring/runtime are placeholders)"
       ],
       "planned": [
-        "Genesis capability assessment — instantiate CPU/GPU/RAM/Storage/Network/Transmission as IPv6-addressed assets with PoS at boot (R1, R10)",
         "Swarm distribution protocol — announce/discover/serve shards, consumers become providers, O(log N) per-node load (R12)",
-        "Adaptive erasure coding — Reed-Solomon parameters scale with asset size, no post-creation shard splitting (R14)",
         "Streaming shard reconstruction — reconstruct as shards arrive, not buffer-all-then-reconstruct (R13)",
         "Shard migration — copy-then-redirect without blocking reads or causing fault intolerance (R14)",
         "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
         "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
         "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
-        "mDNS peer discovery (start_mdns_discovery is explicit stub)",
-        "Gossip protocol for mesh coordination (start_gossip_protocol is explicit stub)",
-        "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
-        "Real distributed shard transfer over STOQ (distribution currently computes placements but never sends bytes)"
+        "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)"
       ]
     },
-    "completion": 54
+    "completion": 73
   },
   {
     "id": "caesar",
@@ -284,7 +283,8 @@ export const crateStatuses: CrateStatus[] = [
         "Bug tracking/reporting — GitHub issue templates (bug report, feature request), severity labels, security disclosure via SECURITY.md",
         "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
         "Unified cross-crate identity model (NodeId BLAKE3([u8;32]), ScopedIdentity, WorkloadType — all crates use lib canonical types)",
-        "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)"
+        "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)",
+        "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)"
       ],
       "inDevelopment": [],
       "planned": [
@@ -294,11 +294,10 @@ export const crateStatuses: CrateStatus[] = [
         "Live alpha deployment — deploy gateway + STOQ + trustchain to trust.hypermesh.online with monitoring and alerting",
         "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
         "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
-        "Real partition/chaos testing framework",
-        "Certificate lifecycle per scope (Anonymous=ephemeral, Private=bounded group certs, Public=full transparency chain)"
+        "Real partition/chaos testing framework"
       ]
     },
-    "completion": 50
+    "completion": 56
   },
   {
     "id": "hypermesh-ebpf",
@@ -395,32 +394,31 @@ export const crateStatuses: CrateStatus[] = [
         "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
         "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
         "Matrix-aware positioning via hypermesh_lib canonical types",
-        "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
+        "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier + MinSpec for R13",
         "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
         "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
         "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
         "BLAKE3 content hashing (whitepaper-aligned)",
         "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
-        "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)"
+        "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)",
+        "Certificate manager with real X.509 validation (replaced placeholder private key)",
+        "Certificate store persistence across restarts (filesystem cache ~/.stoq/certs/)",
+        "Graceful degradation with expired certificates (fallback to self-signed Anonymous)",
+        "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
+        "Service discovery registry (register/resolve/deregister by service type)",
+        "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)"
       ],
       "inDevelopment": [
-        "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
-        "Certificate manager placeholder private key (uses .expect() placeholder)",
-        "Service discovery (TODO in stoq/src/api/mod.rs)"
+        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)"
       ],
       "planned": [
-        "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
-        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements",
-        "Permission enforcement at protocol layer",
-        "MetricsFrame protocol wiring to engauge",
-        "Certificate store persistence across restarts",
-        "Graceful degradation with expired certificates"
+        "MetricsFrame protocol wiring to engauge"
       ]
     },
-    "completion": 62
+    "completion": 86
   },
   {
     "id": "trustchain",
@@ -444,7 +442,6 @@ export const crateStatuses: CrateStatus[] = [
         "Threshold cryptography (Shamir SSS over GF(256))",
         "Deployment quality gates",
         "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-        "HTTP/3 server with 8 real handlers (issue, validate, revoke, list, get, health, metrics, dns_resolve) + 8 stub endpoints (status, dns_zones, dns_register, etc.)",
         "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
         "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
         "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
@@ -454,28 +451,29 @@ export const crateStatuses: CrateStatus[] = [
         "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
         "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
         "Identity-scoped certificate extensions (IdentityScopeExtension, OID-based, 4-byte encode/decode)",
-        "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)"
+        "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)",
+        "CA-signed leaf certificates (rcgen signed_by() chain, proper X.509 hierarchy)",
+        "Certificate PEM encoding (rcgen .pem() output, proper base64)",
+        "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs, cert hash search)",
+        "KeyUsage/EKU enforcement in issued X.509 certs (digital signature, key encipherment, server/client auth by subject type)",
+        "Threshold crypto integration with CA initialization (Shamir SSS key splitting at startup)",
+        "Scope-aware certificates (IdentityScopeExtension embedded via custom OID, Device vs Network scope)",
+        "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
+        "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, validation/issuance latency)",
+        "HTTP/3 handlers: list_certificates wired to real cert store"
       ],
       "inDevelopment": [
-        "CA-signed leaf certificates (currently self-signed X.509 with appended FALCON-1024 signature, not true CA-signed X.509)",
-        "Certificate Transparency (Merkle tree structure exists, consistency checker and cert hash search are placeholders)",
-        "Certificate PEM encoding (DER bytes cast to UTF-8 lossy instead of proper PEM base64 encoding)",
-        "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate)"
+        "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate — partially wired)"
       ],
       "planned": [
-        "KeyUsage/EKU enforcement in issued X.509 certs",
-        "Threshold crypto integration with CA initialization",
         "Distributed revocation propagation",
         "Offline device grace period renewal",
-        "Cascading revocation (parent→child identity propagation)",
-        "Real certificate operation metrics (issuance latency, validation throughput)",
+        "Cascading revocation (parent->child identity propagation)",
         "CRL distribution via blockchain (offline revocation)",
-        "Field device bootstrap with intermittent connectivity",
-        "Scope-aware certificates (certificate awareness of Device vs Network scope, traceability enforcement per scope)",
-        "Certificate lifecycle tied to scope (Anonymous = ephemeral per-connection, Private = bounded group, Public = full transparency chain)"
+        "Field device bootstrap with intermittent connectivity"
       ]
     },
-    "completion": 65
+    "completion": 85
   },
   {
     "id": "ui",

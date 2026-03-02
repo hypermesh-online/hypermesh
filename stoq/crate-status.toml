@@ -16,7 +16,7 @@ items = [
     "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
     "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
     "Matrix-aware positioning via hypermesh_lib canonical types",
-    "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier",
+    "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier + MinSpec for R13",
     "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
     "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
     "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
@@ -24,23 +24,22 @@ items = [
     "BLAKE3 content hashing (whitepaper-aligned)",
     "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
     "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)",
+    "Certificate manager with real X.509 validation (replaced placeholder private key)",
+    "Certificate store persistence across restarts (filesystem cache ~/.stoq/certs/)",
+    "Graceful degradation with expired certificates (fallback to self-signed Anonymous)",
+    "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
+    "Service discovery registry (register/resolve/deregister by service type)",
+    "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
 ]
 
 [features.in_development]
 items = [
-    "Sub-100Mbps tier support (R13 minimum spec 1 Mb/s)",
-    "Certificate manager placeholder private key (uses .expect() placeholder)",
-    "Service discovery (TODO in stoq/src/api/mod.rs)",
+    "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
 ]
 
 [features.planned]
 items = [
-    "Cipher suite negotiation for Private/Anonymous networks — agreed-upon alternative suites, standard default (R8)",
-    "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
-    "Permission enforcement at protocol layer",
     "MetricsFrame protocol wiring to engauge",
-    "Certificate store persistence across restarts",
-    "Graceful degradation with expired certificates",
 ]
