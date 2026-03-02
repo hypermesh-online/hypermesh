@@ -27,6 +27,9 @@ pub enum HypermeshError {
     #[error("Configuration error: {0}")]
     Config(String),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 

@@ -30,6 +30,54 @@ use crate::matrix::coordinate::MatrixCoordinate;
 /// three named presets: ANONYMOUS, PRIVATE, PUBLIC.
 pub use hypermesh_lib::PrivacyMode;
 
+use stoq::transport::{
+    AnonymousCertificateStrategy, AuthenticatedCertificateStrategy, CertificateStrategy,
+};
+
+// ---------------------------------------------------------------------------
+// Certificate strategy selection
+// ---------------------------------------------------------------------------
+
+/// Select the correct [`CertificateStrategy`] for the given privacy mode.
+///
+/// - **Anonymous**: Ephemeral self-signed certs, no CA/CT involvement. Cert
+///   rotation is a no-op (each connection gets a fresh cert anyway).
+/// - **Private**: Authenticated via local TrustChain (`local://trustchain`).
+/// - **Public**: Authenticated via global TrustChain (`quic://trust.hypermesh.online`).
+///
+/// Any other two-axis combination (e.g. `Bounded + untracked`) falls back to
+/// Anonymous because untracked modes should never call a CA.
+pub fn select_certificate_strategy(
+    privacy_mode: &PrivacyMode,
+    node_id: &str,
+    common_name: &str,
+    ipv6_addresses: Vec<std::net::Ipv6Addr>,
+) -> Arc<dyn CertificateStrategy> {
+    if !privacy_mode.tracked {
+        // Untracked modes (Anonymous, Bounded+untracked) use ephemeral certs.
+        // No CA, no CT, no renewal. Each connection gets a fresh keypair.
+        Arc::new(AnonymousCertificateStrategy::new())
+    } else if privacy_mode.scope == hypermesh_lib::AccessScope::Bounded {
+        // Private (Bounded + tracked) uses the local TrustChain CA.
+        Arc::new(AuthenticatedCertificateStrategy::new(
+            "local://trustchain".to_string(),
+            node_id.to_string(),
+            common_name.to_string(),
+            ipv6_addresses,
+            "Private".to_string(),
+        ))
+    } else {
+        // Public (Unbounded + tracked) uses the global TrustChain CA.
+        Arc::new(AuthenticatedCertificateStrategy::new(
+            "quic://trust.hypermesh.online".to_string(),
+            node_id.to_string(),
+            common_name.to_string(),
+            ipv6_addresses,
+            "Public".to_string(),
+        ))
+    }
+}
+
 /// Self-signed certificate for localhost
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalhostCertificate {
@@ -373,6 +421,42 @@ mod tests {
 
         // Verify self-sufficiency
         bootstrap.verify_self_sufficient().await.expect("test: async operation");
+    }
+
+    #[test]
+    fn test_select_certificate_strategy_anonymous() {
+        let strategy = select_certificate_strategy(
+            &PrivacyMode::ANONYMOUS,
+            "node-1",
+            "localhost",
+            vec![std::net::Ipv6Addr::LOCALHOST],
+        );
+        assert_eq!(strategy.strategy_name(), "Anonymous");
+        assert!(!strategy.requires_certificate());
+    }
+
+    #[test]
+    fn test_select_certificate_strategy_private() {
+        let strategy = select_certificate_strategy(
+            &PrivacyMode::PRIVATE,
+            "node-1",
+            "localhost",
+            vec![std::net::Ipv6Addr::LOCALHOST],
+        );
+        assert_eq!(strategy.strategy_name(), "Private");
+        assert!(strategy.requires_certificate());
+    }
+
+    #[test]
+    fn test_select_certificate_strategy_public() {
+        let strategy = select_certificate_strategy(
+            &PrivacyMode::PUBLIC,
+            "node-1",
+            "localhost",
+            vec![std::net::Ipv6Addr::LOCALHOST],
+        );
+        assert_eq!(strategy.strategy_name(), "Public");
+        assert!(strategy.requires_certificate());
     }
 
     #[tokio::test]

@@ -8,7 +8,81 @@
 
 use crate::error::HypermeshError;
 use crate::proof::{ProofOfState, SpaceProof, StakeProof, TimeProof, Validatable, WorkProof};
-use crate::types::{AssetId, MatrixPosition, NetworkId, NodeId};
+use crate::types::{AssetId, ContentHash, MatrixPosition, NetworkId, NodeId, PrivacyMode};
+
+// ---------------------------------------------------------------------------
+// ValidationError — descriptive validation failure enum
+// ---------------------------------------------------------------------------
+
+/// Descriptive validation errors for shared types.
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ValidationError {
+    /// A [`NodeId`] is all-zero (uninitialized).
+    #[error("NodeId is all-zero (uninitialized)")]
+    ZeroNodeId,
+    /// A [`ContentHash`] is all-zero (uninitialized).
+    #[error("ContentHash is all-zero (uninitialized)")]
+    ZeroContentHash,
+    /// A [`MatrixPosition`] contains non-finite coordinates.
+    #[error("MatrixPosition has non-finite coordinate on axis '{axis}': {value}")]
+    NonFiniteCoordinate {
+        /// Which axis failed ("x", "y", or "z").
+        axis: &'static str,
+        /// The invalid value.
+        value: f64,
+    },
+}
+
+// ---------------------------------------------------------------------------
+// Free-standing validation helpers
+// ---------------------------------------------------------------------------
+
+/// Validate a [`NodeId`]: must not be all-zero.
+pub fn validate_node_id(id: &NodeId) -> Result<(), ValidationError> {
+    if id.0 == [0u8; 32] {
+        return Err(ValidationError::ZeroNodeId);
+    }
+    Ok(())
+}
+
+/// Validate a [`ContentHash`]: must not be all-zero.
+pub fn validate_content_hash(hash: &ContentHash) -> Result<(), ValidationError> {
+    if hash.0 == [0u8; 32] {
+        return Err(ValidationError::ZeroContentHash);
+    }
+    Ok(())
+}
+
+/// Validate a [`MatrixPosition`]: all coordinates must be finite.
+pub fn validate_matrix_position(pos: &MatrixPosition) -> Result<(), ValidationError> {
+    if !pos.x.is_finite() {
+        return Err(ValidationError::NonFiniteCoordinate {
+            axis: "x",
+            value: pos.x,
+        });
+    }
+    if !pos.y.is_finite() {
+        return Err(ValidationError::NonFiniteCoordinate {
+            axis: "y",
+            value: pos.y,
+        });
+    }
+    if !pos.z.is_finite() {
+        return Err(ValidationError::NonFiniteCoordinate {
+            axis: "z",
+            value: pos.z,
+        });
+    }
+    Ok(())
+}
+
+/// Validate a [`PrivacyMode`]: all modes are structurally valid.
+///
+/// Always returns `true` because the two-axis model (scope + tracked) has no
+/// invalid combinations. Provided for completeness in validation pipelines.
+pub fn validate_privacy_mode(_mode: &PrivacyMode) -> bool {
+    true
+}
 
 // ---------------------------------------------------------------------------
 // NodeId validation
@@ -388,5 +462,70 @@ mod tests {
         bad_stake.stake_amount = 0;
         let pos = ProofOfState::new(valid_space(), bad_stake, valid_work(), valid_time());
         assert!(pos.validate().is_err());
+    }
+
+    // --- Free-standing validation helpers ---
+
+    #[test]
+    fn validate_node_id_accepts_nonzero() {
+        let id = NodeId::from_public_key(b"test-key");
+        assert!(super::validate_node_id(&id).is_ok());
+    }
+
+    #[test]
+    fn validate_node_id_rejects_zero() {
+        let id = NodeId::zeroed();
+        let err = super::validate_node_id(&id).unwrap_err();
+        assert!(matches!(err, super::ValidationError::ZeroNodeId));
+    }
+
+    #[test]
+    fn validate_content_hash_accepts_nonzero() {
+        let hash = ContentHash::from_bytes([0xAB; 32]);
+        assert!(super::validate_content_hash(&hash).is_ok());
+    }
+
+    #[test]
+    fn validate_content_hash_rejects_zero() {
+        let hash = ContentHash::zeroed();
+        let err = super::validate_content_hash(&hash).unwrap_err();
+        assert!(matches!(err, super::ValidationError::ZeroContentHash));
+    }
+
+    #[test]
+    fn validate_matrix_position_accepts_finite() {
+        let pos = MatrixPosition { x: 1.0, y: -2.0, z: 0.0 };
+        assert!(super::validate_matrix_position(&pos).is_ok());
+    }
+
+    #[test]
+    fn validate_matrix_position_rejects_nan() {
+        let pos = MatrixPosition { x: f64::NAN, y: 0.0, z: 0.0 };
+        let err = super::validate_matrix_position(&pos).unwrap_err();
+        match err {
+            super::ValidationError::NonFiniteCoordinate { axis, .. } => {
+                assert_eq!(axis, "x");
+            }
+            other => unreachable!("expected NonFiniteCoordinate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_matrix_position_rejects_infinity_on_z() {
+        let pos = MatrixPosition { x: 0.0, y: 0.0, z: f64::INFINITY };
+        let err = super::validate_matrix_position(&pos).unwrap_err();
+        match err {
+            super::ValidationError::NonFiniteCoordinate { axis, .. } => {
+                assert_eq!(axis, "z");
+            }
+            other => unreachable!("expected NonFiniteCoordinate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validate_privacy_mode_always_true() {
+        assert!(super::validate_privacy_mode(&PrivacyMode::ANONYMOUS));
+        assert!(super::validate_privacy_mode(&PrivacyMode::PRIVATE));
+        assert!(super::validate_privacy_mode(&PrivacyMode::PUBLIC));
     }
 }

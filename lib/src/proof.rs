@@ -220,8 +220,10 @@ impl fmt::Display for ProofOfState {
 /// TrustChain provides the real implementations with crypto verification.
 /// This trait defines the contract that all crates can program against.
 pub trait Validatable {
-    /// Check whether this item passes validation
-    fn validate(&self) -> bool;
+    /// Check whether this item passes structural validation.
+    ///
+    /// Returns `Ok(())` on success, or a descriptive error on failure.
+    fn validate(&self) -> Result<(), crate::error::HypermeshError>;
 }
 
 // ---------------------------------------------------------------------------

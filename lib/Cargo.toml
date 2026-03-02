@@ -18,6 +18,9 @@ rust_decimal = { workspace = true }
 blake3 = { workspace = true }
 postcard = { workspace = true }
 
+[features]
+test-utils = []
+
 [dev-dependencies]
 
 [lib]

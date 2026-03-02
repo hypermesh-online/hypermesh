@@ -56,6 +56,47 @@ pub fn test_privacy_mode_public() -> PrivacyMode {
     PrivacyMode::PUBLIC
 }
 
+/// Create a [`PrivacyMode`] by name: `"anonymous"`, `"private"`, or `"public"`.
+///
+/// Defaults to `ANONYMOUS` for unrecognised strings.
+pub fn test_privacy_mode(variant: &str) -> PrivacyMode {
+    match variant.to_ascii_lowercase().as_str() {
+        "anonymous" => PrivacyMode::ANONYMOUS,
+        "private" => PrivacyMode::PRIVATE,
+        "public" => PrivacyMode::PUBLIC,
+        _ => PrivacyMode::ANONYMOUS,
+    }
+}
+
+/// Compute a BLAKE3 [`ContentHash`] from arbitrary data.
+pub fn test_content_hash_from_data(data: &[u8]) -> ContentHash {
+    let hash = blake3::hash(data);
+    ContentHash::from_bytes(*hash.as_bytes())
+}
+
+/// Bundle of common test fixtures for convenience.
+pub struct TestFixtures {
+    pub node_id: NodeId,
+    pub asset_id: AssetId,
+    pub position: MatrixPosition,
+    pub content_hash: ContentHash,
+    pub network_id: NetworkId,
+    pub privacy_mode: PrivacyMode,
+}
+
+impl Default for TestFixtures {
+    fn default() -> Self {
+        Self {
+            node_id: test_node_id("fixture-node"),
+            asset_id: test_asset_id("fixture-asset"),
+            position: test_matrix_position(1.0, 2.0, 3.0),
+            content_hash: test_content_hash(0xAA),
+            network_id: test_network_id(0x01),
+            privacy_mode: PrivacyMode::PUBLIC,
+        }
+    }
+}
+
 /// Create a valid test [`SpaceProof`].
 pub fn test_space_proof() -> SpaceProof {
     SpaceProof {
@@ -138,5 +179,35 @@ mod tests {
         assert_eq!(test_privacy_mode_anonymous(), PrivacyMode::ANONYMOUS);
         assert_eq!(test_privacy_mode_private(), PrivacyMode::PRIVATE);
         assert_eq!(test_privacy_mode_public(), PrivacyMode::PUBLIC);
+    }
+
+    #[test]
+    fn test_privacy_mode_by_name() {
+        assert_eq!(test_privacy_mode("anonymous"), PrivacyMode::ANONYMOUS);
+        assert_eq!(test_privacy_mode("private"), PrivacyMode::PRIVATE);
+        assert_eq!(test_privacy_mode("public"), PrivacyMode::PUBLIC);
+        // Case-insensitive
+        assert_eq!(test_privacy_mode("PUBLIC"), PrivacyMode::PUBLIC);
+        // Unknown falls back to ANONYMOUS
+        assert_eq!(test_privacy_mode("unknown"), PrivacyMode::ANONYMOUS);
+    }
+
+    #[test]
+    fn test_content_hash_from_data_deterministic() {
+        let hash1 = test_content_hash_from_data(b"hello");
+        let hash2 = test_content_hash_from_data(b"hello");
+        assert_eq!(hash1, hash2);
+        // Different data produces different hash
+        let hash3 = test_content_hash_from_data(b"world");
+        assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_fixtures_default() {
+        let f = TestFixtures::default();
+        assert!(f.node_id.validate().is_ok());
+        assert!(f.asset_id.validate().is_ok());
+        assert!(f.position.is_finite());
+        assert!(!f.network_id.is_zero());
     }
 }

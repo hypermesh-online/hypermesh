@@ -13,13 +13,22 @@ pub mod economic;
 pub mod encoding;
 pub mod error;
 pub mod http;
+pub mod proof;
 pub mod protocol;
+pub mod runtime;
+pub mod sdk;
 pub mod types;
+pub mod validation;
+
+/// Test utilities available to other crates via `features = ["test-utils"]`.
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 
 // Re-export commonly used types at crate root
 pub use asset::*;
 pub use economic::*;
 pub use encoding::{decode, encode, encode_bounded, EncodingError};
 pub use error::HypermeshError;
+pub use proof::{ProofOfState, ProofValidationResult, Validatable};
 pub use protocol::*;
 pub use types::*;

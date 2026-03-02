@@ -22,6 +22,7 @@ pub mod multipath;
 pub mod reflector;
 
 pub mod ebpf;
+pub mod min_spec;
 pub mod pos_extension_validator;
 
 // Re-exports for backward compatibility
@@ -45,6 +46,10 @@ pub use multipath::{MultiPathConnection, MultiPathMetrics, PathInfo, PathPolicy,
 pub use pos_extension_validator::StoqPosExtensionValidator;
 pub use reflector::{
     ReflectorBridge, ReflectorMessage, StoqBlockTransport, SyncProtocol, SyncProtocolConfig,
+};
+pub use min_spec::{
+    max_concurrent_connections, validate_bandwidth_budget, validate_connection_budget,
+    ConnectionBudget, TransportMinSpec,
 };
 pub use stats::{ConnectionPoolStats, PerformanceStats};
 
