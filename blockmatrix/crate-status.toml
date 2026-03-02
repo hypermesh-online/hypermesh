@@ -47,13 +47,19 @@ items = [
     "Instruction-based retrieval with ShardTransport integration (fetch_from_location wired to trait)",
     "mDNS peer discovery (PeerAnnouncement, multicast protocol on _hypermesh._udp.local)",
     "Gossip protocol for mesh coordination (GossipState, membership tracking, configurable fanout/interval)",
+    "Full retrieval pipeline via ShardTransport (retrieve_asset: fetch → RS reconstruct → decrypt → decompress)",
+    "Network scope sync wired to BlockTransport (TransportSyncDriver: reflector discovery, block propagation, state update)",
+    "Dynamic shard rebalancing with real transport (execute_actions_via_transport: move/replicate shards via ShardTransport)",
+    "Swarm distribution protocol (R12 — SwarmProtocol: announce/discover/serve, cascade providers, O(log N) per-node load)",
+    "Streaming shard reconstruction (R13 — StreamingReconstructor: incremental per-group RS decode, memory-efficient)",
+    "Shard migration (R14 — MigrationExecutor: copy-then-redirect, non-blocking reads, rollback on failure)",
+    "Privacy-scoped dedup verification (R4 — PrivacyScopedDedup: full tracking Device/Private, hash-only Anonymous, tamper detection)",
+    "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)",
 ]
 
 [features.in_development]
 items = [
     "Node binary Anonymous certificate strategy fix",
-    "Network scope sync + reflector pooling (data structures and state machines implemented, no actual network I/O)",
-    "Dynamic shard rebalancing (calculates rebalancing decisions, cannot execute — distribution is calculation-only)",
     "Gateway cross-scope transfers (protocol logic Lock->Transfer->Unlock implemented, no network transport wired)",
     "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
     "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
@@ -63,11 +69,6 @@ items = [
 
 [features.planned]
 items = [
-    "Swarm distribution protocol — announce/discover/serve shards, consumers become providers, O(log N) per-node load (R12)",
-    "Streaming shard reconstruction — reconstruct as shards arrive, not buffer-all-then-reconstruct (R13)",
-    "Shard migration — copy-then-redirect without blocking reads or causing fault intolerance (R14)",
-    "Min-spec validation — all operations must work on 1 Mb/s, 50GB storage, 4GB RAM, 2-core 1GHz (R13)",
-    "Privacy-scoped dedup verification — full tracking in Device/Private, hash-only in Anonymous (R4)",
     "1M-node stress test simulation — prove swarm cascade, shard commitment scaling, and min-spec viability (R12, R13)",
     "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)",
 ]
