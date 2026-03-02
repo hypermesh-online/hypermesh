@@ -213,13 +213,14 @@ pub async fn handle_list_certificates(
 ) -> TrustChainResult<Vec<CertificateSummary>> {
     info!("Handler: list certificates");
 
-    // CertificateStore does not expose an iterator over all entries.
-    // Return the count-based summary until a list API is added.
-    let total = ctx.certificate_store.count();
-    info!("Certificate store contains {} certificates", total);
+    let summaries: Vec<CertificateSummary> = ctx
+        .certificate_store
+        .iter_certificates()
+        .map(|cert| issued_to_summary(&cert))
+        .collect();
 
-    // Return empty vec; full enumeration requires store API extension.
-    Ok(Vec::new())
+    info!("Returning {} certificates", summaries.len());
+    Ok(summaries)
 }
 
 /// Get a single certificate by serial number.
@@ -580,5 +581,87 @@ mod tests {
 
         let summary = issued_to_summary(&cert);
         assert_eq!(summary.status, "revoked: key_compromise");
+    }
+
+    // -- Item 2.13: handle_list_certificates wired to iter_certificates --------
+
+    #[tokio::test]
+    async fn test_handle_list_certificates_empty_store() {
+        use crate::security::SecurityConfig;
+
+        let ca_config = crate::ca::CAConfig::testing();
+        let ca = TrustChainCA::new(ca_config)
+            .await
+            .expect("test: create CA");
+        let store = CertificateStore::new()
+            .await
+            .expect("test: create cert store");
+        let security_monitor = SecurityMonitor::new(SecurityConfig::default())
+            .await
+            .expect("test: create security monitor");
+
+        let ctx = HttpHandlerContext {
+            ca: Arc::new(ca),
+            certificate_store: Arc::new(store),
+            security_monitor: Arc::new(security_monitor),
+            start_time: std::time::Instant::now(),
+        };
+
+        let result = handle_list_certificates(&ctx)
+            .await
+            .expect("test: list certificates should not error");
+        assert!(result.is_empty(), "empty store should return empty list");
+    }
+
+    #[tokio::test]
+    async fn test_handle_list_certificates_with_entries() {
+        use crate::security::SecurityConfig;
+
+        let ca_config = crate::ca::CAConfig::testing();
+        let ca = TrustChainCA::new(ca_config)
+            .await
+            .expect("test: create CA");
+        let store = CertificateStore::new()
+            .await
+            .expect("test: create cert store");
+
+        // Insert a certificate into the store
+        let cert = IssuedCertificate {
+            serial_number: "list-test-001".to_string(),
+            certificate_der: vec![1, 2, 3],
+            certificate_pem: "pem".to_string(),
+            chain_pem: "chain".to_string(),
+            fingerprint: [0u8; 32],
+            common_name: "listed.hypermesh.online".to_string(),
+            issued_at: SystemTime::now(),
+            expires_at: SystemTime::now(),
+            issuer_ca_id: "ca-01".to_string(),
+            consensus_proof: ConsensusProof::default(),
+            status: CertificateStatus::Valid,
+            metadata: Default::default(),
+        };
+        store
+            .store_certificate(&cert)
+            .await
+            .expect("test: store certificate");
+
+        let security_monitor = SecurityMonitor::new(SecurityConfig::default())
+            .await
+            .expect("test: create security monitor");
+
+        let ctx = HttpHandlerContext {
+            ca: Arc::new(ca),
+            certificate_store: Arc::new(store),
+            security_monitor: Arc::new(security_monitor),
+            start_time: std::time::Instant::now(),
+        };
+
+        let result = handle_list_certificates(&ctx)
+            .await
+            .expect("test: list certificates should not error");
+        assert_eq!(result.len(), 1, "should return one certificate");
+        assert_eq!(result[0].serial_number, "list-test-001");
+        assert_eq!(result[0].common_name, "listed.hypermesh.online");
+        assert_eq!(result[0].status, "valid");
     }
 }

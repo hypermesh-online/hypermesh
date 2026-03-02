@@ -51,6 +51,8 @@ async fn test_server_unavailable() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -103,6 +105,8 @@ async fn test_network_timeout() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -142,6 +146,8 @@ async fn test_malformed_request() -> Result<()> {
         ipv6_addresses: vec![],      // No IP addresses
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -197,6 +203,8 @@ async fn test_resource_exhaustion() -> Result<()> {
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
+                identity_scope: None,
+                subject_type: None,
             };
 
             let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -251,6 +259,8 @@ async fn test_corrupted_proof() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: corrupted_proof,
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -298,6 +308,8 @@ async fn test_retry_exhaustion() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -341,6 +353,8 @@ async fn test_invalid_consensus_requirements() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     // Invalid requirements (extremely strict)
@@ -404,6 +418,8 @@ async fn test_concurrent_failures() -> Result<()> {
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
+                identity_scope: None,
+                subject_type: None,
             };
 
             let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -466,6 +482,8 @@ async fn test_metrics_during_failures() -> Result<()> {
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -520,6 +538,8 @@ async fn test_graceful_degradation() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();

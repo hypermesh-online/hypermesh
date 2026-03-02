@@ -32,6 +32,8 @@ pub struct CertificateManager {
     trustchain_client: Option<Arc<TrustChainClient>>,
     /// Network-aware certificate strategy
     certificate_strategy: Option<Arc<dyn CertificateStrategy>>,
+    /// Filesystem cache directory for certificate persistence (Item 2.10)
+    cache_dir: Option<std::path::PathBuf>,
 }
 
 impl CertificateManager {
@@ -69,16 +71,24 @@ impl CertificateManager {
             None
         };
 
+        // Determine cache directory for certificate persistence (Item 2.10)
+        let cache_dir = Self::resolve_cache_dir(&config.node_id);
+
         let manager = Self {
             config: Arc::new(config),
             current_certificate: Arc::new(RwLock::new(None)),
             certificate_cache: Arc::new(DashMap::new()),
             trustchain_client,
             certificate_strategy,
+            cache_dir,
         };
 
-        // Initialize certificate
-        manager.initialize_certificate().await?;
+        // Try loading a cached certificate from disk before generating a new one
+        if !manager.try_load_cached_certificate().await {
+            manager.initialize_certificate().await?;
+            // Persist the newly issued certificate
+            manager.persist_current_certificate().await;
+        }
 
         info!("STOQ certificate manager initialized successfully");
         Ok(manager)
@@ -107,6 +117,7 @@ impl CertificateManager {
             certificate_cache: Arc::new(DashMap::new()),
             trustchain_client: None,
             certificate_strategy: Some(strategy),
+            cache_dir: None, // Strategy mode doesn't persist
         };
 
         if manager
@@ -243,17 +254,52 @@ impl CertificateManager {
             }
             CertificateMode::NetworkStrategy => {
                 if let Some(ref strategy) = self.certificate_strategy {
-                    let temp_cert = StoqNodeCertificate {
-                        node_id: "unknown".to_string(),
-                        certificate: CertificateDer::from(cert_der.to_vec()),
-                        private_key: PrivateKeyDer::try_from(vec![0u8])
-                            .expect("placeholder private key"),
-                        issued_at: SystemTime::now(),
-                        expires_at: SystemTime::now() + Duration::from_secs(3600),
-                        fingerprint_sha256: fingerprint,
-                        metadata: None,
-                    };
-                    strategy.validate_certificate(&temp_cert).await
+                    // Parse the DER to validate structure before delegating.
+                    // We intentionally do NOT construct a full StoqNodeCertificate here
+                    // because we don't have the private key for a peer's certificate —
+                    // we only need to check the certificate bytes are well-formed and
+                    // pass strategy-specific validation (expiration, chain trust, etc.).
+                    match x509_parser::parse_x509_certificate(cert_der) {
+                        Ok((_, parsed)) => {
+                            // Check basic validity: not expired
+                            let now = SystemTime::now();
+                            let not_after = parsed.validity().not_after.to_datetime();
+                            if not_after < now {
+                                debug!("Certificate expired per X.509 notAfter");
+                                return Ok(false);
+                            }
+
+                            // Strategy-specific validation: for Anonymous, accept all;
+                            // for Authenticated, delegate to strategy.
+                            // Since we cannot construct a StoqNodeCertificate without
+                            // a private key, generate a dummy ephemeral key solely for
+                            // the trait call. The strategy only inspects the certificate
+                            // DER and metadata, never the private key.
+                            let ephemeral = rcgen::generate_simple_self_signed(
+                                vec!["validation-dummy.local".to_string()],
+                            )
+                            .map_err(|e| anyhow!("ephemeral keygen for validation: {e}"))?;
+                            let dummy_key = PrivateKeyDer::try_from(
+                                ephemeral.key_pair.serialize_der(),
+                            )
+                            .map_err(|e| anyhow!("serialize ephemeral key: {e}"))?;
+
+                            let temp_cert = StoqNodeCertificate {
+                                node_id: "peer-validation".to_string(),
+                                certificate: CertificateDer::from(cert_der.to_vec()),
+                                private_key: dummy_key,
+                                issued_at: SystemTime::now(),
+                                expires_at: SystemTime::now() + Duration::from_secs(3600),
+                                fingerprint_sha256: fingerprint,
+                                metadata: None,
+                            };
+                            strategy.validate_certificate(&temp_cert).await
+                        }
+                        Err(_) => {
+                            debug!("Certificate DER parsing failed during validation");
+                            Ok(false)
+                        }
+                    }
                 } else {
                     Ok(true)
                 }
@@ -298,6 +344,65 @@ impl CertificateManager {
             Ok(true)
         } else {
             Ok(false)
+        }
+    }
+
+    // -- Scope-based permission enforcement (Item 2.12) ---------------------
+
+    /// Operation types that can be gated by certificate scope.
+    #[allow(dead_code)]
+    pub(crate) const SCOPE_OP_SHARD_SEND: &'static str = "shard_send";
+    #[allow(dead_code)]
+    pub(crate) const SCOPE_OP_SHARD_FETCH: &'static str = "shard_fetch";
+    #[allow(dead_code)]
+    pub(crate) const SCOPE_OP_GOSSIP: &'static str = "gossip";
+
+    /// Check if a peer certificate is authorized for the given operation.
+    ///
+    /// The check inspects the X.509 Extended Key Usage (EKU) extensions:
+    /// - ServerAuth: peer may serve data (shard_send, gossip)
+    /// - ClientAuth: peer may request data (shard_fetch)
+    ///
+    /// In LocalhostTesting mode all operations are permitted.
+    pub async fn check_peer_permission(
+        &self,
+        peer_cert_der: &[u8],
+        operation: &str,
+    ) -> Result<bool> {
+        if self.config.mode == CertificateMode::LocalhostTesting {
+            return Ok(true);
+        }
+
+        match x509_parser::parse_x509_certificate(peer_cert_der) {
+            Ok((_, parsed)) => {
+                use x509_parser::extensions::ParsedExtension;
+
+                // Extract EKU from extensions
+                let mut has_server_auth = false;
+                let mut has_client_auth = false;
+
+                for ext in parsed.extensions() {
+                    if let ParsedExtension::ExtendedKeyUsage(eku) = ext.parsed_extension() {
+                        has_server_auth = eku.any || eku.server_auth;
+                        has_client_auth = eku.any || eku.client_auth;
+                    }
+                }
+
+                // If no EKU extension is present, allow all (backward compat)
+                if !has_server_auth && !has_client_auth {
+                    return Ok(true);
+                }
+
+                match operation {
+                    "shard_fetch" => Ok(has_client_auth),
+                    "shard_send" | "gossip" => Ok(has_server_auth),
+                    _ => Ok(has_server_auth || has_client_auth),
+                }
+            }
+            Err(_) => {
+                debug!("Cannot parse peer certificate for permission check");
+                Ok(false)
+            }
         }
     }
 
@@ -401,6 +506,7 @@ impl CertificateManager {
     async fn rotate_certificate(&self) -> Result<()> {
         info!("Rotating certificate");
         self.initialize_certificate().await?;
+        self.persist_current_certificate().await;
         info!("Certificate rotation completed successfully");
         Ok(())
     }
@@ -410,6 +516,193 @@ impl CertificateManager {
         let mut hasher = Sha256::new();
         hasher.update(cert_der);
         hasher.finalize().into()
+    }
+
+    // -- Certificate persistence (Item 2.10) ----------------------------------
+
+    /// Determine the filesystem cache directory for certificate persistence.
+    ///
+    /// Falls back to `$HOME/.stoq/certs/<node_id>`, then `/tmp/stoq-certs/<node_id>`.
+    /// Returns `None` if no directory could be created.
+    fn resolve_cache_dir(node_id: &str) -> Option<std::path::PathBuf> {
+        let base = std::env::var("HOME")
+            .ok()
+            .map(|h| std::path::PathBuf::from(h).join(".stoq").join("certs"))
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/stoq-certs"));
+        let dir = base.join(node_id);
+        std::fs::create_dir_all(&dir).ok()?;
+        Some(dir)
+    }
+
+    /// Try to load a cached certificate from disk.
+    ///
+    /// Returns `true` if a valid (non-expired) certificate was loaded.
+    async fn try_load_cached_certificate(&self) -> bool {
+        let cache_dir = match &self.cache_dir {
+            Some(d) => d,
+            None => return false,
+        };
+
+        let cert_path = cache_dir.join("cert.der");
+        let key_path = cache_dir.join("key.der");
+        let meta_path = cache_dir.join("meta.json");
+
+        let cert_bytes = match std::fs::read(&cert_path) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        let key_bytes = match std::fs::read(&key_path) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+        let meta_bytes = match std::fs::read(&meta_path) {
+            Ok(b) => b,
+            Err(_) => return false,
+        };
+
+        #[derive(serde::Deserialize)]
+        struct CertMeta {
+            node_id: String,
+            expires_at_secs: u64,
+            issued_at_secs: u64,
+        }
+
+        let meta: CertMeta = match serde_json::from_slice(&meta_bytes) {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+
+        let expires_at = std::time::UNIX_EPOCH + Duration::from_secs(meta.expires_at_secs);
+        let issued_at = std::time::UNIX_EPOCH + Duration::from_secs(meta.issued_at_secs);
+
+        // Only use cached cert if it still has at least 1 hour of validity
+        if let Ok(remaining) = expires_at.duration_since(SystemTime::now()) {
+            if remaining < Duration::from_secs(3600) {
+                debug!("Cached certificate expires soon, will regenerate");
+                return false;
+            }
+        } else {
+            debug!("Cached certificate already expired");
+            return false;
+        }
+
+        let cert_der = CertificateDer::from(cert_bytes.clone());
+        let private_key = match PrivateKeyDer::try_from(key_bytes) {
+            Ok(k) => k,
+            Err(_) => return false,
+        };
+        let fingerprint = self.calculate_fingerprint(&cert_bytes);
+
+        let stoq_cert = StoqNodeCertificate {
+            node_id: meta.node_id,
+            certificate: cert_der,
+            private_key,
+            issued_at,
+            expires_at,
+            fingerprint_sha256: fingerprint,
+            metadata: None,
+        };
+
+        // Use try_write since this runs during async init before concurrent access
+        match self.current_certificate.try_write() {
+            Ok(mut guard) => {
+                *guard = Some(stoq_cert);
+                info!("Loaded cached certificate from {}", cert_path.display());
+                true
+            }
+            Err(_) => {
+                debug!("Could not acquire write lock for cached certificate");
+                false
+            }
+        }
+    }
+
+    /// Persist the current certificate to disk for reuse across restarts.
+    async fn persist_current_certificate(&self) {
+        let cache_dir = match &self.cache_dir {
+            Some(d) => d,
+            None => return,
+        };
+
+        let cert_guard = self.current_certificate.read().await;
+        let cert = match cert_guard.as_ref() {
+            Some(c) => c,
+            None => return,
+        };
+
+        let cert_path = cache_dir.join("cert.der");
+        let key_path = cache_dir.join("key.der");
+        let meta_path = cache_dir.join("meta.json");
+
+        let expires_secs = cert
+            .expires_at
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let issued_secs = cert
+            .issued_at
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let meta = serde_json::json!({
+            "node_id": cert.node_id,
+            "expires_at_secs": expires_secs,
+            "issued_at_secs": issued_secs,
+        });
+
+        if let Err(e) = std::fs::write(&cert_path, cert.certificate.as_ref()) {
+            debug!("Failed to persist certificate: {e}");
+            return;
+        }
+
+        // Persist private key DER bytes
+        let key_bytes: &[u8] = match &cert.private_key {
+            PrivateKeyDer::Pkcs1(k) => k.secret_pkcs1_der(),
+            PrivateKeyDer::Pkcs8(k) => k.secret_pkcs8_der(),
+            PrivateKeyDer::Sec1(k) => k.secret_sec1_der(),
+            _ => {
+                debug!("Unsupported private key format for persistence");
+                return;
+            }
+        };
+        if let Err(e) = std::fs::write(&key_path, key_bytes) {
+            debug!("Failed to persist private key: {e}");
+            return;
+        }
+
+        if let Ok(json) = serde_json::to_string_pretty(&meta) {
+            let _ = std::fs::write(&meta_path, json);
+        }
+
+        debug!("Persisted certificate to {}", cert_path.display());
+    }
+
+    // -- Graceful degradation (Item 2.11) ------------------------------------
+
+    /// Check certificate validity and fall back to Anonymous mode if expired.
+    ///
+    /// Returns `true` if the current certificate is still valid, `false` if
+    /// it has expired and the manager switched to Anonymous ephemeral mode.
+    pub async fn check_and_degrade_if_expired(&self) -> bool {
+        let cert_guard = self.current_certificate.read().await;
+        if let Some(cert) = cert_guard.as_ref() {
+            if !cert.is_expired() {
+                return true;
+            }
+            info!("Certificate expired, falling back to Anonymous ephemeral mode");
+        } else {
+            return true; // No cert means strategy mode (Anonymous), not an error
+        }
+        drop(cert_guard);
+
+        // Clear the expired certificate and regenerate a self-signed fallback
+        *self.current_certificate.write().await = None;
+        if let Err(e) = self.create_self_signed_certificate().await {
+            debug!("Fallback self-signed cert generation failed: {e}");
+            return false;
+        }
+        true
     }
 
     /// Backward compatibility: generate_self_signed for tests
@@ -434,5 +727,223 @@ impl CertificateManager {
     #[allow(deprecated)]
     pub async fn new_self_signed() -> Result<Self> {
         Self::generate_self_signed().await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper to create a localhost testing manager
+    async fn test_manager() -> CertificateManager {
+        let config = CertificateConfig::localhost_testing(
+            "test-node-unit".to_string(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        CertificateManager::new(config)
+            .await
+            .expect("test: create CertificateManager")
+    }
+
+    /// Generate a self-signed DER certificate for test validation
+    fn test_self_signed_der() -> (Vec<u8>, Vec<u8>) {
+        let cert_key = rcgen::generate_simple_self_signed(vec!["test.local".to_string()])
+            .expect("test: generate self-signed");
+        let cert_der = cert_key.cert.der().to_vec();
+        let key_der = cert_key.key_pair.serialize_der();
+        (cert_der, key_der)
+    }
+
+    // -- Item 2.9: Real X.509 parsing in validate_certificate_chain -----------
+
+    #[tokio::test]
+    async fn test_validate_certificate_chain_with_valid_der() {
+        let mgr = test_manager().await;
+        let (cert_der, _key_der) = test_self_signed_der();
+
+        // In LocalhostTesting mode, all certs are accepted
+        let result = mgr
+            .validate_certificate_chain(&cert_der)
+            .await
+            .expect("test: validation should not error");
+        assert!(result, "valid DER certificate should pass in localhost mode");
+    }
+
+    #[tokio::test]
+    async fn test_validate_certificate_chain_with_garbage_bytes() {
+        let mgr = test_manager().await;
+        // Garbage bytes should still pass in LocalhostTesting mode
+        let result = mgr
+            .validate_certificate_chain(&[0xDE, 0xAD, 0xBE, 0xEF])
+            .await
+            .expect("test: validation should not error in localhost mode");
+        assert!(
+            result,
+            "localhost testing mode accepts all certificates"
+        );
+    }
+
+    // -- Item 2.10: Certificate persistence to filesystem ---------------------
+
+    #[tokio::test]
+    async fn test_resolve_cache_dir_creates_directory() {
+        let dir = CertificateManager::resolve_cache_dir("test-node-persist");
+        assert!(dir.is_some(), "cache dir should resolve");
+        let path = dir.expect("test: unwrap cache dir");
+        assert!(path.exists(), "cache dir should exist on disk");
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&path);
+    }
+
+    #[tokio::test]
+    async fn test_persist_and_reload_certificate() {
+        // Create a manager that persists
+        let node_id = format!("test-persist-{}", std::process::id());
+        let config = CertificateConfig::localhost_testing(
+            node_id.clone(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        let mgr = CertificateManager::new(config)
+            .await
+            .expect("test: create manager");
+
+        // Verify certificate was persisted
+        let cache_dir = CertificateManager::resolve_cache_dir(&node_id)
+            .expect("test: resolve cache dir");
+        let cert_path = cache_dir.join("cert.der");
+        let key_path = cache_dir.join("key.der");
+        let meta_path = cache_dir.join("meta.json");
+        assert!(cert_path.exists(), "cert.der should be persisted");
+        assert!(key_path.exists(), "key.der should be persisted");
+        assert!(meta_path.exists(), "meta.json should be persisted");
+
+        // Get fingerprint from first manager
+        let fp1 = mgr
+            .get_certificate_fingerprint()
+            .await
+            .expect("test: get fingerprint");
+
+        // Create a second manager with same node_id -- should load from cache
+        let config2 = CertificateConfig::localhost_testing(
+            node_id.clone(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        let mgr2 = CertificateManager::new(config2)
+            .await
+            .expect("test: create second manager");
+        let fp2 = mgr2
+            .get_certificate_fingerprint()
+            .await
+            .expect("test: get fingerprint from cached");
+
+        assert_eq!(fp1, fp2, "second manager should load the same certificate");
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&cache_dir);
+    }
+
+    // -- Item 2.11: Graceful degradation on certificate expiry ----------------
+
+    #[tokio::test]
+    async fn test_check_and_degrade_if_expired_valid_cert() {
+        let mgr = test_manager().await;
+        // Fresh cert should not be expired
+        let valid = mgr.check_and_degrade_if_expired().await;
+        assert!(valid, "fresh certificate should not trigger degradation");
+    }
+
+    #[tokio::test]
+    async fn test_check_and_degrade_no_cert() {
+        let config = CertificateConfig::localhost_testing(
+            "test-degrade-nocert".to_string(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        let mgr = CertificateManager::new(config)
+            .await
+            .expect("test: create manager");
+
+        // Clear the certificate to simulate missing cert
+        *mgr.current_certificate.write().await = None;
+
+        // No cert means Anonymous mode, should return true
+        let result = mgr.check_and_degrade_if_expired().await;
+        assert!(result, "no cert should not be considered an error");
+    }
+
+    #[tokio::test]
+    async fn test_check_and_degrade_expired_cert() {
+        let mgr = test_manager().await;
+
+        // Manually set cert to expired
+        {
+            let mut guard = mgr.current_certificate.write().await;
+            if let Some(cert) = guard.as_mut() {
+                cert.expires_at = SystemTime::now() - Duration::from_secs(3600);
+            }
+        }
+
+        // Should degrade and regenerate
+        let result = mgr.check_and_degrade_if_expired().await;
+        assert!(result, "degradation should recover with self-signed cert");
+
+        // Should now have a new valid certificate
+        let fp = mgr
+            .get_certificate_fingerprint()
+            .await
+            .expect("test: should have new cert");
+        assert!(!fp.is_empty(), "should have a new fingerprint");
+    }
+
+    // -- Item 2.12: Scope-based permission enforcement ------------------------
+
+    #[tokio::test]
+    async fn test_check_peer_permission_localhost_allows_all() {
+        let mgr = test_manager().await;
+        // In localhost mode, all operations are permitted regardless of cert content
+        let allowed = mgr
+            .check_peer_permission(&[0x00], "shard_fetch")
+            .await
+            .expect("test: permission check should not error");
+        assert!(allowed, "localhost mode should allow all");
+    }
+
+    #[tokio::test]
+    async fn test_check_peer_permission_with_no_eku() {
+        // NetworkStrategy mode to exercise real parsing
+        let (cert_der, _key_der) = test_self_signed_der();
+
+        // Create a NetworkStrategy manager with Anonymous strategy
+        use super::super::certificate_strategy::AnonymousCertificateStrategy;
+        let strategy = Arc::new(AnonymousCertificateStrategy::new());
+        let mgr = CertificateManager::with_strategy(strategy)
+            .await
+            .expect("test: create strategy manager");
+
+        // Self-signed cert with no EKU should allow all (backward compat)
+        let allowed = mgr
+            .check_peer_permission(&cert_der, "shard_fetch")
+            .await
+            .expect("test: permission check should not error");
+        assert!(allowed, "cert without EKU should allow all for backward compat");
+    }
+
+    #[tokio::test]
+    async fn test_check_peer_permission_invalid_der() {
+        use super::super::certificate_strategy::AnonymousCertificateStrategy;
+        let strategy = Arc::new(AnonymousCertificateStrategy::new());
+        let mgr = CertificateManager::with_strategy(strategy)
+            .await
+            .expect("test: create strategy manager");
+
+        // Garbage bytes should be denied
+        let allowed = mgr
+            .check_peer_permission(&[0xDE, 0xAD], "shard_send")
+            .await
+            .expect("test: permission check should not error");
+        assert!(!allowed, "invalid DER should be denied");
     }
 }

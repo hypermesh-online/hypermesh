@@ -29,6 +29,8 @@ async fn test_certificate_generation() {
         node_id: "test-node-1".to_string(),
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let cert = ca
@@ -98,6 +100,8 @@ async fn test_certificate_validation() {
         node_id: "test-node-2".to_string(),
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let cert = ca
@@ -129,6 +133,8 @@ async fn test_certificate_chain() {
         node_id: "test-node-3".to_string(),
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let cert = ca

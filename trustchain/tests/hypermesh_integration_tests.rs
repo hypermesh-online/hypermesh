@@ -315,6 +315,8 @@ async fn test_certificate_issuance_with_consensus() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     // Validate via HyperMesh
@@ -523,6 +525,8 @@ async fn test_timeout_handling() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -565,6 +569,8 @@ async fn test_concurrent_validations() -> Result<()> {
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
+                identity_scope: None,
+                subject_type: None,
             };
 
             let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -662,6 +668,8 @@ async fn test_retry_logic() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -714,6 +722,8 @@ async fn test_metrics_tracking() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -770,6 +780,8 @@ async fn test_end_to_end_certificate_flow() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     // Issue certificate (should validate via HyperMesh)

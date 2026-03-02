@@ -152,6 +152,8 @@ async fn main() -> Result<()> {
         ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
         consensus_proof,
         timestamp: std::time::SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let issued_cert = security_ca.issue_certificate_secure(cert_request).await?;

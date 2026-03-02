@@ -213,6 +213,8 @@ async fn bench_single_request_latency() -> Result<()> {
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -281,6 +283,8 @@ async fn bench_sequential_throughput() -> Result<()> {
             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
             consensus_proof: ConsensusProof::new_for_testing(),
             timestamp: SystemTime::now(),
+            identity_scope: None,
+            subject_type: None,
         };
 
         let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -356,6 +360,8 @@ async fn bench_concurrent_load() -> Result<()> {
                     ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                     consensus_proof: ConsensusProof::new_for_testing(),
                     timestamp: SystemTime::now(),
+                    identity_scope: None,
+                    subject_type: None,
                 };
 
                 let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -442,6 +448,8 @@ async fn bench_memory_usage() -> Result<()> {
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
                 consensus_proof: ConsensusProof::new_for_testing(),
                 timestamp: SystemTime::now(),
+                identity_scope: None,
+                subject_type: None,
             };
 
             let consensus_requirements = ConsensusRequirements::localhost_testing();
@@ -500,6 +508,8 @@ async fn bench_cache_performance() -> Result<()> {
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
         consensus_proof: ConsensusProof::new_for_testing(),
         timestamp: SystemTime::now(),
+        identity_scope: None,
+        subject_type: None,
     };
 
     let consensus_requirements = ConsensusRequirements::localhost_testing();
