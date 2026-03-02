@@ -288,6 +288,167 @@ pub async fn handle_dns_resolve(
 }
 
 // ---------------------------------------------------------------------------
+// Consensus and authentication handlers
+// ---------------------------------------------------------------------------
+
+/// Request to validate a submitted proof.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusValidateRequest {
+    pub proof: ConsensusProof,
+}
+
+/// Consensus validation response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusValidateResponse {
+    pub valid: bool,
+    pub space_valid: bool,
+    pub stake_valid: bool,
+    pub work_valid: bool,
+    pub time_valid: bool,
+    pub confidence: f64,
+    pub errors: Vec<String>,
+}
+
+/// Consensus status response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusStatusResponse {
+    pub active: bool,
+    pub proof_types: Vec<String>,
+    pub last_validation_time_ms: u64,
+    pub total_validations: u64,
+}
+
+/// Authentication certificate request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthCertificateRequest {
+    pub common_name: String,
+    pub purpose: String,
+}
+
+/// Authentication certificate response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthCertificateResponse {
+    pub issued: bool,
+    pub serial_number: Option<String>,
+    pub fingerprint: Option<String>,
+    pub expires_at: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Return current Proof of State consensus status from security monitor metrics.
+pub async fn handle_consensus_status(
+    ctx: &HttpHandlerContext,
+) -> TrustChainResult<ConsensusStatusResponse> {
+    info!("Handler: consensus status");
+
+    let metrics = ctx.security_monitor.get_metrics().await;
+    use std::sync::atomic::Ordering::Relaxed;
+
+    Ok(ConsensusStatusResponse {
+        active: true,
+        proof_types: vec![
+            "PoSpace".to_string(),
+            "PoStake".to_string(),
+            "PoWork".to_string(),
+            "PoTime".to_string(),
+        ],
+        last_validation_time_ms: metrics.average_validation_time_ms.load(Relaxed),
+        total_validations: metrics.consensus_validations.load(Relaxed),
+    })
+}
+
+/// Validate a submitted consensus proof against the four-proof system.
+pub async fn handle_consensus_validate(
+    ctx: &HttpHandlerContext,
+    req: ConsensusValidateRequest,
+) -> TrustChainResult<ConsensusValidateResponse> {
+    info!("Handler: validate consensus proof");
+
+    // Validate the proof using the real consensus validation pipeline
+    let validation = crate::consensus::validation::ProofValidation::validate_proof(&req.proof);
+
+    // Record the validation in security metrics
+    let metrics = ctx.security_monitor.get_metrics().await;
+    metrics
+        .consensus_validations
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+    if !validation.all_valid {
+        metrics
+            .validations_failed
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    let errors: Vec<String> = validation
+        .errors
+        .iter()
+        .map(|e| format!("{:?}: {}", e.proof_type, e.error_message))
+        .collect();
+
+    Ok(ConsensusValidateResponse {
+        valid: validation.all_valid,
+        space_valid: validation.space_valid,
+        stake_valid: validation.stake_valid,
+        work_valid: validation.work_valid,
+        time_valid: validation.time_valid,
+        confidence: validation.confidence_score,
+        errors,
+    })
+}
+
+/// Issue or check an authentication certificate via the CA.
+pub async fn handle_auth_certificate(
+    ctx: &HttpHandlerContext,
+    req: AuthCertificateRequest,
+) -> TrustChainResult<AuthCertificateResponse> {
+    info!(
+        "Handler: auth certificate for {} (purpose: {})",
+        req.common_name, req.purpose
+    );
+
+    // Check if a certificate already exists for this common name
+    let existing = ctx
+        .certificate_store
+        .find_by_common_name(&req.common_name)
+        .await;
+
+    if let Some(cert) = existing {
+        // Return existing certificate info
+        return Ok(AuthCertificateResponse {
+            issued: false,
+            serial_number: Some(cert.serial_number.clone()),
+            fingerprint: Some(hex::encode(cert.fingerprint)),
+            expires_at: Some(format_system_time(cert.expires_at)),
+            error: None,
+        });
+    }
+
+    // Issue a new certificate
+    let issue_req = IssueCertificateRequest {
+        common_name: req.common_name.clone(),
+        san_names: vec![req.common_name.clone()],
+        validity_days: Some(365),
+    };
+
+    match handle_issue_certificate(ctx, issue_req).await {
+        Ok(resp) => Ok(AuthCertificateResponse {
+            issued: true,
+            serial_number: Some(resp.serial_number),
+            fingerprint: Some(resp.fingerprint),
+            expires_at: Some(resp.expires_at),
+            error: None,
+        }),
+        Err(e) => Ok(AuthCertificateResponse {
+            issued: false,
+            serial_number: None,
+            fingerprint: None,
+            expires_at: None,
+            error: Some(format!("{e}")),
+        }),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -557,6 +718,116 @@ mod tests {
         assert_eq!(summary.serial_number, "ser-001");
         assert_eq!(summary.common_name, "test.com");
         assert_eq!(summary.status, "valid");
+    }
+
+    #[test]
+    fn test_consensus_validate_request_serialization() {
+        let req = ConsensusValidateRequest {
+            proof: ConsensusProof::default(),
+        };
+        let json = serde_json::to_vec(&req).expect("test: serialize consensus validate request");
+        let decoded: ConsensusValidateRequest =
+            serde_json::from_slice(&json).expect("test: deserialize consensus validate request");
+        // Default StakeProof uses stake_amount = 1000
+        assert_eq!(decoded.proof.stake_proof.stake_amount, 1000);
+    }
+
+    #[test]
+    fn test_consensus_status_response_serialization() {
+        let resp = ConsensusStatusResponse {
+            active: true,
+            proof_types: vec!["PoSpace".to_string()],
+            last_validation_time_ms: 12,
+            total_validations: 100,
+        };
+        let json = serde_json::to_vec(&resp).expect("test: serialize");
+        let decoded: ConsensusStatusResponse =
+            serde_json::from_slice(&json).expect("test: deserialize");
+        assert!(decoded.active);
+        assert_eq!(decoded.total_validations, 100);
+    }
+
+    #[test]
+    fn test_auth_certificate_response_serialization() {
+        let resp = AuthCertificateResponse {
+            issued: true,
+            serial_number: Some("ser-001".to_string()),
+            fingerprint: Some("aabb".to_string()),
+            expires_at: Some("2027-01-01".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_vec(&resp).expect("test: serialize");
+        let decoded: AuthCertificateResponse =
+            serde_json::from_slice(&json).expect("test: deserialize");
+        assert!(decoded.issued);
+        assert_eq!(decoded.serial_number, Some("ser-001".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_handle_consensus_status() {
+        use crate::security::SecurityConfig;
+
+        let ca_config = crate::ca::CAConfig::testing();
+        let ca = TrustChainCA::new(ca_config)
+            .await
+            .expect("test: create CA");
+        let store = CertificateStore::new()
+            .await
+            .expect("test: create cert store");
+        let security_monitor = SecurityMonitor::new(SecurityConfig::default())
+            .await
+            .expect("test: create security monitor");
+
+        let ctx = HttpHandlerContext {
+            ca: Arc::new(ca),
+            certificate_store: Arc::new(store),
+            security_monitor: Arc::new(security_monitor),
+            start_time: std::time::Instant::now(),
+        };
+
+        let result = handle_consensus_status(&ctx)
+            .await
+            .expect("test: consensus status should succeed");
+        assert!(result.active);
+        assert_eq!(result.proof_types.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn test_handle_consensus_validate_default_proof() {
+        use crate::security::SecurityConfig;
+
+        let ca_config = crate::ca::CAConfig::testing();
+        let ca = TrustChainCA::new(ca_config)
+            .await
+            .expect("test: create CA");
+        let store = CertificateStore::new()
+            .await
+            .expect("test: create cert store");
+        let security_monitor = SecurityMonitor::new(SecurityConfig::default())
+            .await
+            .expect("test: create security monitor");
+
+        let ctx = HttpHandlerContext {
+            ca: Arc::new(ca),
+            certificate_store: Arc::new(store),
+            security_monitor: Arc::new(security_monitor),
+            start_time: std::time::Instant::now(),
+        };
+
+        let req = ConsensusValidateRequest {
+            proof: ConsensusProof::default(),
+        };
+
+        let result = handle_consensus_validate(&ctx, req)
+            .await
+            .expect("test: validate should succeed");
+        // Default proof has non-zero values (stake=1000, storage=1GB, compute=1000, offset=0s)
+        // so it passes validation
+        assert!(result.valid, "default proof should pass validation");
+        assert!(
+            (result.confidence - 1.0).abs() < f64::EPSILON,
+            "confidence should be 1.0 for fully valid proof"
+        );
     }
 
     #[test]

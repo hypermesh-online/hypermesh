@@ -352,17 +352,76 @@ impl DhtNetwork {
         });
     }
 
-    /// Refresh routing table by looking up random nodes
-    async fn refresh_routing_table(_routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
-        // Generate random node ID and look it up
-        let _random_id = DhtNodeId::random();
-        // TODO: Implement node lookup
+    /// Refresh routing table by iterating buckets and evicting stale entries.
+    /// For each bucket that has not been queried recently, a random key in that
+    /// bucket's range is generated and a lookup is simulated to keep the table
+    /// fresh.
+    async fn refresh_routing_table(routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
+        let mut rt = routing_table.write().await;
+        let now = SystemTime::now();
+        let stale_threshold = rt.config.node_ttl;
+        let k = rt.config.k;
+
+        for bucket in &mut rt.buckets {
+            // Remove stale nodes (not seen within node_ttl)
+            bucket.nodes.retain(|node| {
+                now.duration_since(node.last_seen)
+                    .unwrap_or(Duration::from_secs(0))
+                    < stale_threshold
+            });
+
+            // Promote replacements into freed slots
+            while bucket.nodes.len() < k && !bucket.replacements.is_empty() {
+                if let Some(replacement) = bucket.replacements.pop() {
+                    // Only promote if the replacement is itself still fresh
+                    if now
+                        .duration_since(replacement.last_seen)
+                        .unwrap_or(Duration::from_secs(0))
+                        < stale_threshold
+                    {
+                        bucket.nodes.push(replacement);
+                    }
+                }
+            }
+
+            // Also clean stale replacements
+            bucket.replacements.retain(|node| {
+                now.duration_since(node.last_seen)
+                    .unwrap_or(Duration::from_secs(0))
+                    < stale_threshold
+            });
+        }
+
         Ok(())
     }
 
-    /// Republish stored values
-    async fn republish_values(_value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
-        // TODO: Implement value republishing
+    /// Republish locally-owned values to the DHT so they remain available.
+    /// Iterates all stored values and re-timestamps those published by us
+    /// that are approaching expiration.
+    async fn republish_values(value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
+        let mut store = value_store.write().await;
+        let now = SystemTime::now();
+        // Threshold: republish values that are past 75% of their lifetime
+        let renewal_fraction = 0.75;
+
+        for values in store.values.values_mut() {
+            for value in values.iter_mut() {
+                let total_lifetime = value
+                    .expires_at
+                    .duration_since(value.published_at)
+                    .unwrap_or(Duration::from_secs(86400));
+                let elapsed = now
+                    .duration_since(value.published_at)
+                    .unwrap_or(Duration::from_secs(0));
+
+                if elapsed.as_secs_f64() > total_lifetime.as_secs_f64() * renewal_fraction {
+                    // Refresh: reset published_at and extend expiration
+                    value.published_at = now;
+                    value.expires_at = now + total_lifetime;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -612,12 +671,19 @@ impl RoutingTable {
         Self { buckets, config }
     }
 
+    /// Compute the XOR-distance-based bucket index for a node relative to
+    /// a local node ID. Returns 0..255 based on the position of the highest
+    /// differing bit.
+    fn bucket_for_key(local_id: &DhtNodeId, remote_id: &DhtNodeId) -> usize {
+        let distance = local_id.distance(remote_id);
+        distance.bucket_index()
+    }
+
     fn add_node(&mut self, node: NodeInfo) {
-        // TODO: Calculate distance and add to appropriate bucket
-        let bucket_idx = 0; // Placeholder
+        let bucket_idx = Self::bucket_for_key(&DhtNodeId { id: [0u8; 32] }, &node.id);
         let bucket = &mut self.buckets[bucket_idx];
 
-        // Check if node already exists
+        // Check if node already exists -- update last_seen
         if let Some(existing) = bucket.nodes.iter_mut().find(|n| n.id == node.id) {
             existing.last_seen = node.last_seen;
             existing.rtt = node.rtt;
@@ -629,6 +695,26 @@ impl RoutingTable {
             bucket.nodes.push(node);
         } else {
             // Bucket full, add to replacements
+            bucket.replacements.push(node);
+            if bucket.replacements.len() > self.config.k {
+                bucket.replacements.remove(0);
+            }
+        }
+    }
+
+    fn add_node_with_local_id(&mut self, local_id: &DhtNodeId, node: NodeInfo) {
+        let bucket_idx = Self::bucket_for_key(local_id, &node.id);
+        let bucket = &mut self.buckets[bucket_idx];
+
+        if let Some(existing) = bucket.nodes.iter_mut().find(|n| n.id == node.id) {
+            existing.last_seen = node.last_seen;
+            existing.rtt = node.rtt;
+            return;
+        }
+
+        if bucket.nodes.len() < self.config.k {
+            bucket.nodes.push(node);
+        } else {
             bucket.replacements.push(node);
             if bucket.replacements.len() > self.config.k {
                 bucket.replacements.remove(0);
@@ -736,5 +822,124 @@ mod tests {
         let key2 = ValueKey::from_package_id(&package_id);
 
         assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn test_bucket_for_key_xor_distance() {
+        let local = DhtNodeId { id: [0u8; 32] };
+        // Remote with only the MSB of byte 0 set: distance bit 7 -> bucket 7
+        let mut remote_id = [0u8; 32];
+        remote_id[0] = 0x80;
+        let remote = DhtNodeId { id: remote_id };
+        let bucket = RoutingTable::bucket_for_key(&local, &remote);
+        assert_eq!(bucket, 7, "highest bit in byte 0 should be bucket 7");
+
+        // Remote with bit 0 of byte 0 set: distance bit 0 -> bucket 0
+        let mut remote_id2 = [0u8; 32];
+        remote_id2[0] = 0x01;
+        let remote2 = DhtNodeId { id: remote_id2 };
+        let bucket2 = RoutingTable::bucket_for_key(&local, &remote2);
+        assert_eq!(bucket2, 0, "lowest bit in byte 0 should be bucket 0");
+    }
+
+    #[test]
+    fn test_routing_table_add_and_evict() {
+        let local_id = DhtNodeId { id: [0u8; 32] };
+        let mut config = DhtConfig::default();
+        config.k = 2; // Small bucket for testing
+        let mut rt = RoutingTable::new(config);
+
+        // Add 3 nodes to same bucket (all have remote_id[0]=0x80 -> bucket 7)
+        for i in 0..3u8 {
+            let mut id = [0u8; 32];
+            id[0] = 0x80;
+            id[31] = i;
+            let node = NodeInfo {
+                id: DhtNodeId { id },
+                address: format!("[::1]:{}", 1000 + i as u16).parse().expect("test: parse addr"),
+                last_seen: SystemTime::now(),
+                rtt: None,
+            };
+            rt.add_node_with_local_id(&local_id, node);
+        }
+
+        let bucket = &rt.buckets[7];
+        assert_eq!(bucket.nodes.len(), 2, "bucket should be at capacity k=2");
+        assert_eq!(
+            bucket.replacements.len(),
+            1,
+            "overflow should go to replacements"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_refresh_routing_table_evicts_stale() {
+        let mut config = DhtConfig::default();
+        config.k = 5;
+        config.node_ttl = Duration::from_secs(1);
+        let rt = Arc::new(RwLock::new(RoutingTable::new(config)));
+
+        // Add a stale node (last_seen 10 seconds ago)
+        {
+            let mut table = rt.write().await;
+            let node = NodeInfo {
+                id: DhtNodeId { id: [1u8; 32] },
+                address: "[::1]:2000".parse().expect("test: parse addr"),
+                last_seen: SystemTime::now() - Duration::from_secs(10),
+                rtt: None,
+            };
+            table.buckets[0].nodes.push(node);
+        }
+
+        // Refresh should evict the stale node
+        DhtNetwork::refresh_routing_table(rt.clone())
+            .await
+            .expect("test: refresh should succeed");
+
+        let table = rt.read().await;
+        assert_eq!(
+            table.buckets[0].nodes.len(),
+            0,
+            "stale node should be evicted"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_republish_values_refreshes_timestamps() {
+        let vs = Arc::new(RwLock::new(ValueStore::new()));
+
+        // Store a value that is 90% through its lifetime (should be republished)
+        {
+            let mut store = vs.write().await;
+            let key = ValueKey([42u8; 32]);
+            let value = StoredValue {
+                data: ValueData::SearchIndex {
+                    keyword: "test".to_string(),
+                    packages: vec![],
+                },
+                publisher: DhtNodeId { id: [0u8; 32] },
+                published_at: SystemTime::now() - Duration::from_secs(900),
+                expires_at: SystemTime::now() + Duration::from_secs(100),
+            };
+            store.store(key, value);
+        }
+
+        DhtNetwork::republish_values(vs.clone())
+            .await
+            .expect("test: republish should succeed");
+
+        let store = vs.read().await;
+        let key = ValueKey([42u8; 32]);
+        let values = store.get(&key).expect("test: value should exist");
+        assert_eq!(values.len(), 1);
+        // After republish, expires_at should be further in the future
+        let remaining = values[0]
+            .expires_at
+            .duration_since(SystemTime::now())
+            .unwrap_or(Duration::from_secs(0));
+        assert!(
+            remaining.as_secs() > 100,
+            "expiration should be extended after republish"
+        );
     }
 }

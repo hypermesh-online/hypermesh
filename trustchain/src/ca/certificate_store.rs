@@ -167,6 +167,15 @@ impl CertificateStore {
         self.certificates.iter().map(|entry| entry.value().clone())
     }
 
+    /// Find the first certificate matching a given common name.
+    /// Returns `None` if no certificate with that CN exists.
+    pub async fn find_by_common_name(&self, common_name: &str) -> Option<IssuedCertificate> {
+        self.certificates
+            .iter()
+            .find(|entry| entry.value().common_name == common_name)
+            .map(|entry| entry.value().clone())
+    }
+
     // -- Persistence helpers --------------------------------------------------
 
     /// Load revocations from disk. Failures are logged but not propagated so

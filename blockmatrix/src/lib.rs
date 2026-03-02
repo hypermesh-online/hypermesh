@@ -263,6 +263,9 @@ pub use privacy::{
 // Real hardware metrics collection from /proc filesystem
 pub mod metrics;
 
+// Performance monitoring, regression detection, and production readiness
+pub mod performance;
+
 // CLI module - matrix topology queries, node management, asset operations
 pub mod cli;
 

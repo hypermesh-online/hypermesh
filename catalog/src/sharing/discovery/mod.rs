@@ -253,6 +253,60 @@ impl DiscoveryService {
         Ok(index.contains_key(asset_id))
     }
 
+    /// Announce a published package to a DHT network for peer discovery.
+    /// This hashes the asset_id into a DHT-compatible key and stores the
+    /// local node as a provider.
+    pub async fn announce_to_dht(
+        &self,
+        asset_id: &AssetRegistration,
+        metadata: &PackageSpecMetadata,
+    ) -> Result<()> {
+        let key = blake3::hash(asset_id.to_hex_string().as_bytes());
+        let local_node = self.get_local_node_id();
+
+        tracing::info!(
+            asset_id = %asset_id,
+            dht_key = %hex::encode(&key.as_bytes()[..8]),
+            node = %local_node,
+            package_name = %metadata.name,
+            "Announcing package to DHT for peer discovery"
+        );
+
+        // Register in local index so other discovery queries find it
+        let index = self.local_index.read().await;
+        if !index.contains_key(asset_id) {
+            drop(index);
+            self.register_package(asset_id, metadata, SharePermission::Public)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Discover packages via DHT-style key lookup.
+    /// Searches the local and federated index using the BLAKE3 hash of the
+    /// query as a DHT key, then falls back to text search.
+    pub async fn discover_via_dht(
+        &self,
+        query: &str,
+    ) -> Result<Vec<(AssetRegistration, PackageSpecMetadata)>> {
+        // First try exact DHT key lookup (for asset ID lookups)
+        let dht_key = blake3::hash(query.as_bytes());
+        let dht_hex = hex::encode(dht_key.as_bytes());
+
+        // Check local index for entries whose hex string matches the DHT key
+        let local_index = self.local_index.read().await;
+        for (asset_id, entry) in local_index.iter() {
+            if asset_id.to_hex_string() == dht_hex {
+                return Ok(vec![(asset_id.clone(), entry.metadata.clone())]);
+            }
+        }
+        drop(local_index);
+
+        // Fall back to regular text search
+        self.search_local(query).await
+    }
+
     /// Get popular packages
     pub async fn get_popular_packages(
         &self,
@@ -395,5 +449,81 @@ mod tests {
             .expect("test: expected success");
         let results = service.search_local("test").await;
         assert!(results.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_announce_and_discover_via_dht() {
+        let service = DiscoveryService::new(Duration::from_secs(3600))
+            .await
+            .expect("test: create service");
+
+        // Create a test asset registration and metadata
+        let asset_data = blockmatrix::assets::core::AssetData {
+            config: b"test-config".to_vec(),
+            definition: b"test-def".to_vec(),
+            metadata: vec![],
+        };
+        let asset_id = crate::AssetRegistration::from_asset_data(
+            &asset_data,
+            blockmatrix::assets::core::NetworkScope::Global,
+            blockmatrix::assets::core::AssetCategory::Application(
+                blockmatrix::assets::core::ApplicationDomain {
+                    domain_name: "catalog".to_string(),
+                    domain_hash: [0u8; 32],
+                },
+            ),
+        );
+
+        let metadata = crate::PackageSpecMetadata {
+            name: "dht-test-package".to_string(),
+            version: "1.0.0".to_string(),
+            tags: vec!["test".to_string()],
+            description: Some("A DHT test package".to_string()),
+            author: Some("test-author".to_string()),
+            license: None,
+            homepage: None,
+            repository: None,
+            download_count: 0,
+            featured: false,
+            keywords: vec!["dht".to_string()],
+            created: None,
+            updated: None,
+        };
+
+        // Announce
+        service
+            .announce_to_dht(&asset_id, &metadata)
+            .await
+            .expect("test: announce should succeed");
+
+        // Verify it's in the local index
+        assert!(
+            service.has_package(&asset_id).await.expect("test: has_package"),
+            "package should be in local index after announce"
+        );
+
+        // Discover via text search
+        let results = service
+            .discover_via_dht("dht-test-package")
+            .await
+            .expect("test: discover should succeed");
+        assert!(
+            !results.is_empty(),
+            "should find the announced package via text search"
+        );
+        assert_eq!(results[0].1.name, "dht-test-package");
+    }
+
+    #[tokio::test]
+    async fn test_discover_via_dht_empty() {
+        let service = DiscoveryService::new(Duration::from_secs(3600))
+            .await
+            .expect("test: create service");
+
+        let results = service
+            .discover_via_dht("nonexistent-package")
+            .await
+            .expect("test: discover should succeed");
+        assert!(results.is_empty(), "should return empty for unknown package");
     }
 }

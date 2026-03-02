@@ -118,6 +118,15 @@ impl ProofValidation {
         self.all_valid
     }
 
+    /// Validate a consensus proof and return the validation result.
+    /// Convenience wrapper around `ConsensusProof::verify_all()`.
+    pub fn validate_proof(proof: &ConsensusProof) -> ProofValidation {
+        match proof.verify_all() {
+            Ok(validation) => validation,
+            Err(_) => ProofValidation::new(false, false, false, false),
+        }
+    }
+
     /// Get human-readable error summary
     pub fn error_summary(&self) -> String {
         if self.errors.is_empty() {

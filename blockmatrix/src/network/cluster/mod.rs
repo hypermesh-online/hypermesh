@@ -17,6 +17,7 @@
 
 mod health;
 mod membership;
+pub mod transport_bridge;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

@@ -8,6 +8,7 @@
 //! to the HyperMesh network, managing rewards through Caesar integration, and
 //! configuring privacy settings for resource sharing.
 
+pub mod distribution_bridge;
 pub mod hardware;
 pub mod notifications;
 pub mod platform;

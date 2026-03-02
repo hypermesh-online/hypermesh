@@ -9,6 +9,7 @@
 //! decisions that traditional systems cannot match.
 
 pub mod discovery;
+pub mod load_balancer;
 pub mod routing;
 
 // Re-export key types

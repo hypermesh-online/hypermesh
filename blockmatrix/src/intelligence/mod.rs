@@ -31,6 +31,7 @@ use tracing::{debug, info, instrument, warn};
 
 // Sub-modules for integration layer
 pub mod integration;
+pub mod metrics_bridge;
 pub mod performance;
 pub mod types;
 pub mod validation;

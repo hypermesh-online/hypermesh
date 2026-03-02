@@ -19,6 +19,12 @@ use super::results::{
 use super::traits::SecurityScanner;
 use crate::assets::AssetPackage;
 
+/// Short BLAKE3-based identifier from a string (first 8 hex chars).
+fn blake3_short(input: &str) -> String {
+    let hash = blake3::hash(input.as_bytes());
+    hash.to_hex()[..8].to_string()
+}
+
 /// Static security scanner
 pub struct StaticSecurityScanner;
 
@@ -124,49 +130,176 @@ impl StaticSecurityScanner {
         risks
     }
 
-    /// Check for known vulnerabilities in BlockMatrix Asset
-    fn check_vulnerabilities(&self, _asset: &AssetPackage) -> Vec<Vulnerability> {
+    /// Check for known vulnerabilities by inspecting declared dependencies
+    /// from the asset's specification.
+    fn check_vulnerabilities(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
         let mut vulnerabilities = Vec::new();
 
-        // Check dependencies for known vulnerabilities from BlockMatrix Asset metadata
-        // Note: Simulated check for demonstration purposes
-        // In production, this would query a real vulnerability database
+        // Scan declared dependencies from asset spec
+        for dep in &asset.spec.spec.dependencies {
+            let name = &dep.name;
+            let version = &dep.version;
 
-        // Check for dependencies in asset metadata
-        // STUB: PackageSpecMetadata doesn't have a get method - would need full content
-        // This block is disabled until metadata dependency access is implemented
-        #[allow(unreachable_code)]
-        if false {
-            let deps: &serde_json::Value = &serde_json::Value::Null; // Placeholder for stub code
-            if let Some(deps_array) = deps.as_array() {
-                for dep in deps_array {
-                    if let Some(dep_obj) = dep.as_object() {
-                        if let (Some(name), Some(version)) =
-                            (dep_obj.get("name"), dep_obj.get("version"))
-                        {
-                            let name_str = name.as_str().unwrap_or("");
-                            let version_str = version.as_str().unwrap_or("");
-
-                            // Simulated vulnerability database check
-                            if name_str == "vulnerable-package" {
-                                vulnerabilities.push(Vulnerability {
-                                    cve: Some("CVE-2024-0001".to_string()),
-                                    description: format!(
-                                        "Known vulnerability in {name_str} {version_str}"
-                                    ),
-                                    severity: SecuritySeverity::High,
-                                    component: name_str.to_string(),
-                                    fix_available: true,
-                                    fix_version: Some("2.0.0".to_string()),
-                                });
-                            }
-                        }
-                    }
-                }
+            // Check against known-vulnerable patterns.
+            // In production this would query a real advisory database.
+            // For now we flag common unsafe patterns.
+            if name.contains("vulnerable") || name.contains("insecure") {
+                vulnerabilities.push(Vulnerability {
+                    cve: Some(format!("HM-VULN-{}", blake3_short(name))),
+                    description: format!(
+                        "Known vulnerability pattern in dependency {name} {version}"
+                    ),
+                    severity: SecuritySeverity::High,
+                    component: name.clone(),
+                    fix_available: false,
+                    fix_version: None,
+                });
             }
         }
 
         vulnerabilities
+    }
+
+    /// Validate package size is within acceptable limits (max 500MB default).
+    fn validate_size(&self, asset: &AssetPackage) -> Option<Vulnerability> {
+        const MAX_PACKAGE_SIZE: usize = 500 * 1024 * 1024; // 500 MB
+        let total_size = asset.content.main_content.len()
+            + asset
+                .content
+                .file_contents
+                .values()
+                .map(|c| c.len())
+                .sum::<usize>()
+            + asset
+                .content
+                .binary_contents
+                .values()
+                .map(|c| c.len())
+                .sum::<usize>();
+
+        if total_size > MAX_PACKAGE_SIZE {
+            return Some(Vulnerability {
+                cve: None,
+                description: format!(
+                    "Package size ({} bytes) exceeds maximum allowed ({MAX_PACKAGE_SIZE} bytes)",
+                    total_size
+                ),
+                severity: SecuritySeverity::Medium,
+                component: "package-size".to_string(),
+                fix_available: false,
+                fix_version: None,
+            });
+        }
+        None
+    }
+
+    /// Verify the package_hash matches the BLAKE3 hash of the content.
+    fn verify_content_hash(&self, asset: &AssetPackage) -> Option<Vulnerability> {
+        if asset.package_hash.is_empty() {
+            return Some(Vulnerability {
+                cve: None,
+                description: "Package hash is empty; content integrity cannot be verified"
+                    .to_string(),
+                severity: SecuritySeverity::High,
+                component: "content-hash".to_string(),
+                fix_available: false,
+                fix_version: None,
+            });
+        }
+
+        // Compute BLAKE3 hash of the main content
+        let computed_hash = blake3::hash(asset.content.main_content.as_bytes());
+        let computed_hex = computed_hash.to_hex().to_string();
+
+        // Only flag if the hash is clearly wrong and looks like it was meant to be a hex hash
+        if asset.package_hash.len() == 64 && asset.package_hash != computed_hex {
+            return Some(Vulnerability {
+                cve: None,
+                description: format!(
+                    "Content hash mismatch: declared={}, computed={}",
+                    &asset.package_hash[..16],
+                    &computed_hex[..16]
+                ),
+                severity: SecuritySeverity::Critical,
+                component: "content-hash".to_string(),
+                fix_available: false,
+                fix_version: None,
+            });
+        }
+        None
+    }
+
+    /// Check that required metadata fields are present.
+    fn check_metadata_completeness(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
+        let mut issues = Vec::new();
+
+        if asset.spec.metadata.name.is_empty() {
+            issues.push(Vulnerability {
+                cve: None,
+                description: "Package name is empty".to_string(),
+                severity: SecuritySeverity::Medium,
+                component: "metadata".to_string(),
+                fix_available: false,
+                fix_version: None,
+            });
+        }
+
+        if asset.spec.metadata.version.is_empty() {
+            issues.push(Vulnerability {
+                cve: None,
+                description: "Package version is empty".to_string(),
+                severity: SecuritySeverity::Medium,
+                component: "metadata".to_string(),
+                fix_available: false,
+                fix_version: None,
+            });
+        }
+
+        issues
+    }
+
+    /// Perform type-specific validation (WASM magic bytes, JSON schema, etc.)
+    fn type_specific_validation(&self, asset: &AssetPackage) -> Vec<Vulnerability> {
+        let mut issues = Vec::new();
+        let asset_type = asset.spec.spec.asset_type.to_lowercase();
+        let content = asset.content.main_content.as_bytes();
+
+        match asset_type.as_str() {
+            "wasm" | "webassembly" => {
+                // WASM magic bytes: \0asm (0x00, 0x61, 0x73, 0x6D)
+                if content.len() >= 4 && &content[..4] != b"\0asm" {
+                    issues.push(Vulnerability {
+                        cve: None,
+                        description: "WASM content missing magic bytes (\\0asm)".to_string(),
+                        severity: SecuritySeverity::High,
+                        component: "type-validation".to_string(),
+                        fix_available: false,
+                        fix_version: None,
+                    });
+                }
+            }
+            "json" | "json-schema" => {
+                if !content.is_empty() {
+                    if let Err(e) =
+                        serde_json::from_slice::<serde_json::Value>(content)
+                    {
+                        issues.push(Vulnerability {
+                            cve: None,
+                            description: format!("Invalid JSON content: {e}"),
+                            severity: SecuritySeverity::Medium,
+                            component: "type-validation".to_string(),
+                            fix_available: false,
+                            fix_version: None,
+                        });
+                    }
+                }
+            }
+            _ => {
+                // No specific validation for unknown types
+            }
+        }
+
+        issues
     }
 
     /// Calculate security score
@@ -232,7 +365,23 @@ impl SecurityScanner for StaticSecurityScanner {
         let mut rule_failures = Vec::new();
         let mut recommendations = Vec::new();
 
-        // Check for vulnerabilities
+        // Size validation
+        if let Some(size_issue) = self.validate_size(asset) {
+            vulnerabilities.push(size_issue);
+        }
+
+        // Content hash verification (BLAKE3)
+        if let Some(hash_issue) = self.verify_content_hash(asset) {
+            vulnerabilities.push(hash_issue);
+        }
+
+        // Metadata completeness check
+        vulnerabilities.extend(self.check_metadata_completeness(asset));
+
+        // Type-specific validation (WASM magic bytes, JSON schema, etc.)
+        vulnerabilities.extend(self.type_specific_validation(asset));
+
+        // Check for vulnerabilities in dependencies
         vulnerabilities.extend(self.check_vulnerabilities(asset));
 
         // Scan code for security issues from BlockMatrix Asset metadata
@@ -300,5 +449,169 @@ impl SecurityScanner for StaticSecurityScanner {
         result.score = self.calculate_score(&result);
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::assets::{
+        AssetContentResolved, AssetSpec, AssetSpecification, PackageSpecMetadata,
+    };
+
+    fn make_test_package(name: &str, content: &str, hash: &str) -> AssetPackage {
+        AssetPackage {
+            spec: AssetSpec {
+                api_version: "v1".to_string(),
+                kind: "test".to_string(),
+                metadata: PackageSpecMetadata {
+                    name: name.to_string(),
+                    version: "1.0.0".to_string(),
+                    tags: vec![],
+                    description: None,
+                    author: Some("test-author".to_string()),
+                    license: None,
+                    homepage: None,
+                    repository: None,
+                    download_count: 0,
+                    featured: false,
+                    keywords: vec![],
+                    created: None,
+                    updated: None,
+                },
+                spec: AssetSpecification {
+                    asset_type: "package".to_string(),
+                    content: crate::AssetContent {
+                        main: String::new(),
+                        files: vec![],
+                        inline: None,
+                        binary: vec![],
+                        templates: vec![],
+                    },
+                    security: crate::AssetSecurity {
+                        consensus_required: false,
+                        certificate_pinning: false,
+                        hash_validation: "blake3".to_string(),
+                        sandbox_level: "strict".to_string(),
+                        allowed_syscalls: vec![],
+                        network_access: crate::assets::types::NetworkAccess {
+                            enabled: false,
+                            allowed_domains: vec![],
+                            allowed_ports: vec![],
+                            require_tls: true,
+                        },
+                        file_access: crate::assets::types::FileAccess {
+                            level: "none".to_string(),
+                            allowed_paths: vec![],
+                            denied_paths: vec![],
+                            allow_temp: false,
+                        },
+                        permissions: vec![],
+                    },
+                    resources: crate::AssetResources {
+                        cpu_limit: "1000m".to_string(),
+                        memory_limit: "512Mi".to_string(),
+                        execution_timeout: "30s".to_string(),
+                        storage_required: None,
+                        network_bandwidth: None,
+                        gpu_required: false,
+                        hardware_requirements: vec![],
+                    },
+                    execution: crate::AssetExecution {
+                        delegation_strategy: "any".to_string(),
+                        minimum_consensus: 1,
+                        retry_policy: "none".to_string(),
+                        max_concurrent: None,
+                        priority: "normal".to_string(),
+                        timeout_config: crate::assets::types::TimeoutConfig {
+                            execution: "30s".to_string(),
+                            network: "10s".to_string(),
+                            io: "5s".to_string(),
+                            compilation: None,
+                        },
+                        scheduling: crate::assets::types::SchedulingConfig {
+                            timing: "immediate".to_string(),
+                            allocation_strategy: "best_fit".to_string(),
+                            node_affinity: vec![],
+                            anti_affinity: vec![],
+                        },
+                    },
+                    dependencies: vec![],
+                    environment: std::collections::HashMap::new(),
+                    config_schema: None,
+                },
+            },
+            content: AssetContentResolved {
+                main_content: content.to_string(),
+                file_contents: std::collections::HashMap::new(),
+                binary_contents: std::collections::HashMap::new(),
+                template_content: std::collections::HashMap::new(),
+                resolved_dependencies: vec![],
+            },
+            validation: crate::assets::registry::AssetValidationStatus {
+                is_valid: true,
+                validated_at: chrono::Utc::now(),
+                errors: vec![],
+                warnings: vec![],
+                security_results: crate::assets::registry::SecurityScanResults {
+                    security_score: 100,
+                    vulnerabilities: vec![],
+                    recommendations: vec![],
+                    scanned_at: chrono::Utc::now(),
+                },
+                dependency_results: Default::default(),
+            },
+            package_hash: hash.to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+            signature: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scanner_validates_size_and_hash() {
+        let scanner = StaticSecurityScanner::new();
+        let package = make_test_package("good-pkg", "hello world", "some-hash");
+
+        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        // Should pass: small size, non-hex hash (not treated as BLAKE3)
+        assert!(result.score > 0, "score should be positive for valid package");
+    }
+
+    #[tokio::test]
+    async fn test_scanner_detects_empty_metadata() {
+        let scanner = StaticSecurityScanner::new();
+        let mut package = make_test_package("", "content", "hash");
+        package.spec.metadata.version = String::new();
+
+        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        // Should have vulnerabilities for empty name and version
+        let metadata_issues: Vec<_> = result
+            .vulnerabilities
+            .iter()
+            .filter(|v| v.component == "metadata")
+            .collect();
+        assert!(
+            metadata_issues.len() >= 2,
+            "should detect missing name and version"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_scanner_type_specific_json_validation() {
+        let scanner = StaticSecurityScanner::new();
+        let mut package = make_test_package("json-pkg", "not valid json {{{", "hash");
+        package.spec.spec.asset_type = "json".to_string();
+
+        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        let type_issues: Vec<_> = result
+            .vulnerabilities
+            .iter()
+            .filter(|v| v.component == "type-validation")
+            .collect();
+        assert!(
+            !type_issues.is_empty(),
+            "should detect invalid JSON content"
+        );
     }
 }
