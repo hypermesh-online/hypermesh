@@ -36,14 +36,14 @@ items = [
     "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
     "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey, replaces opaque String)",
     "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)",
+    "Cross-crate validation helpers (validate_node_id, validate_content_hash, validate_matrix_position, validate_privacy_mode)",
+    "Runtime state types (NodeState, NetworkState, SyncStatus, RuntimeAssetState, RuntimeSnapshot)",
+    "Common test utilities (test_node_id, test_asset_id, test_content_hash, test_privacy_mode, TestFixtures)",
+    "Public SDK types (SdkCapabilities, AssetDescriptor, NodeDescriptor, QueryResult<T>)",
 ]
 
 [features.in_development]
 items = [
-    "Cross-crate validation helpers",
-    "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
-    "Common test utilities",
-    "Public SDK types for third-party integration (stable API surface)",
 ]
 
 [features.planned]

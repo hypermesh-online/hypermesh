@@ -31,11 +31,11 @@ items = [
     "Service discovery registry (register/resolve/deregister by service type)",
     "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
     "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)",
+    "Min-spec transport validation (R13 — TransportMinSpec: connection budget, bandwidth checks, 1Mb/s/4GB/2-core limits)",
 ]
 
 [features.in_development]
 items = [
-    "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)",
 ]
 
 [features.planned]

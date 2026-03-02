@@ -78,14 +78,13 @@ export const crateStatuses: CrateStatus[] = [
         "Intelligence metrics bridge (IntelligenceMetricsCollector: real /proc CPU/memory via hardware module, processing stats)",
         "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
         "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
-        "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)"
+        "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
+        "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)"
       ],
-      "inDevelopment": [
-        "Node binary Anonymous certificate strategy fix"
-      ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 98
+    "completion": 100
   },
   {
     "id": "caesar",
@@ -361,17 +360,16 @@ export const crateStatuses: CrateStatus[] = [
         "GenesisAssetRecord type (R1+R10 — sovereign genesis with hardware-assessed IPv6 assets)",
         "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
         "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey, replaces opaque String)",
-        "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)"
+        "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)",
+        "Cross-crate validation helpers (validate_node_id, validate_content_hash, validate_matrix_position, validate_privacy_mode)",
+        "Runtime state types (NodeState, NetworkState, SyncStatus, RuntimeAssetState, RuntimeSnapshot)",
+        "Common test utilities (test_node_id, test_asset_id, test_content_hash, test_privacy_mode, TestFixtures)",
+        "Public SDK types (SdkCapabilities, AssetDescriptor, NodeDescriptor, QueryResult<T>)"
       ],
-      "inDevelopment": [
-        "Cross-crate validation helpers",
-        "Runtime state unification — all HyperMesh network execution and on-chain operations use Asset typedefs/impls",
-        "Common test utilities",
-        "Public SDK types for third-party integration (stable API surface)"
-      ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 88
+    "completion": 100
   },
   {
     "id": "stoq",
@@ -404,17 +402,16 @@ export const crateStatuses: CrateStatus[] = [
         "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
         "Service discovery registry (register/resolve/deregister by service type)",
         "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
-        "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)"
+        "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)",
+        "Min-spec transport validation (R13 — TransportMinSpec: connection budget, bandwidth checks, 1Mb/s/4GB/2-core limits)"
       ],
-      "inDevelopment": [
-        "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements"
       ]
     },
-    "completion": 89
+    "completion": 93
   },
   {
     "id": "trustchain",

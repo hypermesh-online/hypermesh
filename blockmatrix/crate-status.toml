@@ -63,11 +63,11 @@ items = [
     "Performance monitoring integration (MonitoringIntegration, AlertingManager, MetricsExporter with threshold alerting)",
     "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
     "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
+    "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)",
 ]
 
 [features.in_development]
 items = [
-    "Node binary Anonymous certificate strategy fix",
 ]
 
 [features.planned]
