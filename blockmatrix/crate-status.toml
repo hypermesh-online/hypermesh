@@ -55,12 +55,12 @@ items = [
     "Shard migration (R14 — MigrationExecutor: copy-then-redirect, non-blocking reads, rollback on failure)",
     "Privacy-scoped dedup verification (R4 — PrivacyScopedDedup: full tracking Device/Private, hash-only Anonymous, tamper detection)",
     "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)",
+    "Gateway cross-scope transfers wired to ShardTransport (Lock→Transfer→Unlock with real shard movement)",
 ]
 
 [features.in_development]
 items = [
     "Node binary Anonymous certificate strategy fix",
-    "Gateway cross-scope transfers (protocol logic Lock->Transfer->Unlock implemented, no network transport wired)",
     "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
     "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
     "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",

@@ -26,22 +26,22 @@ items = [
     "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)",
     "Self vs network metrics separation (SelfMetrics, PeerMetrics, node_metrics module, capacity assessment)",
     "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)",
+    "Real network metrics collection (MetricsSource trait, SystemMetricsSource /proc readers, MockMetricsSource for tests)",
+    "Real metrics ingestion pipeline (route by payload type, differential privacy filter, time-series storage)",
+    "Swarm analytics R12 (ShardPopularity, SwarmAnalytics: record_request, get_popular_shards, demand maps)",
+    "Replication triggers R12 (ReplicationTrigger: demand vs replica threshold, ReplicationSignal with urgency)",
+    "Dispersion intelligence R12 (DispersionAdvisor: k-means clustering, recommend_placement near demand)",
+    "Swarm cascade metrics R12+R13 (CascadeTracker: per-node relay load, propagation speed, bottleneck detection)",
+    "Min-spec performance profiling R13 (MinSpecProfiler: 256MB/5%CPU/10KB/s budget validation)",
+    "Real-time routing intelligence feed (RoutingIntelFeed: subscribe/publish RoutingUpdate to STOQ)",
+    "Caesar in-transit/holding amount tracking (CaesarTracker: per-node economic state, network snapshots)",
+    "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)",
 ]
 
 [features.in_development]
 items = [
-    "Real network metrics collection (replace hardcoded stubs in tests)",
-    "Caesar in-transit/holding amount tracking integration",
-    "Collective network intelligence aggregation",
 ]
 
 [features.planned]
 items = [
-    "Swarm analytics — shard popularity tracking, consumer demand patterns, replication demand detection (R12)",
-    "Replication triggers — detect when shard replicas are insufficient for demand, signal BlockMatrix to amplify (R12)",
-    "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
-    "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
-    "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
-    "Real-time routing intelligence feed to STOQ adaptive tiers",
-    "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)",
 ]

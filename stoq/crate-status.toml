@@ -30,6 +30,7 @@ items = [
     "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
     "Service discovery registry (register/resolve/deregister by service type)",
     "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
+    "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)",
 ]
 
 [features.in_development]
@@ -41,5 +42,4 @@ items = [
 items = [
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
-    "MetricsFrame protocol wiring to engauge",
 ]

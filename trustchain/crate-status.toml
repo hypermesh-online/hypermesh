@@ -40,6 +40,11 @@ items = [
     "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
     "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, validation/issuance latency)",
     "HTTP/3 handlers: list_certificates wired to real cert store",
+    "Cascading revocation (parent→child BFS propagation, multi-level cascade)",
+    "Distributed revocation propagation (federation broadcast, BLAKE3 integrity, status tracking)",
+    "CRL distribution via blockchain (hash-linked blocks, full + delta CRLs, chain integrity verification)",
+    "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
+    "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
 ]
 
 [features.in_development]
@@ -49,9 +54,4 @@ items = [
 
 [features.planned]
 items = [
-    "Distributed revocation propagation",
-    "Offline device grace period renewal",
-    "Cascading revocation (parent->child identity propagation)",
-    "CRL distribution via blockchain (offline revocation)",
-    "Field device bootstrap with intermittent connectivity",
 ]

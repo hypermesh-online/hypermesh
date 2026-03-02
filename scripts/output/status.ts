@@ -70,11 +70,11 @@ export const crateStatuses: CrateStatus[] = [
         "Streaming shard reconstruction (R13 — StreamingReconstructor: incremental per-group RS decode, memory-efficient)",
         "Shard migration (R14 — MigrationExecutor: copy-then-redirect, non-blocking reads, rollback on failure)",
         "Privacy-scoped dedup verification (R4 — PrivacyScopedDedup: full tracking Device/Private, hash-only Anonymous, tamper detection)",
-        "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)"
+        "Min-spec validation (R13 — MinSpecValidator: 1Mb/s bandwidth, 50GB storage, 4GB RAM, 2-core budget checks)",
+        "Gateway cross-scope transfers wired to ShardTransport (Lock→Transfer→Unlock with real shard movement)"
       ],
       "inDevelopment": [
         "Node binary Anonymous certificate strategy fix",
-        "Gateway cross-scope transfers (protocol logic Lock->Transfer->Unlock implemented, no network transport wired)",
         "Multi-node deployment (ClusterManager exists, network trust modules improved but not fully end-to-end)",
         "Service mesh controller (circuit breaker, health tracking real; load balancer placeholder)",
         "User contribution platform (data structures exist, cannot work end-to-end — distribution never moves shards)",
@@ -85,7 +85,7 @@ export const crateStatuses: CrateStatus[] = [
         "Performance regression detector (module exists but not compiled — dead code, imports non-existent crate modules)"
       ]
     },
-    "completion": 86
+    "completion": 88
   },
   {
     "id": "caesar",
@@ -218,24 +218,22 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
         "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)",
         "Self vs network metrics separation (SelfMetrics, PeerMetrics, node_metrics module, capacity assessment)",
-        "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)"
+        "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)",
+        "Real network metrics collection (MetricsSource trait, SystemMetricsSource /proc readers, MockMetricsSource for tests)",
+        "Real metrics ingestion pipeline (route by payload type, differential privacy filter, time-series storage)",
+        "Swarm analytics R12 (ShardPopularity, SwarmAnalytics: record_request, get_popular_shards, demand maps)",
+        "Replication triggers R12 (ReplicationTrigger: demand vs replica threshold, ReplicationSignal with urgency)",
+        "Dispersion intelligence R12 (DispersionAdvisor: k-means clustering, recommend_placement near demand)",
+        "Swarm cascade metrics R12+R13 (CascadeTracker: per-node relay load, propagation speed, bottleneck detection)",
+        "Min-spec performance profiling R13 (MinSpecProfiler: 256MB/5%CPU/10KB/s budget validation)",
+        "Real-time routing intelligence feed (RoutingIntelFeed: subscribe/publish RoutingUpdate to STOQ)",
+        "Caesar in-transit/holding amount tracking (CaesarTracker: per-node economic state, network snapshots)",
+        "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)"
       ],
-      "inDevelopment": [
-        "Real network metrics collection (replace hardcoded stubs in tests)",
-        "Caesar in-transit/holding amount tracking integration",
-        "Collective network intelligence aggregation"
-      ],
-      "planned": [
-        "Swarm analytics — shard popularity tracking, consumer demand patterns, replication demand detection (R12)",
-        "Replication triggers — detect when shard replicas are insufficient for demand, signal BlockMatrix to amplify (R12)",
-        "Dispersion intelligence — recommend WHERE new replicas should go based on consumer matrix positions (R12)",
-        "Swarm cascade metrics — measure per-node relay load, cascade propagation speed, bottleneck detection (R12, R13)",
-        "Min-spec performance profiling — verify analytics overhead fits within 1Mb/s, 4GB RAM, 2-core budget (R13)",
-        "Real-time routing intelligence feed to STOQ adaptive tiers",
-        "Real metrics ingestion from STOQ/BlockMatrix (replace hardcoded stubs)"
-      ]
+      "inDevelopment": [],
+      "planned": []
     },
-    "completion": 67
+    "completion": 100
   },
   {
     "id": "gateway",
@@ -408,18 +406,18 @@ export const crateStatuses: CrateStatus[] = [
         "Graceful degradation with expired certificates (fallback to self-signed Anonymous)",
         "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
         "Service discovery registry (register/resolve/deregister by service type)",
-        "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)"
+        "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
+        "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)"
       ],
       "inDevelopment": [
         "Min-spec transport validation — verify STOQ operates within 1 Mb/s, 4GB RAM, 2-core budget (R13)"
       ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
-        "Partition recovery timing measurements",
-        "MetricsFrame protocol wiring to engauge"
+        "Partition recovery timing measurements"
       ]
     },
-    "completion": 86
+    "completion": 89
   },
   {
     "id": "trustchain",
@@ -461,20 +459,19 @@ export const crateStatuses: CrateStatus[] = [
         "Scope-aware certificates (IdentityScopeExtension embedded via custom OID, Device vs Network scope)",
         "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, validation/issuance latency)",
-        "HTTP/3 handlers: list_certificates wired to real cert store"
+        "HTTP/3 handlers: list_certificates wired to real cert store",
+        "Cascading revocation (parent→child BFS propagation, multi-level cascade)",
+        "Distributed revocation propagation (federation broadcast, BLAKE3 integrity, status tracking)",
+        "CRL distribution via blockchain (hash-linked blocks, full + delta CRLs, chain integrity verification)",
+        "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
+        "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)"
       ],
       "inDevelopment": [
         "HTTP/3 stub endpoints (status, dns_zones, dns_register, dns_record_lookup, consensus_status/validate/proofs, auth_certificate — partially wired)"
       ],
-      "planned": [
-        "Distributed revocation propagation",
-        "Offline device grace period renewal",
-        "Cascading revocation (parent->child identity propagation)",
-        "CRL distribution via blockchain (offline revocation)",
-        "Field device bootstrap with intermittent connectivity"
-      ]
+      "planned": []
     },
-    "completion": 85
+    "completion": 98
   },
   {
     "id": "ui",
