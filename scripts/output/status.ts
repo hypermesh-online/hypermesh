@@ -79,17 +79,18 @@ export const crateStatuses: CrateStatus[] = [
         "Performance monitoring integration (MonitoringIntegration with record/flush, AlertingManager with threshold breach detection)",
         "Performance regression prevention (RegressionDetector: baseline comparison, per-metric tolerance, configurable alerts)",
         "1M-node stress test simulation (R12, R13 — cascade O(log N) verification, min-spec budget validation, shard commitment scaling)",
-        "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)"
+        "Node bootstrap Anonymous certificate strategy (select_certificate_strategy routes by PrivacyMode)",
+        "Internal DNS service registration (LOCAL_SERVICES table, 5 services registered at boot, resolve_service())",
+        "Blockchain state persistence on restart (PersistenceManager wired to bootstrap, genesis/blocks/cert survive reboot)",
+        "NodeBlockchain::from_blocks() — reconstruct in-memory chain from persisted blocks with integrity validation",
+        "Node resume path (NodeBootstrap::resume() loads persisted state instead of creating fresh genesis)"
       ],
       "inDevelopment": [
-        "Node binary wiring — connect bootstrap → gossip → mDNS peer discovery → StoqShardTransport into runnable server loop",
-        "Asset CLI end-to-end — `node store <file>` (compress→encrypt→shard→distribute) and `node fetch <asset-id>` (retrieve→reconstruct→decrypt→decompress)",
-        "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes",
-        "Merge/replace blockmatrix stub binary with real node binary (fix port conflict with trustchain on 8446)"
+        "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes"
       ],
       "planned": []
     },
-    "completion": 94
+    "completion": 98
   },
   {
     "id": "caesar",
@@ -233,7 +234,8 @@ export const crateStatuses: CrateStatus[] = [
         "Min-spec performance profiling R13 (MinSpecProfiler: 256MB/5%CPU/10KB/s budget validation)",
         "Real-time routing intelligence feed (RoutingIntelFeed: subscribe/publish RoutingUpdate to STOQ)",
         "Caesar in-transit/holding amount tracking (CaesarTracker: per-node economic state, network snapshots)",
-        "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)"
+        "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)",
+        "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, quinn-based QUIC, bind [::1]:9296, feature-gated server binary)"
       ],
       "inDevelopment": [],
       "planned": []
@@ -266,7 +268,8 @@ export const crateStatuses: CrateStatus[] = [
         "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
         "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
         "Outbound proxy with allowlist filtering",
-        "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)"
+        "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
+        "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)"
       ],
       "inDevelopment": [
         "Production config loader — TOML/env-based config for listen addresses, cert paths, backend service addresses, rate limits",
@@ -275,7 +278,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 87
+    "completion": 88
   },
   {
     "id": "hypermesh",
@@ -479,7 +482,8 @@ export const crateStatuses: CrateStatus[] = [
         "CRL distribution via blockchain (hash-linked blocks, full + delta CRLs, chain integrity verification)",
         "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
         "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
-        "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)"
+        "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)",
+        "Production DNS zones for catalog.hypermesh.online and engauge.hypermesh.online (addresses + subdomain entries)"
       ],
       "inDevelopment": [
         "Production binary hardening — config file loading, graceful shutdown, health endpoint, signal handling",

@@ -96,6 +96,86 @@ impl NodeBlockchain {
         }
     }
 
+    /// Reconstruct a blockchain from persisted blocks.
+    ///
+    /// Used on restart to rebuild the in-memory chain from blocks loaded
+    /// from disk via `BlockchainStorage`. Validates chain integrity
+    /// (previous_hash linkage) and rebuilds all indices.
+    pub fn from_blocks(
+        node_coordinate: MatrixCoordinate,
+        mut blocks: Vec<Block>,
+    ) -> Result<Self, String> {
+        if blocks.is_empty() {
+            return Err("Cannot create blockchain from empty block list".to_string());
+        }
+
+        // Sort by index to ensure correct ordering
+        blocks.sort_by_key(|b| b.index);
+
+        // Verify genesis is present
+        if blocks[0].index != 0 {
+            return Err(format!(
+                "First block must be genesis (index 0), got index {}",
+                blocks[0].index,
+            ));
+        }
+
+        // Validate chain integrity: each block's previous_hash must match
+        // the prior block's hash (skip genesis which has no predecessor)
+        for i in 1..blocks.len() {
+            if blocks[i].previous_hash != blocks[i - 1].hash {
+                return Err(format!(
+                    "Chain integrity violation at block {}: previous_hash {} != block {}'s hash {}",
+                    blocks[i].index,
+                    blocks[i].previous_hash,
+                    blocks[i - 1].index,
+                    blocks[i - 1].hash,
+                ));
+            }
+        }
+
+        // Rebuild indices
+        let mut block_map = HashMap::with_capacity(blocks.len());
+        let mut hash_index = HashMap::with_capacity(blocks.len());
+        let mut total_data_size = 0usize;
+
+        for block in &blocks {
+            block_map.insert(block.index, block.clone());
+            hash_index.insert(block.hash.clone(), block.index);
+            total_data_size += block.size();
+        }
+
+        let head = blocks.last().cloned();
+        let chain_height = head.as_ref().map(|b| b.index).unwrap_or(0);
+
+        let stats = ChainStats {
+            total_blocks: blocks.len() as u64,
+            chain_height,
+            chain_start: Some(blocks[0].timestamp),
+            total_data_size,
+            ..ChainStats::default()
+        };
+
+        info!(
+            "Restored blockchain for node ({},{},{}) — {} blocks, height {}",
+            node_coordinate.x,
+            node_coordinate.y,
+            node_coordinate.z,
+            blocks.len(),
+            chain_height,
+        );
+
+        Ok(NodeBlockchain {
+            node_coordinate,
+            blocks: Arc::new(RwLock::new(block_map)),
+            hash_index: Arc::new(RwLock::new(hash_index)),
+            head: Arc::new(RwLock::new(head)),
+            validator: ChainValidator::new(),
+            stats: Arc::new(RwLock::new(stats)),
+            genesis_auth: Arc::new(RwLock::new(None)),
+        })
+    }
+
     /// Get the node's matrix coordinate
     pub fn node_coordinate(&self) -> &MatrixCoordinate {
         &self.node_coordinate

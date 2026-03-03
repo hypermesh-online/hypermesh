@@ -46,6 +46,7 @@ items = [
     "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
     "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
     "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)",
+    "Production DNS zones for catalog.hypermesh.online and engauge.hypermesh.online (addresses + subdomain entries)",
 ]
 
 [features.in_development]

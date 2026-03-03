@@ -36,6 +36,7 @@ items = [
     "Real-time routing intelligence feed (RoutingIntelFeed: subscribe/publish RoutingUpdate to STOQ)",
     "Caesar in-transit/holding amount tracking (CaesarTracker: per-node economic state, network snapshots)",
     "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)",
+    "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, quinn-based QUIC, bind [::1]:9296, feature-gated server binary)",
 ]
 
 [features.in_development]

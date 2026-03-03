@@ -24,12 +24,14 @@ use blockmatrix::assets::pipeline::{
     ShardMetadata,
 };
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
-use blockmatrix::assets::pipeline::{PipelineStats};
-use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
+use blockmatrix::assets::pipeline::PipelineStats;
+use blockmatrix::blockchain::node_chain::NodeBlockchain;
+use blockmatrix::bootstrap::{node_id, LocalhostCertificate, NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::shard_transport::StoqShardTransport;
 use blockmatrix::network::NetworkManager;
+use blockmatrix::persistence::{BlockQuery, PersistenceConfig, PersistenceManager};
 use hypermesh_lib::ContentHash;
 
 #[derive(Parser, Debug)]
@@ -68,6 +70,10 @@ struct Cli {
     /// Run as a reflector (public peer that accepts and relays)
     #[clap(long)]
     reflector: bool,
+
+    /// Data directory for blockchain persistence
+    #[clap(long, default_value = "~/.blockmatrix")]
+    data_dir: String,
 
     #[clap(subcommand)]
     command: Option<Commands>,
@@ -347,13 +353,122 @@ async fn main() -> Result<()> {
 
     // Create matrix coordinate
     let coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
+    let nid = node_id(&coord);
 
-    // Initialize node with unified bootstrap
-    info!(
-        "Initializing BlockMatrix node at ({}, {}, {})",
-        coord.x, coord.y, coord.z
-    );
-    let bootstrap = NodeBootstrap::initialize(coord).await?;
+    // Resolve data directory (expand ~ to home)
+    let data_dir = if cli.data_dir.starts_with('~') {
+        let home = dirs::home_dir().context("could not determine home directory")?;
+        home.join(&cli.data_dir[2..]) // strip "~/"
+    } else {
+        std::path::PathBuf::from(&cli.data_dir)
+    };
+
+    // Check for existing persisted state
+    let metadata_path = data_dir.join(&nid).join("blockchain").join("metadata.json");
+    let has_persisted_state = metadata_path.exists();
+
+    let (bootstrap, persistence) = if has_persisted_state {
+        // === RESUME: load persisted state ===
+        info!("Found persisted state at {}, resuming node", data_dir.display());
+
+        let persistence_config = PersistenceConfig {
+            storage_dir: data_dir.clone(),
+            enable_background: true,
+            ..PersistenceConfig::default()
+        };
+        let persistence = PersistenceManager::new(persistence_config, nid.clone())
+            .await
+            .context("failed to initialize persistence manager")?;
+
+        // Run recovery (WAL replay, integrity check)
+        let report = persistence.recover().await
+            .context("recovery failed")?;
+        info!(
+            "Recovery complete: status={:?}, blocks_recovered={}, wal_replayed={}",
+            report.status, report.stats.blocks_recovered, report.stats.wal_entries_replayed,
+        );
+
+        // Load all blocks from storage
+        let chain_metadata = persistence.load_block(BlockQuery::ByIndex(0)).await
+            .context("failed to load genesis block")?;
+        let genesis_block = chain_metadata
+            .ok_or_else(|| anyhow::anyhow!("persisted state exists but genesis block missing"))?;
+
+        // Get chain height from storage stats to load all blocks
+        let stats = persistence.get_stats().await;
+        let chain_height = stats.block_count.saturating_sub(1);
+
+        let blocks = if chain_height > 0 {
+            let mut all_blocks = vec![genesis_block.clone()];
+            for idx in 1..=chain_height {
+                if let Some(block) = persistence.load_block(BlockQuery::ByIndex(idx)).await
+                    .context("failed to load block")? {
+                    all_blocks.push(block);
+                }
+            }
+            all_blocks
+        } else {
+            vec![genesis_block.clone()]
+        };
+
+        info!("Loaded {} blocks from disk", blocks.len());
+
+        // Reconstruct in-memory blockchain
+        let blockchain = std::sync::Arc::new(
+            NodeBlockchain::from_blocks(coord, blocks)
+                .map_err(|e| anyhow::anyhow!("failed to reconstruct blockchain: {}", e))?,
+        );
+
+        // Load certificate
+        let cert_path = data_dir.join(&nid).join("certificate.json");
+        let localhost_cert = if cert_path.exists() {
+            let cert_json = std::fs::read_to_string(&cert_path)
+                .with_context(|| format!("failed to read {}", cert_path.display()))?;
+            serde_json::from_str::<LocalhostCertificate>(&cert_json)
+                .context("failed to deserialize certificate")?
+        } else {
+            warn!("Certificate not found on disk, generating fresh one");
+            // Will be re-saved below
+            NodeBootstrap::generate_fresh_certificate()?
+        };
+
+        let bootstrap = NodeBootstrap::resume(coord, blockchain, genesis_block, localhost_cert).await?;
+        (bootstrap, persistence)
+    } else {
+        // === FIRST BOOT: create fresh node ===
+        info!(
+            "No persisted state found, initializing fresh node at ({}, {}, {})",
+            coord.x, coord.y, coord.z
+        );
+
+        let bootstrap = NodeBootstrap::initialize(coord).await?;
+
+        // Initialize persistence and save initial state
+        let persistence_config = PersistenceConfig {
+            storage_dir: data_dir.clone(),
+            enable_background: true,
+            ..PersistenceConfig::default()
+        };
+        let persistence = PersistenceManager::new(persistence_config, nid.clone())
+            .await
+            .context("failed to initialize persistence manager")?;
+
+        // Persist genesis block
+        persistence.save_block(bootstrap.genesis_block()).await
+            .context("failed to persist genesis block")?;
+
+        // Persist certificate
+        let cert_path = data_dir.join(&nid).join("certificate.json");
+        let cert_json = serde_json::to_string_pretty(bootstrap.localhost_certificate())
+            .context("failed to serialize certificate")?;
+        std::fs::write(&cert_path, &cert_json)
+            .with_context(|| format!("failed to write {}", cert_path.display()))?;
+
+        info!("Persisted genesis block and certificate to {}", data_dir.display());
+        (bootstrap, persistence)
+    };
+
+    let persistence = std::sync::Arc::new(persistence);
 
     // Verify self-sufficiency
     bootstrap.verify_self_sufficient().await?;
@@ -365,6 +480,7 @@ async fn main() -> Result<()> {
         bootstrap.localhost_certificate().subject
     );
     info!("Privacy Mode: {:?}", bootstrap.privacy_mode().await);
+    info!("Persisted: {}", if has_persisted_state { "resumed from disk" } else { "fresh (saved)" });
 
     // Get DNS records
     let dns_records = bootstrap.dns().all_records().await;
@@ -507,7 +623,14 @@ async fn main() -> Result<()> {
 
             // Keep running
             tokio::signal::ctrl_c().await?;
-            info!("Shutting down...");
+            info!("Shutting down — flushing persistence...");
+            if let Err(e) = persistence.flush().await {
+                warn!("Persistence flush error: {}", e);
+            }
+            if let Err(e) = persistence.shutdown().await {
+                warn!("Persistence shutdown error: {}", e);
+            }
+            info!("Persistence flushed, shutdown complete.");
         }
         Some(Commands::Status) => {
             info!("Node Status:");

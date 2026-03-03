@@ -189,7 +189,66 @@ pub struct NodeBootstrap {
     bootstrapped_at: SystemTime,
 }
 
+/// Derive a deterministic node ID from matrix coordinates.
+///
+/// Used as the persistence directory name under `~/.blockmatrix/`.
+/// The same coordinates always produce the same ID, so restarting
+/// with the same coordinates finds the same persisted state.
+pub fn node_id(coord: &MatrixCoordinate) -> String {
+    format!("node_{}_{}_{}", coord.x, coord.y, coord.z)
+}
+
 impl NodeBootstrap {
+    /// Resume a previously persisted node.
+    ///
+    /// Instead of creating a fresh genesis/blockchain/certificate, this
+    /// accepts pre-loaded state recovered from disk. DNS and service
+    /// registration still happen (they're ephemeral, in-memory only).
+    pub async fn resume(
+        node_coordinate: MatrixCoordinate,
+        blockchain: Arc<NodeBlockchain>,
+        genesis_block: Block,
+        localhost_cert: LocalhostCertificate,
+    ) -> Result<Self> {
+        info!(
+            "Resuming node at ({}, {}, {}) from persisted state",
+            node_coordinate.x, node_coordinate.y, node_coordinate.z
+        );
+
+        // DNS + service registration (ephemeral, always rebuilt)
+        let dns = DnsResolver::new();
+        dns.register(
+            "localhost".to_string(),
+            IpAddr::from([0, 0, 0, 0, 0, 0, 0, 1]),
+        )
+        .await;
+        for service in LOCAL_SERVICES {
+            dns.register(
+                service.name.to_string(),
+                IpAddr::from(std::net::Ipv6Addr::LOCALHOST),
+            )
+            .await;
+        }
+
+        let privacy_mode = Arc::new(RwLock::new(PrivacyMode::PRIVATE));
+
+        info!(
+            "Node resumed — genesis {}, chain height {}",
+            genesis_block.hash,
+            blockchain.get_height().await,
+        );
+
+        Ok(Self {
+            genesis_block,
+            blockchain,
+            localhost_cert,
+            dns,
+            privacy_mode,
+            node_coordinate,
+            bootstrapped_at: SystemTime::now(),
+        })
+    }
+
     /// Initialize a new node with self-sufficient bootstrap
     ///
     /// This creates:
@@ -211,7 +270,7 @@ impl NodeBootstrap {
         let blockchain = Arc::new(NodeBlockchain::new(node_coordinate));
 
         // 3. Self-sign certificate for localhost
-        let localhost_cert = Self::generate_localhost_certificate()?;
+        let localhost_cert = Self::generate_fresh_certificate()?;
         info!("Generated self-signed localhost certificate");
 
         // 4. Initialize DNS with localhost → ::1
@@ -250,8 +309,11 @@ impl NodeBootstrap {
         Ok(bootstrap)
     }
 
-    /// Generate self-signed certificate for localhost
-    fn generate_localhost_certificate() -> Result<LocalhostCertificate> {
+    /// Generate a fresh self-signed certificate for localhost.
+    ///
+    /// Public so the binary can generate a fallback certificate when
+    /// resuming a node whose certificate file is missing.
+    pub fn generate_fresh_certificate() -> Result<LocalhostCertificate> {
         use blake3::Hasher;
 
         let now = SystemTime::now();

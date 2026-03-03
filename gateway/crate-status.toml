@@ -26,6 +26,7 @@ items = [
     "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
     "Outbound proxy with allowlist filtering",
     "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
+    "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)",
 ]
 
 [features.in_development]
