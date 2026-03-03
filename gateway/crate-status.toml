@@ -6,37 +6,40 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # HTTP/3 server (real, deployed, serving traffic)
     "QUIC/HTTP3 server setup (quinn + h3)",
     "TLS provider (File/TrustChain/SelfSigned certificate sources)",
     "Connection pool with health checks",
     "Router with path-based backend selection",
     "Circuit breaker and retry logic",
     "CORS middleware and request logging",
-    "Request handling (h3 0.0.8 RequestResolver API)",
     "HTTP/3 backend proxying",
-    "STOQ protocol bridge (dual-listener HTTP/3 + STOQ)",
-    "STOQ listener with exponential backoff",
-    "Bootstrap token flow (HTTP/3 to STOQ transition)",
-    "PoS authentication and session management",
-    "Cross-scope routing (Device/Network via ScopeRouter)",
-    "Federation bridge with trust levels (Full/Conditional/Untrusted)",
-    "Cross-scope transfer proxy (lock/transfer/unlock lifecycle)",
     "Rate limiting and DDoS protection (token bucket per-IP/identity/global)",
     "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
     "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
-    "Outbound proxy with allowlist filtering",
-    "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
-    "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)",
-    "Engauge API routing (/api/v1/engauge with pool, proxy, circuit breaker, health check)",
-    "Caesar backend routing (gateway → [::1]:9294)",
-    "Catalog backend routing (gateway → [::1]:9295)",
-    "Health check aggregation — /health endpoint checks all 5 backend services (trustchain, blockmatrix, caesar, catalog, engauge)",
+    "Inbound proxy for HyperMesh dashboards",
+    "Health check aggregation — /health checks all 5 backend services",
+    # Backend routing (real, deployed)
+    "TrustChain backend routing (gateway -> [::1]:8444)",
+    "BlockMatrix backend routing (gateway -> [::1]:9292)",
+    "Caesar backend routing (gateway -> [::1]:9294)",
+    "Catalog backend routing (gateway -> [::1]:9295)",
+    "Engauge backend routing (gateway -> [::1]:9296)",
+    "Engauge API routing (/api/v1/engauge)",
 ]
 
 [features.in_development]
 items = [
-    "Production config loader — TOML/env-based config for listen addresses, cert paths, backend service addresses, rate limits",
-    "Backend service discovery — resolve trustchain/blockmatrix/caesar/catalog backends by address or service registry",
+    # Gateway talks HTTP/3 but backends speak STOQ — protocol bridge is incomplete
+    "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
+    "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
+    "PoS authentication — session management structs exist but proofs are not validated (consensus is fake)",
+    "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
+    "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
+    "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
+    "Outbound proxy with allowlist filtering — code exists, not tested",
+    "Production config loader (TOML/env-based config)",
+    "Backend service discovery (resolve by address or service registry)",
 ]
 
 [features.planned]

@@ -1,47 +1,47 @@
 [crate]
 name = "STOQ Protocol"
 id = "stoq"
-description = "QUIC-based transport protocol with eBPF acceleration and FALCON-1024 signing"
+description = "QUIC-based transport protocol with eBPF acceleration"
 phase = "alpha"
 
 [features.working]
 items = [
-    "QUIC/IPv6 transport — connection pooling, health checks, adaptive congestion control",
-    "FALCON-1024 crypto — key generation, signing, dynamic key_id, real signature verification via FalconTrustChainClient",
-    "Certificate management — two modes: Anonymous (ephemeral per-connection, no CA/CT) and Authenticated (TrustChain-issued, endpoint is configuration for Private/Federated/Public)",
-    "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push and tunnel traffic type enforcement",
-    "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport thin consumer wrapper",
-    "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf orchestrator",
-    "Kernel eBPF program loading via hypermesh-ebpf ebpf-loader feature gate",
+    # Transport (genuinely production-quality QUIC)
+    "QUIC/IPv6 transport via Quinn — connection pooling, health checks, adaptive congestion control",
+    "Certificate management — two modes: Anonymous (ephemeral per-connection) and Authenticated (TrustChain-issued)",
+    "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push",
+    "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport wrapper",
+    "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf",
     "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
-    "PoS/PoW validation — hash-meets-difficulty checks, results fed to eBPF policy layer",
-    "Matrix-aware positioning via hypermesh_lib canonical types",
-    "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment, CC selection per tier + MinSpec for R13",
-    "Protocol-level PoS token validation at line rate — two-stage fast/full, privacy-tier-aware, cached, rate-limited",
-    "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling, redundant mode",
-    "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge",
-    "Engauge METRICS frame type (0xfe000007) — feature-gated handler for streaming MetricsFrame payloads",
-    "BLAKE3 content hashing (whitepaper-aligned)",
+    "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment",
+    "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling",
+    "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol",
+    "BLAKE3 content hashing",
     "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
-    "Identity-aware connection establishment (extract_node_id from X.509 SPKI, identity_scope per strategy)",
-    "Certificate manager with real X.509 validation (replaced placeholder private key)",
-    "Certificate store persistence across restarts (filesystem cache ~/.stoq/certs/)",
+    "Identity-aware connection establishment (extract_node_id from X.509 SPKI)",
+    "Certificate manager with real X.509 validation",
+    "Certificate store persistence across restarts (~/.stoq/certs/)",
     "Graceful degradation with expired certificates (fallback to self-signed Anonymous)",
-    "Permission enforcement at protocol layer (EKU-based scope checking per operation)",
+    "Permission enforcement at protocol layer (EKU-based scope checking)",
     "Service discovery registry (register/resolve/deregister by service type)",
-    "Cipher suite negotiation for Private/Anonymous networks (R8 — CipherSuitePolicy, negotiate handshake)",
-    "MetricsFrame protocol wiring to engauge (MetricsFrameBridge: transport snapshot → Capacity/Congestion/Routing frames)",
-    "Min-spec transport validation (R13 — TransportMinSpec: connection budget, bandwidth checks, 1Mb/s/4GB/2-core limits)",
+    "Cipher suite negotiation for Private/Anonymous networks (R8)",
+    "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
+    "MetricsFrame protocol wiring to engauge",
+    "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
 ]
 
 [features.in_development]
 items = [
-    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable via StoqTransport connections)",
+    "FALCON-1024 crypto — key generation and signing code exists but certificates are currently rcgen X.509 (not FALCON-signed)",
+    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable)",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
+    "Protocol-level PoS token validation — two-stage fast/full code exists but proofs are self-generated fakes",
+    "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
 ]
 
 [features.planned]
 items = [
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
+    "FALCON-1024 signed QUIC handshakes (replace rcgen with real post-quantum)",
 ]

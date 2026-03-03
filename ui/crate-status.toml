@@ -6,29 +6,31 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # UI components (real React, renders in browser)
     "Dashboard home with ecosystem overview",
     "Module pages (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
     "Component library (Radix UI primitives, Tailwind 4)",
     "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
-    "TrustChain management (certificates, security, consensus, node config)",
-    "Asset management views (creation wizard, advanced management)",
-    "Proxy and NAT address management",
-    "API status monitoring and performance dashboards",
-    "Global search across ecosystem modules",
     "Storybook component documentation (5 stories)",
     "Accessibility wrappers and keyboard navigation",
     "React Router page routing with sidebar navigation",
-    "E2E test suite (Playwright, 5 specs: dashboard, navigation, module-pages, accessibility, trustchain)",
+    "E2E test suite (Playwright, 5 specs)",
     "Integration test harness page",
 ]
 
 [features.in_development]
 items = [
+    # Views exist but display static/mock data, not connected to real backends
+    "TrustChain management views — UI exists but shows static data, not connected to TrustChain STOQ API",
+    "Asset management views — creation wizard renders but no real asset creation backend",
+    "Proxy and NAT address management — UI exists but no backend connection",
+    "API status monitoring — dashboard renders but not fetching real service health data",
+    "Global search — UI exists but searches static data only",
     "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
-    "Component unit tests (Vitest, 3 test files + 3 test utilities = 6 total)",
-    "Gateway API client — fetch real data from trust.hypermesh.online gateway endpoints (health, node status, cert status, catalog browse)",
-    "Node join flow — UI for connecting to public network (enter bootstrap address, display matrix position, show peer count)",
-    "Catalog browser — browse/search/install shared asset packages from catalog.hypermesh.online",
+    "Component unit tests (Vitest, 3 test files)",
+    "Gateway API client — fetch real data from trust.hypermesh.online gateway endpoints",
+    "Node join flow — UI for connecting to public network",
+    "Catalog browser — browse/search/install shared asset packages",
 ]
 
 [features.planned]
@@ -37,11 +39,9 @@ items = [
     "Real-time metrics streaming",
     "Multi-node cluster topology visualization",
     "Security monitoring with live alerts",
-    "Native desktop dashboard (Tauri cross-platform: Linux/macOS/Windows)",
+    "Native desktop dashboard (Tauri cross-platform)",
     "Caesar wallet and transaction management UI",
     "Engauge analytics and reward distribution dashboard",
-    "Remote device/resource/asset management hub (Tailscale-like C&C for sovereign nodes)",
-    "Private network remote access (manage resources across networks from any device)",
-    "First-run onboarding flow (sovereign node setup, network join, resource configuration)",
-    "New node registration experience (not traditional sign-up — sovereign identity bootstrap)",
+    "Remote device/resource/asset management hub",
+    "First-run onboarding flow (sovereign node setup, network join)",
 ]

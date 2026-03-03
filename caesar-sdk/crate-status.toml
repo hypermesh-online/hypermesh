@@ -6,6 +6,7 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # These are trait definitions and reference implementations — genuinely complete for what they are
     "IngressAdapter trait (7 methods: adapter_id, supported_denominations, lock_external_value, verify_lock, release_lock, liquidity_pressure, to_gold_grams)",
     "EgressAdapter trait (5 methods: adapter_id, supported_denominations, available_capacity, settle, capacity_ratio)",
     "UPI shared types (IngressLockProof, SettlementReceipt, SettlementFinality, LiquidityPressure, UpiError)",
@@ -19,4 +20,5 @@ items = []
 [features.planned]
 items = [
     "Adapter development guide and examples",
+    "External payment rail adapter implementations (requires real banking/crypto integrations)",
 ]

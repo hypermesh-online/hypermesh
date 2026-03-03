@@ -1,60 +1,62 @@
 [crate]
 name = "TrustChain"
 id = "trustchain"
-description = "FALCON-1024 Certificate Authority with Proof of State validation"
+description = "Certificate Authority with Proof of State validation — currently single-node, target: decentralized"
 phase = "alpha"
 
 [features.working]
 items = [
-    "FALCON-1024 post-quantum signing",
-    "Kyber-1024 key encapsulation",
-    "Proof of State four-proof validation",
-    "Security monitoring and Byzantine detection",
-    "DNS resolver (programmatic resolution works, HTTP/3 endpoint wired, STOQ transport client not fully integrated)",
-    "STOQ-based API server",
-    "SecurityIntegratedCA with mandatory consensus and real metrics",
-    "Binary PoS authentication (whitepaper-aligned, no scoring/reputation)",
-    "StateAuthenticator (renamed from ConsensusValidator)",
-    "BLAKE3 consensus content hashing",
-    "OCSP responder with FALCON-1024 signed responses",
-    "CRL generator and distributor",
-    "Threshold cryptography (Shamir SSS over GF(256))",
-    "Deployment quality gates",
-    "Cross-network CA federation (peer management, trust levels, FALCON-1024 cross-validation)",
-    "CT log federation sync protocol (message types, peer state tracking, consistency proofs)",
-    "Anonymous mode ephemeral certificates (Tor-like tunnel certs, no CA/CT)",
+    # Certificate generation (real X.509, but NOT post-quantum yet)
+    "X.509 certificate issuance via rcgen (real CA-signed leaf certs, proper hierarchy)",
+    "Certificate PEM encoding (rcgen .pem() output, proper base64)",
+    "KeyUsage/EKU enforcement in issued certs (digital signature, key encipherment, server/client auth)",
+    "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
+    "Scope-aware certificates (IdentityScopeExtension embedded via custom OID)",
+    "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs)",
     "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
     "Persistent revocation storage (JSON on disk, survives restart)",
-    "Canonical ProofType from hypermesh-lib (single source of truth)",
-    "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId, to_scoped_identity() bridge)",
+    "OCSP responder structure",
+    "CRL generator and distributor structure",
+    # STOQ API (real QUIC server, accepts connections)
+    "STOQ-based API server (binds [::1]:8444, accepts QUIC, handles cert requests)",
+    "HTTP/3 handlers wired to real cert store (list, issue, validate)",
+    # Identity types (real type system)
     "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
     "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
-    "Identity-scoped certificate extensions (IdentityScopeExtension, OID-based, 4-byte encode/decode)",
-    "TrustAssetKind includes Transmission variant (R10 alignment with SystemAssetKind)",
-    "CA-signed leaf certificates (rcgen signed_by() chain, proper X.509 hierarchy)",
-    "Certificate PEM encoding (rcgen .pem() output, proper base64)",
-    "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs, cert hash search)",
-    "KeyUsage/EKU enforcement in issued X.509 certs (digital signature, key encipherment, server/client auth by subject type)",
-    "Threshold crypto integration with CA initialization (Shamir SSS key splitting at startup)",
-    "Scope-aware certificates (IdentityScopeExtension embedded via custom OID, Device vs Network scope)",
-    "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
-    "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, validation/issuance latency)",
-    "HTTP/3 handlers: list_certificates wired to real cert store",
-    "Cascading revocation (parent→child BFS propagation, multi-level cascade)",
-    "Distributed revocation propagation (federation broadcast, BLAKE3 integrity, status tracking)",
-    "CRL distribution via blockchain (hash-linked blocks, full + delta CRLs, chain integrity verification)",
-    "Offline device grace period renewal (scope-dependent: Anonymous=0, Private=7d, Public=30d, max renewals enforced)",
-    "Field device bootstrap with intermittent connectivity (Provisional→Enrolling→Enrolled, retry limits)",
-    "HTTP/3 handlers wired (consensus_status, consensus_validate with ProofValidation, auth_certificate with CA issuance)",
-    "Production DNS zones for catalog.hypermesh.online and engauge.hypermesh.online (addresses + subdomain entries)",
+    "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId)",
+    "TrustAssetKind includes Transmission variant (R10)",
+    "StateAuthenticator (binary PoS authentication interface)",
+    "BLAKE3 content hashing",
+    "Canonical ProofType from hypermesh-lib",
+    # DNS zones (config entries, not propagated)
+    "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
+    # Metrics
+    "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)",
 ]
 
 [features.in_development]
 items = [
-    "Production binary hardening — config file loading, graceful shutdown, health endpoint, signal handling",
-    "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS (initial clearnet bootstrap before self-issued FALCON certs)",
+    # CRITICAL: Core decentralization features that are missing or fake
+    "FALCON-1024 certificate signing — currently using rcgen (traditional RSA/ECDSA X.509), NOT post-quantum FALCON-1024",
+    "Kyber-1024 KEM integration — type exists but not used in certificate operations",
+    "Real Proof of State validation — consensus proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
+    "StakeProof signature verification — currently checks non-empty string + positive number, no cryptographic verification",
+    "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
+    "DNS zone propagation — DNS resolver is a local HashMap, no cross-node zone transfer",
+    "CT log federation sync — message types exist but no real cross-node sync",
+    "Cross-network CA federation — peer management structs exist but no real QUIC-based peer exchange",
+    "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
+    "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
+    "Production binary hardening (config file loading, graceful shutdown, health endpoint, signal handling)",
+    "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
 ]
 
 [features.planned]
 items = [
+    "Multi-node CA consensus (distributed certificate issuance across reflector pool)",
+    "Distributed revocation propagation (federation broadcast to peer CAs)",
+    "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
+    "Cascading revocation across federated CAs",
+    "Offline device grace period renewal",
+    "Field device bootstrap with intermittent connectivity",
 ]

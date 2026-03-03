@@ -6,6 +6,7 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # These are type definitions and helper functions — they are genuinely correct and complete
     "NodeId, AssetId, NetworkId, and ContentHash newtypes",
     "PrivacyMode struct (2-axis: AccessScope + tracked)",
     "BlockchainScope enum (Device | Network)",
@@ -17,35 +18,28 @@ items = [
     "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
     "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
-    "KeyPairId and AssetMetadata structs",
     "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
-    "Transmission asset type in SystemAssetKind (R10 — first-class mesh relay bandwidth asset)",
+    "Transmission asset type in SystemAssetKind (R10)",
     "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
     "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
-    "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash for R4)",
-    "AssetMetadata canonical struct in lib (consolidated definition with AssetKind + state + timestamps)",
-    "Dns and Transmission variants added to blockmatrix BaseSystemType",
-    "VirtualMachine and Library removed from blockmatrix AssetType/BaseSystemType",
-    "Trustchain proof types linked to lib canonical ProofType (proof_type() methods)",
-    "Trustchain NodeId/AssetId renamed to AuthenticatedNode/AuthenticatedAsset (use lib newtypes)",
-    "AssetMetadata consolidated (crate-local copies renamed: PipelineInputMetadata, PackageSpecMetadata, etc.)",
-    "PacketId conflict resolved (blockmatrix network isolation uses IsolationPacketId)",
+    "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash)",
     "ShardCommitment type (R12 — BLAKE3(sorted placements) compute/verify API)",
-    "Genesis asset inventory types (R1 — Cpu/Gpu/Storage/Network/Memory capability structs)",
-    "GenesisAssetRecord type (R1+R10 — sovereign genesis with hardware-assessed IPv6 assets)",
-    "Shared serialization via postcard (encode/decode/encode_bounded + EncodingError)",
-    "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey, replaces opaque String)",
-    "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity — respects BlockchainScope + traceability axis)",
-    "Cross-crate validation helpers (validate_node_id, validate_content_hash, validate_matrix_position, validate_privacy_mode)",
-    "Runtime state types (NodeState, NetworkState, SyncStatus, RuntimeAssetState, RuntimeSnapshot)",
-    "Common test utilities (test_node_id, test_asset_id, test_content_hash, test_privacy_mode, TestFixtures)",
+    "GenesisAssetRecord type (R1+R10 — capability structs for genesis inventory)",
+    "Shared serialization via postcard (encode/decode/encode_bounded)",
+    "Unified NodeId type (BLAKE3([u8;32]) from FALCON-1024 pubkey)",
+    "Scope-aware identity types (WorkloadType, IdentityScope, ScopedIdentity)",
+    "Cross-crate validation helpers (validate_node_id, validate_content_hash, etc.)",
+    "Runtime state types (NodeState, NetworkState, SyncStatus, RuntimeSnapshot)",
+    "Common test utilities (test fixtures for all canonical types)",
     "Public SDK types (SdkCapabilities, AssetDescriptor, NodeDescriptor, QueryResult<T>)",
 ]
 
 [features.in_development]
 items = [
+    # Lib types are defined but some are not yet exercised by real implementations
+    "Consensus proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
+    "BlockchainScope::Network — enum variant exists but no crate implements Network scope sync",
 ]
 
 [features.planned]
-items = [
-]
+items = []

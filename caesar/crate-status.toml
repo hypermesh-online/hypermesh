@@ -6,49 +6,45 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # EVP core (real state machine, real math, real conservation invariant)
     "EVP core types (PacketId, GoldGrams, MarketTier, PacketState with 11 states, DemurrageRate)",
-    "CaesPacket state machine (Minted→InTransit→Delivered→Settling→Settled, plus Hold/Stall/Expire/Refund/Dissolve/Disperse)",
+    "CaesPacket state machine (Minted->InTransit->Delivered->Settling->Settled, plus Hold/Stall/Expire/Refund/Dissolve/Disperse)",
     "Tier-based demurrage decay (L0 ~5%/hr, L1 ~0.1%/day, L2 ~0.01%/day, L3 ~0.001%/day)",
     "Governor PID controller (velocity, gold deviation, volume, liquidity, in-transit float)",
     "Constitutional fee caps (L0=5%, L1=2%, L2=0.5%, L3=0.1%)",
-    "Per-tier fee modifiers and demurrage overrides",
-    "Network pressure classification (6 quadrants: Bubble, Crash, Stagnation, GoldenEra, Bottleneck, Vacuum)",
+    "Network pressure classification (6 quadrants)",
     "Universal Payment Interface — IngressAdapter + EgressAdapter traits with 4 finality types",
-    "Settlement protocol — validate_settlement, settle_packet, split_rewards (80/20 egress/transit)",
-    "Acceptance criteria — per-recipient tier/adapter/fee/delegate preferences on Network chain",
-    "Gravity dissolution — 90-day timeout, 6-criteria qualification, weighted shard-holder distribution",
-    "Packet processor — validate, handoff with hop/fee tracking, batch processing",
+    "Settlement protocol — validate, settle, split_rewards (80/20 egress/transit)",
+    "Acceptance criteria — per-recipient preferences structure",
+    "Gravity dissolution — 90-day timeout, 6-criteria qualification, weighted distribution",
     "Fee distribution — 80/20 egress/transit split, bytes-weighted transit allocation",
-    "Gold oracle — price tracking, 10% band validation, grams↔USD conversion",
-    "Effective price composite (whitepaper §5.1: network fees + speculation pressure - liquidity shadow)",
-    "Capacity-based packet routing (bandwidth/buffer/latency/load scoring, no trust/reputation)",
-    "Holding buffer — orbit buffer for fee-budget-exceeded/congestion packets with retry limits",
-    "Packet-centric storage (PacketRecord, SettlementRecord, metrics, JSON persistence)",
+    "Gold oracle — price tracking, 10% band validation, grams/USD conversion",
+    "Effective price composite (network fees + speculation pressure - liquidity shadow)",
+    "Capacity-based packet routing (bandwidth/buffer/latency/load scoring)",
+    "Holding buffer — orbit buffer for fee-budget-exceeded/congestion packets",
+    "Packet-centric storage (PacketRecord, SettlementRecord, JSON persistence)",
     "CaesarProtocol coordinator (storage + processor + distributor + oracle + router + governor)",
-    "Conservation law verification + circuit breaker (whitepaper §3.1)",
-    "MeshCredit UPI adapter (internal BlockMatrix ledger, 1:1 CAES denomination)",
-    "Settlement execution pipeline (validate → egress adapter → fee distribution → conservation check)",
-    "Dispersed state handling (egress failure → holding buffer → retry settlement)",
-    "Node operator preferences integration with routing (tier weights, value range, auto_mode)",
-    "Governor-adjusted routing fees (PID-driven fee calculation per packet)",
+    "Conservation law verification + circuit breaker",
+    "MeshCredit UPI adapter (internal ledger, 1:1 CAES denomination)",
     "OracleFeed trait for pluggable gold price sources (ManualFeed for alpha)",
     "Node status tracking in storage (settled count, fee earnings)",
-    "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
-    "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
-    "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
-    "Caesar binary CLI (--bind, --service-name)",
-    "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
-    "Caesar CLI — packet operations + node management (commands, executor, output modules)",
-    "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
-    "Cross-chain bridge (ChainBridge trait, InternalBridge with conservation checks, MockChainBridge for testing)",
+    "STOQ API handlers wired to real CaesarProtocol (5 handlers over QUIC)",
+    "Caesar binary CLI (--bind, --service-name, STOQ API server launcher)",
+    "Cross-chain bridge trait (InternalBridge with conservation checks)",
 ]
 
 [features.in_development]
 items = [
+    # Caesar works in-memory on a single node, but has no real external integration
+    "Multi-node packet routing — routing logic exists but packets don't actually traverse QUIC connections between nodes",
+    "Blockchain-backed acceptance criteria — currently in-memory, should be on Network chain",
+    "Engauge capacity metrics integration — feature-gated code exists but no real data pipeline",
+    "Banking interop bridge — 3 tests failing, external adapter not functional",
 ]
 
 [features.planned]
 items = [
-    "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps — ethers-rs/bitcoin/solana-sdk + bridge liquidity model)",
-    "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)",
+    "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps)",
+    "External fiat/crypto payment rail integrations (blocked by: external API keys + compliance)",
+    "Real gold oracle data feed (blocked by: external API subscription)",
 ]

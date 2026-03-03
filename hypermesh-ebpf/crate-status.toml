@@ -6,29 +6,33 @@ phase = "alpha"
 
 [features.working]
 items = [
-    "HyperMeshEbpf orchestrator API — capability detection, state management, graceful degradation (Full eBPF+AF_XDP → eBPF only → userspace)",
+    # eBPF framework (real kernel interaction, real syscalls)
+    "HyperMeshEbpf orchestrator API — capability detection, state management, graceful degradation (Full eBPF+AF_XDP -> eBPF only -> userspace)",
     "AF_XDP zero-copy I/O — 4-ring UMEM buffers, frame allocator, batch send/receive via syscalls",
     "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with extension header parsing (magic 0x484D)",
-    "AF_XDP kernel integration — xsk_map redirect, UMEM mmap lifecycle, socket reuse across send/receive paths",
-    "BPF map policy enforcement — policy/PoS/asset/xsk maps with 32-byte LE serialization and sync_to_kernel",
-    "PacketDecision three-path routing — Pass (local), Redirect (AF_XDP→STOQ), Forward (XDP_TX to matrix node), Drop",
-    "PoS pre-validation pipeline — header parsing, algorithm indicators, difficulty checks, FastValidationResult",
-    "Validation hooks — STOQ (certificate, packet) + BlockMatrix (extension) registered via set_validation_hooks()",
+    "AF_XDP kernel integration — xsk_map redirect, UMEM mmap lifecycle",
+    "BPF map policy enforcement — 32-byte LE serialization and sync_to_kernel",
+    "PacketDecision three-path routing — Pass (local), Redirect (AF_XDP->STOQ), Forward (XDP_TX), Drop",
+    "Validation hooks — STOQ (certificate, packet) + BlockMatrix (extension) registered",
     "Asset hash verification (BLAKE3) and blockchain registry validation",
-    "Matrix routing path validation (IPv6 + matrix position encoding)",
     "Privacy tier eBPF enforcement with per-policy flag control",
-    "Orchestrator state storage — routing rules, asset hashes, PoS validation state persisted across sessions",
+    "Orchestrator state storage — routing rules, asset hashes, PoS validation state",
     "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
     "Unified intelligence + transport metrics collection",
-    "Multi-queue AF_XDP load balancing — RoundRobin/LeastLoaded/FlowHash strategies, QueueMetrics, MultiQueueManager orchestrator",
-    "Kernel-space PoS structural validation — difficulty (leading zero bits), algorithm indicator, TTL-based cache expiry; full crypto (FALCON-1024/Ed25519/ECDSA) validated in userspace cache model",
-    "Hardware offload detection and opportunistic NIC offload — driver detection (mlx5_core/nfp/bnxt_en), OffloadPolicy (Disabled/Opportunistic/Required), automatic fallback to native XDP",
+    "Multi-queue AF_XDP load balancing (RoundRobin/LeastLoaded/FlowHash strategies)",
+    "Hardware offload detection and opportunistic NIC offload",
 ]
 
 [features.in_development]
 items = [
+    # PoS validation in eBPF is structural only — proofs are self-generated fakes
+    "PoS pre-validation pipeline — header parsing and difficulty checks exist but validate against self-generated proofs",
+    "Kernel-space PoS validation — structural checks work but full crypto (FALCON-1024) not integrated",
+    "Matrix routing path validation — IPv6 + matrix encoding exists but not tested with real multi-node traffic",
 ]
 
 [features.planned]
 items = [
+    "Real FALCON-1024 signature verification in eBPF fast path",
+    "Production multi-node eBPF policy distribution",
 ]

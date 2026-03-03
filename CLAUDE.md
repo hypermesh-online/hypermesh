@@ -24,11 +24,11 @@
 
 ---
 
-## 🎯 **Current Status: ~90% Feature-Complete, Network Propagation Phase**
+## 🎯 **Current Status: Single-Node Alpha — Network/Consensus Not Functional**
 
-**Development Status**: ⚡ **ALPHA** - Core components feature-complete, network propagation pending
-**Repository Status**: ✅ **MONOREPO** - 11 crates in core workspace, deployed to trust.hypermesh.online
-**Implementation Status**: ⚡ **NETWORK PHASE** - 6 services running on GCP, Device scope complete, Network scope DNS/sync propagation pending
+**Development Status**: ⚠️ **SINGLE-NODE ALPHA** - Services run individually but are NOT a decentralized mesh
+**Repository Status**: ✅ **MONOREPO** - 11 crates in core workspace, 6 services deployed to trust.hypermesh.online
+**Implementation Status**: ⚠️ **CRITICAL GAPS** - No real consensus (PoS is self-generated), no cross-node sync, certs are rcgen not FALCON-1024, DNS is local-only
 
 ---
 
@@ -36,19 +36,19 @@
 
 ### **GitHub Organization**: [hypermesh-online](https://github.com/hypermesh-online)
 
-| Component | Repository | Status | Notes |
-|-----------|------------|--------|-------|
-| **BlockMatrix** | `/blockmatrix` | ✅ **100% (69/69)** | Device chain, DNS CLI, persistence, certificate strategy |
-| **Caesar** | `/caesar` | ⚡ **95% (35/37)** | EVP protocol, STOQ API, CLI binary, governor |
-| **Caesar-SDK** | `/caesar-sdk` | ⚡ **83% (5/6)** | UPI traits, mock adapters |
-| **Catalog** | `/catalog` | ⚡ **86% (19/22)** | Package registry, STOQ API, rewards |
-| **Engauge** | `/engauge` | ✅ **100% (31/31)** | Analytics, marketplace, streaming, routing intel |
-| **Gateway** | `/gateway` | ⚡ **93% (25/27)** | HTTP/3 + STOQ gateway, 4 roles, SNI routing |
-| **Hypermesh-eBPF** | `/hypermesh-ebpf` | ✅ **100% (17/17)** | XDP, AF_XDP zero-copy, policy sync |
-| **Lib** | `/lib` | ✅ **100% (34/34)** | Shared types, canonical PrivacyMode |
-| **STOQ** | `/stoq` | ⚡ **87% (26/30)** | QUIC transport with eBPF integration |
-| **TrustChain** | `/trustchain` | ⚡ **95% (41/43)** | FALCON-1024 CA production-ready |
-| **UI** | `/ui` | ⚡ **47% (14/30)** | SvelteKit dashboard, components |
+| Component | Repository | Status | Critical Gap |
+|-----------|------------|--------|--------------|
+| **BlockMatrix** | `/blockmatrix` | ⚠️ **60% (29/48)** | No cross-node sync, no PoS on blocks, shards local-only |
+| **Caesar** | `/caesar` | ⚡ **77% (24/31)** | Single-node only, no multi-node packet routing |
+| **Caesar-SDK** | `/caesar-sdk` | ⚡ **71% (5/7)** | Trait definitions complete, no external adapters |
+| **Catalog** | `/catalog` | ⚠️ **59% (13/22)** | Local-only, DHT not wired to network, OOM bug |
+| **Engauge** | `/engauge` | ⚠️ **65% (19/29)** | No real data pipeline from services, metrics are local/mock |
+| **Gateway** | `/gateway` | ⚠️ **66% (18/27)** | HTTP/3 proxy works but STOQ bridge incomplete, no real PoS auth |
+| **Hypermesh-eBPF** | `/hypermesh-ebpf` | ⚡ **73% (14/19)** | eBPF framework real, PoS validation validates fake proofs |
+| **Lib** | `/lib` | ✅ **92% (25/27)** | Types correct, but consensus types exercised with fake data |
+| **STOQ** | `/stoq` | ⚡ **72% (21/29)** | QUIC transport genuine, FALCON-1024 signing not integrated |
+| **TrustChain** | `/trustchain` | ⚠️ **53% (21/39)** | Single-node CA, certs are rcgen not FALCON, proofs are hardcoded |
+| **UI** | `/ui` | ⚠️ **32% (9/28)** | Components render, no real backend data connections |
 
 ### Critical Architectural Note: Block-MATRIX Topology
 All components operate within a Block-MATRIX network where each node is a cell in a geospatial matrix (x,y,z coordinates). This enables:

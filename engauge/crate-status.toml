@@ -6,43 +6,43 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # Data structures and local computation (real logic, tested)
     "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
     "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
-    "KYC compliance checker (self-sovereign attestation on Device chain, tier-based levels)",
-    "Organic vs speculative traffic detection (pattern-based aggregate flow analysis, whitepaper §16.5)",
-    "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio feedback)",
-    "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime — no trust/reputation)",
-    "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend, AggregatedCapacity)",
+    "KYC compliance checker (self-sovereign attestation structure, tier-based levels)",
+    "Organic vs speculative traffic detection (pattern-based aggregate flow analysis)",
+    "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio)",
+    "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime)",
+    "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend)",
     "Metrics streaming protocol (MetricsFrame, 4 payload types, encode/decode, privacy-mode-aware)",
-    "Differential privacy filter (Laplace noise injection, epsilon-calibrated, Anonymous/Private/Public)",
-    "Metrics publisher and subscriber (push model, per-source rolling window, sequence tracking)",
-    "Regional aggregator (multi-node metrics aggregation for routing decisions)",
-    "Routing intelligence (TensorWeightModifier, PathPolicyRecommendation, RoutingAdvisor + PathAdvisor traits)",
-    "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases, BlockMatrix asset integration)",
-    "Lease manager (supply/demand matching, validation, lifecycle management — Proposed→Active→Completed)",
-    "Pricing engine (Governor-adjusted, tier-aware multipliers L0=1.0/L1=0.8/L2=0.5/L3=0.2, supply-demand scoring)",
+    "Differential privacy filter (Laplace noise injection, epsilon-calibrated)",
+    "Routing intelligence traits (TensorWeightModifier, PathPolicyRecommendation)",
+    "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases)",
+    "Lease manager (supply/demand matching, validation, lifecycle management)",
+    "Pricing engine (Governor-adjusted, tier-aware multipliers)",
     "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
-    "STOQ METRICS frame type integration (0xfe000007 custom frame, feature-gated in stoq crate)",
-    "Verification metrics streaming (PoSPing results via MetricsFrame, privacy-filtered, regional aggregation)",
-    "Self vs network metrics separation (SelfMetrics, PeerMetrics, node_metrics module, capacity assessment)",
-    "EconomicSnapshot extended fields (holdings_by_tier, fee_rate, in_transit count)",
-    "Real network metrics collection (MetricsSource trait, SystemMetricsSource /proc readers, MockMetricsSource for tests)",
-    "Real metrics ingestion pipeline (route by payload type, differential privacy filter, time-series storage)",
-    "Swarm analytics R12 (ShardPopularity, SwarmAnalytics: record_request, get_popular_shards, demand maps)",
-    "Replication triggers R12 (ReplicationTrigger: demand vs replica threshold, ReplicationSignal with urgency)",
-    "Dispersion intelligence R12 (DispersionAdvisor: k-means clustering, recommend_placement near demand)",
-    "Swarm cascade metrics R12+R13 (CascadeTracker: per-node relay load, propagation speed, bottleneck detection)",
-    "Min-spec performance profiling R13 (MinSpecProfiler: 256MB/5%CPU/10KB/s budget validation)",
-    "Real-time routing intelligence feed (RoutingIntelFeed: subscribe/publish RoutingUpdate to STOQ)",
-    "Caesar in-transit/holding amount tracking (CaesarTracker: per-node economic state, network snapshots)",
-    "Collective network intelligence (CollectiveIntelligence: privacy-aware aggregation, 4 NetworkInsight types)",
-    "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, quinn-based QUIC, bind [::1]:9296, feature-gated server binary)",
+    "STOQ METRICS frame type integration (0xfe000007 custom frame)",
+    "Swarm analytics data structures (ShardPopularity, demand maps, cascade tracker)",
+    "Min-spec performance profiling (budget validation against R13 limits)",
+    "Caesar in-transit/holding amount tracking (per-node economic state struct)",
+    "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
 ]
 
 [features.in_development]
 items = [
+    # None of the network integration is functional — all metrics are local or mock
+    "Real metrics ingestion from running services — no pipeline feeds actual data from blockmatrix/stoq/caesar into engauge",
+    "Metrics publisher/subscriber network delivery — push model code exists but no real STOQ connections to peers",
+    "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
+    "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
+    "Swarm replication triggers — ReplicationTrigger logic exists but not wired to actual shard transport",
+    "Dispersion intelligence — k-means clustering code exists but not receiving real demand data",
+    "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
+    "Real-time routing intelligence feed — RoutingIntelFeed code exists but not connected to live STOQ transport",
 ]
 
 [features.planned]
 items = [
+    "End-to-end metrics pipeline (services -> engauge -> analytics -> routing decisions)",
+    "Cross-node metrics federation via reflector pool",
 ]
