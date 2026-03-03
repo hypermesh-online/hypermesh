@@ -57,7 +57,7 @@ impl InboundProxy {
                 path_prefix: "/engauge".into(),
                 display_name: "engauge Panel".into(),
                 description: "Engagement metrics and analytics".into(),
-                backend_name: "blockmatrix".into(),
+                backend_name: "engauge".into(),
             },
             DashboardRoute {
                 path_prefix: "/caesar".into(),

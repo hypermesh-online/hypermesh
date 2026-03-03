@@ -40,6 +40,12 @@ impl ProductionAddresses {
 
     /// API gateway (api.hypermesh.online)
     pub const API_GATEWAY: Ipv6Addr = Ipv6Addr::new(0x2001, 0xdb8, 0x8, 0, 0, 0, 0, 0x1);
+
+    /// Catalog package registry (catalog.hypermesh.online)
+    pub const CATALOG_REGISTRY: Ipv6Addr = Ipv6Addr::new(0x2001, 0xdb8, 0x9, 0, 0, 0, 0, 0x1);
+
+    /// Engauge analytics (engauge.hypermesh.online)
+    pub const ENGAUGE_ANALYTICS: Ipv6Addr = Ipv6Addr::new(0x2001, 0xdb8, 0xa, 0, 0, 0, 0, 0x1);
 }
 
 /// Production DNS zone factory for trust.hypermesh.online
@@ -99,6 +105,16 @@ impl ProductionZoneFactory {
         domains.insert(
             "api.hypermesh.online".to_string(),
             ProductionAddresses::API_GATEWAY,
+        );
+
+        // Catalog and Engauge services
+        domains.insert(
+            "catalog.hypermesh.online".to_string(),
+            ProductionAddresses::CATALOG_REGISTRY,
+        );
+        domains.insert(
+            "engauge.hypermesh.online".to_string(),
+            ProductionAddresses::ENGAUGE_ANALYTICS,
         );
 
         // Service aliases

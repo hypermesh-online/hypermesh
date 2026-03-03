@@ -64,7 +64,7 @@ impl CertificateConfig {
             common_name,
             rotation_interval: Duration::from_secs(24 * 60 * 60), // 24 hours
             // Use local CA for development, trust.hypermesh.online for production
-            trustchain_endpoint: Some("quic://[::1]:8443".to_string()),
+            trustchain_endpoint: Some("quic://[::1]:8444".to_string()),
             network_type: None,
         }
     }

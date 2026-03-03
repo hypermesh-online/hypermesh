@@ -20,9 +20,22 @@ tracing = "0.1"
 anyhow = "1.0"
 thiserror = "1.0"
 rand = "0.8"
+bytes = { version = "1.6", features = ["serde"] }
+
+# Server binary dependencies (optional to avoid stoq<->engauge cycle)
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", features = ["ring"], optional = true }
+rcgen = { version = "0.13", optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"
 
 [features]
 default = []
+server = ["dep:quinn", "dep:rustls", "dep:rcgen", "dep:tracing-subscriber"]
+
+[[bin]]
+name = "engauge-server"
+path = "src/bin/engauge_server.rs"
+required-features = ["server"]

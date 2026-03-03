@@ -27,7 +27,7 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 
 # Scripting languages (library support only - no local execution)
-mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
+mlua = { version = "0.9", features = ["lua54", "async", "serialize", "vendored"] }
 
 # Asset management
 serde = { workspace = true }

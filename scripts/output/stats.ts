@@ -12,8 +12,8 @@ export const crateStats: CrateStats[] = [
   {
     "id": "block-matrix",
     "files": 388,
-    "linesOfCode": 138538,
-    "testCount": 1827
+    "linesOfCode": 138865,
+    "testCount": 1834
   },
   {
     "id": "caesar",
@@ -29,8 +29,8 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "catalog",
-    "files": 78,
-    "linesOfCode": 30176,
+    "files": 79,
+    "linesOfCode": 30264,
     "testCount": 287
   },
   {
@@ -42,7 +42,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "gateway",
     "files": 24,
-    "linesOfCode": 7024,
+    "linesOfCode": 7157,
     "testCount": 229
   },
   {
@@ -66,7 +66,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "trustchain",
     "files": 96,
-    "linesOfCode": 40195,
+    "linesOfCode": 40265,
     "testCount": 387
   },
   {
@@ -78,8 +78,8 @@ export const crateStats: CrateStats[] = [
 ];
 
 export const totalStats = {
-  "totalFiles": 1025,
-  "totalLines": 315883,
-  "totalTests": 3893,
+  "totalFiles": 1026,
+  "totalLines": 316501,
+  "totalTests": 3900,
   "crateCount": 11
 };

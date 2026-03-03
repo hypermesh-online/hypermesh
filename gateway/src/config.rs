@@ -45,6 +45,9 @@ pub struct GatewayConfig {
     /// Catalog backend address
     pub catalog_addr: SocketAddr,
 
+    /// engauge analytics backend address
+    pub engauge_addr: SocketAddr,
+
     /// TLS server name for TrustChain backend (SNI)
     pub trustchain_server_name: String,
 
@@ -56,6 +59,9 @@ pub struct GatewayConfig {
 
     /// TLS server name for Catalog backend (SNI)
     pub catalog_server_name: String,
+
+    /// TLS server name for engauge backend (SNI)
+    pub engauge_server_name: String,
 
     /// Certificate configuration
     pub cert_path: PathBuf,
@@ -140,10 +146,14 @@ impl Default for GatewayConfig {
             catalog_addr: "[::1]:9295"
                 .parse()
                 .expect("hardcoded default catalog addr is valid"),
+            engauge_addr: "[::1]:9296"
+                .parse()
+                .expect("hardcoded default engauge addr is valid"),
             trustchain_server_name: "trustchain".to_string(),
             blockmatrix_server_name: "blockmatrix".to_string(),
             caesar_server_name: "caesar".to_string(),
             catalog_server_name: "catalog".to_string(),
+            engauge_server_name: "engauge".to_string(),
             cert_path: PathBuf::from("certs/server.crt"),
             key_path: PathBuf::from("certs/server.key"),
             pool: ConnectionPoolConfig::default(),
@@ -237,6 +247,14 @@ impl GatewayConfig {
 
         if let Ok(name) = std::env::var("CATALOG_SERVER_NAME") {
             config.catalog_server_name = name;
+        }
+
+        if let Ok(addr) = std::env::var("ENGAUGE_ADDR") {
+            config.engauge_addr = addr.parse()?;
+        }
+
+        if let Ok(name) = std::env::var("ENGAUGE_SERVER_NAME") {
+            config.engauge_server_name = name;
         }
 
         if let Ok(path) = std::env::var("CERT_PATH") {

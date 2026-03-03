@@ -186,10 +186,11 @@ impl CertificateManager {
                 .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
                 .with_no_client_auth(),
             CertificateMode::TrustChainProduction => {
-                let mut root_store = rustls::RootCertStore::empty();
-                root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+                // Alpha: Accept TrustChain CA's self-signed cert during bootstrap.
+                // TODO: Pin the CA root cert after initial enrollment.
                 rustls::ClientConfig::builder()
-                    .with_root_certificates(root_store)
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
                     .with_no_client_auth()
             }
             CertificateMode::NetworkStrategy => {

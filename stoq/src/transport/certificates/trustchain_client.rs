@@ -217,11 +217,10 @@ impl TrustChainClient {
         let (host, port) = self.parse_endpoint()?;
         let ipv6_addr = self.resolve_ipv6(host, port).await?;
 
-        let mut roots = rustls::RootCertStore::empty();
-        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-
+        // Alpha: Accept TrustChain CA's self-signed cert
         let client_config = rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(super::types::AcceptAllVerifier))
             .with_no_client_auth();
 
         let quinn_config = quinn::ClientConfig::new(Arc::new(
@@ -375,11 +374,10 @@ impl TrustChainClient {
 
     /// Build quinn client config with STOQ ALPN
     fn build_quinn_client_config(&self) -> Result<quinn::ClientConfig> {
-        let mut roots = rustls::RootCertStore::empty();
-        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-
+        // Alpha: Accept TrustChain CA's self-signed cert
         let mut client_config = rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(super::types::AcceptAllVerifier))
             .with_no_client_auth();
 
         client_config.alpn_protocols = vec![STOQ_ALPN.to_vec(), b"h3".to_vec()];

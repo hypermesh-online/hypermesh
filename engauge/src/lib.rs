@@ -19,6 +19,7 @@
 //! - [`caesar_tracker`] -- Caesar in-transit/holding amount tracking.
 //! - [`collective_intel`] -- Collective network intelligence aggregation.
 
+pub mod api;
 pub mod caesar_tracker;
 pub mod capacity;
 pub mod collective_intel;

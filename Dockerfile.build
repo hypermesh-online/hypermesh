@@ -1,0 +1,46 @@
+# CI-only build container for producing portable HyperMesh release binaries.
+# This is NOT for running HyperMesh — it needs kernel-level access (eBPF/XDP).
+#
+# Usage:
+#   docker build -f Dockerfile.build -t hypermesh-builder .
+#   docker run --rm -v $(pwd)/artifacts:/out hypermesh-builder
+#
+# Output: /out/ contains portable x86-64 binaries + systemd units.
+
+FROM debian:12-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /build
+COPY . .
+
+# Build portable binaries — override .cargo/config.toml native settings
+ENV RUSTFLAGS="-C target-cpu=x86-64 -C force-frame-pointers=yes"
+RUN cargo build --release \
+    -p gateway \
+    -p trustchain \
+    -p blockmatrix \
+    -p catalog
+
+# Package stage — collect artifacts
+FROM debian:12-slim AS packager
+
+COPY --from=builder /build/target/release/gateway /artifacts/bin/gateway
+COPY --from=builder /build/target/release/trustchain_ca /artifacts/bin/trustchain_ca
+COPY --from=builder /build/target/release/hypermesh /artifacts/bin/hypermesh
+COPY --from=builder /build/target/release/catalog-server /artifacts/bin/catalog-server
+COPY --from=builder /build/systemd/ /artifacts/systemd/
+COPY --from=builder /build/scripts/install.sh /artifacts/install.sh
+
+# Default: copy artifacts to /out volume mount
+CMD cp -r /artifacts/* /out/ && echo "Artifacts copied to /out/"

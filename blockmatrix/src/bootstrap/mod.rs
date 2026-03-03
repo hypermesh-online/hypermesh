@@ -35,6 +35,28 @@ use stoq::transport::{
 };
 
 // ---------------------------------------------------------------------------
+// Well-known local service endpoints
+// ---------------------------------------------------------------------------
+
+/// A local service DNS entry mapping a name to an IPv6 loopback port.
+pub struct ServiceEntry {
+    /// Service name (used as DNS key, e.g. "catalog")
+    pub name: &'static str,
+    /// Port the service binds on [::1]
+    pub port: u16,
+}
+
+/// Default local service DNS entries. Every node registers these
+/// in bootstrap DNS so that `dns.resolve("catalog")` returns `::1`.
+pub const LOCAL_SERVICES: &[ServiceEntry] = &[
+    ServiceEntry { name: "blockmatrix", port: 9292 },
+    ServiceEntry { name: "caesar", port: 9294 },
+    ServiceEntry { name: "catalog", port: 9295 },
+    ServiceEntry { name: "trust", port: 8444 },
+    ServiceEntry { name: "engauge", port: 9296 },
+];
+
+// ---------------------------------------------------------------------------
 // Certificate strategy selection
 // ---------------------------------------------------------------------------
 
@@ -129,6 +151,14 @@ impl DnsResolver {
         self.records.read().await.get(name).copied()
     }
 
+    /// Resolve service name to socket address (IP + port).
+    /// Uses well-known port table for local services.
+    pub async fn resolve_service(&self, name: &str) -> Option<std::net::SocketAddr> {
+        let ip = self.resolve(name).await?;
+        let port = LOCAL_SERVICES.iter().find(|s| s.name == name).map(|s| s.port)?;
+        Some(std::net::SocketAddr::new(ip, port))
+    }
+
     /// Get all records
     pub async fn all_records(&self) -> HashMap<String, IpAddr> {
         self.records.read().await.clone()
@@ -192,6 +222,16 @@ impl NodeBootstrap {
         )
         .await;
         info!("DNS initialized with localhost → ::1");
+
+        // Register well-known local services
+        for service in LOCAL_SERVICES {
+            dns.register(
+                service.name.to_string(),
+                IpAddr::from(std::net::Ipv6Addr::LOCALHOST),
+            )
+            .await;
+        }
+        info!("Registered {} local service DNS entries", LOCAL_SERVICES.len());
 
         // 5. Default to Private mode (localhost only)
         let privacy_mode = Arc::new(RwLock::new(PrivacyMode::PRIVATE));

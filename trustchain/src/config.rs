@@ -141,6 +141,8 @@ impl Default for DnsConfig {
                 "caesar".to_string(),
                 "trust".to_string(),
                 "assets".to_string(),
+                "catalog".to_string(),
+                "engauge".to_string(),
             ],
             consensus_requirements: ConsensusRequirements::localhost_testing(),
         }
@@ -167,6 +169,8 @@ impl DnsConfig {
                 "caesar".to_string(),
                 "trust".to_string(),
                 "assets".to_string(),
+                "catalog".to_string(),
+                "engauge".to_string(),
             ],
             consensus_requirements: ConsensusRequirements::localhost_testing(),
         }
@@ -191,6 +195,8 @@ impl DnsConfig {
                 "caesar".to_string(),
                 "trust".to_string(),
                 "assets".to_string(),
+                "catalog".to_string(),
+                "engauge".to_string(),
             ],
             consensus_requirements: ConsensusRequirements::production(),
         }

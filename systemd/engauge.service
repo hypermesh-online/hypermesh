@@ -1,13 +1,13 @@
 [Unit]
-Description=HyperMesh TrustChain CA
+Description=HyperMesh Engauge Analytics STOQ Server
 Documentation=https://github.com/hypermesh-online/core
-After=network-online.target
+After=network-online.target trustchain.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/trustchain_ca --production --bind [::1]:8444
-WorkingDirectory=/var/lib/hypermesh/trustchain
+ExecStart=/usr/local/bin/engauge-server --bind [::1]:9296
+WorkingDirectory=/var/lib/hypermesh/engauge
 Restart=on-failure
 RestartSec=5
 User=hypermesh
@@ -18,7 +18,7 @@ Environment=RUST_LOG=info
 # Security hardening
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/hypermesh/trustchain /var/log/hypermesh
+ReadWritePaths=/var/lib/hypermesh/engauge /var/log/hypermesh
 PrivateTmp=true
 NoNewPrivileges=true
 

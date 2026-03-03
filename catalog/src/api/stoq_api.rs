@@ -480,20 +480,29 @@ impl CatalogStoqApi {
             config.bind_address
         );
 
-        // Parse bind address
-        let bind_addr: std::net::Ipv6Addr = config
-            .bind_address
-            .split(':')
-            .next()
-            .and_then(|addr| addr.trim_matches(|c| c == '[' || c == ']').parse().ok())
-            .ok_or_else(|| anyhow!("Invalid IPv6 bind address"))?;
-
-        let port: u16 = config
-            .bind_address
-            .split(':')
-            .nth(1)
-            .and_then(|p| p.parse().ok())
-            .ok_or_else(|| anyhow!("Invalid port"))?;
+        // Parse bind address — supports [::1]:9295 and ::1:9295 formats
+        let sock_addr: std::net::SocketAddrV6 = if config.bind_address.starts_with('[') {
+            // Bracketed format: [::1]:9295
+            let s = config.bind_address.trim_start_matches('[');
+            let (addr_str, port_str) = s
+                .split_once("]:")
+                .ok_or_else(|| anyhow!("Invalid bind address: expected [addr]:port"))?;
+            let addr: std::net::Ipv6Addr = addr_str
+                .parse()
+                .map_err(|e| anyhow!("Invalid IPv6 address '{}': {}", addr_str, e))?;
+            let port: u16 = port_str
+                .parse()
+                .map_err(|e| anyhow!("Invalid port '{}': {}", port_str, e))?;
+            std::net::SocketAddrV6::new(addr, port, 0, 0)
+        } else {
+            // Try parsing as SocketAddrV6 directly
+            config
+                .bind_address
+                .parse::<std::net::SocketAddrV6>()
+                .map_err(|e| anyhow!("Invalid bind address '{}': {}", config.bind_address, e))?
+        };
+        let bind_addr = *sock_addr.ip();
+        let port = sock_addr.port();
 
         // Create STOQ transport
         let transport_config = TransportConfig {

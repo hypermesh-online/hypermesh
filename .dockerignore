@@ -1,0 +1,9 @@
+# CI build container — exclude dev artifacts
+target/
+.git/
+artifacts/
+*.md
+!README.md
+.claude/
+.vscode/
+scripts/output/
