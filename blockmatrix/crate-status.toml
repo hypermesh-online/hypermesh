@@ -71,6 +71,10 @@ items = [
     "Reflector bootstrap mode (--reflector flag, broadcasts matrix position, accepts peer connections)",
     "Bootstrap node joining (--bootstrap flag, connect to known peer, exchange node info, join network)",
     "Network peer status logging (periodic connected node count and matrix neighbor display)",
+    "DNS CLI (register/resolve/list subcommands)",
+    "DNS persistence across restarts (dns_records.json)",
+    "DNS-as-asset blockchain registration",
+    "Privacy-aware certificate strategy (NetworkType selection based on PrivacyMode)",
 ]
 
 [features.in_development]

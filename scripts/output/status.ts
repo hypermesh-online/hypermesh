@@ -86,7 +86,11 @@ export const crateStatuses: CrateStatus[] = [
         "Node resume path (NodeBootstrap::resume() loads persisted state instead of creating fresh genesis)",
         "Reflector bootstrap mode (--reflector flag, broadcasts matrix position, accepts peer connections)",
         "Bootstrap node joining (--bootstrap flag, connect to known peer, exchange node info, join network)",
-        "Network peer status logging (periodic connected node count and matrix neighbor display)"
+        "Network peer status logging (periodic connected node count and matrix neighbor display)",
+        "DNS CLI (register/resolve/list subcommands)",
+        "DNS persistence across restarts (dns_records.json)",
+        "DNS-as-asset blockchain registration",
+        "Privacy-aware certificate strategy (NetworkType selection based on PrivacyMode)"
       ],
       "inDevelopment": [],
       "planned": []
@@ -130,6 +134,7 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
         "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
         "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
+        "Caesar binary CLI (--bind, --service-name)",
         "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
         "Caesar CLI — packet operations + node management (commands, executor, output modules)",
         "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
@@ -141,7 +146,7 @@ export const crateStatuses: CrateStatus[] = [
         "External fiat/crypto payment rail integrations — Stripe, Plaid, OpenBanking, Square adapters (blocked by: external API keys + OAuth2 flows + PSD2/PCI-DSS compliance + Gateway outbound HTTP proxy)"
       ]
     },
-    "completion": 94
+    "completion": 95
   },
   {
     "id": "caesar-sdk",
@@ -272,8 +277,8 @@ export const crateStatuses: CrateStatus[] = [
         "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
         "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)",
         "Engauge API routing (/api/v1/engauge with pool, proxy, circuit breaker, health check)",
-        "Caesar dashboard routing fixed (inbound /caesar → caesar backend, not blockmatrix)",
-        "Catalog dashboard routing fixed (inbound /catalog → catalog backend, not blockmatrix)",
+        "Caesar backend routing (gateway → [::1]:9294)",
+        "Catalog backend routing (gateway → [::1]:9295)",
         "Health check aggregation — /health endpoint checks all 5 backend services (trustchain, blockmatrix, caesar, catalog, engauge)"
       ],
       "inDevelopment": [

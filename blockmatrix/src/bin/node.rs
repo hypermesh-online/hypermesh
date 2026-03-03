@@ -127,6 +127,31 @@ enum Commands {
         #[clap(short, long)]
         output: Option<std::path::PathBuf>,
     },
+
+    /// DNS operations — register, resolve, or list names
+    Dns {
+        #[clap(subcommand)]
+        action: DnsAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DnsAction {
+    /// Register a DNS name for this node (writes to local blockchain)
+    Register {
+        /// Domain name to register (e.g., "persist")
+        name: String,
+        /// IPv6 address to point to (default: this node's address)
+        #[clap(short, long)]
+        addr: Option<String>,
+    },
+    /// Resolve a DNS name
+    Resolve {
+        /// Domain name to resolve
+        name: String,
+    },
+    /// List all registered DNS names
+    List,
 }
 
 /// Shard map persisted to disk after Store, used by Fetch to reconstruct.
@@ -341,6 +366,141 @@ async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Resu
     Ok(())
 }
 
+/// Run the Dns subcommand: register, resolve, or list DNS names.
+///
+/// Registration writes the name to both the in-memory resolver (for
+/// immediate local use) and the node's blockchain (DNS-as-asset, R10).
+/// Path to the persisted DNS records file for a given node data directory.
+fn dns_records_path(data_dir: &std::path::Path, node_id: &str) -> std::path::PathBuf {
+    data_dir.join(node_id).join("dns_records.json")
+}
+
+/// Load persisted DNS records from disk and register them into the resolver.
+async fn load_persisted_dns(
+    dns: &blockmatrix::bootstrap::DnsResolver,
+    data_dir: &std::path::Path,
+    node_id: &str,
+) {
+    let path = dns_records_path(data_dir, node_id);
+    if !path.exists() {
+        return;
+    }
+    match std::fs::read_to_string(&path) {
+        Ok(json) => {
+            if let Ok(records) =
+                serde_json::from_str::<std::collections::HashMap<String, String>>(&json)
+            {
+                let mut count = 0u64;
+                for (name, addr_str) in &records {
+                    if let Ok(addr) = addr_str.parse::<std::net::IpAddr>() {
+                        dns.register(name.clone(), addr).await;
+                        count += 1;
+                    }
+                }
+                if count > 0 {
+                    info!("Loaded {count} persisted DNS record(s) from disk");
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Failed to read DNS records from {}: {e}", path.display());
+        }
+    }
+}
+
+/// Persist a single DNS record by updating the on-disk JSON file.
+fn persist_dns_record(
+    data_dir: &std::path::Path,
+    node_id: &str,
+    name: &str,
+    addr: std::net::IpAddr,
+) -> Result<()> {
+    let path = dns_records_path(data_dir, node_id);
+    let mut records: std::collections::HashMap<String, String> = if path.exists() {
+        let json = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        serde_json::from_str(&json).unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
+    records.insert(name.to_string(), addr.to_string());
+    let json = serde_json::to_string_pretty(&records)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, json)?;
+    Ok(())
+}
+
+async fn run_dns(
+    action: DnsAction,
+    bootstrap: &NodeBootstrap,
+    data_dir: &std::path::Path,
+    node_id: &str,
+) -> Result<()> {
+    match action {
+        DnsAction::Register { name, addr } => {
+            // Resolve target address
+            let target_addr: std::net::IpAddr = if let Some(ref a) = addr {
+                a.parse().with_context(|| format!("invalid IPv6 address: {a}"))?
+            } else {
+                // Default: this node's loopback (::1)
+                std::net::IpAddr::from(std::net::Ipv6Addr::LOCALHOST)
+            };
+
+            // 1. Register in local resolver (immediate effect)
+            bootstrap.dns().register(name.clone(), target_addr).await;
+
+            // 2. Persist to disk so it survives restarts
+            persist_dns_record(data_dir, node_id, &name, target_addr)?;
+
+            // 3. Register on local blockchain (DNS-as-asset)
+            let bc = bootstrap.blockchain();
+            let tx_data = format!("DNS:REGISTER:{name}:{target_addr}");
+            let block = bc
+                .add_block_with_data(tx_data.into_bytes())
+                .await
+                .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+            println!();
+            println!("  DNS Registered");
+            println!("  --------------");
+            println!("  name:  {name}");
+            println!("  addr:  {target_addr}");
+            println!("  block: {}", block.hash);
+            println!("  chain: height {}", bc.get_height().await);
+            println!();
+        }
+        DnsAction::Resolve { name } => {
+            match bootstrap.dns().resolve(&name).await {
+                Some(addr) => {
+                    println!("{name} → {addr}");
+                }
+                None => {
+                    println!("{name}: not found");
+                }
+            }
+        }
+        DnsAction::List => {
+            let records = bootstrap.dns().all_records().await;
+            if records.is_empty() {
+                println!("No DNS records registered.");
+            } else {
+                println!();
+                println!("  DNS Records");
+                println!("  -----------");
+                let mut sorted: Vec<_> = records.into_iter().collect();
+                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                for (name, addr) in sorted {
+                    println!("  {name:<20} → {addr}");
+                }
+                println!();
+            }
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -470,6 +630,9 @@ async fn main() -> Result<()> {
     };
 
     let persistence = std::sync::Arc::new(persistence);
+
+    // Load persisted DNS records (user-registered names survive restarts)
+    load_persisted_dns(bootstrap.dns(), &data_dir, &nid).await;
 
     // Verify self-sufficiency
     bootstrap.verify_self_sufficient().await?;
@@ -673,6 +836,9 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Fetch { asset_id, output }) => {
             run_fetch(asset_id, output).await?;
+        }
+        Some(Commands::Dns { action }) => {
+            run_dns(action, &bootstrap, &data_dir, &nid).await?;
         }
         None => {
             // No command - just show bootstrap info

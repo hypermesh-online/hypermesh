@@ -36,6 +36,7 @@ items = [
     "STOQ API handlers wired to real CaesarProtocol (route_packet, node_status, governor_params, effective_rate, health)",
     "Engauge capacity metrics integration (feature-gated: fee distribution, Governor throttle, routing)",
     "Caesar binary entry point — STOQ API server launcher (caesar/src/bin/caesar.rs)",
+    "Caesar binary CLI (--bind, --service-name)",
     "caesar.hypermesh.online gateway routing rule (gateway/src/router.rs + config.rs)",
     "Caesar CLI — packet operations + node management (commands, executor, output modules)",
     "Caesar SDK — UPI traits (IngressAdapter + EgressAdapter) + MeshCreditAdapter extracted into reusable crate",
