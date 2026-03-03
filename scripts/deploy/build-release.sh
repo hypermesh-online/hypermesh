@@ -11,7 +11,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-CRATES="-p gateway -p trustchain -p blockmatrix -p catalog -p engauge"
+CRATES="-p gateway -p trustchain -p blockmatrix -p catalog -p engauge -p caesar"
 MODE="${1:---portable}"
 
 case "$MODE" in
@@ -52,7 +52,7 @@ esac
 # List built binaries
 echo ""
 echo "=== Built binaries ==="
-for bin in gateway trustchain_ca hypermesh catalog-server engauge-server; do
+for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
     path="$BINDIR/$bin"
     if [ -f "$path" ]; then
         size=$(du -h "$path" | cut -f1)
@@ -66,7 +66,7 @@ done
 if [ "$MODE" != "--native" ]; then
     echo ""
     echo "=== Portability check ==="
-    for bin in gateway trustchain_ca hypermesh catalog-server engauge-server; do
+    for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
         path="$BINDIR/$bin"
         if [ -f "$path" ]; then
             if file "$path" | grep -q "static"; then

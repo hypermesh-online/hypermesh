@@ -137,7 +137,7 @@ impl Default for GatewayConfig {
             trustchain_addr: "[::1]:8444"
                 .parse()
                 .expect("hardcoded default trustchain addr is valid"),
-            blockmatrix_addr: "[::1]:8446"
+            blockmatrix_addr: "[::1]:9292"
                 .parse()
                 .expect("hardcoded default blockmatrix addr is valid"),
             caesar_addr: "[::1]:9294"

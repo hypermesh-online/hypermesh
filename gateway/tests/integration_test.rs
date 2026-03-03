@@ -255,8 +255,8 @@ fn test_configuration_loading() {
     let config = GatewayConfig::default();
 
     assert_eq!(config.listen_addr.to_string(), "[::]:8443");
-    assert_eq!(config.trustchain_addr.to_string(), "[::1]:50053");
-    assert_eq!(config.blockmatrix_addr.to_string(), "[::1]:8446");
+    assert_eq!(config.trustchain_addr.to_string(), "[::1]:8444");
+    assert_eq!(config.blockmatrix_addr.to_string(), "[::1]:9292");
     assert_eq!(config.pool.max_connections, 10);
     assert_eq!(config.retry.max_attempts, 3);
     assert!(config.cors.allow_credentials);

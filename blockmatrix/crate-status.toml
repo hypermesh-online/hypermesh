@@ -68,11 +68,13 @@ items = [
     "Blockchain state persistence on restart (PersistenceManager wired to bootstrap, genesis/blocks/cert survive reboot)",
     "NodeBlockchain::from_blocks() — reconstruct in-memory chain from persisted blocks with integrity validation",
     "Node resume path (NodeBootstrap::resume() loads persisted state instead of creating fresh genesis)",
+    "Reflector bootstrap mode (--reflector flag, broadcasts matrix position, accepts peer connections)",
+    "Bootstrap node joining (--bootstrap flag, connect to known peer, exchange node info, join network)",
+    "Network peer status logging (periodic connected node count and matrix neighbor display)",
 ]
 
 [features.in_development]
 items = [
-    "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes",
 ]
 
 [features.planned]

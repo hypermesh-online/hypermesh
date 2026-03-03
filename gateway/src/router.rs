@@ -22,10 +22,12 @@ pub struct GatewayRouter {
     blockmatrix_pool: ConnectionPool,
     caesar_pool: ConnectionPool,
     catalog_pool: ConnectionPool,
+    engauge_pool: ConnectionPool,
     trustchain_proxy: Http3Proxy,
     blockmatrix_proxy: Http3Proxy,
     caesar_proxy: Http3Proxy,
     catalog_proxy: Http3Proxy,
+    engauge_proxy: Http3Proxy,
     /// TrustChain service address (retained for health check routing)
     _trustchain_addr: SocketAddr,
     /// BlockMatrix service address (retained for health check routing)
@@ -34,12 +36,15 @@ pub struct GatewayRouter {
     _caesar_addr: SocketAddr,
     /// Catalog service address (retained for health check routing)
     _catalog_addr: SocketAddr,
+    /// engauge service address (retained for health check routing)
+    _engauge_addr: SocketAddr,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
     trustchain_breaker: Arc<CircuitBreaker>,
     blockmatrix_breaker: Arc<CircuitBreaker>,
     caesar_breaker: Arc<CircuitBreaker>,
     catalog_breaker: Arc<CircuitBreaker>,
+    engauge_breaker: Arc<CircuitBreaker>,
 }
 
 impl GatewayRouter {
@@ -77,6 +82,14 @@ impl GatewayRouter {
         )
         .await?;
 
+        let engauge_pool = ConnectionPool::new(
+            config.engauge_addr,
+            &config.engauge_server_name,
+            config.pool.max_connections,
+            config.pool.idle_timeout,
+        )
+        .await?;
+
         // Create proxies
         let trustchain_proxy =
             Http3Proxy::new(trustchain_pool.clone(), config.pool.connect_timeout);
@@ -87,6 +100,8 @@ impl GatewayRouter {
         let caesar_proxy = Http3Proxy::new(caesar_pool.clone(), config.pool.connect_timeout);
 
         let catalog_proxy = Http3Proxy::new(catalog_pool.clone(), config.pool.connect_timeout);
+
+        let engauge_proxy = Http3Proxy::new(engauge_pool.clone(), config.pool.connect_timeout);
 
         // Create circuit breakers
         let trustchain_breaker = Arc::new(CircuitBreaker::new(
@@ -100,25 +115,31 @@ impl GatewayRouter {
 
         let catalog_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
+        let engauge_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
+
         Ok(Self {
             trustchain_pool,
             blockmatrix_pool,
             caesar_pool,
             catalog_pool,
+            engauge_pool,
             trustchain_proxy,
             blockmatrix_proxy,
             caesar_proxy,
             catalog_proxy,
+            engauge_proxy,
             _trustchain_addr: config.trustchain_addr,
             _blockmatrix_addr: config.blockmatrix_addr,
             _caesar_addr: config.caesar_addr,
             _catalog_addr: config.catalog_addr,
+            _engauge_addr: config.engauge_addr,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
             trustchain_breaker,
             blockmatrix_breaker,
             caesar_breaker,
             catalog_breaker,
+            engauge_breaker,
         })
     }
 
@@ -238,6 +259,12 @@ impl GatewayRouter {
                 &self.catalog_breaker,
                 "/api/v1/catalog",
             ))
+        } else if path.starts_with("/api/v1/engauge") {
+            Ok((
+                &self.engauge_proxy,
+                &self.engauge_breaker,
+                "/api/v1/engauge",
+            ))
         } else {
             Err(anyhow!("No backend found for path: {path}"))
         }
@@ -315,11 +342,29 @@ impl GatewayRouter {
         };
         backends.insert("catalog".to_string(), catalog_status);
 
+        // Check engauge health
+        let engauge_status = match self.engauge_pool.health_check().await {
+            Ok(latency) => {
+                json!({
+                    "status": "up",
+                    "latency_ms": latency.as_millis()
+                })
+            }
+            Err(_) => {
+                json!({
+                    "status": "down",
+                    "latency_ms": null
+                })
+            }
+        };
+        backends.insert("engauge".to_string(), engauge_status);
+
         // Get pool statistics
         let trustchain_stats = self.trustchain_pool.stats();
         let blockmatrix_stats = self.blockmatrix_pool.stats();
         let caesar_stats = self.caesar_pool.stats();
         let catalog_stats = self.catalog_pool.stats();
+        let engauge_stats = self.engauge_pool.stats();
 
         let response_body = json!({
             "status": "healthy",
@@ -346,6 +391,11 @@ impl GatewayRouter {
                     "total_connections": catalog_stats.total_connections,
                     "active_connections": catalog_stats.active_connections,
                     "requests_served": catalog_stats.requests_served,
+                },
+                "engauge": {
+                    "total_connections": engauge_stats.total_connections,
+                    "active_connections": engauge_stats.active_connections,
+                    "requests_served": engauge_stats.requests_served,
                 }
             }
         });

@@ -83,14 +83,15 @@ export const crateStatuses: CrateStatus[] = [
         "Internal DNS service registration (LOCAL_SERVICES table, 5 services registered at boot, resolve_service())",
         "Blockchain state persistence on restart (PersistenceManager wired to bootstrap, genesis/blocks/cert survive reboot)",
         "NodeBlockchain::from_blocks() — reconstruct in-memory chain from persisted blocks with integrity validation",
-        "Node resume path (NodeBootstrap::resume() loads persisted state instead of creating fresh genesis)"
+        "Node resume path (NodeBootstrap::resume() loads persisted state instead of creating fresh genesis)",
+        "Reflector bootstrap mode (--reflector flag, broadcasts matrix position, accepts peer connections)",
+        "Bootstrap node joining (--bootstrap flag, connect to known peer, exchange node info, join network)",
+        "Network peer status logging (periodic connected node count and matrix neighbor display)"
       ],
-      "inDevelopment": [
-        "Reflector bootstrap mode — first node at trust.hypermesh.online acts as peer discovery reflector for joining nodes"
-      ],
+      "inDevelopment": [],
       "planned": []
     },
-    "completion": 98
+    "completion": 100
   },
   {
     "id": "caesar",
@@ -269,16 +270,19 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
         "Outbound proxy with allowlist filtering",
         "Inbound proxy for HyperMesh dashboards (dashboard/engauge/caesar/catalog)",
-        "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)"
+        "Engauge backend routing (config: engauge_addr/server_name, env vars, SNI routing via inbound proxy)",
+        "Engauge API routing (/api/v1/engauge with pool, proxy, circuit breaker, health check)",
+        "Caesar dashboard routing fixed (inbound /caesar → caesar backend, not blockmatrix)",
+        "Catalog dashboard routing fixed (inbound /catalog → catalog backend, not blockmatrix)",
+        "Health check aggregation — /health endpoint checks all 5 backend services (trustchain, blockmatrix, caesar, catalog, engauge)"
       ],
       "inDevelopment": [
         "Production config loader — TOML/env-based config for listen addresses, cert paths, backend service addresses, rate limits",
-        "Backend service discovery — resolve trustchain/blockmatrix/caesar/catalog backends by address or service registry",
-        "Health check aggregation — /health endpoint that checks all backend services and reports overall status"
+        "Backend service discovery — resolve trustchain/blockmatrix/caesar/catalog backends by address or service registry"
       ],
       "planned": []
     },
-    "completion": 88
+    "completion": 93
   },
   {
     "id": "hypermesh",

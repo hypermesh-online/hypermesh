@@ -63,13 +63,13 @@ impl InboundProxy {
                 path_prefix: "/caesar".into(),
                 display_name: "Caesar Wallet".into(),
                 description: "Caesar EVP wallet interface".into(),
-                backend_name: "blockmatrix".into(),
+                backend_name: "caesar".into(),
             },
             DashboardRoute {
                 path_prefix: "/catalog".into(),
                 display_name: "Catalog Browser".into(),
                 description: "Asset package registry browser".into(),
-                backend_name: "blockmatrix".into(),
+                backend_name: "catalog".into(),
             },
         ])
     }
@@ -165,10 +165,9 @@ mod tests {
         let proxy = InboundProxy::with_defaults();
         let route = proxy.match_route("/caesar/wallet");
         assert!(route.is_some());
-        assert_eq!(
-            route.expect("test: checked above").display_name,
-            "Caesar Wallet"
-        );
+        let route = route.expect("test: checked above");
+        assert_eq!(route.display_name, "Caesar Wallet");
+        assert_eq!(route.backend_name, "caesar");
     }
 
     #[test]
@@ -176,10 +175,9 @@ mod tests {
         let proxy = InboundProxy::with_defaults();
         let route = proxy.match_route("/catalog/browse");
         assert!(route.is_some());
-        assert_eq!(
-            route.expect("test: checked above").display_name,
-            "Catalog Browser"
-        );
+        let route = route.expect("test: checked above");
+        assert_eq!(route.display_name, "Catalog Browser");
+        assert_eq!(route.backend_name, "catalog");
     }
 
     #[test]

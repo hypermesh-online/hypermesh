@@ -1,14 +1,13 @@
 [Unit]
-Description=HyperMesh Block-MATRIX Node
+Description=HyperMesh Caesar EVP
 Documentation=https://github.com/hypermesh-online/core
-After=network-online.target trustchain.service
+After=network-online.target blockmatrix.service
 Wants=network-online.target
-Requires=trustchain.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/hypermesh --privacy public --reflector --stoq-port 9292 start
-WorkingDirectory=/var/lib/hypermesh/blockmatrix
+ExecStart=/usr/local/bin/caesar --bind [::1]:9294
+WorkingDirectory=/var/lib/hypermesh/caesar
 Restart=on-failure
 RestartSec=5
 User=hypermesh
@@ -19,7 +18,7 @@ Environment=RUST_LOG=info
 # Security hardening
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/hypermesh/blockmatrix /var/log/hypermesh
+ReadWritePaths=/var/lib/hypermesh/caesar /var/log/hypermesh
 PrivateTmp=true
 NoNewPrivileges=true
 

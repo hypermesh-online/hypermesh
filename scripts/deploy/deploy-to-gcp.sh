@@ -40,7 +40,7 @@ fi
 echo "=== Deploying HyperMesh to $HOST (user: $REMOTE_USER) ==="
 
 # 1. Ensure binaries exist
-for bin in gateway trustchain_ca hypermesh catalog-server engauge-server; do
+for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
     if [ ! -f "$RELEASE_DIR/$bin" ]; then
         echo "ERROR: $RELEASE_DIR/$bin not found. Run build-release.sh first."
         exit 1
@@ -52,7 +52,7 @@ echo "Creating remote directories..."
 $SSH "$REMOTE_USER@$HOST" bash -s <<'REMOTE'
 set -euo pipefail
 sudo id -u hypermesh &>/dev/null || sudo useradd -r -s /usr/sbin/nologin -d /var/lib/hypermesh hypermesh
-sudo mkdir -p /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,engauge}
+sudo mkdir -p /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,engauge,caesar}
 sudo mkdir -p /var/log/hypermesh
 sudo mkdir -p /etc/hypermesh/certs
 sudo chown -R hypermesh:hypermesh /var/lib/hypermesh /var/log/hypermesh /etc/hypermesh
@@ -60,12 +60,12 @@ REMOTE
 
 # 3. Upload binaries (to /tmp first, then sudo mv)
 echo "Uploading binaries..."
-$SCP "$RELEASE_DIR/gateway" "$RELEASE_DIR/trustchain_ca" "$RELEASE_DIR/hypermesh" "$RELEASE_DIR/catalog-server" "$RELEASE_DIR/engauge-server" \
+$SCP "$RELEASE_DIR/gateway" "$RELEASE_DIR/trustchain_ca" "$RELEASE_DIR/hypermesh" "$RELEASE_DIR/catalog-server" "$RELEASE_DIR/engauge-server" "$RELEASE_DIR/caesar" \
     "$REMOTE_USER@$HOST:/tmp/"
 
 $SSH "$REMOTE_USER@$HOST" bash -s <<'REMOTE'
 set -euo pipefail
-for bin in gateway trustchain_ca hypermesh catalog-server engauge-server; do
+for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
     sudo install -m 755 "/tmp/$bin" "/usr/local/bin/$bin"
     rm -f "/tmp/$bin"
 done
@@ -84,14 +84,14 @@ REMOTE
 
 # 5. Upload systemd units
 echo "Uploading systemd units..."
-for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service; do
+for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service caesar.service; do
     if [ -f "$REPO_ROOT/systemd/$unit" ]; then
         $SCP "$REPO_ROOT/systemd/$unit" "$REMOTE_USER@$HOST:/tmp/$unit"
     fi
 done
 $SSH "$REMOTE_USER@$HOST" bash -s <<'REMOTE'
 set -euo pipefail
-for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service; do
+for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service caesar.service; do
     if [ -f "/tmp/$unit" ]; then
         sudo install -m 644 "/tmp/$unit" "/etc/systemd/system/$unit"
         rm -f "/tmp/$unit"
@@ -104,6 +104,6 @@ REMOTE
 echo ""
 echo "=== Deployment complete ==="
 echo "Next steps:"
-echo "  1. Enable services: ssh $REMOTE_USER@$HOST 'sudo systemctl enable --now trustchain blockmatrix catalog engauge gateway'"
-echo "  2. Check status:    ssh $REMOTE_USER@$HOST 'sudo systemctl status trustchain blockmatrix catalog engauge gateway'"
+echo "  1. Enable services: ssh $REMOTE_USER@$HOST 'sudo systemctl enable --now trustchain blockmatrix caesar catalog engauge gateway'"
+echo "  2. Check status:    ssh $REMOTE_USER@$HOST 'sudo systemctl status trustchain blockmatrix caesar catalog engauge gateway'"
 echo "  3. Verify:          curl -k https://$HOST:8443/health"

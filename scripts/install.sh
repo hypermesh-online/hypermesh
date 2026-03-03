@@ -12,8 +12,8 @@ VERSION=""
 PREFIX="/usr/local"
 INSTALL_SYSTEMD=true
 GITHUB_ORG="hypermesh-online"
-GITHUB_REPO="core"
-BINARIES="gateway trustchain_ca hypermesh catalog-server"
+GITHUB_REPO="hypermesh"
+BINARIES="gateway trustchain_ca hypermesh catalog-server engauge-server caesar"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -90,7 +90,7 @@ done
 if [ "$(id -u)" -eq 0 ]; then
     echo "Setting up hypermesh user and directories..."
     id -u hypermesh &>/dev/null 2>&1 || useradd -r -s /usr/sbin/nologin -d /var/lib/hypermesh hypermesh
-    install -d -o hypermesh -g hypermesh /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog}
+    install -d -o hypermesh -g hypermesh /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,engauge,caesar}
     install -d -o hypermesh -g hypermesh /var/log/hypermesh
     install -d -o hypermesh -g hypermesh /etc/hypermesh/certs
 else
@@ -102,7 +102,7 @@ fi
 if $INSTALL_SYSTEMD && [ "$(id -u)" -eq 0 ] && command -v systemctl &>/dev/null; then
     echo "Installing systemd units..."
     SYSTEMD_DIR="/etc/systemd/system"
-    for unit in gateway.service trustchain.service blockmatrix.service catalog.service; do
+    for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service caesar.service; do
         if [ -f "$TMPDIR/systemd/$unit" ]; then
             install -m 644 "$TMPDIR/systemd/$unit" "$SYSTEMD_DIR/$unit"
             echo "  Installed $unit"
@@ -114,7 +114,7 @@ if $INSTALL_SYSTEMD && [ "$(id -u)" -eq 0 ] && command -v systemctl &>/dev/null;
     systemctl daemon-reload
     echo ""
     echo "Start services with:"
-    echo "  systemctl enable --now trustchain blockmatrix catalog gateway"
+    echo "  systemctl enable --now trustchain blockmatrix caesar catalog engauge gateway"
 elif ! $INSTALL_SYSTEMD; then
     echo "Skipping systemd installation (--no-systemd)."
 else
