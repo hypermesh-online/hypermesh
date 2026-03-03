@@ -23,6 +23,7 @@ use blockmatrix::assets::pipeline::{
     Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
     ShardMetadata,
 };
+use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
 use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
@@ -504,24 +505,43 @@ async fn main() -> Result<()> {
                 info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
                 // Configure STOQ transport based on privacy mode.
-                // Anonymous mode: use ephemeral self-signed certs (no CA dependency).
-                // Public mode: standard config (TrustChain CA certs will be used).
+                // Certificate strategy follows PrivacyMode (transport layer):
+                //   Anonymous → ephemeral self-signed certs (no CA dependency)
+                //   Private   → local TrustChain CA (local://trustchain)
+                //   Public    → global TrustChain CA (quic://trust.hypermesh.online)
+                //     - Exception: reflector nodes ARE trust anchors, use local CA
                 let mut stoq_config = stoq::TransportConfig {
                     port: cli.stoq_port,
                     bind_address: std::net::Ipv6Addr::UNSPECIFIED,
                     ..stoq::TransportConfig::default()
                 };
 
-                if privacy_mode == PrivacyMode::ANONYMOUS {
-                    // Anonymous mode: disable FALCON requirement (ephemeral certs
-                    // don't need quantum-resistant CA signatures), reduce connection
-                    // tracking for privacy.
+                // Determine certificate strategy from privacy mode
+                let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
                     stoq_config.enable_falcon_crypto = false;
                     info!("Anonymous mode: using ephemeral certificates, no CA dependency");
-                }
+                    NetworkType::Anonymous
+                } else if privacy_mode == PrivacyMode::PUBLIC {
+                    if cli.reflector {
+                        // Reflector nodes ARE trust anchors — self-issue certs locally.
+                        // trust.hypermesh.online can't request certs from itself over QUIC.
+                        info!("Public reflector: self-issuing certificate via local TrustChain");
+                        NetworkType::P2P
+                    } else {
+                        // Joining nodes request certs from the global TrustChain CA
+                        info!("Public mode: requesting certificate from trust.hypermesh.online");
+                        NetworkType::Public
+                    }
+                } else {
+                    // Private/P2P: node is its own CA via local TrustChain
+                    info!("Private mode: self-issuing certificate via local TrustChain");
+                    NetworkType::P2P
+                };
 
-                // Initialize STOQ
-                let transport = std::sync::Arc::new(stoq::StoqTransport::new(stoq_config).await?);
+                // Initialize STOQ with network-aware certificate strategy
+                let transport = std::sync::Arc::new(
+                    stoq::StoqTransport::new_for_network(stoq_config, network_type).await?
+                );
 
                 // Parse bootstrap nodes
                 let bootstrap_nodes: Vec<std::net::SocketAddr> = cli

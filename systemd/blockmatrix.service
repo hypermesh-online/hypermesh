@@ -7,7 +7,7 @@ Requires=trustchain.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/hypermesh --privacy public --reflector --stoq-port 9292 start
+ExecStart=/usr/local/bin/hypermesh --privacy public --reflector --stoq-port 9292 --data-dir /var/lib/hypermesh/blockmatrix start
 WorkingDirectory=/var/lib/hypermesh/blockmatrix
 Restart=on-failure
 RestartSec=5

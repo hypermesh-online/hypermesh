@@ -4,9 +4,7 @@
 
 //! Caesar EVP server binary.
 //!
-//! Launches the Caesar Ephemeral Value Protocol STOQ API server with
-//! default configuration. CLI argument parsing is intentionally deferred
-//! to a future sprint -- this binary is the minimal server launcher.
+//! Launches the Caesar Ephemeral Value Protocol STOQ API server.
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -18,7 +16,47 @@ use caesar::{CaesarConfig, CaesarProtocol};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let stoq_config = CaesarStoqConfig::default();
+    // Parse CLI args
+    let args: Vec<String> = std::env::args().collect();
+    let mut bind_address = "[::1]:9294".to_string();
+    let mut service_name = "caesar".to_string();
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--bind" | "-b" => {
+                if i + 1 < args.len() {
+                    bind_address = args[i + 1].clone();
+                    i += 1;
+                }
+            }
+            "--service-name" | "-s" => {
+                if i + 1 < args.len() {
+                    service_name = args[i + 1].clone();
+                    i += 1;
+                }
+            }
+            "--help" | "-h" => {
+                println!("Caesar EVP Server");
+                println!();
+                println!("Usage: caesar [OPTIONS]");
+                println!();
+                println!("Options:");
+                println!("  --bind, -b <ADDR>           Bind address (default: [::1]:9294)");
+                println!("  --service-name, -s <NAME>   Service name (default: caesar)");
+                println!("  --help, -h                  Show this help message");
+                return Ok(());
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    let stoq_config = CaesarStoqConfig {
+        bind_address: bind_address.clone(),
+        service_name,
+        enable_logging: true,
+    };
 
     println!();
     println!("  Caesar Ephemeral Value Protocol");
@@ -39,8 +77,7 @@ async fn main() -> anyhow::Result<()> {
     // Create STOQ API server
     let api = Arc::new(
         CaesarStoqApi::new(stoq_config, app_state)
-            .await
-            .expect("failed to create Caesar STOQ API server"),
+            .await?,
     );
 
     // Spawn server and wait for Ctrl+C
