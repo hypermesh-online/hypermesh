@@ -44,7 +44,7 @@ export const crateStatuses: CrateStatus[] = [
         "Internal DNS service registration (5 services at boot, resolve_service())",
         "DNS CLI (register/resolve/list subcommands)",
         "DNS persistence across restarts (dns_records.json)",
-        "DNS-as-asset blockchain registration (writes to Device chain)",
+        "DNS-as-asset blockchain registration (proper AssetRegistration with BaseSystemType::Dns)",
         "CLI for matrix topology queries, node management, and asset operations",
         "Cross-platform OsAbstraction (Linux/macOS/BSD/Windows, hardware detection)",
         "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
@@ -52,10 +52,12 @@ export const crateStatuses: CrateStatus[] = [
         "StateAuthenticator trait (binary authentication interface)",
         "PeerIdentity bridges to lib NodeId",
         "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
-        "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)"
+        "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
+        "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
+        "Peer handshake PoS token exchange — connect_to_peer()/accept_connections() generate+validate StateProof tokens",
+        "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes"
       ],
       "inDevelopment": [
-        "Peer handshake PoS validation — connect_to_peer()/accept_connections() exchange JSON with no proof validation yet",
         "Cross-node block sync — SyncManager/ReflectorPool exist but are NOT wired into node binary start command",
         "Cross-node shard distribution — ShardTransport trait exists but shards only stored/fetched locally",
         "DNS network propagation — records are local-only, no broadcast to TrustChain or peers",
@@ -78,7 +80,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 62
+    "completion": 65
   },
   {
     "id": "caesar",
