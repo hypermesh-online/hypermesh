@@ -55,19 +55,20 @@ export const crateStatuses: CrateStatus[] = [
         "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
         "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
         "Peer handshake PoS token exchange — connect_to_peer()/accept_connections() generate+validate StateProof tokens",
-        "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes"
+        "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes",
+        "Cross-node block sync — SyncManager+ReflectorPool+BlockPropagator wired into node start, 5s sync loop",
+        "Cross-node shard distribution — shards distributed to up to 6 nearest peers after pipeline store",
+        "DNS block propagation — DNS blocks propagate via block sync to connected peers",
+        "Network scope blockchain — reflector nodes join Network chain, TransportSyncDriver runs sync rounds",
+        "Reflector pool block relay — ReflectorPool tracks peers, prunes stale, heartbeat in sync loop",
+        "BLAKE3 shard integrity verification — incoming shards verified before storage",
+        "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)"
       ],
       "inDevelopment": [
-        "Cross-node block sync — SyncManager/ReflectorPool exist but are NOT wired into node binary start command",
-        "Cross-node shard distribution — ShardTransport trait exists but shards only stored/fetched locally",
-        "DNS network propagation — records are local-only, no broadcast to TrustChain or peers",
-        "Network scope blockchain — Device chain works, Network chain sync not implemented",
-        "Reflector pool block relay — code exists, not wired to running node",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
         "Multi-node peer connections — connect_to_peer() code exists, never tested between actual nodes",
-        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
-        "Shard commitment verification — BLAKE3 hash computed but not validated by peers"
+        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
       ],
       "planned": [
         "FALCON-1024 certificate generation (currently using rcgen X.509, not post-quantum)",
@@ -80,7 +81,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 65
+    "completion": 77
   },
   {
     "id": "caesar",
