@@ -354,6 +354,17 @@ pub async fn handle_incoming_shard_stream(
             }
             let shard_data = data[41..41 + data_len].to_vec();
 
+            // Verify BLAKE3 integrity before storing
+            let computed_hash = blake3::hash(&shard_data);
+            if computed_hash.as_bytes() != &shard_id.0 {
+                tracing::warn!(
+                    "Shard BLAKE3 mismatch: expected {}, got {}",
+                    hex::encode(shard_id.0),
+                    hex::encode(computed_hash.as_bytes())
+                );
+                return Err(TransportError::Network("shard hash mismatch".into()));
+            }
+
             store.store(shard_id, shard_data).await;
             tracing::debug!("Stored shard {} from peer", hex::encode(shard_id_bytes));
             Ok(())

@@ -27,7 +27,7 @@ use hypermesh_lib::BlockchainScope;
 /// return block hashes for the requested height range.  The trait is
 /// intentionally synchronous -- callers are expected to pre-load data or
 /// use interior async (e.g. `block_on`) when bridging from async contexts.
-pub trait BlockProvider {
+pub trait BlockProvider: Send + Sync {
     /// Return up to `max_blocks` block hashes starting at `from_height`.
     ///
     /// The second element of the tuple is the provider's current chain height.
@@ -487,6 +487,42 @@ impl SyncManager {
             })
             .map(|(id, _)| id.as_str())
             .collect()
+    }
+}
+
+/// Snapshot-based [`BlockProvider`] for `NodeBlockchain`.
+///
+/// Created from a pre-fetched list of blocks, avoiding the need for async
+/// inside the synchronous `BlockProvider` trait. Typical usage:
+///
+/// ```ignore
+/// let blocks = node_blockchain.get_chain().await;
+/// let provider = NodeBlockchainBlockProvider::from_blocks(&blocks);
+/// sync_manager.process_sync_message_with_provider(msg, Some(&provider));
+/// ```
+pub struct NodeBlockchainBlockProvider {
+    block_hashes: Vec<String>,
+    chain_height: u64,
+}
+
+impl NodeBlockchainBlockProvider {
+    /// Create from a slice of [`Block`]s (typically from `NodeBlockchain::get_chain()`).
+    pub fn from_blocks(blocks: &[super::block::Block]) -> Self {
+        Self {
+            block_hashes: blocks.iter().map(|b| b.hash.clone()).collect(),
+            chain_height: blocks.len() as u64,
+        }
+    }
+}
+
+impl BlockProvider for NodeBlockchainBlockProvider {
+    fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64) {
+        let start = from_height as usize;
+        if start >= self.block_hashes.len() {
+            return (vec![], self.chain_height);
+        }
+        let end = (start + max_blocks as usize).min(self.block_hashes.len());
+        (self.block_hashes[start..end].to_vec(), self.chain_height)
     }
 }
 

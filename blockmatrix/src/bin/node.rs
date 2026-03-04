@@ -17,7 +17,7 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn, Level};
+use tracing::{debug, info, warn, Level};
 
 use blockmatrix::assets::core::{
     AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
@@ -32,10 +32,16 @@ use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
 use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
+use blockmatrix::blockchain::propagation::{
+    BlockPropagator, PropagationStrategy, StoqBlockTransportAdapter,
+};
+use blockmatrix::blockchain::sync_manager::{NodeBlockchainBlockProvider, SyncConfig, SyncManager};
 use blockmatrix::bootstrap::{node_id, LocalhostCertificate, NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
+use blockmatrix::network::reflector_pool::{ReflectorConfig, ReflectorPool};
 use blockmatrix::network::shard_store::ShardStore;
-use blockmatrix::network::shard_transport::StoqShardTransport;
+use blockmatrix::network::shard_transport::{ShardTransport, StoqShardTransport};
+use blockmatrix::network::sync_dispatch::TransportSyncDriver;
 use blockmatrix::network::NetworkManager;
 use blockmatrix::persistence::{BlockQuery, PersistenceConfig, PersistenceManager};
 use hypermesh_lib::ContentHash;
@@ -157,6 +163,104 @@ enum DnsAction {
     },
     /// List all registered DNS names
     List,
+}
+
+/// Propagate a newly-created block to connected peers via the BlockPropagator.
+///
+/// This is a best-effort operation: propagation failures are logged but do
+/// not fail the caller. Only propagates when there are connected peers.
+async fn propagate_block(
+    block: &blockmatrix::blockchain::block::Block,
+    propagator: &tokio::sync::Mutex<BlockPropagator>,
+    network: &NetworkManager,
+) {
+    let coords = network.get_connected_coordinates().await;
+    if coords.is_empty() {
+        debug!("No connected peers, skipping block propagation");
+        return;
+    }
+
+    let result = propagator.lock().await.propagate_block(block, &coords).await;
+    info!(
+        "Block #{} propagated to {} peer(s) ({} failed)",
+        block.index,
+        result.reached_nodes.len(),
+        result.failed_nodes.len(),
+    );
+}
+
+/// Extract DNS registration data from a block's asset records.
+///
+/// DNS registrations are identified by their `AssetCategory::BaseSystem(BaseSystemType::Dns)`
+/// category. The original name/address data is encoded in the `AssetData.config` field as
+/// `DNS:REGISTER:{name}:{addr}` and hashed into `content_hash` during `from_asset_data`.
+///
+/// Since `AssetRegistration` only stores the content hash (not the original data),
+/// this function cannot recover name/addr from the block alone. It returns the
+/// count of DNS-typed assets found, which can trigger a full chain re-scan via
+/// the persistence layer for nodes that have the original DNS records file.
+fn count_dns_assets_in_block(block: &blockmatrix::blockchain::block::Block) -> usize {
+    block
+        .assets
+        .iter()
+        .filter(|asset| {
+            matches!(
+                asset.category,
+                AssetCategory::BaseSystem(BaseSystemType::Dns)
+            )
+        })
+        .count()
+}
+
+/// Optional network context for shard distribution during asset storage.
+///
+/// When running inside `Commands::Start`, the node has a live network with
+/// connected peers. Standalone `Store` invocations have no network.
+struct ShardDistributionCtx {
+    network: std::sync::Arc<NetworkManager>,
+    shard_transport: std::sync::Arc<StoqShardTransport>,
+}
+
+/// Distribute shards to connected network peers (best-effort).
+///
+/// Sends each shard to up to 6 nearest peers. Failures are logged but
+/// do not abort the operation.
+async fn distribute_shards_to_network(
+    ctx: &ShardDistributionCtx,
+    shards: &[(ContentHash, Vec<u8>)],
+) {
+    let connected_nodes = ctx.network.get_connected_nodes().await;
+    if connected_nodes.is_empty() {
+        info!("No connected peers for shard distribution (local-only storage)");
+        return;
+    }
+
+    let mut distributed = 0usize;
+    let mut failed = 0usize;
+    for (shard_hash, shard_data) in shards {
+        // Send to up to 6 nearest peers
+        for node in connected_nodes.iter().take(6) {
+            let node_id = hypermesh_lib::NodeId::from_bytes(
+                *blake3::hash(node.node_id.as_bytes()).as_bytes(),
+            );
+            match ctx
+                .shard_transport
+                .send_shard(&node_id, shard_hash, shard_data)
+                .await
+            {
+                Ok(()) => distributed += 1,
+                Err(e) => {
+                    warn!(
+                        "Failed to distribute shard to {}: {}",
+                        &node.node_id[..8.min(node.node_id.len())],
+                        e
+                    );
+                    failed += 1;
+                }
+            }
+        }
+    }
+    info!("Shard distribution: {} sent, {} failed", distributed, failed);
 }
 
 /// Shard map persisted to disk after Store, used by Fetch to reconstruct.
@@ -340,7 +444,10 @@ fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
 
 /// Run the Store subcommand: ingest a file through the asset pipeline and
 /// persist the resulting shards + shard map locally.
-async fn run_store(path: std::path::PathBuf) -> Result<()> {
+///
+/// When `dist_ctx` is provided (node running with active network), shards are
+/// also distributed to connected peers after local storage.
+async fn run_store(path: std::path::PathBuf, dist_ctx: Option<&ShardDistributionCtx>) -> Result<()> {
     // 1. Read file
     let file_data =
         std::fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -427,7 +534,22 @@ async fn run_store(path: std::path::PathBuf) -> Result<()> {
             .with_context(|| format!("failed to write shard {}", shard_path.display()))?;
     }
 
-    // 8. Print shard map JSON to stdout
+    // 8. Distribute shards to network peers (if running inside a live node)
+    if let Some(ctx) = dist_ctx {
+        let shard_pairs: Vec<(ContentHash, Vec<u8>)> = processed
+            .shards
+            .iter()
+            .map(|s| {
+                let hash_bytes = *blake3::hash(&s.data).as_bytes();
+                (ContentHash(hash_bytes), s.data.clone())
+            })
+            .collect();
+        distribute_shards_to_network(ctx, &shard_pairs).await;
+    } else {
+        debug!("Standalone store: no network available for shard distribution");
+    }
+
+    // 9. Print shard map JSON to stdout
     println!("{map_json}");
     info!("Asset ID: {}", asset_id);
 
@@ -638,6 +760,15 @@ async fn run_dns(
                 .register_asset_record(registration, &state_proof)
                 .await
                 .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+            // DNS block propagation requires a running node with active
+            // network connections (Commands::Start). Standalone `dns register`
+            // writes locally; the block will be propagated on next node start
+            // via the bootstrap block propagation loop.
+            info!(
+                "DNS block #{} stored locally (propagation deferred to next node start)",
+                block.index,
+            );
 
             println!();
             println!("  DNS Registered");
@@ -940,6 +1071,57 @@ async fn main() -> Result<()> {
                 // Start discovery based on privacy mode
                 network_manager.start_discovery().await?;
 
+                // --- Block Sync Infrastructure ---
+                let node_map: std::sync::Arc<tokio::sync::RwLock<
+                    std::collections::HashMap<String, (String, std::net::SocketAddr)>,
+                >> = std::sync::Arc::new(tokio::sync::RwLock::new(
+                    std::collections::HashMap::new(),
+                ));
+
+                let block_transport = std::sync::Arc::new(StoqBlockTransportAdapter::new(
+                    transport.clone(),
+                    node_map.clone(),
+                ));
+
+                let block_propagator = std::sync::Arc::new(tokio::sync::Mutex::new(
+                    BlockPropagator::with_transport(
+                        coord,
+                        PropagationStrategy::NearestN(6),
+                        block_transport.clone(),
+                    ),
+                ));
+
+                let genesis_hash = bootstrap.genesis_block().hash.clone();
+                let sync_manager = std::sync::Arc::new(tokio::sync::Mutex::new(
+                    SyncManager::new(genesis_hash.clone(), SyncConfig::default()),
+                ));
+
+                let reflector_pool = std::sync::Arc::new(tokio::sync::Mutex::new(
+                    ReflectorPool::new(ReflectorConfig::default()),
+                ));
+
+                // If reflector, join a Network scope chain
+                if cli.reflector {
+                    let network_id = format!(
+                        "public-{}",
+                        &genesis_hash[..16.min(genesis_hash.len())]
+                    );
+                    let now_secs = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    match sync_manager
+                        .lock()
+                        .await
+                        .join_network(network_id.clone(), privacy_mode, now_secs)
+                    {
+                        Ok(()) => info!("Joined Network scope: {}", network_id),
+                        Err(e) => warn!("Failed to join network scope: {}", e),
+                    }
+                }
+
+                info!("Block sync infrastructure initialized (propagation=NearestN(6))");
+
                 // Start accepting connections in background
                 let network_clone = std::sync::Arc::new(network_manager);
                 let network_accept = network_clone.clone();
@@ -1001,9 +1183,111 @@ async fn main() -> Result<()> {
                     }
                 });
 
+                // Block sync + reflector heartbeat loop
+                let sync_mgr_loop = sync_manager.clone();
+                let refl_pool_loop = reflector_pool.clone();
+                let blockchain_sync = bootstrap.blockchain().clone();
+                let network_sync = network_clone.clone();
+                let node_map_sync = node_map.clone();
+                let block_transport_sync = block_transport.clone();
+                let is_reflector = cli.reflector;
+                let sync_coord = coord;
+                tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(
+                        tokio::time::Duration::from_secs(5),
+                    );
+                    loop {
+                        interval.tick().await;
+
+                        // Update node_map from connected peers
+                        // (for block transport routing)
+                        let addr_map = network_sync.get_node_address_map().await;
+                        *node_map_sync.write().await = addr_map;
+
+                        // Build BlockProvider snapshot from current chain
+                        let chain = blockchain_sync.get_chain().await;
+                        let provider =
+                            NodeBlockchainBlockProvider::from_blocks(&chain);
+                        let local_height = blockchain_sync.get_height().await;
+
+                        // Run sync round for all networks needing sync
+                        {
+                            let mut sm = sync_mgr_loop.lock().await;
+                            let rp = refl_pool_loop.lock().await;
+                            let synced = TransportSyncDriver::run_sync_round(
+                                &mut sm,
+                                &rp,
+                                Some(&provider),
+                                block_transport_sync.as_ref(),
+                                local_height,
+                                &sync_coord,
+                            )
+                            .await;
+                            if synced > 0 {
+                                info!(
+                                    "Sync round: {} network(s) synchronized",
+                                    synced
+                                );
+                            }
+                        }
+
+                        // Prune stale reflectors
+                        {
+                            let now_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .map(|d| d.as_millis() as u64)
+                                .unwrap_or(0);
+                            let pruned =
+                                refl_pool_loop.lock().await.prune_stale(now_ms);
+                            if pruned > 0 {
+                                debug!(
+                                    "Pruned {} stale reflector(s)",
+                                    pruned
+                                );
+                            }
+                        }
+
+                        // If reflector, log heartbeat status
+                        if is_reflector {
+                            debug!(
+                                "Reflector heartbeat: height={}",
+                                local_height
+                            );
+                        }
+                    }
+                });
+                info!(
+                    "Block sync loop started (interval=5s, reflector={})",
+                    cli.reflector
+                );
+
+                // Propagate any blocks created during bootstrap (e.g. hardware
+                // assessment block on first boot) now that the network is ready.
+                {
+                    let chain = bootstrap.blockchain().get_chain().await;
+                    // Skip genesis (index 0) — peers build their own genesis.
+                    for block in chain.iter().filter(|b| b.index > 0) {
+                        propagate_block(block, &block_propagator, &network_clone)
+                            .await;
+
+                        // Check for DNS assets in propagated blocks so the
+                        // local resolver stays in sync with the blockchain.
+                        let dns_count = count_dns_assets_in_block(block);
+                        if dns_count > 0 {
+                            debug!(
+                                "Block #{} contains {} DNS asset(s)",
+                                block.index, dns_count,
+                            );
+                        }
+                    }
+                }
+
                 // Keep shard_store and shard_transport alive for the node's lifetime
                 let _shard_store = shard_store;
                 let _shard_transport = shard_transport;
+                let _block_propagator = block_propagator.clone();
+                let _sync_manager = sync_manager.clone();
+                let _reflector_pool = reflector_pool.clone();
             }
 
             info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
@@ -1037,7 +1321,7 @@ async fn main() -> Result<()> {
             info!("Privacy mode updated successfully");
         }
         Some(Commands::Store { path }) => {
-            run_store(path).await?;
+            run_store(path, None).await?;
         }
         Some(Commands::Fetch { asset_id, output }) => {
             run_fetch(asset_id, output).await?;

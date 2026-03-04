@@ -37,10 +37,12 @@ pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
 pub use node_chain::{ChainStats, NodeBlockchain};
 pub use propagation::{
     BlockPropagator, BlockTransport, PropagationResult, PropagationStrategy, SimulatedTransport,
+    StoqBlockTransportAdapter,
 };
 pub use state::{BlockQuery, ChainSnapshot, ChainStateManager, SortOrder, StorageStats};
 pub use sync_manager::{
-    BlockProvider, NetworkMembership, SyncConfig, SyncManager, SyncMessage, SyncObserver, SyncState,
+    BlockProvider, NetworkMembership, NodeBlockchainBlockProvider, SyncConfig, SyncManager,
+    SyncMessage, SyncObserver, SyncState,
 };
 pub use validation::{ChainValidator, ValidationRules};
 

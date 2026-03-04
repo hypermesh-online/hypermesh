@@ -445,6 +445,31 @@ impl NetworkManager {
         self.nodes.read().await.values().cloned().collect()
     }
 
+    /// Returns the matrix coordinates of all currently connected peers.
+    /// Used by BlockPropagator to determine propagation targets.
+    pub async fn get_connected_coordinates(&self) -> Vec<MatrixCoordinate> {
+        self.nodes
+            .read()
+            .await
+            .values()
+            .map(|n| n.coordinate)
+            .collect()
+    }
+
+    /// Returns a map of coordinate string -> (node_id, socket_addr) for all connected peers.
+    /// Used by StoqBlockTransportAdapter for block propagation routing.
+    pub async fn get_node_address_map(&self) -> HashMap<String, (String, SocketAddr)> {
+        self.nodes
+            .read()
+            .await
+            .values()
+            .map(|n| {
+                let key = format!("{},{},{}", n.coordinate.x, n.coordinate.y, n.coordinate.z);
+                (key, (n.node_id.clone(), n.address))
+            })
+            .collect()
+    }
+
     /// Get node count
     pub async fn get_node_count(&self) -> usize {
         self.nodes.read().await.len()
