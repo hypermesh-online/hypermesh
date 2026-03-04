@@ -5,10 +5,10 @@
 //! TrustChain Configuration Management
 //!
 //! Central configuration for TrustChain services with IPv6-only networking
-//! and consensus validation parameters.
+//! and state proof validation parameters.
 
 use crate::ca::CAConfig;
-use crate::consensus::ConsensusRequirements;
+use crate::proof_of_state::StateRequirements;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
@@ -48,8 +48,8 @@ pub struct CTConfig {
     pub storage_path: String,
     /// Enable real-time fingerprinting
     pub enable_realtime_fingerprinting: bool,
-    /// Consensus requirements for CT operations
-    pub consensus_requirements: ConsensusRequirements,
+    /// State proof requirements for CT operations
+    pub state_requirements: StateRequirements,
 }
 
 impl Default for CTConfig {
@@ -62,7 +62,7 @@ impl Default for CTConfig {
             merkle_update_interval: Duration::from_secs(60),
             storage_path: "/tmp/trustchain_ct".to_string(),
             enable_realtime_fingerprinting: true,
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 }
@@ -78,7 +78,7 @@ impl CTConfig {
             merkle_update_interval: Duration::from_secs(60),
             storage_path: "/tmp/trustchain_ct".to_string(),
             enable_realtime_fingerprinting: false, // Disabled for testing
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 
@@ -92,7 +92,7 @@ impl CTConfig {
             merkle_update_interval: Duration::from_secs(30),
             storage_path: "/var/lib/trustchain/ct".to_string(),
             enable_realtime_fingerprinting: true,
-            consensus_requirements: ConsensusRequirements::production(),
+            state_requirements: StateRequirements::production(),
         }
     }
 }
@@ -118,8 +118,8 @@ pub struct DnsConfig {
     pub enable_cert_validation: bool,
     /// TrustChain domains to resolve
     pub trustchain_domains: Vec<String>,
-    /// Consensus requirements for DNS operations
-    pub consensus_requirements: ConsensusRequirements,
+    /// State proof requirements for DNS operations
+    pub state_requirements: StateRequirements,
 }
 
 impl Default for DnsConfig {
@@ -144,7 +144,7 @@ impl Default for DnsConfig {
                 "catalog".to_string(),
                 "engauge".to_string(),
             ],
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 }
@@ -172,7 +172,7 @@ impl DnsConfig {
                 "catalog".to_string(),
                 "engauge".to_string(),
             ],
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 
@@ -198,7 +198,7 @@ impl DnsConfig {
                 "catalog".to_string(),
                 "engauge".to_string(),
             ],
-            consensus_requirements: ConsensusRequirements::production(),
+            state_requirements: StateRequirements::production(),
         }
     }
 }
@@ -220,8 +220,8 @@ pub struct ApiConfig {
     pub max_body_size: usize,
     /// CORS allowed origins
     pub cors_origins: Vec<String>,
-    /// Consensus requirements for API operations
-    pub consensus_requirements: ConsensusRequirements,
+    /// State proof requirements for API operations
+    pub state_requirements: StateRequirements,
 }
 
 impl Default for ApiConfig {
@@ -234,7 +234,7 @@ impl Default for ApiConfig {
             rate_limit_per_minute: 60,
             max_body_size: 1024 * 1024,          // 1MB
             cors_origins: vec!["*".to_string()], // Permissive for testing
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 }
@@ -250,7 +250,7 @@ impl ApiConfig {
             rate_limit_per_minute: 1000, // Higher limit for tests
             max_body_size: 1024 * 1024,
             cors_origins: vec!["*".to_string()],
-            consensus_requirements: ConsensusRequirements::localhost_testing(),
+            state_requirements: StateRequirements::localhost_testing(),
         }
     }
 
@@ -267,7 +267,7 @@ impl ApiConfig {
                 "https://hypermesh.online".to_string(),
                 "https://trust.hypermesh.online".to_string(),
             ],
-            consensus_requirements: ConsensusRequirements::production(),
+            state_requirements: StateRequirements::production(),
         }
     }
 }
@@ -499,12 +499,12 @@ impl TrustChainConfig {
             return Err(anyhow!("TrustChain requires IPv6-only networking"));
         }
 
-        // Validate consensus requirements consistency
-        if self.ca.consensus_requirements.minimum_stake
-            != self.ct.consensus_requirements.minimum_stake
+        // Validate state proof requirements consistency
+        if self.ca.state_requirements.minimum_stake
+            != self.ct.state_requirements.minimum_stake
         {
             return Err(anyhow!(
-                "Consensus requirements must be consistent across services"
+                "State proof requirements must be consistent across services"
             ));
         }
 

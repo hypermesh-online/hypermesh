@@ -18,14 +18,14 @@ rotation_interval_hours = 24
 target_issuance_time_ms = 35
 enable_ct_logging = true
 
-# Consensus requirements for certificate operations
-[ca.consensus]
+# State proof requirements for certificate operations
+[ca.state_proof]
 require_proof_of_space = true
 require_proof_of_stake = true
 require_proof_of_work = true
 require_proof_of_time = true
 min_confirmations = 6
-consensus_timeout_ms = 30000
+state_proof_timeout_ms = 30000
 
 [ct]
 # Certificate Transparency Configuration

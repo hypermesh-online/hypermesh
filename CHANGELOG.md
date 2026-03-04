@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - IPv6 asset addressing with AssetAddress and TransferEngine
 - Privacy model: PrivacyMode (Anonymous/Private/Public) independent from BlockchainScope (Device/Network)
 - Quantum-resistant cryptography throughout: FALCON-1024 signing, Kyber-1024 encryption, BLAKE3 hashing
-- Proof of State four-proof consensus: PoSpace, PoStake, PoWork, PoTime
+- Proof of State four-proof authentication: PoSpace, PoStake, PoWork, PoTime
 - Asset pipeline: Compress (Brotli), Encrypt (Kyber-1024), Shard (Reed-Solomon 10+4), Distribute (tensor)
 - Remote proxy/NAT system with IPv6-like addressing for resource access
 - Tensor-based routing and resource allocation using Block-MATRIX topology

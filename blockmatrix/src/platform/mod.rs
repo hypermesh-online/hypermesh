@@ -25,9 +25,6 @@ pub mod config {
     /// Default session timeout
     pub const DEFAULT_SESSION_TIMEOUT: Duration = Duration::from_secs(86400); // 24 hours
 
-    /// Minimum reputation score for platform participation
-    pub const MIN_REPUTATION_SCORE: f64 = 0.5;
-
     /// Default hardware verification timeout
     pub const HARDWARE_VERIFICATION_TIMEOUT: Duration = Duration::from_secs(3600); // 1 hour
 

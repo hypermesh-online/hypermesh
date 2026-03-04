@@ -6,11 +6,11 @@
 //!
 //! Provides seamless integration between Catalog's asset library and HyperMesh's
 //! native AssetManager, eliminating the standalone registry and leveraging HyperMesh's
-//! consensus validation and asset management capabilities.
+//! state proof validation and asset management capabilities.
 //!
 //! ARCHITECTURE:
 //! - Zero network calls - all operations in-memory through AssetManager
-//! - Direct consensus validation through HyperMesh
+//! - Direct state proof validation through HyperMesh
 //! - 100x performance improvement through native integration
 //! - Full compatibility with existing Catalog functionality
 
@@ -24,7 +24,7 @@ use crate::library::{AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryIn
 
 use anyhow::Result;
 use blockmatrix::assets::core::{
-    AssetAllocationRequest, AssetManager, AssetType, ConsensusProof, ResourceRequirements,
+    AssetAllocationRequest, AssetManager, AssetType, StateProof, ResourceRequirements,
 };
 use chrono::{DateTime, Utc};
 use hypermesh_lib::PrivacyMode;
@@ -47,8 +47,8 @@ pub struct HyperMeshAssetRegistry {
 /// Bridge configuration for HyperMesh integration
 #[derive(Debug, Clone)]
 pub struct BridgeConfig {
-    /// Enable consensus validation for all operations
-    pub _enable_consensus: bool,
+    /// Enable state proof validation for all operations
+    pub _enable_state_proof: bool,
     /// Minimum stake required for asset operations
     pub _minimum_stake: u64,
     /// Default privacy level for new assets
@@ -62,7 +62,7 @@ pub struct BridgeConfig {
 impl Default for BridgeConfig {
     fn default() -> Self {
         Self {
-            _enable_consensus: true,
+            _enable_state_proof: true,
             _minimum_stake: 1000,
             _default_privacy: PrivacyMode::PRIVATE,
             _enable_zero_copy: true,
@@ -169,12 +169,12 @@ impl HyperMeshAssetRegistry {
     async fn _package_to_allocation_request(
         &self,
         package: &AssetPackage,
-        consensus_proof: Option<ConsensusProof>,
+        state_proof: Option<StateProof>,
     ) -> Result<AssetAllocationRequest> {
-        let consensus = if self._config._enable_consensus {
-            consensus_proof.unwrap_or_default()
+        let verified_proof = if self._config._enable_state_proof {
+            state_proof.unwrap_or_default()
         } else {
-            ConsensusProof::default()
+            StateProof::default()
         };
 
         let requirements = self._convert_resource_requirements(&package.spec.spec)?;
@@ -183,7 +183,7 @@ impl HyperMeshAssetRegistry {
             asset_type: self._map_asset_type(&package.spec.spec.asset_type),
             requested_resources: requirements,
             privacy_level: self._config._default_privacy,
-            consensus_proof: consensus,
+            state_proof: verified_proof,
             certificate_fingerprint: package.spec.metadata.author.clone().unwrap_or_default(),
             duration_limit: None,
             tags: HashMap::new(),
@@ -358,7 +358,7 @@ impl HyperMeshAssetRegistry {
                     templates: vec![],
                 },
                 security: AssetSecurity {
-                    consensus_required: false,
+                    state_proof_required: false,
                     certificate_pinning: false,
                     hash_validation: "blake3".to_string(),
                     sandbox_level: "strict".to_string(),
@@ -388,7 +388,7 @@ impl HyperMeshAssetRegistry {
                 },
                 execution: AssetExecution {
                     delegation_strategy: "round_robin".to_string(),
-                    minimum_consensus: 1,
+                    minimum_state_proof: 1,
                     retry_policy: "exponential_backoff".to_string(),
                     max_concurrent: Some(10),
                     priority: "normal".to_string(),

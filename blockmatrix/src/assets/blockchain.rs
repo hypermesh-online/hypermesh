@@ -5,11 +5,11 @@
 //! HyperMesh Blockchain Integration for Asset Management
 //!
 //! This module implements asset-based blockchain operations following Proof of State patterns.
-//! Assets are stored directly in blockchain blocks with ConsensusProof validation.
+//! Assets are stored directly in blockchain blocks with StateProof validation.
 
 use crate::assets::core::asset_id::{AssetRegistration, AssetType};
-use crate::consensus::{
-    AsyncConsensus, ConsensusConfig, ConsensusProof, ConsensusResult, DefaultConsensus,
+use crate::proof_of_state::{
+    AsyncStateProof, StateProofConfig, StateProof, StateProofOpResult, DefaultStateProof,
 };
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
@@ -58,8 +58,8 @@ pub struct HyperMeshAssetRecord {
     pub issuing_authority: String,
     /// Asset-specific data payload
     pub data_payload: Vec<u8>,
-    /// Consensus proofs (all 4 required: PoSp+PoSt+PoWk+PoTm)
-    pub consensus_proofs: Vec<ConsensusProof>,
+    /// State proofs (all 4 required: PoSp+PoSt+PoWk+PoTm)
+    pub state_proofs: Vec<StateProof>,
     /// Privacy level for this operation
     pub privacy_level: PrivacyMode,
     /// Asset adapter that handled this operation
@@ -69,13 +69,13 @@ pub struct HyperMeshAssetRecord {
 use hypermesh_lib::PrivacyMode;
 
 impl HyperMeshAssetRecord {
-    /// Create new asset record with consensus validation
+    /// Create new asset record with state proof validation
     pub fn new(
         asset_id: AssetRegistration,
         record_type: AssetRecordType,
         issuing_authority: String,
         data_payload: Vec<u8>,
-        consensus_proofs: Vec<ConsensusProof>,
+        state_proofs: Vec<StateProof>,
         privacy_level: PrivacyMode,
     ) -> Self {
         // Get adapter type from AssetRegistration
@@ -87,21 +87,21 @@ impl HyperMeshAssetRecord {
             timestamp: SystemTime::now(),
             issuing_authority,
             data_payload,
-            consensus_proofs,
+            state_proofs,
             privacy_level,
             adapter_type,
         }
     }
 
-    /// Validate all consensus proofs for this asset operation
-    pub async fn validate_consensus(&self) -> Result<bool, String> {
-        // All asset operations must have at least one consensus proof
-        if self.consensus_proofs.is_empty() {
-            return Err("Asset operations require consensus proofs".to_string());
+    /// Validate all state proofs for this asset operation
+    pub async fn validate_state_proof(&self) -> Result<bool, String> {
+        // All asset operations must have at least one state proof
+        if self.state_proofs.is_empty() {
+            return Err("Asset operations require state proofs".to_string());
         }
 
-        // Validate each consensus proof (all 4 proofs required)
-        for proof in &self.consensus_proofs {
+        // Validate each state proof (all 4 proofs required)
+        for proof in &self.state_proofs {
             if !proof.validate() {
                 return Ok(false);
             }
@@ -190,11 +190,11 @@ impl HyperMeshBlockData {
         }
     }
 
-    /// Check if this block data requires consensus validation
-    pub fn requires_consensus(&self) -> bool {
+    /// Check if this block data requires state proof validation
+    pub fn requires_state_proof(&self) -> bool {
         match self {
             HyperMeshBlockData::Genesis => false,
-            HyperMeshBlockData::AssetRecord(_) => true, // All asset operations require consensus
+            HyperMeshBlockData::AssetRecord(_) => true, // All asset operations require state proof
             HyperMeshBlockData::Raw(_) => false,
         }
     }
@@ -202,8 +202,8 @@ impl HyperMeshBlockData {
 
 /// Asset blockchain manager for HyperMesh
 pub struct AssetBlockchainManager {
-    /// Consensus system for blockchain operations
-    consensus: Arc<DefaultConsensus>,
+    /// State proof system for blockchain operations
+    state_proof: Arc<DefaultStateProof>,
     /// Current node authority for asset operations
     node_authority: String,
 }
@@ -213,18 +213,18 @@ use std::sync::Arc;
 impl AssetBlockchainManager {
     /// Create new asset blockchain manager
     pub fn new(node_authority: String) -> Self {
-        let config = ConsensusConfig::default();
-        let consensus = Arc::new(DefaultConsensus::new(config, node_authority.clone()));
+        let config = StateProofConfig::default();
+        let state_proof = Arc::new(DefaultStateProof::new(config, node_authority.clone()));
         Self {
-            consensus,
+            state_proof,
             node_authority,
         }
     }
 
-    /// Create with custom consensus implementation
-    pub fn with_consensus(consensus: Arc<DefaultConsensus>, node_authority: String) -> Self {
+    /// Create with custom state proof implementation
+    pub fn with_state_proof(state_proof: Arc<DefaultStateProof>, node_authority: String) -> Self {
         Self {
-            consensus,
+            state_proof,
             node_authority,
         }
     }
@@ -234,27 +234,27 @@ impl AssetBlockchainManager {
         &self,
         mut record: HyperMeshAssetRecord,
     ) -> Result<[u8; 32], String> {
-        // Validate consensus proofs
-        if !record.validate_consensus().await? {
-            return Err("Consensus validation failed for asset record".to_string());
+        // Validate state proofs
+        if !record.validate_state_proof().await? {
+            return Err("State proof validation failed for asset record".to_string());
         }
 
-        // Ensure record has proper consensus proofs if missing
-        if record.consensus_proofs.is_empty() {
-            let consensus_proof = self
-                .create_asset_consensus_proof(&record)
+        // Ensure record has proper state proofs if missing
+        if record.state_proofs.is_empty() {
+            let state_proof = self
+                .create_asset_state_proof(&record)
                 .await
-                .map_err(|e| format!("Failed to create consensus proof: {e:?}"))?;
-            record.consensus_proofs.push(consensus_proof);
+                .map_err(|e| format!("Failed to create state proof: {e:?}"))?;
+            record.state_proofs.push(state_proof);
         }
 
         // Create block data
         let block_data = HyperMeshBlockData::AssetRecord(record.clone());
         let _block_data_bytes = block_data.data();
 
-        // TODO: Add to blockchain through consensus system
-        // The Consensus trait needs replicate_entry method or similar
-        // let log_index = self.consensus.replicate_entry(block_data_bytes).await?;
+        // TODO: Add to blockchain through state proof system
+        // The StateProof trait needs replicate_entry method or similar
+        // let log_index = self.state_proof.replicate_entry(block_data_bytes).await?;
 
         // Calculate final block hash
         let block_hash = record.calculate_hash();
@@ -283,36 +283,31 @@ impl AssetBlockchainManager {
         Ok(None)
     }
 
-    /// Create consensus proof for asset operation
-    async fn create_asset_consensus_proof(
+    /// Create state proof for asset operation
+    async fn create_asset_state_proof(
         &self,
         record: &HyperMeshAssetRecord,
-    ) -> ConsensusResult<ConsensusProof> {
+    ) -> StateProofOpResult<StateProof> {
         let node_id = crate::transport::PeerIdentity::from_name(self.node_authority.clone());
         let operation_type = record.record_type.to_string();
 
-        self.consensus
-            .create_consensus_proof(&record.asset_id.to_hex_string(), &node_id, &operation_type)
+        self.state_proof
+            .create_state_proof(&record.asset_id.to_hex_string(), &node_id, &operation_type)
             .await
     }
 
-    /// Validate asset operation with consensus
+    /// Validate asset operation with state proof
     pub async fn validate_asset_operation(
         &self,
         record: &HyperMeshAssetRecord,
     ) -> Result<bool, String> {
-        // Check if we're in a valid consensus state
-        if !self.consensus.is_leader().await {
-            return Err("Asset operations require leader consensus".to_string());
-        }
-
-        // Validate all consensus proofs
-        for proof in &record.consensus_proofs {
+        // Validate all state proofs (bilateral binary authentication)
+        for proof in &record.state_proofs {
             let is_valid = self
-                .consensus
-                .validate_consensus_proof(proof)
+                .state_proof
+                .validate_state_proof(proof)
                 .await
-                .map_err(|e| format!("Consensus proof validation failed: {e:?}"))?;
+                .map_err(|e| format!("State proof validation failed: {e:?}"))?;
             if !is_valid {
                 return Ok(false);
             }
@@ -383,7 +378,7 @@ pub struct ActualResourceUsage {
 mod tests {
     use super::*;
     use crate::assets::core::asset_id::AssetType;
-    use crate::consensus::proof::{
+    use crate::proof_of_state::proof::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use crate::test_utils::test_asset_id;
@@ -393,15 +388,15 @@ mod tests {
     async fn test_asset_record_creation() {
         let asset_id = test_asset_id(AssetType::Cpu);
 
-        // Create mock consensus proof (would be real in production)
-        let consensus_proofs = vec![]; // TODO: Add real consensus proofs
+        // Create mock state proof (would be real in production)
+        let state_proofs = vec![]; // TODO: Add real state proofs
 
         let record = HyperMeshAssetRecord::new(
             asset_id,
             AssetRecordType::Creation,
             "test-authority".to_string(),
             b"test-data".to_vec(),
-            consensus_proofs,
+            state_proofs,
             PrivacyMode::PUBLIC,
         );
 
@@ -411,10 +406,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_asset_record_with_consensus_proof() {
+    async fn test_asset_record_with_state_proof() {
         let asset_id = test_asset_id(AssetType::Cpu);
 
-        // Create real consensus proof for testing
+        // Create real state proof for testing
         let space_proof = SpaceProof::new(
             "test-node".to_string(),
             format!("/hypermesh/assets/{}", asset_id.to_hex_string()),
@@ -438,27 +433,27 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(1));
 
-        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+        let state_proof = StateProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         let record = HyperMeshAssetRecord::new(
             asset_id,
             AssetRecordType::Creation,
             "test-authority".to_string(),
             b"test-data".to_vec(),
-            vec![consensus_proof],
+            vec![state_proof],
             PrivacyMode::PUBLIC,
         );
 
-        // Validate consensus proofs
-        let is_valid = record.validate_consensus().await.expect("test: async operation");
+        // Validate state proofs
+        let is_valid = record.validate_state_proof().await.expect("test: async operation");
         assert!(
             is_valid,
-            "Asset record with consensus proof should be valid"
+            "Asset record with state proof should be valid"
         );
 
         assert_eq!(record.record_type, AssetRecordType::Creation);
         assert_eq!(record.issuing_authority, "test-authority");
-        assert_eq!(record.consensus_proofs.len(), 1);
+        assert_eq!(record.state_proofs.len(), 1);
     }
 
     #[test]
@@ -491,7 +486,7 @@ mod tests {
         );
 
         let block_data = HyperMeshBlockData::AssetRecord(record);
-        assert!(block_data.requires_consensus());
+        assert!(block_data.requires_state_proof());
         assert!(!block_data.data().is_empty());
     }
 }

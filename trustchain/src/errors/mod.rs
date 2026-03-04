@@ -35,9 +35,9 @@ pub enum TrustChainError {
     #[error("API server error: {0}")]
     ApiServer(#[from] ApiError),
 
-    /// Consensus validation errors
-    #[error("Consensus validation error: {0}")]
-    ConsensusValidation(#[from] ConsensusError),
+    /// State proof validation errors
+    #[error("State proof validation error: {0}")]
+    StateProofValidation(#[from] StateProofError),
 
     /// Security errors
     #[error("Security error: {message}")]
@@ -94,9 +94,9 @@ pub enum TrustChainError {
     #[error("Internal error: {message}")]
     Internal { message: String },
 
-    /// Consensus validation failed
-    #[error("Consensus proof validation failed: {reason}")]
-    ConsensusValidationFailed { reason: String },
+    /// State proof validation failed
+    #[error("State proof validation failed: {reason}")]
+    StateProofValidationFailed { reason: String },
 
     /// Certificate transparency disabled
     #[error("Certificate transparency is disabled")]
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_security_error_codes() {
         let security_error = TrustChainError::SecurityValidationFailed {
-            reason: "Consensus validation failed".to_string(),
+            reason: "State proof validation failed".to_string(),
         };
 
         let response = ErrorResponse::new(&security_error);
@@ -283,7 +283,7 @@ mod tests {
 
         let byzantine_error = TrustChainError::ByzantineFaultDetected {
             node_id: "malicious_node_001".to_string(),
-            reason: "Invalid consensus proof".to_string(),
+            reason: "Invalid state proof".to_string(),
         };
 
         let response = ErrorResponse::new(&byzantine_error);
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_security_error_details() {
         let security_error = TrustChainError::SecurityValidationFailed {
-            reason: "Four-proof consensus validation failed".to_string(),
+            reason: "Four-proof state proof validation failed".to_string(),
         };
 
         let response = ErrorResponse::new(&security_error);
@@ -327,7 +327,7 @@ mod tests {
         let details = response.details.expect("test");
         assert_eq!(
             details["security_failure_reason"],
-            "Four-proof consensus validation failed"
+            "Four-proof state proof validation failed"
         );
     }
 

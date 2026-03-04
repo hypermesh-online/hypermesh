@@ -175,10 +175,10 @@ impl PrivacyEnforcer {
                 }
             }
             PrivacyMode::PUBLIC => {
-                // Require consensus proof validation
+                // Require state proof validation
                 if allocation.allocation_type == PrivacyAllocationType::Verified {
-                    // Check for valid consensus proof
-                    // Implementation would validate consensus proof
+                    // Check for valid state proof
+                    // Implementation would validate state proof
                 }
             }
             _ => {

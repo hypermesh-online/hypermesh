@@ -5,7 +5,7 @@
 //! HyperMesh Asset Management System
 //!
 //! This module provides the core asset management system for HyperMesh,
-//! treating all resources as assets with consensus proof validation.
+//! treating all resources as assets with state proof validation.
 
 pub mod adapters;
 pub mod blockchain;
@@ -21,7 +21,7 @@ pub mod storage;
 // Re-export main types for easy access
 pub use core::{
     AssetAdapter, AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetStatistics,
-    AssetType, ConsensusProof, PrivacyMode, SpaceProof, StakeProof, TimeProof, WorkProof,
+    AssetType, StateProof, PrivacyMode, SpaceProof, StakeProof, TimeProof, WorkProof,
     WorkState, WorkloadType,
 };
 
@@ -33,8 +33,7 @@ pub use privacy::{PrivacyManager, ResourceAllocation};
 
 #[cfg(feature = "multi-node")]
 pub use multi_node::{
-    ConsensusDecision, ConsensusManager, MultiNodeCoordinator, NetworkTopology, NodeCapabilities,
-    NodeInfo,
+    MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo,
 };
 
 pub use blockchain::{AssetBlockchainManager, AssetRecordType, HyperMeshAssetRecord};

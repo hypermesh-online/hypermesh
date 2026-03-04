@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::{Notify, RwLock};
 use tracing::{info, instrument};
-pub use trustchain::consensus::ConsensusProof;
+pub use trustchain::proof_of_state::StateProof;
 
 pub use metrics::{BootstrapMetrics, HealthMonitor, HealthState};
 use providers::*;
@@ -115,11 +115,11 @@ pub trait TransportProvider: Send + Sync {
     fn phase(&self) -> BootstrapPhase;
 }
 
-/// Consensus provider trait abstraction
+/// State proof provider trait abstraction
 #[async_trait]
-pub trait ConsensusProvider: Send + Sync {
-    async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool>;
-    async fn generate_proof(&self, data: &[u8]) -> Result<ConsensusProof>;
+pub trait StateProofProvider: Send + Sync {
+    async fn validate_proof(&self, proof: &StateProof) -> Result<bool>;
+    async fn generate_proof(&self, data: &[u8]) -> Result<StateProof>;
     fn phase(&self) -> BootstrapPhase;
     fn is_required(&self) -> bool;
 }
@@ -148,7 +148,7 @@ pub enum ServiceType {
     Catalog,
     Caesar,
     DNS,
-    ConsensusNode,
+    StateProofNode,
 }
 
 /// Service registration information
@@ -188,7 +188,7 @@ pub struct BootstrapManager {
     discovery: Arc<RwLock<Box<dyn ServiceDiscovery>>>,
     certificates: Arc<RwLock<Box<dyn CertificateProvider>>>,
     _transport: Arc<RwLock<Box<dyn TransportProvider>>>,
-    consensus: Arc<RwLock<Box<dyn ConsensusProvider>>>,
+    state_proof: Arc<RwLock<Box<dyn StateProofProvider>>>,
     phase_notifications: Arc<DashMap<BootstrapPhase, Arc<Notify>>>,
     config: Arc<BootstrapConfig>,
     metrics: Arc<BootstrapMetrics>,
@@ -211,7 +211,7 @@ impl BootstrapManager {
             )))),
             certificates: Arc::new(RwLock::new(Box::new(SelfSignedProvider::new()))),
             _transport: Arc::new(RwLock::new(Box::new(BasicTransport::new()))),
-            consensus: Arc::new(RwLock::new(Box::new(NoOpConsensus::new()))),
+            state_proof: Arc::new(RwLock::new(Box::new(NoOpStateProof::new()))),
             phase_notifications: Arc::new(phase_notifications),
             config: Arc::new(config),
             metrics: Arc::new(BootstrapMetrics::new()),
@@ -268,7 +268,7 @@ impl BootstrapManager {
             self.config.network_usage.trustchain_bind,
         ));
         self.update_component_phases(BootstrapPhase::Hybrid).await;
-        *self.consensus.write().await = Box::new(OptionalConsensus::new(
+        *self.state_proof.write().await = Box::new(OptionalStateProof::new(
             self.config.network_usage.hypermesh_bind,
         ));
         self.current_phase.store(1, Ordering::SeqCst);
@@ -289,7 +289,7 @@ impl BootstrapManager {
             self.config.network_usage.hypermesh_bind,
             Some(self.config.network_usage.traditional_dns.clone()),
         ));
-        *self.consensus.write().await = Box::new(RequiredConsensus::new(
+        *self.state_proof.write().await = Box::new(RequiredStateProof::new(
             self.config.network_usage.hypermesh_bind,
         ));
         self.update_component_phases(BootstrapPhase::PartialFederation)
@@ -317,8 +317,8 @@ impl BootstrapManager {
             self.config.network_usage.hypermesh_bind,
             None,
         ));
-        *self.consensus.write().await =
-            Box::new(FullConsensus::new(self.config.network_usage.hypermesh_bind));
+        *self.state_proof.write().await =
+            Box::new(FullStateProof::new(self.config.network_usage.hypermesh_bind));
         self.update_component_phases(BootstrapPhase::FullFederation)
             .await;
         self.enable_advanced_features().await?;

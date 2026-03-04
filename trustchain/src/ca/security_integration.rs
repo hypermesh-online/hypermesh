@@ -4,7 +4,7 @@
 
 //! Security-Integrated Certificate Authority
 //!
-//! Certificate Authority with mandatory consensus validation and security monitoring
+//! Certificate Authority with mandatory state proof validation and security monitoring
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -12,11 +12,11 @@ use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
 
 use super::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
-use crate::consensus::ConsensusResult;
+use crate::proof_of_state::StateProofResult;
 use crate::crypto::{FalconKeyPair, FalconSignature, PQCAlgorithm, PostQuantumCrypto};
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::security::monitoring::{
-    ConsensusValidationStatus, LiveCertificateOperation, OperationState,
+    StateProofValidationStatus, LiveCertificateOperation, OperationState,
 };
 use crate::security::{SecurityMonitor, SecurityValidationResult};
 
@@ -49,8 +49,8 @@ pub struct SecurityIntegrationConfig {
     pub mandatory_security_validation: bool,
     /// Block certificate issuance on security failures
     pub block_on_security_failure: bool,
-    /// Require consensus validation for certificate operations
-    pub mandatory_consensus: bool,
+    /// Require state proof validation for certificate operations
+    pub mandatory_state_proof: bool,
     /// Log all certificate operations to security monitoring
     pub log_all_operations: bool,
     /// Use FALCON-1024 post-quantum signatures for all certificates
@@ -66,7 +66,7 @@ impl Default for SecurityIntegrationConfig {
         Self {
             mandatory_security_validation: true,
             block_on_security_failure: true,
-            mandatory_consensus: true,
+            mandatory_state_proof: true,
             log_all_operations: true,
             mandatory_post_quantum: true, // CRITICAL: Enable FALCON-1024 by default
             enable_hybrid_signatures: true, // Enable for transition period
@@ -84,8 +84,8 @@ pub struct SecureCertificateOperation {
     pub request: CertificateRequest,
     /// Security validation result
     pub security_validation: Option<SecurityValidationResult>,
-    /// Consensus validation result
-    pub consensus_validation: Option<ConsensusResult>,
+    /// State proof validation result
+    pub state_validation: Option<StateProofResult>,
     /// Operation start time
     pub started_at: SystemTime,
     /// Current operation state
@@ -99,13 +99,13 @@ pub struct SecureCertificateOperation {
 pub enum SecureOperationState {
     Created,
     SecurityValidation,
-    ConsensusValidation,
+    StateProofValidation,
     SecurityApproved,
     CertificateGeneration,
     CTLogging,
     Completed,
     SecurityBlocked { reason: String },
-    ConsensusRejected { reason: String },
+    StateProofRejected { reason: String },
     Failed { reason: String },
 }
 
@@ -158,7 +158,7 @@ impl SecurityIntegratedCA {
 
         // Initialize security monitor with production configuration
         let security_monitor_config = crate::security::SecurityConfig {
-            mandatory_consensus: security_config.mandatory_consensus,
+            mandatory_state_proof: security_config.mandatory_state_proof,
             real_time_monitoring: true,
             ..Default::default()
         };
@@ -178,8 +178,8 @@ impl SecurityIntegratedCA {
 
         info!("✅ Security-Integrated CA initialized with FALCON-1024");
         info!(
-            "🔐 Mandatory consensus: {}",
-            integrated_ca.config.mandatory_consensus
+            "🔐 Mandatory state proof: {}",
+            integrated_ca.config.mandatory_state_proof
         );
         info!(
             "🔐 Mandatory post-quantum: {}",
@@ -221,7 +221,7 @@ impl SecurityIntegratedCA {
             operation_id: operation_id.clone(),
             request: request.clone(),
             security_validation: None,
-            consensus_validation: None,
+            state_validation: None,
             started_at: start_time,
             state: SecureOperationState::Created,
             security_alerts: Vec::new(),
@@ -237,10 +237,10 @@ impl SecurityIntegratedCA {
                 operation_type: "issue_certificate".to_string(),
                 common_name: request.common_name.clone(),
                 node_id: request.node_id.clone(),
-                consensus_proof: request.consensus_proof.clone(),
-                consensus_status: ConsensusValidationStatus::Pending,
+                state_proof: request.state_proof.clone(),
+                state_proof_status: StateProofValidationStatus::Pending,
                 started_at: start_time,
-                state: OperationState::ConsensusValidation,
+                state: OperationState::StateProofValidation,
             };
 
             // Get security monitoring dashboard (this would typically be a shared component)
@@ -251,7 +251,7 @@ impl SecurityIntegratedCA {
             );
         }
 
-        // CRITICAL: Perform mandatory security validation with consensus
+        // CRITICAL: Perform mandatory security validation with state proof
         let _security_result = if self.config.mandatory_security_validation {
             info!(
                 "MANDATORY security validation for operation: {}",
@@ -262,7 +262,7 @@ impl SecurityIntegratedCA {
                 .security_monitor
                 .validate_certificate_operation(
                     "issue_certificate",
-                    &request.consensus_proof,
+                    &request.state_proof,
                     &format!("cert_issue_{operation_id}"),
                 )
                 .await?;
@@ -305,39 +305,39 @@ impl SecurityIntegratedCA {
             None
         };
 
-        // PHASE 2: MANDATORY CONSENSUS VALIDATION
-        operation.state = SecureOperationState::ConsensusValidation;
+        // PHASE 2: MANDATORY STATE PROOF VALIDATION
+        operation.state = SecureOperationState::StateProofValidation;
 
-        let _consensus_result = if self.config.mandatory_consensus {
+        let _state_proof_result = if self.config.mandatory_state_proof {
             info!(
-                "MANDATORY consensus validation for operation: {}",
+                "MANDATORY state proof validation for operation: {}",
                 operation_id
             );
 
-            // Use the CA's internal consensus validator
-            let mut consensus_guard = self.ca.consensus.lock().await;
-            let result = consensus_guard
-                .validate_consensus(&request.consensus_proof)
+            // Use the CA's internal state proof validator
+            let mut state_proof_guard = self.ca.state_proof_validator.lock().await;
+            let result = state_proof_guard
+                .validate_state_proof(&request.state_proof)
                 .await?;
 
-            operation.consensus_validation = Some(result.clone());
+            operation.state_validation = Some(result.clone());
 
             if !result.is_valid() {
                 error!(
-                    "CONSENSUS VALIDATION FAILED for operation {}: {:?}",
+                    "STATE PROOF VALIDATION FAILED for operation {}: {:?}",
                     operation_id, result
                 );
 
-                operation.state = SecureOperationState::ConsensusRejected {
-                    reason: "Consensus validation failed".to_string(),
+                operation.state = SecureOperationState::StateProofRejected {
+                    reason: "State proof validation failed".to_string(),
                 };
 
-                return Err(TrustChainError::ConsensusValidationFailed {
-                    reason: "Consensus validation failed".to_string(),
+                return Err(TrustChainError::StateProofValidationFailed {
+                    reason: "State proof validation failed".to_string(),
                 });
             } else {
                 info!(
-                    "Consensus validation PASSED for operation: {}",
+                    "State proof validation PASSED for operation: {}",
                     operation_id
                 );
             }
@@ -345,7 +345,7 @@ impl SecurityIntegratedCA {
             Some(result)
         } else {
             warn!(
-                "Consensus validation DISABLED - CRITICAL SECURITY RISK for operation: {}",
+                "State proof validation DISABLED - CRITICAL SECURITY RISK for operation: {}",
                 operation_id
             );
             None
@@ -408,12 +408,12 @@ impl SecurityIntegratedCA {
             operation_id
         );
 
-        // Generate real consensus proof from network state for validation
+        // Generate real state proof from network state for validation
         let node_id = format!("validator_{operation_id}");
-        let consensus_proof = crate::consensus::ConsensusProof::generate_from_network(&node_id)
+        let state_proof = crate::proof_of_state::StateProof::generate_from_network(&node_id)
             .await
-            .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                reason: format!("Failed to generate consensus proof for validation: {e}"),
+            .map_err(|e| TrustChainError::StateProofValidationFailed {
+                reason: format!("Failed to generate state proof for validation: {e}"),
             })?;
 
         // Perform security validation
@@ -421,7 +421,7 @@ impl SecurityIntegratedCA {
             .security_monitor
             .validate_certificate_operation(
                 "validate_certificate",
-                &consensus_proof,
+                &state_proof,
                 &format!("cert_validate_{operation_id}"),
             )
             .await?;
@@ -429,8 +429,8 @@ impl SecurityIntegratedCA {
         // Create validation result
         let validation_result = CertificateValidationResult {
             is_valid: security_result.is_valid,
-            consensus_validated: security_result
-                .consensus_result
+            state_proof_validated: security_result
+                .state_proof_result
                 .as_ref()
                 .map(|r| r.is_valid())
                 .unwrap_or(false),
@@ -496,8 +496,8 @@ impl SecurityIntegratedCA {
             request.common_name
         );
 
-        // Issue certificate through core CA using pre-validated consensus path
-        // (SecurityIntegratedCA already performed consensus validation in Phases 1-2)
+        // Issue certificate through core CA using pre-validated state proof path
+        // (SecurityIntegratedCA already performed state proof validation in Phases 1-2)
         let mut cert = self.ca.issue_certificate_local(request.clone()).await?;
 
         // Add FALCON-1024 signature to certificate metadata
@@ -678,8 +678,8 @@ pub struct CertificateValidationResult {
     pub is_valid: bool,
     /// Security validation result
     pub security_validation: Option<SecurityValidationResult>,
-    /// Whether consensus was validated
-    pub consensus_validated: bool,
+    /// Whether state proof was validated
+    pub state_proof_validated: bool,
     /// Certificate fingerprint
     pub certificate_fingerprint: [u8; 32],
     /// Validation timestamp
@@ -711,7 +711,7 @@ pub struct PQCInfo {
 mod tests {
     use super::*;
     use crate::ca::CAConfig;
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
 
     #[tokio::test]
     async fn test_security_integrated_ca_creation() {
@@ -721,7 +721,7 @@ mod tests {
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
             .await
             .expect("Failed to create security-integrated CA");
-        assert!(integrated_ca.config.mandatory_consensus);
+        assert!(integrated_ca.config.mandatory_state_proof);
         assert!(integrated_ca.config.mandatory_security_validation);
     }
 
@@ -739,14 +739,14 @@ mod tests {
             san_entries: vec!["secure.test.com".to_string()],
             node_id: "secure_test_node".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            state_proof: StateProof::default_for_testing(),
             timestamp: SystemTime::now(),
             identity_scope: None,
             subject_type: None,
         };
 
         let result = integrated_ca.issue_certificate_secure(request).await;
-        // Should succeed with valid consensus proof
+        // Should succeed with valid state proof
         assert!(
             result.is_ok(),
             "test: certificate issuance failed: {:?}",
@@ -772,23 +772,23 @@ mod tests {
             .expect("Failed to get security dashboard");
 
         // Should have valid dashboard data
-        assert!(dashboard.consensus_status.enabled);
+        assert!(dashboard.state_proof_status.enabled);
         // Other assertions depend on the actual operations performed
     }
 
     #[tokio::test]
-    async fn test_mandatory_consensus_disabled() {
+    async fn test_mandatory_state_proof_disabled() {
         let ca_config = CAConfig::testing(); // Use testing config with random port
         let security_config = SecurityIntegrationConfig {
-            mandatory_consensus: false,
+            mandatory_state_proof: false,
             ..Default::default()
         };
 
         let integrated_ca = SecurityIntegratedCA::new(ca_config, security_config)
             .await
-            .expect("Failed to create CA with consensus disabled");
+            .expect("Failed to create CA with state proof disabled");
 
         // Should still work but with reduced security
-        assert!(!integrated_ca.config.mandatory_consensus);
+        assert!(!integrated_ca.config.mandatory_state_proof);
     }
 }

@@ -44,8 +44,8 @@ pub struct ReplicationConfig {
     pub default_factor: u32,
     /// Maximum replication factor
     pub max_factor: u32,
-    /// Minimum nodes for quorum
-    pub min_quorum: u32,
+    /// Minimum mirror replicas for redundancy
+    pub min_replicas: u32,
     /// Geographic distribution requirements
     pub geo_distribution: bool,
     /// Prefer nodes with high uptime
@@ -59,7 +59,7 @@ impl Default for ReplicationConfig {
         Self {
             default_factor: 3,
             max_factor: 10,
-            min_quorum: 2,
+            min_replicas: 2,
             geo_distribution: true,
             prefer_stable_nodes: true,
             replication_timeout: Duration::from_secs(60),

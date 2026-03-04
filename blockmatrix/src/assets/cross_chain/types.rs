@@ -12,7 +12,7 @@ use crate::assets::core::asset_id::AssetRegistration;
 use crate::assets::matrix_blockchain::{
     EntityType, ProofRequirement, ValidationResult, ZKStatement,
 };
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 
 /// Cross-network validator for privacy-preserving multi-chain validation
 #[derive(Clone, Serialize, Deserialize)]
@@ -46,7 +46,7 @@ pub struct CrossChainValidationRule {
     pub validation_type: CrossChainValidationType,
     /// Privacy requirements
     pub privacy_requirements: PrivacyRequirements,
-    /// Required consensus proofs
+    /// Required state proofs
     pub required_proofs: Vec<ProofRequirement>,
 }
 
@@ -230,8 +230,8 @@ pub struct CrossChainValidationResult {
     pub validated_at: SystemTime,
     /// Validation expiry
     pub expires_at: SystemTime,
-    /// Consensus proofs for validation
-    pub consensus_proofs: Vec<ConsensusProof>,
+    /// State proofs for validation
+    pub state_proofs: Vec<StateProof>,
 }
 
 /// Cross-chain validation status
@@ -329,7 +329,7 @@ pub enum CrossChainValidationError {
     #[error("Validation timeout")]
     ValidationTimeout,
 
-    /// Consensus proof validation failed
-    #[error("Consensus proof validation failed: {error}")]
-    ConsensusValidationFailed { error: String },
+    /// State proof validation failed
+    #[error("State proof validation failed: {error}")]
+    StateProofValidationFailed { error: String },
 }

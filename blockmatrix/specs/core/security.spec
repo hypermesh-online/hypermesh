@@ -41,7 +41,7 @@ The HyperMesh security framework provides defense-in-depth protection using eBPF
 3. **Network Attacks**: Man-in-the-middle, DDoS, and protocol-level attacks
 4. **Data Exfiltration**: Unauthorized data access and extraction
 5. **Supply Chain Attacks**: Compromised dependencies and build processes
-6. **Byzantine Attacks**: Malicious nodes in distributed consensus
+6. **Inauthentic State Attacks**: Malicious nodes submitting invalid Proof of State
 7. **Side-Channel Attacks**: Timing, cache, and power analysis attacks
 
 ### Attack Surface Analysis

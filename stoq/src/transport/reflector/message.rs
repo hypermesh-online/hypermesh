@@ -69,8 +69,8 @@ pub enum ReflectorMessage {
         announcing_node: String,
     },
 
-    /// Quorum confirmation that a peer has validated a block height.
-    QuorumConfirm {
+    /// Replication confirmation that a peer has validated a block height.
+    ReplicationConfirm {
         /// Network the confirmation applies to.
         network_id: NetworkId,
         /// Block height being confirmed.
@@ -115,7 +115,7 @@ impl ReflectorMessage {
             Self::SyncRequest { .. } => "sync_request",
             Self::SyncResponse { .. } => "sync_response",
             Self::BlockAnnounce { .. } => "block_announce",
-            Self::QuorumConfirm { .. } => "quorum_confirm",
+            Self::ReplicationConfirm { .. } => "replication_confirm",
         }
     }
 
@@ -126,7 +126,7 @@ impl ReflectorMessage {
             | Self::SyncRequest { network_id, .. }
             | Self::SyncResponse { network_id, .. }
             | Self::BlockAnnounce { network_id, .. }
-            | Self::QuorumConfirm { network_id, .. } => network_id,
+            | Self::ReplicationConfirm { network_id, .. } => network_id,
         }
     }
 }
@@ -206,8 +206,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quorum_confirm_round_trip() {
-        let msg = ReflectorMessage::QuorumConfirm {
+    fn test_replication_confirm_round_trip() {
+        let msg = ReflectorMessage::ReplicationConfirm {
             network_id: test_network_id(),
             block_height: 88,
             confirming_node: "confirmer".to_string(),
@@ -254,12 +254,12 @@ mod tests {
         };
         assert_eq!(ba.message_type(), "block_announce");
 
-        let qc = ReflectorMessage::QuorumConfirm {
+        let qc = ReflectorMessage::ReplicationConfirm {
             network_id: test_network_id(),
             block_height: 0,
             confirming_node: String::new(),
         };
-        assert_eq!(qc.message_type(), "quorum_confirm");
+        assert_eq!(qc.message_type(), "replication_confirm");
     }
 
     #[test]

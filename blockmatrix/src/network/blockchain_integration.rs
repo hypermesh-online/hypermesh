@@ -11,7 +11,7 @@
 //! - Register matrix positions on blockchain as assets
 //! - Validate position claims using all 4 PoS proofs
 //! - Integrate with TrustChain certificate hierarchy for neighbor trust
-//! - Ensure consensus enforcement before accepting positions
+//! - Ensure Proof of State validation before accepting positions
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -22,9 +22,9 @@ use tracing::{debug, info, warn};
 
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::matrix::coordinate::MatrixCoordinate;
-use trustchain::consensus::validation::{ErrorCode, ProofType, ProofValidation};
-use trustchain::consensus::{
-    ConsensusProof, ConsensusRequirements, SpaceProof, StakeProof, TimeProof, WorkProof,
+use trustchain::proof_of_state::validation::{ErrorCode, ProofType, ProofValidation};
+use trustchain::proof_of_state::{
+    StateProof, StateRequirements, SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 
 /// Matrix position registration on blockchain
@@ -36,8 +36,8 @@ pub struct MatrixPositionRegistration {
     /// Node ID claiming this position
     pub node_id: String,
 
-    /// Consensus proof for this position claim
-    pub consensus_proof: Vec<u8>,
+    /// State proof for this position claim
+    pub state_proof: Vec<u8>,
 
     /// Registration timestamp
     pub timestamp: SystemTime,
@@ -70,8 +70,8 @@ pub struct MatrixPositionValidator {
     /// Registered positions (coordinate -> registration)
     positions: Arc<RwLock<HashMap<MatrixCoordinate, MatrixPositionRegistration>>>,
 
-    /// Consensus requirements for matrix positions
-    requirements: ConsensusRequirements,
+    /// State proof requirements for matrix positions
+    requirements: StateRequirements,
 
     /// Enable verbose logging
     verbose: bool,
@@ -95,7 +95,7 @@ impl MatrixPositionValidator {
         Self {
             blockchain,
             positions: Arc::new(RwLock::new(HashMap::new())),
-            requirements: ConsensusRequirements::localhost_testing(),
+            requirements: StateRequirements::localhost_testing(),
             verbose: true,
         }
     }
@@ -105,7 +105,7 @@ impl MatrixPositionValidator {
         &self,
         coordinate: MatrixCoordinate,
         node_id: String,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<MatrixPositionRegistration> {
         info!(
             "Registering matrix position ({},{},{}) for node {}",
@@ -127,9 +127,9 @@ impl MatrixPositionValidator {
         }
         drop(positions);
 
-        // Validate the consensus proof
+        // Validate the state proof
         let validation_result = self
-            .validate_position_claim(&coordinate, &node_id, &consensus_proof)
+            .validate_position_claim(&coordinate, &node_id, &state_proof)
             .await?;
 
         if !validation_result.is_valid() {
@@ -139,14 +139,14 @@ impl MatrixPositionValidator {
             ));
         }
 
-        // Serialize consensus proof
-        let proof_bytes = consensus_proof.to_bytes()?;
+        // Serialize state proof
+        let proof_bytes = state_proof.to_bytes()?;
 
         // Create registration
         let mut registration = MatrixPositionRegistration {
             coordinate,
             node_id: node_id.clone(),
-            consensus_proof: proof_bytes.clone(),
+            state_proof: proof_bytes.clone(),
             timestamp: SystemTime::now(),
             block_hash: None,
             validation_status: ValidationStatus::Pending,
@@ -161,13 +161,13 @@ impl MatrixPositionValidator {
                 "z": coordinate.z,
             },
             "node_id": node_id,
-            "consensus_proof": hex::encode(&proof_bytes),
+            "state_proof": hex::encode(&proof_bytes),
             "timestamp": registration.timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_secs(),
         });
 
         let block = self
             .blockchain
-            .add_block_with_data(serde_json::to_vec(&registration_data)?)
+            .add_block_with_data(serde_json::to_vec(&registration_data)?, &state_proof)
             .await
             .map_err(|e| anyhow!("Failed to add block: {e}"))?;
 
@@ -191,7 +191,7 @@ impl MatrixPositionValidator {
         &self,
         coordinate: &MatrixCoordinate,
         node_id: &str,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
     ) -> Result<ProofValidation> {
         debug!(
             "Validating position claim for ({},{},{}) by node {}",
@@ -199,13 +199,13 @@ impl MatrixPositionValidator {
         );
 
         // Validate all 4 proofs
-        let mut validation = consensus_proof.verify_all()?;
+        let mut validation = state_proof.verify_all()?;
 
         // Additional matrix-specific validations
 
         // 1. PoSpace (WHERE) - Must have storage at claimed position
         if !self
-            .validate_space_for_position(coordinate, &consensus_proof.space_proof)
+            .validate_space_for_position(coordinate, &state_proof.space_proof)
             .await
         {
             validation.space_valid = false;
@@ -222,7 +222,7 @@ impl MatrixPositionValidator {
 
         // 2. PoStake (WHO) - Must have sufficient stake for position
         if !self
-            .validate_stake_for_position(coordinate, &consensus_proof.stake_proof)
+            .validate_stake_for_position(coordinate, &state_proof.stake_proof)
             .await
         {
             validation.stake_valid = false;
@@ -239,7 +239,7 @@ impl MatrixPositionValidator {
 
         // 3. PoWork (WHAT) - Must prove computational work for position
         if !self
-            .validate_work_for_position(coordinate, &consensus_proof.work_proof)
+            .validate_work_for_position(coordinate, &state_proof.work_proof)
             .await
         {
             validation.work_valid = false;
@@ -256,7 +256,7 @@ impl MatrixPositionValidator {
 
         // 4. PoTime (WHEN) - Must be temporally valid
         if !self
-            .validate_time_for_position(coordinate, &consensus_proof.time_proof)
+            .validate_time_for_position(coordinate, &state_proof.time_proof)
             .await
         {
             validation.time_valid = false;
@@ -272,7 +272,7 @@ impl MatrixPositionValidator {
         }
 
         // Check against requirements
-        let requirements_met = consensus_proof.validate_with_requirements(&self.requirements);
+        let requirements_met = state_proof.validate_with_requirements(&self.requirements);
         if !requirements_met {
             validation.all_valid = false;
             if self.verbose {
@@ -283,20 +283,11 @@ impl MatrixPositionValidator {
             }
         }
 
-        // Recalculate confidence score
-        validation.confidence_score = 0.0;
-        if validation.space_valid {
-            validation.confidence_score += 0.25;
-        }
-        if validation.stake_valid {
-            validation.confidence_score += 0.25;
-        }
-        if validation.work_valid {
-            validation.confidence_score += 0.25;
-        }
-        if validation.time_valid {
-            validation.confidence_score += 0.25;
-        }
+        // Recalculate all_valid (binary: all four must pass)
+        validation.all_valid = validation.space_valid
+            && validation.stake_valid
+            && validation.work_valid
+            && validation.time_valid;
 
         Ok(validation)
     }
@@ -592,13 +583,12 @@ impl MatrixPositionValidator {
 }
 
 /// Production requirements for matrix position claims
-fn production_matrix_requirements() -> ConsensusRequirements {
-    ConsensusRequirements {
+fn production_matrix_requirements() -> StateRequirements {
+    StateRequirements {
         minimum_stake: 10000,
         minimum_storage: 10 * 1024 * 1024 * 1024, // 10GB minimum
         minimum_compute: 1000,
         max_time_offset: Duration::from_secs(60),
-        byzantine_tolerance: 0.33,
     }
 }
 
@@ -615,12 +605,12 @@ mod tests {
         // Create validator
         let validator = MatrixPositionValidator::for_testing(blockchain);
 
-        // Create test consensus proof
-        let consensus_proof = ConsensusProof::new_for_testing();
+        // Create test state proof
+        let state_proof = StateProof::new_for_testing();
 
         // Register position
         let registration = validator
-            .register_position(coordinate, "test_node_001".to_string(), consensus_proof)
+            .register_position(coordinate, "test_node_001".to_string(), state_proof)
             .await;
 
         assert!(registration.is_ok());
@@ -637,14 +627,14 @@ mod tests {
         let validator = MatrixPositionValidator::for_testing(blockchain);
 
         // Register first claim
-        let proof1 = ConsensusProof::new_for_testing();
+        let proof1 = StateProof::new_for_testing();
         let result1 = validator
             .register_position(coordinate, "node_001".to_string(), proof1)
             .await;
         assert!(result1.is_ok());
 
         // Try to register same position
-        let proof2 = ConsensusProof::new_for_testing();
+        let proof2 = StateProof::new_for_testing();
         let result2 = validator
             .register_position(coordinate, "node_002".to_string(), proof2)
             .await;
@@ -667,7 +657,7 @@ mod tests {
         ];
 
         for (i, neighbor) in neighbors.iter().enumerate() {
-            let proof = ConsensusProof::new_for_testing();
+            let proof = StateProof::new_for_testing();
             let _ = validator
                 .register_position(*neighbor, format!("neighbor_{i}"), proof)
                 .await;

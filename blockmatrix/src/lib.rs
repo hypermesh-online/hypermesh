@@ -11,7 +11,7 @@
 //! - AssetRegistration blockchain registration system
 //! - AssetAdapter pattern for specialized handling
 //! - Privacy-aware allocation types
-//! - Consensus proof validation (PoSpace + PoStake + PoWork + PoTime)
+//! - State proof validation (PoSpace + PoStake + PoWork + PoTime)
 
 // Allow unsafe code for necessary system calls (mmap/munmap in NAT system)
 // Individual modules use #![deny(unsafe_code)] where appropriate
@@ -142,14 +142,14 @@ impl Default for ServiceMeshConfig {
 }
 
 // Core modules - Phase 2: Asset System Enabled
-/// API module with STOQ consensus server
+/// API module with STOQ state proof server
 pub mod api;
 
 // Real asset module from the codebase
 pub mod assets;
 
-// Consensus module (re-exports from TrustChain)
-pub mod consensus;
+// Proof of State module (bilateral binary authentication, re-exports from TrustChain)
+pub mod proof_of_state;
 
 // Matrix Coordinate System - Phase 1: Block-MATRIX Foundation
 /// Revolutionary matrix-based topology system for distributed computing
@@ -225,7 +225,7 @@ pub mod transfer;
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,
-    AssetStatus, AssetType, ConsensusProof, ConsensusRequirements, PrivacyMode,
+    AssetStatus, AssetType, StateProof, StateRequirements, PrivacyMode,
 };
 
 pub use assets::adapters::{
@@ -273,7 +273,7 @@ pub mod cli;
 pub mod catalog;
 pub mod container;
 pub mod transport;
-// consensus module already imported above
+// proof_of_state module already imported above
 pub mod extensions;
 pub mod orchestration;
 pub mod platform;
@@ -323,7 +323,7 @@ pub mod test_utils;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof_of_state_integration::{
+    use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use std::time::Duration;
@@ -383,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_proof_creation() {
+    fn test_state_proof_creation() {
         // Test Proof of State Four-Proof System integration
         let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
 
@@ -404,12 +404,12 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
-        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+        let state_proof = StateProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         // Basic validation should pass
-        assert!(consensus_proof.validate());
+        assert!(state_proof.validate());
 
-        println!("✅ Consensus proof creation successful");
+        println!("✅ State proof creation successful");
     }
 
     #[tokio::test]

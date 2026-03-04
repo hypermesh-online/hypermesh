@@ -18,7 +18,7 @@ Include the following in your report:
 The following components are in scope for security reports:
 
 - **TrustChain**: FALCON-1024 certificate authority, certificate issuance and revocation
-- **BlockMatrix**: Kyber-1024 asset encryption, consensus validation, asset pipeline
+- **BlockMatrix**: Kyber-1024 asset encryption, state proof validation, asset pipeline
 - **STOQ**: Transport security, PoS token validation, connection authentication
 - **hypermesh-ebpf**: XDP packet processing, AF_XDP zero-copy I/O, policy enforcement
 - **Caesar**: EVP conservation invariant, settlement logic, gold-gram integrity

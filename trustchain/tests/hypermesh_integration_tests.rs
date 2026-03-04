@@ -5,7 +5,7 @@
 //! TrustChain ↔ HyperMesh Integration Tests
 //!
 //! End-to-end integration tests verifying TrustChain can successfully issue
-//! certificates via HyperMesh consensus validation over STOQ protocol.
+//! certificates via HyperMesh Proof of State validation over STOQ protocol.
 
 use std::net::Ipv6Addr;
 use std::sync::Arc;
@@ -16,12 +16,12 @@ use tracing::{debug, info, warn};
 
 // TrustChain imports
 use trustchain::ca::{CAConfig, CertificateRequest, CertificateStatus, TrustChainCA};
-use trustchain::consensus::{
+use trustchain::proof_of_state::{
     hypermesh_client::{
-        ConsensusValidationStatus, FourProofSet, HyperMeshClientConfig, HyperMeshConsensusClient,
+        StateProofValidationStatus, FourProofSet, HyperMeshClientConfig, HyperMeshStateProofClient,
         SpaceProofData, StakeProofData, TimeProofData, WorkProofData,
     },
-    ConsensusProof, ConsensusRequirements,
+    StateProof, StateRequirements,
 };
 
 // STOQ imports
@@ -42,7 +42,7 @@ fn init_test_tracing() {
         .try_init();
 }
 
-/// Create test HyperMesh consensus server
+/// Create test HyperMesh Proof of State server
 async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
@@ -71,7 +71,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     struct MockMetrics {
         validation_time_us: u64,
         validator_nodes: u32,
-        confidence_level: f64,
+        all_proofs_valid: bool,
         network_load: f32,
     }
 
@@ -99,7 +99,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
 
     #[derive(Serialize)]
     struct MockPerfStats {
-        consensus_latency_ms: u64,
+        state_proof_latency_ms: u64,
         throughput_ops_per_sec: f64,
         network_overhead_bytes: u64,
     }
@@ -121,7 +121,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
                 metrics: MockMetrics {
                     validation_time_us: 5000,
                     validator_nodes: 1,
-                    confidence_level: 1.0,
+                    all_proofs_valid: true,
                     network_load: 0.1,
                 },
                 details: MockDetails {
@@ -137,7 +137,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
                         recovery_action_taken: None,
                     },
                     performance_stats: MockPerfStats {
-                        consensus_latency_ms: 5,
+                        state_proof_latency_ms: 5,
                         throughput_ops_per_sec: 100.0,
                         network_overhead_bytes: 1024,
                     },
@@ -157,7 +157,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
         }
 
         fn path(&self) -> &str {
-            "consensus/validate_certificate"
+            "state_proof/validate_certificate"
         }
     }
 
@@ -180,7 +180,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
                 metrics: MockMetrics {
                     validation_time_us: 8000,
                     validator_nodes: 1,
-                    confidence_level: 1.0,
+                    all_proofs_valid: true,
                     network_load: 0.15,
                 },
                 details: MockDetails {
@@ -196,7 +196,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
                         recovery_action_taken: None,
                     },
                     performance_stats: MockPerfStats {
-                        consensus_latency_ms: 8,
+                        state_proof_latency_ms: 8,
                         throughput_ops_per_sec: 100.0,
                         network_overhead_bytes: 2048,
                     },
@@ -216,7 +216,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
         }
 
         fn path(&self) -> &str {
-            "consensus/validate_proofs"
+            "state_proof/validate_proofs"
         }
     }
 
@@ -235,7 +235,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
 
             let health = Health {
                 status: "healthy".to_string(),
-                service: "hypermesh-consensus-test".to_string(),
+                service: "hypermesh-state-proof-test".to_string(),
                 version: "0.1.0-test".to_string(),
             };
 
@@ -252,7 +252,7 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
         }
 
         fn path(&self) -> &str {
-            "consensus/health"
+            "state_proof/health"
         }
     }
 
@@ -283,17 +283,17 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     // Give server time to bind
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    info!("Test HyperMesh consensus server started on port {}", port);
+    info!("Test HyperMesh Proof of State server started on port {}", port);
     Ok(server)
 }
 
 /// Test 1: Certificate Validation via HyperMesh
 #[tokio::test]
-async fn test_certificate_issuance_with_consensus() -> Result<()> {
+async fn test_certificate_issuance_with_state_proof() -> Result<()> {
     init_test_tracing();
-    info!("=== Test: Certificate Issuance with HyperMesh Consensus ===");
+    info!("=== Test: Certificate Issuance with HyperMesh State Proof ===");
 
-    // Start HyperMesh consensus server
+    // Start HyperMesh Proof of State server
     let port = 19292; // Test port
     let _server = start_test_hypermesh_server(port).await?;
 
@@ -305,7 +305,7 @@ async fn test_certificate_issuance_with_consensus() -> Result<()> {
         enable_caching: false,
         cache_ttl: Duration::from_secs(60),
     };
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     // Create certificate request
     let cert_request = CertificateRequest {
@@ -313,22 +313,22 @@ async fn test_certificate_issuance_with_consensus() -> Result<()> {
         san_entries: vec!["test.hypermesh.online".to_string()],
         node_id: "test_node_001".to_string(),
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,
     };
 
     // Validate via HyperMesh
-    let consensus_requirements = ConsensusRequirements::localhost_testing();
+    let state_requirements = StateRequirements::localhost_testing();
 
     let result = hypermesh_client
-        .validate_certificate_request(&cert_request, &consensus_requirements)
+        .validate_certificate_request(&cert_request, &state_requirements)
         .await?;
 
     // Verify result
     info!("Validation result: {:?}", result.result);
-    assert!(matches!(result.result, ConsensusValidationStatus::Valid));
+    assert!(matches!(result.result, StateProofValidationStatus::Valid));
     assert_eq!(result.validator_id, "test-validator-1");
     assert!(result.metrics.validation_time_us > 0);
     assert!(result.details.proof_results.space_proof_valid);
@@ -350,7 +350,7 @@ async fn test_four_proof_validation() -> Result<()> {
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     // Create valid four-proof set
     let proof_set = FourProofSet {
@@ -389,7 +389,7 @@ async fn test_four_proof_validation() -> Result<()> {
         .await?;
 
     // Verify all four proofs validated
-    assert!(matches!(result.result, ConsensusValidationStatus::Valid));
+    assert!(matches!(result.result, StateProofValidationStatus::Valid));
     assert!(result.details.proof_results.space_proof_valid);
     assert!(result.details.proof_results.stake_proof_valid);
     assert!(result.details.proof_results.work_proof_valid);
@@ -412,7 +412,7 @@ async fn test_invalid_proof_rejection() -> Result<()> {
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     // Create invalid proof set (missing required fields)
     let proof_set = FourProofSet {
@@ -463,7 +463,7 @@ async fn test_byzantine_node_detection() -> Result<()> {
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     // Create request with Byzantine node ID
     let proof_set = FourProofSet {
@@ -516,24 +516,24 @@ async fn test_timeout_handling() -> Result<()> {
         cache_ttl: Duration::from_secs(60),
     };
 
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     let cert_request = CertificateRequest {
         common_name: "timeout-test.hypermesh.online".to_string(),
         san_entries: vec!["timeout-test.hypermesh.online".to_string()],
         node_id: "test_node_timeout".to_string(),
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,
     };
 
-    let consensus_requirements = ConsensusRequirements::localhost_testing();
+    let state_requirements = StateRequirements::localhost_testing();
 
     // This should timeout since no server is running
     let result = hypermesh_client
-        .validate_certificate_request(&cert_request, &consensus_requirements)
+        .validate_certificate_request(&cert_request, &state_requirements)
         .await;
 
     // Expect error due to timeout
@@ -554,7 +554,7 @@ async fn test_concurrent_validations() -> Result<()> {
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();
-    let hypermesh_client = Arc::new(HyperMeshConsensusClient::new(client_config).await?);
+    let hypermesh_client = Arc::new(HyperMeshStateProofClient::new(client_config).await?);
 
     // Submit 10 concurrent certificate requests
     let mut handles = vec![];
@@ -567,16 +567,16 @@ async fn test_concurrent_validations() -> Result<()> {
                 san_entries: vec![format!("concurrent-{}.hypermesh.online", i)],
                 node_id: format!("test_node_{i:03}"),
                 ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-                consensus_proof: ConsensusProof::new_for_testing(),
+                state_proof: StateProof::new_for_testing(),
                 timestamp: SystemTime::now(),
                 identity_scope: None,
                 subject_type: None,
             };
 
-            let consensus_requirements = ConsensusRequirements::localhost_testing();
+            let state_requirements = StateRequirements::localhost_testing();
 
             client
-                .validate_certificate_request(&cert_request, &consensus_requirements)
+                .validate_certificate_request(&cert_request, &state_requirements)
                 .await
         });
         handles.push(handle);
@@ -592,7 +592,7 @@ async fn test_concurrent_validations() -> Result<()> {
             Ok(Ok(validation_result)) => {
                 assert!(matches!(
                     validation_result.result,
-                    ConsensusValidationStatus::Valid
+                    StateProofValidationStatus::Valid
                 ));
                 success_count += 1;
             }
@@ -632,12 +632,12 @@ async fn test_health_check() -> Result<()> {
 
     // Call health endpoint
     let health: serde_json::Value = stoq_client
-        .call("hypermesh", "consensus/health", &())
+        .call("hypermesh", "state_proof/health", &())
         .await?;
 
     // Verify health response
     assert_eq!(health["status"], "healthy");
-    assert_eq!(health["service"], "hypermesh-consensus-test");
+    assert_eq!(health["service"], "hypermesh-state-proof-test");
     info!("Health check response: {:?}", health);
 
     info!("✅ Health check succeeded");
@@ -659,25 +659,25 @@ async fn test_retry_logic() -> Result<()> {
         cache_ttl: Duration::from_secs(60),
     };
 
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     let cert_request = CertificateRequest {
         common_name: "retry-test.hypermesh.online".to_string(),
         san_entries: vec!["retry-test.hypermesh.online".to_string()],
         node_id: "test_node_retry".to_string(),
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,
     };
 
-    let consensus_requirements = ConsensusRequirements::localhost_testing();
+    let state_requirements = StateRequirements::localhost_testing();
 
     // This should retry 3 times before failing (no server running)
     let start = std::time::Instant::now();
     let result = hypermesh_client
-        .validate_certificate_request(&cert_request, &consensus_requirements)
+        .validate_certificate_request(&cert_request, &state_requirements)
         .await;
 
     let elapsed = start.elapsed();
@@ -707,7 +707,7 @@ async fn test_metrics_tracking() -> Result<()> {
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();
-    let hypermesh_client = HyperMeshConsensusClient::new(client_config).await?;
+    let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
     // Check initial metrics
     let initial_metrics = hypermesh_client.get_metrics().await;
@@ -720,16 +720,16 @@ async fn test_metrics_tracking() -> Result<()> {
         san_entries: vec!["metrics-test.hypermesh.online".to_string()],
         node_id: "test_node_metrics".to_string(),
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,
     };
 
-    let consensus_requirements = ConsensusRequirements::localhost_testing();
+    let state_requirements = StateRequirements::localhost_testing();
 
     hypermesh_client
-        .validate_certificate_request(&cert_request, &consensus_requirements)
+        .validate_certificate_request(&cert_request, &state_requirements)
         .await?;
 
     // Check updated metrics
@@ -763,7 +763,7 @@ async fn test_end_to_end_certificate_flow() -> Result<()> {
         cert_validity_days: 365,
         rotation_interval: Duration::from_secs(86400 * 30), // 30 days
         mode: trustchain::ca::CAMode::LocalhostTesting,
-        consensus_requirements: ConsensusRequirements::localhost_testing(),
+        state_requirements: StateRequirements::localhost_testing(),
         hypermesh_client_config: HyperMeshClientConfig::default(),
     };
 
@@ -778,7 +778,7 @@ async fn test_end_to_end_certificate_flow() -> Result<()> {
         ],
         node_id: "test_node_e2e".to_string(),
         ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,

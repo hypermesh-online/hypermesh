@@ -22,7 +22,7 @@ export function CatalogSearchHeader({ selectedPrivacyLevel, onPrivacyLevelChange
           HyperMesh Asset Catalog
         </h1>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Browse, install, and execute applications through HyperMesh asset management with consensus validation and NAT-like proxy addressing.
+          Browse, install, and execute applications through HyperMesh asset management with Proof of State verification and NAT-like proxy addressing.
         </p>
       </div>
 
@@ -49,7 +49,7 @@ export function CatalogSearchHeader({ selectedPrivacyLevel, onPrivacyLevelChange
                 <option value="federated">Federated (Trusted networks)</option>
                 <option value="public">Public (Cross-network)</option>
                 <option value="anonymous">Anonymous (Privacy-first)</option>
-                <option value="verified">Verified (Full consensus)</option>
+                <option value="verified">Verified (Full state proof)</option>
               </select>
             </div>
             <Button 

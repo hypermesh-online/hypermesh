@@ -142,14 +142,12 @@ pub struct CoordinatorConfig {
     pub heartbeat_interval: Duration,
     /// Node failure timeout
     pub failure_timeout: Duration,
-    /// Consensus timeout
-    pub consensus_timeout: Duration,
+    /// Verification timeout
+    pub verification_timeout: Duration,
     /// Maximum retry attempts
     pub max_retries: u32,
-    /// Minimum nodes for consensus
-    pub min_consensus_nodes: u32,
-    /// Byzantine fault tolerance threshold
-    pub byzantine_threshold: f32,
+    /// Suspicion threshold for inauthentic state detection
+    pub suspicion_threshold: f32,
     /// Enable automatic migration
     pub auto_migration: bool,
     /// Enable load balancing
@@ -163,10 +161,9 @@ impl Default for CoordinatorConfig {
         Self {
             heartbeat_interval: Duration::from_secs(10),
             failure_timeout: Duration::from_secs(30),
-            consensus_timeout: Duration::from_secs(5),
+            verification_timeout: Duration::from_secs(5),
             max_retries: 3,
-            min_consensus_nodes: 3,
-            byzantine_threshold: 0.33,
+            suspicion_threshold: 0.33,
             auto_migration: true,
             load_balancing: true,
             pricing_enabled: false,

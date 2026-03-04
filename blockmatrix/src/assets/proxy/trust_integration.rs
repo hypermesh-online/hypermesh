@@ -61,8 +61,8 @@ pub struct TrustChain {
     /// Chain validation status
     pub validation_status: ChainValidationStatus,
 
-    /// Trust level (0.0 - 1.0)
-    pub trust_level: f32,
+    /// Whether the trust chain is valid (binary: valid or invalid)
+    pub valid: bool,
 
     /// Chain creation timestamp
     pub created_at: SystemTime,
@@ -108,9 +108,6 @@ struct RootCA {
     /// Public key fingerprint
     public_key_fingerprint: String,
 
-    /// CA trust level
-    trust_level: f32,
-
     /// CA status
     status: CAStatus,
 
@@ -133,9 +130,6 @@ struct IntermediateCA {
 
     /// Public key fingerprint
     public_key_fingerprint: String,
-
-    /// CA trust level
-    trust_level: f32,
 
     /// CA status
     status: CAStatus,
@@ -160,14 +154,8 @@ pub struct ValidationResult {
     /// Certificate fingerprint
     pub certificate_fingerprint: String,
 
-    /// Validation status
-    pub is_valid: bool,
-
-    /// Trust level determined (0.0 - 1.0)
-    pub trust_level: f32,
-
-    /// Chain validation depth (alias for trust_level)
-    pub chain_depth: f32,
+    /// Whether the certificate chain is valid (binary)
+    pub valid: bool,
 
     /// Validation reason/message
     pub validation_message: String,
@@ -224,9 +212,6 @@ struct TrustChainConfig {
     /// Maximum trust chain length
     max_chain_length: u8,
 
-    /// Minimum trust level required
-    min_trust_level: f32,
-
     /// Enable online revocation checking
     enable_online_revocation_check: bool,
 
@@ -240,7 +225,6 @@ impl Default for TrustChainConfig {
             enable_validation_caching: true,
             validation_cache_timeout: Duration::from_secs(3600), // 1 hour
             max_chain_length: 5,
-            min_trust_level: 0.5,
             enable_online_revocation_check: true,
             _revocation_check_timeout: Duration::from_secs(30),
         }
@@ -312,7 +296,7 @@ impl TrustChainIntegration {
                 .await?
             {
                 if cached_result.expires_at > SystemTime::now() {
-                    return Ok(cached_result.is_valid);
+                    return Ok(cached_result.valid);
                 }
             }
         }
@@ -344,14 +328,12 @@ impl TrustChainIntegration {
         }
 
         tracing::info!(
-            "Node certificate validation for {:?}: {} (trust level: {})",
+            "Node certificate validation for {:?}: {}",
             node_info.node_id,
-            validation_result.is_valid,
-            validation_result.trust_level
+            validation_result.valid,
         );
 
-        Ok(validation_result.is_valid
-            && validation_result.trust_level >= self.config.min_trust_level)
+        Ok(validation_result.valid)
     }
 
     /// Build trust chain for certificate
@@ -371,7 +353,7 @@ impl TrustChainIntegration {
             intermediate_certificates: vec!["hypermesh-intermediate-ca".to_string()],
             end_entity_fingerprint: certificate_fingerprint.to_string(),
             validation_status: ChainValidationStatus::Pending,
-            trust_level: 0.0, // Will be calculated during validation
+            valid: false, // Will be determined during validation
             created_at: SystemTime::now(),
             last_validated: SystemTime::UNIX_EPOCH,
             expires_at: SystemTime::now() + Duration::from_secs(86400), // 24 hours
@@ -384,13 +366,12 @@ impl TrustChainIntegration {
         Ok(chain)
     }
 
-    /// Validate trust chain
+    /// Validate trust chain (binary: valid or invalid)
     async fn validate_trust_chain(
         &self,
         trust_chain: &TrustChain,
     ) -> AssetResult<ValidationResult> {
         let mut is_valid = true;
-        let mut trust_level = 1.0_f32;
         let mut validation_message = "Trust chain validation successful".to_string();
 
         // Validate root CA
@@ -405,8 +386,6 @@ impl TrustChainIntegration {
             } else if root_ca.valid_until < SystemTime::now() {
                 is_valid = false;
                 validation_message = "Root CA certificate has expired".to_string();
-            } else {
-                trust_level = trust_level.min(root_ca.trust_level);
             }
         } else {
             is_valid = false;
@@ -430,8 +409,6 @@ impl TrustChainIntegration {
                     validation_message =
                         format!("Intermediate CA {intermediate_fingerprint} has expired");
                     break;
-                } else {
-                    trust_level = trust_level.min(intermediate_ca.trust_level);
                 }
             } else {
                 is_valid = false;
@@ -451,21 +428,10 @@ impl TrustChainIntegration {
             );
         }
 
-        // Apply minimum trust level requirement
-        if is_valid && trust_level < self.config.min_trust_level {
-            is_valid = false;
-            validation_message = format!(
-                "Trust level too low: {} < {}",
-                trust_level, self.config.min_trust_level
-            );
-        }
-
         let validation_message_clone = validation_message.clone();
         let result = ValidationResult {
             certificate_fingerprint: trust_chain.end_entity_fingerprint.clone(),
-            is_valid,
-            trust_level,
-            chain_depth: trust_level, // Same value as trust_level
+            valid: is_valid,
             validation_message,
             errors: if is_valid {
                 Vec::new()
@@ -477,9 +443,8 @@ impl TrustChainIntegration {
         };
 
         tracing::debug!(
-            "Trust chain validation result: {} (trust level: {})",
-            result.is_valid,
-            result.trust_level
+            "Trust chain validation result: {}",
+            result.valid,
         );
 
         Ok(result)
@@ -561,39 +526,30 @@ impl TrustChainIntegration {
         Ok(())
     }
 
-    /// Get trust level for certificate
-    pub async fn get_certificate_trust_level(
+    /// Check if certificate is valid (binary: valid or invalid)
+    pub async fn is_certificate_valid(
         &self,
         certificate_fingerprint: &str,
-    ) -> AssetResult<f32> {
+    ) -> AssetResult<bool> {
         if let Some(cached_result) = self.get_cached_validation(certificate_fingerprint).await? {
             if cached_result.expires_at > SystemTime::now() {
-                return Ok(cached_result.trust_level);
+                return Ok(cached_result.valid);
             }
         }
-
-        // If not cached, perform validation to get trust level
-        let _mock_node_info = ProxyNodeInfo {
-            node_id: [0u8; 8], // Unknown node ID
-            network_address: "unknown".to_string(),
-            capabilities: ProxyCapabilities {
-                http_proxy: false,
-                socks5_proxy: false,
-                tcp_forwarding: false,
-                vpn_tunnel: false,
-                max_connections: 0,
-                bandwidth_mbps: 0,
-                protocols: vec![],
-            },
-            is_authenticated: false,
-            last_heartbeat: SystemTime::now(),
-            certificate_fingerprint: certificate_fingerprint.to_string(),
-        };
 
         let trust_chain = self.build_trust_chain(certificate_fingerprint).await?;
         let validation_result = self.validate_trust_chain(&trust_chain).await?;
 
-        Ok(validation_result.trust_level)
+        Ok(validation_result.valid)
+    }
+
+    /// Backward-compat alias: returns 1.0 for valid, 0.0 for invalid
+    pub async fn get_certificate_trust_level(
+        &self,
+        certificate_fingerprint: &str,
+    ) -> AssetResult<f32> {
+        let valid = self.is_certificate_valid(certificate_fingerprint).await?;
+        Ok(if valid { 1.0 } else { 0.0 })
     }
 
     /// Cleanup expired cache entries
@@ -617,7 +573,6 @@ impl CertificateValidator {
                 ca_id: "hypermesh-root-ca".to_string(),
                 ca_name: "HyperMesh Root CA".to_string(),
                 public_key_fingerprint: "hypermesh-root-ca-key".to_string(),
-                trust_level: 1.0,
                 status: CAStatus::Active,
                 valid_from: SystemTime::now() - Duration::from_secs(86400 * 365), // 1 year ago
                 valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 10), // 10 years
@@ -632,7 +587,6 @@ impl CertificateValidator {
                 ca_name: "HyperMesh Intermediate CA".to_string(),
                 parent_ca_id: "hypermesh-root-ca".to_string(),
                 public_key_fingerprint: "hypermesh-intermediate-ca-key".to_string(),
-                trust_level: 0.9,
                 status: CAStatus::Active,
                 valid_from: SystemTime::now() - Duration::from_secs(86400 * 30), // 30 days ago
                 valid_until: SystemTime::now() + Duration::from_secs(86400 * 365 * 2), // 2 years
@@ -659,12 +613,10 @@ impl CertificateValidator {
             }
         }
 
-        // Perform validation
+        // Perform validation (binary: valid or invalid)
         let mut result = ValidationResult {
             certificate_fingerprint: certificate_fingerprint.to_string(),
-            is_valid: true,
-            trust_level: 0.0,
-            chain_depth: 0.0,
+            valid: true,
             validation_message: String::new(),
             errors: Vec::new(),
             validated_at: SystemTime::now(),
@@ -673,8 +625,6 @@ impl CertificateValidator {
 
         // Check if it's a known root CA
         if self.root_cas.contains_key(certificate_fingerprint) {
-            result.trust_level = 1.0;
-            result.chain_depth = 1.0;
             result.validation_message = "Root CA certificate".to_string();
             return Ok(result);
         }
@@ -683,27 +633,23 @@ impl CertificateValidator {
         if let Some(intermediate) = self.intermediate_cas.get(certificate_fingerprint) {
             // Validate chain to root
             if self.root_cas.contains_key(&intermediate.parent_ca_id) {
-                result.trust_level = 0.9;
-                result.chain_depth = 0.9;
                 result.validation_message = "Valid intermediate CA with trusted root".to_string();
             } else {
-                result.trust_level = 0.7;
-                result.chain_depth = 0.7;
+                result.valid = false;
                 result.validation_message = "Intermediate CA with unverified root".to_string();
+                result
+                    .errors
+                    .push("Root CA not verified".to_string());
             }
             return Ok(result);
         }
 
-        // For unknown certificates in non-strict mode, assign basic trust
+        // For unknown certificates in non-strict mode, accept
         if !self.validation_config.strict_mode || self.validation_config.allow_self_signed {
-            result.trust_level = 0.5;
-            result.chain_depth = 0.5;
             result.validation_message =
                 "Self-signed or unknown certificate accepted in non-strict mode".to_string();
         } else {
-            result.is_valid = false;
-            result.trust_level = 0.0;
-            result.chain_depth = 0.0;
+            result.valid = false;
             result.validation_message = "Certificate validation failed".to_string();
             result
                 .errors

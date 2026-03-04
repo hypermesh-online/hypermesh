@@ -5,7 +5,7 @@
 //! Catalog-HyperMesh Integration Bridge
 //!
 //! This module bridges the Catalog system with HyperMesh's container runtime,
-//! enabling Catalog assets to be deployed as containers with full consensus
+//! enabling Catalog assets to be deployed as containers with full Proof of State
 //! validation and resource management. Code execution is delegated to remote
 //! HyperMesh nodes via STOQ protocol.
 

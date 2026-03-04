@@ -5,7 +5,7 @@
 //! Storage Asset Adapter trait implementation
 //!
 //! Implements AssetAdapter for storage resource management with:
-//! - Consensus proof validation (PoSpace critical)
+//! - State proof validation (PoSpace critical)
 //! - Asset allocation/deallocation
 //! - Privacy configuration
 //! - Proxy address management
@@ -21,7 +21,7 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, ConsensusProof, NetworkScope, PrivacyMode, ProxyAddress,
+    AssetType, BaseSystemType, StateProof, NetworkScope, PrivacyMode, ProxyAddress,
     ResourceLimits, ResourceUsage, StorageUsage,
 };
 
@@ -83,13 +83,13 @@ impl AssetAdapter for StorageAssetAdapter {
         AssetType::Storage
     }
 
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
         // Validate all four proofs with CRITICAL PoSpace validation for storage
         let valid = proof.validate();
 
         if !valid {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "Storage consensus proof validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "Storage state proof validation failed".to_string(),
             });
         }
 
@@ -131,13 +131,13 @@ impl AssetAdapter for StorageAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        // Validate consensus proof first
+        // Validate state proof first
         if !self
-            .validate_consensus_proof(&request.consensus_proof)
+            .validate_state_proof(&request.state_proof)
             .await?
         {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "Storage allocation consensus validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "Storage allocation state proof validation failed".to_string(),
             });
         }
 
@@ -258,7 +258,7 @@ impl AssetAdapter for StorageAssetAdapter {
                 },
                 privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
@@ -271,8 +271,8 @@ impl AssetAdapter for StorageAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements:
-                    crate::assets::core::privacy::ConsensusRequirements::default(),
+                state_requirements:
+                    crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -350,7 +350,7 @@ impl AssetAdapter for StorageAssetAdapter {
             privacy_level: allocation.privacy_level,
             proxy_address: None, // Will be filled by proxy resolver
             resource_usage: self.get_resource_usage(asset_id).await?,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint: "storage-adapter".to_string(),
             health_status: crate::assets::core::status::AssetHealthStatus::default(),
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),

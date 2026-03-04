@@ -12,7 +12,7 @@ keywords = ["assets", "hypermesh", "package-manager", "trustchain", "distributed
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
-# HyperMesh integration for consensus and asset management
+# HyperMesh integration for state proof validation and asset management
 blockmatrix = { path = "../blockmatrix" }
 
 # STOQ transport layer for P2P communication

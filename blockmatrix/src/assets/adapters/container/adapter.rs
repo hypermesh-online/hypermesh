@@ -14,7 +14,7 @@ use super::types::*;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, ConsensusProof, ContainerRequirements, NetworkScope, PortMapping,
+    AssetType, BaseSystemType, StateProof, ContainerRequirements, NetworkScope, PortMapping,
     PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage, VolumeMount,
 };
 
@@ -181,7 +181,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         AssetType::Container
     }
 
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
         if proof.space_proof.total_size == 0 {
             return Ok(false);
         }
@@ -202,11 +202,11 @@ impl AssetAdapter for ContainerAssetAdapter {
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         if !self
-            .validate_consensus_proof(&request.consensus_proof)
+            .validate_state_proof(&request.state_proof)
             .await?
         {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "Container allocation consensus validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "Container allocation state proof validation failed".to_string(),
             });
         }
 
@@ -340,7 +340,7 @@ impl AssetAdapter for ContainerAssetAdapter {
                 },
                 privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
@@ -353,8 +353,8 @@ impl AssetAdapter for ContainerAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements:
-                    crate::assets::core::privacy::ConsensusRequirements::default(),
+                state_requirements:
+                    crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -426,7 +426,7 @@ impl AssetAdapter for ContainerAssetAdapter {
             privacy_level: allocation.privacy_level,
             proxy_address: None,
             resource_usage: self.get_resource_usage(asset_id).await?,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint: "container-adapter".to_string(),
             health_status: crate::assets::core::status::AssetHealthStatus::default(),
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),

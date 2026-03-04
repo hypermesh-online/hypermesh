@@ -20,7 +20,8 @@ use crate::assets::core::asset_id::{
     AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
 };
 use crate::blockchain::node_chain::NodeBlockchain;
-use crate::consensus::validation::StateAuthenticator;
+use crate::proof_of_state::validation::StateAuthenticator;
+use crate::proof_of_state::StateProof;
 use crate::matrix::coordinate::MatrixCoordinate;
 use hypermesh_lib::{AddressError, AssetAddress, ContentHash};
 
@@ -213,6 +214,8 @@ impl TransferEngine {
         let new_address = self.readdress_asset(&old_address, &intent.target_coord)?;
 
         // 5. Record "transfer-out" block on source chain
+        let source_proof = StateProof::from_bytes(intent.source_proof.as_bytes())
+            .map_err(|e| TransferError::AuthenticationFailed(format!("source proof decode: {e}")))?;
         let transfer_out_asset = build_transfer_record(
             "transfer-out",
             &old_address,
@@ -220,11 +223,13 @@ impl TransferEngine {
             &intent.target_coord,
         );
         let source_block = source_chain
-            .add_block(vec![transfer_out_asset])
+            .add_block(vec![transfer_out_asset], &source_proof)
             .await
             .map_err(|e| TransferError::Blockchain(format!("source chain: {e}")))?;
 
         // 6. Record "transfer-in" block on target chain
+        let target_proof_typed = StateProof::from_bytes(target_proof.as_bytes())
+            .map_err(|e| TransferError::AuthenticationFailed(format!("target proof decode: {e}")))?;
         let transfer_in_asset = build_transfer_record(
             "transfer-in",
             &new_address,
@@ -232,7 +237,7 @@ impl TransferEngine {
             &intent.source_coord,
         );
         let target_block = target_chain
-            .add_block(vec![transfer_in_asset])
+            .add_block(vec![transfer_in_asset], &target_proof_typed)
             .await
             .map_err(|e| TransferError::Blockchain(format!("target chain: {e}")))?;
 
@@ -418,7 +423,7 @@ pub fn create_transfer_intent(
 /// Helper: serialize a trustchain proof into opaque StateProofBytes.
 /// This is the ONLY place that touches trustchain's proof type.
 pub fn proof_to_bytes(
-    proof: &trustchain::consensus::ConsensusProof,
+    proof: &trustchain::proof_of_state::StateProof,
 ) -> Result<StateProofBytes, String> {
     let bytes = proof.to_bytes().map_err(|e| e.to_string())?;
     Ok(StateProofBytes::new(bytes))
@@ -427,12 +432,12 @@ pub fn proof_to_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::validation::DefaultStateAuthenticator;
-    use trustchain::consensus::ConsensusProof;
+    use crate::proof_of_state::validation::DefaultStateAuthenticator;
+    use trustchain::proof_of_state::StateProof;
 
     /// Helper to get valid test proof bytes
     fn test_proof_bytes() -> StateProofBytes {
-        let proof = ConsensusProof::new_for_testing();
+        let proof = StateProof::new_for_testing();
         proof_to_bytes(&proof).expect("test: serialization")
     }
 

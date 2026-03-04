@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Byzantine Fault Detection with Consensus Integration
+//! Byzantine Fault Detection with State Proof Integration
 //!
-//! Detects Byzantine behavior in consensus proofs and certificate operations
+//! Detects Byzantine behavior in state proofs and certificate operations
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,10 +13,10 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use crate::consensus::{ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof};
+use crate::proof_of_state::{StateProof, SpaceProof, StakeProof, TimeProof, WorkProof};
 use crate::errors::Result as TrustChainResult;
 
-/// Byzantine fault detector with consensus integration
+/// Byzantine fault detector with state proof integration
 pub struct ByzantineDetector {
     /// Detection threshold (0.0 - 1.0)
     threshold: f64,
@@ -33,7 +33,7 @@ pub struct ByzantineDetector {
 pub struct NodeBehaviorHistory {
     /// Node ID
     pub node_id: String,
-    /// Total consensus proofs submitted
+    /// Total state proofs submitted
     pub proofs_submitted: u64,
     /// Invalid proofs detected
     pub invalid_proofs: u64,
@@ -81,7 +81,7 @@ pub struct DetectionPatterns {
     pub storage_falsification: HashMap<String, u64>,
     /// Work proof cheating
     pub work_cheating: HashMap<String, u64>,
-    /// Consensus proof replay attacks
+    /// State proof replay attacks
     pub replay_attacks: HashMap<String, u64>,
 }
 
@@ -136,7 +136,7 @@ pub enum ByzantineViolation {
         claimed_power: u64,
         actual_power: u64,
     },
-    /// Consensus proof replay attack
+    /// State proof replay attack
     ReplayAttack { original_timestamp: SystemTime },
     /// Inconsistent proof data
     InconsistentProofData { proof_type: String, details: String },
@@ -162,8 +162,8 @@ pub struct ByzantineDetectionSummary {
 pub struct SuspiciousNode {
     /// Node ID
     pub node_id: String,
-    /// Byzantine confidence score
-    pub confidence_score: f64,
+    /// Number of failed verifications
+    pub failed_verifications: u32,
     /// Recent violations
     pub recent_violations: u64,
     /// Last violation timestamp
@@ -186,10 +186,10 @@ impl ByzantineDetector {
         })
     }
 
-    /// Detect Byzantine behavior in consensus proof
+    /// Detect Byzantine behavior in state proof
     pub async fn detect_byzantine_behavior(
         &self,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
         operation: &str,
     ) -> TrustChainResult<ByzantineDetectionResult> {
         let start_time = std::time::Instant::now();
@@ -206,39 +206,39 @@ impl ByzantineDetector {
         }
 
         // Extract node ID from stake proof
-        let node_id = consensus_proof.stake_proof.stake_holder_id.clone();
+        let node_id = state_proof.stake_proof.stake_holder_id.clone();
 
         // Analyze each proof component for Byzantine behavior
         let mut violations = Vec::new();
 
         // Check stake proof
         if let Some(violation) = self
-            .analyze_stake_proof(&consensus_proof.stake_proof)
+            .analyze_stake_proof(&state_proof.stake_proof)
             .await?
         {
             violations.push(violation);
         }
 
         // Check time proof
-        if let Some(violation) = self.analyze_time_proof(&consensus_proof.time_proof).await? {
+        if let Some(violation) = self.analyze_time_proof(&state_proof.time_proof).await? {
             violations.push(violation);
         }
 
         // Check space proof
         if let Some(violation) = self
-            .analyze_space_proof(&consensus_proof.space_proof)
+            .analyze_space_proof(&state_proof.space_proof)
             .await?
         {
             violations.push(violation);
         }
 
         // Check work proof
-        if let Some(violation) = self.analyze_work_proof(&consensus_proof.work_proof).await? {
+        if let Some(violation) = self.analyze_work_proof(&state_proof.work_proof).await? {
             violations.push(violation);
         }
 
         // Check for replay attacks
-        if let Some(violation) = self.check_replay_attack(consensus_proof, &node_id).await? {
+        if let Some(violation) = self.check_replay_attack(state_proof, &node_id).await? {
             violations.push(violation);
         }
 
@@ -448,13 +448,13 @@ impl ByzantineDetector {
     /// Check for replay attacks
     async fn check_replay_attack(
         &self,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
         node_id: &str,
     ) -> TrustChainResult<Option<ByzantineViolation>> {
         // In production, this would check against a database of used proofs
         // For now, we'll do a simple timestamp check
 
-        let proof_age = consensus_proof
+        let proof_age = state_proof
             .time_proof
             .time_verification_timestamp
             .elapsed()
@@ -477,7 +477,7 @@ impl ByzantineDetector {
             }
 
             return Ok(Some(ByzantineViolation::ReplayAttack {
-                original_timestamp: consensus_proof.time_proof.time_verification_timestamp,
+                original_timestamp: state_proof.time_proof.time_verification_timestamp,
             }));
         }
 
@@ -605,16 +605,14 @@ impl ByzantineDetector {
             .filter(|h| h.byzantine_confidence > 0.1) // Only nodes with some suspicion
             .map(|h| SuspiciousNode {
                 node_id: h.node_id.clone(),
-                confidence_score: h.byzantine_confidence,
+                failed_verifications: h.invalid_proofs as u32,
                 recent_violations: h.invalid_proofs,
                 last_violation: h.last_activity,
             })
             .collect();
 
         suspicious_nodes.sort_by(|a, b| {
-            b.confidence_score
-                .partial_cmp(&a.confidence_score)
-                .unwrap_or(std::cmp::Ordering::Equal) // Handle NaN gracefully
+            b.failed_verifications.cmp(&a.failed_verifications)
         });
         suspicious_nodes.truncate(5);
 
@@ -636,7 +634,7 @@ impl ByzantineDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
 
     #[tokio::test]
     async fn test_byzantine_detector_creation() {
@@ -645,12 +643,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_valid_consensus_proof() {
+    async fn test_valid_state_proof() {
         let detector = ByzantineDetector::new(0.5).await.expect("test: async operation");
-        let consensus_proof = ConsensusProof::default_for_testing();
+        let state_proof = StateProof::default_for_testing();
 
         let result = detector
-            .detect_byzantine_behavior(&consensus_proof, "test_operation")
+            .detect_byzantine_behavior(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 
@@ -669,11 +667,11 @@ mod tests {
         let detector = ByzantineDetector::new(0.1).await.expect("test: async operation"); // Low threshold for testing
 
         // Create invalid stake proof
-        let mut consensus_proof = ConsensusProof::default_for_testing();
-        consensus_proof.stake_proof.stake_amount = 0; // Invalid stake amount
+        let mut state_proof = StateProof::default_for_testing();
+        state_proof.stake_proof.stake_amount = 0; // Invalid stake amount
 
         let result = detector
-            .detect_byzantine_behavior(&consensus_proof, "test_operation")
+            .detect_byzantine_behavior(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 
@@ -693,11 +691,11 @@ mod tests {
         let detector = ByzantineDetector::new(0.1).await.expect("test: async operation");
 
         // Create time proof with excessive offset
-        let mut consensus_proof = ConsensusProof::default_for_testing();
-        consensus_proof.time_proof.network_time_offset = Duration::from_secs(3600); // 1 hour offset
+        let mut state_proof = StateProof::default_for_testing();
+        state_proof.time_proof.network_time_offset = Duration::from_secs(3600); // 1 hour offset
 
         let result = detector
-            .detect_byzantine_behavior(&consensus_proof, "test_operation")
+            .detect_byzantine_behavior(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 
@@ -718,12 +716,12 @@ mod tests {
         let detector = ByzantineDetector::new(0.1).await.expect("test: async operation");
 
         // Create space proof with falsified storage
-        let mut consensus_proof = ConsensusProof::default_for_testing();
-        consensus_proof.space_proof.total_size = 1000;
-        consensus_proof.space_proof.total_storage = 500; // Size > storage (impossible)
+        let mut state_proof = StateProof::default_for_testing();
+        state_proof.space_proof.total_size = 1000;
+        state_proof.space_proof.total_storage = 500; // Size > storage (impossible)
 
         let result = detector
-            .detect_byzantine_behavior(&consensus_proof, "test_operation")
+            .detect_byzantine_behavior(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 
@@ -744,9 +742,9 @@ mod tests {
         let detector = ByzantineDetector::new(0.5).await.expect("test: async operation");
 
         // Perform some detections to populate data
-        let consensus_proof = ConsensusProof::default_for_testing();
+        let state_proof = StateProof::default_for_testing();
         detector
-            .detect_byzantine_behavior(&consensus_proof, "test_operation")
+            .detect_byzantine_behavior(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 

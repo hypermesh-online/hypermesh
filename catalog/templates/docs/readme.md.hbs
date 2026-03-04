@@ -88,7 +88,7 @@ catalog run {{asset.name}} --config my-config.yaml
 ### Security Settings
 
 - **Sandbox Level**: {{security.sandbox_level}}
-- **Consensus Required**: {{security.consensus_required}}
+- **State Proof Required**: {{security.consensus_required}}
 - **Hash Validation**: {{security.hash_validation}}
 - **Network Access**: {{#if security.network_access.enabled}}Enabled{{else}}Disabled{{/if}}
 - **File Access**: {{security.file_access.level}}
@@ -102,7 +102,7 @@ catalog run {{asset.name}} --config my-config.yaml
 - Memory: {{deployment.requirements.memory}}
 - Execution Timeout: {{deployment.requirements.timeout}}
 {{#if deployment.requirements.gpu}}- GPU: Required{{/if}}
-- Minimum Consensus Nodes: {{deployment.requirements.consensus}}
+- Minimum State Proofs: {{deployment.requirements.consensus}}
 
 ### Security
 

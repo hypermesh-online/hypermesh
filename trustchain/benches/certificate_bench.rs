@@ -2,17 +2,17 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Performance benchmarks for TrustChain certificate and consensus operations.
+//! Performance benchmarks for TrustChain certificate and state proof operations.
 //!
 //! Benchmarks real FALCON-1024 key generation, signing, verification,
-//! BinaryAuthenticator pass/fail, and ConsensusProof validation latency.
+//! BinaryAuthenticator pass/fail, and StateProof validation latency.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Duration;
 
 use pqcrypto_falcon::falcon1024;
 
-use trustchain::consensus::{ConsensusProof, ConsensusRequirements};
+use trustchain::proof_of_state::{StateProof, StateRequirements};
 use trustchain::security::BinaryAuthenticator;
 
 /// Benchmark FALCON-1024 key-pair generation.
@@ -112,9 +112,9 @@ fn bench_binary_auth_revoked(c: &mut Criterion) {
     });
 }
 
-/// Benchmark ConsensusProof local (synchronous) four-proof validation.
+/// Benchmark StateProof local (synchronous) four-proof validation.
 fn bench_pos_validate_sync(c: &mut Criterion) {
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     c.bench_function("pos_validate_sync", |b| {
         b.iter(|| {
@@ -124,10 +124,10 @@ fn bench_pos_validate_sync(c: &mut Criterion) {
     });
 }
 
-/// Benchmark ConsensusProof validation against requirements.
+/// Benchmark StateProof validation against requirements.
 fn bench_pos_validate_with_requirements(c: &mut Criterion) {
-    let proof = ConsensusProof::new_for_testing();
-    let requirements = ConsensusRequirements::localhost_testing();
+    let proof = StateProof::new_for_testing();
+    let requirements = StateRequirements::localhost_testing();
 
     c.bench_function("pos_validate_requirements", |b| {
         b.iter(|| {
@@ -137,22 +137,22 @@ fn bench_pos_validate_with_requirements(c: &mut Criterion) {
     });
 }
 
-/// Benchmark ConsensusProof serialization round-trip (to_bytes + from_bytes).
+/// Benchmark StateProof serialization round-trip (to_bytes + from_bytes).
 fn bench_pos_serde_roundtrip(c: &mut Criterion) {
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     c.bench_function("pos_serde_roundtrip", |b| {
         b.iter(|| {
             let bytes = black_box(&proof).to_bytes().expect("serialize");
-            let decoded = ConsensusProof::from_bytes(black_box(&bytes)).expect("deserialize");
+            let decoded = StateProof::from_bytes(black_box(&bytes)).expect("deserialize");
             black_box(decoded);
         });
     });
 }
 
-/// Benchmark BLAKE3 hashing of a ConsensusProof.
+/// Benchmark BLAKE3 hashing of a StateProof.
 fn bench_pos_hash(c: &mut Criterion) {
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     c.bench_function("pos_hash_blake3", |b| {
         b.iter(|| {

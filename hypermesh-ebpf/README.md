@@ -69,7 +69,7 @@ Real zero-copy via direct libc syscalls:
 - Full crypto (FALCON-1024/Ed25519/ECDSA) deferred to userspace
 
 ### HyperMesh Extension Headers
-- **Proof of State** (0x1000): WHO/WHAT/WHEN/WHERE consensus proofs
+- **Proof of State** (0x1000): WHO/WHAT/WHEN/WHERE state proofs
 - **Asset Hash** (0x1001): BLAKE3 content integrity
 - **Matrix Routing** (0x1002): Topology-aware routing paths (IPv6 + matrix position)
 - **Privacy Tier** (0x1003): Access control enforcement

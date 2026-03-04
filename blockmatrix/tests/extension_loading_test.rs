@@ -102,7 +102,7 @@ async fn test_catalog_extension_loading() {
         ExtensionCapability::AssetManagement,
         ExtensionCapability::VMExecution,
         ExtensionCapability::NetworkAccess,
-        ExtensionCapability::ConsensusAccess,
+        ExtensionCapability::StateProofAccess,
     ]);
 
     let quotas = ResourceQuotas::from(ResourceLimits::default());
@@ -159,7 +159,7 @@ async fn test_catalog_extension_loading() {
         params: serde_json::json!({
             "limit": 10
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(request).await.unwrap();
@@ -174,7 +174,7 @@ async fn test_catalog_extension_loading() {
             "code": "print('Hello from Catalog VM')",
             "inputs": {}
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let vm_response = extension.handle_request(vm_request).await.unwrap();

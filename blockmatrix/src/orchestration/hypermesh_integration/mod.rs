@@ -5,7 +5,7 @@
 //! HyperMesh Container Integration - Bridge between container runtime and asset system
 //!
 //! This module integrates the container runtime with HyperMesh's asset management
-//! system, enabling containers to be treated as first-class assets with consensus
+//! system, enabling containers to be treated as first-class assets with state proof
 //! proof validation and resource allocation.
 
 pub mod types;
@@ -20,7 +20,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use crate::assets::core::{
     AssetAllocation, AssetAllocationRequest, AssetManager, AssetRegistration, AssetType,
-    ConsensusProof, PrivacyMode, ResourceRequirements,
+    StateProof, PrivacyMode, ResourceRequirements,
 };
 use crate::container::runtime::ContainerHandle;
 use crate::container::{ContainerId, ContainerRuntime, ContainerSpec, CreateOptions};
@@ -64,14 +64,14 @@ impl HyperMeshContainerOrchestrator {
     ) -> Result<ContainerDeploymentResult> {
         let deployment_start = SystemTime::now();
 
-        if self.config.enable_consensus_validation {
-            self.validate_deployment_consensus(&spec.consensus_proof)
+        if self.config.enable_state_validation {
+            self.validate_deployment_state_proof(&spec.state_proof)
                 .await?;
         }
 
         let allocation_start = SystemTime::now();
         let allocated_assets = if self.config.auto_asset_allocation {
-            self.allocate_container_assets(&spec.required_assets, &spec.consensus_proof)
+            self.allocate_container_assets(&spec.required_assets, &spec.state_proof)
                 .await?
         } else {
             HashMap::new()
@@ -137,17 +137,17 @@ impl HyperMeshContainerOrchestrator {
         })
     }
 
-    /// Validate deployment consensus proof
-    async fn validate_deployment_consensus(&self, consensus_proof: &ConsensusProof) -> Result<()> {
-        if !consensus_proof.validate() {
-            return Err(anyhow!("Invalid consensus proof for container deployment"));
+    /// Validate deployment state proof
+    async fn validate_deployment_state_proof(&self, state_proof: &StateProof) -> Result<()> {
+        if !state_proof.validate() {
+            return Err(anyhow!("Invalid state proof for container deployment"));
         }
 
-        if consensus_proof.space_proof.total_size == 0 {
+        if state_proof.space_proof.total_size == 0 {
             return Err(anyhow!("Space proof required but not provided"));
         }
 
-        if consensus_proof.stake_proof.stake_amount == 0 {
+        if state_proof.stake_proof.stake_amount == 0 {
             return Err(anyhow!("Stake proof required but not provided"));
         }
 
@@ -158,7 +158,7 @@ impl HyperMeshContainerOrchestrator {
     async fn allocate_container_assets(
         &self,
         required_assets: &HashMap<AssetType, AssetRequirements>,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
     ) -> Result<HashMap<AssetType, AssetAllocation>> {
         let mut allocated_assets = HashMap::new();
 
@@ -175,7 +175,7 @@ impl HyperMeshContainerOrchestrator {
                     economic: None,
                 },
                 privacy_level: PrivacyMode::PRIVATE,
-                consensus_proof: consensus_proof.clone(),
+                state_proof: state_proof.clone(),
                 certificate_fingerprint: String::new(),
                 duration_limit: Some(requirements.duration),
                 tags: HashMap::new(),
@@ -347,9 +347,9 @@ impl HyperMeshContainerOrchestrator {
         &self,
         container_id: ContainerId,
         new_requirements: HashMap<AssetType, AssetRequirements>,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<()> {
-        self.validate_deployment_consensus(&consensus_proof).await?;
+        self.validate_deployment_state_proof(&state_proof).await?;
 
         let current_asset_ids = {
             let container_assets = self.container_assets.read().await;
@@ -364,7 +364,7 @@ impl HyperMeshContainerOrchestrator {
         }
 
         let new_allocated_assets = self
-            .allocate_container_assets(&new_requirements, &consensus_proof)
+            .allocate_container_assets(&new_requirements, &state_proof)
             .await?;
 
         let container_handle = self.container_runtime.get_handle(&container_id).await?;

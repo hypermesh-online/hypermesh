@@ -185,9 +185,9 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
     });
   });
 
-  test.describe('Consensus Metrics Monitoring', () => {
-    test('should display four-proof consensus metrics @consensus', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+  test.describe('State Proof Metrics Monitoring', () => {
+    test('should display four-proof state proof metrics @stateproof', async ({ page }) => {
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Verify main metrics are displayed
       await expect(page.getByText('15,234')).toBeVisible(); // Block height
@@ -212,11 +212,11 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
       await page.waitForTimeout(500);
       
       // Verify metrics are still displayed after refresh
-      await expect(page.getByText('Four-Proof Consensus System')).toBeVisible();
+      await expect(page.getByText('Four-Proof State Verification System')).toBeVisible();
     });
 
-    test('should display recent blocks with proof validation @consensus', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+    test('should display recent blocks with proof validation @stateproof', async ({ page }) => {
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Verify recent blocks section
       await expect(page.getByText(/recent blocks/i)).toBeVisible();
@@ -391,10 +391,10 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
     test('should support screen readers @accessibility', async ({ page }) => {
       // This test would require screen reader testing tools
       // For now, verify semantic structure
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Verify proper heading structure
-      await expect(page.getByRole('heading', { name: /four-proof consensus system/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /four-proof state verification system/i })).toBeVisible();
       
       // Verify proper table structure for metrics
       await expect(page.getByRole('table')).toBeVisible();
@@ -420,7 +420,7 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
       const tabs = [
         'node configuration',
         'quantum security', 
-        'consensus metrics',
+        'state proof metrics',
         'certificate details',
         'ecosystem metrics'
       ];

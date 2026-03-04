@@ -5,7 +5,7 @@
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
     AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, ConsensusProof, DeploymentResult, ExecutionResult, ExtensionError,
+    AssetUpdate, StateProof, DeploymentResult, ExecutionResult, ExtensionError,
     ExtensionResult, HashMap, NetworkScope, OperationResult, ResourceUsageReport, RwLock,
 };
 
@@ -202,7 +202,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
             metadata: metadata_map,
             privacy_level: hypermesh_lib::PrivacyMode::PRIVATE,
             allocation: None,
-            consensus_status: blockmatrix::extensions::ConsensusStatus {
+            state_proof_status: blockmatrix::extensions::StateProofStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -215,7 +215,7 @@ impl AssetExtensionHandler for VirtualMachineHandler {
     async fn validate_asset(
         &self,
         id: &AssetRegistration,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> ExtensionResult<bool> {
         let instances = self.instances.read().await;
 
@@ -332,7 +332,7 @@ mod tests {
             ]),
             privacy_level: hypermesh_lib::PrivacyMode::PRIVATE,
             allocation: None,
-            consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
+            state_requirements: blockmatrix::extensions::StateRequirements::default(),
             parent_id: None,
             tags: vec!["test".to_string()],
         };

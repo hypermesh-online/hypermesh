@@ -16,7 +16,7 @@ items = [
     "CryptoAlgorithm enum (Falcon/Kyber/AES)",
     "HypermeshError unified error type",
     "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
-    "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
+    "Canonical state proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
     "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
     "Transmission asset type in SystemAssetKind (R10)",
@@ -37,7 +37,7 @@ items = [
 [features.in_development]
 items = [
     # Lib types are defined but some are not yet exercised by real implementations
-    "Consensus proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
+    "State proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
     "BlockchainScope::Network — enum variant exists but no crate implements Network scope sync",
 ]
 

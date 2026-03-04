@@ -171,7 +171,7 @@ impl Default for ResourceRequirements {
 /// Security configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityConfig {
-    pub consensus_required: bool,
+    pub state_proof_required: bool,
     pub sandbox_level: SandboxLevel,
     pub network_access: bool,
     pub filesystem_access: FilesystemAccess,
@@ -197,7 +197,7 @@ pub enum FilesystemAccess {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionConfig {
     pub strategy: ExecutionStrategy,
-    pub min_consensus: u32,
+    pub min_state_proof: u32,
     pub max_concurrent: Option<u32>,
     pub priority: ExecutionPriority,
     pub retry_policy: RetryPolicy,

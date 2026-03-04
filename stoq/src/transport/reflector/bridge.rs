@@ -71,7 +71,7 @@ impl ReflectorBridge {
     /// Convert a STOQ `ReflectorMessage` to a `BridgedMatrixMessage`.
     ///
     /// Returns `None` for message types that have no direct equivalent
-    /// in blockmatrix's `MatrixMessage` (e.g. `QuorumConfirm`).
+    /// in blockmatrix's `MatrixMessage` (e.g. `ReplicationConfirm`).
     pub fn to_matrix_message(msg: &ReflectorMessage) -> Option<BridgedMatrixMessage> {
         match msg {
             ReflectorMessage::Heartbeat {
@@ -120,7 +120,7 @@ impl ReflectorBridge {
                 block_hash: hex::encode(block_hash),
             }),
 
-            ReflectorMessage::QuorumConfirm { .. } => None,
+            ReflectorMessage::ReplicationConfirm { .. } => None,
         }
     }
 
@@ -319,8 +319,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quorum_confirm_has_no_matrix_equivalent() {
-        let msg = ReflectorMessage::QuorumConfirm {
+    fn test_replication_confirm_has_no_matrix_equivalent() {
+        let msg = ReflectorMessage::ReplicationConfirm {
             network_id: test_network_id(),
             block_height: 10,
             confirming_node: "c".to_string(),

@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetType, ConsensusProof, GpuRequirements, PrivacyMode,
+    AssetAdapter, AssetAllocationRequest, AssetType, StateProof, GpuRequirements, PrivacyMode,
 };
 use std::collections::HashMap;
 use std::time::Duration;
@@ -25,7 +25,7 @@ fn _create_test_gpu_request() -> AssetAllocationRequest {
         },
         privacy_level: PrivacyMode::PRIVATE,
         // Use default test proofs that pass validation (proper hash generation)
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: Some(Duration::from_secs(3600)),
         tags: HashMap::new(),
@@ -42,10 +42,10 @@ async fn test_gpu_adapter_creation() {
 #[tokio::test]
 async fn test_gpu_allocation() {
     // Minimal test to avoid GPU hardware detection issues
-    // Just verify test consensus proof passes validation
+    // Just verify test state proof passes validation
 
     // Create a test proof
-    let test_proof = ConsensusProof::new_for_testing();
+    let test_proof = StateProof::new_for_testing();
 
     // Basic verification that the test proof has valid values for GPU validation:
     // - stake_amount >= 200
@@ -85,5 +85,5 @@ async fn test_gpu_capabilities() {
         .contains(&"nova_vulkan_support".to_string()));
     assert!(capabilities
         .features
-        .contains(&"consensus_acceleration".to_string()));
+        .contains(&"state_proof_acceleration".to_string()));
 }

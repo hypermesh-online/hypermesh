@@ -9,7 +9,7 @@
 //! These tests are prepared for when Catalog is implemented.
 
 use blockmatrix::assets::core::{AssetManager, AssetRegistration, AssetType, PrivacyMode};
-use blockmatrix::consensus::{ConsensusProof, ProofType};
+use blockmatrix::proof_of_state::{StateProof, ProofType};
 use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
 use blockmatrix::extensions::registry::{ExtensionLocation, ExtensionRegistry, RegistryConfig};
 use blockmatrix::extensions::security::{

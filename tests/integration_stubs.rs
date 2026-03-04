@@ -120,7 +120,7 @@ pub async fn test_catalog_hypermesh_integration() -> (bool, Vec<String>) {
         }
     }
 
-    // Test 3: Remote code execution with consensus
+    // Test 3: Remote code execution with state proof
     match test_remote_code_execution().await {
         Ok(_) => {}
         Err(e) => {
@@ -155,11 +155,11 @@ pub async fn test_full_stack_integration() -> (bool, Vec<String>) {
         }
     }
 
-    // Test 2: End-to-end consensus validation
-    match test_end_to_end_consensus().await {
+    // Test 2: End-to-end state proof validation
+    match test_end_to_end_state_proof().await {
         Ok(_) => {}
         Err(e) => {
-            errors.push(format!("E2E consensus failed: {e}"));
+            errors.push(format!("E2E state proof validation failed: {e}"));
             passed = false;
         }
     }
@@ -257,7 +257,7 @@ async fn test_asset_aware_vm() -> Result<()> {
 }
 
 async fn test_remote_code_execution() -> Result<()> {
-    // Test remote code execution with consensus
+    // Test remote code execution with state proof
     time::sleep(Duration::from_millis(70)).await;
     Ok(())
 }
@@ -274,8 +274,8 @@ async fn test_complete_asset_lifecycle() -> Result<()> {
     Ok(())
 }
 
-async fn test_end_to_end_consensus() -> Result<()> {
-    // Test end-to-end consensus validation
+async fn test_end_to_end_state_proof() -> Result<()> {
+    // Test end-to-end state proof validation
     time::sleep(Duration::from_millis(80)).await;
     Ok(())
 }
@@ -304,7 +304,7 @@ async fn test_bootstrap_sequence() -> Result<()> {
     // Phase 2: STOQ protocol activation
     time::sleep(Duration::from_millis(25)).await;
 
-    // Phase 3: HyperMesh consensus
+    // Phase 3: HyperMesh Proof of State validation
     time::sleep(Duration::from_millis(35)).await;
 
     // Phase 4: Full federation

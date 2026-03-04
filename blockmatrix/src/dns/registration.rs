@@ -8,7 +8,7 @@
 
 use super::{DnsError, DnsPoolManager, DnsRecord, DnsResult, Domain};
 use crate::blockchain::NodeBlockchain;
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use crate::dns::validation::DnsValidator;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -39,8 +39,8 @@ pub struct DnsRegistration {
     pub status: RegistrationStatus,
     /// Blockchain transaction hash
     pub tx_hash: Option<String>,
-    /// Consensus proof used for registration
-    pub consensus_proof: Option<Vec<u8>>,
+    /// State proof used for registration
+    pub state_proof: Option<Vec<u8>>,
 }
 
 /// DNS registrar
@@ -77,7 +77,7 @@ impl DnsRegistrar {
         &self,
         domain: Domain,
         record: DnsRecord,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> DnsResult<DnsRegistration> {
         info!("Registering public DNS: {}", domain.full);
 
@@ -108,7 +108,7 @@ impl DnsRegistrar {
             record: record.clone(),
             status: RegistrationStatus::Active,
             tx_hash: Some(tx_hash.clone()),
-            consensus_proof: Some(proof.to_bytes().unwrap_or_default()),
+            state_proof: Some(proof.to_bytes().unwrap_or_default()),
         };
 
         // Store registration
@@ -128,7 +128,7 @@ impl DnsRegistrar {
         domain: Domain,
         network_id: String,
         record: DnsRecord,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> DnsResult<DnsRegistration> {
         info!(
             "Registering federated DNS: {} (network: {})",
@@ -164,7 +164,7 @@ impl DnsRegistrar {
             record: record.clone(),
             status: RegistrationStatus::Active,
             tx_hash: Some(tx_hash.clone()),
-            consensus_proof: Some(proof.to_bytes().unwrap_or_default()),
+            state_proof: Some(proof.to_bytes().unwrap_or_default()),
         };
 
         // Store registration
@@ -196,7 +196,7 @@ impl DnsRegistrar {
         &self,
         domain: &Domain,
         record: &DnsRecord,
-        _proof: &ConsensusProof,
+        proof: &StateProof,
     ) -> DnsResult<String> {
         let blockchain_opt = self.blockchain.read().await;
 
@@ -206,7 +206,7 @@ impl DnsRegistrar {
                 let bc = blockchain.write().await;
                 let tx_data = format!("DNS Registration: {} -> {:?}", domain.full, record.data);
                 let block = bc
-                    .add_block_with_data(tx_data.into_bytes())
+                    .add_block_with_data(tx_data.into_bytes(), proof)
                     .await
                     .map_err(|e| DnsError::BlockchainError(e.to_string()))?;
 
@@ -224,7 +224,7 @@ impl DnsRegistrar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof_of_state_integration::{
+    use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use crate::dns::{DnsRecordData, DnsRecordType};
@@ -241,7 +241,7 @@ mod tests {
         )
     }
 
-    fn create_test_proof() -> ConsensusProof {
+    fn create_test_proof() -> StateProof {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string(), 1000);
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
@@ -254,7 +254,7 @@ mod tests {
             WorkState::Completed,
         );
 
-        ConsensusProof::new(stake, time, space, work)
+        StateProof::new(stake, time, space, work)
     }
 
     #[tokio::test]

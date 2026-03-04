@@ -402,7 +402,7 @@ export function DashboardHome() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-400">
-                Manage connections to Public, P2P, and Federated networks. Configure consensus mechanisms.
+                Manage connections to Public, P2P, and Federated networks. Configure Proof of State verification.
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">

@@ -31,7 +31,7 @@ Canonical shared types for the HyperMesh ecosystem. All crates depend on this li
 - `BaseState` / `AssetStatusTrait` -- asset lifecycle states
 - `AssetAdapter` -- trait for specialized asset handling (three-pillar system)
 
-### Consensus Proofs (`proof.rs`)
+### state proofs (`proof.rs`)
 - `SpaceProof`, `StakeProof`, `WorkProof`, `TimeProof` -- individual proof structs
 - `ProofOfState` -- combined four-proof validation (WHERE/WHO/WHAT/WHEN)
 - `Validatable` trait -- shared validation interface

@@ -8,12 +8,12 @@
 //! "Let Proof of State decide, not hardcoded logic"
 //!
 //! All permission rules live in blockchain Asset records. Distribution queries
-//! consensus validation for eligibility, then applies matrix optimization within
+//! state proof validation for eligibility, then applies matrix optimization within
 //! approved node pool.
 //!
 //! # Architecture
 //!
-//! 1. **PoS Validation** - Query consensus for node eligibility
+//! 1. **PoS Validation** - Query state proof for node eligibility
 //! 2. **Matrix Optimization** - Apply 8-octant distribution within eligible pool
 //! 3. **Audit Trail** - Record placement on blockchain
 //! 4. **Redistribution** - Handle PoS grant/revoke events
@@ -24,7 +24,7 @@
 //! use blockmatrix::distribution::{distribute_shards_pos_aware, NodeInfo};
 //! use blockmatrix::assets::pipeline::sharding::{Shard, ShardMetadata};
 //! use blockmatrix::matrix::coordinate::MatrixCoordinate;
-//! use blockmatrix::consensus::validation::DefaultStateAuthenticator;
+//! use blockmatrix::proof_of_state::validation::DefaultStateAuthenticator;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let nodes = vec![
@@ -34,14 +34,14 @@
 //!     ),
 //! ];
 //! let shards = vec![Shard { data: vec![0u8; 64], metadata: ShardMetadata::default() }];
-//! let consensus = DefaultStateAuthenticator::for_testing();
+//! let state_proof = DefaultStateAuthenticator::for_testing();
 //!
 //! let result = distribute_shards_pos_aware(
 //!     shards,
 //!     "asset-1",
 //!     "PrivateNetwork",
 //!     &nodes,
-//!     &consensus,
+//!     &state_proof,
 //! ).await?;
 //! # Ok(())
 //! # }
@@ -135,7 +135,7 @@ pub struct DistributionResult {
 ///
 /// # Architecture
 ///
-/// 1. **PoS Validation** - Query consensus for eligible nodes
+/// 1. **PoS Validation** - Query state proof for eligible nodes
 /// 2. **Matrix Optimization** - Distribute across 8 octants using golden ratio
 /// 3. **Blockchain Recording** - Audit trail of placement decisions
 ///
@@ -144,7 +144,7 @@ pub struct DistributionResult {
 /// * `shards` - Shards to distribute
 /// * `asset` - Asset being distributed (contains privacy rules)
 /// * `all_nodes` - All available nodes in the network
-/// * `consensus` - Consensus validator for PoS queries
+/// * `state_proof` - State proof validator for PoS queries
 ///
 /// # Returns
 ///
@@ -154,14 +154,14 @@ pub async fn distribute_shards_pos_aware<C>(
     asset_id: &str,
     asset_privacy_level: &str,
     all_nodes: &[NodeInfo],
-    consensus: &C,
+    state_proof: &C,
 ) -> AssetResult<DistributionResult>
 where
     C: pos_validator::StateAuthenticator,
 {
     // Step 1: Query PoS validation for eligible nodes
     let eligible_nodes =
-        get_eligible_nodes(asset_id, asset_privacy_level, &shards, all_nodes, consensus).await?;
+        get_eligible_nodes(asset_id, asset_privacy_level, &shards, all_nodes, state_proof).await?;
 
     if eligible_nodes.is_empty() {
         return Err(AssetError::ValidationError {
@@ -181,7 +181,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::validation::DefaultStateAuthenticator;
+    use crate::proof_of_state::validation::DefaultStateAuthenticator;
     #[tokio::test]
     async fn test_distribution_with_eligible_nodes() {
         // Create test nodes
@@ -205,10 +205,10 @@ mod tests {
         // Create test shards
         let shards = vec![create_test_shard(0), create_test_shard(1)];
 
-        let consensus = DefaultStateAuthenticator::for_testing();
+        let state_proof = DefaultStateAuthenticator::for_testing();
 
         let result =
-            distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &consensus)
+            distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
                 .await;
 
         assert!(result.is_ok());

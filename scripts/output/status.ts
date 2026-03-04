@@ -50,10 +50,12 @@ export const crateStatuses: CrateStatus[] = [
         "Real hardware metrics collection (CPU/memory/network/storage from /proc)",
         "Capability-based GPU detection (honest fallback, no fake hardware)",
         "StateAuthenticator trait (binary authentication interface)",
-        "PeerIdentity bridges to lib NodeId"
+        "PeerIdentity bridges to lib NodeId",
+        "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
+        "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)"
       ],
       "inDevelopment": [
-        "Proof of State validation on block creation — add_block() currently skips PoS entirely, only checks hash linkage",
+        "Peer handshake PoS validation — connect_to_peer()/accept_connections() exchange JSON with no proof validation yet",
         "Cross-node block sync — SyncManager/ReflectorPool exist but are NOT wired into node binary start command",
         "Cross-node shard distribution — ShardTransport trait exists but shards only stored/fetched locally",
         "DNS network propagation — records are local-only, no broadcast to TrustChain or peers",
@@ -67,8 +69,8 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": [
         "FALCON-1024 certificate generation (currently using rcgen X.509, not post-quantum)",
-        "Real consensus proof generation (currently self-generated with hardcoded values)",
-        "Bilateral verification between nodes (R11 — no global consensus, verify with counterparty)",
+        "Real state proof generation (currently self-generated with hardcoded values)",
+        "Bilateral verification between nodes (R11 — no global quorum, verify with counterparty directly)",
         "Swarm distribution protocol (R12 — announce/discover/serve with O(log N) scaling)",
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
         "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
@@ -76,7 +78,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 60
+    "completion": 62
   },
   {
     "id": "caesar",
@@ -254,7 +256,7 @@ export const crateStatuses: CrateStatus[] = [
       "inDevelopment": [
         "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
         "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
-        "PoS authentication — session management structs exist but proofs are not validated (consensus is fake)",
+        "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
         "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
@@ -350,7 +352,7 @@ export const crateStatuses: CrateStatus[] = [
         "CryptoAlgorithm enum (Falcon/Kyber/AES)",
         "HypermeshError unified error type",
         "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
-        "Canonical consensus proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
+        "Canonical state proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
         "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
         "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
         "Transmission asset type in SystemAssetKind (R10)",
@@ -368,7 +370,7 @@ export const crateStatuses: CrateStatus[] = [
         "Public SDK types (SdkCapabilities, AssetDescriptor, NodeDescriptor, QueryResult<T>)"
       ],
       "inDevelopment": [
-        "Consensus proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
+        "State proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
         "BlockchainScope::Network — enum variant exists but no crate implements Network scope sync"
       ],
       "planned": []
@@ -451,7 +453,7 @@ export const crateStatuses: CrateStatus[] = [
       "inDevelopment": [
         "FALCON-1024 certificate signing — currently using rcgen (traditional RSA/ECDSA X.509), NOT post-quantum FALCON-1024",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-        "Real Proof of State validation — consensus proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
+        "Real Proof of State validation — state proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
         "StakeProof signature verification — currently checks non-empty string + positive number, no cryptographic verification",
         "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
         "DNS zone propagation — DNS resolver is a local HashMap, no cross-node zone transfer",
@@ -463,7 +465,7 @@ export const crateStatuses: CrateStatus[] = [
         "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS"
       ],
       "planned": [
-        "Multi-node CA consensus (distributed certificate issuance across reflector pool)",
+        "Multi-node CA coordination (distributed certificate issuance across reflector pool)",
         "Distributed revocation propagation (federation broadcast to peer CAs)",
         "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
         "Cascading revocation across federated CAs",

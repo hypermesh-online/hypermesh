@@ -77,8 +77,8 @@ pub struct NetworkTunnel {
 pub enum TrafficType {
     /// Asset validation proofs
     AssetProof,
-    /// Blockchain consensus
-    Consensus,
+    /// State proof validation
+    StateProof,
     /// Certificate validation
     Certificate,
     /// All traffic (use with caution)
@@ -584,17 +584,17 @@ mod tests {
                 .await
         );
 
-        // Consensus should be blocked
+        // StateProof should be blocked
         assert!(
             !manager
-                .verify_packet_isolation(&net1, 1, &net2, &TrafficType::Consensus)
+                .verify_packet_isolation(&net1, 1, &net2, &TrafficType::StateProof)
                 .await
         );
 
         // Same network always allowed regardless of type
         assert!(
             manager
-                .verify_packet_isolation(&net1, 1, &net1, &TrafficType::Consensus)
+                .verify_packet_isolation(&net1, 1, &net1, &TrafficType::StateProof)
                 .await
         );
 

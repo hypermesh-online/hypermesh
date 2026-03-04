@@ -5,13 +5,13 @@
 //! Privacy Management System for HyperMesh Assets
 //!
 //! User-configurable privacy levels and resource sharing controls with
-//! integration to consensus system, remote proxy addressing, and CAESAR rewards.
+//! integration to state proof system, remote proxy addressing, and CAESAR rewards.
 //!
 //! Based on Proof of State patterns with privacy allocation types:
 //! - Private: Internal network only, no external access
 //! - Public: Cross-network accessible, full discovery
 //! - Anonymous: No identity tracking, privacy-first sharing
-//! - Verified: Full consensus validation required (PoSp+PoSt+PoWk+PoTm)
+//! - Verified: Full state proof validation required (PoSp+PoSt+PoWk+PoTm)
 
 pub mod advanced_config;
 pub mod allocation_types;
@@ -62,8 +62,8 @@ pub struct PrivacyAllocationResult {
     /// Resource allocation configuration
     pub resource_config: ResourceAllocationConfig,
 
-    /// Consensus requirements for this allocation
-    pub consensus_requirements: ConsensusRequirementConfig,
+    /// State proof requirements for this allocation
+    pub state_requirements: StateProofRequirementConfig,
 
     /// CAESAR reward configuration
     pub reward_config: CaesarRewardConfig,
@@ -142,9 +142,9 @@ pub struct AutoRenewalConfig {
     pub require_confirmation: bool,
 }
 
-/// Consensus requirements configuration
+/// State proof requirements configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConsensusRequirementConfig {
+pub struct StateProofRequirementConfig {
     /// Require Proof of Space (PoSp) - WHERE
     pub require_proof_of_space: bool,
 
@@ -198,8 +198,8 @@ pub struct CaesarRewardConfig {
     /// Resource utilization multiplier
     pub utilization_multiplier: f32,
 
-    /// Consensus proof bonus
-    pub consensus_bonus: f32,
+    /// State proof bonus
+    pub verification_bonus: f32,
 
     /// Maximum reward cap per allocation
     pub max_reward_cap: f32,
@@ -399,8 +399,8 @@ pub struct TrustRequirements {
     /// Require certificate validation
     pub require_certificate_validation: bool,
 
-    /// Require consensus proof validation
-    pub require_consensus_validation: bool,
+    /// Require state proof validation
+    pub require_state_validation: bool,
 
     /// Re-authentication interval
     pub reauth_interval: Duration,
@@ -448,7 +448,7 @@ impl Default for AutoRenewalConfig {
     }
 }
 
-impl Default for ConsensusRequirementConfig {
+impl Default for StateProofRequirementConfig {
     fn default() -> Self {
         Self {
             require_proof_of_space: true,

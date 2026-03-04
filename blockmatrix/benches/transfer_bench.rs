@@ -9,17 +9,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
-use blockmatrix::consensus::validation::{DefaultStateAuthenticator, StateAuthenticator};
+use blockmatrix::proof_of_state::validation::{DefaultStateAuthenticator, StateAuthenticator};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::transfer::{
     create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
 };
 use hypermesh_lib::{AssetAddress, ContentHash};
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 
 /// Get valid test proof bytes.
 fn test_proof() -> StateProofBytes {
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
     proof_to_bytes(&proof).unwrap()
 }
 

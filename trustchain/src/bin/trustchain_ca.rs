@@ -17,7 +17,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use trustchain::ca::{CAConfig, CAMode, CertificateRequest, TrustChainCA};
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 use trustchain::http3::{Http3StoqServer, Router};
 
 use http::{Response, StatusCode};
@@ -390,12 +390,12 @@ async fn main() -> Result<()> {
                         }
                     }
 
-                    // Create consensus proof (for local testing, use default)
-                    let consensus_proof = if service_config.allow_self_signed {
-                        ConsensusProof::new_for_testing()
+                    // Create state proof (for local testing, use default)
+                    let state_proof = if service_config.allow_self_signed {
+                        StateProof::new_for_testing()
                     } else {
                         // In production, would validate proof from request
-                        ConsensusProof::new_for_testing()
+                        StateProof::new_for_testing()
                     };
 
                     // Create certificate request
@@ -404,7 +404,7 @@ async fn main() -> Result<()> {
                         san_entries: issue_req.san_entries,
                         node_id: issue_req.node_id,
                         ipv6_addresses,
-                        consensus_proof,
+                        state_proof,
                         timestamp: SystemTime::now(),
                         identity_scope: None,
                         subject_type: None,
@@ -555,7 +555,7 @@ async fn main() -> Result<()> {
                             san_entries: vec![common_name.clone()],
                             node_id,
                             ipv6_addresses: vec![Ipv6Addr::LOCALHOST],
-                            consensus_proof: ConsensusProof::new_for_testing(),
+                            state_proof: StateProof::new_for_testing(),
                             timestamp: SystemTime::now(),
                             identity_scope: None,
                             subject_type: None,

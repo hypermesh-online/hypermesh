@@ -86,7 +86,7 @@ HyperMesh runs as system-level daemons. See `systemd/` for service units.
 
 ### Proof of State
 
-Every asset requires four proofs -- PoSpace (WHERE), PoStake (WHO), PoWork (WHAT/HOW), PoTime (WHEN). Bilateral verification, not global consensus.
+Every asset requires four proofs -- PoSpace (WHERE), PoStake (WHO), PoWork (WHAT/HOW), PoTime (WHEN). Bilateral verification -- no voting, no quorum, no leader election.
 
 ### Block-MATRIX Topology
 
@@ -103,7 +103,7 @@ Starts on boot with a unique genesis block. No network connectivity required. Ne
 - **Private**: Bounded, tracked
 - **Public**: Unbounded, tracked
 
-**BlockchainScope** (consensus layer) -- binary:
+**BlockchainScope** (state proof layer) -- binary:
 - **Device**: Local-only chain, always running from boot
 - **Network**: Synchronized across nodes via reflector pooling
 
@@ -159,7 +159,7 @@ Every asset has a **Kind** (two-level classification: system or user-defined), a
 
 ### Remaining Work
 
-- Network scope blockchain sync (reflector/swarm mode for multi-node consensus)
+- Network scope blockchain sync (reflector/swarm mode for multi-node state proof verification)
 - Cross-network asset transfers with dual proof of state
 - Live multi-chain Caesar bridges (BTC/ETH/SOL)
 - CI/CD pipelines and production deployment

@@ -7,7 +7,7 @@
 //! This module provides STOQ protocol APIs for interacting with
 //! the HyperMesh system, including extension management.
 
-pub mod consensus_api;
+pub mod proof_of_state_api;
 pub mod extensions;
 
 use anyhow::Result;

@@ -16,7 +16,7 @@ use trustchain::{
     api::stoq_api::{TrustChainStoqApi, TrustChainStoqConfig},
     ca::{CAConfig, CAMode, TrustChainCA},
     config::DnsConfig,
-    consensus::{ConsensusRequirements, HyperMeshClientConfig},
+    proof_of_state::{StateRequirements, HyperMeshClientConfig},
     dns::DnsResolver,
 };
 
@@ -48,12 +48,11 @@ async fn main() -> Result<()> {
         cert_validity_days: 365,
         rotation_interval: std::time::Duration::from_secs(30 * 24 * 60 * 60), // 30 days
         mode: CAMode::Production,
-        consensus_requirements: ConsensusRequirements {
+        state_requirements: StateRequirements {
             minimum_stake: 1000,
             max_time_offset: std::time::Duration::from_secs(5),
             minimum_storage: 1000000, // 1MB minimum
             minimum_compute: 100,
-            byzantine_tolerance: 0.33,
         },
         hypermesh_client_config: HyperMeshClientConfig {
             request_timeout: std::time::Duration::from_secs(10),
@@ -85,12 +84,11 @@ async fn main() -> Result<()> {
             "trust".to_string(),
             "assets".to_string(),
         ],
-        consensus_requirements: ConsensusRequirements {
+        state_requirements: StateRequirements {
             minimum_stake: 500,
             max_time_offset: std::time::Duration::from_secs(3),
             minimum_storage: 500000, // 500KB minimum for DNS
             minimum_compute: 50,
-            byzantine_tolerance: 0.33,
         },
     };
     let resolver = Arc::new(DnsResolver::new(dns_config).await?);

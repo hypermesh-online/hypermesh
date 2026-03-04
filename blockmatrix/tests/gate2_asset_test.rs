@@ -11,7 +11,7 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::core::{
-    AssetManager, AssetRegistration, AssetState, AssetStatus, AssetType, ConsensusRequirements,
+    AssetManager, AssetRegistration, AssetState, AssetStatus, AssetType, StateRequirements,
     PrivacyMode,
 };
 
@@ -20,8 +20,8 @@ use blockmatrix::assets::adapters::{
     NetworkAssetAdapter, StorageAssetAdapter,
 };
 
-use blockmatrix::consensus::proof_of_state_integration::{
-    ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+use blockmatrix::proof_of_state::proof_of_state_integration::{
+    StateProof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
 
 use std::time::Duration;
@@ -75,8 +75,8 @@ async fn test_gate2_asset_system_complete() {
         println!("  ✅ Privacy level {:?} available", level);
     }
 
-    // 5. Test Consensus Proof Creation
-    println!("\n✓ Testing Proof of State Four-Proof Consensus System...");
+    // 5. Test State Proof Creation
+    println!("\n✓ Testing Proof of State Four-Proof System...");
 
     let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id-123".to_string(), 1000);
     println!("  ✅ PoStake created (WHO)");
@@ -101,10 +101,10 @@ async fn test_gate2_asset_system_complete() {
     let time_proof = TimeProof::new(Duration::from_secs(30));
     println!("  ✅ PoTime created (WHEN)");
 
-    let consensus_proof = ConsensusProof::new(stake_proof, space_proof, work_proof, time_proof);
+    let state_proof = StateProof::new(stake_proof, space_proof, work_proof, time_proof);
 
-    assert!(consensus_proof.validate());
-    println!("  ✅ Consensus Proof validated successfully");
+    assert!(state_proof.validate());
+    println!("  ✅ State Proof validated successfully");
 
     // 6. Verify Asset Types
     println!("\n✓ Testing all Asset Types...");
@@ -138,7 +138,7 @@ async fn test_gate2_asset_system_complete() {
     println!("  ✓ Universal AssetRegistration system");
     println!("  ✓ AssetAdapter pattern (all 6 adapters)");
     println!("  ✓ Privacy-aware allocation (5 levels)");
-    println!("  ✓ Proof of State Four-Proof consensus");
+    println!("  ✓ Proof of State Four-Proof state proof");
     println!("  ✓ Asset Manager with statistics");
     println!("  ✓ Adapter Registry functional");
     println!("  ⚠️  Remote proxy/NAT deferred to Phase 3");

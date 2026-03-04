@@ -38,7 +38,7 @@ HyperMesh implements a 3-layer architecture:
 
 ### Distributed-First Architecture  
 - P2P mesh networks with direct node connectivity
-- Byzantine fault tolerance consensus mechanisms
+- Bilateral Proof of State authentication (no voting, no quorum, no leader election)
 - Geographic distribution with data locality
 - Network partition resilience with automatic healing
 - Multi-cloud abstraction for true portability
@@ -49,7 +49,7 @@ Detailed specifications are organized in the ./specs/ subdirectory:
 
 ### Core Layer (./specs/core/)
 - **transport.spec** - QUIC/IPv6 transport protocol implementation
-- **consensus.spec** - Distributed state engine with Raft+BFT
+- **consensus.spec** - LEGACY: Replaced by Proof of State (bilateral authentication)
 - **container.spec** - Secure container runtime with hardware isolation
 - **security.spec** - eBPF security framework and threat model
 
@@ -147,7 +147,7 @@ Detailed specifications are organized in the ./specs/ subdirectory:
 ## Implementation Strategy
 
 ### Development Phases
-1. **Core Infrastructure**: Transport, consensus, container runtime
+1. **Core Infrastructure**: Transport, Proof of State, container runtime
 2. **Service Orchestration**: Mesh networking, load balancing, discovery
 3. **Platform Services**: APIs, CLI, monitoring, deployment
 4. **Advanced Features**: Multi-tenancy, compliance, disaster recovery
@@ -156,7 +156,7 @@ Detailed specifications are organized in the ./specs/ subdirectory:
 ### Technology Stack
 - **Language**: Rust for memory safety and performance
 - **Networking**: QUIC over IPv6 for transport security
-- **Consensus**: Raft with Byzantine fault tolerance extensions
+- **Authentication**: Bilateral Proof of State (PoSpace/PoStake/PoWork/PoTime)
 - **Virtualization**: Intel VT-x/AMD-V hardware-assisted isolation
 - **Monitoring**: eBPF for kernel-level observability
 - **Storage**: Content-defined chunking with SHA256 deduplication

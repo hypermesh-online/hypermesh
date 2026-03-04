@@ -30,7 +30,7 @@ async fn test_hypermesh_bridge_creation() -> Result<()> {
 
     // Configure bridge
     let bridge_config = BridgeConfig {
-        enable_consensus: false, // Disable for testing
+        enable_state_proof: false, // Disable for testing
         minimum_stake: 0,
         default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,
@@ -66,7 +66,7 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
 
     // Configure bridge for zero-copy performance
     let bridge_config = BridgeConfig {
-        enable_consensus: false,
+        enable_state_proof: false,
         minimum_stake: 0,
         default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,
@@ -110,7 +110,7 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
         assert_eq!(result.asset.registry, "hypermesh");
         assert!(
             result.asset.verified,
-            "HyperMesh assets are consensus-verified"
+            "HyperMesh assets are state-proof-verified"
         );
     }
 
@@ -124,7 +124,7 @@ async fn test_performance_without_network_calls() -> Result<()> {
 
     // Configure for maximum performance
     let bridge_config = BridgeConfig {
-        enable_consensus: false, // Skip for performance test
+        enable_state_proof: false, // Skip for performance test
         minimum_stake: 0,
         default_privacy: PrivacyMode::PRIVATE,
         enable_zero_copy: true,

@@ -94,16 +94,16 @@ pub async fn test_node_failures() -> (bool, Vec<String>) {
         }
     }
 
-    // Test 3: Leader failure
-    match simulate_leader_failure().await {
-        Ok(elected_new) => {
-            if !elected_new {
-                errors.push("Failed to elect new leader".to_string());
+    // Test 3: Node failure detection
+    match simulate_node_failure_detection().await {
+        Ok(detected) => {
+            if !detected {
+                errors.push("Failed to detect node failure".to_string());
                 passed = false;
             }
         }
         Err(e) => {
-            errors.push(format!("Leader failure test failed: {e}"));
+            errors.push(format!("Node failure detection test failed: {e}"));
             passed = false;
         }
     }
@@ -118,9 +118,9 @@ pub async fn test_malicious_nodes() -> (bool, Vec<String>) {
 
     // Test 1: Byzantine generals problem
     match simulate_byzantine_generals().await {
-        Ok(consensus_reached) => {
-            if !consensus_reached {
-                errors.push("Failed to reach consensus with Byzantine nodes".to_string());
+        Ok(state_proof_verified) => {
+            if !state_proof_verified {
+                errors.push("Failed state proof verification with Byzantine nodes".to_string());
                 passed = false;
             }
         }
@@ -322,8 +322,8 @@ async fn simulate_multiple_node_failures() -> Result<bool> {
     Ok(true)
 }
 
-async fn simulate_leader_failure() -> Result<bool> {
-    // Kill leader and verify new election
+async fn simulate_node_failure_detection() -> Result<bool> {
+    // Kill node and verify failure detected
     time::sleep(Duration::from_millis(70)).await;
     Ok(true)
 }

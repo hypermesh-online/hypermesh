@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use blockmatrix::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
-use blockmatrix::assets::{AssetRegistration, ConsensusProof};
+use blockmatrix::assets::{AssetRegistration, StateProof};
 use hypermesh_lib::PrivacyMode;
 
 use super::asset_type::AssetTypeDefinition;
@@ -47,7 +47,7 @@ pub struct CatalogRegistry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrustPolicy {
     /// Require Proof of State for registration
-    pub require_consensus_proof: bool,
+    pub require_state_proof: bool,
 
     /// Minimum stake amount for registration
     pub minimum_stake: u64,
@@ -62,7 +62,7 @@ pub struct TrustPolicy {
 impl Default for TrustPolicy {
     fn default() -> Self {
         Self {
-            require_consensus_proof: true,
+            require_state_proof: true,
             minimum_stake: 1000,
             allowed_publishers: Vec::new(),
             require_certificate: true,
@@ -129,8 +129,8 @@ impl CatalogRegistry {
     /// Register a new asset type definition
     pub async fn register_type(&self, type_def: AssetTypeDefinition) -> Result<AssetRegistration> {
         // Validate Proof of State if required
-        if self.trust_policy.require_consensus_proof {
-            self.validate_consensus_proof(&type_def.consensus_proof)?;
+        if self.trust_policy.require_state_proof {
+            self.validate_state_proof(&type_def.state_proof)?;
         }
 
         // Check if type already exists
@@ -299,7 +299,7 @@ impl CatalogRegistry {
     }
 
     /// Validate Proof of State
-    fn validate_consensus_proof(&self, proof: &ConsensusProof) -> Result<()> {
+    fn validate_state_proof(&self, proof: &StateProof) -> Result<()> {
         // Basic validation
         if !proof.validate() {
             return Err(anyhow::anyhow!("Proof of State validation failed"));
@@ -441,13 +441,13 @@ pub struct RegistryStatistics {
 mod tests {
     use super::*;
     use crate::registry::asset_type::AssetTypeDefinition;
-    use blockmatrix::consensus::proof_of_state_integration::{
+    use blockmatrix::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use serde_json::json;
     use std::time::Duration;
 
-    fn create_test_consensus_proof() -> ConsensusProof {
+    fn create_test_state_proof() -> StateProof {
         let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
 
         let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
@@ -463,7 +463,7 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
-        ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof)
+        StateProof::new(stake_proof, time_proof, space_proof, work_proof)
     }
 
     #[tokio::test]
@@ -481,8 +481,8 @@ mod tests {
             }
         });
 
-        let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
+        let state_proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, state_proof);
 
         let asset_id = registry.register_type(type_def).await.expect("test: async operation");
         let found_id = registry.find_type("Vehicle").await.expect("test: async operation");
@@ -501,8 +501,8 @@ mod tests {
         // Register multiple types
         for name in &["Vehicle", "VehicleInsurance", "Driver"] {
             let schema = json!({ "type": "object" });
-            let consensus_proof = create_test_consensus_proof();
-            let type_def = AssetTypeDefinition::new(name.to_string(), schema, consensus_proof);
+            let state_proof = create_test_state_proof();
+            let type_def = AssetTypeDefinition::new(name.to_string(), schema, state_proof);
             registry.register_type(type_def).await.expect("test: async operation");
         }
 

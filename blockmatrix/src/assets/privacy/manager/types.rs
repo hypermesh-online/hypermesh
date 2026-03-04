@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use super::super::{
-    CaesarRewardConfig, ConsensusRequirementConfig, PrivacyAllocationResult,
+    CaesarRewardConfig, StateProofRequirementConfig, PrivacyAllocationResult,
     ResourceAllocationConfig,
 };
 use crate::assets::core::PrivacyMode;
@@ -26,8 +26,8 @@ pub struct PrivacyManagerConfig {
     /// Default resource allocation percentages
     pub default_resource_allocation: ResourceAllocationConfig,
 
-    /// Global consensus requirements
-    pub global_consensus_requirements: ConsensusRequirementConfig,
+    /// Global state proof requirements
+    pub global_state_requirements: StateProofRequirementConfig,
 
     /// CAESAR reward base configuration
     pub base_reward_config: CaesarRewardConfig,
@@ -77,7 +77,7 @@ impl Default for PrivacyManagerConfig {
         Self {
             default_privacy_level: PrivacyMode::PRIVATE,
             default_resource_allocation: ResourceAllocationConfig::default(),
-            global_consensus_requirements: ConsensusRequirementConfig::default(),
+            global_state_requirements: StateProofRequirementConfig::default(),
             base_reward_config: CaesarRewardConfig::default(),
             proxy_integration_enabled: true,
             enforcement_strictness: EnforcementStrictness::Moderate,
@@ -104,7 +104,7 @@ impl Default for CaesarRewardConfig {
             base_reward_rate: 1.0,
             privacy_multiplier: 1.0,
             utilization_multiplier: 1.0,
-            consensus_bonus: 0.1,
+            verification_bonus: 0.1,
             max_reward_cap: 1000.0,
             distribution_config: super::super::RewardDistributionConfig::default(),
         }
@@ -159,8 +159,8 @@ pub struct UserPrivacyConfiguration {
     /// Per-resource privacy settings
     pub resource_privacy_settings: HashMap<String, ResourcePrivacyConfig>,
 
-    /// Consensus proof requirements
-    pub consensus_requirements: ConsensusRequirementConfig,
+    /// State proof requirements
+    pub state_requirements: StateProofRequirementConfig,
 
     /// CAESAR reward preferences
     pub reward_preferences: CaesarRewardPreferences,

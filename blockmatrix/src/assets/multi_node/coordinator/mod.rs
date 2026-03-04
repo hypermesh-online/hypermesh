@@ -7,7 +7,7 @@
 //! Revolutionary Concept #4: Multi-Network Participation
 //!
 //! Manages distributed asset coordination across multiple isolated networks
-//! with matrix-based routing, consensus proofs, and zero packet leakage.
+//! with matrix-based routing, state proofs, and zero packet leakage.
 
 mod types;
 
@@ -204,12 +204,12 @@ impl MultiNodeCoordinator {
                     let mut suspicious_behaviors = 0;
                     for (_, state) in states_read.iter() {
                         if let Some(node_state) = state.node_states.get(node_id) {
-                            let consensus_state = state
+                            let state_proof_state = state
                                 .node_states
                                 .values()
                                 .filter(|s| **s != *node_state)
                                 .count();
-                            if consensus_state > state.node_states.len() / 2 {
+                            if state_proof_state > state.node_states.len() / 2 {
                                 suspicious_behaviors += 1;
                             }
                         }
@@ -221,13 +221,13 @@ impl MultiNodeCoordinator {
 
                     let suspicion_ratio =
                         suspicious_behaviors as f32 / states_read.len().max(1) as f32;
-                    if suspicion_ratio > config.byzantine_threshold {
+                    if suspicion_ratio > config.suspicion_threshold {
                         byzantine_nodes.push(node_id.clone());
                     }
                 }
 
                 for byzantine_node in byzantine_nodes {
-                    let _ = event_sender.send(MultiNodeEvent::ByzantineDetected {
+                    let _ = event_sender.send(MultiNodeEvent::InauthenticStateDetected {
                         node: byzantine_node,
                         evidence: Vec::new(),
                     });
@@ -268,8 +268,8 @@ impl MultiNodeCoordinator {
                     MultiNodeEvent::MigrationCompleted { .. } => {
                         metrics_write.successful_migrations += 1;
                     }
-                    MultiNodeEvent::ByzantineDetected { .. } => {
-                        metrics_write.byzantine_nodes += 1;
+                    MultiNodeEvent::InauthenticStateDetected { .. } => {
+                        metrics_write.inauthentic_nodes += 1;
                     }
                     _ => {}
                 }
@@ -519,7 +519,7 @@ impl MultiNodeCoordinatorTrait for MultiNodeCoordinator {
         Ok(())
     }
 
-    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>> {
+    async fn detect_inauthentic_nodes(&self) -> AssetResult<Vec<PeerIdentity>> {
         let nodes = self.nodes.read().await;
         Ok(nodes
             .iter()

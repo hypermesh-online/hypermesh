@@ -15,7 +15,7 @@ pub struct PerformanceTargets {
     pub stoq_throughput_gbps: f64,
     pub trustchain_ops_ms: f64,
     pub catalog_ops_ms: f64,
-    pub consensus_latency_ms: f64,
+    pub state_proof_latency_ms: f64,
     pub memory_usage_mb: f64,
     pub connection_capacity: usize,
 }
@@ -26,7 +26,7 @@ impl Default for PerformanceTargets {
             stoq_throughput_gbps: 2.95,
             trustchain_ops_ms: 35.0,
             catalog_ops_ms: 1.69,
-            consensus_latency_ms: 100.0,
+            state_proof_latency_ms: 100.0,
             memory_usage_mb: 500.0,
             connection_capacity: 10000,
         }
@@ -125,11 +125,11 @@ pub async fn benchmark_asset_operations() -> HashMap<String, f64> {
     metrics
 }
 
-/// Benchmark consensus latency
-pub async fn benchmark_consensus_latency() -> HashMap<String, f64> {
+/// Benchmark state proof validation latency
+pub async fn benchmark_state_proof_latency() -> HashMap<String, f64> {
     let mut metrics = HashMap::new();
 
-    // Four-proof consensus system
+    // Four-proof state proof system
     let proofs = vec![
         ("pospace", benchmark_proof_of_space().await),
         ("postake", benchmark_proof_of_stake().await),
@@ -138,16 +138,16 @@ pub async fn benchmark_consensus_latency() -> HashMap<String, f64> {
     ];
 
     for (proof_type, latency) in proofs {
-        metrics.insert(format!("consensus_{proof_type}_ms"), latency);
+        metrics.insert(format!("state_proof_{proof_type}_ms"), latency);
     }
 
-    // Combined consensus
-    let combined_latency = benchmark_combined_consensus().await;
-    metrics.insert("consensus_combined_ms".to_string(), combined_latency);
+    // Combined state proof validation
+    let combined_latency = benchmark_combined_state_proof().await;
+    metrics.insert("state_proof_combined_ms".to_string(), combined_latency);
 
     // Byzantine fault scenarios
-    let byzantine_latency = benchmark_byzantine_consensus().await;
-    metrics.insert("consensus_byzantine_ms".to_string(), byzantine_latency);
+    let byzantine_latency = benchmark_byzantine_state_proof().await;
+    metrics.insert("state_proof_byzantine_ms".to_string(), byzantine_latency);
 
     metrics
 }
@@ -213,18 +213,18 @@ pub fn validate_metrics(metrics: &HashMap<String, f64>) -> bool {
         }
     }
 
-    // Check consensus latency
-    if let Some(latency) = metrics.get("consensus_combined_ms") {
-        if *latency > targets.consensus_latency_ms {
+    // Check state proof latency
+    if let Some(latency) = metrics.get("state_proof_combined_ms") {
+        if *latency > targets.state_proof_latency_ms {
             eprintln!(
-                "FAILED: Consensus latency {:.2} ms > {:.2} ms (target)",
-                latency, targets.consensus_latency_ms
+                "FAILED: State proof latency {:.2} ms > {:.2} ms (target)",
+                latency, targets.state_proof_latency_ms
             );
             passed = false;
         } else {
             eprintln!(
-                "PASSED: Consensus latency {:.2} ms <= {:.2} ms",
-                latency, targets.consensus_latency_ms
+                "PASSED: State proof latency {:.2} ms <= {:.2} ms",
+                latency, targets.state_proof_latency_ms
             );
         }
     }
@@ -393,11 +393,11 @@ async fn benchmark_proof_of_time() -> f64 {
     10.0 // ms
 }
 
-async fn benchmark_combined_consensus() -> f64 {
+async fn benchmark_combined_state_proof() -> f64 {
     70.0 // ms for all four proofs
 }
 
-async fn benchmark_byzantine_consensus() -> f64 {
+async fn benchmark_byzantine_state_proof() -> f64 {
     95.0 // ms with Byzantine nodes
 }
 
@@ -421,7 +421,7 @@ fn get_performance_baseline() -> HashMap<String, f64> {
     let mut baseline = HashMap::new();
     baseline.insert("stoq_throughput_large_mbps".to_string(), 2800.0);
     baseline.insert("trustchain_validate_ms".to_string(), 30.0);
-    baseline.insert("consensus_combined_ms".to_string(), 65.0);
+    baseline.insert("state_proof_combined_ms".to_string(), 65.0);
     baseline.insert("peak_memory_mb".to_string(), 700.0);
     baseline
 }

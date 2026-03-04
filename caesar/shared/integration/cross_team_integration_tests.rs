@@ -11,14 +11,14 @@ use std::time::{Duration, Instant};
 // Import shared interfaces
 use super::super::interfaces::{
     network_layer::*,
-    consensus_layer::*,
+    validation_layer::*,
     security_layer::*,
 };
 
 /// Integration test suite for all three teams
 pub struct CrossTeamIntegrationTestSuite {
     pub network_layer: Box<dyn NetworkLayer>,
-    pub consensus_layer: Box<dyn ConsensusLayer>,
+    pub validation_layer: Box<dyn ValidationLayer>,
     pub security_layer: Box<dyn SecurityLayer>,
     pub test_results: HashMap<String, IntegrationTestResult>,
 }
@@ -46,12 +46,12 @@ impl CrossTeamIntegrationTestSuite {
     /// Initialize integration test suite with all team implementations
     pub fn new(
         network: Box<dyn NetworkLayer>,
-        consensus: Box<dyn ConsensusLayer>,
+        state_proof: Box<dyn ValidationLayer>,
         security: Box<dyn SecurityLayer>,
     ) -> Self {
         Self {
             network_layer: network,
-            consensus_layer: consensus,
+            validation_layer: state_proof,
             security_layer: security,
             test_results: HashMap::new(),
         }
@@ -64,11 +64,11 @@ impl CrossTeamIntegrationTestSuite {
         // Test 1: Network-Security Integration
         self.test_network_security_integration()?;
         
-        // Test 2: Network-Consensus Integration  
-        self.test_network_consensus_integration()?;
+        // Test 2: Network-State Proof Integration
+        self.test_network_state_proof_integration()?;
         
-        // Test 3: Consensus-Security Integration
-        self.test_consensus_security_integration()?;
+        // Test 3: State Proof-Security Integration
+        self.test_state_proof_security_integration()?;
         
         // Test 4: Three-Way Integration
         self.test_three_way_integration()?;
@@ -126,11 +126,11 @@ impl CrossTeamIntegrationTestSuite {
         Ok(())
     }
 
-    /// Test 2: Network-Consensus Integration (Team 1 ↔ Team 2)  
-    fn test_network_consensus_integration(&mut self) -> Result<(), String> {
+    /// Test 2: Network-State Proof Integration (Team 1 ↔ Team 2)
+    fn test_network_state_proof_integration(&mut self) -> Result<(), String> {
         let start_time = Instant::now();
-        
-        println!("⚖️ Testing Network-Consensus Integration...");
+
+        println!("⚖️ Testing Network-State Proof Integration...");
         
         // Test asset address resolution through network layer
         let test_asset_id = [2u8; 32];
@@ -138,12 +138,12 @@ impl CrossTeamIntegrationTestSuite {
             .resolve_asset_address(test_asset_id)
             .map_err(|e| format!("Failed to resolve asset address: {:?}", e))?;
         
-        // Test memory address resolution through consensus layer
-        let memory_address = self.consensus_layer
+        // Test memory address resolution through state proof layer
+        let memory_address = self.validation_layer
             .resolve_asset_memory_address(test_asset_id)
             .map_err(|e| format!("Failed to resolve memory address: {:?}", e))?;
         
-        // Verify connectivity supports consensus requirements
+        // Verify connectivity supports state proof requirements
         let connectivity = self.network_layer.get_connectivity_status();
         if connectivity.internet_reachability < TARGET_INTERNET_REACHABILITY {
             return Err(format!(
@@ -155,7 +155,7 @@ impl CrossTeamIntegrationTestSuite {
         
         // Test cross-chain synchronization
         let test_chain_state = self.create_test_chain_state();
-        let sync_result = self.consensus_layer
+        let sync_result = self.validation_layer
             .cross_chain_sync(test_chain_state)
             .map_err(|e| format!("Failed cross-chain sync: {:?}", e))?;
         
@@ -163,16 +163,16 @@ impl CrossTeamIntegrationTestSuite {
             return Err("Cross-chain synchronization failed".to_string());
         }
         
-        self.record_test_result("network_consensus_integration", start_time, true, None);
-        println!("✅ Network-Consensus Integration: PASSED");
+        self.record_test_result("network_state_proof_integration", start_time, true, None);
+        println!("✅ Network-State Proof Integration: PASSED");
         Ok(())
     }
 
-    /// Test 3: Consensus-Security Integration (Team 2 ↔ Team 3)
-    fn test_consensus_security_integration(&mut self) -> Result<(), String> {
+    /// Test 3: State Proof-Security Integration (Team 2 ↔ Team 3)
+    fn test_state_proof_security_integration(&mut self) -> Result<(), String> {
         let start_time = Instant::now();
-        
-        println!("🔐 Testing Consensus-Security Integration...");
+
+        println!("🔐 Testing State Proof-Security Integration...");
         
         // Generate asset keys through security layer
         let test_asset_id = [3u8; 32];
@@ -183,8 +183,8 @@ impl CrossTeamIntegrationTestSuite {
         // Create test four-proof with security validation
         let four_proof = self.create_test_four_proof();
         
-        // Validate four proofs through consensus layer
-        let validation_result = self.consensus_layer
+        // Validate four proofs through state proof layer
+        let validation_result = self.validation_layer
             .validate_four_proofs(four_proof.clone())
             .map_err(|e| format!("Failed to validate four proofs: {:?}", e))?;
         
@@ -202,21 +202,21 @@ impl CrossTeamIntegrationTestSuite {
             bandwidth_mbps: 1000,
         };
         
-        let allocation_result = self.consensus_layer
+        let allocation_result = self.validation_layer
             .allocate_privacy_resources(privacy_level.clone(), computational_resources)
             .map_err(|e| format!("Failed privacy resource allocation: {:?}", e))?;
         
         // Validate security compliance
         let security_validation = self.security_layer
-            .validate_security_compliance("consensus_layer")
+            .validate_security_compliance("validation_layer")
             .map_err(|e| format!("Failed security compliance validation: {:?}", e))?;
         
         if !security_validation.is_secure {
             return Err("Security compliance validation failed".to_string());
         }
         
-        self.record_test_result("consensus_security_integration", start_time, true, None);
-        println!("✅ Consensus-Security Integration: PASSED");
+        self.record_test_result("state_proof_security_integration", start_time, true, None);
+        println!("✅ State Proof-Security Integration: PASSED");
         Ok(())
     }
 
@@ -243,9 +243,9 @@ impl CrossTeamIntegrationTestSuite {
             .configure_asset_adapter_security(AssetType::CPU)
             .map_err(|e| format!("Asset adapter security configuration failed: {:?}", e))?;
         
-        // 3. Consensus: Validate and record asset state
+        // 3. State Proof: Validate and record asset state
         let four_proof = self.create_test_four_proof();
-        let validation_result = self.consensus_layer
+        let validation_result = self.validation_layer
             .validate_four_proofs(four_proof.clone())
             .map_err(|e| format!("Four-proof validation failed: {:?}", e))?;
         
@@ -254,7 +254,7 @@ impl CrossTeamIntegrationTestSuite {
         }
         
         let asset_state = self.create_test_asset_state(asset_id, four_proof.clone());
-        let state_hash = self.consensus_layer
+        let state_hash = self.validation_layer
             .record_asset_state(asset_state, four_proof)
             .map_err(|e| format!("Asset state recording failed: {:?}", e))?;
         
@@ -284,16 +284,16 @@ impl CrossTeamIntegrationTestSuite {
             ));
         }
         
-        // Test consensus validation performance
+        // Test state proof validation performance
         let four_proof = self.create_test_four_proof();
         let validation_start = Instant::now();
-        let validation_result = self.consensus_layer
+        let validation_result = self.validation_layer
             .validate_four_proofs(four_proof)
             .map_err(|e| format!("Performance validation failed: {:?}", e))?;
         
         if validation_result.validation_time_ms > TARGET_VALIDATION_TIME_MS {
             return Err(format!(
-                "Consensus validation too slow: {} ms > {} ms",
+                "State proof validation too slow: {} ms > {} ms",
                 validation_result.validation_time_ms,
                 TARGET_VALIDATION_TIME_MS
             ));
@@ -466,7 +466,7 @@ impl CrossTeamIntegrationTestSuite {
             block_height: 100,
             state_root: [1u8; 32],
             asset_states: HashMap::new(),
-            consensus_proofs: HashMap::new(),
+            pos_proofs: HashMap::new(),
         }
     }
 

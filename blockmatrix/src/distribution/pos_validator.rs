@@ -5,7 +5,7 @@
 //! Proof of State (PoS) Validator for Node Eligibility
 //!
 //! CRITICAL: All permission rules live in blockchain Asset records.
-//! This module queries consensus for node eligibility before distribution.
+//! This module queries state proof validation for node eligibility before distribution.
 
 use crate::assets::core::AssetResult;
 use crate::assets::pipeline::sharding::Shard;
@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
-/// Storage access validation result from consensus
+/// Storage access validation result from state proof
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageAccessValidation {
     /// Can this node store the asset/shard?
@@ -42,7 +42,7 @@ pub enum DistributionProofType {
     PoTime,
 }
 
-/// Consensus validator trait for PoS queries
+/// State proof validator trait for PoS queries
 #[async_trait]
 pub trait StateAuthenticator: Send + Sync {
     /// Validate storage access for a node
@@ -62,9 +62,9 @@ pub trait StateAuthenticator: Send + Sync {
     ) -> AssetResult<Vec<StorageAccessValidation>>;
 }
 
-/// Get eligible nodes from consensus validation
+/// Get eligible nodes from state proof validation
 ///
-/// Queries the blockchain Asset records via consensus to determine
+/// Queries the blockchain Asset records via state proof validation to determine
 /// which nodes have permission to store shards for this asset.
 ///
 /// # Arguments
@@ -73,7 +73,7 @@ pub trait StateAuthenticator: Send + Sync {
 /// * `asset_privacy_level` - Privacy level of the asset
 /// * `shards` - Shards to be distributed
 /// * `all_nodes` - All available nodes in network
-/// * `consensus` - Consensus validator for PoS queries
+/// * `state_proof` - State proof validator for PoS queries
 ///
 /// # Returns
 ///
@@ -83,7 +83,7 @@ pub async fn get_eligible_nodes<C>(
     asset_privacy_level: &str,
     shards: &[Shard],
     all_nodes: &[NodeInfo],
-    consensus: &C,
+    state_proof: &C,
 ) -> AssetResult<Vec<NodeInfo>>
 where
     C: StateAuthenticator,
@@ -111,8 +111,8 @@ where
             continue;
         }
 
-        // Query consensus for node eligibility
-        match consensus
+        // Query state proof for node eligibility
+        match state_proof
             .validate_storage_access(&node.node_id, asset_id, &shard_id)
             .await
         {
@@ -123,7 +123,7 @@ where
             }
             Err(e) => {
                 tracing::warn!(
-                    "Consensus validation failed for node {}: {}",
+                    "State proof validation failed for node {}: {}",
                     node.node_id,
                     e
                 );
@@ -141,7 +141,7 @@ pub async fn validate_node_eligibility<C>(
     asset_id: &str,
     asset_privacy_level: &str,
     node_privacy_level: &str,
-    consensus: &C,
+    state_proof: &C,
 ) -> AssetResult<bool>
 where
     C: StateAuthenticator,
@@ -151,9 +151,9 @@ where
         return Ok(false);
     }
 
-    // Consensus validation
+    // State proof validation
     let shard_id = format!("{asset_id}-shard-0");
-    let validation = consensus
+    let validation = state_proof
         .validate_storage_access(node_id, asset_id, &shard_id)
         .await?;
 
@@ -253,7 +253,7 @@ impl StateAuthenticator for MockStateAuthenticator {
 
 /// Implementation for DefaultStateAuthenticator
 #[async_trait]
-impl StateAuthenticator for crate::consensus::validation::DefaultStateAuthenticator {
+impl StateAuthenticator for crate::proof_of_state::validation::DefaultStateAuthenticator {
     async fn validate_storage_access(
         &self,
         node_id: &str,
@@ -350,11 +350,11 @@ mod tests {
         ];
 
         let shards = vec![];
-        let consensus = MockStateAuthenticator::new(true);
+        let state_proof = MockStateAuthenticator::new(true);
 
         // Test PrivateNetwork asset
         let eligible =
-            get_eligible_nodes("test-asset", "PrivateNetwork", &shards, &nodes, &consensus)
+            get_eligible_nodes("test-asset", "PrivateNetwork", &shards, &nodes, &state_proof)
                 .await
                 .expect("test: expected success");
 
@@ -365,14 +365,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_node_eligibility() {
-        let consensus = MockStateAuthenticator::new(true);
+        let state_proof = MockStateAuthenticator::new(true);
 
         let result = validate_node_eligibility(
             "node1",
             "test-asset",
             "PrivateNetwork",
             "PrivateNetwork",
-            &consensus,
+            &state_proof,
         )
         .await
         .expect("test: expected success");
@@ -385,7 +385,7 @@ mod tests {
             "test-asset",
             "PrivateNetwork",
             "PublicNetwork",
-            &consensus,
+            &state_proof,
         )
         .await
         .expect("test: expected success");

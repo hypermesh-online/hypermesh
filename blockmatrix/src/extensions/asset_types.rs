@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime};
 
 use super::types::ResourceUsageReport;
 use crate::assets::core::{
-    AssetAllocation, AssetRegistration, AssetType, ConsensusProof, PrivacyMode,
+    AssetAllocation, AssetRegistration, AssetType, StateProof, PrivacyMode,
 };
 
 /// Asset creation specification
@@ -21,7 +21,7 @@ pub struct AssetCreationSpec {
     pub metadata: HashMap<String, serde_json::Value>,
     pub privacy_level: PrivacyMode,
     pub allocation: Option<AssetAllocation>,
-    pub consensus_requirements: ConsensusRequirements,
+    pub state_requirements: StateRequirements,
     pub parent_id: Option<AssetRegistration>,
     pub tags: Vec<String>,
 }
@@ -54,7 +54,7 @@ pub struct AssetQuery {
 /// This is distinct from `hypermesh_lib::AssetMetadata` (the canonical
 /// cross-crate metadata). `ExtensionAssetRecord` is a blockmatrix-specific
 /// view containing runtime state like privacy level, allocation, and
-/// consensus status that only exist within the extension system.
+/// state proof status that only exist within the extension system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtensionAssetRecord {
     pub id: AssetRegistration,
@@ -67,7 +67,7 @@ pub struct ExtensionAssetRecord {
     pub metadata: HashMap<String, serde_json::Value>,
     pub privacy_level: PrivacyMode,
     pub allocation: Option<AssetAllocation>,
-    pub consensus_status: ConsensusStatus,
+    pub state_proof_status: StateProofStatus,
     pub tags: Vec<String>,
 }
 
@@ -78,7 +78,7 @@ pub enum AssetOperation {
     Execute(ExecutionSpec),
     Transfer(TransferSpec),
     Share(SharingSpec),
-    Validate(ConsensusProof),
+    Validate(StateProof),
     Custom(serde_json::Value),
 }
 
@@ -101,7 +101,7 @@ pub struct DeploymentSpec {
     pub env_vars: HashMap<String, String>,
     pub network_config: Option<NetworkConfig>,
     pub volumes: Vec<VolumeMount>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 /// Resource requirements for deployment
@@ -166,14 +166,14 @@ pub struct ExecutionSpec {
     pub language: String,
     pub inputs: HashMap<String, serde_json::Value>,
     pub timeout: Option<Duration>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferSpec {
     pub new_owner: String,
     pub reason: Option<String>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,7 +181,7 @@ pub struct SharingSpec {
     pub users: Vec<String>,
     pub access_level: String,
     pub expires_at: Option<SystemTime>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,9 +214,9 @@ pub struct SharingResult {
     pub shared_at: SystemTime,
 }
 
-/// Consensus requirements for assets
+/// State proof requirements for assets (bilateral Proof of State)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusRequirements {
+pub struct StateRequirements {
     pub require_proof_of_space: bool,
     pub require_proof_of_stake: bool,
     pub require_proof_of_work: bool,
@@ -227,7 +227,7 @@ pub struct ConsensusRequirements {
     pub time_window: Option<Duration>,
 }
 
-impl Default for ConsensusRequirements {
+impl Default for StateRequirements {
     fn default() -> Self {
         Self {
             require_proof_of_space: true,
@@ -242,11 +242,11 @@ impl Default for ConsensusRequirements {
     }
 }
 
-/// Consensus validation status
+/// State proof validation status
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusStatus {
+pub struct StateProofStatus {
     pub validated: bool,
     pub last_validated: Option<SystemTime>,
-    pub proofs: Option<ConsensusProof>,
+    pub proofs: Option<StateProof>,
     pub errors: Vec<String>,
 }

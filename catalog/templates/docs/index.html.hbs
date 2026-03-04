@@ -317,7 +317,7 @@ catalog install {{asset.name}}@{{asset.version}}</code></pre>
                     <div class="card">
                         <h3>Security Settings</h3>
                         <p><strong>Sandbox Level:</strong> {{security.sandbox_level}}</p>
-                        <p><strong>Consensus:</strong> {{#if security.consensus_required}}Required{{else}}Not Required{{/if}}</p>
+                        <p><strong>State Proof:</strong> {{#if security.consensus_required}}Required{{else}}Not Required{{/if}}</p>
                         <p><strong>Hash Validation:</strong> {{security.hash_validation}}</p>
                         <p><strong>Network Access:</strong> {{#if security.network_access.enabled}}Enabled{{else}}Disabled{{/if}}</p>
                         <p><strong>File Access:</strong> {{security.file_access.level}}</p>

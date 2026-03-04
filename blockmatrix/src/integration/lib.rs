@@ -5,7 +5,7 @@
 //! HyperMesh Platform Integration Layer
 //!
 //! This module provides the unified integration layer that orchestrates all HyperMesh components
-//! including transport, consensus, container runtime, security, and orchestration into a 
+//! including transport, Proof of State, container runtime, security, and orchestration into a
 //! cohesive distributed computing platform.
 //!
 //! # Architecture Overview
@@ -16,7 +16,7 @@
 //! ├─────────────────────────────────────────┤
 //! │  Integration Layer (This Module)        │
 //! ├─────────────────────────────────────────┤
-//! │ Transport│Consensus│Container│Security  │
+//! │ Transport│PoState  │Container│Security  │
 //! ├─────────────────────────────────────────┤
 //! │            STOQ Protocol                │
 //! └─────────────────────────────────────────┘
@@ -33,7 +33,7 @@ use serde::{Serialize, Deserialize};
 
 // Component imports
 use crate::transport::{HyperMeshTransport, TransportConfig, PeerIdentity};
-use crate::consensus::{ConsensusManager, ConsensusConfig};
+use crate::proof_of_state::{StateProofManager, StateProofConfig};
 use hypermesh_container::{ContainerRuntime, ContainerRuntimeConfig};
 use hypermesh_security::{HyperMeshSecurity, SecurityConfig};
 use hypermesh_orchestration::{OrchestrationEngine, OrchestrationConfig};
@@ -100,8 +100,8 @@ pub struct HyperMeshPlatform {
     // stoq: Arc<Stoq>,
     /// Transport layer
     transport: Arc<HyperMeshTransport>,
-    /// Consensus manager
-    consensus: Arc<ConsensusManager>,
+    /// State proof manager
+    state_proof: Arc<StateProofManager>,
     /// Container runtime
     container_runtime: Arc<ContainerRuntime>,
     /// Security framework
@@ -141,12 +141,12 @@ impl HyperMeshPlatform {
                 })?
         );
         
-        // Initialize consensus manager
-        let consensus = Arc::new(
-            ConsensusManager::new(config.consensus.clone())
+        // Initialize state proof manager
+        let state_proof = Arc::new(
+            StateProofManager::new(config.state_proof.clone())
                 .await
                 .map_err(|e| IntegrationError::ComponentInit {
-                    component: "Consensus".to_string(),
+                    component: "StateProof".to_string(),
                     message: e.to_string(),
                 })?
         );
@@ -189,7 +189,7 @@ impl HyperMeshPlatform {
             metrics,
             // stoq,  // temporarily disabled
             transport,
-            consensus,
+            state_proof,
             container_runtime,
             security,
             orchestration,
@@ -226,14 +226,14 @@ impl HyperMeshPlatform {
         drop(security);
         self.coordinator.complete_phase("security_init").await;
         
-        // Phase 3: Initialize consensus with transport integration
-        self.coordinator.start_phase("consensus_init").await;
-        self.consensus.initialize().await
+        // Phase 3: Initialize state proof with transport integration
+        self.coordinator.start_phase("state_proof_init").await;
+        self.state_proof.initialize().await
             .map_err(|e| IntegrationError::ComponentInit {
-                component: "Consensus".to_string(),
+                component: "StateProof".to_string(),
                 message: e.to_string(),
             })?;
-        self.coordinator.complete_phase("consensus_init").await;
+        self.coordinator.complete_phase("state_proof_init").await;
         
         // Phase 4: Initialize container runtime with security integration
         self.coordinator.start_phase("container_init").await;
@@ -267,11 +267,11 @@ impl HyperMeshPlatform {
     async fn setup_component_integrations(&self) -> IntegrationResult<()> {
         info!("Setting up cross-component integrations");
         
-        // Transport-Consensus integration
-        self.setup_transport_consensus_integration().await?;
-        
-        // Consensus-Container integration  
-        self.setup_consensus_container_integration().await?;
+        // Transport-StateProof integration
+        self.setup_transport_state_proof_integration().await?;
+
+        // StateProof-Container integration
+        self.setup_state_proof_container_integration().await?;
         
         // Container-Security integration
         self.setup_container_security_integration().await?;
@@ -286,17 +286,17 @@ impl HyperMeshPlatform {
         Ok(())
     }
     
-    /// Setup Transport-Consensus integration
-    async fn setup_transport_consensus_integration(&self) -> IntegrationResult<()> {
-        info!("Setting up Transport-Consensus integration");
-        
-        // Register consensus as a transport service
+    /// Setup Transport-StateProof integration
+    async fn setup_transport_state_proof_integration(&self) -> IntegrationResult<()> {
+        info!("Setting up Transport-StateProof integration");
+
+        // Register state proof as a transport service
         self.service_registry.register_service(
-            "consensus".to_string(),
+            "state_proof".to_string(),
             services::ServiceEndpoint {
-                service_type: "consensus".to_string(),
-                address: self.config.consensus.node_id.clone(),
-                port: self.config.consensus.port,
+                service_type: "state_proof".to_string(),
+                address: self.config.state_proof.node_id.clone(),
+                port: self.config.state_proof.port,
                 health_check_path: "/health".to_string(),
             }
         ).await?;
@@ -304,11 +304,11 @@ impl HyperMeshPlatform {
         Ok(())
     }
     
-    /// Setup Consensus-Container integration  
-    async fn setup_consensus_container_integration(&self) -> IntegrationResult<()> {
-        info!("Setting up Consensus-Container integration");
+    /// Setup StateProof-Container integration
+    async fn setup_state_proof_container_integration(&self) -> IntegrationResult<()> {
+        info!("Setting up StateProof-Container integration");
         
-        // Register container runtime with consensus for coordinated scheduling
+        // Register container runtime with state proof for coordinated scheduling
         self.service_registry.register_service(
             "container_runtime".to_string(),
             services::ServiceEndpoint {
@@ -347,7 +347,7 @@ impl HyperMeshPlatform {
         info!("Setting up Orchestration integrations");
         
         // Orchestration engine coordinates all components
-        // It uses consensus for distributed decisions
+        // It uses state proof for bilateral verification
         // It uses container runtime for workload deployment
         // It uses security for policy enforcement
         // It uses transport for inter-node communication
@@ -369,8 +369,8 @@ impl HyperMeshPlatform {
             warn!("Container runtime shutdown error: {}", e);
         }
         
-        if let Err(e) = self.consensus.shutdown().await {
-            warn!("Consensus shutdown error: {}", e);
+        if let Err(e) = self.state_proof.shutdown().await {
+            warn!("State proof shutdown error: {}", e);
         }
         
         if let Ok(mut security) = self.security.try_write() {
@@ -411,9 +411,9 @@ impl HyperMeshPlatform {
         &self.transport
     }
     
-    /// Get consensus handle
-    pub fn consensus(&self) -> &Arc<ConsensusManager> {
-        &self.consensus
+    /// Get state proof handle
+    pub fn state_proof(&self) -> &Arc<StateProofManager> {
+        &self.state_proof
     }
     
     /// Get container runtime handle
@@ -457,9 +457,9 @@ impl HyperMeshPlatformBuilder {
         self
     }
     
-    /// Set consensus configuration
-    pub fn consensus_config(mut self, config: ConsensusConfig) -> Self {
-        self.config.consensus = config;
+    /// Set state proof configuration
+    pub fn state_proof_config(mut self, config: StateProofConfig) -> Self {
+        self.config.state_proof = config;
         self
     }
     

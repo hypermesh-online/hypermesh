@@ -59,8 +59,8 @@ pub struct TierRequirements {
     /// Minimum utilization rate
     pub min_utilization_rate: f32,
 
-    /// Minimum consensus proof success rate
-    pub min_consensus_success_rate: f32,
+    /// Minimum state proof success rate
+    pub min_state_proof_success_rate: f32,
 
     /// Minimum stake amount
     pub min_stake_amount: u64,
@@ -129,8 +129,8 @@ pub struct ContributionRequirement {
 pub enum ContributionType {
     /// Hosting paid content (ads, KYCML, paid hosting) - earns CAESAR via NGauge
     ResourceSharing,
-    /// Consensus validation participation
-    ConsensusParticipation,
+    /// State proof validation participation
+    StateProofValidation,
     /// Network stability contributions
     NetworkStability,
     /// Community support activities
@@ -187,7 +187,7 @@ pub enum PerformanceMetric {
     ResourceUtilization,
     SecurityScore,
     AuthenticationRate,
-    ConsensusParticipation,
+    StateProofValidation,
     PeerRating,
 }
 
@@ -234,7 +234,7 @@ pub struct PenaltyConfig {
 pub enum ViolationType {
     PrivacyViolation,
     ServiceUnavailability,
-    ConsensusFailure,
+    StateProofFailure,
     SecurityBreach,
     ResourceMisuse,
     ContractViolation,
@@ -285,14 +285,12 @@ pub struct PerformanceRecovery {
     pub progressive_recovery: bool,
 }
 
-/// Community-based penalty recovery
+/// Bilateral re-verification recovery from penalties
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommunityRecovery {
-    /// Required community votes
-    pub required_votes: u32,
-
-    /// Vote threshold percentage
-    pub vote_threshold: f32,
+    /// Minimum number of peers that must bilaterally verify the node's re-proven state
+    /// Each peer independently validates all four proofs — pass/fail, not a vote
+    pub required_verifiers: u32,
 
     /// Community service requirements
     pub service_requirements: Vec<String>,

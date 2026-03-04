@@ -16,7 +16,7 @@ use std::time::{Duration, SystemTime};
 
 use hypermesh_assets::core::{
     AssetRegistration, AssetType, PrivacyMode,
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+    StateProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     WorkloadType, WorkState
 };
 
@@ -37,12 +37,12 @@ async fn test_privacy_allocation_workflow() {
     let manager_config = PrivacyManagerConfig {
         default_privacy_level: PrivacyMode::PRIVATE,
         default_resource_allocation: super::ResourceAllocationConfig::default(),
-        global_consensus_requirements: super::ConsensusRequirementConfig::default(),
+        global_state_requirements: super::StateProofRequirementConfig::default(),
         base_reward_config: CaesarRewardConfig {
             base_reward_rate: 10.0,
             privacy_multiplier: 1.0,
             utilization_multiplier: 1.0,
-            consensus_bonus: 0.1,
+            verification_bonus: 0.1,
             max_reward_cap: 1000.0,
             distribution_config: RewardDistributionConfig {
                 immediate_payout: true,
@@ -71,7 +71,7 @@ async fn test_privacy_allocation_workflow() {
         user_id: "test-user-123".to_string(),
         preferred_privacy_level: PrivacyMode::PUBLIC,
         resource_privacy_settings: HashMap::new(),
-        consensus_requirements: super::ConsensusRequirementConfig::default(),
+        state_requirements: super::StateProofRequirementConfig::default(),
         reward_preferences: super::manager::CaesarRewardPreferences {
             enabled: true,
             minimum_reward_rate: 5.0,
@@ -127,7 +127,7 @@ async fn test_privacy_allocation_workflow() {
     // Create test asset
     let asset_id = AssetRegistration::new(AssetType::Cpu);
     
-    // Create consensus proof (all four proofs required)
+    // Create state proof (all four proofs required)
     let space_proof = SpaceProof {
         node_id: "test-node".to_string(),
         storage_path: "/test/storage".to_string(),
@@ -162,14 +162,14 @@ async fn test_privacy_allocation_workflow() {
         proof_hash: vec![9, 10, 11, 12, 13, 14, 15, 16],
     };
     
-    let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+    let state_proof = StateProof::new(stake_proof, time_proof, space_proof, work_proof);
     
     // Request privacy-controlled asset allocation
     let allocation_result = privacy_manager.allocate_privacy_controlled_access(
         "test-user-123",
         &asset_id,
         Some(PrivacyMode::PUBLIC), // Override default
-        Some(consensus_proof),
+        Some(state_proof),
     ).await.expect("test: async operation");
     
     // Verify allocation result
@@ -181,11 +181,11 @@ async fn test_privacy_allocation_workflow() {
     assert!(allocation_result.resource_config.cpu_percentage > 0.0);
     assert!(allocation_result.resource_config.max_concurrent_users > 0);
     
-    // Verify consensus requirements
-    assert!(allocation_result.consensus_requirements.require_proof_of_space);
-    assert!(allocation_result.consensus_requirements.require_proof_of_stake);
-    assert!(allocation_result.consensus_requirements.require_proof_of_work);
-    assert!(allocation_result.consensus_requirements.require_proof_of_time);
+    // Verify state proof requirements
+    assert!(allocation_result.state_requirements.require_proof_of_space);
+    assert!(allocation_result.state_requirements.require_proof_of_stake);
+    assert!(allocation_result.state_requirements.require_proof_of_work);
+    assert!(allocation_result.state_requirements.require_proof_of_time);
     
     // Verify CAESAR reward configuration
     assert!(allocation_result.reward_config.base_reward_rate > 0.0);
@@ -225,7 +225,7 @@ async fn test_allocation_types_and_transitions() {
     assert!(private.description().contains("Internal use only"));
     assert!(public.description().contains("Cross-network accessible"));
     assert!(anonymous.description().contains("No identity tracking"));
-    assert!(verified.description().contains("Full consensus validation"));
+    assert!(verified.description().contains("Full state proof validation"));
     
     // Test capabilities
     assert!(!private.supports_remote_access());
@@ -238,11 +238,11 @@ async fn test_allocation_types_and_transitions() {
     assert!(!anonymous.supports_identity_tracking()); // Key difference
     assert!(verified.supports_identity_tracking());
     
-    // Test consensus proof requirements
-    assert!(!private.requires_consensus_proof());
-    assert!(!public.requires_consensus_proof());
-    assert!(!anonymous.requires_consensus_proof());
-    assert!(verified.requires_consensus_proof()); // Only verified requires full consensus
+    // Test state proof requirements
+    assert!(!private.requires_state_proof());
+    assert!(!public.requires_state_proof());
+    assert!(!anonymous.requires_state_proof());
+    assert!(verified.requires_state_proof()); // Only verified requires full state proof
     
     // Test privacy level mappings
     assert_eq!(private.minimum_privacy_level(), PrivacyMode::PRIVATE);
@@ -283,7 +283,7 @@ async fn test_caesar_reward_calculation() {
         base_reward_rate: 10.0,
         privacy_multiplier: 1.0,
         utilization_multiplier: 1.0,
-        consensus_bonus: 0.1,
+        verification_bonus: 0.1,
         max_reward_cap: 1000.0,
         distribution_config: RewardDistributionConfig {
             immediate_payout: false,
@@ -376,7 +376,7 @@ async fn test_privacy_enforcement() {
     let manager_config = PrivacyManagerConfig {
         default_privacy_level: PrivacyMode::PRIVATE,
         default_resource_allocation: super::ResourceAllocationConfig::default(),
-        global_consensus_requirements: super::ConsensusRequirementConfig::default(),
+        global_state_requirements: super::StateProofRequirementConfig::default(),
         base_reward_config: CaesarRewardConfig::default(),
         proxy_integration_enabled: false,
         enforcement_strictness: EnforcementStrictness::Strict,
@@ -398,7 +398,7 @@ async fn test_privacy_enforcement() {
         allocation_type: PrivacyAllocationType::Public,
         privacy_level: PrivacyMode::PUBLIC,
         resource_config: super::ResourceAllocationConfig::default(),
-        consensus_requirements: super::ConsensusRequirementConfig::default(),
+        state_requirements: super::StateProofRequirementConfig::default(),
         reward_config: CaesarRewardConfig::default(),
         proxy_config: super::ProxyConfiguration::default(),
         allocated_at: SystemTime::now(),
@@ -492,7 +492,7 @@ impl Default for super::ResourceAllocationConfig {
     }
 }
 
-impl Default for super::ConsensusRequirementConfig {
+impl Default for super::StateProofRequirementConfig {
     fn default() -> Self {
         Self {
             require_proof_of_space: true,
@@ -547,7 +547,7 @@ impl Default for CaesarRewardConfig {
             base_reward_rate: 10.0,
             privacy_multiplier: 1.0,
             utilization_multiplier: 1.0,
-            consensus_bonus: 0.1,
+            verification_bonus: 0.1,
             max_reward_cap: 1000.0,
             distribution_config: RewardDistributionConfig::default(),
         }
@@ -582,7 +582,7 @@ impl Default for super::TrustRequirements {
     fn default() -> Self {
         Self {
             require_certificate_validation: true,
-            require_consensus_validation: false,
+            require_state_validation: false,
             reauth_interval: Duration::from_secs(3600),
             min_successful_operations: 10,
         }

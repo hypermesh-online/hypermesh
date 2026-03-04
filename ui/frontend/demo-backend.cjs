@@ -72,7 +72,7 @@ const server = https.createServer({
         ca: true,
         ct: true,
         dns: true,
-        consensus: true
+        stateProof: true
       }
     }));
   } else if (req.url === '/stats') {

@@ -23,7 +23,7 @@ mod tests {
     use super::*;
     use crate::assets::core::{
         AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
-        ConsensusProof, NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, TimeProof,
+        StateProof, NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, TimeProof,
         WorkProof, WorkState, WorkloadType,
     };
     use std::collections::HashMap;
@@ -42,7 +42,7 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyMode::PRIVATE,
-            consensus_proof: ConsensusProof::new(
+            state_proof: StateProof::new(
                 StakeProof {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),

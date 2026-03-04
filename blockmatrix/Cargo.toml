@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["HyperMesh Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/hypermesh/hypermesh"
-description = "HyperMesh - Distributed Computing Platform with Proof of State Consensus"
+description = "HyperMesh - Distributed Computing Platform with Proof of State"
 
 [lints]
 workspace = true
@@ -67,7 +67,7 @@ tempfile = { workspace = true }
 uuid = { workspace = true }
 lazy_static = { workspace = true }
 
-# TrustChain - Consensus and certificate system
+# TrustChain - Proof of State and certificate system
 # NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
 trustchain = { path = "../trustchain", features = ["localhost-testing"] }
 
@@ -186,8 +186,8 @@ proptest = { workspace = true }
 ctor = "0.2"  # Test initialization functions
 
 [features]
-default = ["consensus", "assets"]
-consensus = []
+default = ["proof-of-state", "assets"]
+proof-of-state = []
 assets = []
 multi-node = []
 future-tests = []

@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use tracing::{info, Level};
 
 use trustchain::{
-    CAConfig, CertificateRequest, ConsensusProof, PQCAlgorithm, PostQuantumCrypto,
+    CAConfig, CertificateRequest, StateProof, PQCAlgorithm, PostQuantumCrypto,
     SecurityIntegratedCA, SecurityIntegrationConfig,
 };
 
@@ -113,7 +113,7 @@ async fn main() -> Result<()> {
     let security_config = SecurityIntegrationConfig {
         mandatory_security_validation: false, // Simplified for example
         block_on_security_failure: false,
-        mandatory_consensus: false,
+        mandatory_state_proof: false,
         log_all_operations: true,
         mandatory_post_quantum: true,   // CRITICAL: Enable FALCON-1024
         enable_hybrid_signatures: true, // Enable transition support
@@ -139,18 +139,18 @@ async fn main() -> Result<()> {
     // 6. Issue Post-Quantum Certificate
     info!("\n📚 Step 6: Issuing Post-Quantum Certificate");
 
-    // Generate real consensus proof for production example
+    // Generate real state proof for production example
     let node_id = "example_node_001";
-    let consensus_proof = ConsensusProof::generate_from_network(node_id)
+    let state_proof = StateProof::generate_from_network(node_id)
         .await
-        .map_err(|e| anyhow!("Failed to generate consensus proof: {e}"))?;
+        .map_err(|e| anyhow!("Failed to generate state proof: {e}"))?;
 
     let cert_request = CertificateRequest {
         common_name: "example.hypermesh.online".to_string(),
         san_entries: vec!["example.hypermesh.online".to_string()],
         node_id: node_id.to_string(),
         ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-        consensus_proof,
+        state_proof,
         timestamp: std::time::SystemTime::now(),
         identity_scope: None,
         subject_type: None,

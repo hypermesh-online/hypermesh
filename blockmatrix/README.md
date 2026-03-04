@@ -15,7 +15,7 @@ Node Boot
   |-> Optional: join Network chain via reflector pooling
 ```
 
-**Dual-scope blockchain**: Device chain runs always (local-only). Network chain syncs across participating nodes via reflector pooling. PrivacyMode (transport) is independent from BlockchainScope (consensus).
+**Dual-scope blockchain**: Device chain runs always (local-only). Network chain syncs across participating nodes via reflector pooling. PrivacyMode (transport) is independent from BlockchainScope (state replication).
 
 ## Key Features
 
@@ -39,7 +39,7 @@ Node Boot
 | Module | Purpose |
 |--------|---------|
 | `blockchain` | Device-scope chain, block production, validation |
-| `consensus` | Proof of State orchestration (PoSpace/PoStake/PoWork/PoTime) |
+| `proof_of_state` | Proof of State orchestration (PoSpace/PoStake/PoWork/PoTime) |
 | `assets` | Adapters, pipeline (compress/encrypt/shard/distribute), proxy, privacy |
 | `matrix` | Tensor operations, geospatial, coordinate system |
 | `transfer` | TransferEngine, IPv6 AssetAddress, state proofs |

@@ -31,7 +31,7 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, ConsensusProof, MemoryUsage, NetworkScope, PrivacyMode,
+    AssetType, BaseSystemType, StateProof, MemoryUsage, NetworkScope, PrivacyMode,
     ProxyAddress, ResourceLimits, ResourceUsage,
 };
 use crate::os_integration::create_os_abstraction;
@@ -223,7 +223,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         AssetType::Memory
     }
 
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
         let is_test_proof = proof.stake_proof.stake_holder_id == "test_stake_holder"
             && proof.space_proof.node_id == "test_node_001";
 
@@ -261,11 +261,11 @@ impl AssetAdapter for MemoryAssetAdapter {
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         if !self
-            .validate_consensus_proof(&request.consensus_proof)
+            .validate_state_proof(&request.state_proof)
             .await?
         {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "Memory allocation consensus validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "Memory allocation state proof validation failed".to_string(),
             });
         }
 
@@ -390,7 +390,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                 },
                 privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: Some(proxy_address.clone()),
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
@@ -403,8 +403,8 @@ impl AssetAdapter for MemoryAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements:
-                    crate::assets::core::privacy::ConsensusRequirements::default(),
+                state_requirements:
+                    crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -468,7 +468,7 @@ impl AssetAdapter for MemoryAssetAdapter {
             privacy_level: allocation.privacy_level,
             proxy_address: allocation.proxy_address.clone(),
             resource_usage: self.get_resource_usage(asset_id).await?,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint: "memory-adapter".to_string(),
             health_status: crate::assets::core::status::AssetHealthStatus::default(),
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
@@ -696,7 +696,7 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyMode::PRIVATE,
-            consensus_proof: ConsensusProof::new_for_testing(),
+            state_proof: StateProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),
             duration_limit: Some(Duration::from_secs(3600)),
             tags: HashMap::new(),

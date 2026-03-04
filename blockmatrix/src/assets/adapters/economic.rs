@@ -8,9 +8,9 @@
 //! - Token wallets and balances
 //! - Staking positions and rewards
 //! - Cross-chain bridge operations
-//! - Economic consensus validation
+//! - Economic state proof validation
 
-use crate::assets::core::privacy::ConsensusRequirements as PrivacyConsensusRequirements;
+use crate::assets::core::privacy::StateRequirements as PrivacyStateRequirements;
 use crate::assets::core::privacy::{
     AccessConfig, AccessPermissions, AllocationConfig, AuthRequirements, ConcurrencyLimits,
     DurationConfig, RateLimits, ResourceAllocationConfig,
@@ -74,8 +74,8 @@ pub struct EconomicAssetAdapter {
     assets: Arc<RwLock<HashMap<AssetRegistration, EconomicAssetState>>>,
     /// Asset capabilities and limits
     capabilities: AdapterCapabilities,
-    /// Consensus validation requirements
-    consensus_requirements: ConsensusRequirements,
+    /// State proof validation requirements
+    state_requirements: StateRequirements,
 }
 
 /// Internal state for economic assets
@@ -108,11 +108,11 @@ pub struct EconomicLimits {
     pub cross_chain_limit: u64,
 }
 
-/// Consensus requirements for economic operations
+/// State proof requirements for economic operations
 #[derive(Clone, Debug)]
-struct ConsensusRequirements {
+struct StateRequirements {
     /// Require full four-proof validation
-    pub require_full_consensus: bool,
+    pub require_full_state_proof: bool,
     /// Minimum stake for validation participation
     pub min_validation_stake: Decimal,
     /// Economic proof validation timeout
@@ -144,51 +144,51 @@ impl EconomicAssetAdapter {
                     "resource_limits".to_string(),
                 ],
             },
-            consensus_requirements: ConsensusRequirements {
-                require_full_consensus: true,
+            state_requirements: StateRequirements {
+                require_full_state_proof: true,
                 min_validation_stake: Decimal::new(1000, 0), // 1000 tokens minimum
                 validation_timeout: std::time::Duration::from_secs(30),
             },
         }
     }
 
-    /// Validate economic consensus proof
-    async fn validate_economic_consensus(
+    /// Validate economic state proof
+    async fn validate_economic_state_proof(
         &self,
-        proof: &crate::assets::core::ConsensusProof,
+        proof: &crate::assets::core::StateProof,
     ) -> AssetResult<()> {
-        // Validate that economic operations meet consensus requirements
-        if self.consensus_requirements.require_full_consensus {
+        // Validate that economic operations meet state proof requirements
+        if self.state_requirements.require_full_state_proof {
             // Check stake proof for economic validation rights
             let stake_amount = Decimal::from(proof.stake_proof.stake_amount);
-            if stake_amount < self.consensus_requirements.min_validation_stake {
-                return Err(AssetError::ConsensusValidationFailed {
+            if stake_amount < self.state_requirements.min_validation_stake {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: format!(
                         "Insufficient economic validation stake: {} < required {}",
-                        stake_amount, self.consensus_requirements.min_validation_stake
+                        stake_amount, self.state_requirements.min_validation_stake
                     ),
                 });
             }
 
             // Validate space proof for economic asset storage
             if proof.space_proof.total_storage == 0 {
-                return Err(AssetError::ConsensusValidationFailed {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: "Economic assets require storage space commitment".to_string(),
                 });
             }
 
             // Validate work proof for transaction processing capability
             if proof.work_proof.computational_power < 50 {
-                return Err(AssetError::ConsensusValidationFailed {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: "Insufficient computational power for economic operations".to_string(),
                 });
             }
 
             // Validate time proof for economic operation ordering
-            if proof.time_proof.network_time_offset > self.consensus_requirements.validation_timeout
+            if proof.time_proof.network_time_offset > self.state_requirements.validation_timeout
             {
-                return Err(AssetError::ConsensusValidationFailed {
-                    reason: "Time synchronization required for economic consensus".to_string(),
+                return Err(AssetError::StateProofValidationFailed {
+                    reason: "Time synchronization required for economic state proof".to_string(),
                 });
             }
         }
@@ -215,8 +215,8 @@ impl AssetAdapter for EconomicAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<crate::assets::core::AssetAllocation> {
-        // Validate consensus proof for economic operations
-        self.validate_economic_consensus(&request.consensus_proof)
+        // Validate state proof for economic operations
+        self.validate_economic_state_proof(&request.state_proof)
             .await?;
 
         // Extract economic requirements
@@ -273,7 +273,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 resource_usage: Default::default(),
                 privacy_level: request.privacy_level,
                 proxy_address: None,
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: String::new(),
                 metadata: HashMap::new(),
                 health_status: Default::default(),
@@ -309,7 +309,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                     auto_renewal: true,
                     grace_period: std::time::Duration::from_secs(300),
                 },
-                consensus_requirements: PrivacyConsensusRequirements {
+                state_requirements: PrivacyStateRequirements {
                     require_space_proof: true,
                     require_stake_proof: true,
                     require_work_proof: true,
@@ -337,7 +337,7 @@ impl AssetAdapter for EconomicAssetAdapter {
                 auth_requirements: AuthRequirements {
                     require_certificate: true,
                     require_mfa: false,
-                    require_consensus_proof: true,
+                    require_state_proof: true,
                     session_timeout: 3600,
                 },
             },
@@ -487,11 +487,11 @@ impl AssetAdapter for EconomicAssetAdapter {
         AssetType::Economic
     }
 
-    async fn validate_consensus_proof(
+    async fn validate_state_proof(
         &self,
-        proof: &crate::consensus::proof::ConsensusProof,
+        proof: &crate::proof_of_state::proof::StateProof,
     ) -> AssetResult<bool> {
-        // Delegate to existing consensus validation with economic thresholds
+        // Delegate to existing state proof validation with economic thresholds
         // Check if proof meets economic asset requirements
 
         // Validate stake amount meets minimum threshold for economic operations

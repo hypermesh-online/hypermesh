@@ -2,7 +2,7 @@
 
 ## Overview
 
-The HyperMesh Extension Security Model implements defense-in-depth with multiple layers of protection to ensure that extensions cannot compromise system integrity, user privacy, or consensus validation.
+The HyperMesh Extension Security Model implements defense-in-depth with multiple layers of protection to ensure that extensions cannot compromise system integrity, user privacy, or state proof validation.
 
 ## Security Layers
 
@@ -60,7 +60,7 @@ pub enum ExtensionCapability {
     // System Capabilities
     FileSystemRead,     // Read file system
     FileSystemWrite,    // Write file system
-    ConsensusValidate,  // Validate consensus proofs
+    StateProofValidate, // Validate state proofs
     CryptoOperations,   // Perform cryptographic operations
 }
 ```
@@ -134,11 +134,11 @@ pub struct ResourceSandbox {
 3. **Network namespaces**: Network isolation
 4. **AppArmor/SELinux**: Mandatory access control
 
-### Layer 4: Consensus Validation Requirements
+### Layer 4: state proof validation Requirements
 
-#### Mandatory Consensus Proofs
+#### Mandatory state proofs
 ```rust
-pub struct ConsensusRequirement {
+pub struct StateProofRequirement {
     operation: OperationType,
     required_proofs: Vec<ProofType>,
     min_stake: u64,
@@ -150,7 +150,7 @@ pub struct ConsensusRequirement {
 impl ExtensionValidator {
     async fn validate_operation(&self,
         operation: &Operation,
-        proof: &ConsensusProof
+        proof: &StateProof
     ) -> Result<(), ValidationError> {
         // Verify Proof of Space
         if !self.verify_space_proof(&proof.space_proof, operation)? {
@@ -225,7 +225,7 @@ impl ExtensionMonitor {
 - Network traffic analysis
 - System call frequency
 - File system access patterns
-- Consensus validation requests
+- state proof validation requests
 
 ## Attack Prevention
 
@@ -253,8 +253,8 @@ impl ExtensionMonitor {
 - Encryption of sensitive data
 - User consent requirements
 
-#### 4. Consensus Manipulation
-**Attack**: Extension submits invalid consensus proofs
+#### 4. State Proof Manipulation
+**Attack**: Extension submits invalid state proofs
 **Mitigation**:
 - Mandatory proof validation
 - Slashing for invalid proofs
@@ -374,7 +374,7 @@ pub struct AuditEntry {
     extension_id: String,
     event_type: AuditEventType,
     details: serde_json::Value,
-    consensus_proof: Option<ConsensusProof>,
+    state_proof: Option<StateProof>,
     signature: Signature,
 }
 ```
@@ -383,7 +383,7 @@ pub struct AuditEntry {
 1. **GDPR Compliance**: Data protection and privacy
 2. **Security Standards**: OWASP, CWE mitigation
 3. **Cryptographic Standards**: NIST post-quantum requirements
-4. **Consensus Compliance**: Proof of State four-proof validation
+4. **Proof of State Compliance**: Four-proof bilateral validation
 
 ### Regular Security Audits
 - Weekly: Automated security scans
@@ -413,7 +413,7 @@ pub struct AuditEntry {
   "capabilities": [
     "AssetRead",
     "AssetCreate",
-    "ConsensusValidate"
+    "StateProofValidate"
   ],
   "resource_limits": {
     "cpu_percent": 25.0,
@@ -423,8 +423,8 @@ pub struct AuditEntry {
   "security_requirements": {
     "require_certificate": true,
     "require_code_audit": true,
-    "require_consensus_validation": true,
-    "min_reputation_score": 0.8
+    "require_state_proof_validation": true,
+    "require_state_proof": true
   }
 }
 ```
@@ -454,7 +454,7 @@ The HyperMesh Extension Security Model provides comprehensive protection through
 - **Cryptographic verification** ensuring authenticity
 - **Capability-based access control** limiting permissions
 - **Resource sandboxing** preventing resource abuse
-- **Consensus validation** maintaining system integrity
+- **state proof validation** maintaining system integrity
 - **Runtime monitoring** detecting anomalies
 - **Incident response** handling security events
 

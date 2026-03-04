@@ -28,7 +28,7 @@ pub enum PrivacyAllocationType {
     Public,
     /// No identity tracking, privacy-first sharing
     Anonymous,
-    /// Full consensus validation required (PoSp+PoSt+PoWk+PoTm)
+    /// Full state proof validation required (PoSp+PoSt+PoWk+PoTm)
     Verified,
 }
 
@@ -42,13 +42,13 @@ impl PrivacyAllocationType {
             }
             PrivacyAllocationType::Anonymous => "Privacy-first sharing with no identity tracking",
             PrivacyAllocationType::Verified => {
-                "Maximum security with full consensus proof validation"
+                "Maximum security with full state proof validation"
             }
         }
     }
 
-    /// Check if allocation type requires consensus proof
-    pub fn requires_consensus_proof(&self) -> bool {
+    /// Check if allocation type requires state proof
+    pub fn requires_state_proof(&self) -> bool {
         matches!(self, PrivacyAllocationType::Verified)
     }
 
@@ -145,7 +145,7 @@ impl PrivacyAllocationType {
                 "encrypted_communication".to_string(),
             ],
             PrivacyAllocationType::Verified => vec![
-                "consensus_validation".to_string(),
+                "state_validation".to_string(),
                 "proof_verification".to_string(),
                 "quantum_security".to_string(),
                 "trust_scoring".to_string(),

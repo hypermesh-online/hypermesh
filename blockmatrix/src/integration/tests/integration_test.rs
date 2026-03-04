@@ -122,7 +122,7 @@ impl IntegrationTestHarness {
                 name: "hypermesh".to_string(),
                 service_type: ServiceType::HyperMesh,
                 status: ComponentStatus::NotStarted,
-                endpoints: vec!["/assets".to_string(), "/consensus".to_string()],
+                endpoints: vec!["/assets".to_string(), "/state-proof".to_string()],
             },
             MockService {
                 name: "catalog".to_string(),
@@ -340,7 +340,7 @@ async fn test_circular_dependency_resolution() -> Result<()> {
     info!("Testing circular dependency resolution");
 
     // Verify services can start despite circular dependencies:
-    // HyperMesh → TrustChain (DNS) → HyperMesh (consensus)
+    // HyperMesh → TrustChain (DNS) → HyperMesh (state proof)
     // STOQ → TrustChain (certs) → STOQ (transport)
 
     // Phase 0: Start with minimal dependencies
@@ -350,7 +350,7 @@ async fn test_circular_dependency_resolution() -> Result<()> {
 
     // Phase 1: Replace with proper dependencies
     info!("Phase 1: Services would replace self-signed certs with TrustChain certs");
-    info!("Phase 1: TrustChain would use HyperMesh consensus (optional)");
+    info!("Phase 1: TrustChain would use HyperMesh Proof of State (optional)");
 
     // Verify no deadlock occurred
     let test_services = harness.test_services.read().await;

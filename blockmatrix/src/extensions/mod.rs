@@ -6,7 +6,7 @@
 //!
 //! This module defines the comprehensive plugin/extension system for HyperMesh,
 //! allowing external components like Catalog to integrate as dynamic extensions
-//! that provide specialized functionality while maintaining consensus validation
+//! that provide specialized functionality while maintaining state proof validation
 //! and security requirements.
 //!
 //! ## Architecture Overview
@@ -16,8 +16,8 @@
 //! │                    HyperMesh Core System                        │
 //! │                                                                  │
 //! │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐         │
-//! │  │   Asset     │  │   Consensus  │  │   Transport   │         │
-//! │  │   Manager   │  │   (Proof of State)   │  │    (STOQ)     │         │
+//! │  │   Asset     │  │  Proof of    │  │   Transport   │         │
+//! │  │   Manager   │  │     State    │  │    (STOQ)     │         │
 //! │  └──────┬──────┘  └──────┬───────┘  └───────┬───────┘         │
 //! │         │                 │                   │                  │
 //! │  ┌──────┴─────────────────┴───────────────────┴──────────┐     │
@@ -25,7 +25,7 @@
 //! │  │                                                          │     │
 //! │  │  • Dynamic Loading    • Dependency Resolution           │     │
 //! │  │  • Lifecycle Control  • Security Sandboxing             │     │
-//! │  │  • Resource Limits    • Consensus Validation            │     │
+//! │  │  • Resource Limits    • State Proof Validation            │     │
 //! │  └──────────────────────────────────────────────────────────┘   │
 //! └─────────────────────────┬────────────────────────────────────┘
 //!                           │ Extension Interface
@@ -46,7 +46,7 @@
 //! All extensions operate under strict security constraints:
 //! - Capability-based security with explicit permission grants
 //! - Resource quotas and runtime limits
-//! - Consensus validation for critical operations
+//! - State proof validation for critical operations
 //! - TrustChain certificate verification for signed extensions
 //! - Isolated execution environments with controlled API access
 
@@ -75,7 +75,7 @@ pub use types::{
 
 pub use asset_types::{
     AssetCreationSpec, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetUpdate,
-    ConsensusRequirements, ConsensusStatus, CpuRequirement, DeploymentResult, DeploymentSpec,
+    StateRequirements, StateProofStatus, CpuRequirement, DeploymentResult, DeploymentSpec,
     ExecutionResult, ExecutionSpec, GpuRequirement, MemoryRequirement, NetworkConfig,
     OperationResult, PortMapping, ResourceRequirements, SharingResult, SharingSpec,
     StorageRequirement, TransferResult, TransferSpec, VolumeMount,
@@ -114,16 +114,16 @@ pub use manager::UnifiedExtensionManager;
 /// 4. **Registration Phase**:
 ///    - Catalog registers asset handlers for each type
 ///    - Sets up P2P distribution through STOQ
-///    - Configures consensus validation requirements
+///    - Configures state proof validation requirements
 ///
 /// 5. **Operation Phase**:
 ///    - Catalog handles asset library requests
 ///    - Manages package installation/updates
-///    - Validates operations with consensus proofs
+///    - Validates operations with state proofs
 ///    - Distributes assets through P2P network
 ///
 /// 6. **Integration Points**:
-///    - **Consensus**: All operations require Proof of State four-proof validation
+///    - **Proof of State**: All operations require four-proof bilateral validation
 ///    - **TrustChain**: Package signatures and certificate validation
 ///    - **STOQ**: P2P distribution of asset packages
 ///    - **Proxy/NAT**: Remote asset access through NAT-like addressing
@@ -151,7 +151,7 @@ mod tests {
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::NetworkAccess,
-                ExtensionCapability::ConsensusAccess,
+                ExtensionCapability::StateProofAccess,
                 ExtensionCapability::TransportAccess,
             ]),
             provided_assets: vec![
@@ -179,8 +179,8 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_requirements_default() {
-        let reqs = ConsensusRequirements::default();
+    fn test_state_requirements_default() {
+        let reqs = StateRequirements::default();
         assert!(reqs.require_proof_of_space);
         assert!(reqs.require_proof_of_stake);
         assert!(reqs.require_proof_of_work);

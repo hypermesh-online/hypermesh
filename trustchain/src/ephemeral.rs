@@ -7,7 +7,7 @@
 //! Generates self-signed certificates for QUIC TLS handshakes without
 //! involving the CA or Certificate Transparency. These certificates are
 //! meant to be used once and discarded -- no persistence, no CT logging,
-//! no consensus proofs.
+//! no state proofs.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
@@ -56,7 +56,7 @@ pub struct EphemeralCertificate {
 
 /// Generates ephemeral self-signed certificates for anonymous QUIC handshakes.
 ///
-/// No CA involvement, no CT logging, no consensus proofs, no persistence.
+/// No CA involvement, no CT logging, no state proofs, no persistence.
 pub struct EphemeralCertificateGenerator {
     config: EphemeralCertConfig,
     certs_generated: AtomicU64,

@@ -309,7 +309,7 @@ pub struct AdapterCapabilities {
 /// # Security Model
 ///
 /// The trait defines the INTERFACE. Security enforcement happens at the
-/// runtime level (blockmatrix): consensus proofs before execution, resource
+/// runtime level (blockmatrix): state proofs before execution, resource
 /// limits, sandboxing. The adapter declares its capabilities; the runtime
 /// decides what to allow.
 pub trait AssetAdapter: Send + Sync {

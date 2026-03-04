@@ -124,15 +124,15 @@ const IFRRegistry = struct {
 // Integration points with HyperMesh components
 const ComponentIntegration = struct {
     transport_socket: UnixSocket,    // /tmp/hypermesh/transport.sock
-    consensus_socket: UnixSocket,    // /tmp/hypermesh/consensus.sock
+    state_proof_socket: UnixSocket,    // /tmp/hypermesh/state_proof.sock
     container_socket: UnixSocket,    // /tmp/hypermesh/container.sock
     security_socket: UnixSocket,     // /tmp/hypermesh/security.sock
     orchestration_socket: UnixSocket, // /tmp/hypermesh/orchestration.sock
     
     // Replace network calls with Unix socket IPC
-    pub fn notify_consensus(self: *Self, state_change: StateChange) !void {
+    pub fn notify_state_proof(self: *Self, state_change: StateChange) !void {
         const message = try serialize(state_change);
-        try self.consensus_socket.send(message);
+        try self.state_proof_socket.send(message);
     }
     
     // Local component discovery
@@ -545,11 +545,11 @@ integration:
     neural_routing: true
     unix_socket_coordination: true
     
-  # Consensus layer optimization  
-  consensus:
-    predictive_leadership: true
+  # State proof layer optimization
+  state_proof:
+    bilateral_verification: true
     smart_replication: true
-    byzantine_detection_ml: true
+    inauthentic_state_detection: true
     
   # Container runtime acceleration
   container:

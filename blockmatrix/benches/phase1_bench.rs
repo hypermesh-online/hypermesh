@@ -17,6 +17,7 @@ use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::geospatial::{GpsConverter, GpsCoordinate, ScaleResolution};
 use blockmatrix::matrix::tensor::{Matrix3x3, PathFinder, Vector3D};
 use blockmatrix::matrix::{find_k_nearest, find_neighbors, find_neighbors_cubic, MatrixCoordinate};
+use blockmatrix::StateProof;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -257,6 +258,8 @@ fn bench_blockchain_operations(c: &mut Criterion) {
         }
     });
 
+    let proof = StateProof::new_for_testing();
+
     group.bench_function("add_single_block", |b| {
         let mut counter = 0;
         b.iter(|| {
@@ -264,7 +267,7 @@ fn bench_blockchain_operations(c: &mut Criterion) {
             let data = vec![counter as u8; 1024]; // 1KB block
             rt.block_on(async {
                 foundation
-                    .add_block(black_box(&node_id), black_box(data))
+                    .add_block(black_box(&node_id), black_box(data), &proof)
                     .await
                     .unwrap()
             });
@@ -273,6 +276,7 @@ fn bench_blockchain_operations(c: &mut Criterion) {
     });
 
     group.bench_function("add_100_blocks", |b| {
+        let proof = StateProof::new_for_testing();
         b.iter(|| {
             let (rt, foundation, _temp_dir) = create_bench_foundation();
             rt.block_on(async {
@@ -289,7 +293,7 @@ fn bench_blockchain_operations(c: &mut Criterion) {
                 for i in 0..100 {
                     let node_id = format!("node{}", i % 10);
                     let data = vec![i as u8; 1024];
-                    foundation.add_block(&node_id, data).await.unwrap();
+                    foundation.add_block(&node_id, data, &proof).await.unwrap();
                 }
             });
         })
@@ -346,6 +350,8 @@ fn bench_persistence_operations(c: &mut Criterion) {
     group.sample_size(10);
 
     // Test with different network sizes
+    let proof = StateProof::new_for_testing();
+
     for node_count in [10, 50, 100].iter() {
         group.bench_with_input(
             BenchmarkId::new("save_network_state", node_count),
@@ -367,7 +373,7 @@ fn bench_persistence_operations(c: &mut Criterion) {
                         for i in 0..node_count {
                             let node_id = format!("node{i}");
                             let data = vec![i as u8; 1024];
-                            foundation.add_block(&node_id, data).await.unwrap();
+                            foundation.add_block(&node_id, data, &proof).await.unwrap();
                         }
 
                         // Save state

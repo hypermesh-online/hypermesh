@@ -89,16 +89,16 @@ impl QualityGate for SecurityTheaterGate {
     }
 }
 
-/// Consensus Validation Gate
-pub(super) struct ConsensusValidationGate;
+/// State Proof Validation Gate
+pub(super) struct StateProofValidationGate;
 
-impl QualityGate for ConsensusValidationGate {
+impl QualityGate for StateProofValidationGate {
     fn name(&self) -> &str {
-        "ConsensusValidation"
+        "StateProofValidation"
     }
 
     fn description(&self) -> &str {
-        "Validates proper consensus proof validation is implemented"
+        "Validates proper state proof validation is implemented"
     }
 
     fn is_blocking(&self) -> bool {
@@ -108,18 +108,18 @@ impl QualityGate for ConsensusValidationGate {
     fn validate(&self, source_path: &str) -> Result<GateResult> {
         use std::fs;
 
-        let consensus_file = format!("{source_path}/src/consensus/mod.rs");
+        let state_proof_file = format!("{source_path}/src/proof_of_state/mod.rs");
 
-        if !Path::new(&consensus_file).exists() {
+        if !Path::new(&state_proof_file).exists() {
             return Ok(GateResult {
                 status: QualityGateStatus::Fail,
                 score: 0.0,
-                message: "Consensus module not found".to_string(),
-                details: vec!["VIOLATION: Missing consensus validation implementation".to_string()],
+                message: "State proof module not found".to_string(),
+                details: vec!["VIOLATION: Missing state proof validation implementation".to_string()],
             });
         }
 
-        let content = fs::read_to_string(&consensus_file)?;
+        let content = fs::read_to_string(&state_proof_file)?;
 
         let has_network_generation = content.contains("generate_from_network");
         let has_validation = content.contains("validate_with_requirements");
@@ -130,17 +130,17 @@ impl QualityGate for ConsensusValidationGate {
         let mut score = 0.0;
 
         if has_network_generation {
-            details.push("OK: Real consensus proof generation implemented".to_string());
+            details.push("OK: Real state proof generation implemented".to_string());
             score += 0.4;
         } else {
-            details.push("VIOLATION: Missing real consensus proof generation".to_string());
+            details.push("VIOLATION: Missing real state proof generation".to_string());
         }
 
         if has_validation {
-            details.push("OK: Consensus validation with requirements implemented".to_string());
+            details.push("OK: State proof validation with requirements implemented".to_string());
             score += 0.4;
         } else {
-            details.push("VIOLATION: Missing consensus validation requirements".to_string());
+            details.push("VIOLATION: Missing state proof validation requirements".to_string());
         }
 
         if testing_restricted {
@@ -161,7 +161,7 @@ impl QualityGate for ConsensusValidationGate {
         Ok(GateResult {
             status,
             score,
-            message: format!("Consensus validation implementation: {:.1}%", score * 100.0),
+            message: format!("State proof validation implementation: {:.1}%", score * 100.0),
             details,
         })
     }

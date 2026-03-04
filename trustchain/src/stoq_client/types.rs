@@ -65,8 +65,8 @@ pub enum ServiceType {
     CertificateAuthority,
     /// Certificate Transparency log
     CertificateTransparency,
-    /// TrustChain consensus node
-    ConsensusNode,
+    /// TrustChain state proof node
+    StateProofNode,
     /// HyperMesh asset discovery
     AssetDiscovery,
 }
@@ -166,8 +166,8 @@ pub struct CertificateValidationRequest {
 pub enum ValidationPolicy {
     /// Standard X.509 validation
     Standard,
-    /// TrustChain consensus validation
-    TrustChainConsensus,
+    /// TrustChain state proof validation
+    TrustChainStateProof,
     /// Extended validation with CT logs
     ExtendedValidation,
 }
@@ -230,7 +230,7 @@ impl ServiceType {
             ServiceType::Dns => "dns",
             ServiceType::CertificateAuthority => "ca",
             ServiceType::CertificateTransparency => "ct",
-            ServiceType::ConsensusNode => "consensus",
+            ServiceType::StateProofNode => "state_proof",
             ServiceType::AssetDiscovery => "assets",
         }
     }

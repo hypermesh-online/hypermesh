@@ -5,7 +5,7 @@
 //! Production TrustChain Certificate Authority Implementation
 //!
 //! AWS CloudHSM dependencies REMOVED - software-only operation
-//! Software-based certificate authority with four-proof consensus validation,
+//! Software-based certificate authority with four-proof state proof validation,
 //! STOQ protocol integration, and <35ms certificate operations.
 
 use hex;
@@ -19,8 +19,8 @@ use uuid::Uuid;
 
 use super::certificate_store::CertificateStore;
 use super::{CertificateMetadata, CertificateRequest, CertificateStatus, IssuedCertificate};
-use crate::consensus::{
-    ConsensusProof, ConsensusRequirements, ConsensusResult, FourProofValidator,
+use crate::proof_of_state::{
+    StateProof, StateRequirements, StateProofResult, FourProofValidator,
 };
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
@@ -32,8 +32,8 @@ use crate::errors::{Result as TrustChainResult, TrustChainError};
 /// Production TrustChain Certificate Authority (Software-Only)
 pub struct TrustChainCA {
     // AWS CloudHSM dependencies REMOVED - software-only operation
-    /// Four-proof consensus validator (wrapped in Mutex for mutability)
-    consensus: Arc<Mutex<FourProofValidator>>,
+    /// Four-proof state proof validator (wrapped in Mutex for mutability)
+    state_proof_validator: Arc<Mutex<FourProofValidator>>,
     /// Certificate transparency log
     ct_log: Arc<CertificateTransparencyLog>,
     /// Certificate store for issued certificates
@@ -64,7 +64,7 @@ pub struct CAConfiguration {
     pub ca_id: String,
     pub validity_period: Duration,
     pub key_rotation_interval: Duration,
-    pub consensus_requirements: ConsensusRequirements,
+    pub state_requirements: StateRequirements,
     // AWS CloudHSM dependencies REMOVED - hsm config removed
     pub ct_log_url: Option<String>,
     pub performance_targets: PerformanceTargets,
@@ -83,7 +83,7 @@ pub struct PerformanceTargets {
 pub struct CAMetrics {
     pub certificates_issued: std::sync::atomic::AtomicU64,
     // AWS CloudHSM dependencies REMOVED - hsm_operations removed
-    pub consensus_validations: std::sync::atomic::AtomicU64,
+    pub state_validations: std::sync::atomic::AtomicU64,
     pub ct_log_entries: std::sync::atomic::AtomicU64,
     pub average_issuance_time_ms: std::sync::atomic::AtomicU64,
     pub performance_violations: std::sync::atomic::AtomicU64,
@@ -102,7 +102,7 @@ impl Default for CAConfiguration {
             ca_id: "trustchain-ca-production".to_string(),
             validity_period: Duration::from_secs(86400), // 24 hours
             key_rotation_interval: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
-            consensus_requirements: ConsensusRequirements::production(),
+            state_requirements: StateRequirements::production(),
             // AWS CloudHSM dependencies REMOVED - hsm removed
             ct_log_url: None,
             performance_targets: PerformanceTargets {
@@ -123,8 +123,8 @@ impl TrustChainCA {
         // AWS CloudHSM dependencies REMOVED - software-only operation
         info!("Using post-quantum keys (FALCON-1024/Kyber-1024) for production CA");
 
-        // Initialize four-proof consensus validator
-        let consensus = Arc::new(Mutex::new(FourProofValidator::new()));
+        // Initialize four-proof state proof validator
+        let state_proof_validator = Arc::new(Mutex::new(FourProofValidator::new()));
 
         // Initialize certificate transparency log
         let ct_log = Arc::new(CertificateTransparencyLog::new().await?);
@@ -146,7 +146,7 @@ impl TrustChainCA {
 
         let ca = Self {
             // AWS CloudHSM dependencies REMOVED - hsm_client removed
-            consensus,
+            state_proof_validator,
             ct_log,
             certificate_store,
             rotation,
@@ -171,10 +171,10 @@ impl TrustChainCA {
             request.common_name
         );
 
-        // Validate consensus proof
-        let consensus_result = self.validate_certificate_request(&request).await?;
-        if !consensus_result.is_valid() {
-            return Err(TrustChainError::ConsensusValidationFailed {
+        // Validate state proof
+        let state_proof_result = self.validate_certificate_request(&request).await?;
+        if !state_proof_result.is_valid() {
+            return Err(TrustChainError::StateProofValidationFailed {
                 reason: "Four-proof validation failed".to_string(),
             });
         }
@@ -340,10 +340,10 @@ impl TrustChainCA {
             issued_at: now,
             expires_at: now + self.config.validity_period,
             issuer_ca_id: self.config.ca_id.clone(),
-            consensus_proof: ConsensusProof::generate_from_network(&self.config.ca_id)
+            state_proof: StateProof::generate_from_network(&self.config.ca_id)
                 .await
-                .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {e}"),
+                .map_err(|e| TrustChainError::StateProofValidationFailed {
+                    reason: format!("Failed to generate state proof: {e}"),
                 })?,
             status: CertificateStatus::Valid,
             metadata: CertificateMetadata::default(),
@@ -352,37 +352,37 @@ impl TrustChainCA {
         Ok(issued_cert)
     }
 
-    /// Validate certificate request with four-proof consensus
+    /// Validate certificate request with four-proof state proof
     async fn validate_certificate_request(
         &self,
         request: &CertificateRequest,
-    ) -> TrustChainResult<ConsensusResult> {
+    ) -> TrustChainResult<StateProofResult> {
         info!(
             "Validating certificate request for: {}",
             request.common_name
         );
 
-        // Validate consensus proof using four-proof validator
-        let mut consensus_guard = self.consensus.lock().await;
-        let consensus_result = consensus_guard
-            .validate_consensus(&request.consensus_proof)
+        // Validate state proof using four-proof validator
+        let mut state_proof_guard = self.state_proof_validator.lock().await;
+        let state_proof_result = state_proof_guard
+            .validate_state_proof(&request.state_proof)
             .await?;
 
         // Update metrics
         self.metrics
-            .consensus_validations
+            .state_validations
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        if consensus_result.is_valid() {
+        if state_proof_result.is_valid() {
             info!("Certificate request validation successful");
         } else {
             warn!(
                 "Certificate request validation failed: {:?}",
-                consensus_result
+                state_proof_result
             );
         }
 
-        Ok(consensus_result)
+        Ok(state_proof_result)
     }
 
     /// Calculate certificate fingerprint
@@ -416,9 +416,9 @@ impl TrustChainCA {
                     .load(std::sync::atomic::Ordering::Relaxed),
             ),
             // AWS CloudHSM dependencies REMOVED - hsm_operations removed
-            consensus_validations: std::sync::atomic::AtomicU64::new(
+            state_validations: std::sync::atomic::AtomicU64::new(
                 self.metrics
-                    .consensus_validations
+                    .state_validations
                     .load(std::sync::atomic::Ordering::Relaxed),
             ),
             ct_log_entries: std::sync::atomic::AtomicU64::new(
@@ -543,13 +543,13 @@ pub enum RotationResult {
     Error { reason: String },
 }
 
-// Four-Proof Validator Implementation moved to consensus/validator.rs
+// Four-Proof Validator Implementation moved to proof_of_state/validator.rs
 // This avoids duplicate implementations
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
 
     #[tokio::test]
     async fn test_ca_initialization() {
@@ -570,7 +570,7 @@ mod tests {
     // AWS CloudHSM dependencies REMOVED - test_hsm_integration test removed
 
     #[tokio::test]
-    async fn test_certificate_issuance_with_consensus() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_certificate_issuance_with_state_proof() -> Result<(), Box<dyn std::error::Error>> {
         let config = CAConfiguration::default();
         let ca = TrustChainCA::new(config)
             .await
@@ -581,10 +581,10 @@ mod tests {
             san_entries: vec!["test.production.com".to_string()],
             node_id: "prod_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::generate_from_network("test-ca-01")
+            state_proof: StateProof::generate_from_network("test-ca-01")
                 .await
-                .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {e}"),
+                .map_err(|e| TrustChainError::StateProofValidationFailed {
+                    reason: format!("Failed to generate state proof: {e}"),
                 })?,
             timestamp: SystemTime::now(),
             identity_scope: None,

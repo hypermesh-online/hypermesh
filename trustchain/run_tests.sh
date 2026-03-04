@@ -99,9 +99,9 @@ case "$TEST_TYPE" in
         run_test_category "security" "security::"
         run_test_category "ca" "ca::"
         ;;
-    consensus)
-        echo "Running consensus tests..."
-        run_test_category "consensus" "consensus::"
+    proof_of_state)
+        echo "Running Proof of State tests..."
+        run_test_category "proof_of_state" "proof_of_state::"
         ;;
     dns)
         echo "Running DNS tests..."
@@ -126,13 +126,13 @@ case "$TEST_TYPE" in
         collect_metrics
         ;;
     *)
-        echo "Usage: $0 [unit|integration|performance|security|consensus|dns|metrics|all] [-v]"
-        echo "  unit        - Run unit tests only"
-        echo "  integration - Run integration tests"
-        echo "  performance - Run performance benchmarks"
-        echo "  security    - Run security-related tests"
-        echo "  consensus   - Run consensus tests"
-        echo "  dns         - Run DNS tests"
+        echo "Usage: $0 [unit|integration|performance|security|proof_of_state|dns|metrics|all] [-v]"
+        echo "  unit           - Run unit tests only"
+        echo "  integration    - Run integration tests"
+        echo "  performance    - Run performance benchmarks"
+        echo "  security       - Run security-related tests"
+        echo "  proof_of_state - Run Proof of State tests"
+        echo "  dns            - Run DNS tests"
         echo "  metrics     - Show test metrics"
         echo "  all         - Run all tests (default)"
         echo "  -v          - Verbose output (show test output)"

@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Unit tests for Hardware Asset Adapters (isolated from consensus module)
+//! Unit tests for Hardware Asset Adapters (isolated from proof_of_state module)
 //! 
-//! Tests the core adapter functionality without requiring the consensus
+//! Tests the core adapter functionality without requiring the state proof
 //! module to compile, focusing on the adapter implementation itself.
 
 use std::time::SystemTime;
@@ -19,14 +19,14 @@ use hypermesh_assets::core::{
     AssetAdapter, AdapterCapabilities,
 };
 
-/// Create a consensus proof for testing.
-/// Currently unused - adapters are tested without consensus validation.
-/// When needed, use ConsensusProof::new_for_testing() from the trustchain crate.
-fn _create_mock_consensus_proof() -> hypermesh_assets::core::ConsensusProof {
-    panic!("Consensus proof creation requires trustchain integration - use ConsensusProof::new_for_testing()")
+/// Create a state proof for testing.
+/// Currently unused - adapters are tested without state proof validation.
+/// When needed, use StateProof::new_for_testing() from the trustchain crate.
+fn _create_mock_state_proof() -> hypermesh_assets::core::StateProof {
+    panic!("State proof creation requires trustchain integration - use StateProof::new_for_testing()")
 }
 
-/// Test adapter basic functionality without consensus validation
+/// Test adapter basic functionality without state proof validation
 #[tokio::test]
 async fn test_cpu_adapter_basic() {
     let adapter = CpuAssetAdapter::new().await;
@@ -51,7 +51,7 @@ async fn test_gpu_adapter_basic() {
     assert_eq!(capabilities.asset_type, AssetType::Gpu);
     assert!(capabilities.supports_proxy_addressing);
     assert!(capabilities.features.contains(&"nova_support".to_string()));
-    assert!(capabilities.features.contains(&"consensus_acceleration".to_string()));
+    assert!(capabilities.features.contains(&"state_proof_acceleration".to_string()));
     
     let health = adapter.health_check().await.expect("test: async operation");
     assert!(health.healthy);
@@ -152,7 +152,7 @@ async fn test_cpu_adapter_features() {
         "process_isolation",
         "priority_scheduling",
         "resource_monitoring",
-        "consensus_validation"
+        "state_validation"
     ];
     
     for feature in expected_features {
@@ -172,7 +172,7 @@ async fn test_gpu_adapter_features() {
         "multi_gpu",
         "memory_management",
         "compute_isolation",
-        "consensus_acceleration",
+        "state_proof_acceleration",
         "quantum_security",
         "power_monitoring",
         "temperature_monitoring"
@@ -267,8 +267,8 @@ fn test_adapter_compilation() {
     println!("CRITICAL FEATURES IMPLEMENTED:");
     println!("🔥 Memory Adapter: NAT-like addressing system (CRITICAL requirement)");
     println!("🔥 Storage Adapter: PoSpace validation for storage commitment (CRITICAL)");
-    println!("🔥 GPU Adapter: Hardware acceleration with consensus validation");
-    println!("🔥 CPU Adapter: Enhanced with new ConsensusProof system");
+    println!("🔥 GPU Adapter: Hardware acceleration with state proof validation");
+    println!("🔥 CPU Adapter: Enhanced with new StateProof system");
     println!("🔥 All Adapters: Privacy levels (Private → FullPublic)");
     println!("🔥 All Adapters: Quantum-resistant security preparation");
 }

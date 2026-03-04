@@ -53,10 +53,10 @@ impl super::SyncManager {
                 if remote_time > local_time {
                     ConflictResolution::NewestWins
                 } else {
-                    ConflictResolution::ConsensusWins
+                    ConflictResolution::StateProofWins
                 }
             }
-            _ => ConflictResolution::ConsensusWins,
+            _ => ConflictResolution::StateProofWins,
         }
     }
 
@@ -257,7 +257,7 @@ impl super::SyncManager {
         Ok(diff_hashes)
     }
 
-    pub(super) async fn get_consensus_score(&self, metadata: &PackageSpecMetadata) -> Result<f64> {
+    pub(super) async fn get_state_proof_result(&self, metadata: &PackageSpecMetadata) -> Result<f64> {
         // Score based on metadata completeness and trust signals.
         let mut score = 0.0;
         let mut factors = 0;

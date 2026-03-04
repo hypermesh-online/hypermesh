@@ -5,7 +5,7 @@
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
     AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, ConsensusProof, DeploymentResult, ExtensionError, ExtensionResult, HashMap,
+    AssetUpdate, StateProof, DeploymentResult, ExtensionError, ExtensionResult, HashMap,
     NetworkScope, OperationResult, RwLock,
 };
 
@@ -177,7 +177,7 @@ impl AssetExtensionHandler for LibraryHandler {
             metadata: metadata_map,
             privacy_level: hypermesh_lib::PrivacyMode::PUBLIC,
             allocation: None,
-            consensus_status: blockmatrix::extensions::ConsensusStatus {
+            state_proof_status: blockmatrix::extensions::StateProofStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -190,7 +190,7 @@ impl AssetExtensionHandler for LibraryHandler {
     async fn validate_asset(
         &self,
         id: &AssetRegistration,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> ExtensionResult<bool> {
         let packages = self.packages.read().await;
         if !packages.contains_key(id) {
@@ -267,7 +267,7 @@ mod tests {
             ]),
             privacy_level: hypermesh_lib::PrivacyMode::PUBLIC,
             allocation: None,
-            consensus_requirements: blockmatrix::extensions::ConsensusRequirements::default(),
+            state_requirements: blockmatrix::extensions::StateRequirements::default(),
             parent_id: None,
             tags: vec!["library".to_string()],
         };

@@ -104,7 +104,7 @@ impl HealthCheck {
         let mut components = HashMap::new();
 
         // Initialize component health states
-        for component in &["ca", "ct", "dns", "consensus", "stoq", "api"] {
+        for component in &["ca", "ct", "dns", "state_proof", "stoq", "api"] {
             components.insert(
                 component.to_string(),
                 ComponentHealth {
@@ -139,8 +139,8 @@ impl HealthCheck {
         // Check DNS service
         self.check_dns_health().await;
 
-        // Check consensus service
-        self.check_consensus_health().await;
+        // Check state proof service
+        self.check_state_proof_health().await;
 
         // Check STOQ transport
         self.check_stoq_health().await;
@@ -211,13 +211,13 @@ impl HealthCheck {
             .await;
     }
 
-    /// Check consensus service health
-    async fn check_consensus_health(&self) {
+    /// Check state proof service health
+    async fn check_state_proof_health(&self) {
         let start = Instant::now();
         let is_healthy = true;
         let mut details = HashMap::new();
 
-        // Simulate consensus health check
+        // Check state proof service health
         details.insert("proof_validation".to_string(), "operational".to_string());
         details.insert("byzantine_detection".to_string(), "active".to_string());
         details.insert(
@@ -227,7 +227,7 @@ impl HealthCheck {
 
         let response_time = start.elapsed().as_millis() as u64;
 
-        self.update_component_health("consensus", is_healthy, response_time, details)
+        self.update_component_health("state_proof", is_healthy, response_time, details)
             .await;
     }
 

@@ -78,7 +78,7 @@ export function CatalogBrowse({ selectedPrivacyLevel, onPrivacyLevelChange }: Ca
         operation: 'start',
         parameters: {},
         timeout: 300,
-        requiresConsensus: true,
+        requiresStateProof: true,
         allocationDuration: 3600
       });
       alert(`Starting ${app.name} execution through HyperMesh...`);

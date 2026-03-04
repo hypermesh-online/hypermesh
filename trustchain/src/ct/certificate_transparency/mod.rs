@@ -18,7 +18,7 @@ pub use types::*;
 mod tests {
     use super::*;
     use crate::ca::{CertificateMetadata, CertificateStatus, IssuedCertificate};
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
     use std::time::{Duration, SystemTime};
 
     #[tokio::test]
@@ -48,11 +48,11 @@ mod tests {
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(86400 * 365),
             issuer_ca_id: "test-ca".to_string(),
-            consensus_proof: match ConsensusProof::generate_from_network("test-node").await {
+            state_proof: match StateProof::generate_from_network("test-node").await {
                 Ok(p) => p,
                 Err(_) => {
-                    use crate::consensus::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
-                    ConsensusProof::new(
+                    use crate::proof_of_state::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
+                    StateProof::new(
                         StakeProof::default(),
                         TimeProof::default(),
                         SpaceProof::default(),

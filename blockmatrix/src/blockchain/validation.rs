@@ -301,7 +301,7 @@ impl ChainValidator {
 
     /// Check if a chain is longer than another (for fork resolution)
     /// Note: In our architecture, this is for individual node chain management,
-    /// NOT for cross-node consensus (as each node has its own chain)
+    /// NOT for cross-node agreement (as each node has its own chain)
     pub fn is_longer_chain(chain_a: &[Block], chain_b: &[Block]) -> bool {
         chain_a.len() > chain_b.len()
     }

@@ -132,8 +132,8 @@ pub struct NetworkDiscovery {
 pub struct JoinRequirements {
     /// Requires invitation
     pub invitation_required: bool,
-    /// Minimum reputation score
-    pub min_reputation: Option<f64>,
+    /// Whether joining requires a valid Proof of State
+    pub requires_state_proof: bool,
     /// Required proofs
     pub required_proofs: HashSet<NetworkProofType>,
     /// Geographic restrictions
@@ -175,8 +175,8 @@ pub enum ApprovalProcess {
     Automatic,
     /// Manual approval by admin
     ManualAdmin,
-    /// Vote by existing members
-    MemberVote { threshold: f64 },
+    /// Joining node must pass full Proof of State (binary: authentic or not)
+    StateProofRequired,
     /// Smart contract verification
     SmartContract { contract_address: Vec<u8> },
 }
@@ -408,7 +408,7 @@ mod tests {
                 entry_points: vec![],
                 requirements: JoinRequirements {
                     invitation_required: false,
-                    min_reputation: None,
+                    requires_state_proof: true,
                     required_proofs: HashSet::new(),
                     geo_restrictions: None,
                     approval_process: ApprovalProcess::Automatic,

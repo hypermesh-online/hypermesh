@@ -22,7 +22,7 @@ pub use types::*;
 mod tests {
     use super::*;
     use crate::assets::core::{
-        AssetAdapter, AssetAllocationRequest, AssetType, ConsensusProof, CpuRequirements,
+        AssetAdapter, AssetAllocationRequest, AssetType, StateProof, CpuRequirements,
         PrivacyMode,
     };
     #[allow(unused_imports)]
@@ -45,7 +45,7 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyMode::PRIVATE,
-            consensus_proof: ConsensusProof::new_for_testing(),
+            state_proof: StateProof::new_for_testing(),
             certificate_fingerprint: "test-cert".to_string(),
             duration_limit: Some(Duration::from_secs(3600)),
             tags: HashMap::new(),
@@ -61,7 +61,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cpu_allocation() {
-        let test_proof = ConsensusProof::new_for_testing();
+        let test_proof = StateProof::new_for_testing();
         assert!(
             test_proof.stake_proof.stake_amount >= 50,
             "Stake amount should be >= 50"
@@ -98,8 +98,8 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_proof_creation() {
-        let proof = ConsensusProof::new_for_testing();
+    fn test_state_proof_creation() {
+        let proof = StateProof::new_for_testing();
         assert!(proof.validate());
     }
 }

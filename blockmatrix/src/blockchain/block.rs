@@ -46,6 +46,10 @@ pub struct Block {
     /// Optional shard commitment anchoring this block to its spatial shard evidence.
     /// BLAKE3 hash of the canonical shard distribution map (position-based, not identity-based).
     pub shard_commitment: Option<[u8; 32]>,
+
+    /// BLAKE3 hash of the StateProof that authorized this block.
+    /// Genesis blocks have None (self-authorized — sovereignty from boot).
+    pub state_proof_hash: Option<[u8; 32]>,
 }
 
 impl Block {
@@ -71,6 +75,7 @@ impl Block {
             node_coordinate,
             nonce,
             shard_commitment: None,
+            state_proof_hash: None,
         };
 
         // Calculate hash
@@ -115,6 +120,10 @@ impl Block {
             hasher.update(commitment);
         }
 
+        if let Some(proof_hash) = &self.state_proof_hash {
+            hasher.update(proof_hash);
+        }
+
         let hash = hasher.finalize();
         format!("{hash}")
     }
@@ -135,6 +144,15 @@ impl Block {
         self.hash = self.calculate_hash();
     }
 
+    /// Set the state proof hash and recalculate the block hash.
+    ///
+    /// The state proof hash is the BLAKE3 digest of the `StateProof` that
+    /// authorized this block's creation.  Genesis blocks never have one.
+    pub fn set_state_proof_hash(&mut self, hash: [u8; 32]) {
+        self.state_proof_hash = Some(hash);
+        self.hash = self.calculate_hash();
+    }
+
     /// Get the block size in bytes
     pub fn size(&self) -> usize {
         8 + // index
@@ -144,7 +162,8 @@ impl Block {
         64 + // hash (hex string)
         12 + // node_coordinate (3 * i32)
         8 + // nonce
-        if self.shard_commitment.is_some() { 32 } else { 0 } // shard_commitment
+        if self.shard_commitment.is_some() { 32 } else { 0 } + // shard_commitment
+        if self.state_proof_hash.is_some() { 32 } else { 0 } // state_proof_hash
     }
 
     /// Get the assets in this block

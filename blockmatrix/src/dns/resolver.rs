@@ -14,7 +14,7 @@ use super::{
     DnsCache, DnsError, DnsPoolManager, DnsRecord, DnsRecordType, DnsResult, DnsValidator, Domain,
     TrustChainDnsClient,
 };
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -42,8 +42,8 @@ pub struct DnsQuery {
     pub record_type: DnsRecordType,
     /// Requester network ID (for federated access)
     pub requester_network: Option<String>,
-    /// Consensus proof (for validation)
-    pub proof: Option<ConsensusProof>,
+    /// State proof (for validation)
+    pub proof: Option<StateProof>,
     /// Query timestamp
     pub timestamp: SystemTime,
 }
@@ -278,7 +278,7 @@ impl DnsResolver {
         // Fully federated requires strict validation
         if query.proof.is_none() {
             return Err(DnsError::AccessDenied {
-                reason: "Fully federated domain requires consensus proof".to_string(),
+                reason: "Fully federated domain requires state proof".to_string(),
             });
         }
 
@@ -329,7 +329,7 @@ impl DnsResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof_of_state_integration::{
+    use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use crate::dns::DnsRecordData;
@@ -346,7 +346,7 @@ mod tests {
         )
     }
 
-    fn _create_test_proof() -> ConsensusProof {
+    fn _create_test_proof() -> StateProof {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string(), 1000);
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
@@ -359,7 +359,7 @@ mod tests {
             WorkState::Completed,
         );
 
-        ConsensusProof::new(stake, time, space, work)
+        StateProof::new(stake, time, space, work)
     }
 
     async fn setup_resolver() -> (DnsResolver, Arc<DnsPoolManager>) {

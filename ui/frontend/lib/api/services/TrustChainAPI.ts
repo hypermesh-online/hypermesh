@@ -259,7 +259,7 @@ export class TrustChainAPI {
           ca: boolean;
           ct: boolean;
           dns: boolean;
-          consensus: boolean;
+          stateProof: boolean;
         };
       }>(this.service, '/api/v1/trustchain/health');
 

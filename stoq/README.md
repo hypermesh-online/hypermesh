@@ -31,7 +31,7 @@ STOQ is not a simple QUIC wrapper. It provides protocol-level intelligence: Proo
 
 ### Privacy Model
 
-PrivacyMode is a struct with 3 presets -- transport layer is independent from blockchain consensus:
+PrivacyMode is a struct with 3 presets -- transport layer is independent from blockchain state replication:
 
 | PrivacyMode | Tracking | Routing | Use Case |
 |-------------|----------|---------|----------|

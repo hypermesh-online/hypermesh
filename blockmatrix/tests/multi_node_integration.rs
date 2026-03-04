@@ -8,14 +8,14 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::multi_node::{
-    AllocationDecision, ConsensusProposal, MigrationPlan, MigrationPriority, MultiNodeEvent,
+    AllocationDecision, MigrationPlan, MigrationPriority, MultiNodeEvent,
     NodeId, PrivacyMode, ProposalData, ProposalType, ResourceAmount, ResourceSharingRequest,
 };
 use blockmatrix::assets::proxy::{
     GlobalAddress, MemoryOperationType, MemoryPermissions, RemoteMemoryTransport, TransportConfig,
 };
 use blockmatrix::assets::{
-    AssetManager, AssetRegistration, AssetType, ConsensusManager, ConsensusProof,
+    AssetManager, AssetRegistration, AssetType, StateProof,
     MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo,
 };
 use std::time::{Duration, SystemTime};
@@ -50,43 +50,20 @@ async fn test_multi_node_coordinator_initialization() {
 }
 
 #[tokio::test]
-async fn test_consensus_manager() {
-    use blockmatrix::assets::multi_node::consensus::{
-        ConsensusConfig, ConsensusManager, ConsensusProposal, ProposalData, ProposalType, Vote,
-        VoteValue,
+async fn test_state_verification_manager() {
+    use blockmatrix::assets::multi_node::state_verification::{
+        StateVerificationManager, StateVerificationConfig,
     };
 
-    let node = create_test_node(1);
-    let config = ConsensusConfig::default();
-    let manager = ConsensusManager::new(node.clone(), config);
+    let config = StateVerificationConfig::default();
+    let manager = StateVerificationManager::new(config);
 
-    // Create a proposal
-    let proposal = ConsensusProposal {
-        proposal_id: "test-proposal".to_string(),
-        proposal_type: ProposalType::AssetAllocation,
-        proposer: node.clone(),
-        data: ProposalData::Configuration {
-            key: "test-key".to_string(),
-            value: "test-value".to_string(),
-        },
-        timestamp: SystemTime::now(),
-        signature: vec![1, 2, 3, 4],
-    };
+    // Create a test state proof for bilateral verification
+    let state_proof = StateProof::new_for_testing();
 
-    // Submit proposal
-    let round_id = manager.submit_proposal(proposal).await.unwrap();
-    assert!(!round_id.is_empty());
-
-    // Submit a vote
-    let vote = Vote {
-        voter: node.clone(),
-        value: VoteValue::Accept,
-        timestamp: SystemTime::now(),
-        signature: vec![5, 6, 7, 8],
-        justification: Some("Test vote".to_string()),
-    };
-
-    manager.submit_vote(&round_id, vote).await.unwrap();
+    // Verify: binary pass/fail, no voting
+    let result = manager.verify(&state_proof).await.unwrap();
+    assert!(result.is_authentic);
 }
 
 #[tokio::test]

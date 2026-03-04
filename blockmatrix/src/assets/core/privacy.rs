@@ -110,8 +110,8 @@ pub struct AllocationConfig {
     pub concurrency_limits: ConcurrencyLimits,
     /// Duration-based allocation settings
     pub duration_config: DurationConfig,
-    /// Consensus requirements for access
-    pub consensus_requirements: ConsensusRequirements,
+    /// State proof requirements for access
+    pub state_requirements: StateRequirements,
 }
 
 /// Resource allocation percentages
@@ -155,9 +155,9 @@ pub struct DurationConfig {
     pub grace_period: Duration,
 }
 
-/// Consensus requirements for access
+/// State proof requirements for access (bilateral Proof of State)
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConsensusRequirements {
+pub struct StateRequirements {
     /// Require Proof of Space
     pub require_space_proof: bool,
     /// Require Proof of Stake
@@ -222,8 +222,8 @@ pub struct AuthRequirements {
     pub require_certificate: bool,
     /// Require multi-factor authentication
     pub require_mfa: bool,
-    /// Require consensus proof validation
-    pub require_consensus_proof: bool,
+    /// Require state proof validation
+    pub require_state_proof: bool,
     /// Session timeout in seconds
     pub session_timeout: u32,
 }
@@ -321,7 +321,7 @@ impl Default for DurationConfig {
     }
 }
 
-impl Default for ConsensusRequirements {
+impl Default for StateRequirements {
     fn default() -> Self {
         Self {
             require_space_proof: true,
@@ -362,7 +362,7 @@ impl Default for AuthRequirements {
         Self {
             require_certificate: true,
             require_mfa: false,
-            require_consensus_proof: true,
+            require_state_proof: true,
             session_timeout: 3600, // 1 hour
         }
     }
@@ -380,7 +380,7 @@ impl AssetAllocation {
             resource_allocation: ResourceAllocationConfig::default(),
             concurrency_limits: ConcurrencyLimits::default(),
             duration_config: DurationConfig::default(),
-            consensus_requirements: ConsensusRequirements::default(),
+            state_requirements: StateRequirements::default(),
         };
 
         let access_config = AccessConfig {

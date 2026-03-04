@@ -47,7 +47,7 @@ function getTrustChainMockData(endpoint: string, method: string): any {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
-      services: { ca: true, ct: true, dns: true, consensus: true }
+      services: { ca: true, ct: true, dns: true, stateProof: true }
     };
   }
 
@@ -163,11 +163,11 @@ function getHyperMeshMockData(endpoint: string, method: string): any {
       status: 'healthy',
       totalAssets: 42,
       activeAllocations: 12,
-      consensusHealth: 98.5,
+      stateProofHealth: 98.5,
       byzantineDetections: 0,
       networkNodes: 8,
       proxyConnections: 24,
-      lastConsensus: new Date(Date.now() - 5000).toISOString(),
+      lastStateProof: new Date(Date.now() - 5000).toISOString(),
       uptime: 99.8
     };
   }
@@ -219,7 +219,7 @@ function getHyperMeshMockData(endpoint: string, method: string): any {
         startTime: new Date(Date.now() - 1800000).toISOString(),
         endTime: new Date(Date.now() + 1800000).toISOString(),
         status: 'active',
-        consensusProofs: [],
+        stateProofs: [],
         proxyAddress: '2001:db8:proxy::cpu:001/user-123'
       }
     ];
@@ -240,7 +240,7 @@ function getHyperMeshMockData(endpoint: string, method: string): any {
         storage: { usage: 45, available: '2TB', status: 'normal' },
         network: { bandwidth: '10Gbps', latency: '2ms', status: 'optimal' }
       },
-      consensus: { participation: 100, validations: 1234, errors: 0 },
+      stateProof: { participation: 100, validations: 1234, errors: 0 },
       lastUpdate: new Date().toISOString()
     };
   }
@@ -263,7 +263,7 @@ function getHyperMeshMockData(endpoint: string, method: string): any {
   return {
     status: 'healthy',
     assets: [],
-    consensus: { validations: 0 },
+    stateProof: { validations: 0 },
     uptime: 99.5
   };
 }
@@ -300,7 +300,7 @@ function getStoqMockData(endpoint: string, method: string): any {
       nodes: {
         connected: 8,
         synchronized: 8,
-        consensus: 'healthy'
+        stateProof: 'healthy'
       }
     };
   }

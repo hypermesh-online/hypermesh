@@ -5,7 +5,7 @@
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
     AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, ConsensusProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
+    AssetUpdate, StateProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
     OperationResult, RwLock,
 };
 
@@ -172,7 +172,7 @@ impl AssetExtensionHandler for DatasetHandler {
             metadata: metadata_map,
             privacy_level: hypermesh_lib::PrivacyMode::PRIVATE,
             allocation: None,
-            consensus_status: blockmatrix::extensions::ConsensusStatus {
+            state_proof_status: blockmatrix::extensions::StateProofStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -185,7 +185,7 @@ impl AssetExtensionHandler for DatasetHandler {
     async fn validate_asset(
         &self,
         id: &AssetRegistration,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> ExtensionResult<bool> {
         let datasets = self.datasets.read().await;
         if !datasets.contains_key(id) {

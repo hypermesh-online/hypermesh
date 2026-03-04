@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, ConsensusProof, CpuRequirements, CpuUsage, NetworkScope,
+    AssetType, BaseSystemType, StateProof, CpuRequirements, CpuUsage, NetworkScope,
     PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage,
 };
 use crate::os_integration::create_os_abstraction;
@@ -323,7 +323,7 @@ impl AssetAdapter for CpuAssetAdapter {
         AssetType::Cpu
     }
 
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
         let is_test = proof.stake_proof.stake_holder_id == "test_stake_holder"
             && proof.space_proof.node_id == "test_node_001";
         if is_test {
@@ -331,8 +331,8 @@ impl AssetAdapter for CpuAssetAdapter {
         }
         let valid = proof.validate();
         if !valid {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "CPU consensus proof validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "CPU state proof validation failed".to_string(),
             });
         }
         if proof.space_proof.total_size == 0 {
@@ -359,11 +359,11 @@ impl AssetAdapter for CpuAssetAdapter {
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         if !self
-            .validate_consensus_proof(&request.consensus_proof)
+            .validate_state_proof(&request.state_proof)
             .await?
         {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "CPU allocation consensus validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "CPU allocation state proof validation failed".to_string(),
             });
         }
         let cpu_req = request.requested_resources.cpu.as_ref().ok_or_else(|| {
@@ -441,7 +441,7 @@ impl AssetAdapter for CpuAssetAdapter {
                 },
                 privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
@@ -454,8 +454,8 @@ impl AssetAdapter for CpuAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements:
-                    crate::assets::core::privacy::ConsensusRequirements::default(),
+                state_requirements:
+                    crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -528,7 +528,7 @@ impl AssetAdapter for CpuAssetAdapter {
             resource_usage: self.get_resource_usage(asset_id).await?,
             privacy_level: alloc.privacy_level,
             proxy_address: None,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint: "cpu-adapter".to_string(),
             metadata: {
                 let mut m = HashMap::new();

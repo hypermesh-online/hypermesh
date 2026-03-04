@@ -25,12 +25,12 @@ export {
   useReleaseAllocation
 } from './useAllocations';
 
-// Consensus validation
+// State proof validation (NOT consensus -- HyperMesh uses bilateral Proof of State)
 export {
-  useValidateConsensus,
-  useConsensusHistory,
+  useValidateStateProof,
+  useStateProofHistory,
   useSubmitProof
-} from './useConsensus';
+} from './useStateProof';
 
 // Byzantine fault detection
 export {

@@ -492,16 +492,16 @@ impl HyperMeshCollector {
         metrics
     }
 
-    /// Collect consensus metrics
-    pub fn collect_consensus_metrics(&self) -> HashMap<String, MetricValue> {
+    /// Collect state proof metrics
+    pub fn collect_state_proof_metrics(&self) -> HashMap<String, MetricValue> {
         let mut metrics = HashMap::new();
 
         metrics.insert(
-            "hypermesh_consensus_rounds_total".to_string(),
+            "hypermesh_verification_rounds_total".to_string(),
             MetricValue::Counter(0),
         );
         metrics.insert(
-            "hypermesh_consensus_latency_seconds".to_string(),
+            "hypermesh_state_proof_latency_seconds".to_string(),
             MetricValue::Gauge(0.0),
         );
         metrics.insert(

@@ -74,7 +74,7 @@ export function PerformanceAnalyticsTab({ assetMetrics }: PerformanceAnalyticsTa
                   <span className="text-blue-400 font-medium text-sm">Security Status</span>
                 </div>
                 <p className="text-gray-300 text-sm">
-                  All assets have valid consensus proofs. Security posture is strong.
+                  All assets have valid state proofs. Security posture is strong.
                 </p>
               </div>
 

@@ -108,13 +108,13 @@ cargo test --lib ct:: -- --show-output
 2. `ca::tests::test_ca_creation`
 3. `ca::tests::test_certificate_issuance`
 4. `ca::security_integration::tests::test_security_integrated_ca_creation`
-5. `ca::security_integration::tests::test_mandatory_consensus_disabled`
+5. `ca::security_integration::tests::test_mandatory_state proof_disabled`
 6. `ca::security_integration::tests::test_secure_certificate_issuance`
 
 ### Root Cause Analysis
 **Primary Issues**:
 1. **Certificate chain setup**: Test CA not properly initialized
-2. **Consensus mocking**: Security integration requires consensus mocks
+2. **state proof mocking**: Security integration requires state proof mocks
 3. **Key material**: Test certificates using wrong key types
 
 ### Fix Strategy
@@ -138,13 +138,13 @@ async fn create_test_ca() -> CertificateAuthority {
 }
 ```
 
-#### Issue 2: Consensus Mocking
+#### Issue 2: state proof Mocking
 ```rust
-// Create mock consensus validator for tests
-struct MockConsensusValidator;
+// Create mock state proof validator for tests
+struct Mockstate proofValidator;
 
-impl ConsensusValidator for MockConsensusValidator {
-    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
+impl state proofValidator for Mockstate proofValidator {
+    async fn validate_proof(&self, _proof: &state proofProof) -> Result<bool> {
         Ok(true) // Always pass in tests
     }
 }
@@ -215,7 +215,7 @@ cargo test --lib dns:: -- --show-output
 1. `tests::test_trustchain_security_initialization`
 2. `tests::test_security_dashboard`
 3. `tests::test_secure_certificate_issuance`
-4. `tests::test_consensus_validation`
+4. `tests::test_state proof_validation`
 
 ### Root Cause Analysis
 **Primary Issues**:
@@ -284,8 +284,8 @@ cargo test --lib tests:: -- --test-threads=1 --show-output
 3. `config::tests::test_config_file_operations`
 4. `monitoring::metrics::tests::test_timing_statistics`
 5. `validation::tests::test_sanitize_input`
-6. `consensus::hypermesh_client::tests::test_client_metrics`
-7. `consensus::proof::tests::test_time_proof_serialization`
+6. `state proof::hypermesh_client::tests::test_client_metrics`
+7. `state proof::proof::tests::test_time_proof_serialization`
 
 ### Root Cause Analysis
 **Mixed Issues**:
@@ -294,7 +294,7 @@ cargo test --lib tests:: -- --test-threads=1 --show-output
 - Config: File I/O in tests (cleanup issues)
 - Metrics: Timing precision issues
 - Validation: Edge case handling
-- Consensus: Serialization format changes
+- state proof: Serialization format changes
 
 ### Fix Strategy
 

@@ -4,14 +4,14 @@
 
 //! Integration tests for TrustChain certificate management
 //!
-//! Tests use `issue_certificate_local()` for local-only consensus validation.
-//! The full `issue_certificate()` path requires a live HyperMesh consensus
+//! Tests use `issue_certificate_local()` for local-only state proof validation.
+//! The full `issue_certificate()` path requires a live HyperMesh Proof of State
 //! network (STOQ transport) and is only exercised in end-to-end tests.
 
 use std::time::Duration;
 use trustchain::ca::{create_certificate_manager, CertificateConfig, CertificateMode};
 use trustchain::ca::{CAConfig, CertificateRequest, TrustChainCA};
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 
 /// Test certificate generation
 #[tokio::test]
@@ -27,7 +27,7 @@ async fn test_certificate_generation() {
         san_entries: vec![],
         ipv6_addresses: vec![],
         node_id: "test-node-1".to_string(),
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
         identity_scope: None,
         subject_type: None,
@@ -98,7 +98,7 @@ async fn test_certificate_validation() {
         san_entries: vec![],
         ipv6_addresses: vec![],
         node_id: "test-node-2".to_string(),
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
         identity_scope: None,
         subject_type: None,
@@ -131,7 +131,7 @@ async fn test_certificate_chain() {
         san_entries: vec![],
         ipv6_addresses: vec![],
         node_id: "test-node-3".to_string(),
-        consensus_proof: ConsensusProof::new_for_testing(),
+        state_proof: StateProof::new_for_testing(),
         timestamp: std::time::SystemTime::now(),
         identity_scope: None,
         subject_type: None,

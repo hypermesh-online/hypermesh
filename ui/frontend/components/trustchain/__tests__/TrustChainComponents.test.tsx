@@ -6,10 +6,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
-import { 
+import {
   NodeConfigurationSettings,
   QuantumSecuritySettings,
-  ConsensusMetricsPanel,
+  StateProofMetricsPanel,
   CertificateDetailsPanel,
   EcosystemMetricsDashboard
 } from '../index';
@@ -205,11 +205,11 @@ describe('TrustChain Components', () => {
     });
   });
 
-  describe('ConsensusMetricsPanel', () => {
-    it('renders consensus metrics', () => {
-      render(<ConsensusMetricsPanel />);
-      
-      expect(screen.getByText('Four-Proof Consensus System')).toBeInTheDocument();
+  describe('StateProofMetricsPanel', () => {
+    it('renders state proof metrics', () => {
+      render(<StateProofMetricsPanel />);
+
+      expect(screen.getByText('Four-Proof State Verification System')).toBeInTheDocument();
       expect(screen.getByText('15,234')).toBeInTheDocument(); // Block height
       expect(screen.getByText('2.3s')).toBeInTheDocument(); // Block time
       expect(screen.getByText('847')).toBeInTheDocument(); // TPS
@@ -217,8 +217,8 @@ describe('TrustChain Components', () => {
     });
 
     it('displays four proof types', () => {
-      render(<ConsensusMetricsPanel />);
-      
+      render(<StateProofMetricsPanel />);
+
       expect(screen.getByText('SPACE')).toBeInTheDocument();
       expect(screen.getByText('STAKE')).toBeInTheDocument();
       expect(screen.getByText('WORK')).toBeInTheDocument();
@@ -227,8 +227,8 @@ describe('TrustChain Components', () => {
 
     it('handles refresh action', () => {
       const mockOnRefresh = vi.fn();
-      render(<ConsensusMetricsPanel onRefresh={mockOnRefresh} />);
-      
+      render(<StateProofMetricsPanel onRefresh={mockOnRefresh} />);
+
       // Should call refresh automatically with autoRefresh
       expect(mockOnRefresh).toHaveBeenCalled();
     });

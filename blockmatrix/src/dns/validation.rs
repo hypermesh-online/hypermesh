@@ -4,11 +4,11 @@
 
 //! DNS Validation with Proof of State
 //!
-//! PoS-driven DNS access validation using consensus system.
+//! PoS-driven DNS access validation using state proof system.
 
 use super::{DnsError, DnsResult, Domain};
-use crate::consensus::validation::{DefaultStateAuthenticator, StateAuthenticator};
-use crate::consensus::{ConsensusProof, ConsensusRequirements};
+use crate::proof_of_state::validation::{DefaultStateAuthenticator, StateAuthenticator};
+use crate::proof_of_state::{StateProof, StateRequirements};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, warn};
@@ -26,10 +26,10 @@ pub struct ValidationResult {
 
 /// DNS validator with PoS integration
 pub struct DnsValidator {
-    /// Consensus validator
-    consensus_validator: Arc<dyn StateAuthenticator>,
-    /// Consensus requirements for DNS operations
-    requirements: ConsensusRequirements,
+    /// State proof validator
+    state_validator: Arc<dyn StateAuthenticator>,
+    /// State proof requirements for DNS operations
+    requirements: StateRequirements,
     /// Enable strict validation
     _strict_mode: bool,
 }
@@ -41,14 +41,14 @@ impl DnsValidator {
     /// * `strict_mode` - If true, uses production-level requirements. If false, uses lenient testing requirements.
     pub fn new(strict_mode: bool) -> Self {
         let requirements = if strict_mode {
-            ConsensusRequirements::production()
+            StateRequirements::production()
         } else {
             // Use lenient requirements for testing
-            ConsensusRequirements::localhost_testing()
+            StateRequirements::localhost_testing()
         };
 
         Self {
-            consensus_validator: Arc::new(DefaultStateAuthenticator::with_requirements(
+            state_validator: Arc::new(DefaultStateAuthenticator::with_requirements(
                 requirements.clone(),
             )),
             requirements,
@@ -60,7 +60,7 @@ impl DnsValidator {
     pub async fn validate_dns_access(
         &self,
         domain: &Domain,
-        proof: &ConsensusProof,
+        proof: &StateProof,
     ) -> DnsResult<ValidationResult> {
         debug!("Validating DNS access for domain: {}", domain.full);
 
@@ -69,20 +69,20 @@ impl DnsValidator {
             reason: format!("Failed to serialize proof: {e}"),
         })?;
 
-        // Validate consensus proof
+        // Validate state proof
         let is_valid = self
-            .consensus_validator
+            .state_validator
             .validate(&proof_bytes)
             .await
             .map_err(|e| DnsError::ValidationFailed {
-                reason: format!("Consensus validation failed: {e}"),
+                reason: format!("State proof validation failed: {e}"),
             })?;
 
         if !is_valid {
             warn!("DNS access denied for domain: {}", domain.full);
             return Ok(ValidationResult {
                 valid: false,
-                reason: Some("Consensus proof validation failed".to_string()),
+                reason: Some("State proof validation failed".to_string()),
                 validated_proofs: vec![],
             });
         }
@@ -106,7 +106,7 @@ impl DnsValidator {
     pub async fn validate_registration(
         &self,
         domain: &Domain,
-        proof: &ConsensusProof,
+        proof: &StateProof,
     ) -> DnsResult<ValidationResult> {
         debug!("Validating DNS registration for domain: {}", domain.full);
 
@@ -114,7 +114,7 @@ impl DnsValidator {
         if !proof.validate_with_requirements(&self.requirements) {
             return Ok(ValidationResult {
                 valid: false,
-                reason: Some("Insufficient consensus proofs for registration".to_string()),
+                reason: Some("Insufficient state proofs for registration".to_string()),
                 validated_proofs: vec![],
             });
         }
@@ -166,12 +166,12 @@ impl Default for DnsValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::proof_of_state_integration::{
+    use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use std::time::Duration;
 
-    fn create_test_proof() -> ConsensusProof {
+    fn create_test_proof() -> StateProof {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string(), 1000);
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
@@ -184,7 +184,7 @@ mod tests {
             WorkState::Completed,
         );
 
-        ConsensusProof::new(stake, time, space, work)
+        StateProof::new(stake, time, space, work)
     }
 
     #[tokio::test]

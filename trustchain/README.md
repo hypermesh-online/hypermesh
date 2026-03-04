@@ -23,7 +23,7 @@ Authentication is binary -- pass or fail. There are no trust scores, reputation 
 | **CA** | Certificate Authority with issuance, revocation, `SecurityIntegratedCA` |
 | **CT** | Certificate Transparency (RFC 6962 Merkle tree, SCTs, SignedTreeHead) |
 | **DNS** | Resolver with STOQ transport, DNS-as-Asset |
-| **Consensus** | Proof of State four-proof validation, BLAKE3 content hashing |
+| **Proof of State** | Four-proof validation (PoSpace/PoStake/PoWork/PoTime), BLAKE3 content hashing |
 | **Security** | Binary authentication, Byzantine detection, monitoring |
 | **Rotation** | Certificate rotation scheduler with background task |
 | **OCSP** | Responder with FALCON-1024 signed responses |
@@ -35,11 +35,11 @@ Authentication is binary -- pass or fail. There are no trust scores, reputation 
 ### Cryptography
 - **FALCON-1024**: Post-quantum signing for all CA operations and protocol signatures
 - **Kyber-1024**: Key encapsulation for asset encryption
-- **BLAKE3**: Content hashing for consensus and certificate transparency
+- **BLAKE3**: Content hashing for Proof of State and certificate transparency
 
 ### Privacy Model
 
-PrivacyMode is a struct with 3 presets (transport layer, independent from blockchain consensus):
+PrivacyMode is a struct with 3 presets (transport layer, independent from blockchain state replication):
 
 | PrivacyMode | Validation | Certificate Mode |
 |-------------|------------|-----------------|

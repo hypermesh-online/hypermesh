@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::assets::core::{AssetType, ConsensusProof, PrivacyMode};
+use crate::assets::core::{AssetType, StateProof, PrivacyMode};
 
 /// Extension system errors
 #[derive(Debug, thiserror::Error)]
@@ -40,8 +40,8 @@ pub enum ExtensionError {
     #[error("Resource limit exceeded: {resource}")]
     ResourceLimitExceeded { resource: String },
 
-    #[error("Consensus validation failed: {reason}")]
-    ConsensusValidationFailed { reason: String },
+    #[error("State proof validation failed: {reason}")]
+    StateProofValidationFailed { reason: String },
 
     #[error("Certificate validation failed: {fingerprint}")]
     CertificateValidationFailed { fingerprint: String },
@@ -109,7 +109,7 @@ pub enum ExtensionCapability {
     VMExecution,
     NetworkAccess,
     FileSystemAccess,
-    ConsensusAccess,
+    StateProofAccess,
     TrustChainAccess,
     TransportAccess,
     ProxyAccess,
@@ -239,7 +239,7 @@ pub struct ExtensionRequest {
     pub id: String,
     pub method: String,
     pub params: serde_json::Value,
-    pub consensus_proof: Option<ConsensusProof>,
+    pub state_proof: Option<StateProof>,
 }
 
 /// Extension response for custom API calls
@@ -274,7 +274,7 @@ impl Default for ExtensionManagerConfig {
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::VMExecution,
                 ExtensionCapability::NetworkAccess,
-                ExtensionCapability::ConsensusAccess,
+                ExtensionCapability::StateProofAccess,
             ]),
         }
     }

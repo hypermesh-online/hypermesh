@@ -155,7 +155,7 @@ Instead of building custom integrations for every chain, Caesar nodes use **Aggr
 3.  **Node A** initiates a LayerZero message via the Crypto Adapter to swap CAES for BTC on an external DEX (e.g., Uniswap/Thorswap) or finds a Peer (Node B) willing to swap CAES for BTC P2P.
 
 ### 1.2 The "Floating Peg" Validation Protocol
-The +/- 20% Gold Peg is not enforced by a central bank. It is enforced by **Protocol Consensus Rules**.
+The +/- 20% Gold Peg is not enforced by a central bank. It is enforced by **Protocol Validation Rules**.
 
 *   **The Rule:** A node will **reject** any incoming CAES packet if the implied value deviates >20% from the real-time average of XAU/USD (Gold).
 *   **The Data:**

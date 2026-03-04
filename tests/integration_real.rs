@@ -34,8 +34,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn run_multi_node_consensus_tests() -> Result<()> {
-        println!("\n========== MULTI-NODE CONSENSUS TESTS ==========\n");
+    async fn run_multi_node_state_proof_tests() -> Result<()> {
+        println!("\n========== MULTI-NODE STATE PROOF TESTS ==========\n");
 
         // Run multi-node tests from integration/multi_node.rs
         // These are automatically discovered by cargo test

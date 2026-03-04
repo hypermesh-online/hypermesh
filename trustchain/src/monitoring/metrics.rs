@@ -122,9 +122,9 @@ impl Metrics {
             .await;
     }
 
-    /// Record consensus validation
-    pub async fn record_consensus_validation(&self, duration_ms: u64, success: bool) {
-        self.record_component_operation("consensus", duration_ms, success)
+    /// Record state proof validation
+    pub async fn record_state_validation(&self, duration_ms: u64, success: bool) {
+        self.record_component_operation("state_proof", duration_ms, success)
             .await;
     }
 

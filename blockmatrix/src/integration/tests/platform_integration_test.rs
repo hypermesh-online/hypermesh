@@ -11,7 +11,7 @@ use hypermesh_integration::{
     PlatformMetrics, ServiceQuery, ServiceHealthStatus,
 };
 use crate::transport::TransportConfig;
-use crate::consensus::ConsensusConfig;
+use crate::proof_of_state::StateProofConfig;
 use hypermesh_container::ContainerRuntimeConfig;
 use hypermesh_security::SecurityConfig;
 use hypermesh_orchestration::OrchestrationConfig;
@@ -114,7 +114,7 @@ async fn test_component_integrations() {
     // Verify component handles are available
     assert!(!platform.stoq().clone().as_ref() as *const _ == std::ptr::null());
     assert!(!platform.transport().clone().as_ref() as *const _ == std::ptr::null());
-    assert!(!platform.consensus().clone().as_ref() as *const _ == std::ptr::null());
+    assert!(!platform.state_proof().clone().as_ref() as *const _ == std::ptr::null());
     assert!(!platform.container_runtime().clone().as_ref() as *const _ == std::ptr::null());
     assert!(!platform.security().clone().as_ref() as *const _ == std::ptr::null());
     assert!(!platform.orchestration().clone().as_ref() as *const _ == std::ptr::null());
@@ -163,12 +163,12 @@ async fn test_metrics_collection() {
 async fn test_platform_builder() {
     let stoq_config = StoqConfig::default();
     let transport_config = TransportConfig::default();
-    let consensus_config = ConsensusConfig::default();
+    let state_proof_config = StateProofConfig::default();
     
     let platform = HyperMeshPlatformBuilder::new()
         .stoq_config(stoq_config)
         .transport_config(transport_config)
-        .consensus_config(consensus_config)
+        .state_proof_config(state_proof_config)
         .build()
         .await
         .expect("Builder should create platform successfully");
@@ -188,7 +188,7 @@ async fn test_config_validation() {
     
     // Test invalid configuration (port conflict)
     config.transport.bind_port = 8080;
-    config.consensus.port = 8080;
+    config.state_proof.port = 8080;
     
     assert!(config.validate().is_err(), "Port conflict should be detected");
 }
@@ -223,7 +223,7 @@ async fn create_test_config() -> HyperMeshConfig {
     
     // Use different ports to avoid conflicts
     config.transport.bind_port = 9001;
-    config.consensus.port = 9002;
+    config.state_proof.port = 9002;
     config.integration.metrics.prometheus_port = 9003;
     
     // Shorter timeouts for testing

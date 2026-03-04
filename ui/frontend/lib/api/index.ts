@@ -38,16 +38,16 @@ export type {
 } from './services/TrustChainAPI';
 
 export { hyperMeshAPI } from './services/HyperMeshAPI';
-export type { 
-  Asset, 
-  AssetType, 
-  PrivacyLevel, 
-  AssetAllocation, 
-  FourProofConsensus, 
-  ConsensusProof, 
+export type {
+  Asset,
+  AssetType,
+  PrivacyLevel,
+  AssetAllocation,
+  FourProofStateVerification,
+  StateProof,
   ProofType,
-  ByzantineDetection, 
-  RemoteProxy, 
+  ByzantineDetection,
+  RemoteProxy,
   NodeHealth,
   VMAsset,
   VMExecution,
@@ -98,9 +98,9 @@ export {
   useRequestAllocation, 
   useAllocations, 
   useReleaseAllocation, 
-  useValidateConsensus, 
-  useConsensusHistory, 
-  useSubmitProof, 
+  useValidateStateProof,
+  useStateProofHistory,
+  useSubmitProof,
   useByzantineDetections, 
   useReportByzantineBehavior, 
   useRemoteProxies, 

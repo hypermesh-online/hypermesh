@@ -66,7 +66,7 @@ impl CatalogExtension {
             required_capabilities: HashSet::from([
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::NetworkAccess,
-                ExtensionCapability::ConsensusAccess,
+                ExtensionCapability::StateProofAccess,
                 ExtensionCapability::TransportAccess,
                 ExtensionCapability::TrustChainAccess,
                 ExtensionCapability::VMExecution,
@@ -86,7 +86,7 @@ impl CatalogExtension {
                     "cache_size": { "type": "integer" },
                     "max_package_size": { "type": "integer" },
                     "enable_p2p": { "type": "boolean" },
-                    "consensus_validation": { "type": "boolean" }
+                    "state_validation": { "type": "boolean" }
                 }
             })),
         };

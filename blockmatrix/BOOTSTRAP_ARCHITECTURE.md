@@ -97,7 +97,7 @@ pub enum PrivacyMode {
 - Default: `Private` mode (localhost only, no network)
 - Anonymous: Ephemeral connections, no DNS registration
 - P2P: Peer discovery, no blockchain asset registration
-- Public: DNS-as-Asset via `trust.hypermesh.online` gateway, full consensus, maximum CAESAR rewards
+- Public: DNS-as-Asset via `trust.hypermesh.online` gateway, full state proof, maximum CAESAR rewards
 
 **User-Owned Networks**:
 - Users can run multiple devices with SAME blockchain
@@ -106,7 +106,7 @@ pub enum PrivacyMode {
 - Example: HyperMesh dashboard + all user devices sharing blockchain
 
 **Privacy Flexibility**:
-- Network transport layer INDEPENDENT from blockchain consensus
+- Network transport layer INDEPENDENT from blockchain state proof
 - Private blockchain CAN use Anonymous network (maximum security)
 - Any combination possible (Private chain + Anonymous transport, etc.)
 
@@ -136,7 +136,7 @@ bootstrap.verify_self_sufficient().await?;
 bootstrap.set_privacy_mode(PrivacyMode::Public).await?;
 // - Registers DNS as blockchain asset (requires 4 proofs)
 // - Connects to network head
-// - Enables consensus participation
+// - Enables state proof participation
 // - Starts earning CAESAR rewards
 ```
 

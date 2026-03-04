@@ -26,7 +26,7 @@ interface NetworkConnection {
   status: 'Connected' | 'Connecting' | 'Disconnected' | 'Error';
   validationStatus: 'verified' | 'rejected';
   peers: number;
-  consensus: string;
+  verification: string;
   description: string;
 }
 
@@ -38,8 +38,8 @@ const networkConnections: NetworkConnection[] = [
     status: 'Connected',
     validationStatus: 'verified',
     peers: 15420,
-    consensus: 'Proof of Stake',
-    description: 'Global public network with open access and democratic consensus'
+    verification: 'Proof of State',
+    description: 'Global public network with open access and bilateral verification'
   },
   {
     id: 'p2p-local',
@@ -48,7 +48,7 @@ const networkConnections: NetworkConnection[] = [
     status: 'Connected',
     validationStatus: 'verified',
     peers: 12,
-    consensus: 'Byzantine Fault Tolerance',
+    verification: 'Bilateral Verification',
     description: 'Direct peer-to-peer connections with trusted nodes'
   },
   {
@@ -58,7 +58,7 @@ const networkConnections: NetworkConnection[] = [
     status: 'Connecting',
     validationStatus: 'verified',
     peers: 234,
-    consensus: 'Federated Byzantine Agreement',
+    verification: 'Federated State Proof',
     description: 'Private federated network for enterprise resource sharing'
   }
 ];
@@ -183,8 +183,8 @@ function NetworkConnectionCard({
           <div className="text-white font-mono">{network.peers.toLocaleString()}</div>
         </div>
         <div>
-          <span className="text-gray-400">Consensus:</span>
-          <div className="text-white font-mono">{network.consensus}</div>
+          <span className="text-gray-400">Verification:</span>
+          <div className="text-white font-mono">{network.verification}</div>
         </div>
         <div className="flex items-center gap-2">
           <Button 

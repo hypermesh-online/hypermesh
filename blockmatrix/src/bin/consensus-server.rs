@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! HyperMesh Consensus Server Binary
+//! HyperMesh State Proof Server Binary
 //!
-//! Standalone consensus validation server that provides STOQ API endpoints
+//! Standalone state proof validation server that provides STOQ API endpoints
 //! for TrustChain and other services to validate certificates and proofs.
 
 use anyhow::{anyhow, Result};
@@ -12,15 +12,15 @@ use clap::{Arg, Command};
 use std::sync::Arc;
 use tracing::info;
 
-use blockmatrix::consensus::{validation_service::ValidationService, ConsensusConfig};
+use blockmatrix::proof_of_state::{validation_service::ValidationService, StateProofConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Parse command line arguments
-    let matches = Command::new("HyperMesh Consensus Server")
+    let matches = Command::new("HyperMesh State Proof Server")
         .version("0.1.0")
         .author("HyperMesh Team")
-        .about("Consensus validation server for the HyperMesh ecosystem")
+        .about("State proof validation server for the HyperMesh ecosystem")
         .arg(
             Arg::new("bind")
                 .short('b')
@@ -43,7 +43,7 @@ async fn main() -> Result<()> {
                 .long("node-id")
                 .value_name("ID")
                 .help("Node identifier")
-                .default_value("hypermesh-consensus-1"),
+                .default_value("hypermesh-state-proof-1"),
         )
         .arg(
             Arg::new("log-level")
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
         .with_line_number(true)
         .init();
 
-    info!("Starting HyperMesh Consensus Server v0.1.0");
+    info!("Starting HyperMesh State Proof Server v0.1.0");
 
     // Parse configuration
     let bind_address = matches
@@ -120,14 +120,14 @@ async fn main() -> Result<()> {
     // Create node ID (placeholder, actual NodeId uses uuid::Uuid::new_v4())
     let _node_id_str = node_id.clone();
 
-    // Create consensus configuration
-    let _consensus_config = ConsensusConfig::default();
+    // Create state proof configuration
+    let _state_proof_config = StateProofConfig::default();
 
     // Create validation service (stub implementation)
     info!("Creating validation service...");
     let _validation_service = Arc::new(ValidationService::new());
 
-    info!("Consensus validation service initialized");
+    info!("State proof validation service initialized");
     info!("STOQ API server would start at {}:{}", bind_address, port);
     info!("Validation service ready (stub implementation)");
     info!("Max concurrent validations: {}", max_validations);
@@ -139,7 +139,7 @@ async fn main() -> Result<()> {
     tokio::signal::ctrl_c().await?;
 
     info!("Received shutdown signal");
-    info!("HyperMesh Consensus Server shutdown complete");
+    info!("HyperMesh State Proof Server shutdown complete");
     Ok(())
 }
 

@@ -11,12 +11,12 @@ export type { NodeSettings } from './NodeConfigurationSettings';
 export { QuantumSecuritySettings } from './QuantumSecuritySettings';
 export type { SecuritySettings } from './QuantumSecuritySettings';
 
-export { ConsensusMetricsPanel } from './ConsensusMetricsPanel';
-export type { 
-  ProofCoverage, 
-  ConsensusMetrics, 
-  ConsensusBlock 
-} from './ConsensusMetricsPanel';
+export { StateProofMetricsPanel } from './StateProofMetricsPanel';
+export type {
+  ProofCoverage,
+  StateProofMetrics,
+  StateProofBlock
+} from './StateProofMetricsPanel';
 
 export { CertificateDetailsPanel } from './CertificateDetailsPanel';
 export type {
@@ -25,8 +25,8 @@ export type {
 } from './shared/CertificateCard';
 
 export { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
-export type { 
-  EcosystemMetrics, 
-  SystemStatus, 
-  MetricTrend 
+export type {
+  EcosystemMetrics,
+  SystemStatus,
+  MetricTrend
 } from './EcosystemMetricsDashboard';

@@ -347,8 +347,8 @@ impl IntelligenceLayer {
             // Step 7: Cross-network validation if enabled
             if self.config.enable_cross_network_validation {
                 // CrossNetworkValidator doesn't have validate_asset, use validate_cross_network
-                use crate::assets::core::ConsensusProof;
-                let proof = ConsensusProof::default(); // Simplified for now
+                use crate::assets::core::StateProof;
+                let proof = StateProof::default(); // Simplified for now
                 let source_network = *network;
                 let target_network = *network; // Same network for now
 

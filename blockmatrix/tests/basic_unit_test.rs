@@ -94,16 +94,16 @@ fn test_privacy_levels_ordering() {
 }
 
 #[test]
-fn test_consensus_proof_structure() {
+fn test_state_proof_structure() {
     #[derive(Debug)]
-    struct ConsensusProof {
+    struct StateProof {
         space_size: u64,
         stake_amount: u64,
         work_difficulty: u32,
         time_duration: Duration,
     }
 
-    impl ConsensusProof {
+    impl StateProof {
         fn validate(&self) -> bool {
             self.space_size > 0
                 && self.stake_amount > 0
@@ -112,7 +112,7 @@ fn test_consensus_proof_structure() {
         }
     }
 
-    let valid_proof = ConsensusProof {
+    let valid_proof = StateProof {
         space_size: 1024 * 1024,
         stake_amount: 1000,
         work_difficulty: 10,
@@ -121,7 +121,7 @@ fn test_consensus_proof_structure() {
 
     assert!(valid_proof.validate(), "Valid proof should validate");
 
-    let invalid_proof = ConsensusProof {
+    let invalid_proof = StateProof {
         space_size: 0, // Invalid
         stake_amount: 1000,
         work_difficulty: 10,

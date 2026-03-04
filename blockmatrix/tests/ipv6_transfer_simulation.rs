@@ -13,14 +13,14 @@ use std::f64::consts::TAU;
 use std::sync::Arc;
 
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
-use blockmatrix::consensus::validation::DefaultStateAuthenticator;
+use blockmatrix::proof_of_state::validation::DefaultStateAuthenticator;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::transfer::{
     compute_receipt_hash, create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
     TransferError, TransferValidation,
 };
 use hypermesh_lib::{AssetAddress, ContentHash};
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 
 /// A simulated node with its own blockchain and asset registry.
 struct SimNode {
@@ -58,7 +58,7 @@ fn create_nodes() -> Vec<SimNode> {
 
 /// Helper: get valid test proof bytes from trustchain.
 fn valid_proof_bytes() -> StateProofBytes {
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
     proof_to_bytes(&proof).expect("test: proof serialization")
 }
 

@@ -5,7 +5,7 @@
 //! Asset status tracking and monitoring
 //!
 //! Real-time asset status monitoring with state management,
-//! resource usage tracking, and consensus proof validation.
+//! resource usage tracking, and state proof validation.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use std::time::SystemTime;
 
 use super::adapter::ResourceUsage;
 use super::proxy::ProxyAddress;
-use super::{AssetRegistration, ConsensusProof};
+use super::{AssetRegistration, StateProof};
 use hypermesh_lib::PrivacyMode;
 
 /// Current status of an asset instance
@@ -33,8 +33,8 @@ pub struct AssetStatus {
     pub privacy_level: PrivacyMode,
     /// Remote proxy address if assigned
     pub proxy_address: Option<ProxyAddress>,
-    /// Valid consensus proofs for this asset
-    pub consensus_proofs: Vec<ConsensusProof>,
+    /// Valid state proofs for this asset
+    pub state_proofs: Vec<StateProof>,
     /// Owner certificate fingerprint
     pub owner_certificate_fingerprint: String,
     /// Asset metadata and tags
@@ -228,7 +228,7 @@ impl AssetStatus {
             },
             privacy_level,
             proxy_address: None,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint,
             metadata: HashMap::new(),
             health_status: AssetHealthStatus::default(),
@@ -242,9 +242,9 @@ impl AssetStatus {
         self.last_accessed = SystemTime::now();
     }
 
-    /// Add consensus proof
-    pub fn add_consensus_proof(&mut self, proof: ConsensusProof) {
-        self.consensus_proofs.push(proof);
+    /// Add state proof
+    pub fn add_state_proof(&mut self, proof: StateProof) {
+        self.state_proofs.push(proof);
     }
 
     /// Set proxy address
@@ -311,10 +311,10 @@ impl AssetStatus {
         SystemTime::now().duration_since(self.last_accessed).ok()
     }
 
-    /// Check if consensus proofs are valid
-    pub fn validate_consensus_proofs(&self) -> bool {
-        !self.consensus_proofs.is_empty()
-            && self.consensus_proofs.iter().all(|proof| proof.validate())
+    /// Check if state proofs are valid
+    pub fn validate_state_proofs(&self) -> bool {
+        !self.state_proofs.is_empty()
+            && self.state_proofs.iter().all(|proof| proof.validate())
     }
 }
 

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::assets::core::{AssetRegistration, AssetType, ConsensusProof, ProxyAddress};
+use crate::assets::core::{AssetRegistration, AssetType, StateProof, ProxyAddress};
 
 /// Asset package information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,7 +56,7 @@ pub struct InstallOptions {
     pub include_optional: bool,
     pub verify_signatures: bool,
     pub use_proxy: Option<ProxyAddress>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 /// Installation result

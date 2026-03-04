@@ -28,7 +28,7 @@ fn main() {
     println!("\n🔒 TrustChain Certificate Authority:");
     println!("  ✅ Self-Signed Bootstrap: Working");
     println!("  ✅ Certificate Rotation: 24-hour cycles");
-    println!("  ✅ Consensus Validation: Implemented");
+    println!("  ✅ State Proof Validation: Implemented");
     println!("  📊 Certificate Operations: ~35ms average");
 
     // HyperMesh Asset System
@@ -36,7 +36,7 @@ fn main() {
     println!("  ✅ Universal Asset Framework: Core implemented");
     println!("  ✅ Asset Adapters (CPU/GPU/Memory/Storage): Functional");
     println!("  ⚠️  Remote Proxy/NAT System: 70% complete");
-    println!("  🔄 Four-Proof Consensus: In integration");
+    println!("  🔄 Four-Proof State Authentication: In integration");
 
     // Caesar Economic Layer
     println!("\n💰 Caesar Economic Incentives:");

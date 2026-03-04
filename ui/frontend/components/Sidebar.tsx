@@ -51,7 +51,7 @@ const navigation = [
     name: 'TrustChain', 
     href: '/trustchain', 
     icon: Shield, 
-    description: 'Network connections & consensus' 
+    description: 'Network connections & proof of state'
   },
   { 
     name: 'Caesar', 

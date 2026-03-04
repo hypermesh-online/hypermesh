@@ -9,7 +9,7 @@ import { Network } from 'lucide-react';
 import { HyperMeshOverview } from './hypermesh/HyperMeshOverview';
 import { ResourceConfiguration } from './hypermesh/ResourceConfiguration';
 import { SharingManagement } from './hypermesh/SharingManagement';
-import { ConsensusDashboard } from '../consensus/ConsensusDashboard';
+import { StateProofDashboard } from '../proof-of-state/StateProofDashboard';
 import { AdvancedAssetManagement } from '../assets/AdvancedAssetManagement';
 
 const subNavigation = [
@@ -17,7 +17,7 @@ const subNavigation = [
   { name: 'Resources', href: '/hypermesh/resources' },
   { name: 'Advanced Assets', href: '/hypermesh/advanced' },
   { name: 'Sharing', href: '/hypermesh/sharing' },
-  { name: 'Consensus', href: '/hypermesh/consensus' },
+  { name: 'Proof of State', href: '/hypermesh/proof-of-state' },
 ];
 
 function SubNavigation() {
@@ -70,7 +70,7 @@ export function HyperMeshModule() {
         <Route path="/resources" element={<ResourceConfiguration />} />
         <Route path="/advanced" element={<AdvancedAssetManagement />} />
         <Route path="/sharing" element={<SharingManagement />} />
-        <Route path="/consensus" element={<ConsensusDashboard />} />
+        <Route path="/proof-of-state" element={<StateProofDashboard />} />
       </Routes>
     </div>
   );

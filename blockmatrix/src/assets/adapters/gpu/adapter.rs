@@ -23,9 +23,9 @@ impl AssetAdapter for GpuAssetAdapter {
         AssetType::Gpu
     }
 
-    async fn validate_consensus_proof(
+    async fn validate_state_proof(
         &self,
-        proof: &crate::assets::core::ConsensusProof,
+        proof: &crate::assets::core::StateProof,
     ) -> AssetResult<bool> {
         // Check if this is a test proof
         let is_test_proof = proof.stake_proof.stake_holder_id == "test_stake_holder"
@@ -35,17 +35,17 @@ impl AssetAdapter for GpuAssetAdapter {
             return Ok(true);
         }
 
-        // Use GPU acceleration for consensus validation if available
+        // Use GPU acceleration for state proof validation if available
         if self.total_devices > 0 {
-            return self.accelerate_consensus_validation(proof).await;
+            return self.accelerate_state_validation(proof).await;
         }
 
         // Fallback to standard validation with GPU-specific requirements
         let valid = proof.validate();
 
         if !valid {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "GPU consensus proof validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "GPU state proof validation failed".to_string(),
             });
         }
 
@@ -77,13 +77,13 @@ impl AssetAdapter for GpuAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        // Validate consensus proof first
+        // Validate state proof first
         if !self
-            .validate_consensus_proof(&request.consensus_proof)
+            .validate_state_proof(&request.state_proof)
             .await?
         {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "GPU allocation consensus validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "GPU allocation state proof validation failed".to_string(),
             });
         }
 
@@ -174,7 +174,7 @@ impl AssetAdapter for GpuAssetAdapter {
                 },
                 privacy_level: PrivacyMode::PRIVATE,
                 proxy_address: None,
-                consensus_proofs: Vec::new(),
+                state_proofs: Vec::new(),
                 owner_certificate_fingerprint: request.certificate_fingerprint.clone(),
                 metadata: HashMap::new(),
                 health_status: crate::assets::core::status::AssetHealthStatus::default(),
@@ -187,8 +187,8 @@ impl AssetAdapter for GpuAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                consensus_requirements:
-                    crate::assets::core::privacy::ConsensusRequirements::default(),
+                state_requirements:
+                    crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -274,7 +274,7 @@ impl AssetAdapter for GpuAssetAdapter {
             privacy_level: allocation.privacy_level,
             proxy_address: None,
             resource_usage: self.get_resource_usage(asset_id).await?,
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
             owner_certificate_fingerprint: "gpu-adapter".to_string(),
             health_status: crate::assets::core::status::AssetHealthStatus::default(),
             performance_metrics: crate::assets::core::status::AssetPerformanceMetrics::default(),
@@ -491,7 +491,7 @@ impl AssetAdapter for GpuAssetAdapter {
                 "multi_gpu".to_string(),
                 "memory_management".to_string(),
                 "compute_isolation".to_string(),
-                "consensus_acceleration".to_string(),
+                "state_proof_acceleration".to_string(),
                 "quantum_security".to_string(),
                 "power_monitoring".to_string(),
                 "temperature_monitoring".to_string(),

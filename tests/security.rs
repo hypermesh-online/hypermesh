@@ -115,8 +115,8 @@ pub async fn test_byzantine_fault_tolerance() -> (bool, HashMap<String, f64>, Ve
         ("1/3 malicious", test_one_third_byzantine().await),
         ("network_partition", test_network_partition_recovery().await),
         (
-            "consensus_manipulation",
-            test_consensus_manipulation().await,
+            "state_proof_manipulation",
+            test_state_proof_manipulation().await,
         ),
         ("double_spending", test_double_spending_prevention().await),
     ];
@@ -255,7 +255,7 @@ async fn test_network_partition_recovery() -> Result<f64> {
     Ok(0.99)
 }
 
-async fn test_consensus_manipulation() -> Result<f64> {
+async fn test_state_proof_manipulation() -> Result<f64> {
     Ok(0.998)
 }
 

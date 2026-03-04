@@ -5,7 +5,7 @@
 //! Certificate Transparency Implementation
 //!
 //! TrustChain Certificate Transparency logs with merkle tree proofs,
-//! real-time certificate fingerprinting, and consensus validation.
+//! real-time certificate fingerprinting, and state proof validation.
 
 use anyhow::anyhow;
 use dashmap::DashMap;
@@ -19,7 +19,7 @@ use tracing::{debug, error, info, warn};
 
 #[allow(hidden_glob_reexports)]
 use crate::config::CTConfig;
-use crate::consensus::{ConsensusContext, ConsensusProof};
+use crate::proof_of_state::{StateProofContext, StateProof};
 use crate::errors::{CTError, Result as TrustChainResult, TrustChainError};
 
 pub mod fingerprint_tracker;
@@ -55,8 +55,8 @@ pub struct CertificateTransparency {
     storage: Arc<CTStorage>,
     /// Configuration
     config: Arc<CTConfig>,
-    /// Consensus validation context (retained for CT log consensus operations)
-    _consensus_context: Arc<ConsensusContext>,
+    /// State proof validation context (retained for CT log state proof operations)
+    _state_proof_context: Arc<StateProofContext>,
     /// Background task handles
     task_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
@@ -76,8 +76,8 @@ pub struct LogEntry {
     pub common_name: String,
     /// Issuer CA identifier
     pub issuer_ca_id: String,
-    /// Associated consensus proof
-    pub consensus_proof: ConsensusProof,
+    /// Associated state proof
+    pub state_proof: StateProof,
     /// Entry ID (hash of entry data)
     pub entry_id: [u8; 32],
     /// Merkle tree leaf hash
@@ -160,8 +160,8 @@ impl CertificateTransparency {
         ));
         logs.insert("0".to_string(), initial_log);
 
-        // Initialize consensus context
-        let consensus_context = Arc::new(ConsensusContext::new(
+        // Initialize state proof context
+        let state_proof_context = Arc::new(StateProofContext::new(
             config.log_id.clone(),
             "trustchain_ct_network".to_string(),
         ));
@@ -173,7 +173,7 @@ impl CertificateTransparency {
             fingerprint_tracker,
             storage,
             config: Arc::new(config),
-            _consensus_context: consensus_context,
+            _state_proof_context: state_proof_context,
             task_handles: Arc::new(Mutex::new(Vec::new())),
         };
 
@@ -218,10 +218,10 @@ impl CertificateTransparency {
             timestamp,
             common_name,
             issuer_ca_id,
-            consensus_proof: ConsensusProof::generate_from_network(&self.log_id)
+            state_proof: StateProof::generate_from_network(&self.log_id)
                 .await
-                .map_err(|e| TrustChainError::ConsensusValidationFailed {
-                    reason: format!("Failed to generate consensus proof: {e}"),
+                .map_err(|e| TrustChainError::StateProofValidationFailed {
+                    reason: format!("Failed to generate state proof: {e}"),
                 })?, // TODO: Use actual proof
             entry_id,
             leaf_hash: [0u8; 32], // Will be set by merkle log

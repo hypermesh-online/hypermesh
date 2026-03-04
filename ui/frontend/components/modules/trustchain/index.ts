@@ -5,7 +5,7 @@
 // TrustChain UI Consolidation Components
 export { NodeConfigurationSettings } from './NodeConfigurationSettings';
 export { QuantumSecuritySettings } from './QuantumSecuritySettings';
-export { ConsensusMetricsPanel } from './ConsensusMetricsPanel';
+export { StateProofMetricsPanel } from './StateProofMetricsPanel';
 
 // Types from NodeConfigurationSettings
 export type {
@@ -20,9 +20,9 @@ export type {
   TestCertResult,
 } from './QuantumSecuritySettings';
 
-// Types from ConsensusMetricsPanel
+// Types from StateProofMetricsPanel
 export type {
-  ConsensusMetrics,
-  HistoricalConsensusData,
+  StateProofMetrics,
+  HistoricalStateProofData,
   ValidationResult,
-} from './ConsensusMetricsPanel';
+} from './StateProofMetricsPanel';

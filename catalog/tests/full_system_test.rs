@@ -27,16 +27,16 @@ use catalog::distribution::content_addressing::{
 
 use catalog::distribution::dht::DhtNodeId;
 
-use blockmatrix::assets::ConsensusProof;
-use blockmatrix::consensus::proof_of_state_integration::{
+use blockmatrix::assets::StateProof;
+use blockmatrix::proof_of_state::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
 use hypermesh_lib::PrivacyMode;
 
 // ---------------------------------------------------------------------------
-// Helper: construct a valid ConsensusProof for tests
+// Helper: construct a valid StateProof for tests
 // ---------------------------------------------------------------------------
-fn test_consensus_proof() -> ConsensusProof {
+fn test_state_proof() -> StateProof {
     let stake = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
     let space = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
     let work = WorkProof::new(
@@ -48,7 +48,7 @@ fn test_consensus_proof() -> ConsensusProof {
         WorkState::Completed,
     );
     let time = TimeProof::new(Duration::from_secs(10));
-    ConsensusProof::new(stake, time, space, work)
+    StateProof::new(stake, time, space, work)
 }
 
 // ===========================================================================
@@ -72,7 +72,7 @@ async fn test_registry_register_and_find_type() {
         "required": ["vin", "make"]
     });
 
-    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_consensus_proof());
+    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_state_proof());
 
     let asset_id = registry.register_type(type_def).await.unwrap();
     let found_id = registry.find_type("Vehicle").await.unwrap();
@@ -91,10 +91,10 @@ async fn test_registry_duplicate_type_fails() {
     let type1 = AssetTypeDefinition::new(
         "DuplicateType".to_string(),
         schema.clone(),
-        test_consensus_proof(),
+        test_state_proof(),
     );
     let type2 =
-        AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_consensus_proof());
+        AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_state_proof());
 
     registry.register_type(type1).await.unwrap();
     let result = registry.register_type(type2).await;
@@ -112,7 +112,7 @@ async fn test_registry_search_types_with_scoring() {
     // Register multiple types
     for name in &["Vehicle", "VehicleInsurance", "Driver", "DriverLicense"] {
         let schema = json!({"type": "object"});
-        let type_def = AssetTypeDefinition::new(name.to_string(), schema, test_consensus_proof());
+        let type_def = AssetTypeDefinition::new(name.to_string(), schema, test_state_proof());
         registry.register_type(type_def).await.unwrap();
     }
 
@@ -161,7 +161,7 @@ async fn test_registry_resolve_dependencies() {
     );
 
     let schema = json!({"type": "object"});
-    let type_def = AssetTypeDefinition::new("DepTest".to_string(), schema, test_consensus_proof());
+    let type_def = AssetTypeDefinition::new("DepTest".to_string(), schema, test_state_proof());
     registry.register_type(type_def).await.unwrap();
 
     // resolve_dependencies returns empty for now (stub)
@@ -183,7 +183,7 @@ async fn test_registry_list_types() {
     let names = vec!["Alpha", "Beta", "Gamma"];
     for name in &names {
         let schema = json!({"type": "object"});
-        let type_def = AssetTypeDefinition::new(name.to_string(), schema, test_consensus_proof());
+        let type_def = AssetTypeDefinition::new(name.to_string(), schema, test_state_proof());
         registry.register_type(type_def).await.unwrap();
     }
 
@@ -213,7 +213,7 @@ async fn test_registry_statistics() {
 
     let schema = json!({"type": "object"});
     let type_def =
-        AssetTypeDefinition::new("StatsTest".to_string(), schema, test_consensus_proof());
+        AssetTypeDefinition::new("StatsTest".to_string(), schema, test_state_proof());
     registry.register_type(type_def).await.unwrap();
 
     let stats = registry.get_statistics().await;
@@ -234,7 +234,7 @@ fn test_type_definition_validate_valid_instance() {
         }
     });
 
-    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_consensus_proof());
+    let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, test_state_proof());
 
     let instance = json!({"vin": "1HGBH41JXMN109186", "make": "Honda"});
     let result = type_def.validate_instance(&instance).unwrap();
@@ -246,7 +246,7 @@ fn test_type_definition_validate_valid_instance() {
 fn test_type_definition_validate_invalid_instance() {
     let schema = json!({"type": "object"});
     let type_def =
-        AssetTypeDefinition::new("StrictType".to_string(), schema, test_consensus_proof());
+        AssetTypeDefinition::new("StrictType".to_string(), schema, test_state_proof());
 
     // A string is not an object, so validation should fail
     let instance = json!("not an object");
@@ -262,7 +262,7 @@ fn test_type_definition_validate_invalid_instance() {
 fn test_type_definition_with_validation_rules() {
     let schema = json!({"type": "object"});
     let mut type_def =
-        AssetTypeDefinition::new("RuledType".to_string(), schema, test_consensus_proof());
+        AssetTypeDefinition::new("RuledType".to_string(), schema, test_state_proof());
 
     // Add Schema validation rule
     type_def.add_validation_rule(ValidationRule {
@@ -297,7 +297,7 @@ fn test_type_definition_with_validation_rules() {
 fn test_type_definition_add_dependency() {
     let schema = json!({"type": "object"});
     let mut type_def =
-        AssetTypeDefinition::new("WithDeps".to_string(), schema, test_consensus_proof());
+        AssetTypeDefinition::new("WithDeps".to_string(), schema, test_state_proof());
 
     type_def.add_dependency("BaseType".to_string());
     type_def.add_dependency("MixinType".to_string());
@@ -307,7 +307,7 @@ fn test_type_definition_add_dependency() {
 #[test]
 fn test_type_definition_serialization_roundtrip() {
     let schema = json!({"type": "object", "properties": {"name": {"type": "string"}}});
-    let type_def = AssetTypeDefinition::new("SerTest".to_string(), schema, test_consensus_proof());
+    let type_def = AssetTypeDefinition::new("SerTest".to_string(), schema, test_state_proof());
 
     let bytes = type_def.to_storage_format().unwrap();
     let restored = AssetTypeDefinition::from_storage_format(&bytes).unwrap();
@@ -518,7 +518,7 @@ fn test_dht_node_id_hex_display() {
 #[cfg(feature = "future-tests")]
 mod future_full_system_tests {
     use blockmatrix::assets::core::{AssetId, AssetManager, AssetType};
-    use blockmatrix::consensus::{ConsensusProof, ProofType};
+    use blockmatrix::proof_of_state::{StateProof, ProofType};
     use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
     use catalog::{
         AssetLibrary, CatalogConfig, CatalogExtension, DistributionConfig, P2PNode, Package,
@@ -552,12 +552,12 @@ mod future_full_system_tests {
             max_packages_per_library: 1000,
             enable_p2p: false,
             enable_trustchain: false,
-            enable_consensus: false,
+            enable_state_proof: false,
             cache_size_mb: 10,
             auto_verify: false,
             security_config: SecurityConfig {
                 enforce_signatures: false,
-                require_consensus: false,
+                require_state_proof: false,
                 audit_enabled: true,
                 max_package_size_mb: 10,
             },
@@ -575,7 +575,7 @@ mod future_full_system_tests {
                 "description": format!("Test library {}", name),
                 "tags": ["test"]
             }),
-            consensus_proof: None,
+            state_proof: None,
         };
 
         let response = catalog.handle_request(request).await.unwrap();

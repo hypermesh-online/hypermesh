@@ -43,12 +43,14 @@ items = [
     # Naming and identity
     "StateAuthenticator trait (binary authentication interface)",
     "PeerIdentity bridges to lib NodeId",
+    "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
+    "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
 ]
 
 [features.in_development]
 items = [
     # CRITICAL: These are the core mesh networking features that don't work yet
-    "Proof of State validation on block creation — add_block() currently skips PoS entirely, only checks hash linkage",
+    "Peer handshake PoS validation — connect_to_peer()/accept_connections() exchange JSON with no proof validation yet",
     "Cross-node block sync — SyncManager/ReflectorPool exist but are NOT wired into node binary start command",
     "Cross-node shard distribution — ShardTransport trait exists but shards only stored/fetched locally",
     "DNS network propagation — records are local-only, no broadcast to TrustChain or peers",
@@ -64,8 +66,8 @@ items = [
 [features.planned]
 items = [
     "FALCON-1024 certificate generation (currently using rcgen X.509, not post-quantum)",
-    "Real consensus proof generation (currently self-generated with hardcoded values)",
-    "Bilateral verification between nodes (R11 — no global consensus, verify with counterparty)",
+    "Real state proof generation (currently self-generated with hardcoded values)",
+    "Bilateral verification between nodes (R11 — no global quorum, verify with counterparty directly)",
     "Swarm distribution protocol (R12 — announce/discover/serve with O(log N) scaling)",
     "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
     "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",

@@ -33,8 +33,8 @@ async fn test_native_monitoring_system() {
 
     monitoring.record_ct_log_entry(5, true).await;
 
-    monitoring.record_consensus_validation(100, true).await;
-    monitoring.record_consensus_validation(120, false).await;
+    monitoring.record_state_validation(100, true).await;
+    monitoring.record_state_validation(120, false).await;
 
     // Get metrics snapshot
     let metrics = monitoring.get_metrics().await;
@@ -57,10 +57,10 @@ async fn test_native_monitoring_system() {
     let ct_metrics = metrics.components.get("ct").unwrap();
     assert_eq!(ct_metrics.total_operations, 1);
 
-    // Verify consensus metrics
-    assert!(metrics.components.contains_key("consensus"));
-    let consensus_metrics = metrics.components.get("consensus").unwrap();
-    assert_eq!(consensus_metrics.total_operations, 2);
+    // Verify state proof metrics
+    assert!(metrics.components.contains_key("state_proof"));
+    let state_proof_metrics = metrics.components.get("state_proof").unwrap();
+    assert_eq!(state_proof_metrics.total_operations, 2);
 
     println!("Native monitoring system test passed!");
 }
@@ -77,7 +77,7 @@ async fn test_health_check_system() {
 
     // All components should be healthy initially
     assert!(health.is_healthy);
-    assert_eq!(health.components.len(), 6); // ca, ct, dns, consensus, stoq, api
+    assert_eq!(health.components.len(), 6); // ca, ct, dns, state_proof, stoq, api
 
     for (name, component_health) in &health.components {
         assert!(component_health.is_healthy, "{name} should be healthy");

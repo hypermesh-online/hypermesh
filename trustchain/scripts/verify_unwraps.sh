@@ -7,7 +7,7 @@ echo ""
 
 # Per-module breakdown
 echo "Module Breakdown:"
-for module in ct dns crypto security api consensus ca monitoring http3; do
+for module in ct dns crypto security api proof_of_state ca monitoring http3; do
     count=$(grep -r "unwrap()" src/$module --include="*.rs" 2>/dev/null | grep -v "test" | wc -l)
     printf "%-15s: %3d unwraps\n" "$module" "$count"
 done

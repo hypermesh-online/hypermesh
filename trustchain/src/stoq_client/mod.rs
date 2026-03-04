@@ -52,7 +52,7 @@ mod tests {
         assert_eq!(ServiceType::Dns.as_str(), "dns");
         assert_eq!(ServiceType::CertificateAuthority.as_str(), "ca");
         assert_eq!(ServiceType::CertificateTransparency.as_str(), "ct");
-        assert_eq!(ServiceType::ConsensusNode.as_str(), "consensus");
+        assert_eq!(ServiceType::StateProofNode.as_str(), "state_proof");
         assert_eq!(ServiceType::AssetDiscovery.as_str(), "assets");
     }
 

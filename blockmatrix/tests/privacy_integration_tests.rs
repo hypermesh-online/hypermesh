@@ -38,8 +38,8 @@ fn test_all_four_privacy_tiers() {
 
     // Test Public tier
     let mut public = PublicTier::new([0u8; 32]);
-    public.update_reputation(true);
-    assert!(public.reputation > 0.5);
+    public.set_authenticated(true);
+    assert!(public.authenticated);
 }
 
 #[test]

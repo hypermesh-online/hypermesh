@@ -39,7 +39,7 @@ items = [
     # CRITICAL: Core decentralization features that are missing or fake
     "FALCON-1024 certificate signing — currently using rcgen (traditional RSA/ECDSA X.509), NOT post-quantum FALCON-1024",
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-    "Real Proof of State validation — consensus proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
+    "Real Proof of State validation — state proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
     "StakeProof signature verification — currently checks non-empty string + positive number, no cryptographic verification",
     "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
     "DNS zone propagation — DNS resolver is a local HashMap, no cross-node zone transfer",
@@ -53,7 +53,7 @@ items = [
 
 [features.planned]
 items = [
-    "Multi-node CA consensus (distributed certificate issuance across reflector pool)",
+    "Multi-node CA coordination (distributed certificate issuance across reflector pool)",
     "Distributed revocation propagation (federation broadcast to peer CAs)",
     "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
     "Cascading revocation across federated CAs",

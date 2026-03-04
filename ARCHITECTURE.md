@@ -153,7 +153,7 @@ Every asset gets a globally unique `AssetAddress` derived from its `AssetId`. Th
 - Proof of State four-proof validation (PoSpace/PoStake/PoWork/PoTime)
 - Matrix persistence (WAL, snapshots, recovery)
 
-### Networking (consensus layer, not transport)
+### Networking (state proof layer, not transport)
 
 - Federated trust networking
 - DNS record registration and storage
@@ -263,7 +263,7 @@ Svelte-based dashboard for node management, asset browsing, and network visualiz
 
 ## Privacy Independence
 
-`PrivacyMode` (transport layer) and `BlockchainScope` (consensus layer) are independent dimensions:
+`PrivacyMode` (transport layer) and `BlockchainScope` (state proof layer) are independent dimensions:
 
 - **PrivacyMode**: `ANONYMOUS` (unbounded, untracked) | `PRIVATE` (bounded, tracked) | `PUBLIC` (unbounded, tracked)
 - **BlockchainScope**: `Device` (local-only, always running) | `Network` (synchronized via reflector)
@@ -277,7 +277,7 @@ Any combination is valid. They are configured independently.
 
 ---
 
-## Proof of State (Four-Proof Consensus)
+## Proof of State (Four-Proof Authentication)
 
 Every asset requires ALL FOUR proofs -- this is binary authentication (authentic or not), not trust scoring:
 
@@ -286,7 +286,7 @@ Every asset requires ALL FOUR proofs -- this is binary authentication (authentic
 - **PoWork (WHAT/HOW)**: Computational resources and processing
 - **PoTime (WHEN)**: Temporal ordering and timestamp validation
 
-Combined into a unified Consensus Proof answering WHERE/WHO/WHAT/WHEN. Bilateral verification, not global consensus.
+Combined into a unified State Proof answering WHERE/WHO/WHAT/WHEN. Bilateral verification -- no voting, no quorum, no leader election.
 
 ---
 

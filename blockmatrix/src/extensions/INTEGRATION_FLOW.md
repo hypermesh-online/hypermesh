@@ -28,14 +28,14 @@ graph TB
     subgraph "Runtime Operations"
         L --> M[Handle Requests]
         M --> N[Validate Permissions]
-        N --> O[Check Consensus]
+        N --> O[Check State Proof]
         O --> P[Execute Operation]
         P --> Q[Update State]
         Q --> R[Return Response]
     end
 
     subgraph "Integration Points"
-        O --> S[Proof of State Consensus]
+        O --> S[Proof of State Validation]
         O --> T[TrustChain Certs]
         P --> U[STOQ Transport]
         P --> V[Proxy/NAT System]
@@ -100,7 +100,7 @@ catalog-extension/
       "asset:write",
       "asset:create",
       "network:connect",
-      "consensus:validate",
+      "state_proof:validate",
       "storage:read",
       "storage:write"
     ],
@@ -348,7 +348,7 @@ impl CatalogDistribution {
                 chunks: chunk_hashes,
                 merkle_root: merkle_tree.root(),
                 size: package.size,
-                consensus_proof: package.consensus_proof.clone(),
+                state_proof: package.state_proof.clone(),
             }
         ).await?;
 
@@ -357,13 +357,13 @@ impl CatalogDistribution {
 }
 ```
 
-#### 3.3 Consensus Integration
+#### 3.3 State Proof Integration
 ```rust
-impl CatalogConsensus {
+impl CatalogStateProof {
     async fn validate_package_operation(
         &self,
         operation: &PackageOperation,
-        proof: &ConsensusProof
+        proof: &StateProof
     ) -> Result<bool> {
         // Validate all four proofs
         let validations = futures::join!(
@@ -433,8 +433,8 @@ impl CatalogExtension {
     async fn handle_install_package(&self, request: ExtensionRequest) -> ExtensionResponse {
         let params: InstallParams = request.params()?;
 
-        // Verify consensus proof
-        if !self.validate_consensus(&params.consensus_proof).await? {
+        // Verify state proof
+        if !self.validate_state_proof(&params.state_proof).await? {
             return ExtensionResponse::invalid_proof();
         }
 
@@ -473,7 +473,7 @@ impl CatalogAssetIntegration {
                     asset_type: asset.asset_type.clone(),
                     metadata: asset.metadata.clone(),
                     privacy_level: PrivacyMode::PRIVATE,
-                    consensus_requirements: ConsensusRequirements::default(),
+                    state_requirements: StateRequirements::default(),
                 }
             ).await?;
 
@@ -507,7 +507,7 @@ impl CatalogAssetIntegration {
                 source: global_address.clone(),
                 destination: asset_id.clone(),
                 trust_requirements: config.trust_requirements.clone(),
-                consensus_validation: true,
+                state_proof_validation: true,
             }
         ).await?;
 
@@ -573,11 +573,11 @@ impl CatalogState {
         // Encrypt with user key
         let encrypted = self.encrypt_state(&serialized)?;
 
-        // Store with consensus validation
+        // Store with state proof validation
         self.state_store.put(
             "catalog.state",
             encrypted,
-            ConsensusProof::new()
+            StateProof::new()
         ).await?;
 
         Ok(())
@@ -633,15 +633,15 @@ async fn test_catalog_extension_loading() {
 async fn test_package_installation() {
     let catalog = setup_catalog_extension().await;
 
-    // Create consensus proof
-    let proof = create_test_consensus_proof().await;
+    // Create state proof
+    let proof = create_test_state_proof().await;
 
     // Install package
     let result = catalog.install_package(
         "julia-scientific-computing",
         InstallOptions {
             verify_signatures: true,
-            consensus_proof: proof,
+            state_proof: proof,
         }
     ).await.unwrap();
 
@@ -724,7 +724,7 @@ impl CatalogOperations {
 ### Phase 2: Integration (Week 2)
 - [ ] Integrate with AssetManager
 - [ ] Connect to STOQ transport
-- [ ] Implement consensus validation
+- [ ] Implement state proof validation
 
 ### Phase 3: Testing (Week 3)
 - [ ] Unit testing
@@ -742,7 +742,7 @@ impl CatalogOperations {
 The integration flow transforms Catalog from a standalone service into a fully integrated HyperMesh extension, providing:
 
 1. **Seamless Integration**: Native integration with HyperMesh systems
-2. **Security**: Multi-layer security with consensus validation
+2. **Security**: Multi-layer security with state proof validation
 3. **Performance**: Optimized caching and parallel operations
 4. **Distribution**: P2P asset distribution via STOQ
 5. **Extensibility**: Plugin architecture for future enhancements

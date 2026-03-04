@@ -505,7 +505,7 @@ mod tests {
         t.connect_reflector("r1".into(), "[::1]:9001".into(), test_position(1.0))
             .expect("test: connect");
 
-        let msg = ReflectorMessage::QuorumConfirm {
+        let msg = ReflectorMessage::ReplicationConfirm {
             network_id: test_network(),
             block_height: 5,
             confirming_node: "r1".to_string(),

@@ -30,7 +30,7 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 
 1. **Local blockchain starts on boot** -- no network required, node is self-sufficient
 2. **Node is its own DNS provider** -- bootstraps independently before network registration
-3. **PrivacyMode (transport) is independent from BlockchainScope (consensus)** -- any combination valid
+3. **PrivacyMode (transport) is independent from BlockchainScope (state proof)** -- any combination valid
 4. **Users can create private networks** across their own devices with shared blockchain
 5. **trust.hypermesh.online** is the global Public Gateway -- private networks work without it
 
@@ -42,7 +42,7 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 | `blockchain/` | Per-node chain, block validation, sync manager |
 | `assets/` | 6 adapters, pipeline, proxy/NAT, privacy allocation |
 | `transfer/` | IPv6 asset addressing, TransferEngine |
-| `consensus/` | PoS orchestration (re-exports from TrustChain) |
+| `proof_of_state/` | PoS orchestration (re-exports from TrustChain) |
 | `distribution/` | PoS validator integration, redistribution |
 | `retrieval/` | Instruction-based shard reconstruction |
 | `persistence/` | WAL, snapshots, matrix state recovery |

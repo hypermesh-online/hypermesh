@@ -131,8 +131,8 @@ pub enum ProxyCapability {
     Compression,
     /// Supports caching
     Caching,
-    /// Supports consensus validation
-    ConsensusValidation,
+    /// Supports state proof validation
+    StateProofValidation,
 }
 
 /// Proxy node status
@@ -287,8 +287,8 @@ impl ProxySelector {
                 .await
             {
                 Ok(validation) => {
-                    // Check if validation meets requirement
-                    validation.trust_level >= required_level.to_score()
+                    // Binary authentication: certificate is valid or not
+                    validation.valid
                 }
                 Err(_) => false,
             }

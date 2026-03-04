@@ -17,7 +17,7 @@ export function TrustChainModule() {
           TrustChain
         </h1>
         <p className="text-gray-400 mt-2">
-          Network connections and consensus mechanisms for Public, P2P, and Federated networks
+          Network connections and Proof of State verification for Public, P2P, and Federated networks
         </p>
       </div>
 

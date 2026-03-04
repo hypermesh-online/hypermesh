@@ -257,7 +257,7 @@ fn create_test_package(id: &str) -> LibraryAssetPackage {
             },
             resources: ResourceRequirements::default(),
             security: SecurityConfig {
-                consensus_required: false,
+                state_proof_required: false,
                 sandbox_level: SandboxLevel::Standard,
                 network_access: false,
                 filesystem_access: FilesystemAccess::ReadOnly,
@@ -265,7 +265,7 @@ fn create_test_package(id: &str) -> LibraryAssetPackage {
             },
             execution: ExecutionConfig {
                 strategy: ExecutionStrategy::NearestNode,
-                min_consensus: 1,
+                min_state_proof: 1,
                 max_concurrent: Some(1),
                 priority: ExecutionPriority::Normal,
                 retry_policy: RetryPolicy::default(),

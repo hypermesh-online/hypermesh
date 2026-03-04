@@ -52,8 +52,8 @@ class SecurityTestSuite:
                 'required_functions': ['generate_real_private_key', 'calculate_fingerprint']
             },
             {
-                'name': 'TrustChain Consensus',
-                'file': 'trustchain/src/consensus/mod.rs',
+                'name': 'TrustChain Proof of State',
+                'file': 'trustchain/src/proof_of_state/mod.rs',
                 'required_imports': ['sha2', 'bincode'],
                 'required_functions': ['generate_from_network', 'validate']
             }
@@ -99,7 +99,7 @@ class SecurityTestSuite:
                 'validate_node_id',
                 'validate_certificate_request',
                 'validate_ipv6',
-                'validate_consensus_proof',
+                'validate_state_proof',
                 'sanitize_input'
             ]
 
@@ -214,17 +214,17 @@ class SecurityTestSuite:
 
         return all_found
 
-    def test_consensus_validation(self) -> bool:
-        """Test consensus proof validation implementation"""
-        print("\n[TEST 6] Consensus Validation")
+    def test_state_proof_validation(self) -> bool:
+        """Test Proof of State validation implementation"""
+        print("\n[TEST 6] Proof of State Validation")
         print("-" * 50)
 
-        consensus_file = self.project_root / 'trustchain/src/consensus/mod.rs'
-        if not consensus_file.exists():
-            print("  ❌ Consensus module not found")
+        pos_file = self.project_root / 'trustchain/src/proof_of_state/mod.rs'
+        if not pos_file.exists():
+            print("  ❌ Proof of State module not found")
             return False
 
-        with open(consensus_file, 'r') as f:
+        with open(pos_file, 'r') as f:
             content = f.read()
 
         proof_types = ['StakeProof', 'TimeProof', 'SpaceProof', 'WorkProof']
@@ -234,10 +234,10 @@ class SecurityTestSuite:
         for proof in proof_types:
             if proof in content:
                 print(f"  ✓ {proof}: Implemented")
-                self.test_results['passed'].append(f'Consensus: {proof}')
+                self.test_results['passed'].append(f'StateProof: {proof}')
             else:
                 print(f"  ❌ {proof}: Missing")
-                self.test_results['failed'].append(f'Consensus: {proof}')
+                self.test_results['failed'].append(f'StateProof: {proof}')
                 all_found = False
 
         for method in validation_methods:
@@ -418,7 +418,7 @@ class SecurityTestSuite:
             self.test_security_bypasses,
             self.test_error_handling,
             self.test_certificate_security,
-            self.test_consensus_validation,
+            self.test_state_proof_validation,
             self.test_penetration_resistance
         ]
 

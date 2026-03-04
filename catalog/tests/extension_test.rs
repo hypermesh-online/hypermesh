@@ -35,7 +35,7 @@ fn test_extension_default_config() {
     let config = CatalogExtensionConfig::default();
     assert_eq!(config.cache_size, 1024 * 1024 * 1024); // 1GB
     assert!(config.enable_p2p);
-    assert!(config.consensus_validation);
+    assert!(config.state_validation);
     assert_eq!(config.hypermesh_address, "catalog.hypermesh.online");
 }
 
@@ -79,7 +79,7 @@ fn test_extension_required_capabilities() {
     assert_eq!(caps.len(), 7);
     assert!(caps.contains(&ExtensionCapability::AssetManagement));
     assert!(caps.contains(&ExtensionCapability::NetworkAccess));
-    assert!(caps.contains(&ExtensionCapability::ConsensusAccess));
+    assert!(caps.contains(&ExtensionCapability::StateProofAccess));
     assert!(caps.contains(&ExtensionCapability::TransportAccess));
     assert!(caps.contains(&ExtensionCapability::TrustChainAccess));
     assert!(caps.contains(&ExtensionCapability::VMExecution));
@@ -130,7 +130,7 @@ async fn test_extension_handle_request_stats() {
         id: "stats-req-1".to_string(),
         method: "catalog.stats".to_string(),
         params: serde_json::Value::Null,
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(request).await.unwrap();
@@ -152,7 +152,7 @@ async fn test_extension_handle_request_unknown_method() {
         id: "unknown-1".to_string(),
         method: "catalog.nonexistent".to_string(),
         params: serde_json::Value::Null,
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(request).await.unwrap();
@@ -226,7 +226,7 @@ async fn test_extension_request_increments_counter() {
         id: "count-1".to_string(),
         method: "catalog.stats".to_string(),
         params: serde_json::Value::Null,
-        consensus_proof: None,
+        state_proof: None,
     };
     extension.handle_request(request).await.unwrap();
 
@@ -299,14 +299,14 @@ fn test_config_builder_pattern() {
         .with_library_path(PathBuf::from("/tmp/catalog"))
         .with_cache_size(512 * 1024 * 1024)
         .with_p2p(false)
-        .with_consensus_validation(true)
+        .with_state_validation(true)
         .with_hypermesh_address("test.hypermesh.online".to_string())
         .with_trustchain_cert("cert.pem".to_string());
 
     assert_eq!(config.library_path, PathBuf::from("/tmp/catalog"));
     assert_eq!(config.cache_size, 512 * 1024 * 1024);
     assert!(!config.enable_p2p);
-    assert!(config.consensus_validation);
+    assert!(config.state_validation);
     assert_eq!(config.hypermesh_address, "test.hypermesh.online");
     assert_eq!(config.trustchain_cert_path, Some("cert.pem".to_string()));
 }
@@ -314,7 +314,7 @@ fn test_config_builder_pattern() {
 #[test]
 fn test_config_min_stake_for_publish() {
     let config = CatalogExtensionConfig::default();
-    // Default min_consensus_proofs is 2, so min_stake = 100 * 2 = 200
+    // Default min_state_proofs is 2, so min_stake = 100 * 2 = 200
     let min_stake = config.min_stake_for_publish();
     assert_eq!(min_stake, 200);
 }
@@ -349,7 +349,7 @@ mod future_extension_tests {
                 "library_path": "/tmp/test-catalog-library",
                 "cache_size": 1024 * 1024 * 100,
                 "enable_p2p": false,
-                "consensus_validation": false,
+                "state_validation": false,
                 "debug_mode": true,
             }),
             resource_limits: ResourceLimits::default(),
@@ -367,7 +367,7 @@ mod future_extension_tests {
         let mut config = CatalogExtensionConfig::default();
         config.library_path = PathBuf::from("/tmp/test-catalog-library");
         config.enable_p2p = false;
-        config.consensus_validation = false;
+        config.state_validation = false;
         config.debug_mode = true;
         config
     }
@@ -416,7 +416,7 @@ mod future_extension_tests {
             ]),
             privacy_level: PrivacyMode::PRIVATE,
             allocation: None,
-            consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
+            state_requirements: hypermesh::extensions::StateRequirements::default(),
             parent_id: None,
             tags: vec!["test".to_string()],
         };

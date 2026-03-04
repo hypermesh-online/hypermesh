@@ -38,8 +38,8 @@ test.describe('TrustChain UI Accessibility Tests', () => {
       expect(accessibilityScanResults.violations).toEqual([]);
     });
 
-    test('should pass axe accessibility tests for consensus metrics @accessibility', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+    test('should pass axe accessibility tests for state proof metrics @accessibility', async ({ page }) => {
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       const accessibilityScanResults = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa'])
@@ -224,7 +224,7 @@ test.describe('TrustChain UI Accessibility Tests', () => {
     });
 
     test('should provide proper headings hierarchy @accessibility', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Verify main heading
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -235,11 +235,11 @@ test.describe('TrustChain UI Accessibility Tests', () => {
       expect(count).toBeGreaterThan(0);
       
       // Verify heading text
-      await expect(page.getByRole('heading', { name: /four-proof consensus system/i })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /four-proof state verification system/i })).toBeVisible();
     });
 
     test('should provide proper table structure for data @accessibility', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Check for proper table structure if metrics are displayed in table format
       const tables = page.getByRole('table');
@@ -331,7 +331,7 @@ test.describe('TrustChain UI Accessibility Tests', () => {
     });
 
     test('should not rely solely on color for information @accessibility', async ({ page }) => {
-      await page.getByRole('tab', { name: /consensus metrics/i }).click();
+      await page.getByRole('tab', { name: /state proof metrics/i }).click();
       
       // Verify proof status uses more than just color
       // Should have text labels like "VALID", "PENDING", etc.

@@ -199,7 +199,7 @@ mod tests {
             allowed_networks: vec![],
             allowed_peers: vec![],
             max_concurrent_access: 5,
-            require_consensus: false,
+            require_state_proof: false,
         };
 
         let mapping = translator
@@ -251,7 +251,7 @@ mod tests {
             allowed_networks: vec!["some-net".to_string()],
             allowed_peers: vec![],
             max_concurrent_access: 1,
-            require_consensus: false,
+            require_state_proof: false,
         };
 
         let result = translator

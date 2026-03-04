@@ -106,7 +106,7 @@ spec:
     templates: []
 
   security:
-    consensus_required: false
+    state_proof_required: false
     certificate_pinning: false
     hash_validation: "blake3"
     sandbox_level: "{{sandbox_level}}"
@@ -132,7 +132,7 @@ spec:
 
   execution:
     delegation_strategy: "load_balanced"
-    minimum_consensus: 1
+    minimum_state_proof: 1
     retry_policy: "simple"
     priority: "normal"
     timeout_config:

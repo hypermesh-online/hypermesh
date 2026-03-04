@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::assets::core::ConsensusProof;
+use crate::assets::core::StateProof;
 use crate::container::{ContainerSpec, ResourceRequirements};
 use crate::orchestration::hypermesh_integration::{
     ContainerMetadata, HyperMeshContainerOrchestrator, HyperMeshContainerSpec,
@@ -50,7 +50,7 @@ impl CatalogHyperMeshBridge {
     pub async fn deploy_catalog_asset(
         &self,
         deployment_spec: CatalogDeploymentSpec,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<CatalogDeploymentResult> {
         let deployment_id = Uuid::new_v4().to_string();
         let start_time = SystemTime::now();
@@ -77,7 +77,7 @@ impl CatalogHyperMeshBridge {
                 ));
             }
             DeploymentStrategy::Container { container_config } => {
-                self.deploy_as_container(&deployment_spec.asset, container_config, &consensus_proof)
+                self.deploy_as_container(&deployment_spec.asset, container_config, &state_proof)
                     .await?
             }
             DeploymentStrategy::Serverless { .. } => {
@@ -143,7 +143,7 @@ impl CatalogHyperMeshBridge {
         &self,
         asset: &CatalogAssetType,
         container_config: &ContainerDeploymentConfig,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
     ) -> Result<InternalDeploymentResult> {
         match asset {
             CatalogAssetType::ContainerImage {
@@ -165,7 +165,7 @@ impl CatalogHyperMeshBridge {
                 let hypermesh_spec = HyperMeshContainerSpec {
                     container_spec,
                     required_assets: HashMap::new(),
-                    consensus_proof: consensus_proof.clone(),
+                    state_proof: state_proof.clone(),
                     privacy_requirements: PrivacyRequirements::default(),
                     performance_requirements: PerformanceRequirements::default(),
                     metadata: ContainerMetadata {

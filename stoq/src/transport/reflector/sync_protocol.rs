@@ -4,7 +4,7 @@
 
 //! Sync protocol state machine for reflector pool synchronization.
 //!
-//! Manages heartbeat broadcasting, peer health tracking, quorum
+//! Manages heartbeat broadcasting, peer health tracking, replication threshold
 //! detection for block heights, sync request/response flow, block
 //! announcements, and stale-peer pruning.
 
@@ -34,8 +34,8 @@ pub struct SyncProtocolConfig {
     /// A reflector is considered stale after this duration without a
     /// heartbeat.
     pub stale_reflector_timeout: Duration,
-    /// Fraction of peers that must confirm a block for quorum (0.0-1.0).
-    pub quorum_threshold: f64,
+    /// Fraction of peers that must confirm a block for replication threshold (0.0-1.0).
+    pub replication_threshold: f64,
     /// Maximum number of blocks to request in a single sync batch.
     pub max_sync_batch_size: u32,
     /// Delay before retrying a failed sync request.
@@ -49,7 +49,7 @@ impl Default for SyncProtocolConfig {
         Self {
             heartbeat_interval: Duration::from_secs(5),
             stale_reflector_timeout: Duration::from_secs(30),
-            quorum_threshold: 0.67,
+            replication_threshold: 0.67,
             max_sync_batch_size: 50,
             sync_retry_delay: Duration::from_secs(2),
             max_sync_retries: 5,
@@ -79,26 +79,26 @@ pub struct PeerHealth {
 }
 
 // ---------------------------------------------------------------------------
-// QuorumState
+// ReplicationState
 // ---------------------------------------------------------------------------
 
-/// Tracks quorum confirmations for block heights.
+/// Tracks replication threshold confirmations for block heights.
 #[derive(Debug)]
-pub struct QuorumState {
+pub struct ReplicationState {
     /// `block_height -> list of confirming node_ids`.
     confirmations: HashMap<u64, Vec<String>>,
-    /// Total number of known peers for quorum fraction calculation.
+    /// Total number of known peers for replication threshold fraction calculation.
     total_peers: usize,
 }
 
-impl Default for QuorumState {
+impl Default for ReplicationState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl QuorumState {
-    /// Create an empty quorum state.
+impl ReplicationState {
+    /// Create an empty replication threshold state.
     pub fn new() -> Self {
         Self {
             confirmations: HashMap::new(),
@@ -116,12 +116,12 @@ impl QuorumState {
         }
     }
 
-    /// Check whether quorum has been reached for `block_height`.
+    /// Check whether replication threshold has been reached for `block_height`.
     ///
-    /// Quorum is reached when the number of unique confirmations is
+    /// Threshold is met when the number of unique confirmations is
     /// at least `ceil(total_peers * threshold)`. If there are zero
-    /// peers, quorum is never reached.
-    pub fn has_quorum(&self, block_height: u64, threshold: f64) -> bool {
+    /// peers, replication threshold is never reached.
+    pub fn has_sufficient_peers(&self, block_height: u64, threshold: f64) -> bool {
         if self.total_peers == 0 {
             return false;
         }
@@ -134,7 +134,7 @@ impl QuorumState {
         count >= required
     }
 
-    /// Update the total peer count used for quorum calculations.
+    /// Update the total peer count used for replication threshold calculations.
     pub fn update_peer_count(&mut self, count: usize) {
         self.total_peers = count;
     }
@@ -157,7 +157,7 @@ impl QuorumState {
 // SyncProtocol
 // ---------------------------------------------------------------------------
 
-/// Sync protocol state machine coordinating heartbeats, quorum,
+/// Sync protocol state machine coordinating heartbeats, replication threshold,
 /// sync requests, block announcements, and peer health.
 pub struct SyncProtocol {
     /// Protocol configuration.
@@ -174,8 +174,8 @@ pub struct SyncProtocol {
     local_block_height: AtomicU64,
     /// Per-peer health information.
     health_tracker: Arc<DashMap<String, PeerHealth>>,
-    /// Quorum tracking for block heights.
-    quorum_state: Arc<RwLock<QuorumState>>,
+    /// Replication tracking for block heights.
+    replication_state: Arc<RwLock<ReplicationState>>,
     /// Flag indicating whether a sync operation is currently active.
     _sync_in_progress: RwLock<bool>,
 }
@@ -202,7 +202,7 @@ impl SyncProtocol {
             local_position,
             local_block_height: AtomicU64::new(0),
             health_tracker: Arc::new(DashMap::new()),
-            quorum_state: Arc::new(RwLock::new(QuorumState::new())),
+            replication_state: Arc::new(RwLock::new(ReplicationState::new())),
             _sync_in_progress: RwLock::new(false),
         }
     }
@@ -264,8 +264,8 @@ impl SyncProtocol {
         self.transport
             .update_reflector_health(from_node, clamped_health, block_height);
 
-        // Keep quorum state's peer count in sync.
-        self.quorum_state
+        // Keep replication threshold state's peer count in sync.
+        self.replication_state
             .write()
             .update_peer_count(self.health_tracker.len());
 
@@ -324,20 +324,20 @@ impl SyncProtocol {
         self.transport.broadcast_message(&msg)
     }
 
-    // -- Quorum --------------------------------------------------------------
+    // -- Replication ----------------------------------------------------------
 
-    /// Record a quorum confirmation from a peer.
+    /// Record a replication threshold confirmation from a peer.
     pub fn record_confirmation(&self, block_height: u64, from_node: &str) {
-        self.quorum_state
+        self.replication_state
             .write()
             .record_confirmation(block_height, from_node.to_string());
     }
 
-    /// Check whether quorum has been reached for a block height.
-    pub fn has_quorum(&self, block_height: u64) -> bool {
-        self.quorum_state
+    /// Check whether replication threshold has been reached for a block height.
+    pub fn has_sufficient_peers(&self, block_height: u64) -> bool {
+        self.replication_state
             .read()
-            .has_quorum(block_height, self.config.quorum_threshold)
+            .has_sufficient_peers(block_height, self.config.replication_threshold)
     }
 
     // -- Stale peer management -----------------------------------------------
@@ -364,7 +364,7 @@ impl SyncProtocol {
         }
 
         if count > 0 {
-            self.quorum_state
+            self.replication_state
                 .write()
                 .update_peer_count(self.health_tracker.len());
             info!(pruned = count, "Stale reflectors removed");
@@ -509,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn test_quorum_detection() {
+    fn test_replication_threshold_detection() {
         let t = make_transport();
         let p = make_protocol(t.clone());
 
@@ -529,18 +529,18 @@ mod tests {
         // ceil(3 * 0.67) = ceil(2.01) = 3 -- need all 3? Let's verify:
         // Actually 3 * 0.67 = 2.01, ceil(2.01) = 3. So we need 3.
         // With threshold 0.67 and 3 peers, required = ceil(2.01) = 3.
-        // Let's confirm with 2 confirmations first (should NOT have quorum)
+        // Let's confirm with 2 confirmations first (should NOT meet threshold)
         p.record_confirmation(10, "p1");
         p.record_confirmation(10, "p2");
-        assert!(!p.has_quorum(10), "2/3 should not meet quorum at 0.67");
+        assert!(!p.has_sufficient_peers(10), "2/3 should not meet threshold at 0.67");
 
-        // 3 out of 3 -> should meet quorum
+        // 3 out of 3 -> should meet threshold
         p.record_confirmation(10, "p3");
-        assert!(p.has_quorum(10), "3/3 should meet quorum at 0.67");
+        assert!(p.has_sufficient_peers(10), "3/3 should meet threshold at 0.67");
     }
 
     #[test]
-    fn test_quorum_below_threshold() {
+    fn test_replication_threshold_below_threshold() {
         let t = make_transport();
         let p = make_protocol(t.clone());
 
@@ -554,15 +554,15 @@ mod tests {
 
         // Only 1 confirmation -- well below threshold
         p.record_confirmation(50, "p1");
-        assert!(!p.has_quorum(50));
+        assert!(!p.has_sufficient_peers(50));
 
         // 2 confirmations -- still below (need 3)
         p.record_confirmation(50, "p2");
-        assert!(!p.has_quorum(50));
+        assert!(!p.has_sufficient_peers(50));
 
         // 3 confirmations -- meets threshold
         p.record_confirmation(50, "p3");
-        assert!(p.has_quorum(50));
+        assert!(p.has_sufficient_peers(50));
     }
 
     #[test]
@@ -660,8 +660,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quorum_cleanup_below() {
-        let mut qs = QuorumState::new();
+    fn test_replication_threshold_cleanup_below() {
+        let mut qs = ReplicationState::new();
         qs.update_peer_count(3);
 
         qs.record_confirmation(5, "a".to_string());
@@ -676,7 +676,7 @@ mod tests {
 
     #[test]
     fn test_duplicate_confirmation_ignored() {
-        let mut qs = QuorumState::new();
+        let mut qs = ReplicationState::new();
         qs.update_peer_count(3);
 
         qs.record_confirmation(10, "node-a".to_string());

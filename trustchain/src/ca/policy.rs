@@ -9,19 +9,19 @@
 use anyhow::Result;
 
 use super::CertificateRequest;
-use crate::consensus::ConsensusRequirements;
+use crate::proof_of_state::StateRequirements;
 
 /// Policy engine for certificate validation
 #[derive(Clone)]
 pub struct PolicyEngine {
-    consensus_requirements: ConsensusRequirements,
+    state_requirements: StateRequirements,
 }
 
 impl PolicyEngine {
     /// Create new policy engine
-    pub fn new(consensus_requirements: ConsensusRequirements) -> Self {
+    pub fn new(state_requirements: StateRequirements) -> Self {
         Self {
-            consensus_requirements,
+            state_requirements,
         }
     }
 
@@ -32,10 +32,10 @@ impl PolicyEngine {
             return Ok(false);
         }
 
-        // Validate consensus proof meets requirements
+        // Validate state proof meets requirements
         if !request
-            .consensus_proof
-            .validate_with_requirements(&self.consensus_requirements)
+            .state_proof
+            .validate_with_requirements(&self.state_requirements)
         {
             return Ok(false);
         }

@@ -15,7 +15,7 @@ use std::time::Duration;
 use super::privacy::AssetAllocation;
 use super::proxy::ProxyAddress;
 use super::status::AssetStatus;
-use super::{AssetRegistration, AssetResult, AssetType, ConsensusProof};
+use super::{AssetRegistration, AssetResult, AssetType, StateProof};
 use hypermesh_lib::PrivacyMode;
 
 /// Universal asset adapter trait
@@ -25,9 +25,9 @@ pub trait AssetAdapter: Send + Sync {
     /// Get the asset type this adapter handles
     fn asset_type(&self) -> AssetType;
 
-    /// Validate consensus proof for this asset type
+    /// Validate state proof for this asset type
     /// CRITICAL: Every operation requires PoSpace + PoStake + PoWork + PoTime validation
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool>;
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool>;
 
     /// Allocate an asset instance
     async fn allocate_asset(
@@ -75,7 +75,7 @@ pub trait AssetAdapter: Send + Sync {
     fn get_capabilities(&self) -> AdapterCapabilities;
 }
 
-/// Asset allocation request with consensus proof
+/// Asset allocation request with state proof
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetAllocationRequest {
     /// Type of asset to allocate
@@ -84,8 +84,8 @@ pub struct AssetAllocationRequest {
     pub requested_resources: ResourceRequirements,
     /// Privacy level configuration
     pub privacy_level: PrivacyMode,
-    /// Consensus proof validation (ALL FOUR PROOFS REQUIRED)
-    pub consensus_proof: ConsensusProof,
+    /// State proof validation (ALL FOUR PROOFS REQUIRED)
+    pub state_proof: StateProof,
     /// Certificate fingerprint for authorization
     pub certificate_fingerprint: String,
     /// Optional duration limit for allocation

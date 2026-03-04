@@ -34,7 +34,7 @@ export interface Asset {
   type: 'CPU' | 'GPU' | 'Memory' | 'Storage';
   status: 'available' | 'allocated' | 'maintenance';
   proxyAddress: string;
-  consensusProof?: string;
+  stateProof?: string;
 }
 
 export interface AssetAllocation {
@@ -275,7 +275,7 @@ export class StoqDataProvider {
       await this.stoqClient.sendMessage('assets_request', {
         timestamp: new Date().toISOString(),
         requestId: `assets-${Date.now()}`,
-        includeConsensusProofs: true
+        includeStateProofs: true
       });
     } catch (error) {
       console.error('❌ Failed to request assets:', error);

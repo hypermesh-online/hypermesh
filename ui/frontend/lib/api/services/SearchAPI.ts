@@ -221,7 +221,7 @@ class SearchAPI {
     } catch {
       // Fallback to default trending topics
       return [
-        { type: 'popular', text: 'consensus proofs', count: 145 },
+        { type: 'popular', text: 'state proofs', count: 145 },
         { type: 'popular', text: 'caesar staking', count: 89 },
         { type: 'popular', text: 'trustchain certificates', count: 67 },
         { type: 'popular', text: 'hypermesh nodes', count: 54 },

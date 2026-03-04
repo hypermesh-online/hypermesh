@@ -9,7 +9,7 @@ import { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
 import type { SystemStatus as EcoSystemStatus } from './EcosystemMetricsDashboard';
 import { NetworkManagement } from './NetworkManagement';
 import { SecuritySettings } from './SecuritySettings';
-import { ConsensusMetricsPanel } from './ConsensusMetricsPanel';
+import { StateProofMetricsPanel } from './StateProofMetricsPanel';
 import { SecurityMonitoringDashboard } from '../security/SecurityMonitoringDashboard';
 import { TrustChainSettings } from './TrustChainSettings';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 const subNavigation = [
   { name: 'Overview', href: '/trustchain' },
   { name: 'Networks', href: '/trustchain/networks' },
-  { name: 'Consensus', href: '/trustchain/consensus' },
+  { name: 'State Proof', href: '/trustchain/state-proof' },
   { name: 'Security', href: '/trustchain/security' },
   { name: 'Settings', href: '/trustchain/settings' },
 ];
@@ -74,14 +74,14 @@ function TrustChainOverview() {
   );
 }
 
-function ConsensusSettings() {
+function StateProofSettings() {
   return (
-    <ConsensusMetricsPanel
+    <StateProofMetricsPanel
       onRefresh={() => {
-        console.log('Refreshing consensus metrics...');
+        console.log('Refreshing state proof metrics...');
       }}
       onValidate={() => {
-        console.log('Validating consensus...');
+        console.log('Validating state proof...');
       }}
     />
   );
@@ -123,7 +123,7 @@ export function TrustChainRouting() {
       <Routes>
         <Route path="/" element={<TrustChainOverview />} />
         <Route path="/networks" element={<NetworkManagement />} />
-        <Route path="/consensus" element={<ConsensusSettings />} />
+        <Route path="/state-proof" element={<StateProofSettings />} />
         <Route path="/security" element={<SecurityMonitoringDashboard />} />
         <Route path="/settings" element={<TrustChainSettings />} />
       </Routes>

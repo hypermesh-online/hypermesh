@@ -8,7 +8,7 @@
 //! - Nova engine GPU compute unit allocation (Vulkan compute shaders)
 //! - Vulkan-based memory management (device memory, buffers)
 //! - Multi-GPU coordination and scheduling via Nova
-//! - Hardware acceleration for consensus proofs
+//! - Hardware acceleration for state proofs
 //! - Quantum-resistant security with FALCON-1024
 //! - Remote proxy access for distributed GPU compute
 

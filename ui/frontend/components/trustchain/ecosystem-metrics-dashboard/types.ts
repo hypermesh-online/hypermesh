@@ -6,7 +6,7 @@ export interface EcosystemMetrics {
   totalAssets: number;
   activeCertificates: number;
   networkThroughput: number;
-  consensusBlocks: number;
+  verifiedBlocks: number;
   quantumConnections: number;
   economicRewards: number;
 }

@@ -145,8 +145,8 @@ pub struct AuthenticationStatus {
     pub authenticated: bool,
     /// Whether the certificate is valid
     pub certificate_valid: bool,
-    /// Whether consensus verification passed
-    pub consensus_verified: bool,
+    /// Whether state proof verification passed
+    pub state_verified: bool,
     /// When this status was last checked
     pub last_checked: SystemTime,
     /// When this status expires
@@ -195,7 +195,7 @@ pub enum EvidenceType {
     ConflictingSignatures,
     InvalidProof,
     NetworkBehaviorLog,
-    ConsensusViolation,
+    StateProofViolation,
     CryptographicMismatch,
 }
 

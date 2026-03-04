@@ -210,7 +210,7 @@ async fn test_configuration_scenarios() {
             ExtensionCapability::AssetManagement,
             ExtensionCapability::VMExecution,
             ExtensionCapability::NetworkAccess,
-            ExtensionCapability::ConsensusAccess,
+            ExtensionCapability::StateProofAccess,
             ExtensionCapability::StorageAccess,
         ]),
     };
@@ -264,7 +264,7 @@ async fn test_cleanup_on_unload() {
                 "version": "1.0.0",
                 "code": "test code"
             }),
-            consensus_proof: None,
+            state_proof: None,
         };
         extension.handle_request(request).await.ok();
     }
@@ -331,7 +331,7 @@ async fn test_state_persistence() {
                 "name": format!("lib-{}", i),
                 "description": format!("Library {}", i)
             }),
-            consensus_proof: None,
+            state_proof: None,
         };
         extension.handle_request(request).await.ok();
     }
@@ -393,7 +393,7 @@ async fn test_hot_reload() {
             "name": "persistent-lib",
             "description": "Should survive reload"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
     extension1.handle_request(request).await.unwrap();
 
@@ -428,7 +428,7 @@ async fn test_hot_reload() {
         id: "hot-2".to_string(),
         method: "list_libraries".to_string(),
         params: json!({}),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension2.handle_request(request2).await.unwrap();

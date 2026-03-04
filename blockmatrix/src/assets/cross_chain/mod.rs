@@ -123,7 +123,7 @@ impl CrossChainValidationManager {
             validated_at: SystemTime::now(),
             expires_at: SystemTime::now()
                 + Duration::from_secs(validator.cache_config.cache_ttl_seconds),
-            consensus_proofs: Vec::new(),
+            state_proofs: Vec::new(),
         };
 
         // Cache result if enabled
@@ -420,7 +420,7 @@ mod tests {
                 trusted_entities: vec!["bank.hypermesh.online".to_string()],
                 max_retention_period: Duration::from_secs(86400),
             },
-            required_proofs: vec![ProofRequirement::ConsensusProof],
+            required_proofs: vec![ProofRequirement::StateProof],
         };
 
         assert_eq!(rule.rule_id, "vehicle_purchase_rule");

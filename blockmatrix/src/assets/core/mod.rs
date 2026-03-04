@@ -10,7 +10,7 @@
 //! - Network resources and bandwidth
 //! - User-defined assets
 //!
-//! All assets require Consensus Proof validation (PoSpace + PoStake + PoWork + PoTime)
+//! All assets require State Proof validation (PoSpace + PoStake + PoWork + PoTime)
 //! and support user-configurable privacy levels with remote proxy addressing.
 
 #![deny(unsafe_code)]
@@ -73,9 +73,9 @@ pub enum AssetError {
     #[error("Asset not found: {asset_id}")]
     AssetNotFound { asset_id: String },
 
-    /// Consensus validation failed
-    #[error("Consensus validation failed: {reason}")]
-    ConsensusValidationFailed { reason: String },
+    /// State proof validation failed
+    #[error("State proof validation failed: {reason}")]
+    StateProofValidationFailed { reason: String },
 
     /// Invalid privacy level configuration
     #[error("Invalid privacy level: {level:?}")]
@@ -150,13 +150,13 @@ pub enum AssetError {
     Internal(#[from] anyhow::Error),
 }
 
-// Import Proof of State Four-Proof Consensus System
-pub use crate::consensus::proof_of_state_integration::{
-    ClientCredentials, ConsensusProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
+// Import Proof of State Four-Proof validation system
+pub use crate::proof_of_state::proof_of_state_integration::{
+    ClientCredentials, StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
     WorkState, WorkloadType,
 };
 
-// All consensus proof types are now imported from Proof of State integration above
+// All state proof types are now imported from Proof of State integration above
 
 /// Core asset manager coordinating all asset operations
 pub struct AssetManager {
@@ -166,13 +166,13 @@ pub struct AssetManager {
     adapters: Arc<RwLock<HashMap<AssetType, Arc<dyn AssetAdapter>>>>,
     /// Proxy address resolver
     proxy_resolver: Arc<ProxyAddressResolver>,
-    /// Consensus validation requirements
-    consensus_requirements: ConsensusRequirements,
+    /// State proof validation requirements
+    state_requirements: StateRequirements,
 }
 
-/// Consensus requirements configuration
+/// State proof requirements configuration
 #[derive(Clone, Debug)]
-pub struct ConsensusRequirements {
+pub struct StateRequirements {
     /// Require all four proofs (default: true)
     pub require_all_proofs: bool,
     /// Minimum stake amount required
@@ -183,7 +183,7 @@ pub struct ConsensusRequirements {
     pub minimum_compute_power: u64,
 }
 
-impl Default for ConsensusRequirements {
+impl Default for StateRequirements {
     fn default() -> Self {
         Self {
             require_all_proofs: true,
@@ -207,7 +207,7 @@ impl AssetManager {
             assets: Arc::new(RwLock::new(HashMap::new())),
             adapters: Arc::new(RwLock::new(HashMap::new())),
             proxy_resolver: Arc::new(ProxyAddressResolver::new()),
-            consensus_requirements: ConsensusRequirements::default(),
+            state_requirements: StateRequirements::default(),
         }
     }
 
@@ -244,13 +244,13 @@ impl AssetManager {
         Ok(())
     }
 
-    /// Allocate an asset with consensus proof validation
+    /// Allocate an asset with state proof validation
     pub async fn allocate_asset(
         &self,
         request: AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        // Validate consensus proof first
-        self.validate_consensus_proof(&request.consensus_proof)
+        // Validate state proof first
+        self.validate_state_proof(&request.state_proof)
             .await?;
 
         // Get appropriate adapter
@@ -428,51 +428,51 @@ impl AssetManager {
         adapter.set_resource_limits(asset_id, limits).await
     }
 
-    /// Validate consensus proof according to requirements using Proof of State Four-Proof System
-    async fn validate_consensus_proof(&self, proof: &ConsensusProof) -> AssetResult<bool> {
+    /// Validate state proof according to requirements using Proof of State Four-Proof System
+    async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
         // Use Proof of State comprehensive validation first
         if let Err(e) = proof.validate_comprehensive().await {
-            return Err(AssetError::ConsensusValidationFailed {
+            return Err(AssetError::StateProofValidationFailed {
                 reason: format!("Proof of State comprehensive validation failed: {e}"),
             });
         }
 
         // Basic validation check
         if !proof.validate() {
-            return Err(AssetError::ConsensusValidationFailed {
-                reason: "Basic consensus proof validation failed".to_string(),
+            return Err(AssetError::StateProofValidationFailed {
+                reason: "Basic state proof validation failed".to_string(),
             });
         }
 
         // Check against HyperMesh asset requirements
-        if self.consensus_requirements.require_all_proofs {
+        if self.state_requirements.require_all_proofs {
             // All four proofs must be present and valid (enforced by Proof of State)
-            if proof.stake_proof.stake_amount < self.consensus_requirements.minimum_stake {
-                return Err(AssetError::ConsensusValidationFailed {
+            if proof.stake_proof.stake_amount < self.state_requirements.minimum_stake {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: format!(
                         "Insufficient stake: {} < required {}",
-                        proof.stake_proof.stake_amount, self.consensus_requirements.minimum_stake
+                        proof.stake_proof.stake_amount, self.state_requirements.minimum_stake
                     ),
                 });
             }
 
-            if proof.time_proof.network_time_offset > self.consensus_requirements.max_time_offset {
-                return Err(AssetError::ConsensusValidationFailed {
+            if proof.time_proof.network_time_offset > self.state_requirements.max_time_offset {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: "Time offset too large".to_string(),
                 });
             }
 
             if proof.work_proof.computational_power
-                < self.consensus_requirements.minimum_compute_power
+                < self.state_requirements.minimum_compute_power
             {
-                return Err(AssetError::ConsensusValidationFailed {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: "Insufficient computational power".to_string(),
                 });
             }
 
             // Validate storage space commitment (from Proof of State SpaceProof)
             if proof.space_proof.total_storage == 0 {
-                return Err(AssetError::ConsensusValidationFailed {
+                return Err(AssetError::StateProofValidationFailed {
                     reason: "No storage space committed".to_string(),
                 });
             }
@@ -549,8 +549,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_consensus_proof_validation() {
-        // Test Proof of State Four-Proof Consensus System integration
+    fn test_state_proof_validation() {
+        // Test Proof of State Four-Proof validation system integration
         let stake_proof = StakeProof::new(
             "test-holder".to_string(),
             "test-holder-id".to_string(),
@@ -570,11 +570,11 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
-        // ConsensusProof::new expects: (stake, time, space, work)
-        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+        // StateProof::new expects: (stake, time, space, work)
+        let state_proof = StateProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         // Test basic validation (synchronous)
-        assert!(consensus_proof.validate());
+        assert!(state_proof.validate());
     }
 
     #[tokio::test]

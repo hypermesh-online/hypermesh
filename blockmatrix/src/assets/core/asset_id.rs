@@ -53,7 +53,7 @@ pub struct FederationId(pub [u8; 32]);
 /// BlockMatrix's domain-specific node fingerprint (32-byte blockchain ID).
 /// Unlike hypermesh_lib::NodeId (a bare 32-byte BLAKE3 hash), this carries a
 /// cryptographic 32-byte identifier suitable for blockchain operations,
-/// consensus proof binding, and content-addressed lookups.
+/// state proof binding, and content-addressed lookups.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NodeFingerprint(pub [u8; 32]);
 

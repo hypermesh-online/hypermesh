@@ -8,7 +8,7 @@
 //! It simulates a car purchase involving separate nodes for a buyer, a bank, a dealer, an insurance company, and the DMV.
 
 use async_trait::async_trait;
-use blockmatrix::assets::core::{AssetRegistration, AssetResult, AssetType, ConsensusProof};
+use blockmatrix::assets::core::{AssetRegistration, AssetResult, AssetType, StateProof};
 use blockmatrix::assets::multi_node::network_membership::{
     ApprovalProcess, JoinRequirements, NetworkCredentials,
 };
@@ -39,7 +39,7 @@ impl MockTrustChainClient {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: true,
-                        min_reputation: None,
+                        requires_state_proof: false,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::ManualAdmin,
@@ -56,7 +56,7 @@ impl MockTrustChainClient {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: None,
+                        requires_state_proof: false,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -73,7 +73,7 @@ impl MockTrustChainClient {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: Some(0.8),
+                        requires_state_proof: true,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -90,7 +90,7 @@ impl MockTrustChainClient {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: Some(0.7),
+                        requires_state_proof: true,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -107,7 +107,7 @@ impl MockTrustChainClient {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: Some(0.9),
+                        requires_state_proof: true,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -155,13 +155,13 @@ fn create_node(name: &str, id: [u8; 32]) -> PeerIdentity {
     }
 }
 
-fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> ConsensusProof {
+fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> StateProof {
     use std::time::{Duration, SystemTime};
-    use trustchain::consensus::{
+    use trustchain::proof_of_state::{
         SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
     };
 
-    ConsensusProof {
+    StateProof {
         stake_proof: StakeProof {
             stake_holder: stake_holder.to_string(),
             stake_holder_id: stake_holder_id.to_string(),

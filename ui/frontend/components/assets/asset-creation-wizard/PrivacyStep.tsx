@@ -34,9 +34,9 @@ const privacyOptions = [
     level: 'full_public' as const,
     icon: Globe,
     title: 'Public',
-    desc: 'Available to the global HyperMesh network with full consensus validation',
+    desc: 'Available to the global HyperMesh network with full Proof of State verification',
     color: 'green',
-    features: ['Global network access', 'Maximum rewards', 'Full consensus required']
+    features: ['Global network access', 'Maximum rewards', 'Full state proof required']
   }
 ];
 

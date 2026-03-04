@@ -396,7 +396,7 @@ impl ExtensionCliExecutor {
             id: uuid::Uuid::new_v4().to_string(),
             method: "exec".to_string(),
             params: serde_json::Value::Object(params),
-            consensus_proof: None,
+            state_proof: None,
         };
 
         let response = self.manager.handle_request(&extension_id, request).await?;

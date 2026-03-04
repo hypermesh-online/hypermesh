@@ -118,9 +118,9 @@ async fn validate_performance_targets() -> PerformanceValidation {
 
     // Latency targets
     validation.trustchain_latency_ms = measure_trustchain_latency().await;
-    validation.consensus_latency_ms = measure_consensus_latency().await;
+    validation.state_proof_validation_ms = measure_state_proof_latency().await;
     validation.latency_passed =
-        validation.trustchain_latency_ms <= 50.0 && validation.consensus_latency_ms <= 100.0;
+        validation.trustchain_latency_ms <= 50.0 && validation.state_proof_validation_ms <= 100.0;
 
     // Scalability
     validation.max_connections = test_max_connections().await;
@@ -253,8 +253,8 @@ async fn measure_trustchain_latency() -> f64 {
     35.0 // Current latency in ms
 }
 
-async fn measure_consensus_latency() -> f64 {
-    70.0 // Current consensus latency in ms
+async fn measure_state_proof_latency() -> f64 {
+    70.0 // Current state proof validation latency in ms
 }
 
 async fn test_max_connections() -> usize {
@@ -455,7 +455,7 @@ pub struct PerformanceValidation {
     pub stoq_throughput_gbps: f64,
     pub throughput_passed: bool,
     pub trustchain_latency_ms: f64,
-    pub consensus_latency_ms: f64,
+    pub state_proof_validation_ms: f64,
     pub latency_passed: bool,
     pub max_connections: usize,
     pub scalability_passed: bool,

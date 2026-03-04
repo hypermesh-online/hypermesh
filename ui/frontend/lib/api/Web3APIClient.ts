@@ -9,7 +9,7 @@
  * - Unified Server (port 8443): All services through REST API endpoints
  *   - /api/v1/trustchain/*: Certificate management, DNS, rotation
  *   - /api/v1/stoq/*: QUIC transport, performance metrics
- *   - /api/v1/hypermesh/*: Asset management, consensus validation
+ *   - /api/v1/hypermesh/*: Asset management, state proof validation
  *   - /api/v1/integration/*: Cross-service coordination
  */
 

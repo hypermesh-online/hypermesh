@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Hardware asset adapters with consensus proof validation
+//! Hardware asset adapters with state proof validation
 //!
 //! Implements specialized adapters for different hardware types:
 //! - Memory: NAT-like addressing and remote proxy system (CRITICAL)
@@ -13,7 +13,7 @@
 //! - Container: Resource orchestration
 //!
 //! All adapters implement the universal AssetAdapter trait and require
-//! Consensus Proof validation (PoSpace + PoStake + PoWork + PoTime).
+//! State Proof validation (PoSpace + PoStake + PoWork + PoTime).
 
 mod adapter_helpers;
 

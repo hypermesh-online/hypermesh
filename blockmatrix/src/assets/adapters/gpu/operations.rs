@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetError, AssetRegistration, AssetResult, ConsensusProof, GpuRequirements, ProxyAddress,
+    AssetError, AssetRegistration, AssetResult, StateProof, GpuRequirements, ProxyAddress,
 };
 
 use super::types::*;
@@ -161,10 +161,10 @@ impl GpuAssetAdapter {
         context_id
     }
 
-    /// Accelerate consensus proof validation using GPU
-    pub(crate) async fn accelerate_consensus_validation(
+    /// Accelerate state proof validation using GPU
+    pub(crate) async fn accelerate_state_validation(
         &self,
-        proof: &ConsensusProof,
+        proof: &StateProof,
     ) -> AssetResult<bool> {
         Ok(proof.validate())
     }

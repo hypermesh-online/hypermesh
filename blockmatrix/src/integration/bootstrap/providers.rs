@@ -3,23 +3,23 @@
 // See the LICENSE file in the repository root for full license text.
 
 //! Bootstrap provider implementations for service discovery,
-//! certificate management, transport, and consensus.
+//! certificate management, transport, and Proof of State.
 //!
 //! Each provider tier matches a bootstrap phase:
-//! - Traditional (Phase 0): Self-signed certs, DNS, basic transport, no-op consensus
-//! - Hybrid (Phase 1): TrustChain certs, hybrid discovery, optional consensus
-//! - Partial Federation (Phase 2): Federated discovery, required consensus
-//! - Full Federation (Phase 3): Full federated discovery, full consensus
+//! - Traditional (Phase 0): Self-signed certs, DNS, basic transport, no-op state proof
+//! - Hybrid (Phase 1): TrustChain certs, hybrid discovery, optional state proof
+//! - Partial Federation (Phase 2): Federated discovery, required state proof
+//! - Full Federation (Phase 3): Full federated discovery, full state proof
 
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-pub use trustchain::consensus::ConsensusProof;
+pub use trustchain::proof_of_state::StateProof;
 
 use super::{
-    BootstrapPhase, Certificate, CertificateProvider, Connection, ConsensusProvider, Listener,
+    BootstrapPhase, Certificate, CertificateProvider, Connection, StateProofProvider, Listener,
     ServiceDiscovery, ServiceEndpoint, ServiceRegistration, ServiceType, TransportProvider,
 };
 
@@ -240,27 +240,27 @@ impl Listener for BasicListener {
     }
 }
 
-// --- Consensus Providers ---
+// --- State Proof Providers ---
 
-pub(crate) struct NoOpConsensus;
+pub(crate) struct NoOpStateProof;
 
-impl NoOpConsensus {
+impl NoOpStateProof {
     pub fn new() -> Self {
         Self
     }
 }
 
 #[async_trait]
-impl ConsensusProvider for NoOpConsensus {
-    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
+impl StateProofProvider for NoOpStateProof {
+    async fn validate_proof(&self, _proof: &StateProof) -> Result<bool> {
         Ok(true)
     }
 
-    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{
+    async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
+        use trustchain::proof_of_state::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
-        Ok(ConsensusProof::new(
+        Ok(StateProof::new(
             StakeProof::new("noop".to_string(), "noop".to_string(), 0),
             TimeProof::new(Duration::from_secs(0)),
             SpaceProof::new("noop".to_string(), "/dev/null".to_string(), 0),
@@ -283,11 +283,11 @@ impl ConsensusProvider for NoOpConsensus {
     }
 }
 
-pub(crate) struct OptionalConsensus {
+pub(crate) struct OptionalStateProof {
     _hypermesh_addr: SocketAddr,
 }
 
-impl OptionalConsensus {
+impl OptionalStateProof {
     pub fn new(hypermesh_addr: SocketAddr) -> Self {
         Self {
             _hypermesh_addr: hypermesh_addr,
@@ -296,16 +296,16 @@ impl OptionalConsensus {
 }
 
 #[async_trait]
-impl ConsensusProvider for OptionalConsensus {
-    async fn validate_proof(&self, _proof: &ConsensusProof) -> Result<bool> {
+impl StateProofProvider for OptionalStateProof {
+    async fn validate_proof(&self, _proof: &StateProof) -> Result<bool> {
         Ok(true)
     }
 
-    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{
+    async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
+        use trustchain::proof_of_state::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
-        Ok(ConsensusProof::new(
+        Ok(StateProof::new(
             StakeProof::new("optional".to_string(), "validator1".to_string(), 1000),
             TimeProof::new(Duration::from_secs(1)),
             SpaceProof::new("optional".to_string(), "/tmp/optional".to_string(), 1024),
@@ -328,11 +328,11 @@ impl ConsensusProvider for OptionalConsensus {
     }
 }
 
-pub(crate) struct RequiredConsensus {
+pub(crate) struct RequiredStateProof {
     _hypermesh_addr: SocketAddr,
 }
 
-impl RequiredConsensus {
+impl RequiredStateProof {
     pub fn new(hypermesh_addr: SocketAddr) -> Self {
         Self {
             _hypermesh_addr: hypermesh_addr,
@@ -341,16 +341,16 @@ impl RequiredConsensus {
 }
 
 #[async_trait]
-impl ConsensusProvider for RequiredConsensus {
-    async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool> {
+impl StateProofProvider for RequiredStateProof {
+    async fn validate_proof(&self, proof: &StateProof) -> Result<bool> {
         Ok(proof.stake_proof.stake_amount >= 2000)
     }
 
-    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{
+    async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
+        use trustchain::proof_of_state::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
-        Ok(ConsensusProof::new(
+        Ok(StateProof::new(
             StakeProof::new("required".to_string(), "validator2".to_string(), 5000),
             TimeProof::new(Duration::from_secs(5)),
             SpaceProof::new("required".to_string(), "/tmp/required".to_string(), 10240),
@@ -373,11 +373,11 @@ impl ConsensusProvider for RequiredConsensus {
     }
 }
 
-pub(crate) struct FullConsensus {
+pub(crate) struct FullStateProof {
     _hypermesh_addr: SocketAddr,
 }
 
-impl FullConsensus {
+impl FullStateProof {
     pub fn new(hypermesh_addr: SocketAddr) -> Self {
         Self {
             _hypermesh_addr: hypermesh_addr,
@@ -386,18 +386,18 @@ impl FullConsensus {
 }
 
 #[async_trait]
-impl ConsensusProvider for FullConsensus {
-    async fn validate_proof(&self, proof: &ConsensusProof) -> Result<bool> {
+impl StateProofProvider for FullStateProof {
+    async fn validate_proof(&self, proof: &StateProof) -> Result<bool> {
         Ok(proof.stake_proof.stake_amount >= 10000
             && proof.space_proof.total_storage >= 100000
             && !proof.work_proof.work_challenges.is_empty())
     }
 
-    async fn generate_proof(&self, _data: &[u8]) -> Result<ConsensusProof> {
-        use trustchain::consensus::{
+    async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
+        use trustchain::proof_of_state::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
-        Ok(ConsensusProof::new(
+        Ok(StateProof::new(
             StakeProof::new("full".to_string(), "validator4".to_string(), 100000),
             TimeProof::new(Duration::from_secs(10)),
             SpaceProof::new("full".to_string(), "/var/hypermesh".to_string(), 1048576),

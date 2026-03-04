@@ -91,7 +91,7 @@ pub enum WorkCategory {
     Storage,
     /// Signing, verification, key exchange
     Cryptographic,
-    /// Proof checking, consensus participation
+    /// Proof checking, Proof of State validation
     Validation,
 }
 

@@ -171,7 +171,7 @@ fn create_benchmark_config() -> HyperMeshConfig {
     
     // Use different ports for benchmarks
     config.transport.bind_port = 9100;
-    config.consensus.port = 9101;
+    config.state_proof.port = 9101;
     config.integration.metrics.prometheus_port = 9102;
     
     // Optimize for performance

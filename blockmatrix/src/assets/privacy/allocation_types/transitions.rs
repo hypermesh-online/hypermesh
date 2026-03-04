@@ -38,8 +38,8 @@ pub struct TransitionValidation {
     /// Require user consent
     pub require_user_consent: bool,
 
-    /// Require consensus proof
-    pub require_consensus_proof: bool,
+    /// Require state proof
+    pub require_state_proof: bool,
 
     /// Require administrator approval
     pub require_admin_approval: bool,
@@ -179,9 +179,9 @@ impl PrivacyTransition {
         }
 
         // Validate specific requirements
-        if self.validation_requirements.require_consensus_proof {
-            // Check if consensus proof is available and valid
-            // This would integrate with the consensus system
+        if self.validation_requirements.require_state_proof {
+            // Check if state proof is available and valid
+            // This would integrate with the state proof system
         }
 
         if self.validation_requirements.require_user_consent {

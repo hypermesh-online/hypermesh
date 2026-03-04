@@ -5,7 +5,7 @@
 //! Privacy Manager - Core privacy configuration and enforcement
 //!
 //! Manages user privacy preferences, resource allocation controls,
-//! and integration with consensus system and proxy management.
+//! and integration with state proof system and proxy management.
 
 mod operations;
 mod types;

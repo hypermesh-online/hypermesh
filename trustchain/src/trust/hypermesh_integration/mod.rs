@@ -43,13 +43,13 @@ mod tests {
         let status = AuthenticationStatus {
             authenticated: true,
             certificate_valid: true,
-            consensus_verified: true,
+            state_verified: true,
             last_checked: SystemTime::now(),
             expiry: SystemTime::now() + std::time::Duration::from_secs(3600),
         };
         assert!(status.authenticated);
         assert!(status.certificate_valid);
-        assert!(status.consensus_verified);
+        assert!(status.state_verified);
     }
 
     #[test]

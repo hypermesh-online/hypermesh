@@ -73,10 +73,10 @@ impl AssetLibraryExtension for CatalogExtension {
         self.increment_requests().await;
         self.start_operation().await;
 
-        if self.config.consensus_validation {
-            // Consensus validation for installs requires the proof to be embedded in
+        if self.config.state_validation {
+            // State proof validation for installs requires the proof to be embedded in
             // the package metadata. The proof is validated at publish time; for installs,
-            // we check if the package's security metadata requires consensus and log
+            // we check if the package's security metadata requires state proof and log
             // that validation is deferred to the execution layer.
             let package_preview = self
                 .library_manager
@@ -86,9 +86,9 @@ impl AssetLibraryExtension for CatalogExtension {
                 .await;
             if let Some(pkg) = package_preview {
                 if let Some(ref spec) = pkg.spec {
-                    if spec.security.consensus_required {
+                    if spec.security.state_proof_required {
                         tracing::warn!(
-                            "Package {} requires consensus validation; \
+                            "Package {} requires state proof validation; \
                              proof verification deferred to execution layer",
                             package_id
                         );
@@ -235,12 +235,12 @@ impl AssetLibraryExtension for CatalogExtension {
     async fn publish_package(
         &self,
         package: AssetPackageSpec,
-        proof: blockmatrix::assets::core::ConsensusProof,
+        proof: blockmatrix::assets::core::StateProof,
     ) -> ExtensionResult<PublishResult> {
         self.increment_requests().await;
         self.start_operation().await;
 
-        if self.config.consensus_validation {
+        if self.config.state_validation {
             // Verify all four proofs (PoSpace, PoStake, PoWork, PoTime)
             if !proof.validate() {
                 self.complete_operation().await;

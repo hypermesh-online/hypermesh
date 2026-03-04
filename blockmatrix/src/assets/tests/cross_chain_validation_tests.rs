@@ -230,7 +230,7 @@ async fn test_validation_rule_creation() {
             max_retention_period: Duration::from_secs(3600),
         },
         required_proofs: vec![
-            ProofRequirement::ConsensusProof,
+            ProofRequirement::StateProof,
             ProofRequirement::ZeroKnowledgeProof,
         ],
     };

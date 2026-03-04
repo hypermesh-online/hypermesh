@@ -148,8 +148,8 @@ pub struct PackageAvailability {
 pub enum ConflictResolution {
     /// Use newest version
     NewestWins,
-    /// Use version with highest consensus
-    ConsensusWins,
+    /// Use version with highest state proof score
+    StateProofWins,
     /// Merge changes (if possible)
     Merge,
     /// Keep both versions
@@ -363,7 +363,7 @@ impl SharingManager {
         // Perform synchronization
         let sync_result = self
             .sync_manager
-            .sync_with_peer(peer, ConflictResolution::ConsensusWins)
+            .sync_with_peer(peer, ConflictResolution::StateProofWins)
             .await;
 
         match sync_result {

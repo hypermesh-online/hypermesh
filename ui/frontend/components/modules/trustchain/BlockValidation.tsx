@@ -20,7 +20,7 @@ interface ValidationResult {
   networkHealth: {
     byzantineFaultTolerance: number;
     chainIntegrity: number;
-    consensusParticipation: number;
+    verificationParticipation: number;
   };
   recommendations: string[];
 }
@@ -160,7 +160,7 @@ export function BlockValidation({ validationResults, onViewDetails }: BlockValid
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <CheckCircle className="h-5 w-5" />
-            <span>Consensus Validation Results</span>
+            <span>State Proof Validation Results</span>
             {validationResults.success ? (
               <Badge className="bg-green-600">Valid</Badge>
             ) : (
@@ -206,7 +206,7 @@ export function BlockValidation({ validationResults, onViewDetails }: BlockValid
                 <div>
                   <span className="text-muted-foreground">Participation:</span>
                   <span className="font-medium ml-2">
-                    {validationResults.networkHealth.consensusParticipation}%
+                    {validationResults.networkHealth.verificationParticipation}%
                   </span>
                 </div>
               </div>

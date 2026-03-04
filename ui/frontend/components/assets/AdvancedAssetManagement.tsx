@@ -9,7 +9,7 @@
  * - Universal asset lifecycle management with real-time tracking
  * - NAT-like proxy addressing for remote resource access
  * - Asset allocation with privacy-aware sharing controls
- * - Byzantine-resistant asset validation and consensus
+ * - Byzantine-resistant asset validation and Proof of State verification
  * - Performance analytics and optimization recommendations
  *
  * Integrates with real HyperMesh asset APIs for production data.

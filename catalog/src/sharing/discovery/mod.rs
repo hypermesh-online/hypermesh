@@ -168,7 +168,7 @@ impl DiscoveryService {
                 templates: vec![],
             },
             security: crate::AssetSecurity {
-                consensus_required: false,
+                state_proof_required: false,
                 certificate_pinning: false,
                 hash_validation: "blake3".to_string(),
                 sandbox_level: "standard".to_string(),
@@ -198,7 +198,7 @@ impl DiscoveryService {
             },
             execution: crate::AssetExecution {
                 delegation_strategy: "any".to_string(),
-                minimum_consensus: 1,
+                minimum_state_proof: 1,
                 retry_policy: "none".to_string(),
                 max_concurrent: None,
                 priority: "normal".to_string(),

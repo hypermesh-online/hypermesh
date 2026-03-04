@@ -13,7 +13,7 @@
 //! See STUB_INVENTORY.md for implementation status.
 //!
 //! Implements distributed asset coordination across multiple HyperMesh nodes
-//! with Byzantine fault tolerance, consensus-based allocation, and automatic
+//! with bilateral Proof of State verification, allocation, and automatic
 //! migration capabilities.
 
 #[cfg(feature = "multi-node")]
@@ -27,11 +27,11 @@ use std::time::{Duration, SystemTime};
 
 #[cfg(feature = "multi-node")]
 use crate::assets::core::{
-    AssetRegistration, AssetResult, AssetState, AssetType, ConsensusProof, PrivacyMode,
+    AssetRegistration, AssetResult, AssetState, AssetType, StateProof,
 };
 
 #[cfg(feature = "multi-node")]
-pub mod consensus;
+pub mod state_verification;
 #[cfg(feature = "multi-node")]
 pub mod coordinator;
 #[cfg(feature = "multi-node")]
@@ -47,8 +47,6 @@ pub mod network_membership;
 #[cfg(feature = "multi-node")]
 pub mod resource_sharing;
 
-#[cfg(feature = "multi-node")]
-pub use consensus::{ConsensusDecision, ConsensusManager, VotingRound};
 #[cfg(feature = "multi-node")]
 pub use coordinator::{MultiNodeCoordinator, NodeCapabilities, NodeInfo};
 #[cfg(feature = "multi-node")]
@@ -119,8 +117,8 @@ pub struct DistributedAssetState {
     pub replica_nodes: Vec<PeerIdentity>,
     /// Current state across nodes
     pub node_states: HashMap<PeerIdentity, AssetState>,
-    /// Consensus proof for state
-    pub consensus_proof: ConsensusProof,
+    /// State proof for state
+    pub state_proof: StateProof,
     /// Version number for conflict resolution
     pub version: u64,
     /// Last state synchronization
@@ -139,9 +137,9 @@ pub struct AllocationDecision {
     pub score: f64,
     /// Decision timestamp
     pub decided_at: SystemTime,
-    /// Consensus participants
+    /// Verification participants (bilateral Proof of State)
     pub participants: Vec<PeerIdentity>,
-    /// Consensus signatures
+    /// Verification signatures (bilateral Proof of State)
     pub signatures: Vec<Vec<u8>>,
 }
 
@@ -273,8 +271,8 @@ pub enum MultiNodeEvent {
         request: ResourceSharingRequest,
         offers: Vec<ResourceSharingOffer>,
     },
-    /// Byzantine behavior detected
-    ByzantineDetected {
+    /// Inauthentic state detected (bilateral verification failed)
+    InauthenticStateDetected {
         node: PeerIdentity,
         evidence: Vec<u8>,
     },
@@ -306,8 +304,8 @@ pub trait MultiNodeCoordinatorTrait: Send + Sync {
     /// Handle node failure
     async fn handle_node_failure(&self, failed_node: PeerIdentity) -> AssetResult<()>;
 
-    /// Detect and handle Byzantine nodes
-    async fn detect_byzantine_nodes(&self) -> AssetResult<Vec<PeerIdentity>>;
+    /// Detect nodes with inauthentic state
+    async fn detect_inauthentic_nodes(&self) -> AssetResult<Vec<PeerIdentity>>;
 
     /// Synchronize asset state across nodes
     async fn sync_asset_state(
@@ -341,16 +339,16 @@ pub struct MultiNodeMetrics {
     pub healthy_nodes: u64,
     /// Failed nodes
     pub failed_nodes: u64,
-    /// Byzantine nodes detected
-    pub byzantine_nodes: u64,
+    /// Inauthentic nodes detected
+    pub inauthentic_nodes: u64,
     /// Total assets managed
     pub total_assets: u64,
     /// Assets successfully migrated
     pub successful_migrations: u64,
     /// Failed migrations
     pub failed_migrations: u64,
-    /// Average consensus time (ms)
-    pub avg_consensus_time_ms: f64,
+    /// Average verification time (ms)
+    pub avg_verification_time_ms: f64,
     /// Network partitions detected
     pub partitions_detected: u64,
     /// Partitions healed

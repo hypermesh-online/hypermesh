@@ -75,7 +75,7 @@ echo ""
 # Step 6: Integration points
 echo -e "${BLUE}Integration Points:${NC}"
 echo "✓ AssetManager - Universal asset handling"
-echo "✓ Consensus - Four-proof validation"
+echo "✓ Proof of State - Four-proof validation"
 echo "✓ TrustChain - Certificate verification"
 echo "✓ STOQ - P2P distribution"
 echo "✓ VM Runtime - Code execution"

@@ -139,7 +139,7 @@ async fn test_memory_leaks() {
                     "version": "1.0.0",
                     "code": format!("code {} {}", cycle, i)
                 }),
-                consensus_proof: None,
+                state_proof: None,
             };
             extension.handle_request(request).await.ok();
         }
@@ -294,7 +294,7 @@ async fn test_network_partition() {
             "remote_node": "unreachable.node.local",
             "timeout_ms": 1000
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(network_request).await;
@@ -320,7 +320,7 @@ async fn test_network_partition() {
         id: "net-part-2".to_string(),
         method: "check_connectivity".to_string(),
         params: json!({}),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let recovery = extension.handle_request(recovery_request).await;
@@ -353,7 +353,7 @@ async fn test_crash_recovery() {
             "code": "while(true) { allocate_memory(); }", // Infinite allocation
             "timeout": 100
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let result = extension.handle_request(crash_request).await;
@@ -377,7 +377,7 @@ async fn test_crash_recovery() {
         id: "health-1".to_string(),
         method: "health_check".to_string(),
         params: json!({}),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let health = extension.handle_request(health_check).await;
@@ -444,7 +444,7 @@ async fn test_concurrent_operations() {
                     id: format!("concurrent-{}", i),
                     method: "list_packages".to_string(),
                     params: json!({"limit": 5}),
-                    consensus_proof: None,
+                    state_proof: None,
                 };
                 ext.handle_request(request).await.ok()
             } else {

@@ -8,13 +8,13 @@
 //! with detailed error reporting and BlockMatrix AssetId integration.
 
 use std::time::Duration;
-use trustchain::consensus::{AssetProofRequirements, AssetValidationContext, ConsensusProof};
+use trustchain::proof_of_state::{AssetProofRequirements, AssetValidationContext, StateProof};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     println!("=== Proof of State Validation Examples ===\n");
 
-    // Example 1: Generate and validate full consensus proof
+    // Example 1: Generate and validate full state proof
     example_1_full_validation().await?;
 
     // Example 2: Validate with minimum requirements
@@ -34,11 +34,11 @@ async fn example_1_full_validation() -> anyhow::Result<()> {
     println!("Example 1: Full Four-Proof Validation");
     println!("--------------------------------------");
 
-    // Generate consensus proof from network (in production)
-    // let proof = ConsensusProof::generate_from_network("node-001").await?;
+    // Generate state proof from network (in production)
+    // let proof = StateProof::generate_from_network("node-001").await?;
 
     // For this example, use test proof
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     // Validate all four proofs
     let validation = proof.verify_all()?;
@@ -48,7 +48,7 @@ async fn example_1_full_validation() -> anyhow::Result<()> {
     println!("PoWork (WHAT/HOW) valid: {}", validation.work_valid);
     println!("PoTime (WHEN) valid: {}", validation.time_valid);
     println!("Overall valid: {}", validation.all_valid);
-    println!("Confidence score: {:.2}", validation.confidence_score);
+    println!("Proofs passed: {}/4", validation.proofs_passed());
 
     if !validation.errors.is_empty() {
         println!("\nValidation errors:");
@@ -66,7 +66,7 @@ async fn example_2_minimum_requirements() -> anyhow::Result<()> {
     println!("Example 2: Validation with Minimum Requirements");
     println!("-----------------------------------------------");
 
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     // Validate with specific minimum requirements
     let validation = proof.verify_with_requirements(
@@ -77,7 +77,7 @@ async fn example_2_minimum_requirements() -> anyhow::Result<()> {
     )?;
 
     println!("Validation result: {}", validation.all_valid);
-    println!("Confidence: {:.2}", validation.confidence_score);
+    println!("Proofs passed: {}/4", validation.proofs_passed());
 
     if !validation.all_valid {
         println!("Failed requirements: {}", validation.error_summary());
@@ -92,7 +92,7 @@ async fn example_3_asset_validation() -> anyhow::Result<()> {
     println!("Example 3: Asset-Specific Validation (BlockMatrix)");
     println!("--------------------------------------------------");
 
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     // Create asset validation context
     let context = AssetValidationContext::new(
@@ -108,7 +108,7 @@ async fn example_3_asset_validation() -> anyhow::Result<()> {
 
     println!("Asset ID: {}", context.asset_id);
     println!("All proofs valid: {}", validation.all_valid);
-    println!("Confidence: {:.2}", validation.confidence_score);
+    println!("Proofs passed: {}/4", validation.proofs_passed());
 
     if validation.all_valid {
         println!("✅ Asset requirements satisfied");
@@ -126,7 +126,7 @@ async fn example_4_partial_requirements() -> anyhow::Result<()> {
     println!("Example 4: Partial Proof Requirements");
     println!("--------------------------------------");
 
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     // Asset requires only stake and space (not work/time)
     let requirements = AssetProofRequirements::custom(
@@ -149,8 +149,8 @@ async fn example_4_partial_requirements() -> anyhow::Result<()> {
     println!("Time valid (not required): {}", validation.time_valid);
     println!("Overall valid: {}", validation.all_valid);
     println!(
-        "Confidence: {:.2} (based on 2 required proofs)",
-        validation.confidence_score
+        "Proofs passed: {}/4 (2 required)",
+        validation.proofs_passed()
     );
 
     println!("\n");

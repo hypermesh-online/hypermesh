@@ -11,19 +11,19 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
-use crate::consensus::{ConsensusProof, ConsensusRequirements, ConsensusResult};
+use crate::proof_of_state::{StateProof, StateRequirements, StateProofResult};
 
 /// Security configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecurityConfig {
-    /// Require consensus for all certificate operations
-    pub mandatory_consensus: bool,
-    /// Byzantine detection threshold (percentage of malicious behavior)
-    pub byzantine_threshold: f64,
+    /// Require state proof for all certificate operations
+    pub mandatory_state_proof: bool,
+    /// Maximum failed verifications before a node is flagged
+    pub max_failed_verifications: u32,
     /// Security alert severity levels
     pub alert_threshold: SecuritySeverity,
-    /// Consensus requirements for certificate operations
-    pub consensus_requirements: ConsensusRequirements,
+    /// State proof requirements for certificate operations
+    pub state_requirements: StateRequirements,
     /// Enable real-time monitoring
     pub real_time_monitoring: bool,
 }
@@ -31,10 +31,10 @@ pub struct SecurityConfig {
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
-            mandatory_consensus: true,
-            byzantine_threshold: 0.33,
+            mandatory_state_proof: true,
+            max_failed_verifications: 3,
             alert_threshold: SecuritySeverity::Medium,
-            consensus_requirements: ConsensusRequirements::production(),
+            state_requirements: StateRequirements::production(),
             real_time_monitoring: true,
         }
     }
@@ -64,7 +64,7 @@ impl std::fmt::Display for SecuritySeverity {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecurityValidationResult {
     pub is_valid: bool,
-    pub consensus_result: Option<ConsensusResult>,
+    pub state_proof_result: Option<StateProofResult>,
     pub byzantine_detection: super::ByzantineDetectionResult,
     pub alerts: Vec<super::SecurityAlert>,
     pub validated_at: SystemTime,
@@ -74,7 +74,7 @@ pub struct SecurityValidationResult {
 /// Validation metrics
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidationMetrics {
-    pub consensus_time_ms: u64,
+    pub verification_time_ms: u64,
     pub byzantine_time_ms: u64,
     pub total_time_ms: u64,
     pub security_score: f64,
@@ -86,11 +86,11 @@ pub struct SecurityMetrics {
     pub validations_total: std::sync::atomic::AtomicU64,
     pub validations_successful: std::sync::atomic::AtomicU64,
     pub validations_failed: std::sync::atomic::AtomicU64,
-    pub consensus_validations: std::sync::atomic::AtomicU64,
+    pub state_validations: std::sync::atomic::AtomicU64,
     pub byzantine_detections: std::sync::atomic::AtomicU64,
     pub alerts_generated: std::sync::atomic::AtomicU64,
-    pub certificate_consensus_required: std::sync::atomic::AtomicU64,
-    pub certificate_consensus_approved: std::sync::atomic::AtomicU64,
+    pub certificate_state_proof_required: std::sync::atomic::AtomicU64,
+    pub certificate_state_proof_approved: std::sync::atomic::AtomicU64,
     pub average_validation_time_ms: std::sync::atomic::AtomicU64,
 }
 
@@ -107,8 +107,8 @@ impl Clone for SecurityMetrics {
             validations_failed: std::sync::atomic::AtomicU64::new(
                 self.validations_failed.load(Relaxed),
             ),
-            consensus_validations: std::sync::atomic::AtomicU64::new(
-                self.consensus_validations.load(Relaxed),
+            state_validations: std::sync::atomic::AtomicU64::new(
+                self.state_validations.load(Relaxed),
             ),
             byzantine_detections: std::sync::atomic::AtomicU64::new(
                 self.byzantine_detections.load(Relaxed),
@@ -116,11 +116,11 @@ impl Clone for SecurityMetrics {
             alerts_generated: std::sync::atomic::AtomicU64::new(
                 self.alerts_generated.load(Relaxed),
             ),
-            certificate_consensus_required: std::sync::atomic::AtomicU64::new(
-                self.certificate_consensus_required.load(Relaxed),
+            certificate_state_proof_required: std::sync::atomic::AtomicU64::new(
+                self.certificate_state_proof_required.load(Relaxed),
             ),
-            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(
-                self.certificate_consensus_approved.load(Relaxed),
+            certificate_state_proof_approved: std::sync::atomic::AtomicU64::new(
+                self.certificate_state_proof_approved.load(Relaxed),
             ),
             average_validation_time_ms: std::sync::atomic::AtomicU64::new(
                 self.average_validation_time_ms.load(Relaxed),
@@ -140,8 +140,8 @@ impl std::fmt::Debug for SecurityMetrics {
             )
             .field("validations_failed", &self.validations_failed.load(Relaxed))
             .field(
-                "consensus_validations",
-                &self.consensus_validations.load(Relaxed),
+                "state_validations",
+                &self.state_validations.load(Relaxed),
             )
             .field(
                 "byzantine_detections",
@@ -149,12 +149,12 @@ impl std::fmt::Debug for SecurityMetrics {
             )
             .field("alerts_generated", &self.alerts_generated.load(Relaxed))
             .field(
-                "certificate_consensus_required",
-                &self.certificate_consensus_required.load(Relaxed),
+                "certificate_state_proof_required",
+                &self.certificate_state_proof_required.load(Relaxed),
             )
             .field(
-                "certificate_consensus_approved",
-                &self.certificate_consensus_approved.load(Relaxed),
+                "certificate_state_proof_approved",
+                &self.certificate_state_proof_approved.load(Relaxed),
             )
             .field(
                 "average_validation_time_ms",
@@ -179,8 +179,8 @@ impl Serialize for SecurityMetrics {
         )?;
         state.serialize_field("validations_failed", &self.validations_failed.load(Relaxed))?;
         state.serialize_field(
-            "consensus_validations",
-            &self.consensus_validations.load(Relaxed),
+            "state_validations",
+            &self.state_validations.load(Relaxed),
         )?;
         state.serialize_field(
             "byzantine_detections",
@@ -188,12 +188,12 @@ impl Serialize for SecurityMetrics {
         )?;
         state.serialize_field("alerts_generated", &self.alerts_generated.load(Relaxed))?;
         state.serialize_field(
-            "certificate_consensus_required",
-            &self.certificate_consensus_required.load(Relaxed),
+            "certificate_state_proof_required",
+            &self.certificate_state_proof_required.load(Relaxed),
         )?;
         state.serialize_field(
-            "certificate_consensus_approved",
-            &self.certificate_consensus_approved.load(Relaxed),
+            "certificate_state_proof_approved",
+            &self.certificate_state_proof_approved.load(Relaxed),
         )?;
         state.serialize_field(
             "average_validation_time_ms",
@@ -213,11 +213,11 @@ impl<'de> Deserialize<'de> for SecurityMetrics {
             validations_total: u64,
             validations_successful: u64,
             validations_failed: u64,
-            consensus_validations: u64,
+            state_validations: u64,
             byzantine_detections: u64,
             alerts_generated: u64,
-            certificate_consensus_required: u64,
-            certificate_consensus_approved: u64,
+            certificate_state_proof_required: u64,
+            certificate_state_proof_approved: u64,
             average_validation_time_ms: u64,
         }
         let data = Data::deserialize(deserializer)?;
@@ -225,14 +225,14 @@ impl<'de> Deserialize<'de> for SecurityMetrics {
             validations_total: std::sync::atomic::AtomicU64::new(data.validations_total),
             validations_successful: std::sync::atomic::AtomicU64::new(data.validations_successful),
             validations_failed: std::sync::atomic::AtomicU64::new(data.validations_failed),
-            consensus_validations: std::sync::atomic::AtomicU64::new(data.consensus_validations),
+            state_validations: std::sync::atomic::AtomicU64::new(data.state_validations),
             byzantine_detections: std::sync::atomic::AtomicU64::new(data.byzantine_detections),
             alerts_generated: std::sync::atomic::AtomicU64::new(data.alerts_generated),
-            certificate_consensus_required: std::sync::atomic::AtomicU64::new(
-                data.certificate_consensus_required,
+            certificate_state_proof_required: std::sync::atomic::AtomicU64::new(
+                data.certificate_state_proof_required,
             ),
-            certificate_consensus_approved: std::sync::atomic::AtomicU64::new(
-                data.certificate_consensus_approved,
+            certificate_state_proof_approved: std::sync::atomic::AtomicU64::new(
+                data.certificate_state_proof_approved,
             ),
             average_validation_time_ms: std::sync::atomic::AtomicU64::new(
                 data.average_validation_time_ms,
@@ -263,7 +263,7 @@ pub struct SecurityEvent {
     pub severity: SecuritySeverity,
     pub timestamp: SystemTime,
     pub description: String,
-    pub consensus_proof: Option<ConsensusProof>,
+    pub state_proof: Option<StateProof>,
     pub metadata: HashMap<String, String>,
 }
 
@@ -274,7 +274,7 @@ pub struct SecurityDashboard {
     pub recent_alerts: Vec<super::SecurityAlert>,
     pub recent_events: Vec<SecurityEvent>,
     pub byzantine_summary: super::ByzantineDetectionSummary,
-    pub consensus_status: ConsensusStatus,
+    pub state_proof_status: StateProofStatus,
     pub timestamp: SystemTime,
 }
 
@@ -284,21 +284,21 @@ pub struct SecurityDashboardMetrics {
     pub validations_total: u64,
     pub validations_successful: u64,
     pub validations_failed: u64,
-    pub consensus_validations: u64,
+    pub state_validations: u64,
     pub byzantine_detections: u64,
     pub alerts_generated: u64,
-    pub certificate_consensus_required: u64,
-    pub certificate_consensus_approved: u64,
+    pub certificate_state_proof_required: u64,
+    pub certificate_state_proof_approved: u64,
     pub average_validation_time_ms: u64,
 }
 
-/// Consensus status
+/// State proof status
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConsensusStatus {
+pub struct StateProofStatus {
     pub enabled: bool,
     pub total_validations: u64,
     pub approval_rate: f64,
-    pub requirements: ConsensusRequirements,
+    pub requirements: StateRequirements,
 }
 
 impl SecurityEventLog {

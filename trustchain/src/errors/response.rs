@@ -57,9 +57,9 @@ impl ErrorResponse {
                 ApiError::RateLimitExceeded { .. } => "API_RATE_LIMIT".to_string(),
                 _ => "API_ERROR".to_string(),
             },
-            TrustChainError::ConsensusValidation(e) => match e {
-                ConsensusError::ByzantineFault { .. } => "CONSENSUS_BYZANTINE_FAULT".to_string(),
-                _ => "CONSENSUS_ERROR".to_string(),
+            TrustChainError::StateProofValidation(e) => match e {
+                StateProofError::ByzantineFault { .. } => "STATE_PROOF_BYZANTINE_FAULT".to_string(),
+                _ => "STATE_PROOF_ERROR".to_string(),
             },
             TrustChainError::SecurityError { .. } => "SECURITY_ERROR".to_string(),
             TrustChainError::SecurityValidationFailed { .. } => {
@@ -87,7 +87,7 @@ impl ErrorResponse {
                 "operation": operation,
                 "timeout_duration_secs": duration.as_secs()
             })),
-            TrustChainError::ConsensusValidation(ConsensusError::ProofOfStakeFailed {
+            TrustChainError::StateProofValidation(StateProofError::ProofOfStakeFailed {
                 stake,
                 minimum,
             }) => Some(serde_json::json!({

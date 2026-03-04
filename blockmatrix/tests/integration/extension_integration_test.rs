@@ -17,7 +17,7 @@ use blockmatrix::{
         AssetQuery, ExtensionAssetRecord, AssetOperation, OperationResult,
         manager::UnifiedExtensionManager,
     },
-    assets::core::{AssetManager, AssetRegistration, PrivacyMode, ConsensusProof},
+    assets::core::{AssetManager, AssetRegistration, PrivacyMode, StateProof},
 };
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
@@ -181,7 +181,7 @@ impl AssetExtensionHandler for MockAssetHandler {
             metadata: spec.metadata,
             privacy_level: spec.privacy_level,
             allocation: spec.allocation,
-            consensus_status: hypermesh::extensions::ConsensusStatus {
+            state_proof_status: hypermesh::extensions::StateProofStatus {
                 validated: false,
                 last_validated: None,
                 proofs: None,
@@ -255,7 +255,7 @@ impl AssetExtensionHandler for MockAssetHandler {
             })
     }
 
-    async fn validate_asset(&self, _id: &AssetRegistration, _proof: ConsensusProof) -> ExtensionResult<bool> {
+    async fn validate_asset(&self, _id: &AssetRegistration, _proof: StateProof) -> ExtensionResult<bool> {
         Ok(true)
     }
 
@@ -308,7 +308,7 @@ async fn test_extension_asset_handler() {
         metadata: HashMap::new(),
         privacy_level: PrivacyMode::PRIVATE,
         allocation: None,
-        consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
+        state_requirements: hypermesh::extensions::StateRequirements::default(),
         parent_id: None,
         tags: vec!["test".to_string()],
     };
@@ -349,7 +349,7 @@ async fn test_extension_request_handling() {
         params: serde_json::json!({
             "param1": "value1"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = manager.handle_request("mock-catalog", request.clone()).await.unwrap();
@@ -439,7 +439,7 @@ async fn test_catalog_extension_integration() {
             "package_id": "julia-scientific",
             "version": "1.0.0"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = manager.handle_request("mock-catalog", request).await.unwrap();
@@ -459,7 +459,7 @@ async fn test_catalog_extension_integration() {
         ]),
         privacy_level: PrivacyMode::PUBLIC,
         allocation: None,
-        consensus_requirements: hypermesh::extensions::ConsensusRequirements::default(),
+        state_requirements: hypermesh::extensions::StateRequirements::default(),
         parent_id: None,
         tags: vec!["julia".to_string(), "scientific".to_string()],
     };
@@ -472,9 +472,9 @@ async fn test_catalog_extension_integration() {
     assert_eq!(metadata.name, "julia-scientific-package");
     assert_eq!(metadata.asset_type, AssetType::Dns);
 
-    // Validate with consensus
-    let consensus_proof = ConsensusProof::default();
-    let valid = handler.validate_asset(&asset_id, consensus_proof).await.unwrap();
+    // Validate with state proof
+    let state_proof = StateProof::default();
+    let valid = handler.validate_asset(&asset_id, state_proof).await.unwrap();
     assert!(valid);
 }
 

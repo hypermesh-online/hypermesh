@@ -489,7 +489,7 @@ mod tests {
             cache_ttl: Duration::from_secs(300),
             enable_cert_validation: false,
             trustchain_domains: vec![],
-            consensus_requirements: crate::consensus::ConsensusRequirements::localhost_testing(),
+            state_requirements: crate::proof_of_state::StateRequirements::localhost_testing(),
         }
     }
 

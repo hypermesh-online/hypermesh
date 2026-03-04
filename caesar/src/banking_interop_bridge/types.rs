@@ -204,7 +204,6 @@ pub struct AccountDetails {
 pub struct VerificationResult {
     pub is_valid: bool,
     pub verification_id: String,
-    pub confidence_score: Decimal,
     pub issues: Vec<String>,
 }
 

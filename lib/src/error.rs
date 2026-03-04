@@ -12,8 +12,8 @@ pub enum HypermeshError {
     #[error("Transport error: {0}")]
     Transport(String),
 
-    #[error("Consensus error: {0}")]
-    Consensus(String),
+    #[error("State proof error: {0}")]
+    StateProof(String),
 
     #[error("Asset error: {0}")]
     Asset(String),

@@ -81,8 +81,8 @@ pub enum SuspiciousEvent {
         asset_id: AssetRegistration,
         discrepancy: String,
     },
-    /// Invalid consensus votes
-    InvalidVote { round_id: String, reason: String },
+    /// Failed bilateral verification
+    FailedVerification { peer_id: String, reason: String },
     /// Excessive failures
     ExcessiveFailures { failure_rate: f64 },
     /// Data corruption
@@ -135,7 +135,7 @@ pub enum FaultType {
     ByzantineNode,
     DataCorruption,
     ResourceExhaustion,
-    ConsensusFailure,
+    VerificationFailure,
 }
 
 /// Recovery strategy
@@ -304,7 +304,7 @@ impl FaultRecovery {
         strategies.insert(FaultType::NetworkPartition, RecoveryStrategy::Replication);
         strategies.insert(FaultType::DataCorruption, RecoveryStrategy::Rollback);
         strategies.insert(FaultType::ResourceExhaustion, RecoveryStrategy::Migration);
-        strategies.insert(FaultType::ConsensusFailure, RecoveryStrategy::Restart);
+        strategies.insert(FaultType::VerificationFailure, RecoveryStrategy::Restart);
 
         Self {
             strategies,

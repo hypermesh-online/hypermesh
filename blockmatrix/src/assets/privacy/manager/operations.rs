@@ -11,12 +11,12 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use super::super::{
-    allocation_types::PrivacyAllocationType, ConsensusRequirementConfig, PrivacyAllocationResult,
+    allocation_types::PrivacyAllocationType, StateProofRequirementConfig, PrivacyAllocationResult,
     ProxyConfiguration, ResourceAllocationConfig,
 };
 use crate::assets::core::{AssetError, AssetRegistration, AssetResult, PrivacyMode};
 use crate::assets::proxy::RemoteProxyManager;
-use crate::consensus::proof::ConsensusProof;
+use crate::proof_of_state::proof::StateProof;
 
 use super::types::*;
 
@@ -68,7 +68,7 @@ impl PrivacyManager {
         user_id: &str,
         asset_id: &AssetRegistration,
         requested_privacy_level: Option<PrivacyMode>,
-        consensus_proof: Option<ConsensusProof>,
+        state_proof: Option<StateProof>,
     ) -> AssetResult<PrivacyAllocationResult> {
         // Get user configuration
         let user_config = {
@@ -84,11 +84,11 @@ impl PrivacyManager {
         // Determine privacy level
         let privacy_level = requested_privacy_level.unwrap_or(user_config.preferred_privacy_level);
 
-        // Validate consensus proof if required
-        if let Some(proof) = &consensus_proof {
+        // Validate state proof if required
+        if let Some(proof) = &state_proof {
             if !proof.validate() {
                 return Err(AssetError::AdapterError {
-                    message: "Invalid consensus proof provided".to_string(),
+                    message: "Invalid state proof provided".to_string(),
                 });
             }
         }
@@ -103,9 +103,9 @@ impl PrivacyManager {
             .create_resource_config(&user_config, &privacy_level, asset_id)
             .await?;
 
-        // Create consensus requirements
-        let consensus_requirements = self
-            .merge_consensus_requirements(&user_config.consensus_requirements, &privacy_level)
+        // Create state proof requirements
+        let state_requirements = self
+            .merge_state_requirements(&user_config.state_requirements, &privacy_level)
             .await?;
 
         // Calculate CAESAR rewards
@@ -135,7 +135,7 @@ impl PrivacyManager {
             allocation_type,
             privacy_level,
             resource_config,
-            consensus_requirements,
+            state_requirements,
             reward_config,
             proxy_config,
             allocated_at: SystemTime::now(),
@@ -282,11 +282,11 @@ impl PrivacyManager {
         })
     }
 
-    async fn merge_consensus_requirements(
+    async fn merge_state_requirements(
         &self,
-        user_requirements: &ConsensusRequirementConfig,
+        user_requirements: &StateProofRequirementConfig,
         privacy_level: &PrivacyMode,
-    ) -> AssetResult<ConsensusRequirementConfig> {
+    ) -> AssetResult<StateProofRequirementConfig> {
         let mut merged = user_requirements.clone();
 
         if *privacy_level == PrivacyMode::PRIVATE {

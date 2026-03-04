@@ -12,7 +12,7 @@ if [ -z "$CATEGORY" ]; then
     echo "  ct        - Certificate transparency tests"
     echo "  dns       - DNS resolution tests"
     echo "  security  - Security and monitoring tests"
-    echo "  consensus - Consensus validation tests"
+    echo "  proof_of_state - Proof of State validation tests"
     echo "  integration - Integration tests"
     echo "  all       - All tests"
     exit 1
@@ -38,9 +38,9 @@ case $CATEGORY in
         echo "Security tests:"
         cargo test --lib security:: -- --show-output 2>&1 | grep -E "test.*\.\.\.|PASSED|FAILED|error"
         ;;
-    consensus)
-        echo "Consensus tests:"
-        cargo test --lib consensus:: -- --show-output 2>&1 | grep -E "test.*\.\.\.|PASSED|FAILED|error"
+    proof_of_state)
+        echo "Proof of State tests:"
+        cargo test --lib proof_of_state:: -- --show-output 2>&1 | grep -E "test.*\.\.\.|PASSED|FAILED|error"
         ;;
     integration)
         echo "Integration tests:"

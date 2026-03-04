@@ -187,7 +187,7 @@ pub struct AssetState {
 pub struct ValidationResult {
     pub is_valid: bool,
     pub proof_validations: ProofValidations,
-    pub confidence_score: f64,
+    pub valid: bool,
     pub validation_time_ms: u64,
     pub error_details: Option<String>,
 }

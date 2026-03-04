@@ -15,7 +15,7 @@
 //! Example: Car purchase validation across Bank->Dealer->Insurance->DMV
 
 use super::PeerIdentity;
-use crate::assets::core::{AssetError, AssetRegistration, AssetResult, ConsensusProof};
+use crate::assets::core::{AssetError, AssetRegistration, AssetResult, StateProof};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -222,8 +222,8 @@ pub struct ValidationResult {
     pub asset_id: AssetRegistration,
     /// Networks where validated
     pub validated_networks: Vec<NetworkId>,
-    /// Consensus proof
-    pub proof: ConsensusProof,
+    /// State proof
+    pub proof: StateProof,
     /// Validation time
     pub validated_at: SystemTime,
     /// Valid
@@ -249,7 +249,7 @@ impl CrossNetworkValidator {
         asset_id: AssetRegistration,
         source_network: NetworkId,
         target_network: NetworkId,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> AssetResult<bool> {
         // Check cache
         let cache_key = (target_network, asset_id.clone());
@@ -536,7 +536,7 @@ impl MultiNetworkCoordinator {
         asset_id: AssetRegistration,
         source_network: NetworkId,
         target_network: NetworkId,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> AssetResult<bool> {
         if !self.config.cross_network_validation {
             return Ok(true); // Validation disabled
@@ -649,7 +649,7 @@ mod tests {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: None,
+                        requires_state_proof: false,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -665,7 +665,7 @@ mod tests {
                     entry_points: vec![],
                     requirements: JoinRequirements {
                         invitation_required: false,
-                        min_reputation: None,
+                        requires_state_proof: false,
                         required_proofs: HashSet::new(),
                         geo_restrictions: None,
                         approval_process: ApprovalProcess::Automatic,
@@ -739,12 +739,12 @@ mod tests {
         let bank_network = NetworkId([1u8; 16]);
         let dealer_network = NetworkId([2u8; 16]);
 
-        use crate::consensus::{
+        use crate::proof_of_state::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
         use std::time::SystemTime;
 
-        let proof = ConsensusProof {
+        let proof = StateProof {
             space_proof: SpaceProof {
                 node_id: "test-node".to_string(),
                 storage_path: "/tmp/test".to_string(),

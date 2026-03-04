@@ -16,7 +16,7 @@ use tracing::{debug, error, info, warn};
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::blockchain_integration::{MatrixPositionValidator, ValidationStatus};
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 
 /// Network position validator for matrix topology
 pub struct NetworkPositionValidator {
@@ -69,7 +69,7 @@ impl NetworkPositionValidator {
         &self,
         coordinate: MatrixCoordinate,
         node_id: String,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<bool> {
         info!(
             "Validating network position ({},{},{}) for node {}",
@@ -91,7 +91,7 @@ impl NetworkPositionValidator {
         // Try to register the position (this validates it)
         match self
             .position_validator
-            .register_position(coordinate, node_id.clone(), consensus_proof)
+            .register_position(coordinate, node_id.clone(), state_proof)
             .await
         {
             Ok(registration) => {
@@ -382,7 +382,7 @@ mod tests {
         let validator = NetworkPositionValidator::new(blockchain, false);
 
         // Create test proof
-        let proof = ConsensusProof::new_for_testing();
+        let proof = StateProof::new_for_testing();
 
         // Validate position
         let result = validator
@@ -403,7 +403,7 @@ mod tests {
         for x in -2..=2 {
             for y in -2..=2 {
                 let coord = MatrixCoordinate::new(x * 10, y * 10, 0).expect("test: valid coordinate");
-                let proof = ConsensusProof::new_for_testing();
+                let proof = StateProof::new_for_testing();
                 let _ = validator
                     .validate_node_position(coord, format!("node_{x}_{y}"), proof)
                     .await;
@@ -429,7 +429,7 @@ mod tests {
         let blockchain = Arc::new(NodeBlockchain::new(coordinate));
         let validator = NetworkPositionValidator::new(blockchain, false);
 
-        let proof = ConsensusProof::new_for_testing();
+        let proof = StateProof::new_for_testing();
 
         // First validation - should hit blockchain
         let result1 = validator

@@ -20,7 +20,7 @@ done
 echo ""
 # Count by module
 echo "TODO distribution by module:"
-for module in ct dns crypto security api consensus ca monitoring; do
+for module in ct dns crypto security api proof_of_state ca monitoring; do
     count=$(grep -r "TODO\|FIXME" src/$module --include="*.rs" 2>/dev/null | grep -v "test" | wc -l)
     if [ $count -gt 0 ]; then
         printf "%-15s: %2d TODOs\n" "$module" "$count"

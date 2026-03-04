@@ -342,8 +342,8 @@ async fn run_performance_tests() -> Result<()> {
     }
     println!();
 
-    println!("Benchmarking Consensus Latency...");
-    let metrics = performance::benchmark_consensus_latency().await;
+    println!("Benchmarking State Proof Latency...");
+    let metrics = performance::benchmark_state_proof_latency().await;
     for (key, value) in metrics {
         println!("  └─ {key}: {value:.2}");
     }

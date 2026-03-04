@@ -25,7 +25,7 @@
 //! For eligible paid content hosting, rewards are calculated based on:
 //! - Privacy levels (higher public access = higher rewards)
 //! - Resource allocation and utilization
-//! - Consensus proof validation
+//! - State proof validation
 //! - Performance metrics and tier bonuses
 
 mod calculation;

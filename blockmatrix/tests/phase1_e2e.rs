@@ -19,6 +19,7 @@ use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::geospatial::{GpsConverter, GpsCoordinate, ScaleResolution};
 use blockmatrix::matrix::tensor::{Matrix3x3, PathFinder, Vector3D};
 use blockmatrix::matrix::MatrixCoordinate;
+use blockmatrix::proof_of_state::StateProof;
 use std::time::Instant;
 use tempfile::TempDir;
 
@@ -87,10 +88,11 @@ async fn test_e2e_100_node_matrix_network() {
 
     // Add blocks to multiple nodes
     let start = Instant::now();
+    let proof = StateProof::new_for_testing();
     for i in 0..10 {
         let node_id = format!("node_{i}_{i}");
         let data = format!("Block data from node {i}").into_bytes();
-        foundation.add_block(&node_id, data).await.unwrap();
+        foundation.add_block(&node_id, data, &proof).await.unwrap();
     }
     let block_time = start.elapsed();
     println!("✓ Added 10 blocks in {block_time:?}");
@@ -154,11 +156,12 @@ async fn test_e2e_full_workflow() {
 
     // Step 3: Add blocks to all nodes
     println!("Step 3: Adding blocks to all nodes...");
+    let proof = StateProof::new_for_testing();
     for x in 0..5 {
         for y in 0..5 {
             let node_id = format!("node_{x}_{y}");
             let data = format!("Data from node ({x}, {y})").into_bytes();
-            foundation.add_block(&node_id, data).await.unwrap();
+            foundation.add_block(&node_id, data, &proof).await.unwrap();
         }
     }
     println!("✓ Blocks added to all nodes");
@@ -359,10 +362,11 @@ async fn test_e2e_blockchain_propagation() {
         println!("Testing {strategy:?} propagation...");
 
         // Add blocks to all nodes
+        let proof = StateProof::new_for_testing();
         for i in 0..node_count {
             let node_id = format!("node{i}");
             let data = format!("Block from node{i} with {strategy:?}").into_bytes();
-            foundation.add_block(&node_id, data).await.unwrap();
+            foundation.add_block(&node_id, data, &proof).await.unwrap();
         }
 
         // Verify all nodes received their blocks
@@ -404,10 +408,11 @@ async fn test_e2e_persistence_recovery() {
         }
 
         // Add blocks
+        let proof = StateProof::new_for_testing();
         for i in 0..20 {
             let node_id = format!("node{i}");
             let data = format!("Persistent data {i}").into_bytes();
-            foundation.add_block(&node_id, data).await.unwrap();
+            foundation.add_block(&node_id, data, &proof).await.unwrap();
         }
 
         println!("Created 20 nodes with blocks");
@@ -481,11 +486,12 @@ async fn test_e2e_performance_validation() {
     assert!(per_query < 1_000, "Should discover neighbors in <1ms");
 
     // Test 3: Block addition performance
+    let proof = StateProof::new_for_testing();
     let start = Instant::now();
     for i in 0..100 {
         let node_id = format!("node{i}");
         let data = vec![i as u8; 1024]; // 1KB blocks
-        foundation.add_block(&node_id, data).await.unwrap();
+        foundation.add_block(&node_id, data, &proof).await.unwrap();
     }
     let block_time = start.elapsed();
     let per_block = block_time.as_micros() / 100;
@@ -586,9 +592,10 @@ async fn test_e2e_concurrent_operations() {
         let foundation = foundation.clone();
         let handle = tokio::spawn(async move {
             let node_id = format!("node{i}");
+            let proof = StateProof::new_for_testing();
             for j in 0..10 {
                 let data = format!("Block {j} from node {i}").into_bytes();
-                foundation.add_block(&node_id, data).await.unwrap();
+                foundation.add_block(&node_id, data, &proof).await.unwrap();
             }
         });
         handles.push(handle);

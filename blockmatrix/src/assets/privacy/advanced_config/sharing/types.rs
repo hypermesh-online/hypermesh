@@ -77,7 +77,7 @@ pub struct ApprovalStep {
     pub name: String,
     pub approvers: Vec<ApproverRequirement>,
     pub timeout: Duration,
-    pub consensus_level: ConsensusLevel,
+    pub approval_level: StateProofLevel,
     pub conditions: Vec<String>,
 }
 
@@ -101,9 +101,9 @@ pub enum ApproverType {
     ExternalAuditor,
 }
 
-/// Consensus levels for approval
+/// Approval levels for sharing workflows
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ConsensusLevel {
+pub enum StateProofLevel {
     Unanimous,
     Majority,
     Plurality,

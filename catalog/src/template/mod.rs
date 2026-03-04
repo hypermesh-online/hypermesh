@@ -604,7 +604,7 @@ mod tests {
             serde_json::Value::String("A test program".to_string()),
         );
         context_params.insert(
-            "consensus_required".to_string(),
+            "state_proof_required".to_string(),
             serde_json::Value::Bool(false),
         );
         context_params.insert(

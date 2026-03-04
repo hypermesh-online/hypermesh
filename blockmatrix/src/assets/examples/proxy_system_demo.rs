@@ -10,7 +10,7 @@
 use std::time::SystemTime;
 use tokio;
 
-// Since we have dependency issues with the consensus module, we'll import the types directly
+// Since we have dependency issues with the proof_of_state module, we'll import the types directly
 use hypermesh_assets::core::{
     AssetRegistration, AssetType, PrivacyMode,
     ProxyAddress, ProxyNodeInfo, ProxyCapabilities,

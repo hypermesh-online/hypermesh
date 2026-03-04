@@ -5,7 +5,7 @@
 //! Extension Configuration for Catalog
 //!
 //! This module defines the configuration structures for the Catalog extension,
-//! including settings for library management, consensus validation, and resource limits.
+//! including settings for library management, state proof validation, and resource limits.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -25,8 +25,8 @@ pub struct CatalogExtensionConfig {
     /// Enable P2P distribution via STOQ
     pub enable_p2p: bool,
 
-    /// Enable consensus validation for operations
-    pub consensus_validation: bool,
+    /// Enable state proof validation for operations
+    pub state_validation: bool,
 
     /// HyperMesh network address
     pub hypermesh_address: String,
@@ -63,7 +63,7 @@ impl Default for CatalogExtensionConfig {
             cache_size: 1024 * 1024 * 1024,      // 1GB
             max_package_size: 100 * 1024 * 1024, // 100MB
             enable_p2p: true,
-            consensus_validation: true,
+            state_validation: true,
             hypermesh_address: "catalog.hypermesh.online".to_string(),
             trustchain_cert_path: None,
             certificate_fingerprint: None,
@@ -101,18 +101,18 @@ impl CatalogExtensionConfig {
         self
     }
 
-    /// Builder pattern for consensus validation
-    pub fn with_consensus_validation(mut self, enable: bool) -> Self {
-        self.consensus_validation = enable;
+    /// Builder pattern for state proof validation
+    pub fn with_state_validation(mut self, enable: bool) -> Self {
+        self.state_validation = enable;
         self
     }
 
     /// Minimum stake amount required for publishing packages.
-    /// Derived from security.min_consensus_proofs as a scaling factor.
+    /// Derived from security.min_state_proofs as a scaling factor.
     /// Default: 100 tokens (requires non-trivial economic commitment).
     pub fn min_stake_for_publish(&self) -> u64 {
         // Base minimum of 100 tokens, scaled by Proof of State requirements
-        100 * self.security.min_consensus_proofs as u64
+        100 * self.security.min_state_proofs as u64
     }
 
     /// Builder pattern for HyperMesh address
@@ -141,8 +141,8 @@ impl CatalogExtensionConfig {
         if let Some(enable) = settings.enable_p2p {
             self.enable_p2p = enable;
         }
-        if let Some(enable) = settings.consensus_validation {
-            self.consensus_validation = enable;
+        if let Some(enable) = settings.state_validation {
+            self.state_validation = enable;
         }
         if let Some(debug) = settings.debug_mode {
             self.debug_mode = debug;
@@ -199,8 +199,8 @@ pub struct ExtensionSettings {
     /// P2P distribution toggle
     pub enable_p2p: Option<bool>,
 
-    /// Consensus validation toggle
-    pub consensus_validation: Option<bool>,
+    /// State proof validation toggle
+    pub state_validation: Option<bool>,
 
     /// Debug mode toggle
     pub debug_mode: Option<bool>,
@@ -247,10 +247,10 @@ pub struct SecurityConfig {
     pub verify_signatures: bool,
 
     /// Require Proof of State for all operations
-    pub require_consensus: bool,
+    pub require_state_proof: bool,
 
     /// Minimum Proof of State proofs required
-    pub min_consensus_proofs: u8,
+    pub min_state_proofs: u8,
 
     /// Enable sandboxing for execution
     pub enable_sandbox: bool,
@@ -269,8 +269,8 @@ impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
             verify_signatures: true,
-            require_consensus: false,
-            min_consensus_proofs: 2, // At least 2 of 4 proofs
+            require_state_proof: false,
+            min_state_proofs: 2, // At least 2 of 4 proofs
             enable_sandbox: true,
             allowed_languages: vec![
                 "lua".to_string(),
@@ -376,10 +376,10 @@ impl ConfigLoader {
                 .map_err(|_| ConfigError::InvalidValue("Invalid P2P setting".to_string()))?;
         }
 
-        if let Ok(enable) = std::env::var("CATALOG_CONSENSUS_VALIDATION") {
-            config.consensus_validation = enable
+        if let Ok(enable) = std::env::var("CATALOG_STATE_PROOF_VALIDATION") {
+            config.state_validation = enable
                 .parse()
-                .map_err(|_| ConfigError::InvalidValue("Invalid consensus setting".to_string()))?;
+                .map_err(|_| ConfigError::InvalidValue("Invalid state proof setting".to_string()))?;
         }
 
         if let Ok(address) = std::env::var("CATALOG_HYPERMESH_ADDRESS") {
@@ -435,7 +435,7 @@ mod tests {
         let config = CatalogExtensionConfig::default();
         assert_eq!(config.cache_size, 1024 * 1024 * 1024);
         assert!(config.enable_p2p);
-        assert!(config.consensus_validation);
+        assert!(config.state_validation);
     }
 
     #[test]
@@ -444,12 +444,12 @@ mod tests {
             .with_library_path(PathBuf::from("/tmp/catalog"))
             .with_cache_size(512 * 1024 * 1024)
             .with_p2p(false)
-            .with_consensus_validation(false);
+            .with_state_validation(false);
 
         assert_eq!(config.library_path, PathBuf::from("/tmp/catalog"));
         assert_eq!(config.cache_size, 512 * 1024 * 1024);
         assert!(!config.enable_p2p);
-        assert!(!config.consensus_validation);
+        assert!(!config.state_validation);
     }
 
     #[test]
@@ -464,7 +464,7 @@ mod tests {
     fn test_security_config_default() {
         let config = SecurityConfig::default();
         assert!(config.verify_signatures);
-        assert_eq!(config.min_consensus_proofs, 2);
+        assert_eq!(config.min_state_proofs, 2);
         assert!(config.enable_sandbox);
         assert_eq!(config.allowed_languages.len(), 4);
     }

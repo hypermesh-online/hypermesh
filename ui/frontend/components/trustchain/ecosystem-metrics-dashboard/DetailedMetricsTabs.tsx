@@ -20,7 +20,7 @@ export function DetailedMetricsTabs({ metrics, activeTab, onTabChange }: Detaile
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
       <TabsList className="grid w-full grid-cols-4 bg-black/20">
         <TabsTrigger value="overview" className="text-white">Performance</TabsTrigger>
-        <TabsTrigger value="consensus" className="text-white">Consensus</TabsTrigger>
+        <TabsTrigger value="stateProof" className="text-white">State Proof</TabsTrigger>
         <TabsTrigger value="security" className="text-white">Security</TabsTrigger>
         <TabsTrigger value="economics" className="text-white">Economics</TabsTrigger>
       </TabsList>
@@ -84,10 +84,10 @@ export function DetailedMetricsTabs({ metrics, activeTab, onTabChange }: Detaile
         </div>
       </TabsContent>
 
-      <TabsContent value="consensus" className="space-y-6 mt-6">
+      <TabsContent value="stateProof" className="space-y-6 mt-6">
         <Card className="bg-black/40 border-green-500/30 backdrop-blur-lg">
           <CardHeader>
-            <CardTitle className="text-white">Four-Proof Consensus</CardTitle>
+            <CardTitle className="text-white">Four-Proof State Verification</CardTitle>
             <CardDescription className="text-gray-400">
               Proof of State protocol validation status
             </CardDescription>

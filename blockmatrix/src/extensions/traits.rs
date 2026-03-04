@@ -12,7 +12,7 @@ use std::sync::Arc;
 use super::asset_types::*;
 use super::package_types::*;
 use super::types::*;
-use crate::assets::core::{AssetManager, AssetRegistration, AssetType, ConsensusProof};
+use crate::assets::core::{AssetManager, AssetRegistration, AssetType, StateProof};
 
 /// Core trait that all HyperMesh extensions must implement
 #[async_trait]
@@ -76,11 +76,11 @@ pub trait AssetExtensionHandler: Send + Sync {
     /// Get asset record
     async fn get_metadata(&self, id: &AssetRegistration) -> ExtensionResult<ExtensionAssetRecord>;
 
-    /// Validate asset with consensus proofs
+    /// Validate asset with state proofs
     async fn validate_asset(
         &self,
         id: &AssetRegistration,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> ExtensionResult<bool>;
 
     /// Handle asset-specific operations
@@ -128,7 +128,7 @@ pub trait AssetLibraryExtension: HyperMeshExtension {
     async fn publish_package(
         &self,
         package: AssetPackageSpec,
-        proof: ConsensusProof,
+        proof: StateProof,
     ) -> ExtensionResult<PublishResult>;
 
     /// Verify package integrity

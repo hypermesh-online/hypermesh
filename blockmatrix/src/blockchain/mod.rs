@@ -13,10 +13,10 @@
 //! - Genesis block includes the node's MatrixCoordinate
 //! - Chain validation is per-node (no cross-node merkle validation)
 //! - Block propagation uses matrix topology for neighbor discovery
-//! - Complete autonomy - nodes don't need consensus to add blocks
+//! - Complete autonomy - nodes don't need external validation to add blocks
 //!
 //! This fundamentally differs from traditional blockchain architectures where
-//! all nodes share a single chain and use consensus mechanisms like PoW or PoS.
+//! all nodes share a single chain and use Proof of States like PoW or PoS.
 
 pub mod block;
 pub mod errors;

@@ -4,7 +4,7 @@
 
 //! Security Alert Management System
 //!
-//! Real-time security alerts with consensus validation integration
+//! Real-time security alerts with state proof validation integration
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::SecuritySeverity;
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Security alert manager
@@ -48,8 +48,8 @@ pub struct SecurityAlert {
     pub category: AlertCategory,
     /// Alert status
     pub status: AlertStatus,
-    /// Associated consensus proof (if any)
-    pub consensus_proof: Option<ConsensusProof>,
+    /// Associated state proof (if any)
+    pub state_proof: Option<StateProof>,
     /// Associated operation ID (if any)
     pub operation_id: Option<String>,
     /// Additional metadata
@@ -61,8 +61,8 @@ pub struct SecurityAlert {
 /// Alert category
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AlertCategory {
-    /// Consensus validation failures
-    ConsensusValidation,
+    /// State proof validation failures
+    StateProofValidation,
     /// Byzantine behavior detection
     ByzantineBehavior,
     /// Certificate operations
@@ -166,7 +166,7 @@ impl SecurityAlertManager {
         severity: SecuritySeverity,
         title: String,
         description: String,
-        consensus_proof: Option<ConsensusProof>,
+        state_proof: Option<StateProof>,
     ) -> TrustChainResult<SecurityAlert> {
         // Check if alert meets threshold
         if severity < self.threshold {
@@ -191,7 +191,7 @@ impl SecurityAlertManager {
         let alert_id = uuid::Uuid::new_v4().to_string();
 
         // Determine alert category based on content
-        let category = self.categorize_alert(&title, &description, &consensus_proof);
+        let category = self.categorize_alert(&title, &description, &state_proof);
 
         // Calculate auto-resolve time for certain alert types
         let auto_resolve_at = if matches!(category, AlertCategory::Performance) {
@@ -208,7 +208,7 @@ impl SecurityAlertManager {
             timestamp: SystemTime::now(),
             category,
             status: AlertStatus::Active,
-            consensus_proof,
+            state_proof,
             operation_id: None, // Can be set later
             metadata: HashMap::new(),
             auto_resolve_at,
@@ -473,12 +473,12 @@ impl SecurityAlertManager {
         &self,
         title: &str,
         description: &str,
-        consensus_proof: &Option<ConsensusProof>,
+        state_proof: &Option<StateProof>,
     ) -> AlertCategory {
         let content = format!("{} {}", title.to_lowercase(), description.to_lowercase());
 
-        if content.contains("consensus") || content.contains("proof") || consensus_proof.is_some() {
-            AlertCategory::ConsensusValidation
+        if content.contains("state_proof") || content.contains("state proof") || content.contains("proof") || state_proof.is_some() {
+            AlertCategory::StateProofValidation
         } else if content.contains("byzantine") || content.contains("malicious") {
             AlertCategory::ByzantineBehavior
         } else if content.contains("certificate")
@@ -710,13 +710,13 @@ mod tests {
         let alert = manager
             .generate_alert(
                 SecuritySeverity::High,
-                "Consensus Validation Failed".to_string(),
-                "Four-proof consensus validation failed".to_string(),
+                "State Proof Validation Failed".to_string(),
+                "Four-proof state proof validation failed".to_string(),
                 None,
             )
             .await
             .expect("test: expected success");
 
-        assert!(matches!(alert.category, AlertCategory::ConsensusValidation));
+        assert!(matches!(alert.category, AlertCategory::StateProofValidation));
     }
 }

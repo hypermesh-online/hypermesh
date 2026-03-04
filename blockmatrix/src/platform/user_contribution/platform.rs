@@ -23,7 +23,7 @@ use super::session::{
     SessionStatus, UserId,
 };
 use super::sharing::SharingPreferences;
-use crate::assets::core::{AssetAllocation, AssetManager, AssetType, ConsensusProof};
+use crate::assets::core::{AssetAllocation, AssetManager, AssetType, StateProof};
 
 /// User contribution platform for hardware sharing
 pub struct UserContributionPlatform {
@@ -130,7 +130,7 @@ impl UserContributionPlatform {
         &self,
         user_id: &UserId,
         resource_types: Vec<AssetType>,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<ContributionSession> {
         let user_profile = {
             let profiles = self.user_profiles.read().await;
@@ -145,7 +145,7 @@ impl UserContributionPlatform {
         let mut asset_allocations = HashMap::new();
         for asset_type in resource_types {
             let allocation = self
-                .allocate_user_resource(&user_profile, asset_type.clone(), &consensus_proof)
+                .allocate_user_resource(&user_profile, asset_type.clone(), &state_proof)
                 .await?;
             asset_allocations.insert(asset_type, allocation);
         }
@@ -279,7 +279,7 @@ impl UserContributionPlatform {
         &self,
         user_profile: &UserProfile,
         asset_type: AssetType,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
     ) -> Result<AssetAllocation> {
         let resource_settings = user_profile
             .sharing_preferences
@@ -314,7 +314,7 @@ impl UserContributionPlatform {
                 economic: None,
             },
             privacy_level: crate::assets::core::PrivacyMode::PRIVATE,
-            consensus_proof: consensus_proof.clone(),
+            state_proof: state_proof.clone(),
             certificate_fingerprint: String::new(),
             duration_limit: Some(resource_settings.max_session_duration),
             tags: HashMap::new(),

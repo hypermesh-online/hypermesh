@@ -290,8 +290,8 @@ impl FederatedTier {
 /// Federation validator for cross-network trust
 #[derive(Debug, Clone)]
 pub struct FederationValidator {
-    /// Required consensus percentage across networks
-    pub consensus_threshold: f32,
+    /// Required verification response threshold across federation partners
+    pub verification_threshold: f32,
     /// Timeout for federation responses (milliseconds)
     pub timeout_ms: u64,
     /// Require cryptographic proof from partners
@@ -301,7 +301,7 @@ pub struct FederationValidator {
 impl FederationValidator {
     pub fn new() -> Self {
         Self {
-            consensus_threshold: 0.67, // 2/3 majority
+            verification_threshold: 0.67, // 2/3 majority
             timeout_ms: 10000,
             require_proof: true,
         }
@@ -321,8 +321,8 @@ pub struct PublicTier {
     pub pos_validator: ProofOfStateValidator,
     /// Public node identifier
     pub node_id: NodeId,
-    /// Reputation score (0.0 to 1.0)
-    pub reputation: f32,
+    /// Whether this node has passed Proof of State authentication (binary)
+    pub authenticated: bool,
     /// Total validated transactions
     pub validated_count: u64,
 }
@@ -332,24 +332,26 @@ impl PublicTier {
         Self {
             pos_validator: ProofOfStateValidator::new(),
             node_id,
-            reputation: 0.5, // Start with neutral reputation
+            authenticated: false,
             validated_count: 0,
         }
     }
 
-    /// Update reputation based on validation success
-    pub fn update_reputation(&mut self, success: bool) {
-        if success {
-            self.reputation = (self.reputation + 0.01).min(1.0);
+    /// Set authentication status based on Proof of State validation (binary pass/fail)
+    pub fn set_authenticated(&mut self, valid: bool) {
+        self.authenticated = valid;
+        if valid {
             self.validated_count += 1;
-        } else {
-            self.reputation = (self.reputation - 0.05).max(0.0);
         }
     }
 
-    /// Get CAESAR reward multiplier based on reputation
+    /// Get CAESAR reward multiplier: authenticated nodes get full bonus, others get base
     pub fn caesar_bonus(&self) -> f32 {
-        1.0 + (self.reputation * 0.5) // Up to 50% bonus
+        if self.authenticated {
+            1.5
+        } else {
+            1.0
+        }
     }
 }
 
@@ -467,24 +469,25 @@ mod tests {
     }
 
     #[test]
-    fn test_public_tier_reputation() {
+    fn test_public_tier_authentication() {
         let mut tier = PublicTier::new(NodeId([0u8; 32]));
-        assert_eq!(tier.reputation, 0.5);
+        assert!(!tier.authenticated);
 
-        tier.update_reputation(true);
-        assert!(tier.reputation > 0.5);
+        tier.set_authenticated(true);
+        assert!(tier.authenticated);
+        assert_eq!(tier.validated_count, 1);
 
-        tier.update_reputation(false);
-        assert!(tier.reputation < 0.51);
+        tier.set_authenticated(false);
+        assert!(!tier.authenticated);
     }
 
     #[test]
     fn test_public_tier_caesar_bonus() {
         let mut tier = PublicTier::new(NodeId([0u8; 32]));
-        tier.reputation = 1.0;
+        tier.authenticated = true;
         assert_eq!(tier.caesar_bonus(), 1.5);
 
-        tier.reputation = 0.0;
+        tier.authenticated = false;
         assert_eq!(tier.caesar_bonus(), 1.0);
     }
 

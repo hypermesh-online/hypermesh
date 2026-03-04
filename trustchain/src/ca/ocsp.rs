@@ -393,7 +393,7 @@ mod tests {
         serial: &str,
         status: CertificateStatus,
     ) -> super::super::IssuedCertificate {
-        use crate::consensus::ConsensusProof;
+        use crate::proof_of_state::StateProof;
 
         super::super::IssuedCertificate {
             serial_number: serial.to_string(),
@@ -405,7 +405,7 @@ mod tests {
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now() + Duration::from_secs(86400),
             issuer_ca_id: "test-ca".to_string(),
-            consensus_proof: ConsensusProof::default_for_testing(),
+            state_proof: StateProof::default_for_testing(),
             status,
             metadata: super::super::CertificateMetadata::default(),
         }

@@ -8,7 +8,7 @@ export const defaultMetrics: EcosystemMetrics = {
   totalAssets: 1247,
   activeCertificates: 892,
   networkThroughput: 2.95,
-  consensusBlocks: 15234,
+  verifiedBlocks: 15234,
   quantumConnections: 445,
   economicRewards: 12847.32
 };
@@ -47,7 +47,7 @@ export const defaultSystemStatuses: SystemStatus[] = [
     description: 'Economic incentive and reward distribution system'
   },
   {
-    name: 'Four-Proof Consensus',
+    name: 'Four-Proof State Verification',
     status: 'online',
     uptime: 2246400000,
     lastChecked: new Date().toISOString(),

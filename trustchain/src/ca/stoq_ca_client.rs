@@ -103,8 +103,8 @@ pub struct StoqCertificateRequest {
     pub key_algorithm: KeyAlgorithm,
     /// Requester information
     pub requester: CertificateRequester,
-    /// Consensus proof for validation
-    pub consensus_proof: Option<Bytes>,
+    /// State proof for validation
+    pub state_proof: Option<Bytes>,
 }
 
 /// Certificate response via STOQ
@@ -168,8 +168,8 @@ pub struct StoqRevocationRequest {
     pub reason: RevocationReason,
     /// Requester authorization
     pub requester: CertificateRequester,
-    /// Consensus proof for authorization
-    pub consensus_proof: Option<Bytes>,
+    /// State proof for authorization
+    pub state_proof: Option<Bytes>,
 }
 
 /// Key usage flags
@@ -762,7 +762,7 @@ mod tests {
                 email: Some("test@example.com".to_string()),
                 auth_token: None,
             },
-            consensus_proof: None,
+            state_proof: None,
         };
 
         let serialized =

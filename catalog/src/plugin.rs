@@ -93,7 +93,7 @@ impl HyperMeshExtension for CatalogPlugin {
                 ExtensionCapability::AssetManagement,
                 ExtensionCapability::VMExecution,
                 ExtensionCapability::NetworkAccess,
-                ExtensionCapability::ConsensusAccess,
+                ExtensionCapability::StateProofAccess,
                 ExtensionCapability::TransportAccess,
                 ExtensionCapability::FileSystemAccess,
             ]),
@@ -148,7 +148,7 @@ impl HyperMeshExtension for CatalogPlugin {
                     .get("p2p_enabled")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(true),
-                consensus_validation: true,
+                state_validation: true,
                 hypermesh_address: "catalog.hypermesh.online".to_string(),
                 trustchain_cert_path: None,
                 certificate_fingerprint: None,

@@ -230,7 +230,7 @@ impl ApiHandler for IssueCertificateHandler {
 
         // Build CertificateRequest for CA by parsing the CSR
         use crate::ca::CertificateRequest;
-        use crate::consensus::ConsensusProof;
+        use crate::proof_of_state::StateProof;
 
         // Parse common_name from the CSR PEM
         let common_name = extract_common_name_from_csr(&issue_request.csr_pem)
@@ -238,10 +238,10 @@ impl ApiHandler for IssueCertificateHandler {
                 "Failed to extract common_name from CSR: {e}. A valid CSR with subject CN is required."
             )))?;
 
-        // Generate a real consensus proof from the local node
-        let consensus_proof = ConsensusProof::generate_from_network("api_node").await
+        // Generate a real state proof from the local node
+        let state_proof = StateProof::generate_from_network("api_node").await
             .map_err(|e| ApiError::HandlerError(format!(
-                "Failed to generate consensus proof: {e}. A valid consensus proof is required for certificate issuance."
+                "Failed to generate state proof: {e}. A valid state proof is required for certificate issuance."
             )))?;
 
         let cert_request = CertificateRequest {
@@ -249,7 +249,7 @@ impl ApiHandler for IssueCertificateHandler {
             san_entries: vec![],
             node_id: "api_node".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof,
+            state_proof,
             timestamp: std::time::SystemTime::now(),
             identity_scope: None,
             subject_type: None,

@@ -203,11 +203,11 @@ fn extract_key_improvements(results: &QualityGateResults) -> Vec<String> {
         }
     }
 
-    // Consensus validation improvements
-    if let Some(consensus_gate) = results.individual_gates.get("ConsensusValidation") {
-        if consensus_gate.status != QualityGateStatus::Pass {
+    // State proof validation improvements
+    if let Some(state_proof_gate) = results.individual_gates.get("StateProofValidation") {
+        if state_proof_gate.status != QualityGateStatus::Pass {
             improvements
-                .push("🔐 Implement proper consensus validation with network proofs".to_string());
+                .push("🔐 Implement proper state proof validation with network proofs".to_string());
         }
     }
 

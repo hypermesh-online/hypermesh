@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 // Import BlockMatrix asset types directly
-use blockmatrix::assets::{AssetRegistration, ConsensusProof};
+use blockmatrix::assets::{AssetRegistration, StateProof};
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///
@@ -39,7 +39,7 @@ pub struct AssetTypeDefinition {
     pub dependencies: Vec<String>,
 
     /// Proof of State (all four: PoSp/PoSt/PoWk/PoTm)
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 
     /// Metadata
     pub metadata: TypeMetadata,
@@ -111,7 +111,7 @@ pub enum ValidationRuleType {
 
 impl AssetTypeDefinition {
     /// Create a new asset type definition
-    pub fn new(type_name: String, schema: JsonValue, consensus_proof: ConsensusProof) -> Self {
+    pub fn new(type_name: String, schema: JsonValue, state_proof: StateProof) -> Self {
         // Create AssetRegistration from type definition data
         let asset_data = blockmatrix::assets::core::AssetData {
             config: type_name.as_bytes().to_vec(),
@@ -144,7 +144,7 @@ impl AssetTypeDefinition {
             validation_rules: Vec::new(),
             execution_templates: Vec::new(),
             dependencies: Vec::new(),
-            consensus_proof,
+            state_proof,
             metadata: TypeMetadata {
                 version: "1.0.0".to_string(),
                 author: None,
@@ -261,8 +261,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn create_test_consensus_proof() -> ConsensusProof {
-        use blockmatrix::consensus::proof_of_state_integration::{
+    fn create_test_state_proof() -> StateProof {
+        use blockmatrix::proof_of_state::proof_of_state_integration::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
         use std::time::Duration;
@@ -282,7 +282,7 @@ mod tests {
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
-        ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof)
+        StateProof::new(stake_proof, time_proof, space_proof, work_proof)
     }
 
     #[test]
@@ -298,8 +298,8 @@ mod tests {
             "required": ["vin", "make", "model", "year"]
         });
 
-        let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
+        let state_proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, state_proof);
 
         assert_eq!(type_def.type_name, "Vehicle");
         // asset_type is a method on AssetRegistration, not a field
@@ -317,8 +317,8 @@ mod tests {
             }
         });
 
-        let consensus_proof = create_test_consensus_proof();
-        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, consensus_proof);
+        let state_proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, state_proof);
 
         let instance = json!({
             "vin": "1HGBH41JXMN109186",

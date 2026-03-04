@@ -360,7 +360,7 @@ impl NodeBootstrap {
         } else if mode == PrivacyMode::PUBLIC {
             // Register DNS as blockchain asset
             // Connect to network head
-            // Participate in consensus
+            // Participate in state proof validation
             info!("Public mode: registering with network");
             self.register_with_network().await?;
         } else {
@@ -384,7 +384,7 @@ impl NodeBootstrap {
 
         // TODO: Implement DNS-as-Asset registration
         // TODO: Connect to network head
-        // TODO: Enable consensus participation
+        // TODO: Enable state proof participation
         // TODO: Start CAESAR rewards
 
         warn!("Network registration not yet implemented");

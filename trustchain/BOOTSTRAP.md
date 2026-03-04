@@ -174,7 +174,7 @@ cargo test dns::test_trustchain_connection
 Once the circular dependency is resolved and both systems are stable:
 
 1. **DNS-as-Asset Migration**: Migrate DNS records to BlockMatrix for CAESAR rewards
-2. **Consensus Integration**: DNS updates validated through Proof of State
+2. **state proof Integration**: DNS updates validated through Proof of State
 3. **Multi-Network DNS**: Different DNS views per privacy tier
 4. **Distributed DNS**: DNS records sharded across matrix topology
 

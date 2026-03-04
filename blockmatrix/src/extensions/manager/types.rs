@@ -67,7 +67,7 @@ impl Default for ExtensionManagerConfig {
                 ExtensionCapability::VMExecution,
                 ExtensionCapability::ContainerManagement,
                 ExtensionCapability::NetworkAccess,
-                ExtensionCapability::ConsensusAccess,
+                ExtensionCapability::StateProofAccess,
                 ExtensionCapability::TransportAccess,
                 ExtensionCapability::MonitoringAccess,
             ]),

@@ -48,7 +48,7 @@ permissions = [
     "AssetManagement",
     "VMExecution",
     "NetworkAccess",
-    "ConsensusAccess",
+    "StateProofAccess",
     "TransportAccess",
     "FileSystemAccess"
 ]

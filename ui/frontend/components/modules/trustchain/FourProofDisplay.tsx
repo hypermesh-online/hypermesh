@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface ConsensusMetrics {
+interface StateProofMetrics {
   proofCoverage: {
     space: number;
     stake: number;
@@ -28,7 +28,7 @@ interface ProofType {
 }
 
 interface FourProofDisplayProps {
-  consensusMetrics: ConsensusMetrics;
+  stateProofMetrics: StateProofMetrics;
   onViewDetails: (proofType: ProofType['type']) => void;
 }
 
@@ -70,8 +70,8 @@ const getHealthStatus = (coverage: number) => {
   return { status: 'Critical', color: 'text-red-600', bg: 'bg-red-100' };
 };
 
-export function FourProofDisplay({ consensusMetrics, onViewDetails }: FourProofDisplayProps) {
-  const averageProofCoverage = Object.values(consensusMetrics.proofCoverage)
+export function FourProofDisplay({ stateProofMetrics, onViewDetails }: FourProofDisplayProps) {
+  const averageProofCoverage = Object.values(stateProofMetrics.proofCoverage)
     .reduce((acc, val) => acc + val, 0) / 4;
 
   return (
@@ -81,7 +81,7 @@ export function FourProofDisplay({ consensusMetrics, onViewDetails }: FourProofD
           <div>
             <CardTitle>Proof of State Four-Proof System</CardTitle>
             <CardDescription>
-              Every asset requires ALL FOUR proofs for consensus validation
+              Every asset requires ALL FOUR proofs for state verification
             </CardDescription>
           </div>
           <div className="text-right">
@@ -95,7 +95,7 @@ export function FourProofDisplay({ consensusMetrics, onViewDetails }: FourProofD
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(proofTypes).map(([key, proof]) => {
-            const coverage = consensusMetrics.proofCoverage[key as keyof typeof consensusMetrics.proofCoverage];
+            const coverage = stateProofMetrics.proofCoverage[key as keyof typeof stateProofMetrics.proofCoverage];
             const health = getHealthStatus(coverage);
             
             return (

@@ -409,8 +409,8 @@ cargo test --lib ca::tests::test_certificate_chain_building
 
 ### Document-Only TODOs (2 hours)
 
-#### 1. Consensus Generation Migration
-**Location**: `src/consensus/mod.rs:77,89`
+#### 1. state proof Generation Migration
+**Location**: `src/state proof/mod.rs:77,89`
 **Action**: Add deprecation notice, create migration guide
 
 ```rust
@@ -418,12 +418,12 @@ cargo test --lib ca::tests::test_certificate_chain_building
     since = "0.2.0",
     note = "Use generate_from_network() for production. This method is for testing only. See MIGRATION.md"
 )]
-pub fn generate_dummy_proof() -> ConsensusProof {
+pub fn generate_dummy_proof() -> state proofProof {
     // Keep for backward compatibility
 }
 ```
 
-**Create**: `docs/CONSENSUS_MIGRATION.md` explaining the migration path
+**Create**: `docs/state proof_MIGRATION.md` explaining the migration path
 
 ---
 

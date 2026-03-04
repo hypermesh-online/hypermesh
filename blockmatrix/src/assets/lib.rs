@@ -9,13 +9,13 @@
 //! - Containers and services  
 //! - User-defined assets and applications
 //!
-//! All assets require Consensus Proof validation (PoSpace + PoStake + PoWork + PoTime)
+//! All assets require State Proof validation (PoSpace + PoStake + PoWork + PoTime)
 //! and support user-configurable privacy levels with remote proxy addressing.
 //!
 //! # Key Features
 //!
 //! - **Universal Asset System**: Everything is treated as an asset with unified management
-//! - **Consensus Proof Integration**: ALL operations require PoSp+PoSt+PoWk+PoTm validation
+//! - **State Proof Integration**: ALL operations require PoSp+PoSt+PoWk+PoTm validation
 //! - **Privacy-Aware Allocation**: User-configurable privacy levels (Private → FullPublic)
 //! - **Remote Proxy Addressing**: NAT-like addressing for global HyperMesh ecosystem
 //! - **Quantum-Resistant Security**: FALCON-1024 signatures, Kyber encryption patterns
@@ -58,14 +58,14 @@
 //!
 //! ```rust,no_run
 //! use hypermesh_assets::{AssetManager, AssetAllocationRequest, AssetType, PrivacyMode};
-//! use hypermesh_assets::core::{ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof};
+//! use hypermesh_assets::core::{StateProof, SpaceProof, StakeProof, WorkProof, TimeProof};
 //!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let asset_manager = AssetManager::new();
 //!
-//! // Create consensus proof (ALL FOUR PROOFS REQUIRED)
-//! let consensus_proof = ConsensusProof::new(
+//! // Create state proof (ALL FOUR PROOFS REQUIRED)
+//! let state_proof = StateProof::new(
 //!     SpaceProof { /* ... */ },
 //!     StakeProof { /* ... */ },
 //!     WorkProof { /* ... */ },
@@ -75,7 +75,7 @@
 //! let request = AssetAllocationRequest {
 //!     asset_type: AssetType::Cpu,
 //!     privacy_level: PrivacyMode::PRIVATE,
-//!     consensus_proof,
+//!     state_proof,
 //!     certificate_fingerprint: "cert-fingerprint".to_string(),
 //!     // ... other fields
 //! };
@@ -139,8 +139,8 @@ pub use core::{
     AssetManager, AssetError, AssetResult,
     AssetRegistration, AssetType,
     AssetStatus, AssetState,
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
-    ConsensusRequirements, AssetStatistics,
+    StateProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+    StateRequirements, AssetStatistics,
 };
 
 // Adapter system exports
@@ -183,8 +183,8 @@ pub mod privacy {
         PrivacyConstraints, PrivacyValidationRules, PrivacyTemplate,
         PrivacyPreset, AdvancedPrivacyOptions,
         
-        // Consensus requirements
-        ConsensusRequirementConfig, DifficultyRequirements,
+        // State proof requirements
+        StateProofRequirementConfig, DifficultyRequirements,
         
         // Proxy configuration for privacy
         ProxyConfiguration, NatAddressingPreferences,
@@ -234,8 +234,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// HyperMesh Asset System version
 pub const HYPERMESH_ASSETS_VERSION: &str = "0.1.0";
 
-/// Supported consensus proof version
-pub const CONSENSUS_PROOF_VERSION: u8 = 1;
+/// Supported state proof version
+pub const STATE_PROOF_VERSION: u8 = 1;
 
 /// Default HyperMesh network identifier (IPv6 prefix)
 pub const DEFAULT_HYPERMESH_NETWORK_ID: [u8; 16] = [
@@ -249,8 +249,8 @@ pub const DEFAULT_ASSET_PORT_RANGE: (u16, u16) = (8000, 9000);
 /// Maximum concurrent asset allocations per adapter
 pub const MAX_CONCURRENT_ALLOCATIONS: u32 = 1000;
 
-/// Default consensus proof validation timeout
-pub const CONSENSUS_VALIDATION_TIMEOUT_SECS: u64 = 30;
+/// Default state proof validation timeout
+pub const STATE_PROOF_VALIDATION_TIMEOUT_SECS: u64 = 30;
 
 /// Asset health check interval
 pub const ASSET_HEALTH_CHECK_INTERVAL_SECS: u64 = 60;
@@ -272,7 +272,7 @@ mod integration_tests {
     }
     
     #[test]
-    fn test_consensus_proof_validation() {
+    fn test_state_proof_validation() {
         let space_proof = SpaceProof {
             node_id: "test-node".to_string(),
             storage_path: "/test/storage".to_string(),
@@ -307,10 +307,10 @@ mod integration_tests {
             proof_hash: vec![9, 10, 11, 12, 13, 14, 15, 16],
         };
         
-        let consensus_proof = ConsensusProof::new(space_proof, stake_proof, work_proof, time_proof);
+        let state_proof = StateProof::new(space_proof, stake_proof, work_proof, time_proof);
         
         // Test that all four proofs are required and validated
-        assert!(consensus_proof.validate());
+        assert!(state_proof.validate());
     }
     
     #[test]

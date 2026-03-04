@@ -3,11 +3,11 @@
 // See the LICENSE file in the repository root for full license text.
 
 /**
- * HyperMesh API - Asset management, consensus validation, and Byzantine detection
+ * HyperMesh API - Asset management, state proof verification, and Byzantine detection
  *
  * Provides typed interface for HyperMesh service operations:
  * - Universal asset management (CPU, GPU, Memory, Storage)
- * - Four-proof consensus system (PoSp, PoSt, PoWk, PoTm)
+ * - Four-proof state verification system (PoSp, PoSt, PoWk, PoTm)
  * - Byzantine fault detection and recovery
  * - Remote proxy/NAT addressing system
  */
@@ -22,8 +22,8 @@ export type {
   ProofType,
   Asset,
   AssetAllocation,
-  ConsensusProof,
-  FourProofConsensus,
+  StateProof,
+  FourProofStateVerification,
   ByzantineDetection,
   RemoteProxy,
   NodeHealth,
@@ -37,7 +37,7 @@ import type {
   AssetType,
   PrivacyLevel,
   ProofType,
-  FourProofConsensus,
+  FourProofStateVerification,
   AssetAllocation,
   ByzantineDetection,
   RemoteProxy,
@@ -117,16 +117,16 @@ export class HyperMeshAPI {
     });
   }
 
-  async validateConsensus(assetId: string, blockId: string): Promise<FourProofConsensus> {
-    return web3ApiClient.request<FourProofConsensus>(this.service, `/api/v1/hypermesh/consensus/validate`, {
+  async validateStateProof(assetId: string, blockId: string): Promise<FourProofStateVerification> {
+    return web3ApiClient.request<FourProofStateVerification>(this.service, `/api/v1/hypermesh/state-proof/validate`, {
       method: 'POST',
       body: { assetId, blockId }
     });
   }
 
-  async getConsensusHistory(assetId: string, limit: number = 100): Promise<FourProofConsensus[]> {
-    return web3ApiClient.request<FourProofConsensus[]>(this.service,
-      `/api/v1/hypermesh/consensus/history/${assetId}?limit=${limit}`);
+  async getStateProofHistory(assetId: string, limit: number = 100): Promise<FourProofStateVerification[]> {
+    return web3ApiClient.request<FourProofStateVerification[]>(this.service,
+      `/api/v1/hypermesh/state-proof/history/${assetId}?limit=${limit}`);
   }
 
   async submitProof(proof: {
@@ -136,7 +136,7 @@ export class HyperMeshAPI {
     data: any;
     signature: string;
   }): Promise<{ accepted: boolean; reason?: string }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/consensus/proof', {
+    return web3ApiClient.request(this.service, '/api/v1/hypermesh/state-proof/submit', {
       method: 'POST',
       body: proof
     });
@@ -248,11 +248,11 @@ export class HyperMeshAPI {
     status: 'healthy' | 'degraded' | 'critical';
     totalAssets: number;
     activeAllocations: number;
-    consensusHealth: number;
+    stateProofHealth: number;
     byzantineDetections: number;
     networkNodes: number;
     proxyConnections: number;
-    lastConsensus: string;
+    lastStateProof: string;
     uptime: number;
   }> {
     return web3ApiClient.request(this.service, '/api/v1/hypermesh/system/status');
@@ -332,7 +332,7 @@ export class HyperMeshAPI {
     operation: string;
     parameters: any;
     timeout?: number;
-    requiresConsensus?: boolean;
+    requiresStateProof?: boolean;
     allocationDuration?: number;
   }): Promise<VMExecution> {
     return web3ApiClient.request<VMExecution>(this.service, '/api/v1/hypermesh/vm/execute', {
@@ -342,7 +342,7 @@ export class HyperMeshAPI {
         operation: request.operation,
         parameters: request.parameters,
         timeout: request.timeout || 300,
-        requiresConsensus: request.requiresConsensus || true,
+        requiresStateProof: request.requiresStateProof || true,
         allocationDuration: request.allocationDuration || 3600
       }
     });

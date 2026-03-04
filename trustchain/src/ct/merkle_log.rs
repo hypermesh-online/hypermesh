@@ -334,7 +334,7 @@ impl MerklePath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
     use std::time::SystemTime;
 
     async fn create_test_entry(seq_num: u64) -> anyhow::Result<LogEntry> {
@@ -345,7 +345,7 @@ mod tests {
             timestamp: SystemTime::now(),
             common_name: format!("test{seq_num}.example.com"),
             issuer_ca_id: "test-ca".to_string(),
-            consensus_proof: ConsensusProof::generate_from_network("test-node").await?,
+            state_proof: StateProof::generate_from_network("test-node").await?,
             entry_id: [seq_num as u8; 32],
             leaf_hash: [0u8; 32], // Will be calculated
         })

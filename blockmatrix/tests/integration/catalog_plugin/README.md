@@ -10,7 +10,7 @@ These tests are prepared for when the Catalog extension is implemented in BlockM
 
 1. **Lifecycle** (`lifecycle.rs`) - Plugin loading, unloading, configuration, hot-reload
 2. **Integration** (`integration.rs`) - Asset registration, handlers, extension traits, API endpoints
-3. **Operations** (`operations.rs`) - Library operations, P2P distribution, consensus integration
+3. **Operations** (`operations.rs`) - Library operations, P2P distribution, state proof integration
 4. **Reliability** (`reliability.rs`) - Error handling, crash recovery, resource isolation, concurrent operations
 
 ## Current Compilation Status
@@ -19,7 +19,7 @@ These tests are prepared for when the Catalog extension is implemented in BlockM
 
 ### Missing API Components
 
-1. **`blockmatrix::consensus::ProofType`** - Not exported from consensus module
+1. **`blockmatrix::proof_of_state::ProofType`** - Not exported from proof_of_state module
 2. **`hypermesh` crate** - Unresolved module references (extensions API)
 3. **Extension API fields** - Various API mismatches:
    - `ExtensionLoader.config` is private
@@ -78,7 +78,7 @@ When implementing the Catalog extension, ensure:
 - [ ] Security manager and capability checking
 - [ ] Extension trait implementation
 - [ ] API endpoint handlers
-- [ ] Consensus integration
+- [ ] state proof integration
 - [ ] P2P distribution support
 - [ ] TrustChain verification
 - [ ] Resource isolation and quotas

@@ -16,7 +16,7 @@ use tracing::{info, warn};
 
 use crate::ca::certificate_store::CertificateStore;
 use crate::ca::{CertificateRequest, CertificateStatus, IssuedCertificate, TrustChainCA};
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::security::SecurityMonitor;
 
@@ -96,7 +96,7 @@ pub struct HealthResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricsResponse {
     pub certificates_issued: u64,
-    pub consensus_validations: u64,
+    pub state_validations: u64,
     pub security_validations_total: u64,
     pub security_validations_failed: u64,
     pub byzantine_detections: u64,
@@ -126,10 +126,10 @@ pub async fn handle_issue_certificate(
 ) -> TrustChainResult<IssueCertificateResponse> {
     info!("Handler: issue certificate for {}", req.common_name);
 
-    let consensus_proof = ConsensusProof::generate_from_network("http3-handler")
+    let state_proof = StateProof::generate_from_network("http3-handler")
         .await
-        .map_err(|e| TrustChainError::ConsensusValidationFailed {
-            reason: format!("Failed to generate consensus proof: {e}"),
+        .map_err(|e| TrustChainError::StateProofValidationFailed {
+            reason: format!("Failed to generate state proof: {e}"),
         })?;
 
     let cert_request = CertificateRequest {
@@ -137,7 +137,7 @@ pub async fn handle_issue_certificate(
         san_entries: req.san_names,
         node_id: "http3-client".to_string(),
         ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-        consensus_proof,
+        state_proof,
         timestamp: SystemTime::now(),
         identity_scope: None,
         subject_type: None,
@@ -257,7 +257,7 @@ pub async fn handle_metrics(ctx: &HttpHandlerContext) -> TrustChainResult<Metric
 
     Ok(MetricsResponse {
         certificates_issued: 0, // CA metrics are private; use security totals
-        consensus_validations: security.consensus_validations.load(Relaxed),
+        state_validations: security.state_validations.load(Relaxed),
         security_validations_total: security.validations_total.load(Relaxed),
         security_validations_failed: security.validations_failed.load(Relaxed),
         byzantine_detections: security.byzantine_detections.load(Relaxed),
@@ -288,30 +288,30 @@ pub async fn handle_dns_resolve(
 }
 
 // ---------------------------------------------------------------------------
-// Consensus and authentication handlers
+// State proof and authentication handlers
 // ---------------------------------------------------------------------------
 
 /// Request to validate a submitted proof.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusValidateRequest {
-    pub proof: ConsensusProof,
+pub struct StateProofValidateRequest {
+    pub proof: StateProof,
 }
 
-/// Consensus validation response.
+/// State proof validation response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusValidateResponse {
+pub struct StateProofValidateResponse {
     pub valid: bool,
     pub space_valid: bool,
     pub stake_valid: bool,
     pub work_valid: bool,
     pub time_valid: bool,
-    pub confidence: f64,
+    pub proofs_passed: u32,
     pub errors: Vec<String>,
 }
 
-/// Consensus status response.
+/// State proof status response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConsensusStatusResponse {
+pub struct StateProofStatusResponse {
     pub active: bool,
     pub proof_types: Vec<String>,
     pub last_validation_time_ms: u64,
@@ -335,16 +335,16 @@ pub struct AuthCertificateResponse {
     pub error: Option<String>,
 }
 
-/// Return current Proof of State consensus status from security monitor metrics.
-pub async fn handle_consensus_status(
+/// Return current Proof of State status from security monitor metrics.
+pub async fn handle_state_proof_status(
     ctx: &HttpHandlerContext,
-) -> TrustChainResult<ConsensusStatusResponse> {
-    info!("Handler: consensus status");
+) -> TrustChainResult<StateProofStatusResponse> {
+    info!("Handler: state proof status");
 
     let metrics = ctx.security_monitor.get_metrics().await;
     use std::sync::atomic::Ordering::Relaxed;
 
-    Ok(ConsensusStatusResponse {
+    Ok(StateProofStatusResponse {
         active: true,
         proof_types: vec![
             "PoSpace".to_string(),
@@ -353,24 +353,24 @@ pub async fn handle_consensus_status(
             "PoTime".to_string(),
         ],
         last_validation_time_ms: metrics.average_validation_time_ms.load(Relaxed),
-        total_validations: metrics.consensus_validations.load(Relaxed),
+        total_validations: metrics.state_validations.load(Relaxed),
     })
 }
 
-/// Validate a submitted consensus proof against the four-proof system.
-pub async fn handle_consensus_validate(
+/// Validate a submitted state proof against the four-proof system.
+pub async fn handle_state_proof_validate(
     ctx: &HttpHandlerContext,
-    req: ConsensusValidateRequest,
-) -> TrustChainResult<ConsensusValidateResponse> {
-    info!("Handler: validate consensus proof");
+    req: StateProofValidateRequest,
+) -> TrustChainResult<StateProofValidateResponse> {
+    info!("Handler: validate state proof");
 
-    // Validate the proof using the real consensus validation pipeline
-    let validation = crate::consensus::validation::ProofValidation::validate_proof(&req.proof);
+    // Validate the proof using the real state proof validation pipeline
+    let validation = crate::proof_of_state::validation::ProofValidation::validate_proof(&req.proof);
 
     // Record the validation in security metrics
     let metrics = ctx.security_monitor.get_metrics().await;
     metrics
-        .consensus_validations
+        .state_validations
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     if !validation.all_valid {
@@ -385,13 +385,13 @@ pub async fn handle_consensus_validate(
         .map(|e| format!("{:?}: {}", e.proof_type, e.error_message))
         .collect();
 
-    Ok(ConsensusValidateResponse {
+    Ok(StateProofValidateResponse {
         valid: validation.all_valid,
         space_valid: validation.space_valid,
         stake_valid: validation.stake_valid,
         work_valid: validation.work_valid,
         time_valid: validation.time_valid,
-        confidence: validation.confidence_score,
+        proofs_passed: validation.proofs_passed(),
         errors,
     })
 }
@@ -661,7 +661,7 @@ mod tests {
     fn test_metrics_response_serialization() {
         let resp = MetricsResponse {
             certificates_issued: 100,
-            consensus_validations: 50,
+            state_validations: 50,
             security_validations_total: 200,
             security_validations_failed: 3,
             byzantine_detections: 1,
@@ -709,7 +709,7 @@ mod tests {
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now(),
             issuer_ca_id: "ca-01".to_string(),
-            consensus_proof: ConsensusProof::default(),
+            state_proof: StateProof::default(),
             status: CertificateStatus::Valid,
             metadata: Default::default(),
         };
@@ -721,27 +721,27 @@ mod tests {
     }
 
     #[test]
-    fn test_consensus_validate_request_serialization() {
-        let req = ConsensusValidateRequest {
-            proof: ConsensusProof::default(),
+    fn test_state_proof_validate_request_serialization() {
+        let req = StateProofValidateRequest {
+            proof: StateProof::default(),
         };
-        let json = serde_json::to_vec(&req).expect("test: serialize consensus validate request");
-        let decoded: ConsensusValidateRequest =
-            serde_json::from_slice(&json).expect("test: deserialize consensus validate request");
+        let json = serde_json::to_vec(&req).expect("test: serialize state proof validate request");
+        let decoded: StateProofValidateRequest =
+            serde_json::from_slice(&json).expect("test: deserialize state proof validate request");
         // Default StakeProof uses stake_amount = 1000
         assert_eq!(decoded.proof.stake_proof.stake_amount, 1000);
     }
 
     #[test]
-    fn test_consensus_status_response_serialization() {
-        let resp = ConsensusStatusResponse {
+    fn test_state_proof_status_response_serialization() {
+        let resp = StateProofStatusResponse {
             active: true,
             proof_types: vec!["PoSpace".to_string()],
             last_validation_time_ms: 12,
             total_validations: 100,
         };
         let json = serde_json::to_vec(&resp).expect("test: serialize");
-        let decoded: ConsensusStatusResponse =
+        let decoded: StateProofStatusResponse =
             serde_json::from_slice(&json).expect("test: deserialize");
         assert!(decoded.active);
         assert_eq!(decoded.total_validations, 100);
@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_consensus_status() {
+    async fn test_handle_state_proof_status() {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
@@ -785,15 +785,15 @@ mod tests {
             start_time: std::time::Instant::now(),
         };
 
-        let result = handle_consensus_status(&ctx)
+        let result = handle_state_proof_status(&ctx)
             .await
-            .expect("test: consensus status should succeed");
+            .expect("test: state proof status should succeed");
         assert!(result.active);
         assert_eq!(result.proof_types.len(), 4);
     }
 
     #[tokio::test]
-    async fn test_handle_consensus_validate_default_proof() {
+    async fn test_handle_state_proof_validate_default_proof() {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
@@ -814,19 +814,19 @@ mod tests {
             start_time: std::time::Instant::now(),
         };
 
-        let req = ConsensusValidateRequest {
-            proof: ConsensusProof::default(),
+        let req = StateProofValidateRequest {
+            proof: StateProof::default(),
         };
 
-        let result = handle_consensus_validate(&ctx, req)
+        let result = handle_state_proof_validate(&ctx, req)
             .await
             .expect("test: validate should succeed");
         // Default proof has non-zero values (stake=1000, storage=1GB, compute=1000, offset=0s)
         // so it passes validation
         assert!(result.valid, "default proof should pass validation");
-        assert!(
-            (result.confidence - 1.0).abs() < f64::EPSILON,
-            "confidence should be 1.0 for fully valid proof"
+        assert_eq!(
+            result.proofs_passed, 4,
+            "all four proofs should pass for valid proof"
         );
     }
 
@@ -842,7 +842,7 @@ mod tests {
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now(),
             issuer_ca_id: "ca-01".to_string(),
-            consensus_proof: ConsensusProof::default(),
+            state_proof: StateProof::default(),
             status: CertificateStatus::Revoked {
                 reason: "key_compromise".to_string(),
                 revoked_at: SystemTime::now(),
@@ -907,7 +907,7 @@ mod tests {
             issued_at: SystemTime::now(),
             expires_at: SystemTime::now(),
             issuer_ca_id: "ca-01".to_string(),
-            consensus_proof: ConsensusProof::default(),
+            state_proof: StateProof::default(),
             status: CertificateStatus::Valid,
             metadata: Default::default(),
         };

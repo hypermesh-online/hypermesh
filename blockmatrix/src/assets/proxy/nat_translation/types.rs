@@ -89,8 +89,8 @@ pub struct PrivacyConfig {
     pub allowed_peers: Vec<String>,
     /// Maximum concurrent access
     pub max_concurrent_access: u32,
-    /// Require consensus validation
-    pub require_consensus: bool,
+    /// Require state proof validation
+    pub require_state_proof: bool,
 }
 
 /// Translation state tracking

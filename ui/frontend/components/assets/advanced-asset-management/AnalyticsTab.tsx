@@ -79,7 +79,7 @@ function OptimizationRecommendations() {
             <Shield className="h-4 w-4 text-blue-400" />
             <span className="text-blue-400 font-medium text-sm">Security Status</span>
           </div>
-          <p className="text-gray-300 text-sm">All assets have valid consensus proofs. Security posture is good.</p>
+          <p className="text-gray-300 text-sm">All assets have valid state proofs. Security posture is good.</p>
         </div>
       </div>
     </div>

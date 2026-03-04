@@ -155,7 +155,7 @@ pub struct ParameterConstraints {
 /// Security requirements and configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetSecurity {
-    pub consensus_required: bool,
+    pub state_proof_required: bool,
     pub certificate_pinning: bool,
     pub hash_validation: String,
     pub sandbox_level: String,
@@ -205,7 +205,7 @@ pub struct HardwareRequirement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetExecution {
     pub delegation_strategy: String,
-    pub minimum_consensus: u32,
+    pub minimum_state_proof: u32,
     pub retry_policy: String,
     pub max_concurrent: Option<u32>,
     pub priority: String,

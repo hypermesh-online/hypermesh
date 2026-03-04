@@ -4,7 +4,7 @@
 
 //! Security Monitoring Dashboard
 //!
-//! Real-time security monitoring with consensus validation integration
+//! Real-time security monitoring with state proof validation integration
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::SecuritySeverity;
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 
 /// Real-time security monitoring dashboard
@@ -32,12 +32,12 @@ pub struct SecurityMonitoringDashboard {
 pub struct SecurityDashboardData {
     /// Real-time security status
     pub security_status: SecurityStatus,
-    /// Live certificate operations requiring consensus
+    /// Live certificate operations requiring state proof validation
     pub live_certificate_operations: Vec<LiveCertificateOperation>,
     /// Active security alerts
     pub active_alerts: Vec<ActiveSecurityAlert>,
-    /// Consensus validation metrics
-    pub consensus_metrics: LiveConsensusMetrics,
+    /// State proof validation metrics
+    pub state_proof_metrics: LiveStateProofMetrics,
     /// Byzantine detection results
     pub byzantine_metrics: ByzantineMetrics,
     /// Performance metrics
@@ -52,7 +52,7 @@ impl Default for SecurityDashboardData {
             security_status: SecurityStatus::default(),
             live_certificate_operations: Vec::new(),
             active_alerts: Vec::new(),
-            consensus_metrics: LiveConsensusMetrics::default(),
+            state_proof_metrics: LiveStateProofMetrics::default(),
             byzantine_metrics: ByzantineMetrics::default(),
             performance_metrics: SecurityPerformanceMetrics::default(),
             last_update: SystemTime::now(),
@@ -82,7 +82,7 @@ impl Default for SecurityStatus {
     }
 }
 
-/// Live certificate operation with consensus validation
+/// Live certificate operation with state proof validation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LiveCertificateOperation {
     /// Operation ID
@@ -93,19 +93,19 @@ pub struct LiveCertificateOperation {
     pub common_name: String,
     /// Node ID requesting operation
     pub node_id: String,
-    /// Consensus proof provided
-    pub consensus_proof: ConsensusProof,
-    /// Consensus validation status
-    pub consensus_status: ConsensusValidationStatus,
+    /// State proof provided
+    pub state_proof: StateProof,
+    /// State proof validation status
+    pub state_proof_status: StateProofValidationStatus,
     /// Operation start time
     pub started_at: SystemTime,
     /// Operation current state
     pub state: OperationState,
 }
 
-/// Consensus validation status for dashboard
+/// State proof validation status for dashboard
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum ConsensusValidationStatus {
+pub enum StateProofValidationStatus {
     Pending,
     Validating,
     Approved { validation_time_ms: u64 },
@@ -117,7 +117,7 @@ pub enum ConsensusValidationStatus {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum OperationState {
     Created,
-    ConsensusValidation,
+    StateProofValidation,
     ByzantineDetection,
     CertificateGeneration,
     CTLogging,
@@ -142,8 +142,8 @@ pub struct ActiveSecurityAlert {
     pub operation_id: Option<String>,
     /// Alert status
     pub status: AlertStatus,
-    /// Consensus proof related to alert
-    pub consensus_proof: Option<ConsensusProof>,
+    /// State proof related to alert
+    pub state_proof: Option<StateProof>,
 }
 
 /// Alert status
@@ -155,10 +155,10 @@ pub enum AlertStatus {
     Escalated,
 }
 
-/// Live consensus metrics
+/// Live state proof metrics
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct LiveConsensusMetrics {
-    /// Total consensus validations in progress
+pub struct LiveStateProofMetrics {
+    /// Total state proof validations in progress
     pub validations_in_progress: u64,
     /// Recent validation rate (validations per second)
     pub validation_rate: f64,
@@ -192,8 +192,8 @@ pub struct ByzantineMetrics {
     pub detection_rate: f64,
     /// Suspected malicious nodes
     pub suspected_nodes: Vec<String>,
-    /// Byzantine confidence scores
-    pub confidence_scores: HashMap<String, f64>,
+    /// Per-node failed verification counts
+    pub failed_verification_counts: HashMap<String, u32>,
 }
 
 /// Security performance metrics
@@ -314,7 +314,7 @@ impl SecurityMonitoringDashboard {
         &self,
         operation_id: String,
         state: OperationState,
-        consensus_status: Option<ConsensusValidationStatus>,
+        state_proof_status: Option<StateProofValidationStatus>,
     ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
 
@@ -325,8 +325,8 @@ impl SecurityMonitoringDashboard {
             .find(|op| op.operation_id == operation_id)
         {
             operation.state = state;
-            if let Some(status) = consensus_status {
-                operation.consensus_status = status;
+            if let Some(status) = state_proof_status {
+                operation.state_proof_status = status;
             }
         }
 
@@ -395,16 +395,16 @@ impl SecurityMonitoringDashboard {
         Ok(())
     }
 
-    /// Update consensus metrics
-    pub async fn update_consensus_metrics(
+    /// Update state proof metrics
+    pub async fn update_state_proof_metrics(
         &self,
-        metrics_update: LiveConsensusMetrics,
+        metrics_update: LiveStateProofMetrics,
     ) -> TrustChainResult<()> {
         let mut metrics = self.metrics.write().await;
-        metrics.consensus_metrics = metrics_update;
+        metrics.state_proof_metrics = metrics_update;
         metrics.last_update = SystemTime::now();
 
-        debug!("Consensus metrics updated");
+        debug!("State proof metrics updated");
         Ok(())
     }
 
@@ -509,7 +509,7 @@ impl SecurityMonitoringDashboard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::consensus::ConsensusProof;
+    use crate::proof_of_state::StateProof;
 
     #[tokio::test]
     async fn test_dashboard_creation() {
@@ -550,8 +550,8 @@ mod tests {
             operation_type: "issue_certificate".to_string(),
             common_name: "test.example.com".to_string(),
             node_id: "test_node_001".to_string(),
-            consensus_proof: ConsensusProof::default_for_testing(),
-            consensus_status: ConsensusValidationStatus::Pending,
+            state_proof: StateProof::default_for_testing(),
+            state_proof_status: StateProofValidationStatus::Pending,
             started_at: SystemTime::now(),
             state: OperationState::Created,
         };
@@ -577,12 +577,12 @@ mod tests {
         let alert = ActiveSecurityAlert {
             alert_id: "alert_001".to_string(),
             severity: SecuritySeverity::Critical,
-            title: "Consensus Validation Failed".to_string(),
-            description: "Critical consensus validation failure detected".to_string(),
+            title: "State Proof Validation Failed".to_string(),
+            description: "Critical state proof validation failure detected".to_string(),
             timestamp: SystemTime::now(),
             operation_id: Some("test_op_001".to_string()),
             status: AlertStatus::Active,
-            consensus_proof: None,
+            state_proof: None,
         };
 
         dashboard.add_security_alert(alert).await.expect("test: async operation");

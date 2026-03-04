@@ -40,7 +40,7 @@ export function ThreatsTab({ byzantineDetections }: ThreatsTabProps) {
                     Status: {detection.status}
                   </div>
                   <div className="text-xs text-gray-500 mt-1">
-                    Evidence: {detection.evidence?.invalidOperations?.join(', ') || 'Consensus deviation, invalid proofs'} -
+                    Evidence: {detection.evidence?.invalidOperations?.join(', ') || 'Verification deviation, invalid proofs'} -
                     Action: {detection.mitigation?.actions?.join(', ') || 'Node quarantined, peers notified'}
                   </div>
                 </div>
@@ -56,7 +56,7 @@ export function ThreatsTab({ byzantineDetections }: ThreatsTabProps) {
             <h3 className="text-lg font-medium text-white mb-2">Network Secure</h3>
             <p className="text-gray-400">No Byzantine threats detected. All nodes are behaving correctly.</p>
             <div className="mt-4 grid gap-2 text-sm text-green-400">
-              <div>Consensus validation operating normally</div>
+              <div>State proof validation operating normally</div>
               <div>All proof submissions are valid</div>
               <div>No malicious behavior patterns detected</div>
             </div>

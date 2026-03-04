@@ -19,6 +19,8 @@ use super::genesis_auth::{GenesisAuthManager, GenesisCredentials};
 use super::validation::ChainValidator;
 use crate::assets::core::AssetRegistration;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::proof_of_state::validation_service::{StateProofValidationService, ValidationService};
+use crate::proof_of_state::{StateProof, StateRequirements};
 
 /// Statistics about a node's blockchain
 #[derive(Debug, Clone, Default)]
@@ -52,8 +54,11 @@ pub struct NodeBlockchain {
     /// Current chain head (latest block)
     head: Arc<RwLock<Option<Block>>>,
 
-    /// Chain validator
+    /// Chain validator (structural: hash linkage, timestamp, size)
     validator: ChainValidator,
+
+    /// State proof validation service (four-proof: WHO/WHEN/WHERE/WHAT)
+    state_proof_validator: Arc<ValidationService>,
 
     /// Chain statistics
     stats: Arc<RwLock<ChainStats>>,
@@ -91,9 +96,23 @@ impl NodeBlockchain {
             hash_index: Arc::new(RwLock::new(hash_index)),
             head: Arc::new(RwLock::new(Some(genesis))),
             validator: ChainValidator::new(),
+            state_proof_validator: Arc::new(ValidationService::new()),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Create a new blockchain with custom state proof requirements.
+    ///
+    /// Use `StateRequirements::production()` for production deployments,
+    /// `StateRequirements::default()` for development/testing.
+    pub fn with_requirements(
+        node_coordinate: MatrixCoordinate,
+        requirements: StateRequirements,
+    ) -> Self {
+        let mut chain = Self::new(node_coordinate);
+        chain.state_proof_validator = Arc::new(ValidationService::with_requirements(requirements));
+        chain
     }
 
     /// Reconstruct a blockchain from persisted blocks.
@@ -171,6 +190,7 @@ impl NodeBlockchain {
             hash_index: Arc::new(RwLock::new(hash_index)),
             head: Arc::new(RwLock::new(head)),
             validator: ChainValidator::new(),
+            state_proof_validator: Arc::new(ValidationService::new()),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
         })
@@ -181,37 +201,56 @@ impl NodeBlockchain {
         &self.node_coordinate
     }
 
-    /// Add a new block to this node's chain
-    pub async fn add_block(&self, assets: Vec<AssetRegistration>) -> Result<Block, String> {
+    /// Add a new block to this node's chain.
+    ///
+    /// Requires a valid `StateProof` — all four proofs (PoSpace, PoStake,
+    /// PoWork, PoTime) must pass binary validation.  The proof's BLAKE3 hash
+    /// is anchored in the block header.
+    pub async fn add_block(
+        &self,
+        assets: Vec<AssetRegistration>,
+        state_proof: &StateProof,
+    ) -> Result<Block, String> {
+        // 1. Validate state proof (binary: pass or fail)
+        self.state_proof_validator
+            .validate(state_proof)
+            .map_err(|e| format!("State proof validation failed: {e}"))?;
+
         let head = self.head.read().await;
         let previous = head
             .as_ref()
             .ok_or_else(|| "No head block found".to_string())?;
 
         let new_index = previous.index + 1;
-        let new_block = Block::new(
+        let mut new_block = Block::new(
             new_index,
             assets,
             previous.hash.clone(),
             self.node_coordinate,
         );
 
+        // 2. Anchor proof hash in block header
+        let proof_hash = state_proof
+            .hash()
+            .map_err(|e| format!("Failed to hash state proof: {e}"))?;
+        new_block.set_state_proof_hash(proof_hash);
+
         let previous_clone = previous.clone();
         drop(head); // Release read lock
 
-        // Validate the new block
+        // 3. Validate block structure (hash linkage, timestamp, size)
         if !self
             .validator
             .validate_block(&new_block, Some(&previous_clone))
         {
-            return Err("Block validation failed".to_string());
+            return Err("Block structural validation failed".to_string());
         }
 
-        // Add block to chain
+        // 4. Insert validated block
         self.insert_block(new_block.clone()).await?;
 
         info!(
-            "Added block #{} to node ({},{},{}) chain",
+            "Added block #{} to node ({},{},{}) chain [state proof anchored]",
             new_index, self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z
         );
 
@@ -219,8 +258,12 @@ impl NodeBlockchain {
     }
 
     /// Helper: Create asset from data and add block (temporary compatibility method)
-    /// TODO: Remove this once all callers properly create Assets
-    pub async fn add_block_with_data(&self, data: Vec<u8>) -> Result<Block, String> {
+    /// TODO: Remove this once all callers properly create Assets with correct categories
+    pub async fn add_block_with_data(
+        &self,
+        data: Vec<u8>,
+        state_proof: &StateProof,
+    ) -> Result<Block, String> {
         use crate::assets::core::asset_id::{
             AssetCategory, AssetData, BaseSystemType, NetworkScope,
         };
@@ -238,7 +281,7 @@ impl NodeBlockchain {
             AssetCategory::BaseSystem(BaseSystemType::Container),
         );
 
-        self.add_block(vec![asset_id]).await
+        self.add_block(vec![asset_id], state_proof).await
     }
 
     /// Insert a block into the chain (internal helper)
@@ -408,7 +451,13 @@ impl NodeBlockchain {
         &self,
         assets: Vec<AssetRegistration>,
         shard_placement_data: &[u8],
+        state_proof: &StateProof,
     ) -> Result<Block, String> {
+        // 1. Validate state proof (binary: pass or fail)
+        self.state_proof_validator
+            .validate(state_proof)
+            .map_err(|e| format!("State proof validation failed: {e}"))?;
+
         let head = self.head.read().await;
         let previous = head
             .as_ref()
@@ -422,24 +471,31 @@ impl NodeBlockchain {
             self.node_coordinate,
         );
 
-        // Compute shard commitment and set it (recalculates block hash)
+        // 2. Anchor proof hash in block header
+        let proof_hash = state_proof
+            .hash()
+            .map_err(|e| format!("Failed to hash state proof: {e}"))?;
+        new_block.set_state_proof_hash(proof_hash);
+
+        // 3. Compute shard commitment and set it (recalculates block hash)
         let commitment = hypermesh_lib::protocol::ShardCommitment::compute(shard_placement_data);
         new_block.set_shard_commitment(*commitment.as_bytes());
 
         let previous_clone = previous.clone();
         drop(head);
 
+        // 4. Validate block structure
         if !self
             .validator
             .validate_block(&new_block, Some(&previous_clone))
         {
-            return Err("Block validation failed".to_string());
+            return Err("Block structural validation failed".to_string());
         }
 
         self.insert_block(new_block.clone()).await?;
 
         info!(
-            "Added block #{} with shard commitment to node ({},{},{}) chain",
+            "Added block #{} with shard commitment to node ({},{},{}) chain [state proof anchored]",
             new_index,
             self.node_coordinate.x,
             self.node_coordinate.y,
@@ -457,12 +513,13 @@ impl NodeBlockchain {
     pub async fn register_asset_record(
         &self,
         registration: AssetRegistration,
+        state_proof: &StateProof,
     ) -> Result<Block, String> {
         info!(
             "Registering asset on blockchain at ({},{},{})",
             self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z,
         );
-        self.add_block(vec![registration]).await
+        self.add_block(vec![registration], state_proof).await
     }
 
     /// Register multiple asset records in a single block.
@@ -471,6 +528,7 @@ impl NodeBlockchain {
     pub async fn register_asset_records(
         &self,
         registrations: Vec<AssetRegistration>,
+        state_proof: &StateProof,
     ) -> Result<Block, String> {
         if registrations.is_empty() {
             return Err("cannot register empty asset list".to_string());
@@ -482,7 +540,7 @@ impl NodeBlockchain {
             self.node_coordinate.y,
             self.node_coordinate.z,
         );
-        self.add_block(registrations).await
+        self.add_block(registrations, state_proof).await
     }
 
     // === MFA Genesis Authentication Methods ===
@@ -603,6 +661,11 @@ mod tests {
     use super::*;
     use tokio;
 
+    /// Helper: create a valid test proof for block creation
+    fn test_proof() -> StateProof {
+        StateProof::new_for_testing()
+    }
+
     #[tokio::test]
     async fn test_blockchain_creation() {
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
@@ -620,18 +683,20 @@ mod tests {
     async fn test_add_blocks() {
         let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add first block
         let block1 = chain
-            .add_block_with_data(b"First block".to_vec())
+            .add_block_with_data(b"First block".to_vec(), &proof)
             .await
             .expect("test: expected success");
         assert_eq!(block1.index, 1);
         assert_eq!(chain.get_height().await, 1);
+        assert!(block1.state_proof_hash.is_some(), "block must have state proof hash");
 
         // Add second block
         let block2 = chain
-            .add_block_with_data(b"Second block".to_vec())
+            .add_block_with_data(b"Second block".to_vec(), &proof)
             .await
             .expect("test: expected success");
         assert_eq!(block2.index, 2);
@@ -646,9 +711,10 @@ mod tests {
     async fn test_block_retrieval() {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let block = chain
-            .add_block_with_data(b"Test data".to_vec())
+            .add_block_with_data(b"Test data".to_vec(), &proof)
             .await
             .expect("test: expected success");
 
@@ -669,12 +735,13 @@ mod tests {
     async fn test_chain_statistics() {
         let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add some blocks
         for i in 0..5 {
             let data = format!("Block {i}");
             chain
-                .add_block_with_data(data.as_bytes().to_vec())
+                .add_block_with_data(data.as_bytes().to_vec(), &proof)
                 .await
                 .expect("test: expected success");
         }
@@ -690,10 +757,11 @@ mod tests {
     async fn test_get_chain() {
         let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add blocks
         for i in 0..3 {
-            chain.add_block_with_data(vec![i as u8; 10]).await.expect("test: block addition");
+            chain.add_block_with_data(vec![i as u8; 10], &proof).await.expect("test: block addition");
         }
 
         let full_chain = chain.get_chain().await;
@@ -709,10 +777,11 @@ mod tests {
     async fn test_recent_blocks() {
         let coord = MatrixCoordinate::new(3, 3, 3).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add 10 blocks
         for i in 0..10 {
-            chain.add_block_with_data(vec![i as u8]).await.expect("test: block addition");
+            chain.add_block_with_data(vec![i as u8], &proof).await.expect("test: block addition");
         }
 
         // Get last 5 blocks
@@ -726,13 +795,14 @@ mod tests {
     async fn test_blocks_in_time_range() {
         let coord = MatrixCoordinate::new(4, 4, 4).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let start_time = Utc::now();
 
         // Add blocks with small delays
         for i in 0..3 {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            chain.add_block_with_data(vec![i]).await.expect("test: block addition");
+            chain.add_block_with_data(vec![i], &proof).await.expect("test: block addition");
         }
 
         let end_time = Utc::now();
@@ -746,16 +816,56 @@ mod tests {
     async fn test_chain_validation() {
         let coord = MatrixCoordinate::new(6, 6, 6).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add valid blocks
         for i in 0..5 {
-            chain.add_block_with_data(vec![i]).await.expect("test: block addition");
+            chain.add_block_with_data(vec![i], &proof).await.expect("test: block addition");
         }
 
         // Chain should be valid
         assert!(chain.validate_chain().await);
+    }
 
-        // TODO: Test invalid chain scenarios (would need to manipulate internals)
+    #[tokio::test]
+    async fn test_invalid_proof_rejected() {
+        let coord = MatrixCoordinate::new(13, 13, 13).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Create an invalid proof (zero stake = fails validation)
+        let mut bad_proof = StateProof::new_for_testing();
+        bad_proof.stake_proof.stake_amount = 0;
+
+        let result = chain
+            .add_block_with_data(b"should fail".to_vec(), &bad_proof)
+            .await;
+        assert!(result.is_err(), "Invalid state proof must be rejected");
+        assert!(
+            result.unwrap_err().contains("State proof validation failed"),
+            "Error should mention state proof"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_state_proof_hash_anchored_in_block() {
+        let coord = MatrixCoordinate::new(14, 14, 14).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
+
+        let block = chain
+            .add_block_with_data(b"proof anchored".to_vec(), &proof)
+            .await
+            .expect("test: expected success");
+
+        // Block must have state proof hash
+        assert!(block.state_proof_hash.is_some());
+
+        // Hash must match the proof's BLAKE3 digest
+        let expected_hash = proof.hash().expect("test: proof hash");
+        assert_eq!(block.state_proof_hash.expect("test: present"), expected_hash);
+
+        // Block hash must still be valid (includes proof hash)
+        assert!(block.verify_hash());
     }
 
     // === Item 4.2: Asset registration tests ===
@@ -764,16 +874,18 @@ mod tests {
     async fn test_register_asset_record() {
         let coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let asset = AssetRegistration::genesis(coord);
         let block = chain
-            .register_asset_record(asset.clone())
+            .register_asset_record(asset.clone(), &proof)
             .await
             .expect("test: registration");
 
         assert_eq!(block.index, 1);
         assert_eq!(block.assets.len(), 1);
         assert_eq!(block.assets[0], asset);
+        assert!(block.state_proof_hash.is_some());
         assert!(chain.validate_chain().await);
     }
 
@@ -781,6 +893,7 @@ mod tests {
     async fn test_register_multiple_asset_records() {
         let coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let assets = vec![
             AssetRegistration::genesis(coord),
@@ -789,7 +902,7 @@ mod tests {
             ),
         ];
         let block = chain
-            .register_asset_records(assets.clone())
+            .register_asset_records(assets.clone(), &proof)
             .await
             .expect("test: batch registration");
 
@@ -802,8 +915,9 @@ mod tests {
     async fn test_register_empty_assets_fails() {
         let coord = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
-        let result = chain.register_asset_records(vec![]).await;
+        let result = chain.register_asset_records(vec![], &proof).await;
         assert!(result.is_err());
     }
 
@@ -813,18 +927,23 @@ mod tests {
     async fn test_add_block_with_shard_commitment() {
         let coord = MatrixCoordinate::new(11, 11, 11).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let asset = AssetRegistration::genesis(coord);
         let placement_data = b"shard0:node-a,shard1:node-b";
 
         let block = chain
-            .add_block_with_shard_commitment(vec![asset], placement_data)
+            .add_block_with_shard_commitment(vec![asset], placement_data, &proof)
             .await
             .expect("test: block with commitment");
 
         assert!(
             block.shard_commitment.is_some(),
             "block must have shard commitment"
+        );
+        assert!(
+            block.state_proof_hash.is_some(),
+            "block must have state proof hash"
         );
 
         // Verify the commitment matches BLAKE3 of the placement data
@@ -842,19 +961,20 @@ mod tests {
     async fn test_shard_commitment_changes_block_hash() {
         let coord = MatrixCoordinate::new(12, 12, 12).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         let asset = AssetRegistration::genesis(coord);
 
         // Block without commitment
         let block_a = chain
-            .add_block(vec![asset.clone()])
+            .add_block(vec![asset.clone()], &proof)
             .await
             .expect("test: block without commitment");
 
         // Block with commitment (different chain to avoid index collision)
         let chain2 = NodeBlockchain::new(coord);
         let block_b = chain2
-            .add_block_with_shard_commitment(vec![asset], b"test data")
+            .add_block_with_shard_commitment(vec![asset], b"test data", &proof)
             .await
             .expect("test: block with commitment");
 
@@ -868,10 +988,11 @@ mod tests {
     async fn test_total_size() {
         let coord = MatrixCoordinate::new(7, 7, 7).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
+        let proof = test_proof();
 
         // Add blocks with known sizes
-        chain.add_block_with_data(vec![0u8; 100]).await.expect("test: block addition");
-        chain.add_block_with_data(vec![0u8; 200]).await.expect("test: block addition");
+        chain.add_block_with_data(vec![0u8; 100], &proof).await.expect("test: block addition");
+        chain.add_block_with_data(vec![0u8; 200], &proof).await.expect("test: block addition");
 
         let total_size = chain.get_total_size().await;
         assert!(total_size >= 300); // At least the data we added

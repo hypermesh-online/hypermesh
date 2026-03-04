@@ -117,8 +117,8 @@ pub struct RequiredChecks {
     pub vulnerability_scan: bool,
     /// Require publisher authentication check
     pub publisher_auth_check: bool,
-    /// Require consensus validation
-    pub consensus_validation: bool,
+    /// Require state proof validation
+    pub state_validation: bool,
     /// Require post-quantum signatures
     pub pqc_signatures: bool,
 }
@@ -132,7 +132,7 @@ impl Default for RequiredChecks {
             revocation_check: true,
             vulnerability_scan: true,
             publisher_auth_check: true,
-            consensus_validation: false,
+            state_validation: false,
             pqc_signatures: false,
         }
     }
@@ -192,7 +192,7 @@ impl PolicyEngine {
                     revocation_check: true,
                     vulnerability_scan: true,
                     publisher_auth_check: true,
-                    consensus_validation: true,
+                    state_validation: true,
                     pqc_signatures: true,
                 },
                 allowed_publisher_types: vec![
@@ -245,7 +245,7 @@ impl PolicyEngine {
                     revocation_check: false,
                     vulnerability_scan: true,
                     publisher_auth_check: false,
-                    consensus_validation: false,
+                    state_validation: false,
                     pqc_signatures: false,
                 },
                 allowed_publisher_types: vec![

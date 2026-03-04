@@ -253,7 +253,7 @@ Catalog provides the asset management foundation for HyperMesh:
 
 - **Asset Operations**: 1.69ms average (4,166x faster than 1s target)
 - **Julia VM Execution**: Secure sandboxed environments
-- **Consensus Integration**: PoW/PoS validation operational
+- **Proof of State Integration**: PoS four-proof validation operational
 
 ## Quick Start
 
@@ -272,7 +272,7 @@ cargo bench
 
 - **Asset Creation**: Create and manage digital assets
 - **Secure Execution**: JuliaVM for safe code execution
-- **Consensus Proof**: Blockchain-grade asset validation
+- **Proof of State**: Blockchain-grade asset validation
 - **Cross-Node Assets**: Assets transfer across HyperMesh network
 
 ## Integration
@@ -298,21 +298,21 @@ HyperMesh is a next-generation distributed computing platform providing:
 
 ## Status
 
-✅ **Core Systems Complete** - Asset management and consensus operational
+✅ **Core Systems Complete** - Asset management and Proof of State operational
 ⚠️ **Integration Phase** - Connecting all ecosystem components
 
 ## Performance
 
 - **Asset System**: 500x faster than targets (0.002s operations)
 - **Byzantine Detection**: <1s malicious node detection and isolation
-- **Consensus**: 15s finality (50% better than 30s target)
+- **State Proof Validation**: 15s finality (50% better than 30s target)
 - **Recovery**: Sub-millisecond failure recovery
 
 ## Architecture
 
 ### Core Components
 - **Asset Management**: Universal adapter system for CPU/GPU/Memory/Storage
-- **Consensus System**: PBFT with Byzantine fault tolerance
+- **Proof of State**: Bilateral four-proof authentication (PoSpace/PoStake/PoWork/PoTime)
 - **Remote Proxy**: NAT-like addressing for global resource access
 - **Security**: Quantum-resistant cryptography (FALCON-1024/Kyber)
 
@@ -437,7 +437,7 @@ TrustChain provides the security foundation for the HyperMesh ecosystem:
 - **Certificate Transparency**: Merkle tree proofs and SCT generation
 - **DNS-over-QUIC**: IPv6-only DNS server with certificate validation
 - **API Layer**: REST endpoints for certificate lifecycle management
-- **Consensus Integration**: Proof of State four-proof validation system
+- **Proof of State Integration**: Four-proof bilateral authentication system
 
 ### Security Features
 - **IPv6-Only Networking**: Complete IPv4 elimination
@@ -491,7 +491,7 @@ copy_shared_docs() {
             [[ -f "$BASE_DIR/BOOTSTRAP_ROADMAP.md" ]] && cp "$BASE_DIR/BOOTSTRAP_ROADMAP.md" "$target_dir/"
             ;;
         "stoq"|"hypermesh"|"trustchain")
-            [[ -f "$BASE_DIR/PROOF_OF_STATE_CONSENSUS_INTEGRATION.spec" ]] && cp "$BASE_DIR/PROOF_OF_STATE_CONSENSUS_INTEGRATION.spec" "$target_dir/"
+            [[ -f "$BASE_DIR/PROOF_OF_STATE_INTEGRATION.spec" ]] && cp "$BASE_DIR/PROOF_OF_STATE_INTEGRATION.spec" "$target_dir/"
             ;;
     esac
     

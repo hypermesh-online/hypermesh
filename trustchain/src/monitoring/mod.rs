@@ -207,10 +207,10 @@ impl MonitoringSystem {
         self.metrics.record_ct_log_entry(duration_ms, success).await;
     }
 
-    /// Record consensus validation
-    pub async fn record_consensus_validation(&self, duration_ms: u64, success: bool) {
+    /// Record state proof validation
+    pub async fn record_state_validation(&self, duration_ms: u64, success: bool) {
         self.metrics
-            .record_consensus_validation(duration_ms, success)
+            .record_state_validation(duration_ms, success)
             .await;
     }
 

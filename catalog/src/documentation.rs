@@ -200,7 +200,7 @@ catalog install {{asset.name}}
 ### Security Settings
 
 - **Sandbox Level**: {{security.sandbox_level}}
-- **Consensus Required**: {{security.consensus_required}}
+- **State Proof Required**: {{security.state_proof_required}}
 
 ---
 
@@ -311,7 +311,7 @@ catalog install {{asset.name}}
                 "updated": package.spec.metadata.updated,
             },
             "security": {
-                "consensus_required": package.spec.spec.security.consensus_required,
+                "state_proof_required": package.spec.spec.security.state_proof_required,
                 "sandbox_level": package.spec.spec.security.sandbox_level,
                 "hash_validation": package.spec.spec.security.hash_validation,
                 "network_access": package.spec.spec.security.network_access,
@@ -325,7 +325,7 @@ catalog install {{asset.name}}
             },
             "execution": {
                 "delegation_strategy": package.spec.spec.execution.delegation_strategy,
-                "minimum_consensus": package.spec.spec.execution.minimum_consensus,
+                "minimum_state_proof": package.spec.spec.execution.minimum_state_proof,
                 "retry_policy": package.spec.spec.execution.retry_policy,
                 "priority": package.spec.spec.execution.priority,
             },
@@ -502,7 +502,7 @@ catalog install {{asset.name}}
                 "memory": package.spec.spec.resources.memory_limit,
                 "timeout": package.spec.spec.resources.execution_timeout,
                 "gpu": package.spec.spec.resources.gpu_required,
-                "consensus": package.spec.spec.execution.minimum_consensus,
+                "state_proof": package.spec.spec.execution.minimum_state_proof,
             },
             "security": {
                 "sandbox_level": package.spec.spec.security.sandbox_level,
@@ -657,7 +657,7 @@ mod tests {
                         templates: vec![],
                     },
                     security: AssetSecurity {
-                        consensus_required: false,
+                        state_proof_required: false,
                         certificate_pinning: false,
                         hash_validation: "blake3".to_string(),
                         sandbox_level: "standard".to_string(),
@@ -687,7 +687,7 @@ mod tests {
                     },
                     execution: AssetExecution {
                         delegation_strategy: "nearest_node".to_string(),
-                        minimum_consensus: 1,
+                        minimum_state_proof: 1,
                         retry_policy: "none".to_string(),
                         max_concurrent: None,
                         priority: "normal".to_string(),

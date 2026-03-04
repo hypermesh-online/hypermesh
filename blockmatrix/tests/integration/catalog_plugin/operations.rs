@@ -4,16 +4,16 @@
 
 //! Plugin operation tests
 //!
-//! Tests for library operations, P2P distribution, cross-node sync, consensus integration, and TrustChain verification.
+//! Tests for library operations, P2P distribution, cross-node sync, Proof of State integration, and TrustChain verification.
 //!
 //! NOTE: All tests marked #[ignore] - Requires Catalog extension implementation
 
 use super::*;
 
-/// Test consensus validation integration
+/// Test state proof validation integration
 #[tokio::test]
 #[ignore = "Requires Catalog extension implementation"]
-async fn test_consensus_integration() {
+async fn test_state_proof_integration() {
     init_test_logging();
 
     let loader = create_test_loader();
@@ -23,8 +23,8 @@ async fn test_consensus_integration() {
     let extension_id = loader.load_extension(&extension_path).await.unwrap();
     let extension = loader.get_extension(&extension_id).await.unwrap();
 
-    // Create mock consensus proof
-    let consensus_proof = ConsensusProof {
+    // Create mock state proof
+    let state_proof = StateProof {
         block_height: 12345,
         block_hash: vec![0u8; 32],
         timestamp: SystemTime::now(),
@@ -38,16 +38,16 @@ async fn test_consensus_integration() {
         merkle_root: vec![0u8; 32],
     };
 
-    // Test request with consensus proof
+    // Test request with state proof
     let request = ExtensionRequest {
-        id: "consensus-test".to_string(),
+        id: "state-proof-test".to_string(),
         method: "create_verified_package".to_string(),
         params: json!({
             "name": "verified-package",
             "version": "1.0.0",
             "code": "verified code"
         }),
-        consensus_proof: Some(consensus_proof),
+        state_proof: Some(state_proof),
     };
 
     let response = extension.handle_request(request).await;
@@ -56,7 +56,7 @@ async fn test_consensus_integration() {
     // Cleanup
     loader.unload_extension(&extension_id).await.unwrap();
 
-    info!("Consensus integration test passed");
+    info!("State proof integration test passed");
 }
 
 /// Test asset library operations through HyperMesh
@@ -88,7 +88,7 @@ async fn test_library_operations() {
             "description": "Mathematical functions",
             "tags": ["math", "computation"]
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let lib_response = extension.handle_request(create_lib).await.unwrap();
@@ -107,7 +107,7 @@ async fn test_library_operations() {
                 "code": "function factorial(n) { return n <= 1 ? 1 : n * factorial(n-1); }"
             }
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let pkg_response = extension.handle_request(add_package).await.unwrap();
@@ -120,7 +120,7 @@ async fn test_library_operations() {
         params: json!({
             "library_id": lib_id
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let list_response = extension.handle_request(list_contents).await.unwrap();
@@ -155,7 +155,7 @@ async fn test_p2p_distribution() {
             "address": "192.168.1.100:8080",
             "capabilities": ["storage", "compute"]
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(register_peer).await.unwrap();
@@ -170,7 +170,7 @@ async fn test_p2p_distribution() {
             "target_nodes": ["node-123"],
             "replication_factor": 3
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(distribute).await.unwrap();
@@ -204,7 +204,7 @@ async fn test_trustchain_verification() {
             "certificate": "mock-cert-data",
             "private_key": "mock-key-data"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let sign_response = extension.handle_request(sign_package).await;
@@ -220,7 +220,7 @@ async fn test_trustchain_verification() {
             "signature": "mock-signature",
             "certificate_chain": ["cert1", "cert2"]
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let verify_response = extension.handle_request(verify_package).await;
@@ -260,7 +260,7 @@ async fn test_cross_node_sync() {
             "version": "1.0.0",
             "code": "shared code"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response1 = ext1.handle_request(create_content).await.unwrap();
@@ -276,7 +276,7 @@ async fn test_cross_node_sync() {
             "source_node": "node1",
             "verify": true
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response2 = ext2.handle_request(sync_request).await;

@@ -163,7 +163,7 @@ impl ProofOfStateValidator {
     /// - Non-zero check (all-zero hash is invalid)
     /// - Leading zero bits meet the configured difficulty requirement
     ///
-    /// Actual PoW challenge verification happens in the consensus layer.
+    /// Actual PoW challenge verification happens in the Proof of State layer.
     fn validate_proof_of_work(&self, what: &[u8; 32]) -> Result<()> {
         if what.iter().all(|&b| b == 0) {
             return Err(anyhow!("Proof of Work is zero"));
@@ -190,7 +190,7 @@ impl ProofOfStateValidator {
     ///   - IPv6: first byte matches a valid prefix (global unicast, unique local, etc.)
     ///   - Matrix: 3 x f32 (12 bytes) + 4 padding; coordinates must be finite
     ///
-    /// Deep blockchain verification happens in the consensus layer.
+    /// Deep blockchain verification happens in the Proof of State layer.
     fn validate_proof_of_space(&self, where_: &[u8; 16]) -> Result<()> {
         if where_.iter().all(|&b| b == 0) {
             return Err(anyhow!("Proof of Space is zero"));
@@ -243,11 +243,11 @@ impl ProofOfStateValidator {
         }
     }
 
-    /// Validate complete four-proof consensus (returns error on first failure).
-    pub fn validate_consensus(&self, proof: &ProofOfStateHeader) -> Result<()> {
+    /// Validate complete four-proof state proof (returns error on first failure).
+    pub fn validate_state_proof(&self, proof: &ProofOfStateHeader) -> Result<()> {
         self.validate(proof)?;
         tracing::debug!(
-            "Four-proof consensus validated for timestamp {}",
+            "Four-proof state proof validated for timestamp {}",
             proof.when
         );
         Ok(())

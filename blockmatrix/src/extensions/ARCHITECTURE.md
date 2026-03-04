@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The HyperMesh Extension Interface provides a comprehensive plugin architecture that transforms standalone services like Catalog into dynamically loadable extensions. This architecture maintains HyperMesh's security, consensus, and performance requirements while enabling modular functionality expansion.
+The HyperMesh Extension Interface provides a comprehensive plugin architecture that transforms standalone services like Catalog into dynamically loadable extensions. This architecture maintains HyperMesh's security, Proof of State, and performance requirements while enabling modular functionality expansion.
 
 ## Architecture Overview
 
@@ -20,7 +20,7 @@ The HyperMesh Extension Interface provides a comprehensive plugin architecture t
    - Security sandboxing and capability management
 
 3. **Integration Points**
-   - **Consensus System**: Proof of State four-proof validation (PoSpace + PoStake + PoWork + PoTime)
+   - **Proof of State**: Four-proof bilateral validation (PoSpace + PoStake + PoWork + PoTime)
    - **TrustChain**: Certificate validation and package signing
    - **STOQ Protocol**: P2P distribution of asset packages
    - **Proxy/NAT System**: Remote asset addressing and access
@@ -56,11 +56,11 @@ Configuration → Asset Registration → Manager Extension → API Setup
 
 ### 4. Operation Phase
 ```
-Request → Validation → Consensus Check → Execution → Response
+Request → Validation → State Proof Check → Execution → Response
 ```
 - Handle API requests
 - Validate permissions and quotas
-- Verify consensus proofs
+- Verify state proofs
 - Execute operations
 - Return results
 
@@ -81,7 +81,7 @@ Extensions operate under strict capability constraints:
 - `ContainerManagement`: Deploy and manage containers
 - `VMExecution`: Execute code in VM runtime
 - `NetworkAccess`: Network communication
-- `ConsensusAccess`: Validate consensus proofs
+- `StateProofAccess`: Validate Proof of State
 - `TrustChainAccess`: Certificate operations
 - `TransportAccess`: STOQ protocol usage
 - `ProxyAccess`: NAT-like addressing
@@ -94,8 +94,8 @@ Each extension has enforced limits:
 - Network: Maximum bandwidth (default 100MB/s)
 - Operations: Maximum concurrent (default 100)
 
-### Consensus Requirements
-All critical operations require consensus validation:
+### State Proof Requirements
+All critical operations require state proof validation:
 - **Proof of Space**: Storage commitment verification
 - **Proof of Stake**: Economic stake validation
 - **Proof of Work**: Computational effort proof
@@ -113,7 +113,7 @@ All critical operations require consensus validation:
   "required_capabilities": [
     "AssetManagement",
     "NetworkAccess",
-    "ConsensusAccess",
+    "StateProofAccess",
     "TransportAccess"
   ],
   "provided_assets": [
@@ -139,13 +139,13 @@ All critical operations require consensus validation:
        async fn list_packages(&self, filter: PackageFilter) -> ExtensionResult<Vec<AssetPackage>> {
            // Query package registry
            // Apply filters
-           // Return results with consensus validation
+           // Return results with state proof validation
        }
 
        async fn install_package(&self, package_id: &str, options: InstallOptions) -> ExtensionResult<InstallResult> {
            // Verify package signature
            // Download via STOQ P2P
-           // Install with consensus proof
+           // Install with state proof
            // Register assets with AssetManager
        }
    }
@@ -175,17 +175,17 @@ All critical operations require consensus validation:
    }
    ```
 
-3. **Consensus Integration**
+3. **State Proof Integration**
    ```rust
-   async fn deploy_catalog_asset(&self, spec: DeploymentSpec, proof: ConsensusProof) -> ExtensionResult<DeploymentResult> {
-       // Validate all four proofs
-       self.validate_consensus_proof(&proof)?;
+   async fn deploy_catalog_asset(&self, spec: DeploymentSpec, proof: StateProof) -> ExtensionResult<DeploymentResult> {
+       // Validate all four proofs (bilateral)
+       self.validate_state_proof(&proof)?;
 
        // Check resource allocation
        self.verify_resource_allocation(&spec.resources)?;
 
-       // Deploy with consensus validation
-       let deployment = self.deploy_with_consensus(spec, proof).await?;
+       // Deploy with state proof validation
+       let deployment = self.deploy_with_state_proof(spec, proof).await?;
 
        Ok(deployment)
    }
@@ -195,7 +195,7 @@ All critical operations require consensus validation:
 
 ### STOQ Protocol Integration
 ```
-Package Upload → STOQ Chunking → P2P Distribution → Consensus Validation
+Package Upload → STOQ Chunking → P2P Distribution → state proof validation
 ```
 
 1. **Package Publishing**
@@ -207,13 +207,13 @@ Package Upload → STOQ Chunking → P2P Distribution → Consensus Validation
 2. **Package Discovery**
    - Query P2P network
    - Verify package signatures
-   - Check consensus validation
+   - Check state proof validation
    - Return verified results
 
 3. **Package Installation**
    - Download via STOQ P2P
    - Verify integrity and signatures
-   - Install with consensus proof
+   - Install with state proof
    - Register assets locally
 
 ## Remote Proxy/NAT Integration
@@ -225,7 +225,7 @@ pub struct ProxyAssetAccess {
     local_address: AssetId,
     global_address: ProxyAddress,
     trust_level: TrustLevel,
-    consensus_proof: ConsensusProof,
+    state_proof: StateProof,
 }
 ```
 
@@ -245,7 +245,7 @@ pub struct ProxyAssetAccess {
 ### Benchmarks
 - Extension load time: <100ms
 - Asset operation latency: <10ms
-- Consensus validation: <50ms
+- state proof validation: <50ms
 - P2P package transfer: >100MB/s
 
 ## Migration Path for Catalog
@@ -262,7 +262,7 @@ pub struct ProxyAssetAccess {
 
 ### Phase 3: Integration Testing
 - Test dynamic loading/unloading
-- Verify consensus integration
+- Verify state proof integration
 - Test P2P distribution
 - Validate security constraints
 
@@ -305,7 +305,7 @@ let install_result = catalog
         "julia-scientific-computing",
         InstallOptions {
             verify_signatures: true,
-            consensus_proof: proof,
+            state_proof: proof,
             ..Default::default()
         }
     )

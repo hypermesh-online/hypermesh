@@ -455,7 +455,7 @@ async fn register_validation_rules(
             max_retention_period: Duration::from_secs(86400 * 30), // 30 days
         },
         required_proofs: vec![
-            hypermesh_assets::matrix_blockchain::ProofRequirement::ConsensusProof,
+            hypermesh_assets::matrix_blockchain::ProofRequirement::StateProof,
             hypermesh_assets::matrix_blockchain::ProofRequirement::DigitalSignature,
             hypermesh_assets::matrix_blockchain::ProofRequirement::ZeroKnowledgeProof,
         ],

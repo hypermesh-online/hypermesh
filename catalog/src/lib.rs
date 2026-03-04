@@ -44,8 +44,8 @@ use std::sync::Arc;
 
 // Re-export key types from HyperMesh
 pub use blockmatrix::assets::core::{AssetRegistration, AssetType};
-pub use blockmatrix::consensus::proof_of_state_integration::{
-    ConsensusProof, SpaceProof, StakeProof, TimeProof, WorkProof,
+pub use blockmatrix::proof_of_state::proof_of_state_integration::{
+    StateProof, SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 
 // Canonical asset types from lib -- directly usable now that catalog's
@@ -67,9 +67,9 @@ pub struct ExecutionResult {
     pub output: Option<serde_json::Value>,
 }
 
-// Define ConsensusContext locally (Catalog-specific configuration)
+// Define StateProofContext locally (Catalog-specific configuration)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ConsensusContext {
+pub struct StateProofContext {
     /// Network difficulty for PoW
     pub network_difficulty: u64,
     /// Minimum space commitment for PoS
@@ -108,7 +108,7 @@ pub const CATALOG_VERSION: &str = "0.1.0";
 
 /// Main Catalog instance - HyperMesh Asset Package Manager
 pub struct Catalog {
-    consensus_context: Arc<ConsensusContext>,
+    state_proof_context: Arc<StateProofContext>,
     #[allow(deprecated)] // During migration to CatalogRegistry
     asset_registry: Arc<registry::AssetRegistry>,
     template_generator: Arc<template::CatalogTemplateGenerator>,
@@ -121,8 +121,8 @@ pub struct Catalog {
 /// Catalog configuration for HyperMesh integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogConfig {
-    /// Consensus configuration
-    pub consensus: ConsensusContext,
+    /// State proof configuration
+    pub state_proof: StateProofContext,
     /// Registry configuration
     pub registry: registry::RegistryConfig,
     /// Template configuration
@@ -140,7 +140,7 @@ pub struct CatalogConfig {
 impl Default for CatalogConfig {
     fn default() -> Self {
         Self {
-            consensus: ConsensusContext::default(),
+            state_proof: StateProofContext::default(),
             registry: registry::RegistryConfig::default(),
             template: template::TemplateConfig::default(),
             validation: validation::ValidationConfig::default(),
@@ -154,7 +154,7 @@ impl Default for CatalogConfig {
 impl Catalog {
     /// Create a new Catalog instance with HyperMesh integration
     pub async fn new(config: CatalogConfig) -> Result<Self> {
-        let consensus_context = Arc::new(config.consensus);
+        let state_proof_context = Arc::new(config.state_proof);
 
         // Initialize components
         #[allow(deprecated)] // During migration to CatalogRegistry
@@ -181,7 +181,7 @@ impl Catalog {
         hypermesh_client.connect().await?;
 
         Ok(Self {
-            consensus_context,
+            state_proof_context,
             asset_registry,
             template_generator,
             asset_validator,
@@ -191,9 +191,9 @@ impl Catalog {
         })
     }
 
-    /// Get consensus configuration
-    pub fn consensus_context(&self) -> Arc<ConsensusContext> {
-        Arc::clone(&self.consensus_context)
+    /// Get state proof configuration
+    pub fn state_proof_context(&self) -> Arc<StateProofContext> {
+        Arc::clone(&self.state_proof_context)
     }
 
     /// Get asset registry
@@ -239,15 +239,15 @@ impl Catalog {
             ));
         }
 
-        // Lightweight consensus metadata check: if the package declares consensus_required,
-        // verify that the consensus context is configured. Heavy proof validation happens
+        // Lightweight state proof metadata check: if the package declares state_proof_required,
+        // verify that the state proof context is configured. Heavy proof validation happens
         // in the extension lifecycle (publish_package).
-        if package.spec.spec.security.consensus_required
-            && self.consensus_context.min_stake_amount == 0
-            && self.consensus_context.min_space_commitment == 0
+        if package.spec.spec.security.state_proof_required
+            && self.state_proof_context.min_stake_amount == 0
+            && self.state_proof_context.min_space_commitment == 0
         {
             tracing::warn!(
-                "Package '{}' requires consensus but consensus context has zero thresholds",
+                "Package '{}' requires state proof validation but state proof context has zero thresholds",
                 package.spec.metadata.name,
             );
         }
@@ -306,12 +306,12 @@ impl Catalog {
     ) -> Result<hypermesh_integration::CatalogExecutionContext> {
         // Proof of State enforcement: if the package or context requires validation,
         // log that PoS proofs are enforced at the execution layer.
-        if package.spec.spec.security.consensus_required {
+        if package.spec.spec.security.state_proof_required {
             tracing::info!(
                 "Asset {}: Proof of State validation enforced at execution layer (min_stake={}, min_space={})",
                 asset_id,
-                self.consensus_context.min_stake_amount,
-                self.consensus_context.min_space_commitment,
+                self.state_proof_context.min_stake_amount,
+                self.state_proof_context.min_space_commitment,
             );
         }
 
@@ -362,9 +362,9 @@ impl CatalogBuilder {
         }
     }
 
-    /// Set consensus configuration
-    pub fn with_consensus(mut self, config: ConsensusContext) -> Self {
-        self.config.consensus = config;
+    /// Set state proof configuration
+    pub fn with_state_proof(mut self, config: StateProofContext) -> Self {
+        self.config.state_proof = config;
         self
     }
 

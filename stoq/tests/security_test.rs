@@ -33,7 +33,7 @@ async fn test_real_falcon_cryptography() -> Result<()> {
     let test_messages = vec![
         &b"Critical security message"[..],
         &b"Byzantine fault tolerance test"[..],
-        &b"Consensus proof validation"[..],
+        &b"State proof validation"[..],
         &b"Remote proxy authentication"[..],
     ];
 
@@ -194,11 +194,11 @@ async fn test_byzantine_fault_detection() -> Result<()> {
     byzantine_node.add_trusted_key("honest".to_string(), honest_public.clone());
 
     // Honest node creates valid signature
-    let valid_data = b"Valid consensus data";
+    let valid_data = b"Valid state proof data";
     let valid_signature = honest_node.sign_handshake_data(valid_data)?;
 
     // Byzantine node attempts to forge signature (will fail)
-    let forged_data = b"Forged consensus data";
+    let forged_data = b"Forged state proof data";
     let byzantine_signature = byzantine_node.sign_handshake_data(forged_data)?;
 
     // Try to verify forged signature with wrong data

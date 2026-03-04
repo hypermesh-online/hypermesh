@@ -11,8 +11,8 @@
 pub mod api;
 pub mod ca;
 pub mod config;
-pub mod consensus;
 pub mod crypto; // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
+pub mod proof_of_state;
 pub mod ct;
 pub mod deployment; // NEW: Quality gates and deployment validation
 pub mod dns;
@@ -29,7 +29,7 @@ pub mod validation; // Ephemeral self-signed certs for anonymous QUIC handshakes
 pub use ca::security_integration::{SecurityIntegratedCA, SecurityIntegrationConfig};
 pub use ca::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
 pub use config::{DnsConfig, TrustChainConfig};
-pub use consensus::{ConsensusContext, ConsensusProof, ConsensusRequirements};
+pub use proof_of_state::{StateProof, StateProofContext, StateRequirements};
 pub use crypto::{FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm, PostQuantumCrypto};
 pub use errors::{Result, TrustChainError};
 pub use security::{SecurityDashboard, SecurityMonitor, SecurityValidationResult};
@@ -40,7 +40,7 @@ use tracing::{error, info, warn};
 
 /// Main TrustChain service coordinator with security integration
 pub struct TrustChain {
-    /// Security-integrated Certificate Authority (MANDATORY CONSENSUS)
+    /// Security-integrated Certificate Authority (MANDATORY STATE PROOF)
     security_ca: Arc<SecurityIntegratedCA>,
     /// Certificate Transparency logs
     ct: Arc<ct::CertificateTransparency>,
@@ -62,8 +62,8 @@ pub struct TrustChainSecurityConfig {
     pub base_config: TrustChainConfig,
     /// Security integration configuration
     pub security_config: SecurityIntegrationConfig,
-    /// Enable mandatory consensus for all operations
-    pub mandatory_consensus: bool,
+    /// Enable mandatory state proof for all operations
+    pub mandatory_state_proof: bool,
 }
 
 impl Default for TrustChainSecurityConfig {
@@ -71,7 +71,7 @@ impl Default for TrustChainSecurityConfig {
         Self {
             base_config: TrustChainConfig::localhost_testing(),
             security_config: SecurityIntegrationConfig::default(),
-            mandatory_consensus: true,
+            mandatory_state_proof: true,
         }
     }
 }
@@ -81,11 +81,11 @@ impl TrustChain {
     pub async fn new_with_security(security_config: TrustChainSecurityConfig) -> Result<Self> {
         info!("Initializing TrustChain with MANDATORY SECURITY INTEGRATION");
 
-        if !security_config.mandatory_consensus {
-            warn!("⚠️  CRITICAL SECURITY WARNING: Consensus validation is DISABLED!");
+        if !security_config.mandatory_state_proof {
+            warn!("⚠️  CRITICAL SECURITY WARNING: State proof validation is DISABLED!");
             warn!("⚠️  This reduces security and should only be used for testing!");
         } else {
-            info!("✅ MANDATORY consensus validation ENABLED for all certificate operations");
+            info!("✅ MANDATORY state proof validation ENABLED for all certificate operations");
         }
 
         let config = security_config.base_config;
@@ -126,7 +126,7 @@ impl TrustChain {
 
         // Initialize SECURITY-INTEGRATED Certificate Authority
         let mut security_integration_config = security_config.security_config;
-        security_integration_config.mandatory_consensus = security_config.mandatory_consensus;
+        security_integration_config.mandatory_state_proof = security_config.mandatory_state_proof;
 
         let security_ca = Arc::new(
             SecurityIntegratedCA::new(config.ca.clone(), security_integration_config).await?,
@@ -164,7 +164,7 @@ impl TrustChain {
 
         info!("✅ TrustChain service initialized with MANDATORY SECURITY INTEGRATION");
         info!(
-            "🔐 Security features: Consensus validation, Byzantine detection, Real-time monitoring"
+            "🔐 Security features: State proof validation, Byzantine detection, Real-time monitoring"
         );
         Ok(trustchain)
     }
@@ -174,7 +174,7 @@ impl TrustChain {
         let security_config = TrustChainSecurityConfig {
             base_config: config,
             security_config: SecurityIntegrationConfig::default(),
-            mandatory_consensus: true, // Always enable for production
+            mandatory_state_proof: true, // Always enable for production
         };
 
         Self::new_with_security(security_config).await
@@ -203,9 +203,9 @@ impl TrustChain {
         &self,
         request: CertificateRequest,
     ) -> Result<IssuedCertificate> {
-        info!("🔐 SECURE certificate issuance with mandatory consensus validation");
+        info!("🔐 SECURE certificate issuance with mandatory state proof validation");
 
-        // Issue certificate through security-integrated CA (includes consensus validation)
+        // Issue certificate through security-integrated CA (includes state proof validation)
         let cert = self.security_ca.issue_certificate_secure(request).await?;
 
         // Log certificate in CT logs
@@ -297,14 +297,14 @@ impl TrustChain {
         self.security_monitor.get_metrics().await
     }
 
-    /// Validate consensus proof directly
-    pub async fn validate_consensus_proof(
+    /// Validate state proof directly
+    pub async fn validate_state_proof(
         &self,
-        consensus_proof: &ConsensusProof,
+        state_proof: &StateProof,
         operation: &str,
     ) -> Result<SecurityValidationResult> {
         self.security_monitor
-            .validate_certificate_operation(operation, consensus_proof, "direct_validation")
+            .validate_certificate_operation(operation, state_proof, "direct_validation")
             .await
             .map_err(|e| TrustChainError::SecurityError {
                 message: e.to_string(),
@@ -379,7 +379,7 @@ impl TrustChain {
     // Internal service startup methods
 
     async fn start_ca_service(&self) -> Result<()> {
-        info!("✅ Security-Integrated Certificate Authority ready (consensus mandatory)");
+        info!("✅ Security-Integrated Certificate Authority ready (state proof mandatory)");
         Ok(())
     }
 
@@ -416,7 +416,7 @@ impl TrustChain {
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::localhost_testing(),
             security_config: SecurityIntegrationConfig {
-                mandatory_consensus: false,          // Reduced for testing
+                mandatory_state_proof: false,          // Reduced for testing
                 mandatory_security_validation: true, // Keep basic validation
                 block_on_security_failure: false,    // Don't block for testing
                 log_all_operations: true,
@@ -424,7 +424,7 @@ impl TrustChain {
                 enable_hybrid_signatures: true,
                 quantum_security_level: 128,
             },
-            mandatory_consensus: false, // Reduced for testing
+            mandatory_state_proof: false, // Reduced for testing
         };
 
         Self::new_with_security(security_config).await
@@ -436,7 +436,7 @@ impl TrustChain {
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::production(),
             security_config: SecurityIntegrationConfig {
-                mandatory_consensus: true,           // MANDATORY for production
+                mandatory_state_proof: true,           // MANDATORY for production
                 mandatory_security_validation: true, // MANDATORY for production
                 block_on_security_failure: true,     // MANDATORY for production
                 log_all_operations: true,
@@ -444,7 +444,7 @@ impl TrustChain {
                 enable_hybrid_signatures: true,
                 quantum_security_level: 128,
             },
-            mandatory_consensus: true, // MANDATORY for production
+            mandatory_state_proof: true, // MANDATORY for production
         };
 
         Self::new_with_security(security_config).await
@@ -454,7 +454,7 @@ impl TrustChain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use consensus::ConsensusProof;
+    use proof_of_state::StateProof;
     use serial_test::serial;
 
     #[tokio::test]
@@ -476,7 +476,7 @@ mod tests {
             san_entries: vec!["test.secure.com".to_string()],
             node_id: "test_node_001".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            state_proof: StateProof::default_for_testing(),
             timestamp: std::time::SystemTime::now(),
             identity_scope: None,
             subject_type: None,
@@ -502,12 +502,12 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_consensus_validation() -> anyhow::Result<()> {
+    async fn test_state_validation() -> anyhow::Result<()> {
         let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
 
-        let consensus_proof = ConsensusProof::new_for_testing();
+        let state_proof = StateProof::new_for_testing();
         let result = trustchain
-            .validate_consensus_proof(&consensus_proof, "test_operation")
+            .validate_state_proof(&state_proof, "test_operation")
             .await
             .expect("test: expected success");
 
@@ -522,25 +522,25 @@ mod tests {
         let prod_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::production(),
             security_config: SecurityIntegrationConfig::default(),
-            mandatory_consensus: true,
+            mandatory_state_proof: true,
         };
 
-        assert!(prod_config.mandatory_consensus);
-        assert!(prod_config.security_config.mandatory_consensus);
+        assert!(prod_config.mandatory_state_proof);
+        assert!(prod_config.security_config.mandatory_state_proof);
         assert!(prod_config.security_config.block_on_security_failure);
 
         // Test testing config
         let test_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::localhost_testing(),
             security_config: SecurityIntegrationConfig {
-                mandatory_consensus: false,
+                mandatory_state_proof: false,
                 block_on_security_failure: false,
                 ..Default::default()
             },
-            mandatory_consensus: false,
+            mandatory_state_proof: false,
         };
 
-        assert!(!test_config.mandatory_consensus);
+        assert!(!test_config.mandatory_state_proof);
         assert!(!test_config.security_config.block_on_security_failure);
     }
 }

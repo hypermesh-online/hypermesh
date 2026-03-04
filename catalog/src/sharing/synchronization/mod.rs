@@ -115,7 +115,7 @@ impl SyncManager {
     pub async fn selective_sync(&self, peer: &PeerInfo, strategy: SyncStrategy) -> Result<u32> {
         match strategy {
             SyncStrategy::Full => {
-                self.sync_with_peer(peer, ConflictResolution::ConsensusWins)
+                self.sync_with_peer(peer, ConflictResolution::StateProofWins)
                     .await
             }
             SyncStrategy::Incremental { since } => self.incremental_sync(peer, since).await,
@@ -274,10 +274,10 @@ impl SyncManager {
                     }
                     // Otherwise keep local version
                 }
-                ConflictResolution::ConsensusWins => {
-                    // Check consensus scores
-                    if self.get_consensus_score(&conflict.remote_metadata).await?
-                        > self.get_consensus_score(&conflict.local_metadata).await?
+                ConflictResolution::StateProofWins => {
+                    // Check state proof scores
+                    if self.get_state_proof_result(&conflict.remote_metadata).await?
+                        > self.get_state_proof_result(&conflict.local_metadata).await?
                     {
                         // Use remote version
                         if let Ok(package) = self

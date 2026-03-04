@@ -4,7 +4,7 @@
 
 //! Configuration management for HyperMesh platform integration
 
-use crate::consensus::ConsensusConfig;
+use crate::proof_of_state::StateProofConfig;
 use crate::container::config::ContainerConfig as ContainerRuntimeConfig;
 use crate::orchestration::HyperMeshIntegrationConfig as OrchestrationConfig;
 use crate::security::config::SecurityConfig;
@@ -19,8 +19,8 @@ pub struct HyperMeshConfig {
     pub stoq: StoqConfig,
     /// Transport layer configuration
     pub transport: TransportConfig,
-    /// Consensus configuration
-    pub consensus: ConsensusConfig,
+    /// State proof configuration
+    pub state_proof: StateProofConfig,
     /// Container runtime configuration
     pub container: ContainerRuntimeConfig,
     /// Security framework configuration
@@ -141,7 +141,7 @@ impl HyperMeshConfig {
         // Validate port conflicts
         let mut ports = [
             self.transport.network_usage.port,
-            // consensus.port does not exist - skip
+            // state_proof.port does not exist - skip
             // container.runtime_port does not exist - skip
             self.integration.metrics.prometheus_port,
         ];

@@ -23,6 +23,7 @@ use blockmatrix::assets::pipeline::{
     Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
     ShardMetadata,
 };
+use blockmatrix::StateProof;
 use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
 use blockmatrix::assets::pipeline::PipelineStats;
@@ -457,8 +458,9 @@ async fn run_dns(
             // 3. Register on local blockchain (DNS-as-asset)
             let bc = bootstrap.blockchain();
             let tx_data = format!("DNS:REGISTER:{name}:{target_addr}");
+            let state_proof = StateProof::new_for_testing();
             let block = bc
-                .add_block_with_data(tx_data.into_bytes())
+                .add_block_with_data(tx_data.into_bytes(), &state_proof)
                 .await
                 .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
 

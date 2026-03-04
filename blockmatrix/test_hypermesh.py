@@ -42,7 +42,7 @@ def test_build_status():
     modules = [
         "hypermesh-assets",
         "hypermesh-transport",
-        "hypermesh-consensus",
+        "hypermesh-proof-of-state",
         "hypermesh-orchestration",
         "hypermesh-catalog",
         "stoq"
@@ -87,7 +87,7 @@ def test_asset_management():
             # Check for key patterns
             checks = {
                 "AssetAdapter trait": "trait AssetAdapter" in content or "impl AssetAdapter" in content,
-                "Four-proof consensus": any(proof in content for proof in ["PoSpace", "PoStake", "PoWork", "PoTime"]),
+                "Four-proof state authentication": any(proof in content for proof in ["PoSpace", "PoStake", "PoWork", "PoTime"]),
                 "Dynamic allocation": "allocate" in content.lower() or "resource" in content.lower(),
                 "Privacy levels": "Privacy" in content or "private" in content.lower()
             }

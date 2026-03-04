@@ -67,7 +67,7 @@ pub struct RedistributionResult {
 /// * `current_placements` - Current shard placements
 /// * `shards` - Shards to potentially redistribute
 /// * `all_nodes` - All network nodes
-/// * `consensus` - Consensus validator
+/// * `state_proof` - State proof validator
 /// * `strategy` - Redistribution strategy
 ///
 /// # Returns
@@ -80,7 +80,7 @@ pub async fn handle_pos_revocation<C>(
     current_placements: &[ShardPlacement],
     shards: Vec<Shard>,
     all_nodes: &[NodeInfo],
-    _consensus: &C,
+    _state_proof: &C,
     strategy: RedistributionStrategy,
 ) -> AssetResult<RedistributionResult>
 where
@@ -160,7 +160,7 @@ pub async fn redistribute_shards<C>(
     current_placements: &[ShardPlacement],
     shards: Vec<Shard>,
     all_nodes: &[NodeInfo],
-    consensus: &C,
+    state_proof: &C,
     strategy: RedistributionStrategy,
 ) -> AssetResult<RedistributionResult>
 where
@@ -175,7 +175,7 @@ where
                 current_placements,
                 shards,
                 all_nodes,
-                consensus,
+                state_proof,
                 strategy,
             )
             .await
@@ -189,7 +189,7 @@ where
                 current_placements,
                 shards,
                 all_nodes,
-                consensus,
+                state_proof,
                 strategy,
             )
             .await
@@ -391,7 +391,7 @@ mod tests {
             },
         ];
 
-        let consensus = MockStateAuthenticator::new(true);
+        let state_proof = MockStateAuthenticator::new(true);
 
         let result = handle_pos_revocation(
             "test-asset",
@@ -400,7 +400,7 @@ mod tests {
             &current_placements,
             shards,
             &nodes,
-            &consensus,
+            &state_proof,
             RedistributionStrategy::Minimal,
         )
         .await
@@ -423,7 +423,7 @@ mod tests {
             distance_from_origin: 17.32,
         }];
 
-        let consensus = MockStateAuthenticator::new(true);
+        let state_proof = MockStateAuthenticator::new(true);
 
         let result = handle_pos_revocation(
             "test-asset",
@@ -432,7 +432,7 @@ mod tests {
             &current_placements,
             shards,
             &nodes,
-            &consensus,
+            &state_proof,
             RedistributionStrategy::Minimal,
         )
         .await
@@ -463,7 +463,7 @@ mod tests {
             },
         ];
 
-        let consensus = MockStateAuthenticator::new(true);
+        let state_proof = MockStateAuthenticator::new(true);
 
         // Test each strategy
         for strategy in [
@@ -477,7 +477,7 @@ mod tests {
                 &current_placements,
                 shards.clone(),
                 &nodes,
-                &consensus,
+                &state_proof,
                 strategy,
             )
             .await;

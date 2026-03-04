@@ -16,7 +16,7 @@ use std::path::Path;
 use tracing::{error, info};
 
 use gates::{
-    ConsensusValidationGate, DNSInfrastructureGate, HSMDependencyGate, MockResponseGate,
+    StateProofValidationGate, DNSInfrastructureGate, HSMDependencyGate, MockResponseGate,
     ProductionReadinessGate, SecurityTheaterGate,
 };
 
@@ -99,7 +99,7 @@ impl QualityGateValidator {
 
         let gates: Vec<Box<dyn QualityGate>> = vec![
             Box::new(SecurityTheaterGate),
-            Box::new(ConsensusValidationGate),
+            Box::new(StateProofValidationGate),
             Box::new(HSMDependencyGate),
             Box::new(MockResponseGate),
             Box::new(ProductionReadinessGate),

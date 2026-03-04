@@ -216,7 +216,7 @@ git push origin sprint-2.2-day-N
   - [ ] test_certificate_validation
   - [ ] test_security_integrated_ca_creation
   - [ ] test_secure_certificate_issuance
-  - [ ] test_mandatory_consensus_disabled
+  - [ ] test_mandatory_state proof_disabled
 
 - [ ] **12:00-12:15** Verify CA tests
   ```bash
@@ -246,7 +246,7 @@ git push origin sprint-2.2-day-N
 - [ ] **3:30-5:00** Fix integration tests
   - [ ] test_trustchain_security_initialization
   - [ ] test_security_dashboard
-  - [ ] test_consensus_validation
+  - [ ] test_state proof_validation
   - [ ] test_client_metrics
   - [ ] test_time_proof_serialization
 
@@ -319,7 +319,7 @@ git push origin sprint-2.2-day-N
   - Test full chain verification
 
 - [ ] **10:00-11:00** Create Migration Guides
-  - [ ] `docs/CONSENSUS_MIGRATION.md`
+  - [ ] `docs/state proof_MIGRATION.md`
   - Document deprecation of dummy proof generation
   - Explain migration to network-based generation
 

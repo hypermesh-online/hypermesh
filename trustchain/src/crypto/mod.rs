@@ -113,8 +113,8 @@ pub enum KeyUsage {
     AssetAuthentication,
     /// Remote proxy authentication
     RemoteProxyAuth,
-    /// Consensus validation
-    ConsensusValidation,
+    /// State proof validation
+    StateProofValidation,
     /// Encryption/Decryption
     Encryption,
     /// General purpose signing

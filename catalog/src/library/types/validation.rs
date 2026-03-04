@@ -13,8 +13,8 @@ use crate::registry::AssetTypeDefinition;
 impl LibraryAssetPackage {
     /// Convert to AssetTypeDefinition (new registry architecture)
     pub fn to_asset_type_definition(&self) -> Result<AssetTypeDefinition, anyhow::Error> {
-        use blockmatrix::assets::ConsensusProof;
-        use blockmatrix::consensus::proof_of_state_integration::{
+        use blockmatrix::assets::StateProof;
+        use blockmatrix::proof_of_state::proof_of_state_integration::{
             SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
         };
         use serde_json::json;
@@ -48,7 +48,7 @@ impl LibraryAssetPackage {
                 .unwrap_or(0),
         ));
 
-        let consensus_proof = ConsensusProof::new(stake_proof, time_proof, space_proof, work_proof);
+        let state_proof = StateProof::new(stake_proof, time_proof, space_proof, work_proof);
 
         let schema = json!({
             "type": "object",
@@ -61,7 +61,7 @@ impl LibraryAssetPackage {
             "required": ["name", "version", "asset_type"]
         });
 
-        let mut type_def = AssetTypeDefinition::new(self.name.clone(), schema, consensus_proof);
+        let mut type_def = AssetTypeDefinition::new(self.name.clone(), schema, state_proof);
 
         type_def.metadata.version = self.version.clone();
         type_def.metadata.author = self.author().map(|s| s.to_string());
@@ -162,10 +162,10 @@ impl LibraryAssetPackage {
                         templates: vec![],
                     },
                     security: AssetSecurity {
-                        consensus_required: self
+                        state_proof_required: self
                             .spec
                             .as_ref()
-                            .map(|s| s.security.consensus_required)
+                            .map(|s| s.security.state_proof_required)
                             .unwrap_or(false),
                         certificate_pinning: false,
                         hash_validation: "blake3".to_string(),
@@ -246,10 +246,10 @@ impl LibraryAssetPackage {
                                 ExecutionStrategy::LoadBalanced => "loadbalanced".to_string(),
                             })
                             .unwrap_or_else(|| "loadbalanced".to_string()),
-                        minimum_consensus: self
+                        minimum_state_proof: self
                             .spec
                             .as_ref()
-                            .map(|s| s.execution.min_consensus)
+                            .map(|s| s.execution.min_state_proof)
                             .unwrap_or(1),
                         retry_policy: self
                             .spec

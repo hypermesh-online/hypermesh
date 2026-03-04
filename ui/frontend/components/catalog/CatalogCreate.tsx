@@ -89,7 +89,7 @@ export function CatalogCreate() {
           Create HyperMesh Assets
         </h1>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Create and deploy custom applications as HyperMesh VM assets with consensus validation.
+          Create and deploy custom applications as HyperMesh VM assets with Proof of State verification.
         </p>
       </div>
 
@@ -175,7 +175,7 @@ main()`}
                   <option value="federated">Federated (Trusted networks)</option>
                   <option value="public">Public (Cross-network)</option>
                   <option value="anonymous">Anonymous (Privacy-first)</option>
-                  <option value="verified">Verified (Full consensus)</option>
+                  <option value="verified">Verified (Full state proof)</option>
                 </select>
               </div>
 

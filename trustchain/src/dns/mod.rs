@@ -20,7 +20,7 @@ use trust_dns_proto::op::ResponseCode;
 use trust_dns_proto::rr::{DNSClass, Name, RData, Record, RecordType};
 
 use crate::config::DnsConfig;
-use crate::consensus::ConsensusContext;
+use crate::proof_of_state::StateProofContext;
 use crate::errors::{DnsError, Result as TrustChainResult};
 
 pub mod bootstrap;
@@ -60,8 +60,8 @@ pub struct DnsResolver {
     cert_validator: Arc<CertificateValidator>,
     /// Configuration
     config: Arc<DnsConfig>,
-    /// Consensus validation context  
-    consensus_context: Arc<ConsensusContext>,
+    /// State proof validation context  
+    state_proof_context: Arc<StateProofContext>,
     /// Background task handles
     task_handles: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
@@ -261,8 +261,8 @@ impl DnsResolver {
         let stoq_client =
             Arc::new(crate::stoq_client::TrustChainStoqClient::new(stoq_config).await?);
 
-        // Initialize consensus context
-        let consensus_context = Arc::new(ConsensusContext::new(
+        // Initialize state proof context
+        let state_proof_context = Arc::new(StateProofContext::new(
             config.server_id.clone(),
             "trustchain_dns_network".to_string(),
         ));
@@ -274,7 +274,7 @@ impl DnsResolver {
             cache,
             cert_validator,
             config: Arc::new(config),
-            consensus_context,
+            state_proof_context,
             task_handles: Arc::new(Mutex::new(Vec::new())),
         };
 
@@ -471,7 +471,7 @@ impl DnsResolver {
             cache: Arc::clone(&self.cache),
             cert_validator: Arc::clone(&self.cert_validator),
             config: Arc::clone(&self.config),
-            consensus_context: Arc::clone(&self.consensus_context),
+            state_proof_context: Arc::clone(&self.state_proof_context),
             task_handles: Arc::clone(&self.task_handles),
         }
     }

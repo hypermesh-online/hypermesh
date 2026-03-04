@@ -46,7 +46,7 @@ impl CaesarRewardCalculator {
             .await?;
 
         // Performance bonuses
-        let consensus_bonus = self.calculate_consensus_bonus().await?;
+        let verification_bonus = self.calculate_verification_bonus().await?;
 
         // Apply dynamic adjustments
         let final_rate = self
@@ -58,7 +58,7 @@ impl CaesarRewardCalculator {
             base_reward_rate: final_rate,
             privacy_multiplier,
             utilization_multiplier,
-            consensus_bonus,
+            verification_bonus,
             max_reward_cap: self.base_config.max_reward_cap,
             distribution_config: self.create_distribution_config(user_preferences).await?,
         })
@@ -159,8 +159,8 @@ impl CaesarRewardCalculator {
         Ok(1.0)
     }
 
-    async fn calculate_consensus_bonus(&self) -> AssetResult<f32> {
-        Ok(self.base_config.consensus_bonus)
+    async fn calculate_verification_bonus(&self) -> AssetResult<f32> {
+        Ok(self.base_config.verification_bonus)
     }
 
     async fn apply_dynamic_adjustments(&self, base_rate: f32) -> AssetResult<f32> {
@@ -268,7 +268,7 @@ impl CaesarRewardCalculator {
                     min_allocation_time: Duration::from_secs(7 * 24 * 60 * 60), // 7 days
                     min_privacy_participation: HashMap::new(),
                     min_utilization_rate: 0.5,
-                    min_consensus_success_rate: 0.9,
+                    min_state_proof_success_rate: 0.9,
                     min_stake_amount: 1000,
                     require_authentication: true,
                 },
@@ -288,7 +288,7 @@ impl CaesarRewardCalculator {
                     min_allocation_time: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
                     min_privacy_participation: HashMap::new(),
                     min_utilization_rate: 0.7,
-                    min_consensus_success_rate: 0.95,
+                    min_state_proof_success_rate: 0.95,
                     min_stake_amount: 5000,
                     require_authentication: true,
                 },

@@ -382,8 +382,8 @@ pub trait SecurityIntegrationValidator {
     /// Validate Team 1 network security integration (Team 3 → Team 1)
     fn validate_network_security_integration(&self) -> Result<bool, SecurityError>;
     
-    /// Validate Team 2 consensus security requirements (Team 3 → Team 2)
-    fn validate_consensus_security_integration(&self) -> Result<bool, SecurityError>;
+    /// Validate Team 2 state proof security requirements (Team 3 → Team 2)
+    fn validate_state_proof_security_integration(&self) -> Result<bool, SecurityError>;
     
     /// Validate enterprise entity security requirements (ALL TEAMS)
     fn validate_enterprise_security_compliance(&self, entity_types: &[String]) -> Result<bool, SecurityError>;

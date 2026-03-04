@@ -10,7 +10,7 @@
 
 pub use super::blockchain::{AssetRecordType, HyperMeshAssetRecord};
 use crate::assets::core::asset_id::AssetRegistration;
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use hypermesh_lib::PrivacyMode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -143,8 +143,8 @@ pub struct EntityBlock {
     pub timestamp: SystemTime,
     /// Block data specific to this entity
     pub data: EntityBlockData,
-    /// Consensus proof for this block
-    pub consensus_proof: ConsensusProof,
+    /// State proof for this block
+    pub state_proof: StateProof,
     /// Block hash
     pub hash: [u8; 32],
     /// Entity signature
@@ -263,7 +263,7 @@ pub struct EntityIdentifier {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum ProofRequirement {
-    ConsensusProof,
+    StateProof,
     DigitalSignature,
     ZeroKnowledgeProof,
     TimestampProof,
@@ -317,33 +317,33 @@ impl EntityBlockchain {
             initial_policies: config.privacy_policies.clone(),
         };
 
-        // Create genesis block (would have real consensus proof in production)
+        // Create genesis block (would have real state proof in production)
         let genesis_block = EntityBlock {
             index: 0,
             previous_hash: [0u8; 32],
             timestamp: SystemTime::now(),
             data: genesis_data,
-            consensus_proof: ConsensusProof::new(
-                // TODO: Generate real consensus proofs
+            state_proof: StateProof::new(
+                // TODO: Generate real state proofs
                 // Order: StakeProof, TimeProof, SpaceProof, WorkProof
-                crate::consensus::proof::StakeProof::new(
+                crate::proof_of_state::proof::StakeProof::new(
                     config.network_domain.clone(),
                     "genesis-node".to_string(),
                     1000,
                 ),
-                crate::consensus::proof::TimeProof::new(Duration::from_secs(0)),
-                crate::consensus::proof::SpaceProof::new(
+                crate::proof_of_state::proof::TimeProof::new(Duration::from_secs(0)),
+                crate::proof_of_state::proof::SpaceProof::new(
                     "genesis-node".to_string(),
                     "/genesis".to_string(),
                     0,
                 ),
-                crate::consensus::proof::WorkProof::new(
+                crate::proof_of_state::proof::WorkProof::new(
                     "genesis-owner".to_string(),
                     "genesis-workload".to_string(),
                     0,
                     1000,
-                    crate::consensus::proof::WorkloadType::Compute,
-                    crate::consensus::proof::WorkState::Completed,
+                    crate::proof_of_state::proof::WorkloadType::Compute,
+                    crate::proof_of_state::proof::WorkState::Completed,
                 ),
             ),
             hash: [0u8; 32], // Would be calculated
@@ -365,11 +365,11 @@ impl EntityBlockchain {
     pub async fn add_asset_record(
         &mut self,
         asset_record: HyperMeshAssetRecord,
-        consensus_proof: ConsensusProof,
+        state_proof: StateProof,
     ) -> Result<u64, String> {
-        // Validate consensus proof
-        if !consensus_proof.validate() {
-            return Err("Invalid consensus proof".to_string());
+        // Validate state proof
+        if !state_proof.validate() {
+            return Err("Invalid state proof".to_string());
         }
 
         // Create new block
@@ -385,7 +385,7 @@ impl EntityBlockchain {
             previous_hash,
             timestamp: SystemTime::now(),
             data: EntityBlockData::AssetRecord(asset_record),
-            consensus_proof,
+            state_proof,
             hash: [0u8; 32],          // Would be calculated properly
             entity_signature: vec![], // Would be signed by entity
         };

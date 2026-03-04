@@ -6,7 +6,7 @@
 //!
 //! This module provides a comprehensive performance monitoring dashboard for HyperMesh
 //! infrastructure, including real-time container performance metrics, P2P network
-//! monitoring, Byzantine fault tolerance metrics, and consensus performance analysis.
+//! monitoring, Byzantine fault tolerance metrics, and Proof of State performance analysis.
 //!
 //! # Features
 //!
@@ -14,7 +14,7 @@
 //! - Container startup and scaling performance tracking (<100ms targets)
 //! - P2P mesh connectivity performance (<5ms connection establishment)
 //! - Byzantine fault detection and reputation tracking
-//! - Consensus latency monitoring (<50ms coordination overhead)
+//! - State proof latency monitoring (<50ms coordination overhead)
 //! - Network throughput and utilization analysis
 //! - Automated performance alerting and remediation triggers
 

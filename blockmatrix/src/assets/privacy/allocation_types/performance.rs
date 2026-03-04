@@ -99,8 +99,8 @@ pub enum FaultToleranceLevel {
 /// Integration settings for allocation types
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct IntegrationSettings {
-    /// Consensus system integration
-    pub consensus_integration: ConsensusIntegrationSettings,
+    /// State proof system integration
+    pub state_proof_integration: StateProofIntegrationSettings,
 
     /// Proxy system integration
     pub proxy_integration: ProxyIntegrationSettings,
@@ -112,23 +112,23 @@ pub struct IntegrationSettings {
     pub external_integrations: Vec<ExternalIntegration>,
 }
 
-/// Consensus system integration settings
+/// State proof system integration settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConsensusIntegrationSettings {
-    /// Required consensus proofs
+pub struct StateProofIntegrationSettings {
+    /// Required state proofs
     pub required_proofs: Vec<String>,
 
     /// Proof validation frequency
     pub validation_frequency: Duration,
 
-    /// Consensus participation requirements
+    /// State proof participation requirements
     pub participation_requirements: ParticipationRequirements,
 }
 
-/// Consensus participation requirements
+/// State proof participation requirements
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ParticipationRequirements {
-    /// Must participate in consensus
+    /// Must participate in state proof validation
     pub must_participate: bool,
 
     /// Minimum participation level

@@ -247,7 +247,7 @@ impl HyperMeshAssetRegistry {
             registry: "hypermesh".to_string(),
             rating: stats.rating,
             download_count: stats.download_count,
-            verified: true, // All HyperMesh assets are consensus-verified
+            verified: true, // All HyperMesh assets are state-proof-verified
         })
     }
 

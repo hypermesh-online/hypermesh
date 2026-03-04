@@ -155,7 +155,7 @@ edition = "2021"
 authors = ["HyperMesh Team"]
 description = "Web3 Ecosystem - Unified STOQ/HyperMesh/TrustChain/Caesar/Catalog Stack"
 license = "MIT OR Apache-2.0"
-keywords = ["hypermesh", "protocol", "stoq", "trustchain", "consensus"]
+keywords = ["hypermesh", "protocol", "stoq", "trustchain", "proof-of-state"]
 
 [dependencies]
 # Use workspace dependencies
@@ -263,9 +263,9 @@ hardware-acceleration = []
 zero-copy = []
 
 # Deployment modes
-production = ["blockmatrix-full", "high-performance", "consensus-mandatory"]
+production = ["blockmatrix-full", "high-performance", "proof-of-state-mandatory"]
 development = ["blockmatrix-full", "legacy-compatibility"]
-consensus-mandatory = []
+proof-of-state-mandatory = []
 legacy-compatibility = []
 future-tests = []
 

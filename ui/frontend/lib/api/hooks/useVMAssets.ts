@@ -141,7 +141,7 @@ export function useExecuteVMAsset() {
       operation: string;
       parameters: any;
       timeout?: number;
-      requiresConsensus?: boolean;
+      requiresStateProof?: boolean;
       allocationDuration?: number;
       executionParams?: any;
     }) => hyperMeshAPI.executeVMAsset(request),

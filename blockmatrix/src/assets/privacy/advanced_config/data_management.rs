@@ -172,7 +172,7 @@ pub enum KeyDerivationMethod {
     UserPassword,
     HardwareToken,
     BiometricData,
-    ConsensusProof,
+    StateProof,
     MultiParty,
 }
 

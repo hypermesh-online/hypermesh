@@ -30,5 +30,5 @@ pub(crate) use tokio::sync::RwLock;
 pub(crate) use blockmatrix::assets::core::{
     ApplicationDomain, AssetCategory, AssetData, AssetRegistration, AssetType, NetworkScope,
 };
-pub(crate) use blockmatrix::consensus::proof_of_state_integration::ConsensusProof;
+pub(crate) use blockmatrix::proof_of_state::proof_of_state_integration::StateProof;
 // BLAKE3 used via blake3::hash() for domain hashes

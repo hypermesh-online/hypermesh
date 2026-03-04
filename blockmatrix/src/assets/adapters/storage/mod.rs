@@ -32,7 +32,7 @@ pub use self::sharding::{ShardingAlgorithm, ShardingConfig};
 mod tests {
     use super::*;
     use crate::assets::core::{
-        AssetAllocationRequest, AssetType, ConsensusProof, PrivacyMode, SpaceProof, StakeProof,
+        AssetAllocationRequest, AssetType, StateProof, PrivacyMode, SpaceProof, StakeProof,
         StorageRequirements, StorageType, TimeProof, WorkProof, WorkState, WorkloadType,
     };
     use std::collections::HashMap;
@@ -67,8 +67,8 @@ mod tests {
                 ..Default::default()
             },
             privacy_level: PrivacyMode::PRIVATE,
-            // ConsensusProof::new expects: (stake, time, space, work)
-            consensus_proof: ConsensusProof::new(
+            // StateProof::new expects: (stake, time, space, work)
+            state_proof: StateProof::new(
                 StakeProof {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),

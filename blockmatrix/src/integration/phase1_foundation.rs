@@ -14,6 +14,7 @@
 use crate::blockchain::{
     Block, BlockPropagator, ChainStateManager, NodeBlockchain, PropagationStrategy,
 };
+use crate::proof_of_state::StateProof;
 use crate::matrix::{CoordinateError, MatrixCoordinate};
 use crate::persistence::{PersistenceConfig, PersistenceManager, RecoveryManager};
 use anyhow::Result;
@@ -260,12 +261,17 @@ impl MatrixFoundation {
     }
 
     /// Add a block to a node's blockchain
-    pub async fn add_block(&self, node_id: &str, data: Vec<u8>) -> Phase1Result<Block> {
+    pub async fn add_block(
+        &self,
+        node_id: &str,
+        data: Vec<u8>,
+        state_proof: &StateProof,
+    ) -> Phase1Result<Block> {
         let node = self.get_node(node_id).await?;
         let blockchain = node.blockchain.write().await;
 
         blockchain
-            .add_block_with_data(data)
+            .add_block_with_data(data, state_proof)
             .await
             .map_err(Phase1Error::Blockchain)
     }
@@ -525,8 +531,9 @@ mod tests {
             .await
             .expect("test");
 
+        let proof = StateProof::new_for_testing();
         let block = foundation
-            .add_block("node1", b"test data".to_vec())
+            .add_block("node1", b"test data".to_vec(), &proof)
             .await
             .expect("test");
         assert_eq!(block.asset_count(), 1); // Block should contain one asset

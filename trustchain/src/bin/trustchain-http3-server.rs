@@ -311,12 +311,12 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
         },
     );
 
-    // Consensus status (stub)
-    let router = router.get("/api/v1/trustchain/consensus/status", |_req| async move {
-        // TODO: Implement handle_consensus_status() in handlers.rs — needs
+    // State proof status (stub)
+    let router = router.get("/api/v1/trustchain/state_proof/status", |_req| async move {
+        // TODO: Implement handle_state_proof_status() in handlers.rs — needs
         // FourProofValidator round/validator state exposure.
         let response = serde_json::json!({
-            "consensus_active": false,
+            "state_proof_active": false,
             "current_round": 0,
             "validators": 0,
             "finality_threshold": 0.67,
@@ -324,28 +324,28 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
         build_json_response(response, uuid::Uuid::new_v4().to_string())
     });
 
-    // Consensus validate (stub)
-    let router = router.post("/api/v1/trustchain/consensus/validate", |_req| async move {
-        // TODO: Implement handle_consensus_validate() in handlers.rs — needs
-        // ConsensusProof deserialization from request body and validation via
+    // State proof validate (stub)
+    let router = router.post("/api/v1/trustchain/state_proof/validate", |_req| async move {
+        // TODO: Implement handle_state_proof_validate() in handlers.rs — needs
+        // StateProof deserialization from request body and validation via
         // SecurityMonitor::validate_certificate_operation().
         build_error_response(
             "NOT_IMPLEMENTED",
-            "Consensus validation endpoint requires proof deserialization (not yet wired)"
+            "State proof validation endpoint requires proof deserialization (not yet wired)"
                 .to_string(),
             uuid::Uuid::new_v4().to_string(),
         )
     });
 
-    // Consensus proofs by asset ID (stub)
+    // State proofs by asset ID (stub)
     let router = router.get(
-        "/api/v1/trustchain/consensus/proofs/{asset_id}",
+        "/api/v1/trustchain/state_proof/proofs/{asset_id}",
         |_req| async move {
-            // TODO: Implement handle_consensus_proofs() in handlers.rs — needs
-            // per-asset proof retrieval from blockchain/consensus layer.
+            // TODO: Implement handle_state_proofs() in handlers.rs — needs
+            // per-asset proof retrieval from blockchain/state proof layer.
             build_error_response(
                 "NOT_IMPLEMENTED",
-                "Consensus proof retrieval requires blockchain integration (not yet wired)"
+                "State proof retrieval requires blockchain integration (not yet wired)"
                     .to_string(),
                 uuid::Uuid::new_v4().to_string(),
             )

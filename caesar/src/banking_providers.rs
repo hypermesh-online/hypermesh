@@ -119,7 +119,6 @@ impl BankingApiProvider for StripeProvider {
         Ok(VerificationResult {
             is_valid,
             verification_id: format!("stripe_verify_{}", Utc::now().timestamp()),
-            confidence_score: if is_valid { dec!(0.85) } else { dec!(0.1) },
             issues: if is_valid {
                 vec![]
             } else {
@@ -452,7 +451,6 @@ mod test_mocks {
             Ok(VerificationResult {
                 is_valid: true,
                 verification_id: "mock_verification".to_string(),
-                confidence_score: dec!(0.99),
                 issues: vec![],
             })
         }

@@ -85,7 +85,7 @@ pub struct HyperMeshTransportStats {
     pub active_connections: usize,
 }
 
-/// HyperMesh transport trait for consensus integration
+/// HyperMesh transport trait for state proof integration
 #[async_trait]
 pub trait HyperMeshTransportTrait: Send + Sync {
     /// Connect to a remote endpoint

@@ -6,7 +6,7 @@ authors = ["Web3 Ecosystem Team"]
 description = "TrustChain - Certificate Authority with Certificate Transparency and DNS resolution"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/web3-ecosystem/trustchain"
-keywords = ["ca", "certificate", "transparency", "dns", "consensus"]
+keywords = ["ca", "certificate", "transparency", "dns", "proof-of-state"]
 
 [lints]
 workspace = true
@@ -69,7 +69,7 @@ serde_yaml = { workspace = true }
 toml = { workspace = true }
 bincode = { workspace = true }
 
-# Consensus and blockchain
+# State proof and blockchain
 sha2 = { workspace = true }
 blake3 = { workspace = true }
 merkletree = { workspace = true }
@@ -119,17 +119,17 @@ tokio-test = { workspace = true }
 serial_test = "3"
 
 [features]
-default = ["ca", "ct", "dns", "consensus", "localhost-testing"]
+default = ["ca", "ct", "dns", "proof-of-state", "localhost-testing"]
 
 # Core features
-ca = []           # Certificate Authority
-ct = []           # Certificate Transparency
-dns = []          # DNS resolution
-consensus = []    # Proof of State validation integration
+ca = []                # Certificate Authority
+ct = []                # Certificate Transparency
+dns = []               # DNS resolution
+proof-of-state = []    # Proof of State validation integration
 
 # Testing and development
 localhost-testing = []
-production-ready = ["consensus"]
+production-ready = ["proof-of-state"]
 
 [lib]
 name = "trustchain"

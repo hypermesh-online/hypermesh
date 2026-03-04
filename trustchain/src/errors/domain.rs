@@ -34,8 +34,8 @@ pub enum CAError {
     #[error("Policy validation failed: {policy} - {reason}")]
     PolicyValidation { policy: String, reason: String },
 
-    #[error("Insufficient consensus proof for certificate operation")]
-    InsufficientConsensusProof,
+    #[error("Insufficient state proof for certificate operation")]
+    InsufficientStateProof,
 }
 
 /// Certificate Transparency specific errors
@@ -152,9 +152,9 @@ pub enum ApiError {
     ServerStartup { reason: String },
 }
 
-/// Consensus validation specific errors
+/// State proof validation specific errors
 #[derive(Debug, Error, Serialize, Deserialize)]
-pub enum ConsensusError {
+pub enum StateProofError {
     #[error("Proof of Stake validation failed: stake {stake} < minimum {minimum}")]
     ProofOfStakeFailed { stake: u64, minimum: u64 },
 
@@ -176,11 +176,11 @@ pub enum ConsensusError {
         evidence: String,
     },
 
-    #[error("Consensus proof malformed: {reason}")]
+    #[error("State proof malformed: {reason}")]
     MalformedProof { reason: String },
 
-    #[error("Consensus timeout: operation {operation} timed out")]
-    ConsensusTimeout { operation: String },
+    #[error("State proof timeout: operation {operation} timed out")]
+    StateProofTimeout { operation: String },
 
     #[error("Insufficient validators: {current} < minimum {minimum}")]
     InsufficientValidators { current: u32, minimum: u32 },

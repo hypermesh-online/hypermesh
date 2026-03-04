@@ -22,7 +22,7 @@ export type EventChannel =
   | 'trustchain.rotation'
   | 'trustchain.dns'
   | 'hypermesh.assets'
-  | 'hypermesh.consensus'
+  | 'hypermesh.stateProof'
   | 'hypermesh.byzantine'
   | 'hypermesh.vm'
   | 'stoq.connections'

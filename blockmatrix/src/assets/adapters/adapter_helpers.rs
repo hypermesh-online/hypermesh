@@ -12,7 +12,7 @@ use std::time::SystemTime;
 
 use crate::assets::core::privacy::{
     AccessConfig, AccessPermissions, AllocationConfig, AuthRequirements, ConcurrencyLimits,
-    ConsensusRequirements, DurationConfig, RateLimits, ResourceAllocationConfig,
+    StateRequirements, DurationConfig, RateLimits, ResourceAllocationConfig,
 };
 use crate::assets::core::status::{AssetHealthStatus, AssetPerformanceMetrics};
 use crate::assets::core::{
@@ -47,8 +47,8 @@ pub fn _create_asset_allocation(
         status.set_proxy_address(proxy_addr);
     }
 
-    // Add consensus proof
-    status.add_consensus_proof(request.consensus_proof.clone());
+    // Add state proof
+    status.add_state_proof(request.state_proof.clone());
 
     // Create allocation config
     let allocation_config = AllocationConfig {
@@ -56,7 +56,7 @@ pub fn _create_asset_allocation(
         resource_allocation: ResourceAllocationConfig::default(),
         concurrency_limits: ConcurrencyLimits::default(),
         duration_config: DurationConfig::default(),
-        consensus_requirements: ConsensusRequirements::default(),
+        state_requirements: StateRequirements::default(),
     };
 
     // Create access config
@@ -117,7 +117,7 @@ pub fn _create_asset_status(
         }),
         privacy_level,
         proxy_address,
-        consensus_proofs: Vec::new(),
+        state_proofs: Vec::new(),
         owner_certificate_fingerprint: certificate_fingerprint,
         metadata,
         health_status: AssetHealthStatus::default(),

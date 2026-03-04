@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 /**
- * HyperMesh API Types - Type definitions for asset management, consensus, and proxy systems
+ * HyperMesh API Types - Type definitions for asset management, state proof verification, and proxy systems
  */
 
 export type AssetType = 'cpu' | 'gpu' | 'memory' | 'storage' | 'network' | 'service' | 'container' | 'vm' | 'application' | 'compute';
@@ -48,11 +48,11 @@ export interface AssetAllocation {
   startTime: string;
   endTime: string;
   status: 'pending' | 'active' | 'completed' | 'cancelled' | 'failed';
-  consensusProofs: ConsensusProof[];
+  stateProofs: StateProof[];
   proxyAddress?: string;
 }
 
-export interface ConsensusProof {
+export interface StateProof {
   type: ProofType;
   data: any;
   validatedAt: string;
@@ -61,15 +61,15 @@ export interface ConsensusProof {
   valid: boolean;
 }
 
-export interface FourProofConsensus {
+export interface FourProofStateVerification {
   blockId: string;
   assetId: string;
-  proofs: ConsensusProof[];
+  proofs: StateProof[];
   combinedProof: {
     hash: string;
     signature: string;
     validatedAt: string;
-    consensusReached: boolean;
+    verified: boolean;
   };
   status: 'pending' | 'validated' | 'rejected' | 'failed';
   timestamp: string;
@@ -80,12 +80,12 @@ export interface ByzantineDetection {
   id: string;
   nodeId: string;
   detectedAt: string;
-  behaviour: 'double_spending' | 'invalid_proof' | 'consensus_attack' | 'network_partition' | 'timing_attack';
-  behaviorType: 'double_spending' | 'invalid_proof' | 'consensus_attack' | 'network_partition' | 'timing_attack';
+  behaviour: 'double_spending' | 'invalid_proof' | 'proof_forgery' | 'network_partition' | 'timing_attack';
+  behaviorType: 'double_spending' | 'invalid_proof' | 'proof_forgery' | 'network_partition' | 'timing_attack';
   severity: 'low' | 'medium' | 'high' | 'critical';
   confidence: number; // 0-100
   evidence: {
-    conflictingProofs?: ConsensusProof[];
+    conflictingProofs?: StateProof[];
     invalidOperations?: string[];
     networkAnomalies?: any[];
   };
@@ -135,9 +135,9 @@ export interface NodeHealth {
     networkLatency: number;
     uptime: number;
   };
-  consensusMetrics: {
+  stateProofMetrics: {
     proofsValidated: number;
-    consensusParticipation: number;
+    verificationParticipation: number;
     byzantineDetections: number;
   };
   lastHeartbeat: string;
@@ -185,7 +185,7 @@ export interface VMExecution {
     operation: string;
     parameters: any;
     timeout: number;
-    requiresConsensus: boolean;
+    requiresStateProof: boolean;
   };
   execution: {
     startTime?: string;
@@ -201,7 +201,7 @@ export interface VMExecution {
     };
   };
   result?: { output: string; exitCode: number; duration: number };
-  consensusProofs?: ConsensusProof[];
+  stateProofs?: StateProof[];
   proxyAddress?: string;
 }
 

@@ -10,7 +10,7 @@
 //! CRITICAL ARCHITECTURE CHANGE:
 //! - Public network uses BlockMatrix's OWN blockchain for registration
 //! - DNS-as-Asset registration happens on LOCAL node blockchain
-//! - Certificate validation through LOCAL blockchain consensus
+//! - Certificate validation through LOCAL blockchain state proof
 //! - Full 4-proof PoS validation via STOQ integration
 //! - NO external trust.hypermesh.online dependency
 
@@ -144,7 +144,7 @@ impl PublicNetworkHandler {
         // 1. Create a certificate registration transaction
         // 2. Add it to the local node's blockchain
         // 3. Propagate to neighbor nodes via matrix topology
-        // 4. Achieve consensus through 4-proof validation
+        // 4. Achieve state proof through 4-proof validation
 
         // Derive key material from PoS proofs using BLAKE3.
         // Public key = BLAKE3(proof_of_stake || proof_of_space)

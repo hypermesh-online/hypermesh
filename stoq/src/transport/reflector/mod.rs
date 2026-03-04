@@ -5,7 +5,7 @@
 //! Reflector Pool Transport for Network-scope blockchain synchronization.
 //!
 //! Provides the STOQ-side transport layer for reflector-based chain sync,
-//! including heartbeat/health tracking, quorum detection, a sync protocol
+//! including heartbeat/health tracking, replication threshold detection, a sync protocol
 //! state machine, message serialization, and a bridge to blockmatrix's
 //! `MatrixMessage` system.
 //!
@@ -16,7 +16,7 @@
 //! - [`StoqBlockTransport`] -- transport layer built on an outbox/inbox
 //!   pattern that decouples the protocol from real STOQ network I/O,
 //!   enabling testability and future stream integration.
-//! - [`SyncProtocol`] -- state machine for heartbeats, quorum detection,
+//! - [`SyncProtocol`] -- state machine for heartbeats, replication threshold,
 //!   sync requests, block announcements, and stale-peer pruning.
 //! - [`ReflectorBridge`] -- bidirectional converter between STOQ
 //!   `ReflectorMessage` and blockmatrix `BridgedMatrixMessage`.

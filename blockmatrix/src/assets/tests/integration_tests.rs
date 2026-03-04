@@ -4,7 +4,7 @@
 
 //! Integration tests for Hardware Asset Adapters
 //! 
-//! Tests all adapters with the new ConsensusProof system and ensures
+//! Tests all adapters with the new StateProof system and ensures
 //! proper integration with the four-proof validation (PoSp+PoSt+PoWk+PoTm).
 
 use std::time::{Duration, SystemTime};
@@ -14,18 +14,18 @@ use hypermesh_assets::core::{
     AssetType, AssetAllocationRequest, PrivacyMode, ResourceRequirements,
     CpuRequirements, GpuRequirements, MemoryRequirements, StorageRequirements, StorageType,
 };
-use hypermesh_assets::core::consensus::proof::{
-    ConsensusProof, SpaceProof, StakeProof, WorkProof, TimeProof,
+use hypermesh_assets::core::proof_of_state::proof::{
+    StateProof, SpaceProof, StakeProof, WorkProof, TimeProof,
     NetworkPosition, AccessPermissions, AccessLevel,
 };
 use hypermesh_assets::adapters::{
     AdapterRegistry, CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter,
 };
 
-/// Create a valid ConsensusProof for testing
-fn create_test_consensus_proof(resource_type: &str, stake_amount: u64, difficulty: u32, committed_space: u64) -> ConsensusProof {
-    // ConsensusProof::new expects: (stake, time, space, work)
-    ConsensusProof::new(
+/// Create a valid StateProof for testing
+fn create_test_state_proof(resource_type: &str, stake_amount: u64, difficulty: u32, committed_space: u64) -> StateProof {
+    // StateProof::new expects: (stake, time, space, work)
+    StateProof::new(
         StakeProof::new(
             "test-holder".to_string(),
             "test-node".to_string(),
@@ -62,7 +62,7 @@ fn create_cpu_allocation_request() -> AssetAllocationRequest {
             ..Default::default()
         },
         privacy_level: PrivacyMode::PRIVATE,
-        consensus_proof: create_test_consensus_proof("cpu", 50, 16, 2), // CPU requirements
+        state_proof: create_test_state_proof("cpu", 50, 16, 2), // CPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
         tags: HashMap::new(),
@@ -83,7 +83,7 @@ fn create_gpu_allocation_request() -> AssetAllocationRequest {
             ..Default::default()
         },
         privacy_level: PrivacyMode::PRIVATE,
-        consensus_proof: create_test_consensus_proof("gpu", 200, 20, 8 * 1024 * 1024 * 1024), // GPU requirements
+        state_proof: create_test_state_proof("gpu", 200, 20, 8 * 1024 * 1024 * 1024), // GPU requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
         tags: HashMap::new(),
@@ -104,7 +104,7 @@ fn create_memory_allocation_request() -> AssetAllocationRequest {
             ..Default::default()
         },
         privacy_level: PrivacyMode::PRIVATE,
-        consensus_proof: create_test_consensus_proof("memory", 100, 12, 1024 * 1024 * 1024), // Memory requirements
+        state_proof: create_test_state_proof("memory", 100, 12, 1024 * 1024 * 1024), // Memory requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
         tags: HashMap::new(),
@@ -126,7 +126,7 @@ fn create_storage_allocation_request() -> AssetAllocationRequest {
             ..Default::default()
         },
         privacy_level: PrivacyMode::PRIVATE,
-        consensus_proof: create_test_consensus_proof("storage", 75, 14, 10 * 1024 * 1024 * 1024), // Storage requirements
+        state_proof: create_test_state_proof("storage", 75, 14, 10 * 1024 * 1024 * 1024), // Storage requirements
         certificate_fingerprint: "test-cert".to_string(),
         duration_limit: None,
         tags: HashMap::new(),
@@ -148,17 +148,17 @@ async fn test_adapter_registry_integration() {
 }
 
 #[tokio::test]
-async fn test_cpu_adapter_consensus_validation() {
+async fn test_cpu_adapter_state_validation() {
     let adapter = CpuAssetAdapter::new().await;
     let request = create_cpu_allocation_request();
     
-    // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
-    assert!(valid, "CPU consensus proof validation should pass");
+    // Test state proof validation
+    let valid = adapter.validate_state_proof(&request.state_proof).await.expect("test: async operation");
+    assert!(valid, "CPU state proof validation should pass");
     
     // Test allocation
     let allocation = adapter.allocate_asset(&request).await;
-    assert!(allocation.is_ok(), "CPU allocation should succeed with valid consensus proof");
+    assert!(allocation.is_ok(), "CPU allocation should succeed with valid state proof");
     
     if let Ok(allocation) = allocation {
         // Test deallocation
@@ -168,17 +168,17 @@ async fn test_cpu_adapter_consensus_validation() {
 }
 
 #[tokio::test]
-async fn test_gpu_adapter_consensus_validation() {
+async fn test_gpu_adapter_state_validation() {
     let adapter = GpuAssetAdapter::new().await;
     let request = create_gpu_allocation_request();
     
-    // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
-    assert!(valid, "GPU consensus proof validation should pass");
+    // Test state proof validation
+    let valid = adapter.validate_state_proof(&request.state_proof).await.expect("test: async operation");
+    assert!(valid, "GPU state proof validation should pass");
     
     // Test allocation
     let allocation = adapter.allocate_asset(&request).await;
-    assert!(allocation.is_ok(), "GPU allocation should succeed with valid consensus proof");
+    assert!(allocation.is_ok(), "GPU allocation should succeed with valid state proof");
     
     if let Ok(allocation) = allocation {
         // Test deallocation
@@ -192,13 +192,13 @@ async fn test_memory_adapter_nat_addressing() {
     let adapter = MemoryAssetAdapter::new().await;
     let request = create_memory_allocation_request();
     
-    // Test consensus proof validation
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
-    assert!(valid, "Memory consensus proof validation should pass");
+    // Test state proof validation
+    let valid = adapter.validate_state_proof(&request.state_proof).await.expect("test: async operation");
+    assert!(valid, "Memory state proof validation should pass");
     
     // Test allocation with NAT-like addressing
     let allocation = adapter.allocate_asset(&request).await;
-    assert!(allocation.is_ok(), "Memory allocation should succeed with valid consensus proof");
+    assert!(allocation.is_ok(), "Memory allocation should succeed with valid state proof");
     
     if let Ok(allocation) = allocation {
         // Test proxy address assignment (NAT-like system)
@@ -223,9 +223,9 @@ async fn test_storage_adapter_pos_validation() {
     let adapter = StorageAssetAdapter::new().await;
     let request = create_storage_allocation_request();
     
-    // Test consensus proof validation (critical PoSpace validation for storage)
-    let valid = adapter.validate_consensus_proof(&request.consensus_proof).await.expect("test: async operation");
-    assert!(valid, "Storage consensus proof validation should pass with proper PoSpace");
+    // Test state proof validation (critical PoSpace validation for storage)
+    let valid = adapter.validate_state_proof(&request.state_proof).await.expect("test: async operation");
+    assert!(valid, "Storage state proof validation should pass with proper PoSpace");
     
     // Test allocation with sharding
     let allocation = adapter.allocate_asset(&request).await;
@@ -244,12 +244,12 @@ async fn test_storage_adapter_pos_validation() {
 }
 
 #[tokio::test]
-async fn test_consensus_proof_validation_failures() {
+async fn test_state_proof_validation_failures() {
     let adapter = CpuAssetAdapter::new().await;
     
     // Test with invalid PoSpace (0 committed space)
-    // ConsensusProof::new expects: (stake, time, space, work)
-    let invalid_space_proof = ConsensusProof::new(
+    // StateProof::new expects: (stake, time, space, work)
+    let invalid_space_proof = StateProof::new(
         StakeProof::new(
             "test-holder".to_string(),
             "test-node".to_string(),
@@ -271,12 +271,12 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_space_proof).await.expect("test: async operation");
-    assert!(!valid, "Consensus proof with 0 committed space should fail");
+    let valid = adapter.validate_state_proof(&invalid_space_proof).await.expect("test: async operation");
+    assert!(!valid, "State proof with 0 committed space should fail");
     
     // Test with insufficient stake
-    // ConsensusProof::new expects: (stake, time, space, work)
-    let invalid_stake_proof = ConsensusProof::new(
+    // StateProof::new expects: (stake, time, space, work)
+    let invalid_stake_proof = StateProof::new(
         StakeProof::new(
             "test-holder".to_string(),
             "test-node".to_string(),
@@ -298,12 +298,12 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_stake_proof).await.expect("test: async operation");
-    assert!(!valid, "Consensus proof with insufficient stake should fail");
+    let valid = adapter.validate_state_proof(&invalid_stake_proof).await.expect("test: async operation");
+    assert!(!valid, "State proof with insufficient stake should fail");
     
     // Test with insufficient work difficulty
-    // ConsensusProof::new expects: (stake, time, space, work)
-    let invalid_work_proof = ConsensusProof::new(
+    // StateProof::new expects: (stake, time, space, work)
+    let invalid_work_proof = StateProof::new(
         StakeProof::new(
             "test-holder".to_string(),
             "test-node".to_string(),
@@ -325,8 +325,8 @@ async fn test_consensus_proof_validation_failures() {
         ),
     );
     
-    let valid = adapter.validate_consensus_proof(&invalid_work_proof).await.expect("test: async operation");
-    assert!(!valid, "Consensus proof with insufficient work difficulty should fail");
+    let valid = adapter.validate_state_proof(&invalid_work_proof).await.expect("test: async operation");
+    assert!(!valid, "State proof with insufficient work difficulty should fail");
 }
 
 #[tokio::test]

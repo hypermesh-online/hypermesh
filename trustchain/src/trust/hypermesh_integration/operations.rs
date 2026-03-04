@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
 
 use super::types::*;
-use crate::consensus::FourProofValidator;
+use crate::proof_of_state::FourProofValidator;
 use crate::errors::Result as TrustChainResult;
 
 /// HyperMesh trust validator with Byzantine fault detection
@@ -48,7 +48,7 @@ pub struct RemoteProxyManager {
 
 /// Binary authentication engine for assets and nodes
 pub struct BinaryAuthEngine {
-    _consensus_validator: Arc<FourProofValidator>,
+    _state_validator: Arc<FourProofValidator>,
 }
 
 impl HyperMeshTrustValidator {
@@ -298,7 +298,7 @@ impl RemoteProxyManager {
 impl BinaryAuthEngine {
     pub(crate) async fn new(_config: &TrustValidatorConfig) -> TrustChainResult<Self> {
         Ok(Self {
-            _consensus_validator: Arc::new(FourProofValidator::new()),
+            _state_validator: Arc::new(FourProofValidator::new()),
         })
     }
 
@@ -309,7 +309,7 @@ impl BinaryAuthEngine {
         Ok(AuthenticationStatus {
             authenticated: true,
             certificate_valid: true,
-            consensus_verified: true,
+            state_verified: true,
             last_checked: SystemTime::now(),
             expiry: SystemTime::now() + Duration::from_secs(3600),
         })

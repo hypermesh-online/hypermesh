@@ -63,14 +63,14 @@ pub fn validate_ipv6(addr: &str) -> Result<Ipv6Addr> {
         .map_err(|_| anyhow!("Invalid IPv6 address: {addr}"))
 }
 
-/// Validate consensus proof size
-pub fn validate_consensus_proof(proof_data: &[u8]) -> Result<()> {
+/// Validate state proof size
+pub fn validate_state_proof(proof_data: &[u8]) -> Result<()> {
     if proof_data.is_empty() {
-        return Err(anyhow!("Consensus proof cannot be empty"));
+        return Err(anyhow!("State proof cannot be empty"));
     }
 
     if proof_data.len() > 10_000 {
-        return Err(anyhow!("Consensus proof too large (max 10KB)"));
+        return Err(anyhow!("State proof too large (max 10KB)"));
     }
 
     Ok(())

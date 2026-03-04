@@ -37,7 +37,7 @@ pub struct PolicyCondition {
 pub enum ConditionType {
     RequireValidation,
     RequirePeerApproval,
-    RequireFederationConsensus,
+    RequireFederationStateProof,
     RequireProofOfState,
     RateLimited,
     TimeLocked,

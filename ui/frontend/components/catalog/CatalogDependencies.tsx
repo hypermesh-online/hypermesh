@@ -38,10 +38,10 @@ const mockDependencies = [
   },
   {
     id: '3',
-    name: 'Consensus-Utils',
+    name: 'StateProof-Utils',
     version: '0.8.5',
     status: 'missing',
-    description: 'Consensus proof generation and validation',
+    description: 'State proof generation and validation',
     dependents: ['verified-app'],
     size: '12MB'
   }

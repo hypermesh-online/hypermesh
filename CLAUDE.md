@@ -24,11 +24,11 @@
 
 ---
 
-## 🎯 **Current Status: Single-Node Alpha — Network/Consensus Not Functional**
+## 🎯 **Current Status: Single-Node Alpha — Network Sync Not Functional**
 
 **Development Status**: ⚠️ **SINGLE-NODE ALPHA** - Services run individually but are NOT a decentralized mesh
 **Repository Status**: ✅ **MONOREPO** - 11 crates in core workspace, 6 services deployed to trust.hypermesh.online
-**Implementation Status**: ⚠️ **CRITICAL GAPS** - No real consensus (PoS is self-generated), no cross-node sync, certs are rcgen not FALCON-1024, DNS is local-only
+**Implementation Status**: ⚠️ **CRITICAL GAPS** - No real Proof of State (PoS is self-generated), no cross-node sync, certs are rcgen not FALCON-1024, DNS is local-only
 
 ---
 
@@ -45,7 +45,7 @@
 | **Engauge** | `/engauge` | ⚠️ **65% (19/29)** | No real data pipeline from services, metrics are local/mock |
 | **Gateway** | `/gateway` | ⚠️ **66% (18/27)** | HTTP/3 proxy works but STOQ bridge incomplete, no real PoS auth |
 | **Hypermesh-eBPF** | `/hypermesh-ebpf` | ⚡ **73% (14/19)** | eBPF framework real, PoS validation validates fake proofs |
-| **Lib** | `/lib` | ✅ **92% (25/27)** | Types correct, but consensus types exercised with fake data |
+| **Lib** | `/lib` | ✅ **92% (25/27)** | Types correct, but state proof types exercised with fake data |
 | **STOQ** | `/stoq` | ⚡ **72% (21/29)** | QUIC transport genuine, FALCON-1024 signing not integrated |
 | **TrustChain** | `/trustchain` | ⚠️ **53% (21/39)** | Single-node CA, certs are rcgen not FALCON, proofs are hardcoded |
 | **UI** | `/ui` | ⚠️ **32% (9/28)** | Components render, no real backend data connections |
@@ -92,7 +92,7 @@ scripts/deploy/deploy-all.sh              # One-command deployment
 
 ### **4. Performance Optimization**
 - ⚡ STOQ transport optimization (current: 2.95 Gbps, target: adaptive tiers)
-- ⚡ Multi-node consensus finality testing
+- ⚡ Multi-node Proof of State verification testing
 - ⚡ Real-world stress testing and profiling
 - ⚡ Production deployment hardening
 
@@ -100,18 +100,18 @@ scripts/deploy/deploy-all.sh              # One-command deployment
 
 ## 📋 **Core Architecture (Technical Reference)**
 
-### **Proof of State Four-Proof Consensus System (⚡ 50% Implemented)**
-**Location**: `/trustchain/src/consensus/` (primary implementation, re-exported by BlockMatrix)
-**Secondary**: `/blockmatrix/src/consensus/` (BlockMatrix-specific consensus orchestration)
+### **Proof of State Four-Proof System (⚡ 50% Implemented)**
+**Location**: `/trustchain/src/proof_of_state/` (primary implementation, re-exported by BlockMatrix)
+**Secondary**: `/blockmatrix/src/proof_of_state/` (BlockMatrix-specific state proof orchestration)
 **Reference**: Original NKrypt patterns adapted for production
 
 **CRITICAL**: Every asset requires ALL FOUR proofs (not split by type):
 - **PoSpace (PoSp)**: WHERE - storage location and physical/network location
-- **PoStake (PoSt)**: WHO - ownership, access rights, and economic stake  
+- **PoStake (PoSt)**: WHO - ownership, access rights, and economic stake
 - **PoWork (PoWk)**: WHAT/HOW - computational resources and processing
 - **PoTime (PoTm)**: WHEN - temporal ordering and timestamp validation
 
-**Combined**: Unified "Consensus Proof" answering WHERE/WHO/WHAT/WHEN for every block/asset
+**Combined**: Unified "State Proof" answering WHERE/WHO/WHAT/WHEN for every block/asset
 
 ### **HyperMesh Asset System (⚡ 60% Implemented)**
 **Location**: `/blockmatrix/src/assets/` (asset management library)
@@ -166,7 +166,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 **User Controls** (All Mandatory):
 - Resource allocation percentages (0-100% per resource type)
 - Concurrent usage limits, rewards configuration, duration limits
-- Consensus requirements (which proofs: PoSp/PoSt/PoWk/PoTm)
+- State proof requirements (which proofs: PoSp/PoSt/PoWk/PoTm)
 - Remote proxy settings (NAT-like addressing preferences)
 
 ### **Remote Proxy/NAT System (✅ Implemented)**
@@ -203,7 +203,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 
 **Key File Status**:
 - `/blockmatrix/src/blockchain/` - Single blockchain implementation (Device scope only)
-- `/blockmatrix/src/consensus/` - Basic PoS validation, no scope awareness
+- `/blockmatrix/src/proof_of_state/` - Basic PoS validation, no scope awareness
 
 #### Two Blockchain Scope Types
 
@@ -215,7 +215,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 **Participation Model**:
 - Node runs Device chain always (local, independent)
 - Node optionally joins one or more Network chains (synced via reflector pooling)
-- Each Network chain has independent consensus rules
+- Each Network chain has independent Proof of State rules
 - Gateway nodes bridge Device-to-Network and cross-network transfers
 - PrivacyMode controls transport behavior independently of chain scope
 
@@ -232,7 +232,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 - Controls packet tracking and identity disclosure
 - Independent of blockchain scope
 
-**BlockchainScope** (CONSENSUS layer):
+**BlockchainScope** (STATE REPLICATION layer):
 - Device (local-only), Network (synced across nodes)
 - Controls whether chain state is replicated
 - Independent of transport privacy
@@ -326,7 +326,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ **Asset SDK**: Plugin development and asset creation tools complete
 - ✅ **Syntax Validation**: Julia/Lua/WASM syntax validation (not execution)
 - ✅ **HyperMesh Integration**: Resource allocation through Asset Adapters
-- ⚡ **Consensus Proof Validation**: Integration in progress
+- ⚡ **State Proof Validation**: Integration in progress
 - ✅ **Network Address**: catalog.hypermesh.online (via TrustChain DNS)
 
 **Execution Model**:
@@ -382,13 +382,13 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 ## Privacy Flexibility Matrix (CRITICAL UNDERSTANDING)
 
-**Network layer (transport) is COMPLETELY INDEPENDENT from blockchain layer (consensus):**
+**Network layer (transport) is COMPLETELY INDEPENDENT from blockchain layer (state replication):**
 
 **Transport Layer** (STOQ PrivacyMode):
 - Anonymous (open, untracked), Private (bounded, tracked), Public (open, tracked)
 - Controls packet tracking and communication privacy
 
-**Consensus Layer** (BlockchainScope):
+**State Replication Layer** (BlockchainScope):
 - Device (local-only), Network (synced)
 - Controls whether chain state is replicated across nodes
 
@@ -456,8 +456,8 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 **Existing Implementation**:
 - `/blockmatrix/src/blockchain/` - Single blockchain implementation (Device scope only)
-- `/blockmatrix/src/consensus/` - Consensus orchestration (needs scope awareness)
-- `/trustchain/src/consensus/` - Core Proof of State implementation (primary)
+- `/blockmatrix/src/proof_of_state/` - State proof orchestration (needs scope awareness)
+- `/trustchain/src/proof_of_state/` - Core Proof of State implementation (primary)
 - `/blockmatrix/src/assets/adapters/` - Asset adapters (CPU/GPU/Memory/Storage/Network/Container)
 - `/blockmatrix/src/assets/proxy/` - Remote proxy/NAT system
 - `/stoq/src/transport/mod.rs` - QUIC transport with eBPF
@@ -478,21 +478,21 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ Separate protocols (TrustChain, STOQ, Catalog) from BlockMatrix
 - ✅ Everything is a BlockMatrix Asset with remote NAT-like addressing
 - ✅ IPv6-only networking throughout ecosystem
-- ✅ Four-proof consensus (PoSpace, PoStake, PoWork, PoTime) for all operations
+- ✅ Four-proof Proof of State (PoSpace, PoStake, PoWork, PoTime) for all operations
 - ✅ Quantum-resistant cryptography (FALCON-1024, Kyber)
 
 **Blockchain Architecture** (Clarified):
 - ✅ **Current State**: Single blockchain per node (Device scope only)
 - ✅ **Target State**: Device (local) + Network (synced) dual-scope model
-- ✅ **Layer Separation**: PrivacyMode (transport) ≠ BlockchainScope (consensus)
+- ✅ **Layer Separation**: PrivacyMode (transport) ≠ BlockchainScope (state replication)
 - ❌ **Network Scope Sync**: Reflector/swarm mode NOT yet implemented
 - ❌ **BlockchainScope Abstraction**: Device | Network pending
 
 **Privacy Architecture** (Clarified):
 - ✅ **Three PrivacyModes**: Anonymous | Private | Public (STOQ transport layer)
-- ✅ **Two Blockchain Scopes**: Device | Network (consensus layer)
+- ✅ **Two Blockchain Scopes**: Device | Network (state replication layer)
 - ✅ **Privacy Flexibility Matrix**: PrivacyMode ≠ BlockchainScope (independent dimensions)
-- ✅ **Transport + Consensus Independence**: Any PrivacyMode can carry any BlockchainScope
+- ✅ **Transport + State Replication Independence**: Any PrivacyMode can carry any BlockchainScope
 
 ---
 
@@ -508,7 +508,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 **Critical Understanding**:
 - **Current State**: Single blockchain per node (Device scope only), Network scope not yet implemented
-- **PrivacyMode vs BlockchainScope**: PrivacyMode (Anonymous/Private/Public) is TRANSPORT layer, BlockchainScope (Device/Network) is CONSENSUS layer
+- **PrivacyMode vs BlockchainScope**: PrivacyMode (Anonymous/Private/Public) is TRANSPORT layer, BlockchainScope (Device/Network) is STATE REPLICATION layer
 - **Layer Independence**: PrivacyMode and BlockchainScope are independent dimensions
 - **Target Architecture**: Nodes run Device chain always + optionally join Network chains via reflector pooling
 - The Block-MATRIX topology IS the trust mechanism - position in matrix determines trust relationships

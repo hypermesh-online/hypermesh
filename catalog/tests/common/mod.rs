@@ -40,7 +40,7 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
                     templates: vec![],
                 },
                 security: AssetSecurity {
-                    consensus_required: false,
+                    state_proof_required: false,
                     certificate_pinning: false,
                     hash_validation: "blake3".to_string(),
                     sandbox_level: "standard".to_string(),
@@ -70,7 +70,7 @@ pub fn create_test_package(name: &str, version: &str) -> AssetPackage {
                 },
                 execution: AssetExecution {
                     delegation_strategy: "nearest_node".to_string(),
-                    minimum_consensus: 1,
+                    minimum_state_proof: 1,
                     retry_policy: "none".to_string(),
                     max_concurrent: None,
                     priority: "normal".to_string(),

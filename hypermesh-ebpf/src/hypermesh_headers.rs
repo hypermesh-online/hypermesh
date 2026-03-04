@@ -18,7 +18,7 @@ pub const EXT_PRIVACY_TIER: u16 = 0x1003;
 
 /// Proof of State extension header
 ///
-/// Contains the four proofs required by HyperMesh consensus:
+/// Contains the four proofs required by HyperMesh Proof of State:
 /// - WHO: Proof of Stake (identity validation)
 /// - WHAT: Proof of Work (computational commitment)
 /// - WHEN: Proof of Time (temporal ordering)

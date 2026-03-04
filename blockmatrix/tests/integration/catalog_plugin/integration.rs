@@ -234,7 +234,7 @@ async fn test_asset_handlers() {
             "description": "Test library for validation",
             "packages": []
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(library_request).await.unwrap();
@@ -250,7 +250,7 @@ async fn test_asset_handlers() {
             "library": "test-library",
             "code": "function test() { return 42; }"
         }),
-        consensus_proof: None,
+        state_proof: None,
     };
 
     let response = extension.handle_request(package_request).await.unwrap();
@@ -291,7 +291,7 @@ async fn test_api_endpoints() {
             id: format!("test-{}", method),
             method: method.to_string(),
             params,
-            consensus_proof: None,
+            state_proof: None,
         };
 
         let response = extension.handle_request(request).await;

@@ -158,8 +158,8 @@ pub const TARGET_LATENCY_MS: u32 = 100; // Maximum acceptable latency
 
 /// Interface validation for cross-team integration
 pub trait NetworkIntegrationValidator {
-    /// Validate Team 2 can use network for consensus
-    fn validate_consensus_network_requirements(&self) -> Result<bool, NetworkError>;
+    /// Validate Team 2 can use network for state proof
+    fn validate_state_proof_network_requirements(&self) -> Result<bool, NetworkError>;
     
     /// Validate Team 3 can use network for security
     fn validate_security_network_requirements(&self) -> Result<bool, NetworkError>;

@@ -12,12 +12,12 @@
 // Common helpers
 // ============================================================================
 
-use blockmatrix::assets::ConsensusProof;
-use blockmatrix::consensus::proof_of_state_integration::{
+use blockmatrix::assets::StateProof;
+use blockmatrix::proof_of_state::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
 
-fn create_test_proof() -> ConsensusProof {
+fn create_test_proof() -> StateProof {
     let stake = StakeProof::new("test-holder".into(), "test-id".into(), 1000);
     let space = SpaceProof::new("test-node".into(), "/test".into(), 1024);
     let work = WorkProof::new(
@@ -29,7 +29,7 @@ fn create_test_proof() -> ConsensusProof {
         WorkState::Completed,
     );
     let time = TimeProof::new(std::time::Duration::from_secs(10));
-    ConsensusProof::new(stake, time, space, work)
+    StateProof::new(stake, time, space, work)
 }
 
 /// Helper: create a CatalogRegistry with lenient trust policy for testing.

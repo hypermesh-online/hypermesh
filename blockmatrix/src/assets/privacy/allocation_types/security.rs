@@ -69,7 +69,7 @@ pub enum AuthenticationMethod {
     Token,
     Biometric,
     Hardware,
-    ConsensusProof,
+    StateProof,
 }
 
 /// Session management requirements

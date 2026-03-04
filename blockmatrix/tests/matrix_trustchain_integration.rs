@@ -17,7 +17,7 @@ use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::blockchain_integration::{MatrixPositionValidator, ValidationStatus};
 use blockmatrix::network::validation::NetworkPositionValidator;
 use std::sync::Arc;
-use trustchain::consensus::ConsensusProof;
+use trustchain::proof_of_state::StateProof;
 
 #[tokio::test]
 async fn test_matrix_position_registration_flow() -> Result<()> {
@@ -38,16 +38,16 @@ async fn test_matrix_position_registration_flow() -> Result<()> {
     // Step 3: Create position validator with TrustChain integration
     let validator = MatrixPositionValidator::for_testing(blockchain.clone());
 
-    // Step 4: Generate consensus proof (all 4 proofs)
-    let consensus_proof = ConsensusProof::new_for_testing();
-    println!("Generated consensus proof with all 4 proofs (PoSpace, PoStake, PoWork, PoTime)");
+    // Step 4: Generate state proof (all 4 proofs)
+    let state_proof = StateProof::new_for_testing();
+    println!("Generated state proof with all 4 proofs (PoSpace, PoStake, PoWork, PoTime)");
 
     // Step 5: Register position on blockchain with PoS validation
     let registration = validator
         .register_position(
             coordinate,
             "integration_test_node".to_string(),
-            consensus_proof,
+            state_proof,
         )
         .await?;
 
@@ -77,7 +77,7 @@ async fn test_neighbor_discovery_with_validation() -> Result<()> {
     let validator = MatrixPositionValidator::for_testing(blockchain.clone());
 
     // Register center position
-    let center_proof = ConsensusProof::new_for_testing();
+    let center_proof = StateProof::new_for_testing();
     validator
         .register_position(center, "center_node".to_string(), center_proof)
         .await?;
@@ -94,7 +94,7 @@ async fn test_neighbor_discovery_with_validation() -> Result<()> {
     ];
 
     for (neighbor_coord, node_id) in &neighbors {
-        let proof = ConsensusProof::new_for_testing();
+        let proof = StateProof::new_for_testing();
         validator
             .register_position(*neighbor_coord, node_id.to_string(), proof)
             .await?;
@@ -148,7 +148,7 @@ async fn test_pos_validation_requirements() -> Result<()> {
     let validator = MatrixPositionValidator::new(blockchain);
 
     // Create a proof that might not meet production requirements
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
 
     // Try to register with potentially insufficient proof
     let result = validator
@@ -187,7 +187,7 @@ async fn test_duplicate_position_prevention() -> Result<()> {
     let validator = MatrixPositionValidator::for_testing(blockchain);
 
     // Register first node
-    let proof1 = ConsensusProof::new_for_testing();
+    let proof1 = StateProof::new_for_testing();
     let result1 = validator
         .register_position(coordinate, "first_node".to_string(), proof1)
         .await;
@@ -198,7 +198,7 @@ async fn test_duplicate_position_prevention() -> Result<()> {
     );
 
     // Try to register second node at same position
-    let proof2 = ConsensusProof::new_for_testing();
+    let proof2 = StateProof::new_for_testing();
     let result2 = validator
         .register_position(coordinate, "second_node".to_string(), proof2)
         .await;
@@ -224,7 +224,7 @@ async fn test_network_level_validation() -> Result<()> {
     let network_validator = NetworkPositionValidator::new(blockchain, false);
 
     // Validate a position at network level
-    let proof = ConsensusProof::new_for_testing();
+    let proof = StateProof::new_for_testing();
     let is_valid = network_validator
         .validate_node_position(coordinate, "network_node".to_string(), proof)
         .await?;
@@ -267,7 +267,7 @@ async fn test_central_vs_edge_position_requirements() -> Result<()> {
 
     // Test central position (near origin)
     let central = MatrixCoordinate::new(1, 1, 1)?;
-    let central_proof = ConsensusProof::new_for_testing();
+    let central_proof = StateProof::new_for_testing();
     let central_result = validator
         .register_position(central, "central_node".to_string(), central_proof)
         .await;
@@ -280,7 +280,7 @@ async fn test_central_vs_edge_position_requirements() -> Result<()> {
 
     // Test edge position (far from origin)
     let edge = MatrixCoordinate::new(1000, 1000, 1000)?;
-    let edge_proof = ConsensusProof::new_for_testing();
+    let edge_proof = StateProof::new_for_testing();
     let edge_result = validator
         .register_position(edge, "edge_node".to_string(), edge_proof)
         .await;

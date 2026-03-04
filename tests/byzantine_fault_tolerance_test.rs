@@ -22,12 +22,12 @@ use tokio::time::{timeout, Duration, Instant};
 
 // Component imports for Byzantine testing
 // TODO: Re-enable when trustchain and catalog are available in test context
-// use trustchain::{TrustChainNode, ConsensusNode, ConsensusMessage, NodeId as TrustNodeId};
-// use catalog::{ConsensusEngine, ConsensusProof, PoSpace, PoStake, PoWork, PoTime};
+// use trustchain::{TrustChainNode, StateProofNode, StateProofMessage, NodeId as TrustNodeId};
+// use catalog::{StateProofEngine, StateProof, PoSpace, PoStake, PoWork, PoTime};
 
 /// Real Byzantine fault tolerance test with actual malicious nodes
 #[tokio::test]
-async fn test_real_byzantine_consensus_attacks() -> Result<()> {
+async fn test_real_byzantine_state_proof_attacks() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     println!("🎯 Starting REAL Byzantine fault tolerance testing...");
@@ -44,12 +44,12 @@ async fn test_real_byzantine_consensus_attacks() -> Result<()> {
 
     // Phase 3: Verify Byzantine tolerance
     assert!(
-        attack_results.consensus_maintained,
-        "Consensus should be maintained under Byzantine attacks"
+        attack_results.state_verified,
+        "State proof verification should be maintained under Byzantine attacks"
     );
     assert!(
-        attack_results.honest_nodes_agreed >= 7,
-        "At least 7 honest nodes should agree"
+        attack_results.honest_nodes_verified >= 7,
+        "At least 7 honest nodes should have verified proofs"
     );
     assert!(
         attack_results.successful_blocks > 0,
@@ -58,12 +58,12 @@ async fn test_real_byzantine_consensus_attacks() -> Result<()> {
 
     println!("✅ Byzantine fault tolerance test PASSED");
     println!(
-        "   - Consensus maintained: {}",
-        attack_results.consensus_maintained
+        "   - State proof verification maintained: {}",
+        attack_results.state_verified
     );
     println!(
-        "   - Honest nodes in agreement: {}",
-        attack_results.honest_nodes_agreed
+        "   - Honest nodes with verified proofs: {}",
+        attack_results.honest_nodes_verified
     );
     println!(
         "   - Valid blocks produced: {}",
@@ -90,7 +90,7 @@ async fn create_byzantine_network(
     for i in 0..byzantine_nodes {
         let attack_type = match i % 3 {
             0 => ByzantineAttackType::DoubleSigning,
-            1 => ByzantineAttackType::InvalidConsensusProof,
+            1 => ByzantineAttackType::InvalidStateProof,
             2 => ByzantineAttackType::NetworkPartition,
             _ => ByzantineAttackType::DoubleSigning,
         };
@@ -112,41 +112,41 @@ async fn execute_byzantine_attacks(
     let test_duration = Duration::from_secs(10);
     let start_time = Instant::now();
 
-    let consensus_counter = Arc::new(AtomicUsize::new(0));
+    let verification_counter = Arc::new(AtomicUsize::new(0));
     let block_counter = Arc::new(AtomicUsize::new(0));
 
     // Start honest nodes
     let mut honest_handles = Vec::new();
     for node in honest_nodes {
         let node_clone = node.clone();
-        let consensus_counter_clone = consensus_counter.clone();
+        let verification_counter_clone = verification_counter.clone();
         let block_counter_clone = block_counter.clone();
 
         let handle = tokio::spawn(async move {
-            let mut consensus_rounds = 0;
+            let mut verification_rounds = 0;
             let mut successful_blocks = 0;
 
             while start_time.elapsed() < test_duration {
-                // Participate in consensus
-                match node_clone.participate_in_consensus().await {
-                    Ok(consensus_result) => {
-                        consensus_rounds += 1;
-                        consensus_counter_clone.fetch_add(1, Ordering::Relaxed);
+                // Submit state proof for verification
+                match node_clone.submit_state_proof().await {
+                    Ok(state_proof_result) => {
+                        verification_rounds += 1;
+                        verification_counter_clone.fetch_add(1, Ordering::Relaxed);
 
-                        if consensus_result.block_committed {
+                        if state_proof_result.block_committed {
                             successful_blocks += 1;
                             block_counter_clone.fetch_add(1, Ordering::Relaxed);
                         }
                     }
                     Err(e) => {
-                        eprintln!("Consensus failed: {}", e);
+                        eprintln!("State proof verification failed: {}", e);
                     }
                 }
 
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
 
-            (consensus_rounds, successful_blocks)
+            (verification_rounds, successful_blocks)
         });
         honest_handles.push(handle);
     }
@@ -170,18 +170,18 @@ async fn execute_byzantine_attacks(
     tokio::time::sleep(test_duration).await;
 
     // Collect results
-    let mut total_consensus_rounds = 0;
+    let mut total_verification_rounds = 0;
     let mut total_successful_blocks = 0;
-    let mut nodes_in_agreement = 0;
+    let mut nodes_with_verified_proofs = 0;
 
     for handle in honest_handles {
-        let (consensus_rounds, successful_blocks) = handle.await?;
-        total_consensus_rounds += consensus_rounds;
+        let (verification_rounds, successful_blocks) = handle.await?;
+        total_verification_rounds += verification_rounds;
         total_successful_blocks += successful_blocks;
 
-        // Count nodes that achieved consensus
-        if consensus_rounds > 0 {
-            nodes_in_agreement += 1;
+        // Count nodes that verified proofs
+        if verification_rounds > 0 {
+            nodes_with_verified_proofs += 1;
         }
     }
 
@@ -190,14 +190,14 @@ async fn execute_byzantine_attacks(
         handle.abort();
     }
 
-    // Determine if consensus was maintained
-    let consensus_maintained = nodes_in_agreement >= (honest_nodes.len() * 2 / 3);
+    // Determine if state proof verification was maintained
+    let state_verified = nodes_with_verified_proofs >= (honest_nodes.len() * 2 / 3);
 
     Ok(ByzantineTestResult {
-        consensus_maintained,
-        honest_nodes_agreed: nodes_in_agreement,
+        state_verified,
+        honest_nodes_verified: nodes_with_verified_proofs,
         successful_blocks: total_successful_blocks,
-        total_consensus_rounds,
+        total_verification_rounds,
         attack_duration: test_duration,
     })
 }
@@ -233,7 +233,7 @@ async fn connect_nodes_in_mesh(
 #[derive(Debug, Clone)]
 struct HonestNode {
     node_id: TrustNodeId,
-    consensus_engine: Arc<ConsensusEngine>,
+    state_proof_engine: Arc<StateProofEngine>,
     peers: Arc<tokio::sync::RwLock<Vec<TrustNodeId>>>,
 }
 
@@ -241,7 +241,7 @@ impl HonestNode {
     async fn new(node_id: String) -> Result<Self> {
         Ok(HonestNode {
             node_id: TrustNodeId::new(node_id),
-            consensus_engine: Arc::new(ConsensusEngine::new().await?),
+            state_proof_engine: Arc::new(StateProofEngine::new().await?),
             peers: Arc::new(tokio::sync::RwLock::new(Vec::new())),
         })
     }
@@ -258,30 +258,30 @@ impl HonestNode {
         Ok(())
     }
 
-    async fn participate_in_consensus(&self) -> Result<ConsensusResult> {
-        // Generate required consensus proofs for HyperMesh
+    async fn submit_state_proof(&self) -> Result<StateProofResult> {
+        // Generate required state proofs for HyperMesh
         let pos_proof = PoSpace::generate_proof(b"space_challenge")?;
         let post_proof = PoStake::generate_proof(1000, &self.node_id)?; // 1000 stake
         let pow_proof = PoWork::generate_proof(b"work_challenge")?;
         let pot_proof = PoTime::generate_proof(Instant::now())?;
 
-        let consensus_proof = ConsensusProof {
+        let state_proof = StateProof {
             pos_proof,
             post_proof,
             pow_proof,
             pot_proof,
         };
 
-        // Participate in consensus with real proofs
-        let consensus_result = self
-            .consensus_engine
-            .participate_in_round(&self.node_id, consensus_proof)
+        // Submit state proof for bilateral verification
+        let state_proof_result = self
+            .state_proof_engine
+            .participate_in_round(&self.node_id, state_proof)
             .await?;
 
-        Ok(ConsensusResult {
-            round_number: consensus_result.round,
-            block_committed: consensus_result.success,
-            node_votes: consensus_result.votes,
+        Ok(StateProofResult {
+            round_number: state_proof_result.round,
+            block_committed: state_proof_result.success,
+            proofs_verified: state_proof_result.votes,
         })
     }
 }
@@ -297,7 +297,7 @@ struct MaliciousNode {
 #[derive(Debug, Clone)]
 enum ByzantineAttackType {
     DoubleSigning,
-    InvalidConsensusProof,
+    InvalidStateProof,
     NetworkPartition,
 }
 
@@ -330,8 +330,8 @@ impl MaliciousNode {
             ByzantineAttackType::DoubleSigning => {
                 self.double_signing_attack().await?;
             }
-            ByzantineAttackType::InvalidConsensusProof => {
-                self.invalid_consensus_proof_attack().await?;
+            ByzantineAttackType::InvalidStateProof => {
+                self.invalid_state_proof_attack().await?;
             }
             ByzantineAttackType::NetworkPartition => {
                 self.network_partition_attack().await?;
@@ -342,18 +342,18 @@ impl MaliciousNode {
     }
 
     async fn double_signing_attack(&self) -> Result<()> {
-        // Create two conflicting consensus messages for the same round
+        // Create two conflicting state proof messages for the same round
         let mut rng = rand::thread_rng();
         let round = rng.gen_range(1..1000);
 
-        let message1 = ConsensusMessage {
+        let message1 = StateProofMessage {
             round,
             block_hash: "block_hash_1".to_string(),
             signature: "fake_signature_1".to_string(),
             sender: self.node_id.clone(),
         };
 
-        let message2 = ConsensusMessage {
+        let message2 = StateProofMessage {
             round,
             block_hash: "block_hash_2".to_string(), // Different block for same round
             signature: "fake_signature_2".to_string(),
@@ -364,8 +364,8 @@ impl MaliciousNode {
         let peers = self.peers.read().await;
         for peer in peers.iter() {
             // Simulate sending conflicting messages
-            self.send_consensus_message(peer, &message1).await?;
-            self.send_consensus_message(peer, &message2).await?;
+            self.send_state_proof_message(peer, &message1).await?;
+            self.send_state_proof_message(peer, &message2).await?;
         }
 
         println!(
@@ -375,9 +375,9 @@ impl MaliciousNode {
         Ok(())
     }
 
-    async fn invalid_consensus_proof_attack(&self) -> Result<()> {
-        // Generate invalid consensus proofs to try to fool the network
-        let invalid_proof = ConsensusProof {
+    async fn invalid_state_proof_attack(&self) -> Result<()> {
+        // Generate invalid state proofs to try to fool the network
+        let invalid_proof = StateProof {
             pos_proof: PoSpace::generate_fake_proof(), // Invalid proof
             post_proof: PoStake::generate_fake_proof(),
             pow_proof: PoWork::generate_fake_proof(),
@@ -389,7 +389,7 @@ impl MaliciousNode {
             self.send_invalid_proof(peer, &invalid_proof).await?;
         }
 
-        println!("🔴 ATTACK: Invalid consensus proof by {}", self.node_id);
+        println!("🔴 ATTACK: Invalid state proof by {}", self.node_id);
         Ok(())
     }
 
@@ -411,17 +411,17 @@ impl MaliciousNode {
         Ok(())
     }
 
-    async fn send_consensus_message(
+    async fn send_state_proof_message(
         &self,
         peer: &TrustNodeId,
-        message: &ConsensusMessage,
+        message: &StateProofMessage,
     ) -> Result<()> {
-        // Simulate sending malicious consensus message
+        // Simulate sending malicious state proof message
         tokio::time::sleep(Duration::from_millis(1)).await; // Network delay
         Ok(())
     }
 
-    async fn send_invalid_proof(&self, peer: &TrustNodeId, proof: &ConsensusProof) -> Result<()> {
+    async fn send_invalid_proof(&self, peer: &TrustNodeId, proof: &StateProof) -> Result<()> {
         // Simulate sending invalid proof
         tokio::time::sleep(Duration::from_millis(1)).await;
         Ok(())
@@ -439,23 +439,23 @@ impl MaliciousNode {
 }
 
 #[derive(Debug)]
-struct ConsensusResult {
+struct StateProofResult {
     round_number: u64,
     block_committed: bool,
-    node_votes: usize,
+    proofs_verified: usize,
 }
 
 #[derive(Debug)]
 struct ByzantineTestResult {
-    consensus_maintained: bool,
-    honest_nodes_agreed: usize,
+    state_verified: bool,
+    honest_nodes_verified: usize,
     successful_blocks: usize,
-    total_consensus_rounds: usize,
+    total_verification_rounds: usize,
     attack_duration: Duration,
 }
 
 #[derive(Debug)]
-struct ConsensusMessage {
+struct StateProofMessage {
     round: u64,
     block_hash: String,
     signature: String,

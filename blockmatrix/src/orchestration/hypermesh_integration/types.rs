@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
 use crate::assets::core::{
-    AssetAllocation, AssetStatus, AssetType, ConsensusProof, PrivacyMode, WorkloadType,
+    AssetAllocation, AssetStatus, AssetType, StateProof, PrivacyMode, WorkloadType,
 };
 use crate::container::runtime::ContainerHandle;
 use crate::container::{ContainerId, ContainerStatus};
@@ -19,8 +19,8 @@ use crate::container::{ContainerId, ContainerStatus};
 pub struct HyperMeshIntegrationConfig {
     /// Enable automatic asset allocation for containers
     pub auto_asset_allocation: bool,
-    /// Enable consensus validation for container operations
-    pub enable_consensus_validation: bool,
+    /// Enable state proof validation for container operations
+    pub enable_state_validation: bool,
     /// Default privacy level for container assets
     pub default_privacy_level: PrivacyMode,
     /// Resource allocation strategy
@@ -37,7 +37,7 @@ impl Default for HyperMeshIntegrationConfig {
     fn default() -> Self {
         Self {
             auto_asset_allocation: true,
-            enable_consensus_validation: true,
+            enable_state_validation: true,
             default_privacy_level: PrivacyMode::PRIVATE,
             resource_allocation_strategy: ResourceAllocationStrategy::Balanced,
             max_containers_per_node: 100,
@@ -80,8 +80,8 @@ pub struct HyperMeshContainerSpec {
     pub container_spec: crate::container::ContainerSpec,
     /// Required asset allocations
     pub required_assets: HashMap<AssetType, AssetRequirements>,
-    /// Consensus proof for deployment
-    pub consensus_proof: ConsensusProof,
+    /// State proof for deployment
+    pub state_proof: StateProof,
     /// Privacy requirements
     pub privacy_requirements: PrivacyRequirements,
     /// Performance requirements

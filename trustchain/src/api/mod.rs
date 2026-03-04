@@ -12,7 +12,7 @@ use std::net::Ipv6Addr;
 use std::time::SystemTime;
 
 use crate::ca::IssuedCertificate;
-use crate::consensus::ConsensusProof;
+use crate::proof_of_state::StateProof;
 use crate::ct::SignedCertificateTimestamp;
 use crate::dns::DnsResponse;
 
@@ -75,7 +75,7 @@ pub struct ServiceHealth {
     pub ca: bool,
     pub ct: bool,
     pub dns: bool,
-    pub consensus: bool,
+    pub state_proof: bool,
 }
 
 /// Health check response
@@ -94,7 +94,7 @@ pub struct CertificateIssueRequest {
     pub san_entries: Vec<String>,
     pub node_id: String,
     pub ipv6_addresses: Vec<Ipv6Addr>,
-    pub consensus_proof: ConsensusProof,
+    pub state_proof: StateProof,
 }
 
 /// Certificate response
@@ -140,28 +140,28 @@ pub struct CertificateValidationResponse {
     pub ca_verified: bool,
 }
 
-/// Consensus validation request
+/// State proof validation request
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConsensusValidationRequest {
-    pub consensus_proof: ConsensusProof,
+pub struct StateProofValidationRequest {
+    pub state_proof: StateProof,
     pub operation: String,
 }
 
-/// Consensus validation response
+/// State proof validation response
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConsensusValidationResponse {
+pub struct StateProofValidationResponse {
     pub is_valid: bool,
-    pub validation_details: ConsensusValidationDetails,
+    pub validation_details: StateProofValidationDetails,
 }
 
-/// Consensus validation details
+/// State proof validation details
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ConsensusValidationDetails {
+pub struct StateProofValidationDetails {
     pub stake_valid: bool,
     pub time_valid: bool,
     pub space_valid: bool,
     pub work_valid: bool,
-    pub overall_score: f64,
+    pub all_valid: bool,
 }
 
 #[cfg(test)]
@@ -186,7 +186,7 @@ mod tests {
                 ca: true,
                 ct: true,
                 dns: true,
-                consensus: true,
+                state_proof: true,
             },
         };
 
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_certificate_request_deserialization() {
-        use crate::consensus::ConsensusProof;
+        use crate::proof_of_state::StateProof;
 
         // Test deserialization with simplified approach
         let request = CertificateIssueRequest {
@@ -208,7 +208,7 @@ mod tests {
             ],
             node_id: "node123".to_string(),
             ipv6_addresses: vec![std::net::Ipv6Addr::LOCALHOST],
-            consensus_proof: ConsensusProof::default_for_testing(),
+            state_proof: StateProof::default_for_testing(),
         };
 
         // Test serialization/deserialization roundtrip

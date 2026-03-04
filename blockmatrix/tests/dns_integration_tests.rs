@@ -6,17 +6,17 @@
 //!
 //! Sprint 3.3: Test scenarios for Nike (mixed), Bank (portal+private), Gov (fully federated)
 
-use blockmatrix::consensus::proof_of_state_integration::{
+use blockmatrix::proof_of_state::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
 };
-use blockmatrix::consensus::ConsensusProof;
+use blockmatrix::proof_of_state::StateProof;
 use blockmatrix::dns::*;
 use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-/// Create test consensus proof
-fn create_test_proof() -> ConsensusProof {
+/// Create test state proof
+fn create_test_proof() -> StateProof {
     let stake = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
     let time = TimeProof::new(Duration::from_secs(10));
     let space = SpaceProof::new(
@@ -33,7 +33,7 @@ fn create_test_proof() -> ConsensusProof {
         WorkState::Completed,
     );
 
-    ConsensusProof::new(stake, time, space, work)
+    StateProof::new(stake, time, space, work)
 }
 
 /// Create test DNS record
