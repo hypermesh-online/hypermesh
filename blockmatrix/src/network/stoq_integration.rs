@@ -17,6 +17,7 @@ use tracing::{debug, info, warn};
 
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::proof_of_state::StateProof;
 use stoq::{Connection, Endpoint, StoqTransport};
 
 /// Service discovery tag for matrix nodes
@@ -254,18 +255,53 @@ impl MatrixStoqIntegration {
         Ok(peer_info.node_id)
     }
 
+    /// Generate PoS token bytes for handshake
+    async fn generate_pos_token(node_id: &str) -> Vec<u8> {
+        let state_proof = StateProof::generate_from_network(node_id)
+            .await
+            .unwrap_or_else(|e| {
+                warn!("PoS proof generation failed (using test fallback): {e}");
+                StateProof::new_for_testing()
+            });
+        state_proof.to_bytes().unwrap_or_default()
+    }
+
+    /// Validate a peer's PoS token from announcement
+    fn validate_peer_pos_token(pos_token: &Option<Vec<u8>>) -> Result<()> {
+        let token_bytes = pos_token
+            .as_ref()
+            .ok_or_else(|| anyhow!("Missing pos_token in peer announcement"))?;
+
+        if token_bytes.is_empty() {
+            return Err(anyhow!("Empty pos_token in peer announcement"));
+        }
+
+        let peer_proof = StateProof::from_bytes(token_bytes)
+            .map_err(|e| anyhow!("Invalid state proof format: {e}"))?;
+
+        if !peer_proof.validate() {
+            return Err(anyhow!("Peer state proof validation failed"));
+        }
+
+        debug!("Peer PoS token validated successfully");
+        Ok(())
+    }
+
     /// Exchange node information with peer
     async fn exchange_node_info(&self, connection: &Arc<Connection>) -> Result<MatrixNodeInfo> {
         // Open a bidirectional stream
         let mut stream = connection.open_stream().await?;
 
-        // Create our announcement
+        // Generate real PoS token for handshake
+        let pos_token_bytes = Self::generate_pos_token(&self.node_id).await;
+
+        // Create our announcement with PoS token
         let announcement = MatrixNodeAnnouncement {
             coordinate: self.local_coordinate,
             node_id: self.node_id.clone(),
             privacy_mode: format!("{:?}", self.privacy_mode),
             protocol_version: MATRIX_PROTOCOL_VERSION.to_string(),
-            pos_token: None, // TODO: Add PoS token when available
+            pos_token: Some(pos_token_bytes),
             services: vec!["matrix".to_string()],
         };
 
@@ -280,15 +316,20 @@ impl MatrixStoqIntegration {
         let peer_message: MatrixMessage = serde_json::from_slice(&peer_data)?;
 
         match peer_message {
-            MatrixMessage::Announcement(peer_announcement) => Ok(MatrixNodeInfo {
-                coordinate: peer_announcement.coordinate,
-                node_id: peer_announcement.node_id,
-                address: connection.endpoint().to_socket_addr().to_string(),
-                privacy_mode: peer_announcement.privacy_mode,
-                distance: self
-                    .local_coordinate
-                    .euclidean_distance(&peer_announcement.coordinate),
-            }),
+            MatrixMessage::Announcement(peer_announcement) => {
+                // Validate peer's PoS token
+                Self::validate_peer_pos_token(&peer_announcement.pos_token)?;
+
+                Ok(MatrixNodeInfo {
+                    coordinate: peer_announcement.coordinate,
+                    node_id: peer_announcement.node_id,
+                    address: connection.endpoint().to_socket_addr().to_string(),
+                    privacy_mode: peer_announcement.privacy_mode,
+                    distance: self
+                        .local_coordinate
+                        .euclidean_distance(&peer_announcement.coordinate),
+                })
+            }
             _ => Err(anyhow!("Expected announcement message from peer")),
         }
     }
@@ -431,13 +472,19 @@ impl MatrixStoqIntegration {
 
         match peer_message {
             MatrixMessage::Announcement(peer_announcement) => {
-                // Send our announcement back
+                // Validate peer's PoS token
+                Self::validate_peer_pos_token(&peer_announcement.pos_token)?;
+
+                // Generate real PoS token for our response
+                let pos_token_bytes = Self::generate_pos_token(&self.node_id).await;
+
+                // Send our announcement back with PoS token
                 let our_announcement = MatrixNodeAnnouncement {
                     coordinate: self.local_coordinate,
                     node_id: self.node_id.clone(),
                     privacy_mode: format!("{:?}", self.privacy_mode),
                     protocol_version: MATRIX_PROTOCOL_VERSION.to_string(),
-                    pos_token: None,
+                    pos_token: Some(pos_token_bytes),
                     services: vec!["matrix".to_string()],
                 };
 

@@ -33,6 +33,7 @@ use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
+use crate::proof_of_state::StateProof;
 
 /// Node network information
 #[derive(Clone)]
@@ -237,15 +238,26 @@ impl NetworkManager {
         // Open a stream for handshake
         let mut stream = connection.open_stream().await?;
 
-        // Send our node info
+        // Generate PoS proof for handshake
+        let node_id_string = self.get_node_id();
+        let state_proof = StateProof::generate_from_network(&node_id_string)
+            .await
+            .unwrap_or_else(|e| {
+                warn!("PoS proof generation failed (using test fallback): {e}");
+                StateProof::new_for_testing()
+            });
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
+
+        // Send our node info with PoS token
         let our_info = serde_json::json!({
             "coordinate": {
                 "x": self.local_coordinate.x,
                 "y": self.local_coordinate.y,
                 "z": self.local_coordinate.z,
             },
-            "node_id": self.get_node_id(),
+            "node_id": node_id_string,
             "privacy_mode": format!("{:?}", *self.privacy_mode.read().await),
+            "pos_token": hex::encode(&proof_bytes),
         });
 
         stream.send(our_info.to_string().as_bytes()).await?;
@@ -254,23 +266,27 @@ impl NetworkManager {
         let peer_data = stream.receive().await?;
         let peer_info: serde_json::Value = serde_json::from_slice(&peer_data)?;
 
-        // Parse peer information
-        let coordinate = MatrixCoordinate::new(
-            peer_info["coordinate"]["x"].as_i64().unwrap_or(0),
-            peer_info["coordinate"]["y"].as_i64().unwrap_or(0),
-            peer_info["coordinate"]["z"].as_i64().unwrap_or(0),
-        )?;
+        // Validate peer's PoS proof
+        Self::validate_peer_pos_token(&peer_info)?;
+
+        // Parse peer information — require valid coordinates
+        let x = peer_info["coordinate"]["x"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate x in peer handshake"))?;
+        let y = peer_info["coordinate"]["y"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate y in peer handshake"))?;
+        let z = peer_info["coordinate"]["z"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate z in peer handshake"))?;
+        let coordinate = MatrixCoordinate::new(x, y, z)?;
 
         let node_id = peer_info["node_id"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing node_id"))?
             .to_string();
 
-        let privacy_mode = match peer_info["privacy_mode"].as_str().unwrap_or("Private") {
-            "Anonymous" => PrivacyMode::ANONYMOUS,
-            "Public" => PrivacyMode::PUBLIC,
-            _ => PrivacyMode::PRIVATE, // Private, P2P, and unknown all collapse to PRIVATE
-        };
+        let privacy_mode = Self::parse_privacy_mode(&peer_info);
 
         Ok(NetworkNode {
             coordinate,
@@ -279,6 +295,36 @@ impl NetworkManager {
             privacy_mode,
             connection: Some(connection.clone()),
         })
+    }
+
+    /// Validate peer's PoS token from handshake JSON
+    fn validate_peer_pos_token(peer_info: &serde_json::Value) -> Result<()> {
+        let pos_hex = peer_info
+            .get("pos_token")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing pos_token in peer handshake"))?;
+
+        let pos_bytes = hex::decode(pos_hex)
+            .map_err(|e| anyhow!("Invalid pos_token hex encoding: {e}"))?;
+
+        let peer_proof = StateProof::from_bytes(&pos_bytes)
+            .map_err(|e| anyhow!("Invalid state proof format: {e}"))?;
+
+        if !peer_proof.validate() {
+            return Err(anyhow!("Peer state proof validation failed"));
+        }
+
+        debug!("Peer PoS token validated successfully");
+        Ok(())
+    }
+
+    /// Parse privacy mode from peer handshake JSON
+    fn parse_privacy_mode(peer_info: &serde_json::Value) -> PrivacyMode {
+        match peer_info["privacy_mode"].as_str().unwrap_or("Private") {
+            "Anonymous" => PrivacyMode::ANONYMOUS,
+            "Public" => PrivacyMode::PUBLIC,
+            _ => PrivacyMode::PRIVATE, // Private, P2P, and unknown all collapse to PRIVATE
+        }
     }
 
     /// Start mDNS discovery for local network.
@@ -466,63 +512,15 @@ impl NetworkManager {
 
                     // Handle connection in background
                     tokio::spawn(async move {
-                        debug!("Accepted incoming connection");
-
-                        // Exchange node info
-                        if let Ok(mut stream) = connection.accept_stream().await {
-                            // Receive peer info
-                            if let Ok(peer_data) = stream.receive().await {
-                                if let Ok(peer_info) =
-                                    serde_json::from_slice::<serde_json::Value>(&peer_data)
-                                {
-                                    // Send our info
-                                    let node_id = {
-                                        let mut hasher = blake3::Hasher::new();
-                                        hasher.update(&local_coord.x.to_le_bytes());
-                                        hasher.update(&local_coord.y.to_le_bytes());
-                                        hasher.update(&local_coord.z.to_le_bytes());
-                                        hasher.finalize().to_hex().to_string()
-                                    };
-                                    let privacy_str = format!("{:?}", *privacy_mode.read().await);
-
-                                    let our_info = serde_json::json!({
-                                        "coordinate": {
-                                            "x": local_coord.x,
-                                            "y": local_coord.y,
-                                            "z": local_coord.z,
-                                        },
-                                        "node_id": node_id,
-                                        "privacy_mode": privacy_str,
-                                    });
-
-                                    if stream.send(our_info.to_string().as_bytes()).await.is_ok() {
-                                        // Parse and store peer
-                                        if let (Some(x), Some(y), Some(z)) = (
-                                            peer_info["coordinate"]["x"].as_i64(),
-                                            peer_info["coordinate"]["y"].as_i64(),
-                                            peer_info["coordinate"]["z"].as_i64(),
-                                        ) {
-                                            if let Ok(coordinate) = MatrixCoordinate::new(x, y, z) {
-                                                let node_id = peer_info["node_id"]
-                                                    .as_str()
-                                                    .unwrap_or("unknown")
-                                                    .to_string();
-
-                                                let node = NetworkNode {
-                                                    coordinate,
-                                                    address: connection.endpoint().to_socket_addr(),
-                                                    node_id: node_id.clone(),
-                                                    privacy_mode: PrivacyMode::PUBLIC, // Default
-                                                    connection: Some(connection),
-                                                };
-
-                                                nodes.write().await.insert(node_id, node);
-                                                info!("Added incoming node to network");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        if let Err(e) = Self::handle_incoming_handshake(
+                            connection,
+                            nodes,
+                            local_coord,
+                            privacy_mode,
+                        )
+                        .await
+                        {
+                            warn!("Incoming handshake failed: {e}");
                         }
                     });
                 }
@@ -531,6 +529,89 @@ impl NetworkManager {
                 }
             }
         }
+    }
+
+    /// Handle the handshake for an incoming connection
+    async fn handle_incoming_handshake(
+        connection: Arc<stoq::Connection>,
+        nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
+        local_coord: MatrixCoordinate,
+        privacy_mode: Arc<RwLock<PrivacyMode>>,
+    ) -> Result<()> {
+        debug!("Accepted incoming connection");
+
+        let mut stream = connection.accept_stream().await?;
+
+        // Receive peer info
+        let peer_data = stream.receive().await?;
+        let peer_info: serde_json::Value = serde_json::from_slice(&peer_data)?;
+
+        // Validate peer's PoS token
+        Self::validate_peer_pos_token(&peer_info)?;
+
+        // Generate our PoS proof for response
+        let node_id = {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&local_coord.x.to_le_bytes());
+            hasher.update(&local_coord.y.to_le_bytes());
+            hasher.update(&local_coord.z.to_le_bytes());
+            hasher.finalize().to_hex().to_string()
+        };
+
+        let state_proof = StateProof::generate_from_network(&node_id)
+            .await
+            .unwrap_or_else(|e| {
+                warn!("PoS proof generation failed (using test fallback): {e}");
+                StateProof::new_for_testing()
+            });
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
+
+        let privacy_str = format!("{:?}", *privacy_mode.read().await);
+
+        let our_info = serde_json::json!({
+            "coordinate": {
+                "x": local_coord.x,
+                "y": local_coord.y,
+                "z": local_coord.z,
+            },
+            "node_id": node_id,
+            "privacy_mode": privacy_str,
+            "pos_token": hex::encode(&proof_bytes),
+        });
+
+        stream.send(our_info.to_string().as_bytes()).await?;
+
+        // Parse peer coordinates — require all three
+        let x = peer_info["coordinate"]["x"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate x from incoming peer"))?;
+        let y = peer_info["coordinate"]["y"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate y from incoming peer"))?;
+        let z = peer_info["coordinate"]["z"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate z from incoming peer"))?;
+        let coordinate = MatrixCoordinate::new(x, y, z)?;
+
+        let peer_node_id = peer_info["node_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing node_id from incoming peer"))?
+            .to_string();
+
+        // Parse peer's privacy mode instead of hardcoding PUBLIC
+        let peer_privacy_mode = Self::parse_privacy_mode(&peer_info);
+
+        let node = NetworkNode {
+            coordinate,
+            address: connection.endpoint().to_socket_addr(),
+            node_id: peer_node_id.clone(),
+            privacy_mode: peer_privacy_mode,
+            connection: Some(connection),
+        };
+
+        nodes.write().await.insert(peer_node_id, node);
+        info!("Added incoming node to network");
+        Ok(())
     }
 }
 

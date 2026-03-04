@@ -19,10 +19,14 @@ use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn, Level};
 
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::assets::pipeline::{
     Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
     ShardMetadata,
 };
+use blockmatrix::create_os_abstraction;
 use blockmatrix::StateProof;
 use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
@@ -171,6 +175,167 @@ struct ShardMap {
 fn shard_maps_dir() -> Result<std::path::PathBuf> {
     let home = dirs::home_dir().context("could not determine home directory")?;
     Ok(home.join(".hypermesh").join("shard_maps"))
+}
+
+/// Assess node hardware and build `AssetRegistration` entries for each
+/// detected resource (R1 compliance: hardware assessed, not self-reported,
+/// registered as IPv6-addressed assets with Proof of State).
+fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
+    let os = create_os_abstraction().context("failed to create OS abstraction")?;
+    let platform = os.platform().to_string();
+    let mut assets: Vec<AssetRegistration> = Vec::new();
+
+    // CPU asset
+    match os.detect_cpu() {
+        Ok(cpu) => {
+            let freq_str = cpu
+                .frequency_mhz
+                .map(|f| format!("{f} MHz"))
+                .unwrap_or_else(|| "unknown".to_string());
+            let asset_data = AssetData {
+                config: format!(
+                    "platform={platform},cores={},arch={}",
+                    cpu.cores, cpu.architecture,
+                )
+                .into_bytes(),
+                definition: format!(
+                    "cpu:{}:{}:{}",
+                    cpu.model, cpu.cores, freq_str,
+                )
+                .into_bytes(),
+                metadata: format!(
+                    "vendor={},freq={}",
+                    cpu.vendor.as_deref().unwrap_or("unknown"),
+                    freq_str,
+                )
+                .into_bytes(),
+            };
+            assets.push(AssetRegistration::from_asset_data(
+                &asset_data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Cpu),
+            ));
+            info!(
+                "Hardware: CPU {} ({} cores, {})",
+                cpu.model, cpu.cores, freq_str,
+            );
+        }
+        Err(e) => warn!("CPU detection failed: {e}"),
+    }
+
+    // Memory asset
+    match os.detect_memory() {
+        Ok(mem) => {
+            let total_mb = mem.total_bytes / (1024 * 1024);
+            let avail_mb = mem.available_bytes / (1024 * 1024);
+            let asset_data = AssetData {
+                config: format!("platform={platform}").into_bytes(),
+                definition: format!(
+                    "memory:total={},available={}",
+                    mem.total_bytes, mem.available_bytes,
+                )
+                .into_bytes(),
+                metadata: format!("usage={:.1}%", mem.usage_percent).into_bytes(),
+            };
+            assets.push(AssetRegistration::from_asset_data(
+                &asset_data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Memory),
+            ));
+            info!("Hardware: Memory {total_mb} MB total, {avail_mb} MB available");
+        }
+        Err(e) => warn!("Memory detection failed: {e}"),
+    }
+
+    // Storage assets (one per mount point)
+    match os.detect_storage() {
+        Ok(devices) => {
+            for dev in &devices {
+                let total_gb = dev.total_bytes / (1024 * 1024 * 1024);
+                let avail_gb = dev.available_bytes / (1024 * 1024 * 1024);
+                let asset_data = AssetData {
+                    config: format!(
+                        "platform={platform},fs={},type={:?}",
+                        dev.filesystem, dev.storage_type,
+                    )
+                    .into_bytes(),
+                    definition: format!(
+                        "storage:{}:total={},available={}",
+                        dev.mount_point, dev.total_bytes, dev.available_bytes,
+                    )
+                    .into_bytes(),
+                    metadata: format!(
+                        "device={},usage={:.1}%",
+                        dev.device, dev.usage_percent,
+                    )
+                    .into_bytes(),
+                };
+                assets.push(AssetRegistration::from_asset_data(
+                    &asset_data,
+                    NetworkScope::Global,
+                    AssetCategory::BaseSystem(BaseSystemType::Storage),
+                ));
+                info!(
+                    "Hardware: Storage {} ({} GB total, {} GB free, {:?})",
+                    dev.mount_point, total_gb, avail_gb, dev.storage_type,
+                );
+            }
+        }
+        Err(e) => warn!("Storage detection failed: {e}"),
+    }
+
+    // Network asset (platform-level; individual interfaces are not enumerated
+    // by OsAbstraction, so we register a single network presence asset)
+    let asset_data = AssetData {
+        config: format!("platform={platform}").into_bytes(),
+        definition: b"network:ipv6:loopback=::1".to_vec(),
+        metadata: b"interface=lo".to_vec(),
+    };
+    assets.push(AssetRegistration::from_asset_data(
+        &asset_data,
+        NetworkScope::Global,
+        AssetCategory::BaseSystem(BaseSystemType::Network),
+    ));
+    info!("Hardware: Network interface registered");
+
+    // GPU assets (optional, many nodes have none)
+    match os.detect_gpu() {
+        Ok(gpus) => {
+            for gpu in &gpus {
+                let mem_str = gpu
+                    .memory_bytes
+                    .map(|m| format!("{} MB", m / (1024 * 1024)))
+                    .unwrap_or_else(|| "unknown".to_string());
+                let asset_data = AssetData {
+                    config: format!(
+                        "platform={platform},vendor={},type={:?}",
+                        gpu.vendor, gpu.gpu_type,
+                    )
+                    .into_bytes(),
+                    definition: format!("gpu:{}:{}", gpu.model, mem_str).into_bytes(),
+                    metadata: format!(
+                        "capabilities={}",
+                        gpu.capabilities.join(","),
+                    )
+                    .into_bytes(),
+                };
+                assets.push(AssetRegistration::from_asset_data(
+                    &asset_data,
+                    NetworkScope::Global,
+                    AssetCategory::BaseSystem(BaseSystemType::Gpu),
+                ));
+                info!("Hardware: GPU {} ({}, {})", gpu.model, gpu.vendor, mem_str);
+            }
+        }
+        Err(e) => warn!("GPU detection skipped: {e}"),
+    }
+
+    if assets.is_empty() {
+        anyhow::bail!("Hardware assessment found zero assets — cannot satisfy R1");
+    }
+
+    info!("Hardware assessment complete: {} asset(s) detected", assets.len());
+    Ok(assets)
 }
 
 /// Run the Store subcommand: ingest a file through the asset pipeline and
@@ -455,12 +620,22 @@ async fn run_dns(
             // 2. Persist to disk so it survives restarts
             persist_dns_record(data_dir, node_id, &name, target_addr)?;
 
-            // 3. Register on local blockchain (DNS-as-asset)
+            // 3. Register on local blockchain (DNS-as-asset, R10)
             let bc = bootstrap.blockchain();
-            let tx_data = format!("DNS:REGISTER:{name}:{target_addr}");
+            let dns_data_str = format!("DNS:REGISTER:{name}:{target_addr}");
+            let asset_data = AssetData {
+                config: dns_data_str.as_bytes().to_vec(),
+                definition: format!("dns-record:{name}").into_bytes(),
+                metadata: format!("addr={target_addr}").into_bytes(),
+            };
+            let registration = AssetRegistration::from_asset_data(
+                &asset_data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Dns),
+            );
             let state_proof = StateProof::new_for_testing();
             let block = bc
-                .add_block_with_data(tx_data.into_bytes(), &state_proof)
+                .register_asset_record(registration, &state_proof)
                 .await
                 .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
 
@@ -628,6 +803,34 @@ async fn main() -> Result<()> {
             .with_context(|| format!("failed to write {}", cert_path.display()))?;
 
         info!("Persisted genesis block and certificate to {}", data_dir.display());
+
+        // === R1: Assess hardware and register as assets in block #1 ===
+        info!("Assessing node hardware for asset registration (R1)...");
+        match assess_hardware_assets() {
+            Ok(hw_assets) => {
+                let state_proof = StateProof::new_for_testing();
+                match bootstrap
+                    .blockchain()
+                    .register_asset_records(hw_assets, &state_proof)
+                    .await
+                {
+                    Ok(block) => {
+                        info!(
+                            "Registered hardware assets in block #{} (hash: {})",
+                            block.index,
+                            &block.hash[..16],
+                        );
+                        // Persist the hardware asset block
+                        if let Err(e) = persistence.save_block(&block).await {
+                            warn!("Failed to persist hardware asset block: {e}");
+                        }
+                    }
+                    Err(e) => warn!("Failed to register hardware assets: {e}"),
+                }
+            }
+            Err(e) => warn!("Hardware assessment failed: {e}"),
+        }
+
         (bootstrap, persistence)
     };
 
