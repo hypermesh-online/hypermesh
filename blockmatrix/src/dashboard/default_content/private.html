@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HyperMesh Dashboard</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+        h1 { color: #1a1a2e; }
+        .card { background: #f8f9fa; border: 1px solid #dee2e6; padding: 16px; border-radius: 8px; margin: 12px 0; }
+        .metric { font-size: 1.5em; font-weight: bold; color: #1a1a2e; }
+        .label { color: #6c757d; font-size: 0.85em; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    </style>
+</head>
+<body>
+    <h1>HyperMesh Dashboard</h1>
+    <div class="grid">
+        <div class="card"><div class="label">Chain Height</div><div class="metric" id="height">...</div></div>
+        <div class="card"><div class="label">Peers</div><div class="metric" id="peers">...</div></div>
+        <div class="card"><div class="label">Uptime</div><div class="metric" id="uptime">...</div></div>
+        <div class="card"><div class="label">Privacy Mode</div><div class="metric" id="privacy">...</div></div>
+    </div>
+    <h2>DNS Records</h2>
+    <div id="dns-list">Loading...</div>
+    <script>
+        async function refresh() {
+            try {
+                const r = await fetch('/api/v1/blockmatrix/status');
+                if (r.ok) {
+                    const d = await r.json();
+                    document.getElementById('height').textContent = d.chain_height || '0';
+                    document.getElementById('peers').textContent = d.peers || '0';
+                    document.getElementById('uptime').textContent = (d.uptime_secs || 0) + 's';
+                    document.getElementById('privacy').textContent = d.privacy_mode || 'unknown';
+                }
+            } catch(e) {
+                console.error('Status fetch failed:', e);
+            }
+        }
+        refresh();
+        setInterval(refresh, 30000);
+    </script>
+</body>
+</html>

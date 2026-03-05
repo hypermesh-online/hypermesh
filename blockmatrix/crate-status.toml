@@ -87,6 +87,12 @@ items = [
     "Domain CLI (register, create, list, nodes, invite subcommands)",
     "Join command — join a domain network with optional invitation token",
     "Domain IPC handlers (domain.register, domain.list, domain.join)",
+    # Dashboard system (Phase 3)
+    "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private/admin)",
+    "Dashboard CLI (deploy, list, info, init/scaffold)",
+    "Dashboard IPC handlers (dashboard.list, dashboard.info)",
+    "Default dashboard HTML (public welcome, private live metrics, admin controls)",
+    "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs",
 ]
 
 [features.in_development]

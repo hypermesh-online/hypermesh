@@ -86,7 +86,12 @@ export const crateStatuses: CrateStatus[] = [
         "Domain invitation tokens — BLAKE3-HMAC keyed by owner proof, time-bounded",
         "Domain CLI (register, create, list, nodes, invite subcommands)",
         "Join command — join a domain network with optional invitation token",
-        "Domain IPC handlers (domain.register, domain.list, domain.join)"
+        "Domain IPC handlers (domain.register, domain.list, domain.join)",
+        "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private/admin)",
+        "Dashboard CLI (deploy, list, info, init/scaffold)",
+        "Dashboard IPC handlers (dashboard.list, dashboard.info)",
+        "Default dashboard HTML (public welcome, private live metrics, admin controls)",
+        "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs"
       ],
       "inDevelopment": [
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
@@ -191,6 +196,7 @@ export const crateStatuses: CrateStatus[] = [
         "BLAKE3 content hashing",
         "DHT distribution — local data structures (XOR-distance routing, k-bucket management, value store)",
         "Dependency resolution (topological sort, transitive resolution, circular detection)",
+        "Dashboard manifest types (DashboardManifest parse/validate, shared with blockmatrix)",
         "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness)",
         "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)"
       ],
@@ -207,7 +213,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 59
+    "completion": 61
   },
   {
     "id": "engauge",
@@ -277,7 +283,8 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar backend routing (gateway -> [::1]:9294)",
         "Catalog backend routing (gateway -> [::1]:9295)",
         "Engauge backend routing (gateway -> [::1]:9296)",
-        "Engauge API routing (/api/v1/engauge)"
+        "Engauge API routing (/api/v1/engauge)",
+        "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)"
       ],
       "inDevelopment": [
         "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
@@ -292,7 +299,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 67
+    "completion": 68
   },
   {
     "id": "hypermesh",

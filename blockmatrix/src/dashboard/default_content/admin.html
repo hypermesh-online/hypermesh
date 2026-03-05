@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HyperMesh Admin</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
+        h1 { color: #1a1a2e; }
+        h2 { margin-top: 24px; }
+        .card { background: #f8f9fa; border: 1px solid #dee2e6; padding: 16px; border-radius: 8px; margin: 12px 0; }
+        .metric { font-size: 1.5em; font-weight: bold; color: #1a1a2e; }
+        .label { color: #6c757d; font-size: 0.85em; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        input, button { padding: 8px 12px; margin: 4px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #1a1a2e; color: white; cursor: pointer; }
+        button:hover { background: #2d2d4e; }
+        .form-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>HyperMesh Admin</h1>
+    <div class="grid">
+        <div class="card"><div class="label">Chain Height</div><div class="metric" id="height">...</div></div>
+        <div class="card"><div class="label">Peers</div><div class="metric" id="peers">...</div></div>
+        <div class="card"><div class="label">Uptime</div><div class="metric" id="uptime">...</div></div>
+        <div class="card"><div class="label">Node ID</div><div class="metric" id="nodeid" style="font-size:0.8em">...</div></div>
+    </div>
+    <h2>DNS Registration</h2>
+    <div class="form-row">
+        <input id="dns-name" placeholder="Name" />
+        <input id="dns-addr" placeholder="IPv6 Address" />
+        <button onclick="registerDns()">Register</button>
+    </div>
+    <div id="dns-result"></div>
+    <h2>Peer Connect</h2>
+    <div class="form-row">
+        <input id="peer-addr" placeholder="[::1]:9292" />
+        <button onclick="connectPeer()">Connect</button>
+    </div>
+    <script>
+        async function refresh() {
+            try {
+                const r = await fetch('/api/v1/blockmatrix/status');
+                if (r.ok) {
+                    const d = await r.json();
+                    document.getElementById('height').textContent = d.chain_height || '0';
+                    document.getElementById('peers').textContent = d.peers || '0';
+                    document.getElementById('uptime').textContent = (d.uptime_secs || 0) + 's';
+                    document.getElementById('nodeid').textContent = d.node_id || '?';
+                }
+            } catch(e) {
+                console.error('Status fetch failed:', e);
+            }
+        }
+        async function registerDns() {
+            var name = document.getElementById('dns-name').value;
+            var addr = document.getElementById('dns-addr').value;
+            try {
+                var r = await fetch('/api/v1/blockmatrix/dns/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, addr: addr })
+                });
+                document.getElementById('dns-result').textContent = r.ok ? 'Registered!' : 'Failed';
+            } catch(e) {
+                document.getElementById('dns-result').textContent = 'Error: ' + e;
+            }
+        }
+        async function connectPeer() {
+            var addr = document.getElementById('peer-addr').value;
+            try {
+                var r = await fetch('/api/v1/blockmatrix/peers/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ addr: addr })
+                });
+                alert(r.ok ? 'Connected!' : 'Failed');
+            } catch(e) {
+                alert('Error: ' + e);
+            }
+        }
+        refresh();
+        setInterval(refresh, 30000);
+    </script>
+</body>
+</html>

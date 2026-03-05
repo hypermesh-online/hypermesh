@@ -272,6 +272,9 @@ pub mod cli;
 // IPC module - JSON-RPC 2.0 over Unix domain sockets for daemon/client communication
 pub mod ipc;
 
+// Dashboard asset manifest and lifecycle
+pub mod dashboard;
+
 // Module stubs - some enabled for Gate 2
 pub mod catalog;
 pub mod container;

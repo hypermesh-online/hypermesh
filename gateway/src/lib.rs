@@ -5,6 +5,7 @@
 pub mod auth;
 pub mod bootstrap;
 pub mod config;
+pub mod dashboard_server;
 pub mod domain_router;
 pub mod error;
 pub mod federation;

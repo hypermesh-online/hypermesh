@@ -9,6 +9,7 @@
 pub mod asset;
 pub mod blockchain;
 pub mod config;
+pub mod dashboard;
 pub mod dns;
 pub mod domain;
 pub mod network;
@@ -79,6 +80,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     network::register(handler, &state);
     topology::register(handler, &state);
     asset::register(handler, &state);
+    dashboard::register(handler, &state);
     config::register(handler);
 }
 
@@ -173,6 +175,8 @@ mod tests {
             "topology.routing_cost",
             "topology.path",
             "asset.list",
+            "dashboard.list",
+            "dashboard.info",
             "config.show",
             "config.get",
             "config.set",

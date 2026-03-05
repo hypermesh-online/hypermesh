@@ -190,6 +190,12 @@ enum Commands {
         #[clap(subcommand)]
         action: ConfigCommand,
     },
+
+    /// Dashboard operations
+    Dashboard {
+        #[clap(subcommand)]
+        action: DashboardAction,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -210,6 +216,27 @@ enum ConfigCommand {
     },
     /// Initialize default config file
     Init,
+}
+
+#[derive(Subcommand, Debug)]
+enum DashboardAction {
+    /// Deploy a dashboard from a directory containing dashboard.toml
+    Deploy {
+        /// Path to directory containing dashboard.toml
+        path: std::path::PathBuf,
+    },
+    /// List registered dashboards
+    List,
+    /// Show dashboard info
+    Info {
+        /// Dashboard name
+        name: String,
+    },
+    /// Initialize a new dashboard project (scaffold)
+    Init {
+        /// Project name (default: my-dashboard)
+        name: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2043,6 +2070,111 @@ async fn main() -> Result<()> {
             // Config commands are handled early in main() before bootstrap.
             // This arm is unreachable but satisfies exhaustiveness.
             unreachable!("config commands handled before bootstrap");
+        }
+        Some(Commands::Dashboard { action }) => {
+            match action {
+                DashboardAction::Deploy { path } => {
+                    let manifest_path = path.join("dashboard.toml");
+                    if !manifest_path.exists() {
+                        eprintln!("No dashboard.toml found in {}", path.display());
+                        std::process::exit(1);
+                    }
+                    let toml_str = std::fs::read_to_string(&manifest_path)
+                        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
+                    let manifest = blockmatrix::dashboard::parse_manifest(&toml_str)
+                        .map_err(|e| anyhow::anyhow!(e))?;
+                    if let Err(errors) =
+                        blockmatrix::dashboard::validate_manifest(&manifest, &path)
+                    {
+                        for e in &errors {
+                            eprintln!("Validation error: {e}");
+                        }
+                        std::process::exit(1);
+                    }
+                    info!(
+                        "Dashboard '{}' v{} validated",
+                        manifest.dashboard.name, manifest.dashboard.version
+                    );
+                    info!("Domain: {}", manifest.dashboard.domain);
+                    println!(
+                        "Dashboard '{}' validated successfully. Deploy pipeline coming soon.",
+                        manifest.dashboard.name
+                    );
+                }
+                DashboardAction::List => {
+                    let client = ipc::IpcClient::new();
+                    if client.is_daemon_running().await {
+                        match client.call_ok("dashboard.list", serde_json::json!({})).await {
+                            Ok(resp) => println!(
+                                "{}",
+                                serde_json::to_string_pretty(&resp).unwrap_or_default()
+                            ),
+                            Err(e) => eprintln!("Error: {e}"),
+                        }
+                    } else {
+                        println!(
+                            "No dashboards registered yet. \
+                             Deploy with: hypermesh dashboard deploy <path>"
+                        );
+                    }
+                }
+                DashboardAction::Info { name } => {
+                    let client = ipc::IpcClient::new();
+                    if client.is_daemon_running().await {
+                        match client
+                            .call_ok(
+                                "dashboard.info",
+                                serde_json::json!({"name": name}),
+                            )
+                            .await
+                        {
+                            Ok(resp) => println!(
+                                "{}",
+                                serde_json::to_string_pretty(&resp).unwrap_or_default()
+                            ),
+                            Err(e) => eprintln!("Error: {e}"),
+                        }
+                    } else {
+                        println!("Dashboard '{}': not found", name);
+                    }
+                }
+                DashboardAction::Init { name } => {
+                    let project_name =
+                        name.unwrap_or_else(|| "my-dashboard".to_string());
+                    info!("Scaffolding dashboard project: {}", project_name);
+
+                    let dir = std::path::PathBuf::from(&project_name);
+                    std::fs::create_dir_all(dir.join("dist/public"))?;
+                    std::fs::create_dir_all(dir.join("dist/private"))?;
+                    std::fs::create_dir_all(dir.join("dist/admin"))?;
+
+                    let manifest_toml =
+                        blockmatrix::dashboard::scaffold_manifest(&project_name);
+                    std::fs::write(dir.join("dashboard.toml"), &manifest_toml)?;
+
+                    std::fs::write(
+                        dir.join("dist/public/index.html"),
+                        blockmatrix::dashboard::scaffold_html(&project_name, "public"),
+                    )?;
+                    std::fs::write(
+                        dir.join("dist/private/index.html"),
+                        blockmatrix::dashboard::scaffold_html(&project_name, "private"),
+                    )?;
+                    std::fs::write(
+                        dir.join("dist/admin/index.html"),
+                        blockmatrix::dashboard::scaffold_html(&project_name, "admin"),
+                    )?;
+
+                    println!("Created dashboard project at ./{project_name}/");
+                    println!("  dashboard.toml");
+                    println!("  dist/public/index.html");
+                    println!("  dist/private/index.html");
+                    println!("  dist/admin/index.html");
+                    println!(
+                        "\nDeploy with: hypermesh dashboard deploy ./{project_name}/"
+                    );
+                }
+            }
         }
         None => {
             // No command - just show bootstrap info

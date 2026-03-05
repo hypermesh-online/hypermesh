@@ -7,6 +7,7 @@
 //! Provides the foundational asset package format parsing, validation, and management
 //! for the Catalog asset library ecosystem.
 
+pub mod dashboard;
 pub mod operations;
 pub mod registry;
 pub mod types;

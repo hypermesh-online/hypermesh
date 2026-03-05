@@ -10,6 +10,7 @@ members = [
     "hypermesh-ebpf",
     "gateway",
     "engauge",
+    "hypermesh-sdk",
 ]
 resolver = "2"
 

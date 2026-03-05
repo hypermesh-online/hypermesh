@@ -1,0 +1,17 @@
+[package]
+name = "hypermesh-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK for HyperMesh daemon"
+license = "BSL-1.1"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+tempfile = { workspace = true }
