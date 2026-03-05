@@ -43,6 +43,7 @@ use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::shard_transport::{ShardTransport, StoqShardTransport};
 use blockmatrix::network::sync_dispatch::TransportSyncDriver;
 use blockmatrix::network::NetworkManager;
+use blockmatrix::ipc;
 use blockmatrix::persistence::{BlockQuery, PersistenceConfig, PersistenceManager};
 use hypermesh_lib::ContentHash;
 
@@ -87,6 +88,14 @@ struct Cli {
     #[clap(long, default_value = "~/.blockmatrix")]
     data_dir: String,
 
+    /// Output in JSON format
+    #[clap(long, global = true)]
+    json: bool,
+
+    /// Path to config file
+    #[clap(long, global = true)]
+    config: Option<std::path::PathBuf>,
+
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -112,7 +121,21 @@ impl From<PrivacyModeArg> for PrivacyMode {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Start the node
+    /// Connect to the mesh (starts daemon if not running)
+    Connect {
+        /// Privacy mode
+        #[clap(value_enum, default_value = "public")]
+        mode: PrivacyModeArg,
+        /// Run in foreground (don't background)
+        #[clap(long)]
+        foreground: bool,
+    },
+
+    /// Disconnect from the mesh (stop daemon)
+    Disconnect,
+
+    /// [DEPRECATED] Use 'connect' instead
+    #[clap(hide = true)]
     Start,
 
     /// Show node status
@@ -144,6 +167,32 @@ enum Commands {
         #[clap(subcommand)]
         action: DnsAction,
     },
+
+    /// Manage configuration
+    Config {
+        #[clap(subcommand)]
+        action: ConfigCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigCommand {
+    /// Show current configuration
+    Show,
+    /// Get a config value by dotted key path
+    Get {
+        /// Dotted key path (e.g. "network.stoq_port")
+        key: String,
+    },
+    /// Set a config value
+    Set {
+        /// Dotted key path (e.g. "network.stoq_port")
+        key: String,
+        /// Value to set (parsed as JSON if possible, otherwise string)
+        value: String,
+    },
+    /// Initialize default config file
+    Init,
 }
 
 #[derive(Subcommand, Debug)]
@@ -214,7 +263,7 @@ fn count_dns_assets_in_block(block: &blockmatrix::blockchain::block::Block) -> u
 
 /// Optional network context for shard distribution during asset storage.
 ///
-/// When running inside `Commands::Start`, the node has a live network with
+/// When running inside `Commands::Connect`, the node has a live network with
 /// connected peers. Standalone `Store` invocations have no network.
 struct ShardDistributionCtx {
     network: std::sync::Arc<NetworkManager>,
@@ -762,7 +811,7 @@ async fn run_dns(
                 .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
 
             // DNS block propagation requires a running node with active
-            // network connections (Commands::Start). Standalone `dns register`
+            // network connections (Commands::Connect). Standalone `dns register`
             // writes locally; the block will be propagated on next node start
             // via the bootstrap block propagation loop.
             info!(
@@ -809,9 +858,365 @@ async fn run_dns(
     Ok(())
 }
 
+/// Run the connect/start flow: initialize STOQ, network, sync loops, IPC server,
+/// then wait for Ctrl+C or IPC shutdown.
+async fn run_connect(
+    cli: &Cli,
+    coord: MatrixCoordinate,
+    nid: &str,
+    _data_dir: &std::path::Path,
+    bootstrap: &NodeBootstrap,
+    persistence: std::sync::Arc<PersistenceManager>,
+) -> Result<()> {
+    info!("Starting node services...");
+
+    // Set initial privacy mode if different from default
+    let target_mode = cli.privacy.into();
+    if bootstrap.privacy_mode().await != target_mode {
+        bootstrap.set_privacy_mode(target_mode).await?;
+    }
+
+    // Network manager reference (populated if STOQ starts)
+    let mut network_ref: Option<std::sync::Arc<NetworkManager>> = None;
+
+    // Initialize STOQ transport if not in Private mode
+    let privacy_mode = bootstrap.privacy_mode().await;
+    if privacy_mode != PrivacyMode::PRIVATE {
+        info!("Initializing STOQ transport on port {}", cli.stoq_port);
+
+        // Configure STOQ transport based on privacy mode.
+        let mut stoq_config = stoq::TransportConfig {
+            port: cli.stoq_port,
+            bind_address: std::net::Ipv6Addr::UNSPECIFIED,
+            ..stoq::TransportConfig::default()
+        };
+
+        // Determine certificate strategy from privacy mode
+        let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
+            stoq_config.enable_falcon_crypto = false;
+            info!("Anonymous mode: using ephemeral certificates, no CA dependency");
+            NetworkType::Anonymous
+        } else if privacy_mode == PrivacyMode::PUBLIC {
+            info!("Public mode: self-issuing certificate via local TrustChain");
+            NetworkType::P2P
+        } else {
+            info!("Private mode: self-issuing certificate via local TrustChain");
+            NetworkType::P2P
+        };
+
+        // Initialize STOQ with network-aware certificate strategy
+        let transport = std::sync::Arc::new(
+            stoq::StoqTransport::new_for_network(stoq_config, network_type).await?,
+        );
+
+        // Parse bootstrap nodes
+        let bootstrap_nodes: Vec<std::net::SocketAddr> = cli
+            .bootstrap
+            .iter()
+            .filter_map(|addr| addr.parse().ok())
+            .collect();
+
+        if !bootstrap_nodes.is_empty() {
+            info!("Bootstrap nodes: {:?}", bootstrap_nodes);
+        }
+
+        // Create shard infrastructure
+        let shard_store = std::sync::Arc::new(ShardStore::new());
+        let shard_transport =
+            std::sync::Arc::new(StoqShardTransport::new(transport.clone()));
+        info!(
+            "Shard store and transport initialized (store={} shards)",
+            shard_store.count().await
+        );
+
+        // Create network manager
+        let network_manager =
+            NetworkManager::new(coord, transport.clone(), privacy_mode, bootstrap_nodes).await?;
+
+        // Start discovery based on privacy mode
+        network_manager.start_discovery().await?;
+
+        // --- Block Sync Infrastructure ---
+        let node_map: std::sync::Arc<
+            tokio::sync::RwLock<
+                std::collections::HashMap<String, (String, std::net::SocketAddr)>,
+            >,
+        > = std::sync::Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        ));
+
+        let block_transport = std::sync::Arc::new(StoqBlockTransportAdapter::new(
+            transport.clone(),
+            node_map.clone(),
+        ));
+
+        let block_propagator = std::sync::Arc::new(tokio::sync::Mutex::new(
+            BlockPropagator::with_transport(
+                coord,
+                PropagationStrategy::NearestN(6),
+                block_transport.clone(),
+            ),
+        ));
+
+        let genesis_hash = bootstrap.genesis_block().hash.clone();
+        let sync_manager = std::sync::Arc::new(tokio::sync::Mutex::new(
+            SyncManager::new(genesis_hash.clone(), SyncConfig::default()),
+        ));
+
+        let reflector_pool = std::sync::Arc::new(tokio::sync::Mutex::new(
+            ReflectorPool::new(ReflectorConfig::default()),
+        ));
+
+        // If reflector, join a Network scope chain
+        if cli.reflector {
+            let network_id = format!(
+                "public-{}",
+                &genesis_hash[..16.min(genesis_hash.len())]
+            );
+            let now_secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            match sync_manager
+                .lock()
+                .await
+                .join_network(network_id.clone(), privacy_mode, now_secs)
+            {
+                Ok(()) => info!("Joined Network scope: {}", network_id),
+                Err(e) => warn!("Failed to join network scope: {}", e),
+            }
+        }
+
+        info!("Block sync infrastructure initialized (propagation=NearestN(6))");
+
+        // Start accepting connections in background
+        let network_clone = std::sync::Arc::new(network_manager);
+        let network_accept = network_clone.clone();
+        tokio::spawn(async move {
+            if let Err(e) = network_accept.accept_connections().await {
+                warn!("Connection acceptor error: {}", e);
+            }
+        });
+
+        // If reflector, broadcast our position so peers can find us
+        if cli.reflector {
+            info!("Reflector mode: broadcasting matrix position");
+            network_clone.broadcast_matrix_position().await?;
+        }
+
+        info!(
+            "Network initialized, accepting connections on port {}",
+            cli.stoq_port
+        );
+
+        // Periodically sync peer addresses to shard transport
+        let network_status = network_clone.clone();
+        let shard_transport_sync = shard_transport.clone();
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(10));
+            loop {
+                interval.tick().await;
+
+                let nodes = network_status.get_connected_nodes().await;
+                for node in &nodes {
+                    let node_id = hypermesh_lib::NodeId::from_bytes(
+                        *blake3::hash(node.node_id.as_bytes()).as_bytes(),
+                    );
+                    shard_transport_sync
+                        .register_node_address(&node_id, node.address)
+                        .await;
+                }
+
+                let node_count = nodes.len();
+                if node_count > 0 {
+                    info!("Connected nodes: {}", node_count);
+                    let neighbors = network_status.find_matrix_neighbors(10.0).await;
+                    for neighbor in neighbors.iter().take(3) {
+                        info!(
+                            "  - Node {} at ({},{},{})",
+                            &neighbor.node_id[..8],
+                            neighbor.coordinate.x,
+                            neighbor.coordinate.y,
+                            neighbor.coordinate.z
+                        );
+                    }
+                }
+            }
+        });
+
+        // Block sync + reflector heartbeat loop
+        let sync_mgr_loop = sync_manager.clone();
+        let refl_pool_loop = reflector_pool.clone();
+        let blockchain_sync = bootstrap.blockchain().clone();
+        let network_sync = network_clone.clone();
+        let node_map_sync = node_map.clone();
+        let block_transport_sync = block_transport.clone();
+        let is_reflector = cli.reflector;
+        let sync_coord = coord;
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(5));
+            loop {
+                interval.tick().await;
+
+                let addr_map = network_sync.get_node_address_map().await;
+                *node_map_sync.write().await = addr_map;
+
+                let chain = blockchain_sync.get_chain().await;
+                let provider = NodeBlockchainBlockProvider::from_blocks(&chain);
+                let local_height = blockchain_sync.get_height().await;
+
+                {
+                    let mut sm = sync_mgr_loop.lock().await;
+                    let rp = refl_pool_loop.lock().await;
+                    let synced = TransportSyncDriver::run_sync_round(
+                        &mut sm,
+                        &rp,
+                        Some(&provider),
+                        block_transport_sync.as_ref(),
+                        local_height,
+                        &sync_coord,
+                    )
+                    .await;
+                    if synced > 0 {
+                        info!("Sync round: {} network(s) synchronized", synced);
+                    }
+                }
+
+                {
+                    let now_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0);
+                    let pruned = refl_pool_loop.lock().await.prune_stale(now_ms);
+                    if pruned > 0 {
+                        debug!("Pruned {} stale reflector(s)", pruned);
+                    }
+                }
+
+                if is_reflector {
+                    debug!("Reflector heartbeat: height={}", local_height);
+                }
+            }
+        });
+        info!(
+            "Block sync loop started (interval=5s, reflector={})",
+            cli.reflector
+        );
+
+        // Propagate any blocks created during bootstrap
+        {
+            let chain = bootstrap.blockchain().get_chain().await;
+            for block in chain.iter().filter(|b| b.index > 0) {
+                propagate_block(block, &block_propagator, &network_clone).await;
+
+                let dns_count = count_dns_assets_in_block(block);
+                if dns_count > 0 {
+                    debug!(
+                        "Block #{} contains {} DNS asset(s)",
+                        block.index, dns_count,
+                    );
+                }
+            }
+        }
+
+        // Keep infrastructure alive for the node's lifetime
+        let _shard_store = shard_store;
+        let _shard_transport = shard_transport;
+        let _block_propagator = block_propagator.clone();
+        let _sync_manager = sync_manager.clone();
+        let _reflector_pool = reflector_pool.clone();
+
+        network_ref = Some(network_clone);
+    }
+
+    // --- IPC Server Setup ---
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
+
+    let daemon_state = std::sync::Arc::new(ipc::DaemonState {
+        blockchain: bootstrap.blockchain().clone(),
+        persistence: persistence.clone(),
+        network: network_ref,
+        coordinate: coord,
+        node_id: nid.to_string(),
+        data_dir: _data_dir.to_path_buf(),
+        privacy_mode: format!("{:?}", bootstrap.privacy_mode().await),
+        started_at: std::time::Instant::now(),
+        shutdown_tx: shutdown_tx.clone(),
+        dns_resolver: bootstrap.dns().clone(),
+    });
+
+    let mut handler = ipc::RequestHandler::new();
+    ipc::register_all(&mut handler, daemon_state.clone());
+
+    let ipc_server = match ipc::IpcServer::new(std::sync::Arc::new(handler)) {
+        Ok(server) => {
+            let server = std::sync::Arc::new(server);
+            let server_run = server.clone();
+            tokio::spawn(async move {
+                if let Err(e) = server_run.run().await {
+                    warn!("IPC server error: {}", e);
+                }
+            });
+            info!("IPC server started");
+            Some(server)
+        }
+        Err(e) => {
+            warn!("Failed to start IPC server: {e}");
+            None
+        }
+    };
+
+    info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
+    info!("Press Ctrl+C to stop");
+
+    // Wait for Ctrl+C or IPC shutdown
+    tokio::select! {
+        result = tokio::signal::ctrl_c() => {
+            if let Err(e) = result {
+                warn!("Failed to listen for Ctrl+C: {}", e);
+            }
+            info!("Ctrl+C received, shutting down...");
+        }
+        _ = shutdown_rx.changed() => {
+            info!("Shutdown requested via IPC");
+        }
+    }
+
+    // Shut down IPC server
+    if let Some(server) = ipc_server {
+        server.shutdown();
+    }
+
+    info!("Shutting down -- flushing persistence...");
+    if let Err(e) = persistence.flush().await {
+        warn!("Persistence flush error: {}", e);
+    }
+    if let Err(e) = persistence.shutdown().await {
+        warn!("Persistence shutdown error: {}", e);
+    }
+    info!("Persistence flushed, shutdown complete.");
+
+    Ok(())
+}
+
+/// Load config from `--config` path or the default location.
+fn load_config(cli: &Cli) -> ipc::HypermeshConfig {
+    match &cli.config {
+        Some(path) => ipc::HypermeshConfig::load_from(path),
+        None => ipc::HypermeshConfig::load(),
+    }
+}
+
+/// Parse a string value as JSON; fall back to a JSON string if it fails.
+fn parse_config_value(raw: &str) -> serde_json::Value {
+    serde_json::from_str(raw).unwrap_or_else(|_| serde_json::Value::String(raw.to_string()))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     // Initialize logging
     let level = if cli.debug { Level::DEBUG } else { Level::INFO };
@@ -819,6 +1224,89 @@ async fn main() -> Result<()> {
         .with_max_level(level)
         .with_target(false)
         .init();
+
+    // --- Handle Config subcommand early (no bootstrap needed) ---
+    if let Some(Commands::Config { ref action }) = cli.command {
+        match action {
+            ConfigCommand::Show => {
+                let config = load_config(&cli);
+                let output = serde_json::to_string_pretty(&config)
+                    .context("failed to serialize config")?;
+                println!("{output}");
+                return Ok(());
+            }
+            ConfigCommand::Get { key } => {
+                let config = load_config(&cli);
+                let value = serde_json::to_value(&config)
+                    .context("failed to serialize config")?;
+                match ipc::config::get_dotpath(&value, key) {
+                    Some(v) => {
+                        let output = serde_json::to_string_pretty(v)
+                            .context("failed to format value")?;
+                        println!("{output}");
+                    }
+                    None => {
+                        eprintln!("Key not found: {key}");
+                        std::process::exit(1);
+                    }
+                }
+                return Ok(());
+            }
+            ConfigCommand::Set { key, value } => {
+                let mut config = load_config(&cli);
+                let mut json_value = serde_json::to_value(&config)
+                    .context("failed to serialize config")?;
+                let parsed = parse_config_value(value);
+                ipc::config::set_dotpath(&mut json_value, key, parsed)
+                    .map_err(|e| anyhow::anyhow!("failed to set key: {e}"))?;
+                config = serde_json::from_value(json_value)
+                    .context("invalid config after update")?;
+                match &cli.config {
+                    Some(path) => config.save_to(path)
+                        .map_err(|e| anyhow::anyhow!("{e}"))?,
+                    None => config.save()
+                        .map_err(|e| anyhow::anyhow!("{e}"))?,
+                }
+                println!("Set {key} = {value}");
+                return Ok(());
+            }
+            ConfigCommand::Init => {
+                let config = ipc::HypermeshConfig::default();
+                let path = match &cli.config {
+                    Some(p) => p.clone(),
+                    None => ipc::HypermeshConfig::default_path(),
+                };
+                config.save_to(&path)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                println!("Created {}", path.display());
+                return Ok(());
+            }
+        }
+    }
+
+    // --- Merge config file with CLI flags (CLI wins) ---
+    let config = load_config(&cli);
+    if cli.coord_x == 0 && config.node.coord_x != 0 {
+        cli.coord_x = config.node.coord_x;
+    }
+    if cli.coord_y == 0 && config.node.coord_y != 0 {
+        cli.coord_y = config.node.coord_y;
+    }
+    if cli.coord_z == 0 && config.node.coord_z != 0 {
+        cli.coord_z = config.node.coord_z;
+    }
+    if cli.stoq_port == 9292 && config.network.stoq_port != 9292 {
+        cli.stoq_port = config.network.stoq_port;
+    }
+    if cli.data_dir == "~/.blockmatrix" && config.node.data_dir != "~/.blockmatrix" {
+        cli.data_dir = config.node.data_dir.clone();
+    }
+    if cli.bootstrap.is_empty() && !config.network.bootstrap_nodes.is_empty() {
+        cli.bootstrap = config.network.bootstrap_nodes.clone();
+    }
+    if !cli.reflector && config.network.reflector {
+        cli.reflector = true;
+    }
 
     // Create matrix coordinate
     let coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
@@ -991,344 +1479,184 @@ async fn main() -> Result<()> {
     // Execute command
     match cli.command {
         Some(Commands::Start) => {
-            info!("Starting node services...");
-            // Set initial privacy mode if different from default
-            let target_mode = cli.privacy.into();
-            if bootstrap.privacy_mode().await != target_mode {
-                bootstrap.set_privacy_mode(target_mode).await?;
+            eprintln!("'start' is deprecated. Use 'hypermesh connect public --foreground' instead.");
+            eprintln!("Running as 'connect public --foreground'...");
+            // Fall through to Connect logic by recursing into same path
+            run_connect(
+                &cli, coord, &nid, &data_dir, &bootstrap, persistence.clone(),
+            ).await?;
+        }
+        Some(Commands::Connect { .. }) => {
+            // Check if daemon is already running
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                println!("Daemon already running.");
+                return Ok(());
             }
-
-            // Initialize STOQ transport if not in Private mode
-            let privacy_mode = bootstrap.privacy_mode().await;
-            if privacy_mode != PrivacyMode::PRIVATE {
-                info!("Initializing STOQ transport on port {}", cli.stoq_port);
-
-                // Configure STOQ transport based on privacy mode.
-                // Certificate strategy follows PrivacyMode (transport layer):
-                //   Anonymous → ephemeral self-signed certs (no CA dependency)
-                //   Private   → local TrustChain CA (local://trustchain)
-                //   Public    → global TrustChain CA (quic://trust.hypermesh.online)
-                //     - Exception: reflector nodes ARE trust anchors, use local CA
-                let mut stoq_config = stoq::TransportConfig {
-                    port: cli.stoq_port,
-                    bind_address: std::net::Ipv6Addr::UNSPECIFIED,
-                    ..stoq::TransportConfig::default()
-                };
-
-                // Determine certificate strategy from privacy mode
-                let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
-                    stoq_config.enable_falcon_crypto = false;
-                    info!("Anonymous mode: using ephemeral certificates, no CA dependency");
-                    NetworkType::Anonymous
-                } else if privacy_mode == PrivacyMode::PUBLIC {
-                    // All public nodes use local TrustChain for now.
-                    // Gateway-proxied TrustChain CA is not yet wired, so
-                    // NetworkType::Public would fail trying quic://trust.hypermesh.online.
-                    // Reflectors are trust anchors; joining nodes self-sign until
-                    // the gateway can proxy cert requests to the remote CA.
-                    info!("Public mode: self-issuing certificate via local TrustChain");
-                    NetworkType::P2P
-                } else {
-                    // Private/P2P: node is its own CA via local TrustChain
-                    info!("Private mode: self-issuing certificate via local TrustChain");
-                    NetworkType::P2P
-                };
-
-                // Initialize STOQ with network-aware certificate strategy
-                let transport = std::sync::Arc::new(
-                    stoq::StoqTransport::new_for_network(stoq_config, network_type).await?
-                );
-
-                // Parse bootstrap nodes
-                let bootstrap_nodes: Vec<std::net::SocketAddr> = cli
-                    .bootstrap
-                    .iter()
-                    .filter_map(|addr| addr.parse().ok())
-                    .collect();
-
-                if !bootstrap_nodes.is_empty() {
-                    info!("Bootstrap nodes: {:?}", bootstrap_nodes);
-                }
-
-                // Create shard infrastructure
-                let shard_store = std::sync::Arc::new(ShardStore::new());
-                let shard_transport = std::sync::Arc::new(
-                    StoqShardTransport::new(transport.clone()),
-                );
-                info!(
-                    "Shard store and transport initialized (store={} shards)",
-                    shard_store.count().await
-                );
-
-                // Create network manager
-                let network_manager =
-                    NetworkManager::new(coord, transport.clone(), privacy_mode, bootstrap_nodes)
-                        .await?;
-
-                // Start discovery based on privacy mode
-                network_manager.start_discovery().await?;
-
-                // --- Block Sync Infrastructure ---
-                let node_map: std::sync::Arc<tokio::sync::RwLock<
-                    std::collections::HashMap<String, (String, std::net::SocketAddr)>,
-                >> = std::sync::Arc::new(tokio::sync::RwLock::new(
-                    std::collections::HashMap::new(),
-                ));
-
-                let block_transport = std::sync::Arc::new(StoqBlockTransportAdapter::new(
-                    transport.clone(),
-                    node_map.clone(),
-                ));
-
-                let block_propagator = std::sync::Arc::new(tokio::sync::Mutex::new(
-                    BlockPropagator::with_transport(
-                        coord,
-                        PropagationStrategy::NearestN(6),
-                        block_transport.clone(),
-                    ),
-                ));
-
-                let genesis_hash = bootstrap.genesis_block().hash.clone();
-                let sync_manager = std::sync::Arc::new(tokio::sync::Mutex::new(
-                    SyncManager::new(genesis_hash.clone(), SyncConfig::default()),
-                ));
-
-                let reflector_pool = std::sync::Arc::new(tokio::sync::Mutex::new(
-                    ReflectorPool::new(ReflectorConfig::default()),
-                ));
-
-                // If reflector, join a Network scope chain
-                if cli.reflector {
-                    let network_id = format!(
-                        "public-{}",
-                        &genesis_hash[..16.min(genesis_hash.len())]
-                    );
-                    let now_secs = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs())
-                        .unwrap_or(0);
-                    match sync_manager
-                        .lock()
-                        .await
-                        .join_network(network_id.clone(), privacy_mode, now_secs)
-                    {
-                        Ok(()) => info!("Joined Network scope: {}", network_id),
-                        Err(e) => warn!("Failed to join network scope: {}", e),
-                    }
-                }
-
-                info!("Block sync infrastructure initialized (propagation=NearestN(6))");
-
-                // Start accepting connections in background
-                let network_clone = std::sync::Arc::new(network_manager);
-                let network_accept = network_clone.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = network_accept.accept_connections().await {
-                        warn!("Connection acceptor error: {}", e);
-                    }
-                });
-
-                // If reflector, broadcast our position so peers can find us
-                if cli.reflector {
-                    info!("Reflector mode: broadcasting matrix position");
-                    network_clone.broadcast_matrix_position().await?;
-                }
-
-                info!(
-                    "Network initialized, accepting connections on port {}",
-                    cli.stoq_port
-                );
-
-                // Periodically sync peer addresses to shard transport
-                // and show connected node status
-                let network_status = network_clone.clone();
-                let shard_transport_sync = shard_transport.clone();
-                tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(
-                        tokio::time::Duration::from_secs(10),
-                    );
-                    loop {
-                        interval.tick().await;
-
-                        // Sync peer addresses into shard transport for auto-dial
-                        let nodes = network_status.get_connected_nodes().await;
-                        for node in &nodes {
-                            let node_id = hypermesh_lib::NodeId::from_bytes(
-                                *blake3::hash(node.node_id.as_bytes()).as_bytes(),
-                            );
-                            shard_transport_sync
-                                .register_node_address(&node_id, node.address)
-                                .await;
-                        }
-
-                        // Log status every 3rd tick (roughly 30s)
-                        let node_count = nodes.len();
-                        if node_count > 0 {
-                            info!("Connected nodes: {}", node_count);
-                            let neighbors =
-                                network_status.find_matrix_neighbors(10.0).await;
-                            for neighbor in neighbors.iter().take(3) {
-                                info!(
-                                    "  - Node {} at ({},{},{})",
-                                    &neighbor.node_id[..8],
-                                    neighbor.coordinate.x,
-                                    neighbor.coordinate.y,
-                                    neighbor.coordinate.z
-                                );
-                            }
-                        }
-                    }
-                });
-
-                // Block sync + reflector heartbeat loop
-                let sync_mgr_loop = sync_manager.clone();
-                let refl_pool_loop = reflector_pool.clone();
-                let blockchain_sync = bootstrap.blockchain().clone();
-                let network_sync = network_clone.clone();
-                let node_map_sync = node_map.clone();
-                let block_transport_sync = block_transport.clone();
-                let is_reflector = cli.reflector;
-                let sync_coord = coord;
-                tokio::spawn(async move {
-                    let mut interval = tokio::time::interval(
-                        tokio::time::Duration::from_secs(5),
-                    );
-                    loop {
-                        interval.tick().await;
-
-                        // Update node_map from connected peers
-                        // (for block transport routing)
-                        let addr_map = network_sync.get_node_address_map().await;
-                        *node_map_sync.write().await = addr_map;
-
-                        // Build BlockProvider snapshot from current chain
-                        let chain = blockchain_sync.get_chain().await;
-                        let provider =
-                            NodeBlockchainBlockProvider::from_blocks(&chain);
-                        let local_height = blockchain_sync.get_height().await;
-
-                        // Run sync round for all networks needing sync
-                        {
-                            let mut sm = sync_mgr_loop.lock().await;
-                            let rp = refl_pool_loop.lock().await;
-                            let synced = TransportSyncDriver::run_sync_round(
-                                &mut sm,
-                                &rp,
-                                Some(&provider),
-                                block_transport_sync.as_ref(),
-                                local_height,
-                                &sync_coord,
-                            )
-                            .await;
-                            if synced > 0 {
-                                info!(
-                                    "Sync round: {} network(s) synchronized",
-                                    synced
-                                );
-                            }
-                        }
-
-                        // Prune stale reflectors
-                        {
-                            let now_ms = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .map(|d| d.as_millis() as u64)
-                                .unwrap_or(0);
-                            let pruned =
-                                refl_pool_loop.lock().await.prune_stale(now_ms);
-                            if pruned > 0 {
-                                debug!(
-                                    "Pruned {} stale reflector(s)",
-                                    pruned
-                                );
-                            }
-                        }
-
-                        // If reflector, log heartbeat status
-                        if is_reflector {
-                            debug!(
-                                "Reflector heartbeat: height={}",
-                                local_height
-                            );
-                        }
-                    }
-                });
-                info!(
-                    "Block sync loop started (interval=5s, reflector={})",
-                    cli.reflector
-                );
-
-                // Propagate any blocks created during bootstrap (e.g. hardware
-                // assessment block on first boot) now that the network is ready.
-                {
-                    let chain = bootstrap.blockchain().get_chain().await;
-                    // Skip genesis (index 0) — peers build their own genesis.
-                    for block in chain.iter().filter(|b| b.index > 0) {
-                        propagate_block(block, &block_propagator, &network_clone)
-                            .await;
-
-                        // Check for DNS assets in propagated blocks so the
-                        // local resolver stays in sync with the blockchain.
-                        let dns_count = count_dns_assets_in_block(block);
-                        if dns_count > 0 {
-                            debug!(
-                                "Block #{} contains {} DNS asset(s)",
-                                block.index, dns_count,
-                            );
-                        }
-                    }
-                }
-
-                // Keep shard_store and shard_transport alive for the node's lifetime
-                let _shard_store = shard_store;
-                let _shard_transport = shard_transport;
-                let _block_propagator = block_propagator.clone();
-                let _sync_manager = sync_manager.clone();
-                let _reflector_pool = reflector_pool.clone();
+            run_connect(
+                &cli, coord, &nid, &data_dir, &bootstrap, persistence.clone(),
+            ).await?;
+        }
+        Some(Commands::Disconnect) => {
+            let client = ipc::IpcClient::new();
+            if !client.is_daemon_running().await {
+                eprintln!("No daemon running.");
+                std::process::exit(1);
             }
-
-            info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
-            info!("Press Ctrl+C to stop");
-
-            // Keep running
-            tokio::signal::ctrl_c().await?;
-            info!("Shutting down — flushing persistence...");
-            if let Err(e) = persistence.flush().await {
-                warn!("Persistence flush error: {}", e);
+            match client.call("shutdown", serde_json::json!({})).await {
+                Ok(_) => println!("Daemon shutting down."),
+                Err(e) => eprintln!("Failed to send shutdown: {e}"),
             }
-            if let Err(e) = persistence.shutdown().await {
-                warn!("Persistence shutdown error: {}", e);
-            }
-            info!("Persistence flushed, shutdown complete.");
         }
         Some(Commands::Status) => {
-            info!("Node Status:");
-            info!("  Genesis: {}", bootstrap.genesis_block().hash);
-            info!(
-                "  Blockchain height: {}",
-                bootstrap.blockchain().get_height().await
-            );
-            info!("  Privacy mode: {:?}", bootstrap.privacy_mode().await);
-            info!("  Self-sufficient: ✓");
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                match client.call_ok("status", serde_json::json!({})).await {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => eprintln!("Error: {e}"),
+                }
+            } else if cli.json {
+                // JSON offline status
+                let height = bootstrap.blockchain().get_height().await;
+                let privacy = format!("{:?}", bootstrap.privacy_mode().await);
+                let status = serde_json::json!({
+                    "online": false,
+                    "genesis": bootstrap.genesis_block().hash,
+                    "chain_height": height,
+                    "privacy_mode": privacy,
+                    "self_sufficient": true,
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&status).unwrap_or_default()
+                );
+            } else {
+                // Offline status: show bootstrap info
+                info!("Node Status (offline):");
+                info!("  Genesis: {}", bootstrap.genesis_block().hash);
+                info!(
+                    "  Blockchain height: {}",
+                    bootstrap.blockchain().get_height().await
+                );
+                info!("  Privacy mode: {:?}", bootstrap.privacy_mode().await);
+                info!("  Self-sufficient: yes");
+                eprintln!("No daemon running. Start with: hypermesh connect public");
+            }
         }
         Some(Commands::SetPrivacy { mode }) => {
-            let new_mode = mode.into();
-            info!("Transitioning to {:?} mode...", new_mode);
-            bootstrap.set_privacy_mode(new_mode).await?;
-            info!("Privacy mode updated successfully");
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                let mode_str = format!("{mode:?}");
+                match client
+                    .call_ok("set_privacy", serde_json::json!({"mode": mode_str}))
+                    .await
+                {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => eprintln!("Error: {e}"),
+                }
+            } else {
+                let new_mode = mode.into();
+                info!("Transitioning to {:?} mode...", new_mode);
+                bootstrap.set_privacy_mode(new_mode).await?;
+                info!("Privacy mode updated successfully");
+            }
         }
         Some(Commands::Store { path }) => {
-            run_store(path, None).await?;
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                let path_str = path.display().to_string();
+                match client
+                    .call_ok("store", serde_json::json!({"path": path_str}))
+                    .await
+                {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => {
+                        warn!("IPC store failed ({e}), falling back to standalone");
+                        run_store(path, None).await?;
+                    }
+                }
+            } else {
+                run_store(path, None).await?;
+            }
         }
         Some(Commands::Fetch { asset_id, output }) => {
-            run_fetch(asset_id, output).await?;
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                match client
+                    .call_ok(
+                        "fetch",
+                        serde_json::json!({
+                            "asset_id": asset_id,
+                            "output": output.as_ref().map(|p| p.display().to_string()),
+                        }),
+                    )
+                    .await
+                {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => {
+                        warn!("IPC fetch failed ({e}), falling back to standalone");
+                        run_fetch(asset_id, output).await?;
+                    }
+                }
+            } else {
+                run_fetch(asset_id, output).await?;
+            }
         }
         Some(Commands::Dns { action }) => {
-            run_dns(action, &bootstrap, &data_dir, &nid).await?;
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                let result = match &action {
+                    DnsAction::Register { name, addr } => {
+                        client
+                            .call_ok(
+                                "dns.register",
+                                serde_json::json!({"name": name, "addr": addr}),
+                            )
+                            .await
+                    }
+                    DnsAction::Resolve { name } => {
+                        client
+                            .call_ok("dns.resolve", serde_json::json!({"name": name}))
+                            .await
+                    }
+                    DnsAction::List => {
+                        client
+                            .call_ok("dns.list", serde_json::json!({}))
+                            .await
+                    }
+                };
+                match result {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => eprintln!("Error: {e}"),
+                }
+            } else {
+                // Offline fallback: use local bootstrap DNS
+                run_dns(action, &bootstrap, &data_dir, &nid).await?;
+            }
+        }
+        Some(Commands::Config { .. }) => {
+            // Config commands are handled early in main() before bootstrap.
+            // This arm is unreachable but satisfies exhaustiveness.
+            unreachable!("config commands handled before bootstrap");
         }
         None => {
             // No command - just show bootstrap info
-            info!("Node initialized successfully. Use 'start' to run or 'status' to check.");
+            info!("Node initialized successfully. Use 'connect' to run or 'status' to check.");
         }
     }
 

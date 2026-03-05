@@ -64,7 +64,21 @@ export const crateStatuses: CrateStatus[] = [
         "BLAKE3 shard integrity verification — incoming shards verified before storage",
         "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
         "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
-        "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg"
+        "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
+        "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
+        "Daemon lifecycle (connect/disconnect commands, PID file, graceful shutdown)",
+        "IPC handler dispatch (ping, shutdown, status methods)",
+        "DaemonState shared context for IPC handlers",
+        "Socket path 3-tier fallback ($HYPERMESH_SOCK > $XDG_RUNTIME_DIR > ~/.hypermesh)",
+        "IPC handler modules (dns, blockchain, network, topology, asset, config)",
+        "All CLI commands route through IPC when daemon is running",
+        "Standalone fallback for store/fetch without daemon",
+        "CliOutput Serialize support for JSON IPC responses",
+        "TOML config file (~/.hypermesh/config.toml) with load/save/merge",
+        "Config CLI (show/get/set/init subcommands)",
+        "--json global flag for machine-parseable output",
+        "--config global flag for custom config path",
+        "CLI flags override config file values (CLI > config > defaults)"
       ],
       "inDevelopment": [
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
@@ -82,7 +96,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 80
+    "completion": 84
   },
   {
     "id": "caesar",

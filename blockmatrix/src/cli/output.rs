@@ -8,6 +8,7 @@
 //! error types for CLI command execution. All formatting is done via `Display`
 //! implementations so callers can simply `println!("{}", output)`.
 
+use serde::Serialize;
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,7 @@ use std::fmt;
 // ---------------------------------------------------------------------------
 
 /// Structured output from a CLI command.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum CliOutput {
     /// Free-form text output.
     Text(String),
@@ -40,7 +41,7 @@ impl fmt::Display for CliOutput {
 // ---------------------------------------------------------------------------
 
 /// A simple table with column headers and rows of string values.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CliTable {
     /// Column header names.
     pub headers: Vec<String>,
@@ -135,7 +136,7 @@ impl fmt::Display for CliTable {
 // ---------------------------------------------------------------------------
 
 /// Errors that can occur during CLI command execution.
-#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Serialize, thiserror::Error)]
 pub enum CliError {
     /// An argument was missing or malformed.
     #[error("Invalid argument: {0}")]
