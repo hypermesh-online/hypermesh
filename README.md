@@ -76,9 +76,21 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 ---
 
+## Join the Network
+
+Join the public HyperMesh mesh in one command:
+
+```bash
+hypermesh --privacy public --bootstrap "[2600:1900:4001:cf7::]:9292" start
+```
+
+Your node creates its own blockchain, assesses hardware, generates a self-signed certificate, connects via STOQ, and completes a bilateral Proof of State handshake -- no external dependencies required.
+
+See [Onboarding Guide](docs/guides/ONBOARDING.md) for the full walkthrough.
+
 ## Installation
 
-HyperMesh runs as system-level daemons. See `systemd/` for service units.
+HyperMesh runs as system-level daemons. See `systemd/` for service units and [docs/guides/INSTALL.md](docs/guides/INSTALL.md) for the full server deployment guide.
 
 ---
 

@@ -161,6 +161,7 @@ sudo ufw allow from fd00::/8 to any port 8444:9296 proto udp
 
 ## Next Steps
 
+- [Joining the Network (Quick Start)](ONBOARDING.md) — join the public mesh in one command
 - [Setting Up a Private HyperMesh Network](PRIVATE_NETWORK.md) — connect multiple devices
 - [Exposing Services via Public Gateway](PUBLIC_ENDPOINTS.md) — make your node publicly accessible
 - [Running a Private Catalog](PRIVATE_CATALOG.md) — distribute packages within your network
