@@ -58,14 +58,16 @@ items = [
     "Reflector pool block relay — ReflectorPool tracks peers, prunes stale, heartbeat in sync loop",
     "BLAKE3 shard integrity verification — incoming shards verified before storage",
     "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
+    # E2E verified (local ↔ trust.hypermesh.online)
+    "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
+    "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
 ]
 
 [features.in_development]
 items = [
-    # Remaining mesh networking gaps (wired but not yet tested multi-node on GCP)
+    # Remaining mesh networking gaps
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
-    "Multi-node peer connections — connect_to_peer() code exists, never tested between actual nodes",
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
 ]
 

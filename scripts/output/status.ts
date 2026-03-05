@@ -62,12 +62,13 @@ export const crateStatuses: CrateStatus[] = [
         "Network scope blockchain — reflector nodes join Network chain, TransportSyncDriver runs sync rounds",
         "Reflector pool block relay — ReflectorPool tracks peers, prunes stale, heartbeat in sync loop",
         "BLAKE3 shard integrity verification — incoming shards verified before storage",
-        "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)"
+        "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
+        "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
+        "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg"
       ],
       "inDevelopment": [
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
-        "Multi-node peer connections — connect_to_peer() code exists, never tested between actual nodes",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
       ],
       "planned": [
@@ -81,7 +82,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 77
+    "completion": 80
   },
   {
     "id": "caesar",
