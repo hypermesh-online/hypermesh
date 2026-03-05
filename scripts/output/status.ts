@@ -91,7 +91,13 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard CLI (deploy, list, info, init/scaffold)",
         "Dashboard IPC handlers (dashboard.list, dashboard.info)",
         "Default dashboard HTML (public welcome, private live metrics, admin controls)",
-        "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs"
+        "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs",
+        "Dashboard asset type (BaseSystemType::Dashboard, AssetType::Dashboard) — blockchain-registered",
+        "Dashboard deploy pipeline — collect files, BLAKE3 hash, register as blockchain asset, persist to disk",
+        "Dashboard IPC handlers (dashboard.deploy, dashboard.list, dashboard.info) — real data from disk",
+        "HTTP API server ([::1]:9293) — 20 endpoints bridging HTTP to IPC for dashboard JS access",
+        "Default dashboard auto-registration on first connect (public/private/admin HTML with live API calls)",
+        "SDK-integrated default dashboards (public onboarding, private live metrics, admin controls)"
       ],
       "inDevelopment": [
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
@@ -109,7 +115,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 86
+    "completion": 87
   },
   {
     "id": "caesar",
@@ -284,7 +290,9 @@ export const crateStatuses: CrateStatus[] = [
         "Catalog backend routing (gateway -> [::1]:9295)",
         "Engauge backend routing (gateway -> [::1]:9296)",
         "Engauge API routing (/api/v1/engauge)",
-        "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)"
+        "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)",
+        "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
+        "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)"
       ],
       "inDevelopment": [
         "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
@@ -299,7 +307,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 68
+    "completion": 70
   },
   {
     "id": "hypermesh",

@@ -75,6 +75,7 @@ impl AdapterRegistry {
             AssetType::Blockchain => None,
             AssetType::Dns => None,
             AssetType::Transmission => None,
+            AssetType::Dashboard => None,
         }
     }
 

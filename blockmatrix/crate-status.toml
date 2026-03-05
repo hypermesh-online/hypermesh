@@ -93,6 +93,13 @@ items = [
     "Dashboard IPC handlers (dashboard.list, dashboard.info)",
     "Default dashboard HTML (public welcome, private live metrics, admin controls)",
     "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs",
+    # Dashboard asset pipeline (deploy → register → serve)
+    "Dashboard asset type (BaseSystemType::Dashboard, AssetType::Dashboard) — blockchain-registered",
+    "Dashboard deploy pipeline — collect files, BLAKE3 hash, register as blockchain asset, persist to disk",
+    "Dashboard IPC handlers (dashboard.deploy, dashboard.list, dashboard.info) — real data from disk",
+    "HTTP API server ([::1]:9293) — 20 endpoints bridging HTTP to IPC for dashboard JS access",
+    "Default dashboard auto-registration on first connect (public/private/admin HTML with live API calls)",
+    "SDK-integrated default dashboards (public onboarding, private live metrics, admin controls)",
 ]
 
 [features.in_development]

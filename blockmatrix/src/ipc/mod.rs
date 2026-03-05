@@ -9,6 +9,7 @@ pub mod client;
 pub mod config;
 pub mod handler;
 pub mod handlers;
+pub mod http_api;
 pub mod protocol;
 pub mod server;
 pub mod state;

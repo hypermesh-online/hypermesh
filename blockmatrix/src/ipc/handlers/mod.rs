@@ -175,6 +175,7 @@ mod tests {
             "topology.routing_cost",
             "topology.path",
             "asset.list",
+            "dashboard.deploy",
             "dashboard.list",
             "dashboard.info",
             "config.show",

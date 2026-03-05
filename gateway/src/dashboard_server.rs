@@ -10,11 +10,13 @@
 //! scope-based fallback (admin -> private -> public).
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
 use crate::auth::AuthResult;
 
@@ -133,6 +135,96 @@ impl DashboardServer {
         cache.insert(domain.to_string(), entry);
     }
 
+    /// Load default dashboard HTML for a domain.
+    ///
+    /// Accepts raw HTML strings for each scope and registers them as the
+    /// `index.html` for the corresponding scope directory. This avoids a
+    /// dependency on blockmatrix — the caller passes the HTML constants.
+    pub async fn load_defaults(
+        &self,
+        domain: &str,
+        owner_identity: &str,
+        public_html: &str,
+        private_html: &str,
+        admin_html: &str,
+    ) {
+        let mut scopes: HashMap<String, HashMap<String, CachedFile>> = HashMap::new();
+
+        for (scope_dir, html) in [
+            ("public", public_html),
+            ("private", private_html),
+            ("admin", admin_html),
+        ] {
+            if html.is_empty() {
+                continue;
+            }
+            let mut files = HashMap::new();
+            files.insert(
+                "index.html".to_string(),
+                CachedFile {
+                    content: html.as_bytes().to_vec(),
+                    content_type: "text/html; charset=utf-8".to_string(),
+                },
+            );
+            scopes.insert(scope_dir.to_string(), files);
+        }
+
+        let entry = DashboardCache {
+            scopes,
+            owner_identity: owner_identity.to_string(),
+            loaded_at: Instant::now(),
+        };
+        self.register_dashboard(domain, entry).await;
+        debug!(domain, "loaded default dashboard HTML");
+    }
+
+    /// Load dashboard files from a directory on disk.
+    ///
+    /// Expects the directory to contain `public/`, `private/`, and/or `admin/`
+    /// subdirectories. All files within those subdirectories are read and
+    /// cached with content-types detected from their extensions.
+    ///
+    /// Returns `Ok(count)` with the total number of files loaded, or an error
+    /// if the base directory cannot be read.
+    pub async fn load_from_directory(
+        &self,
+        domain: &str,
+        owner_identity: &str,
+        base_dir: &Path,
+    ) -> Result<usize, std::io::Error> {
+        let mut scopes: HashMap<String, HashMap<String, CachedFile>> = HashMap::new();
+        let mut total = 0usize;
+
+        for scope_dir in &["public", "private", "admin"] {
+            let scope_path = base_dir.join(scope_dir);
+            if !scope_path.is_dir() {
+                continue;
+            }
+
+            let mut files = HashMap::new();
+            Self::read_dir_recursive(&scope_path, &scope_path, &mut files)?;
+            total += files.len();
+            if !files.is_empty() {
+                debug!(
+                    domain,
+                    scope = *scope_dir,
+                    count = files.len(),
+                    "loaded dashboard files from disk",
+                );
+                scopes.insert((*scope_dir).to_string(), files);
+            }
+        }
+
+        let entry = DashboardCache {
+            scopes,
+            owner_identity: owner_identity.to_string(),
+            loaded_at: Instant::now(),
+        };
+        self.register_dashboard(domain, entry).await;
+        debug!(domain, total, "loaded dashboard from directory");
+        Ok(total)
+    }
+
     /// Serve a file for the given `domain`, `path`, and `scope`.
     ///
     /// Returns `None` on cache miss, expiry, path traversal attempt, or when
@@ -223,6 +315,52 @@ impl DashboardServer {
     }
 
     // -- internal helpers --------------------------------------------------
+
+    /// Recursively read all files under `dir`, storing them relative to
+    /// `base` (the scope root). Skips unreadable files with a warning.
+    fn read_dir_recursive(
+        base: &Path,
+        dir: &Path,
+        out: &mut HashMap<String, CachedFile>,
+    ) -> Result<(), std::io::Error> {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_dir() {
+                Self::read_dir_recursive(base, &path, out)?;
+                continue;
+            }
+
+            let rel = match path.strip_prefix(base) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            // Normalise to forward-slash relative path.
+            let key = rel
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
+
+            match std::fs::read(&path) {
+                Ok(content) => {
+                    let content_type =
+                        detect_content_type(&key).to_string();
+                    out.insert(key, CachedFile { content, content_type });
+                }
+                Err(e) => {
+                    warn!(
+                        path = %path.display(),
+                        error = %e,
+                        "skipping unreadable dashboard file",
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
 
     fn increment_scope_stat(&self, scope: DashboardScope) {
         match scope {
@@ -514,6 +652,150 @@ mod tests {
         let _ = server.serve("none.com", "/x", DashboardScope::Public).await;
         let snap = server.stats();
         assert_eq!(snap.cache_misses, 1);
+    }
+
+    // ===== load_defaults (3 tests) ========================================
+
+    #[tokio::test]
+    async fn load_defaults_populates_all_scopes() {
+        let server = DashboardServer::new(Duration::from_secs(300));
+        server
+            .load_defaults("d.com", "owner", "<h1>pub</h1>", "<h1>priv</h1>", "<h1>adm</h1>")
+            .await;
+
+        let pub_file = server
+            .serve("d.com", "/index.html", DashboardScope::Public)
+            .await
+            .expect("test: public index");
+        assert_eq!(pub_file.content, b"<h1>pub</h1>");
+
+        let priv_file = server
+            .serve("d.com", "/index.html", DashboardScope::Private)
+            .await
+            .expect("test: private index");
+        assert_eq!(priv_file.content, b"<h1>priv</h1>");
+
+        let adm_file = server
+            .serve("d.com", "/index.html", DashboardScope::Admin)
+            .await
+            .expect("test: admin index");
+        assert_eq!(adm_file.content, b"<h1>adm</h1>");
+    }
+
+    #[tokio::test]
+    async fn load_defaults_skips_empty_scopes() {
+        let server = DashboardServer::new(Duration::from_secs(300));
+        server.load_defaults("d.com", "owner", "<h1>pub</h1>", "", "").await;
+
+        // Private scope has no index.html, so it falls back to public.
+        let result = server
+            .serve("d.com", "/index.html", DashboardScope::Private)
+            .await
+            .expect("test: should fall back to public");
+        assert_eq!(result.content, b"<h1>pub</h1>");
+    }
+
+    #[tokio::test]
+    async fn load_defaults_content_type_is_html() {
+        let server = DashboardServer::new(Duration::from_secs(300));
+        server.load_defaults("d.com", "owner", "<h1>hi</h1>", "", "").await;
+
+        let file = server
+            .serve("d.com", "/index.html", DashboardScope::Public)
+            .await
+            .expect("test: should find file");
+        assert_eq!(file.content_type, "text/html; charset=utf-8");
+    }
+
+    // ===== load_from_directory (3 tests) ===================================
+
+    #[tokio::test]
+    async fn load_from_directory_reads_files() {
+        let tmp = std::env::temp_dir().join("gw_test_load_dir");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let pub_dir = tmp.join("public");
+        std::fs::create_dir_all(&pub_dir).expect("test: create dir");
+        std::fs::write(pub_dir.join("index.html"), b"<h1>hello</h1>").expect("test: write");
+        std::fs::write(pub_dir.join("app.js"), b"console.log(1)").expect("test: write");
+
+        let server = DashboardServer::new(Duration::from_secs(300));
+        let count = server
+            .load_from_directory("d.com", "owner", &tmp)
+            .await
+            .expect("test: load dir");
+        assert_eq!(count, 2);
+
+        let html = server
+            .serve("d.com", "/index.html", DashboardScope::Public)
+            .await
+            .expect("test: should find index");
+        assert_eq!(html.content, b"<h1>hello</h1>");
+
+        let js = server
+            .serve("d.com", "/app.js", DashboardScope::Public)
+            .await
+            .expect("test: should find js");
+        assert_eq!(js.content, b"console.log(1)");
+        assert_eq!(js.content_type, "application/javascript");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn load_from_directory_reads_nested_subdirs() {
+        let tmp = std::env::temp_dir().join("gw_test_load_nested");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let nested = tmp.join("public").join("assets").join("css");
+        std::fs::create_dir_all(&nested).expect("test: create dir");
+        std::fs::write(nested.join("style.css"), b"body{}").expect("test: write");
+
+        let server = DashboardServer::new(Duration::from_secs(300));
+        let count = server
+            .load_from_directory("d.com", "owner", &tmp)
+            .await
+            .expect("test: load dir");
+        assert_eq!(count, 1);
+
+        let css = server
+            .serve("d.com", "/assets/css/style.css", DashboardScope::Public)
+            .await
+            .expect("test: should find nested css");
+        assert_eq!(css.content, b"body{}");
+        assert_eq!(css.content_type, "text/css; charset=utf-8");
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn load_from_directory_skips_missing_scope_dirs() {
+        let tmp = std::env::temp_dir().join("gw_test_load_skip");
+        let _ = std::fs::remove_dir_all(&tmp);
+        // Only create admin dir — no public or private.
+        let admin_dir = tmp.join("admin");
+        std::fs::create_dir_all(&admin_dir).expect("test: create dir");
+        std::fs::write(admin_dir.join("index.html"), b"<h1>admin</h1>").expect("test: write");
+
+        let server = DashboardServer::new(Duration::from_secs(300));
+        let count = server
+            .load_from_directory("d.com", "owner", &tmp)
+            .await
+            .expect("test: load dir");
+        assert_eq!(count, 1);
+
+        // Public scope has nothing — should return None.
+        let result = server
+            .serve("d.com", "/index.html", DashboardScope::Public)
+            .await;
+        assert!(result.is_none());
+
+        // Admin scope has the file.
+        let adm = server
+            .serve("d.com", "/index.html", DashboardScope::Admin)
+            .await
+            .expect("test: admin index");
+        assert_eq!(adm.content, b"<h1>admin</h1>");
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     // ===== DashboardScope helpers (2 tests) ===============================

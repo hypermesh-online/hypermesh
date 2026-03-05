@@ -24,3 +24,5 @@ pub mod scope_router;
 pub mod stoq_bridge;
 pub mod stoq_listener;
 pub mod tls;
+
+pub mod onboarding;

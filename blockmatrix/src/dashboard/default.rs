@@ -6,13 +6,16 @@
 //! Three tiers are compiled into the binary via `include_str!` so a node
 //! can serve a dashboard without any external files on disk.
 
-/// Static welcome page for public visitors (no JavaScript).
+/// Public onboarding dashboard — fetches node status, domains, and assets
+/// via `/api/v1/*` endpoints. Dark theme, vanilla JS, no external deps.
 pub const DEFAULT_PUBLIC_HTML: &str = include_str!("default_content/public.html");
 
-/// Dashboard with live metric fetching for authenticated private peers.
+/// Private live-updating dashboard — auto-refreshes every 5 s, shows
+/// blockchain height, peers, DNS, assets, domains, and recent blocks.
 pub const DEFAULT_PRIVATE_HTML: &str = include_str!("default_content/private.html");
 
-/// Admin dashboard with DNS registration and peer connection controls.
+/// Admin dashboard — everything from private plus DNS/domain registration
+/// forms, peer connect, config viewer, dashboard list, and node shutdown.
 pub const DEFAULT_ADMIN_HTML: &str = include_str!("default_content/admin.html");
 
 #[cfg(test)]

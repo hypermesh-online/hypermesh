@@ -27,6 +27,7 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
         AssetType::Blockchain => AssetCategory::BaseSystem(BaseSystemType::Blockchain),
         AssetType::Dns => AssetCategory::BaseSystem(BaseSystemType::Dns),
         AssetType::Transmission => AssetCategory::BaseSystem(BaseSystemType::Transmission),
+        AssetType::Dashboard => AssetCategory::BaseSystem(BaseSystemType::Dashboard),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }
@@ -57,6 +58,7 @@ pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> As
         AssetType::Blockchain => AssetCategory::BaseSystem(BaseSystemType::Blockchain),
         AssetType::Dns => AssetCategory::BaseSystem(BaseSystemType::Dns),
         AssetType::Transmission => AssetCategory::BaseSystem(BaseSystemType::Transmission),
+        AssetType::Dashboard => AssetCategory::BaseSystem(BaseSystemType::Dashboard),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }

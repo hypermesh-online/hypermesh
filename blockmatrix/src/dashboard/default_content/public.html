@@ -5,18 +5,171 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HyperMesh Node</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; color: #333; }
-        h1 { color: #1a1a2e; }
-        .info { background: #f0f0f0; padding: 16px; border-radius: 8px; margin: 16px 0; }
-        a { color: #0066cc; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: #0a0a0a; color: #c8c8c8;
+            max-width: 720px; margin: 0 auto; padding: 40px 24px;
+            line-height: 1.6;
+        }
+        h1 { color: #00ff88; font-size: 1.6em; margin-bottom: 8px; }
+        .subtitle { color: #666; font-size: 0.85em; margin-bottom: 32px; }
+        .greeting { color: #e0e0e0; font-size: 1.1em; margin-bottom: 24px; }
+        .info-line { margin: 4px 0; }
+        .info-line .val { color: #00ff88; }
+        .section { margin: 28px 0 12px; }
+        .section-title {
+            color: #00ff88; font-size: 0.95em; font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .divider { color: #333; margin-bottom: 12px; }
+        .metrics {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px; margin-bottom: 24px;
+        }
+        .metric-card {
+            background: #111; border: 1px solid #1a1a1a; border-radius: 6px;
+            padding: 14px 16px;
+        }
+        .metric-label { color: #666; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; }
+        .metric-value { color: #e0e0e0; font-size: 1.3em; font-weight: bold; margin-top: 4px; }
+        .quick-start { background: #0d1117; border: 1px solid #1a1a1a; border-radius: 6px; padding: 16px 20px; }
+        .quick-start ol { padding-left: 20px; }
+        .quick-start li { margin: 8px 0; }
+        .cmd { color: #00ff88; background: #0a0a0a; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+        .error-banner {
+            background: #1a0a0a; border: 1px solid #441111; border-radius: 6px;
+            padding: 10px 14px; color: #ff6666; margin-bottom: 16px; display: none;
+        }
+        @media (max-width: 480px) {
+            body { padding: 20px 16px; }
+            .metrics { grid-template-columns: 1fr 1fr; }
+            .cmd { font-size: 0.8em; word-break: break-all; }
+        }
     </style>
 </head>
 <body>
-    <h1>HyperMesh Node</h1>
-    <div class="info">
-        <p>This node is part of the HyperMesh decentralized mesh network.</p>
-        <p>Connect via STOQ to access the full dashboard.</p>
+    <h1>Hello, HyperMesh!</h1>
+    <div class="subtitle">Decentralized mesh node</div>
+    <div id="error" class="error-banner"></div>
+
+    <div id="greeting" class="greeting"></div>
+    <div id="catalog-info" class="info-line"></div>
+
+    <div class="section">
+        <div class="section-title">Network Performance</div>
+        <div class="divider">--------------------</div>
     </div>
-    <p><a href="https://github.com/hypermesh-online">Documentation</a></p>
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-label">Chain Height</div>
+            <div class="metric-value" id="chain-height">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Connected Peers</div>
+            <div class="metric-value" id="peer-count">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Uptime</div>
+            <div class="metric-value" id="uptime">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Privacy Mode</div>
+            <div class="metric-value" id="privacy-mode">--</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Quick Start</div>
+        <div class="divider">-----------</div>
+    </div>
+    <div class="quick-start">
+        <ol>
+            <li>Register a DNS name: <span class="cmd">hypermesh dns register my-service --addr fd00::1</span></li>
+            <li>Store a file: <span class="cmd">hypermesh store /path/to/file.txt</span></li>
+            <li>Create a dashboard: <span class="cmd">hypermesh dashboard init my-dashboard</span></li>
+            <li>Deploy it: <span class="cmd">hypermesh dashboard deploy ./my-dashboard</span></li>
+        </ol>
+    </div>
+
+    <script>
+        var API = window.location.origin + '/api/v1';
+
+        function formatUptime(secs) {
+            if (secs < 60) return secs + 's';
+            if (secs < 3600) return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+            var h = Math.floor(secs / 3600);
+            var m = Math.floor((secs % 3600) / 60);
+            if (h < 24) return h + 'h ' + m + 'm';
+            var d = Math.floor(h / 24);
+            return d + 'd ' + (h % 24) + 'h';
+        }
+
+        function showError(msg) {
+            var el = document.getElementById('error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        async function fetchJson(path) {
+            var r = await fetch(API + path);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }
+
+        async function loadStatus() {
+            try {
+                var d = await fetchJson('/status');
+                document.getElementById('chain-height').textContent = d.chain_height || '0';
+                document.getElementById('peer-count').textContent = d.peers || '0';
+                document.getElementById('uptime').textContent = formatUptime(d.uptime_secs || 0);
+                document.getElementById('privacy-mode').textContent = d.privacy_mode || 'Unknown';
+                hideError();
+            } catch (e) {
+                showError('Cannot reach node API: ' + e.message);
+            }
+        }
+
+        async function loadDomains() {
+            try {
+                var d = await fetchJson('/domain/list');
+                var domains = d.domains || d || [];
+                if (domains.length > 0) {
+                    var first = domains[0];
+                    var name = first.name || first.domain || 'unknown';
+                    var addr = first.address || first.addr || first.ipv6 || '';
+                    var nodeCount = domains.length;
+                    document.getElementById('greeting').innerHTML =
+                        'You have registered the public domain <span class="val">' + name + '</span>' +
+                        (addr ? ' @ <span class="val">' + addr + '</span>' : '') +
+                        ' and are running <span class="val">' + nodeCount + '</span> node(s)!';
+                } else {
+                    document.getElementById('greeting').innerHTML =
+                        'No domains registered yet. Use <span class="cmd">hypermesh domain register</span> to get started.';
+                }
+            } catch (e) {
+                document.getElementById('greeting').textContent = 'Welcome to your HyperMesh node.';
+            }
+        }
+
+        async function loadAssets() {
+            try {
+                var d = await fetchJson('/asset/list');
+                var assets = d.assets || d || [];
+                document.getElementById('catalog-info').innerHTML =
+                    'You have registered <span class="val">' + assets.length + '</span> catalog asset(s).';
+            } catch (e) {
+                document.getElementById('catalog-info').textContent = '';
+            }
+        }
+
+        loadStatus();
+        loadDomains();
+        loadAssets();
+    </script>
 </body>
 </html>

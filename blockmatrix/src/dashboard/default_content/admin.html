@@ -5,83 +5,579 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HyperMesh Admin</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
-        h1 { color: #1a1a2e; }
-        h2 { margin-top: 24px; }
-        .card { background: #f8f9fa; border: 1px solid #dee2e6; padding: 16px; border-radius: 8px; margin: 12px 0; }
-        .metric { font-size: 1.5em; font-weight: bold; color: #1a1a2e; }
-        .label { color: #6c757d; font-size: 0.85em; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-        input, button { padding: 8px 12px; margin: 4px; border-radius: 4px; border: 1px solid #ccc; }
-        button { background: #1a1a2e; color: white; cursor: pointer; }
-        button:hover { background: #2d2d4e; }
-        .form-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            background: #0a0a0a; color: #c8c8c8;
+            max-width: 960px; margin: 0 auto; padding: 40px 24px;
+            line-height: 1.6;
+        }
+        h1 { color: #00ff88; font-size: 1.4em; margin-bottom: 4px; }
+        h2 { color: #00ff88; font-size: 1.05em; margin: 28px 0 8px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .live-dot { width: 8px; height: 8px; background: #00ff88; border-radius: 50%; display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .live-label { color: #666; font-size: 0.8em; }
+        .metrics {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px; margin-bottom: 24px;
+        }
+        .metric-card {
+            background: #111; border: 1px solid #1a1a1a; border-radius: 6px;
+            padding: 12px 14px;
+        }
+        .metric-label { color: #666; font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.05em; }
+        .metric-value { color: #e0e0e0; font-size: 1.2em; font-weight: bold; margin-top: 2px; }
+        .metric-value.accent { color: #00ff88; }
+        table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+        th { text-align: left; color: #666; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; border-bottom: 1px solid #1a1a1a; }
+        td { padding: 8px 10px; border-bottom: 1px solid #0f0f0f; font-size: 0.85em; color: #c8c8c8; }
+        tr:hover td { background: #111; }
+        .table-wrap { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
+        .empty { color: #444; font-style: italic; padding: 12px; text-align: center; font-size: 0.85em; }
+        .hash { color: #888; font-size: 0.8em; font-family: inherit; }
+        .divider { color: #222; margin-bottom: 8px; }
+        .form-section {
+            background: #0d1117; border: 1px solid #1a1a1a; border-radius: 6px;
+            padding: 16px 20px; margin: 8px 0 20px;
+        }
+        .form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+        input[type="text"] {
+            background: #111; border: 1px solid #333; color: #e0e0e0;
+            padding: 8px 12px; border-radius: 4px; font-family: inherit;
+            font-size: 0.85em; flex: 1; min-width: 140px;
+        }
+        input[type="text"]:focus { outline: none; border-color: #00ff88; }
+        input[type="text"]::placeholder { color: #444; }
+        button {
+            background: #00ff88; color: #0a0a0a; border: none;
+            padding: 8px 16px; border-radius: 4px; cursor: pointer;
+            font-family: inherit; font-size: 0.85em; font-weight: bold;
+            white-space: nowrap;
+        }
+        button:hover { background: #00cc6e; }
+        button.danger { background: #ff4444; color: #fff; }
+        button.danger:hover { background: #cc3333; }
+        button.secondary { background: #333; color: #c8c8c8; }
+        button.secondary:hover { background: #444; }
+        .result {
+            margin-top: 8px; padding: 8px 12px; border-radius: 4px;
+            font-size: 0.85em; display: none;
+        }
+        .result.ok { background: #0a1a0a; border: 1px solid #114411; color: #00ff88; display: block; }
+        .result.err { background: #1a0a0a; border: 1px solid #441111; color: #ff6666; display: block; }
+        .config-view {
+            background: #111; border: 1px solid #1a1a1a; border-radius: 4px;
+            padding: 12px 16px; font-size: 0.8em; white-space: pre-wrap;
+            word-break: break-all; max-height: 300px; overflow-y: auto; color: #aaa;
+        }
+        .error-banner {
+            background: #1a0a0a; border: 1px solid #441111; border-radius: 6px;
+            padding: 10px 14px; color: #ff6666; margin-bottom: 16px; display: none;
+        }
+        .shutdown-zone {
+            background: #1a0a0a; border: 1px solid #441111; border-radius: 6px;
+            padding: 16px 20px; margin-top: 40px;
+        }
+        .shutdown-zone h2 { color: #ff4444; margin-top: 0; }
+        @media (max-width: 600px) {
+            body { padding: 20px 12px; }
+            .metrics { grid-template-columns: 1fr 1fr; }
+            .header-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .form-row { flex-direction: column; }
+            input[type="text"] { width: 100%; }
+        }
     </style>
 </head>
 <body>
-    <h1>HyperMesh Admin</h1>
-    <div class="grid">
-        <div class="card"><div class="label">Chain Height</div><div class="metric" id="height">...</div></div>
-        <div class="card"><div class="label">Peers</div><div class="metric" id="peers">...</div></div>
-        <div class="card"><div class="label">Uptime</div><div class="metric" id="uptime">...</div></div>
-        <div class="card"><div class="label">Node ID</div><div class="metric" id="nodeid" style="font-size:0.8em">...</div></div>
+    <div class="header-bar">
+        <h1>HyperMesh Admin</h1>
+        <div><span class="live-dot"></span><span class="live-label">Live (5s refresh)</span></div>
     </div>
+    <div id="error" class="error-banner"></div>
+
+    <!-- Status Metrics -->
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-label">Chain Height</div>
+            <div class="metric-value accent" id="chain-height">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Connected Peers</div>
+            <div class="metric-value" id="peer-count">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Uptime</div>
+            <div class="metric-value" id="uptime">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Privacy Mode</div>
+            <div class="metric-value" id="privacy-mode">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Node ID</div>
+            <div class="metric-value hash" id="node-id">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Coordinate</div>
+            <div class="metric-value" id="coordinate">--</div>
+        </div>
+    </div>
+
+    <!-- Latest Block -->
+    <h2>Latest Block</h2>
+    <div class="divider">------------</div>
+    <div class="metrics">
+        <div class="metric-card">
+            <div class="metric-label">Height</div>
+            <div class="metric-value" id="block-height">--</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Hash</div>
+            <div class="metric-value hash" id="block-hash">--</div>
+        </div>
+    </div>
+
+    <!-- DNS Registration -->
     <h2>DNS Registration</h2>
-    <div class="form-row">
-        <input id="dns-name" placeholder="Name" />
-        <input id="dns-addr" placeholder="IPv6 Address" />
-        <button onclick="registerDns()">Register</button>
+    <div class="divider">----------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="dns-name" placeholder="Name (e.g. my-service)" />
+            <input type="text" id="dns-addr" placeholder="IPv6 Address (e.g. fd00::1)" />
+            <button onclick="registerDns()">Register DNS</button>
+        </div>
+        <div id="dns-result" class="result"></div>
     </div>
-    <div id="dns-result"></div>
+
+    <!-- DNS Records -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Address</th><th>TTL</th></tr></thead>
+            <tbody id="dns-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Peer Connect -->
     <h2>Peer Connect</h2>
-    <div class="form-row">
-        <input id="peer-addr" placeholder="[::1]:9292" />
-        <button onclick="connectPeer()">Connect</button>
+    <div class="divider">------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="peer-addr" placeholder="Peer address (e.g. [::1]:9292)" />
+            <button onclick="connectPeer()">Connect</button>
+        </div>
+        <div id="peer-result" class="result"></div>
     </div>
+
+    <!-- Connected Peers -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Peer ID</th><th>Address</th><th>Coordinate</th></tr></thead>
+            <tbody id="peers-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Domain Registration -->
+    <h2>Domain Registration</h2>
+    <div class="divider">-------------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="domain-name" placeholder="Domain name" />
+            <button onclick="registerDomain()">Register Domain</button>
+        </div>
+        <div id="domain-result" class="result"></div>
+    </div>
+
+    <!-- Domains -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Domain</th><th>Role</th><th>Scope</th></tr></thead>
+            <tbody id="domains-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Assets -->
+    <h2>Assets</h2>
+    <div class="divider">------</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Asset ID</th><th>Type</th><th>State</th></tr></thead>
+            <tbody id="assets-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Recent Blocks -->
+    <h2>Recent Blocks</h2>
+    <div class="divider">-------------</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Height</th><th>Hash</th><th>Transactions</th></tr></thead>
+            <tbody id="blocks-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Config Viewer -->
+    <h2>Node Configuration</h2>
+    <div class="divider">------------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <button class="secondary" onclick="loadConfig()">Reload Config</button>
+        </div>
+        <div id="config-view" class="config-view">Click "Reload Config" to view current configuration.</div>
+    </div>
+
+    <!-- Dashboard Deploy Info -->
+    <h2>Deployed Dashboards</h2>
+    <div class="divider">-------------------</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Scope</th><th>Status</th></tr></thead>
+            <tbody id="dashboards-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Shutdown -->
+    <div class="shutdown-zone">
+        <h2>Danger Zone</h2>
+        <p style="color:#888; font-size:0.85em; margin: 8px 0 12px;">Shut down this node. This action cannot be undone remotely.</p>
+        <button class="danger" onclick="shutdownNode()">Shutdown Node</button>
+        <div id="shutdown-result" class="result"></div>
+    </div>
+
     <script>
-        async function refresh() {
+        var API = window.location.origin + '/api/v1';
+
+        function formatUptime(secs) {
+            if (secs < 60) return secs + 's';
+            if (secs < 3600) return Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+            var h = Math.floor(secs / 3600);
+            var m = Math.floor((secs % 3600) / 60);
+            if (h < 24) return h + 'h ' + m + 'm';
+            var d = Math.floor(h / 24);
+            return d + 'd ' + (h % 24) + 'h';
+        }
+
+        function truncHash(h) {
+            if (!h || h.length < 16) return h || '--';
+            return h.slice(0, 8) + '...' + h.slice(-8);
+        }
+
+        function showError(msg) {
+            var el = document.getElementById('error');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function emptyRow(cols, msg) {
+            return '<tr><td colspan="' + cols + '" class="empty">' + msg + '</td></tr>';
+        }
+
+        function esc(s) {
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function showResult(id, ok, msg) {
+            var el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'result ' + (ok ? 'ok' : 'err');
+        }
+
+        async function fetchJson(path) {
+            var r = await fetch(API + path);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }
+
+        async function postJson(path, body) {
+            var r = await fetch(API + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            var data = null;
+            try { data = await r.json(); } catch (_) {}
+            return { ok: r.ok, status: r.status, data: data };
+        }
+
+        /* --- Data Loading --- */
+
+        async function loadStatus() {
             try {
-                const r = await fetch('/api/v1/blockmatrix/status');
-                if (r.ok) {
-                    const d = await r.json();
-                    document.getElementById('height').textContent = d.chain_height || '0';
-                    document.getElementById('peers').textContent = d.peers || '0';
-                    document.getElementById('uptime').textContent = (d.uptime_secs || 0) + 's';
-                    document.getElementById('nodeid').textContent = d.node_id || '?';
+                var d = await fetchJson('/status');
+                document.getElementById('chain-height').textContent = d.chain_height || '0';
+                document.getElementById('peer-count').textContent = d.peers || '0';
+                document.getElementById('uptime').textContent = formatUptime(d.uptime_secs || 0);
+                document.getElementById('privacy-mode').textContent = d.privacy_mode || 'Unknown';
+                document.getElementById('node-id').textContent = truncHash(d.node_id || '');
+                document.getElementById('node-id').title = d.node_id || '';
+                var c = d.coordinate;
+                if (c) {
+                    document.getElementById('coordinate').textContent = '(' + c.x + ', ' + c.y + ', ' + c.z + ')';
                 }
-            } catch(e) {
-                console.error('Status fetch failed:', e);
+                hideError();
+            } catch (e) {
+                showError('Cannot reach node API: ' + e.message);
             }
         }
+
+        async function loadBlockchain() {
+            try {
+                var d = await fetchJson('/blockchain/height');
+                var height = d.height || d.chain_height || 0;
+                document.getElementById('block-height').textContent = height;
+                if (height > 0) {
+                    try {
+                        var b = await fetchJson('/blockchain/block?height=' + (height - 1));
+                        document.getElementById('block-hash').textContent = truncHash(b.hash || b.block_hash || '');
+                        document.getElementById('block-hash').title = b.hash || b.block_hash || '';
+                    } catch (_) {}
+                }
+            } catch (_) {}
+        }
+
+        async function loadPeers() {
+            try {
+                var d = await fetchJson('/network/peers');
+                var peers = d.peers || d || [];
+                var body = document.getElementById('peers-body');
+                if (peers.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No peers connected');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < peers.length; i++) {
+                    var p = peers[i];
+                    var coord = p.coordinate ? '(' + p.coordinate.x + ',' + p.coordinate.y + ',' + p.coordinate.z + ')' : '--';
+                    html += '<tr><td>' + esc(truncHash(p.node_id || p.id || '')) + '</td>'
+                        + '<td>' + esc(p.address || p.addr || '--') + '</td>'
+                        + '<td>' + esc(coord) + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('peers-body').innerHTML = emptyRow(3, 'Failed to load peers');
+            }
+        }
+
+        async function loadDns() {
+            try {
+                var d = await fetchJson('/dns/list');
+                var records = d.records || d || [];
+                var body = document.getElementById('dns-body');
+                if (records.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No DNS records');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < records.length; i++) {
+                    var r = records[i];
+                    html += '<tr><td>' + esc(r.name || '') + '</td>'
+                        + '<td>' + esc(r.address || r.addr || '') + '</td>'
+                        + '<td>' + esc(r.ttl != null ? r.ttl + 's' : '--') + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('dns-body').innerHTML = emptyRow(3, 'Failed to load DNS');
+            }
+        }
+
+        async function loadAssets() {
+            try {
+                var d = await fetchJson('/asset/list');
+                var assets = d.assets || d || [];
+                var body = document.getElementById('assets-body');
+                if (assets.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No assets registered');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < assets.length; i++) {
+                    var a = assets[i];
+                    html += '<tr><td class="hash" title="' + esc(a.id || a.asset_id || '') + '">'
+                        + esc(truncHash(a.id || a.asset_id || '')) + '</td>'
+                        + '<td>' + esc(a.asset_type || a.type || '--') + '</td>'
+                        + '<td>' + esc(a.state || a.status || '--') + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('assets-body').innerHTML = emptyRow(3, 'Failed to load assets');
+            }
+        }
+
+        async function loadDomains() {
+            try {
+                var d = await fetchJson('/domain/list');
+                var domains = d.domains || d || [];
+                var body = document.getElementById('domains-body');
+                if (domains.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No domain memberships');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < domains.length; i++) {
+                    var dm = domains[i];
+                    html += '<tr><td>' + esc(dm.name || dm.domain || '') + '</td>'
+                        + '<td>' + esc(dm.role || '--') + '</td>'
+                        + '<td>' + esc(dm.scope || '--') + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('domains-body').innerHTML = emptyRow(3, 'Failed to load domains');
+            }
+        }
+
+        async function loadRecentBlocks() {
+            try {
+                var hd = await fetchJson('/blockchain/height');
+                var height = hd.height || hd.chain_height || 0;
+                var body = document.getElementById('blocks-body');
+                if (height === 0) {
+                    body.innerHTML = emptyRow(3, 'No blocks yet');
+                    return;
+                }
+                var html = '';
+                var start = Math.max(0, height - 5);
+                for (var i = height - 1; i >= start; i--) {
+                    try {
+                        var b = await fetchJson('/blockchain/block?height=' + i);
+                        var txCount = b.transactions ? b.transactions.length : (b.tx_count || 0);
+                        html += '<tr><td>' + i + '</td>'
+                            + '<td class="hash" title="' + esc(b.hash || b.block_hash || '') + '">'
+                            + esc(truncHash(b.hash || b.block_hash || '')) + '</td>'
+                            + '<td>' + txCount + '</td></tr>';
+                    } catch (_) {
+                        html += '<tr><td>' + i + '</td><td class="empty">--</td><td>--</td></tr>';
+                    }
+                }
+                body.innerHTML = html || emptyRow(3, 'No blocks available');
+            } catch (_) {
+                document.getElementById('blocks-body').innerHTML = emptyRow(3, 'Failed to load blocks');
+            }
+        }
+
+        async function loadDashboards() {
+            try {
+                var d = await fetchJson('/dashboard/list');
+                var dashes = d.dashboards || d || [];
+                var body = document.getElementById('dashboards-body');
+                if (dashes.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No dashboards deployed (using defaults)');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < dashes.length; i++) {
+                    var db = dashes[i];
+                    html += '<tr><td>' + esc(db.name || '') + '</td>'
+                        + '<td>' + esc(db.scope || '--') + '</td>'
+                        + '<td>' + esc(db.status || 'deployed') + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('dashboards-body').innerHTML = emptyRow(3, 'Failed to load dashboards');
+            }
+        }
+
+        /* --- Actions --- */
+
         async function registerDns() {
-            var name = document.getElementById('dns-name').value;
-            var addr = document.getElementById('dns-addr').value;
+            var name = document.getElementById('dns-name').value.trim();
+            var addr = document.getElementById('dns-addr').value.trim();
+            if (!name) { showResult('dns-result', false, 'Name is required'); return; }
+            if (!addr) { showResult('dns-result', false, 'Address is required'); return; }
             try {
-                var r = await fetch('/api/v1/blockmatrix/dns/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: name, addr: addr })
-                });
-                document.getElementById('dns-result').textContent = r.ok ? 'Registered!' : 'Failed';
-            } catch(e) {
-                document.getElementById('dns-result').textContent = 'Error: ' + e;
+                var r = await postJson('/dns/register', { name: name, addr: addr });
+                if (r.ok) {
+                    showResult('dns-result', true, 'Registered: ' + name + ' -> ' + addr);
+                    document.getElementById('dns-name').value = '';
+                    document.getElementById('dns-addr').value = '';
+                    loadDns();
+                } else {
+                    showResult('dns-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('dns-result', false, 'Error: ' + e.message);
             }
         }
+
         async function connectPeer() {
-            var addr = document.getElementById('peer-addr').value;
+            var addr = document.getElementById('peer-addr').value.trim();
+            if (!addr) { showResult('peer-result', false, 'Address is required'); return; }
             try {
-                var r = await fetch('/api/v1/blockmatrix/peers/connect', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ addr: addr })
-                });
-                alert(r.ok ? 'Connected!' : 'Failed');
-            } catch(e) {
-                alert('Error: ' + e);
+                var r = await postJson('/network/connect', { addr: addr });
+                if (r.ok) {
+                    showResult('peer-result', true, 'Connected to ' + addr);
+                    document.getElementById('peer-addr').value = '';
+                    loadPeers();
+                } else {
+                    showResult('peer-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('peer-result', false, 'Error: ' + e.message);
             }
         }
-        refresh();
-        setInterval(refresh, 30000);
+
+        async function registerDomain() {
+            var name = document.getElementById('domain-name').value.trim();
+            if (!name) { showResult('domain-result', false, 'Domain name is required'); return; }
+            try {
+                var r = await postJson('/domain/register', { name: name });
+                if (r.ok) {
+                    showResult('domain-result', true, 'Domain registered: ' + name);
+                    document.getElementById('domain-name').value = '';
+                    loadDomains();
+                } else {
+                    showResult('domain-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('domain-result', false, 'Error: ' + e.message);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                var d = await fetchJson('/config/show');
+                document.getElementById('config-view').textContent = JSON.stringify(d, null, 2);
+            } catch (e) {
+                document.getElementById('config-view').textContent = 'Failed to load config: ' + e.message;
+            }
+        }
+
+        function shutdownNode() {
+            if (!confirm('Are you sure you want to shut down this node? You will lose remote access.')) return;
+            if (!confirm('This is your final confirmation. The node will stop immediately.')) return;
+            postJson('/shutdown', {}).then(function(r) {
+                if (r.ok) {
+                    showResult('shutdown-result', true, 'Node is shutting down...');
+                } else {
+                    showResult('shutdown-result', false, 'Shutdown failed');
+                }
+            }).catch(function(e) {
+                showResult('shutdown-result', false, 'Error: ' + e.message);
+            });
+        }
+
+        /* --- Refresh Loop --- */
+
+        async function refreshAll() {
+            await Promise.all([
+                loadStatus(),
+                loadBlockchain(),
+                loadPeers(),
+                loadDns(),
+                loadAssets(),
+                loadDomains(),
+                loadRecentBlocks(),
+                loadDashboards()
+            ]);
+        }
+
+        refreshAll();
+        setInterval(refreshAll, 5000);
     </script>
 </body>
 </html>

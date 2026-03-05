@@ -86,6 +86,7 @@ pub enum BaseSystemType {
     Dns,
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
+    Dashboard,
 }
 
 /// Application domain for user assets
@@ -156,6 +157,7 @@ pub enum AssetType {
     Dns,
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
+    Dashboard,
 }
 
 impl AssetType {
@@ -172,6 +174,7 @@ impl AssetType {
             AssetType::Blockchain => 7,
             AssetType::Dns => 8,
             AssetType::Transmission => 9,
+            AssetType::Dashboard => 10,
         }
     }
 
@@ -188,6 +191,7 @@ impl AssetType {
             AssetType::Blockchain => "Blockchain",
             AssetType::Dns => "Dns",
             AssetType::Transmission => "Transmission",
+            AssetType::Dashboard => "Dashboard",
         }
     }
 }
@@ -213,6 +217,7 @@ impl From<AssetType> for hypermesh_lib::SystemAssetKind {
             AssetType::Blockchain => Self::Blockchain,
             AssetType::Dns => Self::Dns,
             AssetType::Transmission => Self::Transmission,
+            AssetType::Dashboard => Self::Dashboard,
         }
     }
 }
@@ -230,6 +235,7 @@ impl From<hypermesh_lib::SystemAssetKind> for AssetType {
             hypermesh_lib::SystemAssetKind::Blockchain => Self::Blockchain,
             hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
+            hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
         }
     }
 }
@@ -247,6 +253,7 @@ impl From<BaseSystemType> for hypermesh_lib::SystemAssetKind {
             BaseSystemType::Blockchain => Self::Blockchain,
             BaseSystemType::Dns => Self::Dns,
             BaseSystemType::Transmission => Self::Transmission,
+            BaseSystemType::Dashboard => Self::Dashboard,
         }
     }
 }
@@ -264,6 +271,7 @@ impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
             hypermesh_lib::SystemAssetKind::Blockchain => Self::Blockchain,
             hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
+            hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
         }
     }
 }
@@ -325,6 +333,7 @@ impl AssetRegistration {
             AssetType::Blockchain => BaseSystemType::Blockchain,
             AssetType::Dns => BaseSystemType::Dns,
             AssetType::Transmission => BaseSystemType::Transmission,
+            AssetType::Dashboard => BaseSystemType::Dashboard,
         };
 
         Self {
@@ -404,6 +413,7 @@ impl AssetRegistration {
                     BaseSystemType::Blockchain => 7,
                     BaseSystemType::Dns => 8,
                     BaseSystemType::Transmission => 9,
+                    BaseSystemType::Dashboard => 10,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -587,6 +597,7 @@ impl AssetRegistration {
                 BaseSystemType::Blockchain => AssetType::Blockchain,
                 BaseSystemType::Dns => AssetType::Dns,
                 BaseSystemType::Transmission => AssetType::Transmission,
+                BaseSystemType::Dashboard => AssetType::Dashboard,
             }),
             AssetCategory::Application(_) => None,
         }

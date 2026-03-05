@@ -9,6 +9,7 @@
 //! catalog crate.
 
 pub mod default;
+pub mod deploy;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

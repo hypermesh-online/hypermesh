@@ -1217,7 +1217,7 @@ async fn run_connect(
     cli: &Cli,
     coord: MatrixCoordinate,
     nid: &str,
-    _data_dir: &std::path::Path,
+    data_dir: &std::path::Path,
     bootstrap: &NodeBootstrap,
     persistence: std::sync::Arc<PersistenceManager>,
 ) -> Result<()> {
@@ -1493,7 +1493,7 @@ async fn run_connect(
         network: network_ref,
         coordinate: coord,
         node_id: nid.to_string(),
-        data_dir: _data_dir.to_path_buf(),
+        data_dir: data_dir.to_path_buf(),
         privacy_mode: format!("{:?}", bootstrap.privacy_mode().await),
         started_at: std::time::Instant::now(),
         shutdown_tx: shutdown_tx.clone(),
@@ -1503,7 +1503,9 @@ async fn run_connect(
     let mut handler = ipc::RequestHandler::new();
     ipc::register_all(&mut handler, daemon_state.clone());
 
-    let ipc_server = match ipc::IpcServer::new(std::sync::Arc::new(handler)) {
+    let handler = std::sync::Arc::new(handler);
+
+    let ipc_server = match ipc::IpcServer::new(handler.clone()) {
         Ok(server) => {
             let server = std::sync::Arc::new(server);
             let server_run = server.clone();
@@ -1520,6 +1522,50 @@ async fn run_connect(
             None
         }
     };
+
+    // HTTP API server for dashboard access (localhost only)
+    let http_handler = handler.clone();
+    tokio::spawn(async move {
+        if let Err(e) = ipc::http_api::run_http_api(
+            http_handler,
+            ipc::http_api::DEFAULT_HTTP_API_PORT,
+        )
+        .await
+        {
+            warn!("HTTP API error: {}", e);
+        }
+    });
+
+    // Register default dashboard if none exists yet
+    {
+        let dash_dir = data_dir.join("dashboards").join("default");
+        if !dash_dir.exists() {
+            info!("Registering default dashboard...");
+            if let Err(e) = std::fs::create_dir_all(dash_dir.join("public")) {
+                warn!("Failed to create default dashboard dir: {}", e);
+            } else {
+                let _ = std::fs::create_dir_all(dash_dir.join("private"));
+                let _ = std::fs::create_dir_all(dash_dir.join("admin"));
+                let _ = std::fs::write(
+                    dash_dir.join("public").join("index.html"),
+                    blockmatrix::dashboard::default::DEFAULT_PUBLIC_HTML,
+                );
+                let _ = std::fs::write(
+                    dash_dir.join("private").join("index.html"),
+                    blockmatrix::dashboard::default::DEFAULT_PRIVATE_HTML,
+                );
+                let _ = std::fs::write(
+                    dash_dir.join("admin").join("index.html"),
+                    blockmatrix::dashboard::default::DEFAULT_ADMIN_HTML,
+                );
+                let manifest = format!(
+                    "[meta]\nname = \"default\"\nversion = \"1.0.0\"\ndescription = \"Default HyperMesh node dashboard\"\n\n[access]\npublic = \"public\"\nprivate = \"private\"\nadmin = \"admin\"\n"
+                );
+                let _ = std::fs::write(dash_dir.join("dashboard.toml"), &manifest);
+                info!("Default dashboard registered at {}", dash_dir.display());
+            }
+        }
+    }
 
     info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
     info!("Press Ctrl+C to stop");
@@ -2096,10 +2142,98 @@ async fn main() -> Result<()> {
                         manifest.dashboard.name, manifest.dashboard.version
                     );
                     info!("Domain: {}", manifest.dashboard.domain);
-                    println!(
-                        "Dashboard '{}' validated successfully. Deploy pipeline coming soon.",
-                        manifest.dashboard.name
-                    );
+
+                    // Collect all files from the access scope directories
+                    let files = blockmatrix::dashboard::deploy::collect_dashboard_files(
+                        &path,
+                        &manifest.access,
+                    )
+                    .with_context(|| "failed to collect dashboard files")?;
+
+                    if files.is_empty() {
+                        eprintln!("No files found in dashboard scope directories");
+                        std::process::exit(1);
+                    }
+
+                    // Bundle and hash
+                    let bundle = blockmatrix::dashboard::deploy::bundle_files(&files);
+                    let content_hash = blockmatrix::dashboard::deploy::blake3_hash(&bundle);
+
+                    // Check if daemon is running -- prefer IPC for deploy
+                    let client = ipc::IpcClient::new();
+                    if client.is_daemon_running().await {
+                        // Build files payload as base64 for IPC
+                        use base64::Engine as _;
+                        let files_json: serde_json::Value = files
+                            .iter()
+                            .map(|(k, v)| {
+                                (k.clone(), serde_json::Value::String(
+                                    base64::engine::general_purpose::STANDARD.encode(v),
+                                ))
+                            })
+                            .collect::<serde_json::Map<String, serde_json::Value>>()
+                            .into();
+
+                        match client
+                            .call_ok(
+                                "dashboard.deploy",
+                                serde_json::json!({
+                                    "name": manifest.dashboard.name,
+                                    "manifest_toml": toml_str,
+                                    "files": files_json,
+                                }),
+                            )
+                            .await
+                        {
+                            Ok(resp) => println!(
+                                "{}",
+                                serde_json::to_string_pretty(&resp).unwrap_or_default()
+                            ),
+                            Err(e) => {
+                                eprintln!("Deploy via daemon failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                    } else {
+                        // Direct deploy (no daemon running)
+                        let asset_data = AssetData {
+                            config: format!(
+                                "DASHBOARD:DEPLOY:{}",
+                                manifest.dashboard.name
+                            )
+                            .into_bytes(),
+                            definition: bundle,
+                            metadata: toml_str.as_bytes().to_vec(),
+                        };
+                        let registration = AssetRegistration::from_asset_data(
+                            &asset_data,
+                            NetworkScope::Global,
+                            AssetCategory::BaseSystem(BaseSystemType::Dashboard),
+                        );
+                        let state_proof = StateProof::new_for_testing();
+                        let block = bootstrap
+                            .blockchain()
+                            .register_asset_record(registration, &state_proof)
+                            .await
+                            .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+                        // Save files to data dir for local serving
+                        blockmatrix::dashboard::deploy::persist_dashboard(
+                            &data_dir, &manifest.dashboard.name, &toml_str, &files,
+                        )
+                        .with_context(|| "failed to persist dashboard files")?;
+
+                        println!();
+                        println!("  Dashboard Deployed");
+                        println!("  ------------------");
+                        println!("  name:    {}", manifest.dashboard.name);
+                        println!("  version: {}", manifest.dashboard.version);
+                        println!("  domain:  {}", manifest.dashboard.domain);
+                        println!("  hash:    {}", hex::encode(content_hash));
+                        println!("  block:   #{}", block.index);
+                        println!("  files:   {}", files.len());
+                        println!();
+                    }
                 }
                 DashboardAction::List => {
                     let client = ipc::IpcClient::new();

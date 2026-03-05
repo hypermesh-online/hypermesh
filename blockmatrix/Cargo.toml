@@ -160,6 +160,7 @@ sysinfo = "0.30"  # System information (CPU, memory, processes)
 rmp-serde = "1.3"  # MessagePack serialization
 walkdir = "2.5"  # Directory traversal
 dirs = "5.0"  # User directories
+base64 = "0.22"  # Base64 encoding for IPC file transfer
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.29", features = ["fs"] }  # statvfs for storage detection

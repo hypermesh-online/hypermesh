@@ -26,6 +26,7 @@ pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
             SystemAssetKind::Blockchain => AssetType::Blockchain,
             SystemAssetKind::Dns => AssetType::Dns,
             SystemAssetKind::Transmission => AssetType::Transmission,
+            SystemAssetKind::Dashboard => AssetType::Dashboard,
         },
         AssetKind::UserDefined(_) => AssetType::Container,
     }
@@ -44,6 +45,7 @@ pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
         AssetType::Blockchain => SystemAssetKind::Blockchain,
         AssetType::Dns => SystemAssetKind::Dns,
         AssetType::Transmission => SystemAssetKind::Transmission,
+        AssetType::Dashboard => SystemAssetKind::Dashboard,
     })
 }
 
@@ -75,6 +77,7 @@ pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
         BaseSystemType::Blockchain => SystemAssetKind::Blockchain,
         BaseSystemType::Dns => SystemAssetKind::Dns,
         BaseSystemType::Transmission => SystemAssetKind::Transmission,
+        BaseSystemType::Dashboard => SystemAssetKind::Dashboard,
     }
 }
 
@@ -96,6 +99,7 @@ pub fn _parse_asset_kind(s: &str) -> AssetKind {
         "transmission" | "relay" | "bandwidth" => {
             AssetKind::System(SystemAssetKind::Transmission)
         }
+        "dashboard" => AssetKind::System(SystemAssetKind::Dashboard),
         other => {
             // Treat anything else as a UserDefined type with a zeroed hash
             // (callers can fill in the real hash later).

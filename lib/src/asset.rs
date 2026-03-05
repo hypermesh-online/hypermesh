@@ -68,6 +68,7 @@ pub enum SystemAssetKind {
     Dns,
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
+    Dashboard,
 }
 
 impl SystemAssetKind {
@@ -84,6 +85,7 @@ impl SystemAssetKind {
             Self::Blockchain => 7,
             Self::Dns => 8,
             Self::Transmission => 9,
+            Self::Dashboard => 10,
         }
     }
 
@@ -100,6 +102,7 @@ impl SystemAssetKind {
             Self::Blockchain => "Blockchain",
             Self::Dns => "Dns",
             Self::Transmission => "Transmission",
+            Self::Dashboard => "Dashboard",
         }
     }
 }

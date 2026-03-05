@@ -28,6 +28,8 @@ items = [
     "Engauge API routing (/api/v1/engauge)",
     # Dashboard serving
     "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)",
+    "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
+    "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
 ]
 
 [features.in_development]
