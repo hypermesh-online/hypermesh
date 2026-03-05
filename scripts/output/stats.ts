@@ -52,6 +52,12 @@ export const crateStats: CrateStats[] = [
     "testCount": 158
   },
   {
+    "id": "hypermesh-ffi",
+    "files": 13,
+    "linesOfCode": 1024,
+    "testCount": 12
+  },
+  {
     "id": "hypermesh-lib",
     "files": 16,
     "linesOfCode": 5220,
@@ -84,8 +90,8 @@ export const crateStats: CrateStats[] = [
 ];
 
 export const totalStats = {
-  "totalFiles": 1064,
-  "totalLines": 327953,
-  "totalTests": 4093,
-  "crateCount": 12
+  "totalFiles": 1077,
+  "totalLines": 328977,
+  "totalTests": 4105,
+  "crateCount": 13
 };

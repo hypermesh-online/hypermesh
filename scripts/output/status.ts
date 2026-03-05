@@ -378,6 +378,39 @@ export const crateStatuses: CrateStatus[] = [
     "completion": 74
   },
   {
+    "id": "hypermesh-ffi",
+    "name": "HyperMesh FFI",
+    "description": "C FFI bindings for the HyperMesh SDK — foundation for TypeScript, Go, Python, C/C++, C# integrations",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "Opaque client handle (hypermesh_connect/disconnect with tokio runtime)",
+        "Raw JSON-RPC call (hypermesh_call — any IPC method accessible from C)",
+        "Thread-local error state (hypermesh_last_error, set on failure)",
+        "Memory management (hypermesh_free_string for caller-owned strings)",
+        "Node API (hypermesh_status)",
+        "DNS API (hypermesh_dns_resolve, dns_list, dns_register)",
+        "Network API (hypermesh_peers)",
+        "Blockchain API (hypermesh_blockchain_height, blockchain_block)",
+        "Topology API (hypermesh_topology_info)",
+        "Asset API (hypermesh_asset_list, asset_store, asset_fetch)",
+        "Domain API (hypermesh_domain_list, domain_register)",
+        "Dashboard API (hypermesh_dashboard_list, dashboard_deploy)",
+        "Config API (hypermesh_config_show, config_get)",
+        "C header file (include/hypermesh.h with extern C guards)",
+        "NULL-safe — all functions handle NULL client gracefully"
+      ],
+      "inDevelopment": [],
+      "planned": [
+        "TypeScript/Node.js bindings (NAPI-RS or WASM)",
+        "Go bindings (cgo wrapper)",
+        "Python bindings (ctypes/cffi wrapper)",
+        "C# bindings (P/Invoke wrapper)"
+      ]
+    },
+    "completion": 79
+  },
+  {
     "id": "hypermesh-lib",
     "name": "HyperMesh Lib",
     "description": "Shared canonical types for the HyperMesh ecosystem",

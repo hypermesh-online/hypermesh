@@ -1,0 +1,20 @@
+[package]
+name = "hypermesh-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C FFI bindings for HyperMesh SDK"
+license = "BSL-1.1"
+
+[lib]
+name = "hypermesh_ffi"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+hypermesh-sdk = { path = "../hypermesh-sdk" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

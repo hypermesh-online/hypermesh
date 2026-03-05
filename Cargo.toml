@@ -11,6 +11,7 @@ members = [
     "gateway",
     "engauge",
     "hypermesh-sdk",
+    "hypermesh-ffi",
 ]
 resolver = "2"
 
