@@ -27,7 +27,7 @@
 ## 🎯 **Current Status: Single-Node Alpha — Network Sync Not Functional**
 
 **Development Status**: ⚠️ **SINGLE-NODE ALPHA** - Services run individually but are NOT a decentralized mesh
-**Repository Status**: ✅ **MONOREPO** - 11 crates in core workspace, 6 services deployed to trust.hypermesh.online
+**Repository Status**: ✅ **MONOREPO** - 12 crates in core workspace, 6 services deployed to trust.hypermesh.online
 **Implementation Status**: ⚠️ **CRITICAL GAPS** - No real Proof of State (PoS is self-generated), no cross-node sync, certs are rcgen not FALCON-1024, DNS is local-only
 
 ---
@@ -48,6 +48,7 @@
 | **Lib** | `/lib` | ✅ **92% (25/27)** | Types correct, but state proof types exercised with fake data |
 | **STOQ** | `/stoq` | ⚡ **72% (21/29)** | QUIC transport genuine, FALCON-1024 signing not integrated |
 | **TrustChain** | `/trustchain` | ⚠️ **53% (21/39)** | Single-node CA, certs are rcgen not FALCON, proofs are hardcoded |
+| **HyperMesh SDK** | `/hypermesh-sdk` | ⚡ **100% (9/9)** | Alpha — no domain/dashboard/config API yet |
 | **UI** | `/ui` | ⚠️ **32% (9/28)** | Components render, no real backend data connections |
 
 ### Critical Architectural Note: Block-MATRIX Topology
@@ -340,6 +341,8 @@ DNS names are blockchain assets earning CAESAR rewards.
 - `http3://trust` → TrustChain management  
 - `http3://assets` → HyperMesh asset management
 
+**Domain-as-Network (IMPLEMENTED)**: Domain registration creates Network-scope blockchains. Hierarchical DNS resolution walks parent chains. Invitation tokens use BLAKE3-HMAC.
+
 ### **Catalog: Asset Package Manager with Execution Delegation (⚠️ 30% Complete)**
 **Catalog Architecture**:
 - ✅ **Pure Asset Package Manager**: Manages asset packages (definitions, versioning, distribution)
@@ -468,6 +471,9 @@ DNS names are blockchain assets earning CAESAR rewards.
 3. **Cross-Network Asset Transfers**: Dual proof-of-state validation across scopes
 4. **Integration Testing**: End-to-end workflow validation across components
 5. **Performance Optimization**: STOQ transport tuning (2.95 Gbps → adaptive tiers)
+6. ✅ **IPC Architecture**: JSON-RPC 2.0 daemon with Unix socket server/client — COMPLETE
+7. ✅ **Domain Naming**: Domain-as-network registration, hierarchy, BLAKE3-HMAC invitations — COMPLETE
+8. ✅ **Dashboard SDK**: Scope-aware dashboard serving, manifest system, default dashboards — COMPLETE
 
 ### **Key Files for Development**
 
@@ -485,6 +491,12 @@ DNS names are blockchain assets earning CAESAR rewards.
 - `/trustchain/` - FALCON-1024 CA (production-ready)
 - `/catalog/` - Asset package manager (compiles with warnings)
 - `/gateway/` - HTTP/3 + STOQ gateway (100% complete, 20 modules, 194 tests)
+- `/blockmatrix/src/ipc/` - IPC daemon, client, protocol, config, handler modules
+- `/blockmatrix/src/dashboard/` - Dashboard manifest, default content, scaffold
+- `/blockmatrix/src/dns/domain.rs` - Domain-as-network registration
+- `/blockmatrix/src/dns/invitation.rs` - BLAKE3-HMAC invitation tokens
+- `/hypermesh-sdk/` - Typed Rust SDK for daemon IPC API
+- `/gateway/src/dashboard_server.rs` - Scope-aware dashboard serving
 
 ### **Architecture Decisions Made**
 

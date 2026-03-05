@@ -25,6 +25,10 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 - Shard rebalancing on node join/leave
 - CLI (CommandExecutor with topology/node/asset commands)
 - Cross-platform OS abstraction (Linux/Windows/macOS/BSD)
+- IPC daemon (JSON-RPC 2.0 over Unix sockets, handler dispatch, DaemonState)
+- TOML config system (load/save/merge, CLI overrides, dotpath get/set)
+- Domain-as-network (register domain → Network blockchain, hierarchical DNS, invitation tokens)
+- Dashboard manifest (dashboard.toml parse/validate, scope-aware access, scaffold)
 
 ## Architectural Truths
 
@@ -49,9 +53,11 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 | `retrieval/` | Instruction-based shard reconstruction |
 | `persistence/` | WAL, snapshots, matrix state recovery |
 | `network/` | Blockchain integration, membership |
-| `dns/` | DNS record registration and validation |
+| `dns/` | DNS registration, domain-as-network, hierarchy, invitations |
 | `gateway/` | Cross-scope bridge (Device <-> Network) |
 | `privacy/` | Privacy mode switching, tier enforcement |
 | `cli/` | Command executor, output formatting |
 | `os_integration/` | Cross-platform abstraction |
 | `container/` | Basic process isolation, cluster management |
+| `ipc/` | JSON-RPC 2.0 daemon, Unix socket IPC, config system |
+| `dashboard/` | Dashboard manifest, default HTML, scaffold generator |

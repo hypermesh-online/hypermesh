@@ -33,6 +33,10 @@ Node Boot
 - **eBPF security** -- XDP attachment, policy enforcement, Privacy-eBPF bridge with sync_to_kernel
 - **Cross-platform** -- OsAbstraction for Linux/macOS/BSD/Windows with hardware detection
 - **BLAKE3** content hashing throughout, FALCON-1024 for protocol signing
+- **IPC daemon** with JSON-RPC 2.0 over Unix domain sockets
+- **TOML configuration system** with CLI overrides
+- **Domain-as-network** with hierarchical DNS and invitation tokens
+- **Dashboard manifest system** with scope-aware serving
 
 ## Modules
 
@@ -51,12 +55,14 @@ Node Boot
 | `persistence` | WAL, incremental snapshots, recovery |
 | `container` | Process isolation, cluster management, health monitoring |
 | `cli` | Topology queries, node management, asset operations |
-| `dns` | Node-local DNS, blockchain asset registration |
+| `dns` | Node-local DNS, blockchain asset registration, domain hierarchy, invitations |
 | `privacy` | PrivacyMode enforcement, eBPF bridge |
 | `security` | eBPF manager, syscall tracing, ExtensionValidator |
 | `platform` | User contribution, resource sharing controls |
 | `os_integration` | Cross-platform abstraction layer |
 | `intelligence` | Routing intelligence integration |
+| `ipc/` | JSON-RPC 2.0 daemon, Unix socket IPC, config, handler dispatch |
+| `dashboard/` | Dashboard manifest (TOML), scope-aware serving, default HTML |
 
 ## Quick Start
 

@@ -411,6 +411,33 @@ export const crateStatuses: CrateStatus[] = [
     "completion": 93
   },
   {
+    "id": "hypermesh-sdk",
+    "name": "HyperMesh SDK",
+    "description": "Typed Rust client SDK for the HyperMesh daemon IPC API",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "HyperMeshClient with Unix socket IPC connection and raw_call()",
+        "Node API (status, coordinate, privacy mode, uptime)",
+        "DNS API (resolve, list entries)",
+        "Asset API (list, info, store, fetch)",
+        "Network API (peers, connect)",
+        "Blockchain API (height, block by index, chain validation)",
+        "Topology API (info, neighbors, routing cost, path finding)",
+        "SdkError enum (Connection, Ipc, Rpc, Serialization, Timeout, NotConnected)",
+        "Typed response structs with serde deserialization"
+      ],
+      "inDevelopment": [],
+      "planned": [
+        "Domain API (register, list, join, invite)",
+        "Dashboard API (deploy, list, info)",
+        "Config API (show, get, set)",
+        "Event subscription (streaming daemon events)"
+      ]
+    },
+    "completion": 69
+  },
+  {
     "id": "stoq",
     "name": "STOQ Protocol",
     "description": "QUIC-based transport protocol with eBPF acceleration",
