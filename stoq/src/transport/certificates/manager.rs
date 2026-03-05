@@ -196,7 +196,11 @@ impl CertificateManager {
             CertificateMode::NetworkStrategy => {
                 if let Some(ref strategy) = self.certificate_strategy {
                     match strategy.strategy_name() {
-                        "Anonymous" | "P2P" => rustls::ClientConfig::builder()
+                        // Accept all certs for self-signed strategies.
+                        // Note: NetworkType::P2P produces strategy_name "Private",
+                        // NetworkType::Federated produces "Federated".
+                        // All non-Public strategies use self-signed certs.
+                        "Anonymous" | "P2P" | "Private" | "Federated" => rustls::ClientConfig::builder()
                             .dangerous()
                             .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
                             .with_no_client_auth(),

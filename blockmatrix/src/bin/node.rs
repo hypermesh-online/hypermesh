@@ -1021,16 +1021,13 @@ async fn main() -> Result<()> {
                     info!("Anonymous mode: using ephemeral certificates, no CA dependency");
                     NetworkType::Anonymous
                 } else if privacy_mode == PrivacyMode::PUBLIC {
-                    if cli.reflector {
-                        // Reflector nodes ARE trust anchors — self-issue certs locally.
-                        // trust.hypermesh.online can't request certs from itself over QUIC.
-                        info!("Public reflector: self-issuing certificate via local TrustChain");
-                        NetworkType::P2P
-                    } else {
-                        // Joining nodes request certs from the global TrustChain CA
-                        info!("Public mode: requesting certificate from trust.hypermesh.online");
-                        NetworkType::Public
-                    }
+                    // All public nodes use local TrustChain for now.
+                    // Gateway-proxied TrustChain CA is not yet wired, so
+                    // NetworkType::Public would fail trying quic://trust.hypermesh.online.
+                    // Reflectors are trust anchors; joining nodes self-sign until
+                    // the gateway can proxy cert requests to the remote CA.
+                    info!("Public mode: self-issuing certificate via local TrustChain");
+                    NetworkType::P2P
                 } else {
                     // Private/P2P: node is its own CA via local TrustChain
                     info!("Private mode: self-issuing certificate via local TrustChain");

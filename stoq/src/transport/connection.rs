@@ -313,9 +313,13 @@ impl Stream {
         Ok(())
     }
 
-    /// Receive data from the stream
+    /// Receive data from the stream.
+    ///
+    /// Max receive size is 64KB — sufficient for handshakes, sync messages,
+    /// and shard metadata. Bulk shard data uses `send()`/`send_bytes()` with
+    /// length-prefixed framing rather than `read_to_end()`.
     pub async fn receive(&mut self) -> Result<Bytes> {
-        let data = self.recv.read_to_end(crate::STOQ_MTU).await?;
+        let data = self.recv.read_to_end(64 * 1024).await?;
         self.metrics.record_bytes_received(data.len());
         Ok(data.into())
     }

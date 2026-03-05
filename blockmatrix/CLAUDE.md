@@ -33,6 +33,8 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 3. **PrivacyMode (transport) is independent from BlockchainScope (state proof)** -- any combination valid
 4. **Users can create private networks** across their own devices with shared blockchain
 5. **trust.hypermesh.online** is the global Public Gateway -- private networks work without it
+6. **PoS IS bootstrap authentication, TLS IS encryption** -- self-signed certs + PoS handshake = working bootstrap (see papers/HYPERMESH.md §5.7)
+7. **Handshake is flat JSON** -- `connect_to_peer` MUST use NetworkManager path (NOT MatrixStoqIntegration which sends incompatible MatrixMessage format)
 
 ## Key Modules
 

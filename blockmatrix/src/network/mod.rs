@@ -197,13 +197,9 @@ impl NetworkManager {
     pub async fn connect_to_peer(&self, addr: SocketAddr) -> Result<String> {
         info!("Connecting to peer at {}", addr);
 
-        // Use STOQ integration layer if available
-        if let Some(ref stoq_integration) = self.stoq_integration {
-            return stoq_integration.connect_to_node(addr).await;
-        }
-
-        // Fallback to direct STOQ connection
-        // Create endpoint for connection
+        // Always use the NetworkManager handshake path (flat JSON).
+        // MatrixStoqIntegration::connect_to_node sends MatrixMessage::Announcement
+        // which is incompatible with handle_incoming_handshake on the accept side.
         let endpoint = stoq::Endpoint::new(
             match addr {
                 SocketAddr::V6(v6) => *v6.ip(),

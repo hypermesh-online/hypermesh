@@ -283,6 +283,27 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 
 ### Node Bootstrap Architecture (CURRENT + FUTURE)
 
+#### Bootstrap Sequence (Resolves Chicken-and-Egg)
+
+A circular dependency exists: STOQ connection → TLS cert → TrustChain CA → DNS → blockchain → STOQ connection. HyperMesh breaks this by separating encryption from authentication:
+
+**Phase 0 — Bootstrap (IMPLEMENTED):**
+- Node generates self-signed cert via local TrustChain (`NetworkType::P2P` → `local://trustchain`)
+- QUIC/TLS provides encryption only (`AcceptAllVerifier` for non-Public strategies)
+- After QUIC connects, nodes exchange flat JSON handshake with `pos_token` field
+- Bilateral PoS validation is the trust mechanism (not TLS certificates)
+- **Key**: PoS IS authentication. TLS IS encryption. They are independent.
+
+**Phase 1 — Connected (IMPLEMENTED):**
+- Nodes that pass PoS handshake are trusted peers
+- DNS records registered as blockchain assets, propagated via block sync
+- Blocks propagate to peers, shards distribute to matrix neighbors
+
+**Phase 2 — Full PKI (FUTURE):**
+- TrustChain-issued certs replace self-signed after PoS trust is established
+- Reflector/gateway nodes become distributed CAs
+- DNS resolution via blockchain instead of local HashMap
+
 #### Local Blockchain Lifecycle
 **Current Behavior (Single Blockchain)**:
 - Local BlockMatrix blockchain begins with genesis block on boot
