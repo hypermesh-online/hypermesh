@@ -235,12 +235,17 @@ mod tests {
         Arc::new(handler)
     }
 
-    /// Wait for a socket file to appear, with timeout.
+    /// Wait for a socket file to appear and be connectable, with timeout.
     async fn wait_for_socket(path: &PathBuf) {
         for _ in 0..200 {
             if path.exists() {
-                // Socket file exists, but give the listener a moment to be ready
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                // Socket file exists — try connecting to confirm listener is ready
+                for _ in 0..20 {
+                    if tokio::net::UnixStream::connect(path).await.is_ok() {
+                        return;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
                 return;
             }
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
