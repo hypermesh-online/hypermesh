@@ -10,6 +10,7 @@ pub mod asset;
 pub mod blockchain;
 pub mod config;
 pub mod dns;
+pub mod domain;
 pub mod network;
 pub mod topology;
 
@@ -73,6 +74,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
 
     // --- domain modules ---
     dns::register(handler, &state);
+    domain::register(handler, &state);
     blockchain::register(handler, &state);
     network::register(handler, &state);
     topology::register(handler, &state);
@@ -159,6 +161,9 @@ mod tests {
         for method in &[
             "dns.resolve",
             "dns.list",
+            "domain.register",
+            "domain.list",
+            "domain.join",
             "blockchain.height",
             "blockchain.block",
             "blockchain.validate",

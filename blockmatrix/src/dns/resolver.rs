@@ -12,12 +12,15 @@
 
 use super::{
     DnsCache, DnsError, DnsPoolManager, DnsRecord, DnsRecordType, DnsResult, DnsValidator, Domain,
-    TrustChainDnsClient,
+    DomainRegistration, TrustChainDnsClient,
 };
+use crate::dns::domain::derive_network_id;
 use crate::proof_of_state::StateProof;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::sync::RwLock;
 use tracing::{debug, info};
 
 /// DNS resolution tier
@@ -31,6 +34,13 @@ pub enum DnsResolutionTier {
     Federated { network_id: String },
     /// Fully federated (no public access)
     FullyFederated { network_id: String },
+    /// Resolved via hierarchical domain walk (parent chain lookup)
+    Hierarchical {
+        /// The domain whose pool contained the answer
+        authoritative_domain: String,
+        /// Network ID of the authoritative domain
+        network_id: String,
+    },
 }
 
 /// DNS query
@@ -73,6 +83,8 @@ pub struct DnsResolver {
     cache: Arc<DnsCache>,
     /// TrustChain DNS client (service layer)
     trustchain_client: Option<Arc<TrustChainDnsClient>>,
+    /// Domain registry for hierarchical resolution (optional)
+    domain_registry: Option<Arc<RwLock<HashMap<String, DomainRegistration>>>>,
 }
 
 impl DnsResolver {
@@ -87,12 +99,25 @@ impl DnsResolver {
             validator,
             cache,
             trustchain_client: None,
+            domain_registry: None,
         }
     }
 
     /// Set TrustChain DNS client
     pub fn with_trustchain_client(mut self, client: Arc<TrustChainDnsClient>) -> Self {
         self.trustchain_client = Some(client);
+        self
+    }
+
+    /// Set domain registry for hierarchical resolution.
+    ///
+    /// When set, multi-component domains will walk up the parent chain
+    /// looking for a federated pool that contains the queried name.
+    pub fn with_domain_registry(
+        mut self,
+        registry: Arc<RwLock<HashMap<String, DomainRegistration>>>,
+    ) -> Self {
+        self.domain_registry = Some(registry);
         self
     }
 
@@ -119,6 +144,25 @@ impl DnsResolver {
             });
         }
 
+        // Try hierarchical resolution for multi-component domains
+        if self.domain_registry.is_some() && query.domain.is_federated() {
+            if let Some(response) = self.resolve_hierarchical(&query).await {
+                // Cache the hierarchical result
+                if !response.records.is_empty() {
+                    let ttl = response.records[0].ttl;
+                    self.cache
+                        .set(
+                            &query.domain.full,
+                            &query.record_type,
+                            response.records.clone(),
+                            ttl,
+                        )
+                        .await?;
+                }
+                return Ok(response);
+            }
+        }
+
         // Determine resolution tier
         let tier = self.determine_tier(&query);
 
@@ -131,6 +175,11 @@ impl DnsResolver {
             }
             DnsResolutionTier::FullyFederated { network_id } => {
                 self.resolve_fully_federated(&query, network_id).await?
+            }
+            DnsResolutionTier::Hierarchical { .. } => {
+                // Hierarchical is resolved above; this arm is unreachable in
+                // normal flow but required for exhaustive matching.
+                vec![]
             }
         };
 
@@ -324,6 +373,58 @@ impl DnsResolver {
 
         Ok(records)
     }
+
+    /// Walk up the domain hierarchy looking for a federated pool that contains
+    /// the queried domain name.
+    ///
+    /// For "host.lab.hypermesh" the walk order is:
+    ///   1. pool for "lab.hypermesh" (network_id derived from "lab.hypermesh")
+    ///   2. pool for "hypermesh"     (network_id derived from "hypermesh")
+    ///
+    /// Returns `Some(DnsResponse)` on the first pool that has records,
+    /// or `None` if no parent pool contains the name.
+    async fn resolve_hierarchical(&self, query: &DnsQuery) -> Option<DnsResponse> {
+        let mut current = query.domain.parent();
+
+        while let Some(parent_domain) = current {
+            let parent_name = parent_domain.full.clone();
+            let network_id = derive_network_id(&parent_name);
+
+            debug!(
+                "Hierarchical walk: trying parent '{}' (network {})",
+                parent_name, network_id
+            );
+
+            // Try querying the federated pool for this parent
+            if let Ok(records) = self
+                .pool_manager
+                .query_federated(&network_id, &query.domain.full)
+                .await
+            {
+                if !records.is_empty() {
+                    info!(
+                        "Hierarchical resolution: {} found in parent domain '{}' pool",
+                        query.domain.full, parent_name
+                    );
+
+                    return Some(DnsResponse {
+                        domain: query.domain.clone(),
+                        tier: DnsResolutionTier::Hierarchical {
+                            authoritative_domain: parent_name,
+                            network_id,
+                        },
+                        records,
+                        timestamp: SystemTime::now(),
+                        from_cache: false,
+                    });
+                }
+            }
+
+            current = parent_domain.parent();
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -456,5 +557,116 @@ mod tests {
         // Second query should hit cache
         let response2 = resolver.resolve(query).await.expect("test: async operation");
         assert!(response2.from_cache);
+    }
+
+    #[tokio::test]
+    async fn test_hierarchical_resolve_finds_in_parent_pool() {
+        let pool_manager = Arc::new(DnsPoolManager::new());
+        let validator = Arc::new(DnsValidator::new(false));
+        let cache = Arc::new(DnsCache::new(100));
+        let domain_registry = Arc::new(RwLock::new(HashMap::new()));
+
+        let resolver = DnsResolver::new(pool_manager.clone(), validator, cache)
+            .with_domain_registry(domain_registry);
+
+        // Register a record in the parent domain's pool (keyed by network_id)
+        let parent_network_id = crate::dns::domain::derive_network_id("hypermesh");
+        let record = create_test_record("host.hypermesh");
+        pool_manager
+            .register_federated(parent_network_id, record)
+            .await
+            .expect("test: register");
+
+        // Query for "host.hypermesh" — hierarchical walk should find it in "hypermesh" pool
+        let query = DnsQuery {
+            domain: Domain::parse("host.hypermesh").expect("test: parse"),
+            record_type: DnsRecordType::AAAA,
+            requester_network: None,
+            proof: None,
+            timestamp: SystemTime::now(),
+        };
+
+        let response = resolver.resolve(query).await.expect("test: resolve");
+        assert!(
+            matches!(response.tier, DnsResolutionTier::Hierarchical { .. }),
+            "expected Hierarchical tier, got {:?}",
+            response.tier
+        );
+        assert_eq!(response.records.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_flat_domain_unaffected() {
+        let pool_manager = Arc::new(DnsPoolManager::new());
+        let validator = Arc::new(DnsValidator::new(false));
+        let cache = Arc::new(DnsCache::new(100));
+        let domain_registry = Arc::new(RwLock::new(HashMap::new()));
+
+        let resolver = DnsResolver::new(pool_manager.clone(), validator, cache)
+            .with_domain_registry(domain_registry);
+
+        // Register a public record for a flat (single-component) domain
+        let record = create_test_record("nike");
+        pool_manager
+            .register_public(record)
+            .await
+            .expect("test: register");
+
+        let query = DnsQuery {
+            domain: Domain::parse("nike").expect("test: parse"),
+            record_type: DnsRecordType::AAAA,
+            requester_network: None,
+            proof: None,
+            timestamp: SystemTime::now(),
+        };
+
+        let response = resolver.resolve(query).await.expect("test: resolve");
+        // Flat domains skip hierarchical, resolve via Public
+        assert_eq!(response.tier, DnsResolutionTier::Public);
+        assert_eq!(response.records.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_hierarchical_falls_to_public() {
+        let pool_manager = Arc::new(DnsPoolManager::new());
+        let validator = Arc::new(DnsValidator::new(false));
+        let cache = Arc::new(DnsCache::new(100));
+        let domain_registry = Arc::new(RwLock::new(HashMap::new()));
+
+        let resolver = DnsResolver::new(pool_manager.clone(), validator, cache)
+            .with_domain_registry(domain_registry);
+
+        // Register in the public pool (not in any parent domain pool)
+        let record = create_test_record("admin.nike");
+        pool_manager
+            .register_public(record)
+            .await
+            .expect("test: register");
+
+        let query = DnsQuery {
+            domain: Domain::parse("admin.nike").expect("test: parse"),
+            record_type: DnsRecordType::AAAA,
+            requester_network: Some("nike".to_string()),
+            proof: None,
+            timestamp: SystemTime::now(),
+        };
+
+        // Hierarchical walk finds nothing, so falls through to Federated/Public
+        let response = resolver.resolve(query).await;
+        // The federated path will be tried since the domain is_federated.
+        // It may succeed or fail depending on network access validation.
+        // The key assertion is that we did NOT get a Hierarchical tier.
+        match response {
+            Ok(resp) => {
+                assert!(
+                    !matches!(resp.tier, DnsResolutionTier::Hierarchical { .. }),
+                    "should not be Hierarchical when no parent pool has the record"
+                );
+            }
+            Err(_) => {
+                // Federated access denied or pool not found is expected —
+                // the point is hierarchical did not resolve it
+            }
+        }
     }
 }

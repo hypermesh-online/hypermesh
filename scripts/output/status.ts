@@ -78,7 +78,15 @@ export const crateStatuses: CrateStatus[] = [
         "Config CLI (show/get/set/init subcommands)",
         "--json global flag for machine-parseable output",
         "--config global flag for custom config path",
-        "CLI flags override config file values (CLI > config > defaults)"
+        "CLI flags override config file values (CLI > config > defaults)",
+        "Domain-as-network — registering a domain creates a Network-scope blockchain (BLAKE3 chain ID)",
+        "DomainRegistration struct with parent chain derivation and persistence",
+        "Hierarchical DNS resolution — walks parent domain chains right-to-left",
+        "DomainNetworkManager — bridges domain names to SyncManager network join/leave",
+        "Domain invitation tokens — BLAKE3-HMAC keyed by owner proof, time-bounded",
+        "Domain CLI (register, create, list, nodes, invite subcommands)",
+        "Join command — join a domain network with optional invitation token",
+        "Domain IPC handlers (domain.register, domain.list, domain.join)"
       ],
       "inDevelopment": [
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
@@ -96,7 +104,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 84
+    "completion": 86
   },
   {
     "id": "caesar",

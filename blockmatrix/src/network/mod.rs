@@ -505,6 +505,41 @@ impl NetworkManager {
         Ok(())
     }
 
+    /// Connect to peers belonging to a specific domain network.
+    ///
+    /// Attempts to connect to each address in `peers`, logging successes and
+    /// failures. Returns the list of successfully connected node IDs.
+    pub async fn connect_to_domain_network(
+        &self,
+        domain_name: &str,
+        peers: Vec<std::net::SocketAddr>,
+    ) -> Result<Vec<String>> {
+        info!(
+            "Connecting to domain network '{}' via {} peer(s)",
+            domain_name,
+            peers.len()
+        );
+        let mut connected_ids = Vec::new();
+        for addr in peers {
+            match self.connect_to_peer(addr).await {
+                Ok(node_id) => {
+                    info!(
+                        "Connected to domain '{}' peer: {}",
+                        domain_name, node_id
+                    );
+                    connected_ids.push(node_id);
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to connect to domain '{}' peer {}: {}",
+                        domain_name, addr, e
+                    );
+                }
+            }
+        }
+        Ok(connected_ids)
+    }
+
     /// Discover neighbors using STOQ integration
     pub async fn discover_matrix_neighbors_stoq(
         &self,

@@ -19,6 +19,8 @@
 //! 4. Fully Federated: http3://classified.gov → Zero public access
 
 pub mod cache;
+pub mod domain;
+pub mod invitation;
 pub mod pools;
 pub mod records;
 pub mod registration;
@@ -28,6 +30,10 @@ pub mod validation;
 
 // Re-export public API
 pub use cache::{CacheEntry, DnsCache};
+pub use domain::{derive_chain_id, derive_network_id, DomainNetworkManager, DomainRegistration};
+pub use invitation::{
+    create_invitation, decode_invitation, encode_invitation, verify_invitation, DomainInvitation,
+};
 pub use pools::{DnsPool, DnsPoolManager, DnsPoolType, PoolVisibility};
 pub use records::{DnsRecord, DnsRecordData, DnsRecordType};
 pub use registration::{DnsRegistrar, DnsRegistration, RegistrationStatus};
@@ -72,6 +78,15 @@ pub enum DnsError {
 
     #[error("Privacy boundary violation: {reason}")]
     PrivacyViolation { reason: String },
+
+    #[error("Domain not registered: {domain}")]
+    DomainNotRegistered { domain: String },
+
+    #[error("Parent domain not registered: {parent}")]
+    ParentDomainRequired { parent: String },
+
+    #[error("Domain already registered: {domain}")]
+    DomainAlreadyRegistered { domain: String },
 }
 
 pub type DnsResult<T> = Result<T, DnsError>;

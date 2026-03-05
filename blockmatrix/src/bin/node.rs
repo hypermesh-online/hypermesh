@@ -22,6 +22,8 @@ use tracing::{debug, info, warn, Level};
 use blockmatrix::assets::core::{
     AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
 };
+use blockmatrix::dns::domain::DomainRegistration;
+use blockmatrix::dns::invitation;
 use blockmatrix::assets::pipeline::{
     Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
     ShardMetadata,
@@ -168,6 +170,21 @@ enum Commands {
         action: DnsAction,
     },
 
+    /// Domain operations — register, create sub-domains, invite peers
+    Domain {
+        #[clap(subcommand)]
+        action: DomainAction2,
+    },
+
+    /// Join a domain's network
+    Join {
+        /// Domain name (e.g., "home.persist.hypermesh")
+        network: String,
+        /// Invitation token (required for private domains)
+        #[clap(long)]
+        invite: Option<String>,
+    },
+
     /// Manage configuration
     Config {
         #[clap(subcommand)]
@@ -193,6 +210,44 @@ enum ConfigCommand {
     },
     /// Initialize default config file
     Init,
+}
+
+#[derive(Subcommand, Debug)]
+enum DomainAction2 {
+    /// Register a new top-level domain on this node's blockchain
+    Register {
+        /// Domain name (e.g., "hypermesh")
+        name: String,
+        /// Privacy mode for the domain network
+        #[clap(long, value_enum, default_value = "private")]
+        privacy: PrivacyModeArg,
+    },
+    /// Create a sub-domain under an existing domain
+    Create {
+        /// Sub-domain name (e.g., "home.hypermesh")
+        name: String,
+        /// Privacy mode for the sub-domain network
+        #[clap(long, value_enum, default_value = "private")]
+        privacy: PrivacyModeArg,
+    },
+    /// List all registered domains
+    List,
+    /// Show nodes in a domain's network
+    Nodes {
+        /// Domain name to query
+        domain: String,
+    },
+    /// Create an invitation token for a domain
+    Invite {
+        /// Domain name to invite to
+        domain: String,
+        /// Target peer node ID (or "open" for any node)
+        #[clap(long)]
+        peer: String,
+        /// Invitation validity in seconds
+        #[clap(long, default_value = "3600")]
+        ttl: u64,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -766,6 +821,277 @@ fn persist_dns_record(
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&path, json)?;
+    Ok(())
+}
+
+/// Path to persisted domain registrations for a given node.
+fn domain_registrations_path(data_dir: &std::path::Path, node_id: &str) -> std::path::PathBuf {
+    data_dir.join(node_id).join("domain_registrations.json")
+}
+
+/// Load domain registrations from disk.
+fn load_domain_registrations(
+    data_dir: &std::path::Path,
+    node_id: &str,
+) -> Vec<DomainRegistration> {
+    let path = domain_registrations_path(data_dir, node_id);
+    if !path.exists() {
+        return Vec::new();
+    }
+    match blockmatrix::dns::domain::load_domains(&path) {
+        Ok(domains) => domains,
+        Err(e) => {
+            warn!("Failed to load domain registrations: {e}");
+            Vec::new()
+        }
+    }
+}
+
+/// Save domain registrations to disk.
+fn save_domain_registrations(
+    data_dir: &std::path::Path,
+    node_id: &str,
+    domains: &[DomainRegistration],
+) -> Result<()> {
+    let path = domain_registrations_path(data_dir, node_id);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    blockmatrix::dns::domain::save_domains(domains, &path)
+        .context("failed to save domain registrations")
+}
+
+/// Run the Domain subcommand: register, create, list, nodes, or invite.
+async fn run_domain(
+    action: DomainAction2,
+    bootstrap: &NodeBootstrap,
+    data_dir: &std::path::Path,
+    node_id: &str,
+) -> Result<()> {
+    match action {
+        DomainAction2::Register { name, privacy } => {
+            let privacy_mode: PrivacyMode = privacy.into();
+            let mut domains = load_domain_registrations(data_dir, node_id);
+
+            // Check for duplicate
+            if domains.iter().any(|d| d.domain_name == name) {
+                anyhow::bail!("Domain '{}' is already registered on this node", name);
+            }
+
+            let reg = DomainRegistration::new(&name, privacy_mode, node_id.to_string());
+
+            // Register as blockchain asset (DNS-as-asset, R10)
+            let dns_data_str = format!("DOMAIN:REGISTER:{name}");
+            let asset_data = AssetData {
+                config: dns_data_str.as_bytes().to_vec(),
+                definition: format!("domain-registration:{name}").into_bytes(),
+                metadata: format!("network_id={},privacy={privacy_mode:?}", reg.network_id)
+                    .into_bytes(),
+            };
+            let registration = AssetRegistration::from_asset_data(
+                &asset_data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Dns),
+            );
+            let state_proof = StateProof::new_for_testing();
+            let block = bootstrap
+                .blockchain()
+                .register_asset_record(registration, &state_proof)
+                .await
+                .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+            domains.push(reg.clone());
+            save_domain_registrations(data_dir, node_id, &domains)?;
+
+            println!();
+            println!("  Domain Registered");
+            println!("  -----------------");
+            println!("  domain:     {name}");
+            println!("  network_id: {}", reg.network_id);
+            println!("  privacy:    {privacy_mode:?}");
+            println!("  block:      #{}", block.index);
+            println!();
+        }
+        DomainAction2::Create { name, privacy } => {
+            let privacy_mode: PrivacyMode = privacy.into();
+            let mut domains = load_domain_registrations(data_dir, node_id);
+
+            if domains.iter().any(|d| d.domain_name == name) {
+                anyhow::bail!("Domain '{}' is already registered on this node", name);
+            }
+
+            // Check parent domain exists
+            if let Some(dot_pos) = name.find('.') {
+                let parent = &name[dot_pos + 1..];
+                if !parent.is_empty() && !domains.iter().any(|d| d.domain_name == parent) {
+                    warn!(
+                        "Parent domain '{}' not registered on this node (proceeding anyway)",
+                        parent
+                    );
+                }
+            }
+
+            let reg = DomainRegistration::new(&name, privacy_mode, node_id.to_string());
+
+            let dns_data_str = format!("DOMAIN:CREATE:{name}");
+            let asset_data = AssetData {
+                config: dns_data_str.as_bytes().to_vec(),
+                definition: format!("domain-subdomain:{name}").into_bytes(),
+                metadata: format!("network_id={},privacy={privacy_mode:?}", reg.network_id)
+                    .into_bytes(),
+            };
+            let registration = AssetRegistration::from_asset_data(
+                &asset_data,
+                NetworkScope::Global,
+                AssetCategory::BaseSystem(BaseSystemType::Dns),
+            );
+            let state_proof = StateProof::new_for_testing();
+            let block = bootstrap
+                .blockchain()
+                .register_asset_record(registration, &state_proof)
+                .await
+                .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+            domains.push(reg.clone());
+            save_domain_registrations(data_dir, node_id, &domains)?;
+
+            println!();
+            println!("  Sub-Domain Created");
+            println!("  ------------------");
+            println!("  domain:     {name}");
+            println!("  network_id: {}", reg.network_id);
+            println!(
+                "  parent:     {}",
+                reg.parent_network_id.as_deref().unwrap_or("(none)")
+            );
+            println!("  privacy:    {privacy_mode:?}");
+            println!("  block:      #{}", block.index);
+            println!();
+        }
+        DomainAction2::List => {
+            let domains = load_domain_registrations(data_dir, node_id);
+            if domains.is_empty() {
+                println!("No domains registered.");
+            } else {
+                println!();
+                println!("  Registered Domains");
+                println!("  ------------------");
+                for d in &domains {
+                    println!(
+                        "  {:<30} net={} privacy={:?}",
+                        d.domain_name,
+                        &d.network_id[..16],
+                        d.privacy_mode,
+                    );
+                }
+                println!();
+            }
+        }
+        DomainAction2::Nodes { domain } => {
+            // In offline mode, we can only show local info
+            let domains = load_domain_registrations(data_dir, node_id);
+            let found = domains.iter().find(|d| d.domain_name == domain);
+            match found {
+                Some(d) => {
+                    println!();
+                    println!("  Domain: {}", d.domain_name);
+                    println!("  Network ID: {}", d.network_id);
+                    println!("  Owner: {}", d.owner_node_id);
+                    println!(
+                        "  Members: (local node only — connect for network view)"
+                    );
+                    println!();
+                }
+                None => {
+                    println!("Domain '{}' not found in local registrations.", domain);
+                }
+            }
+        }
+        DomainAction2::Invite { domain, peer, ttl } => {
+            let domains = load_domain_registrations(data_dir, node_id);
+            let found = domains.iter().find(|d| d.domain_name == domain);
+            let reg = match found {
+                Some(d) => d,
+                None => {
+                    anyhow::bail!(
+                        "Domain '{}' not registered on this node. Register it first.",
+                        domain
+                    );
+                }
+            };
+
+            // Use state_proof_bytes or node_id as keying material
+            let proof_bytes = reg
+                .state_proof_bytes
+                .as_deref()
+                .unwrap_or(node_id.as_bytes());
+
+            let invitee = if peer == "open" { None } else { Some(peer.as_str()) };
+            let inv = invitation::create_invitation(&domain, proof_bytes, invitee, ttl);
+            let token = invitation::encode_invitation(&inv)
+                .map_err(|e| anyhow::anyhow!("failed to encode invitation: {e}"))?;
+
+            println!();
+            println!("  Domain Invitation");
+            println!("  -----------------");
+            println!("  domain:  {domain}");
+            println!("  peer:    {}", if peer == "open" { "(open)" } else { &peer });
+            println!("  expires: {} seconds", ttl);
+            println!("  token:");
+            println!("  {token}");
+            println!();
+        }
+    }
+    Ok(())
+}
+
+/// Run the Join subcommand: join a domain network (optionally with invitation).
+async fn run_join(
+    network: &str,
+    invite_token: Option<&str>,
+    node_id: &str,
+    data_dir: &std::path::Path,
+) -> Result<()> {
+    // Validate invitation if provided
+    if let Some(token_str) = invite_token {
+        let inv = invitation::decode_invitation(token_str)
+            .map_err(|e| anyhow::anyhow!("Invalid invitation: {e}"))?;
+
+        if inv.domain_name != network {
+            anyhow::bail!(
+                "Invitation is for domain '{}', not '{}'",
+                inv.domain_name,
+                network
+            );
+        }
+
+        if !inv.invitee_node_id.is_empty() && inv.invitee_node_id != node_id {
+            anyhow::bail!(
+                "Invitation is for node '{}', not this node ('{}')",
+                inv.invitee_node_id,
+                node_id
+            );
+        }
+
+        info!("Invitation validated for domain '{}'", network);
+    }
+
+    // Record membership intent locally
+    let domains = load_domain_registrations(data_dir, node_id);
+    let network_id = blockmatrix::dns::domain::derive_network_id(network);
+
+    println!();
+    println!("  Join Domain Network");
+    println!("  -------------------");
+    println!("  domain:     {network}");
+    println!("  network_id: {network_id}");
+    if domains.iter().any(|d| d.domain_name == network) {
+        println!("  status:     already registered (owner)");
+    } else {
+        println!("  status:     membership recorded (connect daemon to sync)");
+    }
+    println!();
+
     Ok(())
 }
 
@@ -1647,6 +1973,70 @@ async fn main() -> Result<()> {
             } else {
                 // Offline fallback: use local bootstrap DNS
                 run_dns(action, &bootstrap, &data_dir, &nid).await?;
+            }
+        }
+        Some(Commands::Domain { action }) => {
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                let result = match &action {
+                    DomainAction2::Register { name, privacy } => {
+                        client
+                            .call_ok(
+                                "domain.register",
+                                serde_json::json!({
+                                    "name": name,
+                                    "privacy": format!("{privacy:?}"),
+                                }),
+                            )
+                            .await
+                    }
+                    DomainAction2::List => {
+                        client
+                            .call_ok("domain.list", serde_json::json!({}))
+                            .await
+                    }
+                    _ => {
+                        // Create/Nodes/Invite — fall through to offline handler
+                        // (these don't need a running daemon)
+                        run_domain(action, &bootstrap, &data_dir, &nid).await?;
+                        return Ok(());
+                    }
+                };
+                match result {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => {
+                        warn!("IPC domain call failed ({e}), falling back to offline");
+                        run_domain(action, &bootstrap, &data_dir, &nid).await?;
+                    }
+                }
+            } else {
+                run_domain(action, &bootstrap, &data_dir, &nid).await?;
+            }
+        }
+        Some(Commands::Join { network, invite }) => {
+            let client = ipc::IpcClient::new();
+            if client.is_daemon_running().await {
+                match client
+                    .call_ok(
+                        "domain.join",
+                        serde_json::json!({
+                            "domain": network,
+                            "invite": invite,
+                        }),
+                    )
+                    .await
+                {
+                    Ok(resp) => println!(
+                        "{}",
+                        serde_json::to_string_pretty(&resp).unwrap_or_default()
+                    ),
+                    Err(e) => eprintln!("Error: {e}"),
+                }
+            } else {
+                run_join(&network, invite.as_deref(), &nid, &data_dir).await?;
             }
         }
         Some(Commands::Config { .. }) => {

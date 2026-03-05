@@ -226,6 +226,35 @@ impl DnsPoolManager {
         Ok(total_removed)
     }
 
+    /// Create a domain-specific federated pool keyed by network_id.
+    pub async fn create_domain_pool(
+        &self,
+        network_id: &str,
+        visibility: PoolVisibility,
+    ) -> DnsResult<()> {
+        let mut pools = self.federated_pools.write().await;
+        if pools.contains_key(network_id) {
+            // Pool already exists — idempotent success
+            return Ok(());
+        }
+        let pool = Arc::new(DnsPool::new(
+            format!("domain-{network_id}"),
+            DnsPoolType::Federated {
+                network_id: network_id.to_string(),
+            },
+            visibility,
+        ));
+        pools.insert(network_id.to_string(), pool);
+        info!("Created domain pool: {}", network_id);
+        Ok(())
+    }
+
+    /// Check whether a pool with the given network_id exists.
+    pub async fn has_pool(&self, network_id: &str) -> bool {
+        let pools = self.federated_pools.read().await;
+        pools.contains_key(network_id)
+    }
+
     /// Get all pool statistics
     pub async fn get_all_stats(&self) -> Vec<PoolStats> {
         let mut stats = vec![self.public_pool.stats().await];

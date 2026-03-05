@@ -7,10 +7,14 @@
 //! Handles DNS record registration with blockchain integration.
 
 use super::{DnsError, DnsPoolManager, DnsRecord, DnsResult, Domain};
+use super::domain::DomainRegistration;
+use super::pools::PoolVisibility;
 use crate::blockchain::NodeBlockchain;
+use crate::bootstrap::PrivacyMode;
 use crate::proof_of_state::StateProof;
 use crate::dns::validation::DnsValidator;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -52,7 +56,9 @@ pub struct DnsRegistrar {
     /// Node blockchain (for registration)
     blockchain: Arc<RwLock<Option<Arc<RwLock<NodeBlockchain>>>>>,
     /// Active registrations (domain -> registration)
-    registrations: Arc<RwLock<std::collections::HashMap<String, DnsRegistration>>>,
+    registrations: Arc<RwLock<HashMap<String, DnsRegistration>>>,
+    /// Domain registrations (domain_name -> DomainRegistration)
+    domain_registrations: Arc<RwLock<HashMap<String, DomainRegistration>>>,
 }
 
 impl DnsRegistrar {
@@ -62,7 +68,8 @@ impl DnsRegistrar {
             pool_manager,
             validator,
             blockchain: Arc::new(RwLock::new(None)),
-            registrations: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            registrations: Arc::new(RwLock::new(HashMap::new())),
+            domain_registrations: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -190,6 +197,107 @@ impl DnsRegistrar {
         registrations.values().cloned().collect()
     }
 
+    /// Register a domain as a blockchain asset.
+    ///
+    /// Creates a Network-scope chain ID, validates parent hierarchy,
+    /// registers to blockchain, and creates the corresponding DNS pool.
+    pub async fn register_domain(
+        &self,
+        domain_name: &str,
+        privacy_mode: PrivacyMode,
+        owner_node_id: String,
+        proof: StateProof,
+    ) -> DnsResult<DomainRegistration> {
+        // Validate domain name format
+        Self::validate_domain_name(domain_name)?;
+
+        // Check not already registered
+        {
+            let domains = self.domain_registrations.read().await;
+            if domains.contains_key(domain_name) {
+                return Err(DnsError::DomainAlreadyRegistered {
+                    domain: domain_name.to_string(),
+                });
+            }
+        }
+
+        // If domain has a parent, verify parent is registered
+        if let Some(parent) = extract_parent(domain_name) {
+            let domains = self.domain_registrations.read().await;
+            if !domains.contains_key(&parent) {
+                return Err(DnsError::ParentDomainRequired { parent });
+            }
+        }
+
+        // Create the registration
+        let mut reg = DomainRegistration::new(domain_name, privacy_mode, owner_node_id);
+        reg.state_proof_bytes = Some(proof.to_bytes().unwrap_or_default());
+
+        // Register to blockchain as DNS asset
+        let domain_parsed = Domain::parse(domain_name).map_err(|_| DnsError::InvalidDomain {
+            domain: domain_name.to_string(),
+        })?;
+        let record = DnsRecord::new(
+            domain_name.to_string(),
+            crate::dns::DnsRecordType::TXT,
+            crate::dns::DnsRecordData::TXT(format!(
+                "DOMAIN:REGISTER:{}:{}",
+                reg.network_id, reg.chain_id.iter().map(|b| format!("{b:02x}")).collect::<String>()
+            )),
+            3600,
+            reg.owner_node_id.clone(),
+        );
+        let _tx_hash = self
+            .register_to_blockchain(&domain_parsed, &record, &proof)
+            .await?;
+
+        // Create domain pool
+        let visibility = match privacy_mode {
+            p if p == PrivacyMode::PUBLIC => PoolVisibility::Public,
+            p if p == PrivacyMode::ANONYMOUS => PoolVisibility::FullyFederated,
+            _ => PoolVisibility::NetworkRestricted,
+        };
+        self.pool_manager
+            .create_domain_pool(&reg.network_id, visibility)
+            .await?;
+
+        // Store
+        let mut domains = self.domain_registrations.write().await;
+        domains.insert(domain_name.to_string(), reg.clone());
+
+        info!("Domain registered: {} (network: {})", domain_name, reg.network_id);
+        Ok(reg)
+    }
+
+    /// Get a domain registration by name.
+    pub async fn get_domain(&self, domain_name: &str) -> Option<DomainRegistration> {
+        let domains = self.domain_registrations.read().await;
+        domains.get(domain_name).cloned()
+    }
+
+    /// List all domain registrations.
+    pub async fn list_domains(&self) -> Vec<DomainRegistration> {
+        let domains = self.domain_registrations.read().await;
+        domains.values().cloned().collect()
+    }
+
+    /// Validate domain name: max 63 chars per component, max 253 total, non-empty.
+    fn validate_domain_name(domain_name: &str) -> DnsResult<()> {
+        if domain_name.is_empty() || domain_name.len() > 253 {
+            return Err(DnsError::InvalidDomain {
+                domain: domain_name.to_string(),
+            });
+        }
+        for component in domain_name.split('.') {
+            if component.is_empty() || component.len() > 63 {
+                return Err(DnsError::InvalidDomain {
+                    domain: domain_name.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+
     // Internal helper methods
 
     async fn register_to_blockchain(
@@ -218,6 +326,17 @@ impl DnsRegistrar {
                 Ok(format!("mock-tx-{}", uuid::Uuid::new_v4()))
             }
         }
+    }
+}
+
+/// Extract the parent domain name (everything after first dot).
+fn extract_parent(domain_name: &str) -> Option<String> {
+    let first_dot = domain_name.find('.')?;
+    let parent = &domain_name[first_dot + 1..];
+    if parent.is_empty() {
+        None
+    } else {
+        Some(parent.to_string())
     }
 }
 
