@@ -98,6 +98,12 @@ items = [
     "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
     "HTTP API server (configurable --http-port, scope-aware: localhost=private, external=public) — 20+ REST endpoints",
     "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing",
+    # Language SDKs wrapping the HTTP REST API (all 20 endpoints)
+    "TypeScript SDK (@hypermesh/sdk) — typed client wrapping /api/v1/* REST endpoints",
+    "Python SDK (hypermesh) — sync (urllib) + async (httpx) client wrapping REST API",
+    "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping REST API",
+    "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping REST API",
+    "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API",
 ]
 
 [features.in_development]

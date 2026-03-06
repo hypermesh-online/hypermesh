@@ -95,7 +95,12 @@ export const crateStatuses: CrateStatus[] = [
         "HTTP API serves dashboards from blockchain — resolves active Dashboard asset, loads bundle by content hash, unbundles, serves scope-aware",
         "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
         "HTTP API server (configurable --http-port, scope-aware: localhost=private, external=public) — 20+ REST endpoints",
-        "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing"
+        "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing",
+        "TypeScript SDK (@hypermesh/sdk) — typed client wrapping /api/v1/* REST endpoints",
+        "Python SDK (hypermesh) — sync (urllib) + async (httpx) client wrapping REST API",
+        "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping REST API",
+        "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping REST API",
+        "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API"
       ],
       "inDevelopment": [
         "Post-handshake message dispatch — incoming MatrixMessage never routed to SyncDispatcher after handshake",
@@ -119,7 +124,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 81
+    "completion": 82
   },
   {
     "id": "caesar",
@@ -406,13 +411,14 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [],
       "planned": [
-        "TypeScript/Node.js bindings (NAPI-RS or WASM)",
-        "Go bindings (cgo wrapper)",
-        "Python bindings (ctypes/cffi wrapper)",
-        "C# bindings (P/Invoke wrapper)"
+        "TypeScript/Node.js FFI bindings (NAPI-RS or WASM) — HTTP SDK exists at sdk/typescript/",
+        "Go FFI bindings (cgo wrapper) — HTTP SDK exists at sdk/go/",
+        "Python FFI bindings (ctypes/cffi wrapper) — HTTP SDK exists at sdk/python/",
+        "C# FFI bindings (P/Invoke wrapper) — HTTP SDK exists at sdk/csharp/",
+        "C++ FFI bindings (direct linking) — HTTP SDK exists at sdk/cpp/"
       ]
     },
-    "completion": 79
+    "completion": 75
   },
   {
     "id": "hypermesh-lib",
@@ -472,11 +478,12 @@ export const crateStatuses: CrateStatus[] = [
         "SdkError enum (Connection, Ipc, Rpc, Serialization, Timeout, NotConnected)",
         "Typed response structs with serde deserialization"
       ],
-      "inDevelopment": [],
+      "inDevelopment": [
+        "Domain API (register, list, join, invite) — available in HTTP SDKs (sdk/typescript, sdk/python, etc.)",
+        "Dashboard API (deploy, list, info) — available in HTTP SDKs",
+        "Config API (show, get, set) — available in HTTP SDKs"
+      ],
       "planned": [
-        "Domain API (register, list, join, invite)",
-        "Dashboard API (deploy, list, info)",
-        "Config API (show, get, set)",
         "Event subscription (streaming daemon events)"
       ]
     },
@@ -587,40 +594,45 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "Dashboard home with ecosystem overview",
-        "Module pages (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
-        "Component library (Radix UI primitives, Tailwind 4)",
+        "React 19 + TypeScript + Vite + Tailwind 4 build system",
+        "Dashboard home with ecosystem overview and hardware detection",
+        "Module pages with sub-routing (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
+        "Component library (45+ Radix UI primitives: buttons, cards, tabs, alerts, badges, etc.)",
         "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
+        "Accessibility wrappers (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly)",
+        "React Router page routing with sidebar navigation and dark theme",
+        "React Query state management (30s staleTime, retry logic, window focus config)",
+        "Unified API client architecture (STOQ native -> STOQ WASM -> HTTP -> mock fallback)",
+        "16 custom React hooks for API integration (useSystemStatus, useCertificates, useAssets, etc.)",
+        "7 API service classes (HyperMeshAPI, TrustChainAPI, STOQAPI, CaesarAPI, EngaugeAPI, SearchAPI, Types)",
         "Storybook component documentation (5 stories)",
-        "Accessibility wrappers and keyboard navigation",
-        "React Router page routing with sidebar navigation",
-        "E2E test suite (Playwright, 5 specs)",
-        "Integration test harness page"
+        "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)"
       ],
       "inDevelopment": [
-        "TrustChain management views — UI exists but shows static data, not connected to TrustChain STOQ API",
+        "Backend API connectivity — UI calls endpoints at [::1]:8443 but most return mock/fallback data",
+        "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
+        "TrustChain management views — 21 components render with static data, no real cert operations",
         "Asset management views — creation wizard renders but no real asset creation backend",
-        "Proxy and NAT address management — UI exists but no backend connection",
-        "API status monitoring — dashboard renders but not fetching real service health data",
-        "Global search — UI exists but searches static data only",
-        "STOQ native demo (WebAssembly integration — StoqWasmClient, useStoqNative hook, wasm stubs)",
-        "Component unit tests (Vitest, 3 test files)",
-        "Gateway API client — fetch real data from trust.hypermesh.online gateway endpoints",
-        "Node join flow — UI for connecting to public network",
-        "Catalog browser — browse/search/install shared asset packages"
+        "Engauge analytics views — renders but metrics are mock data",
+        "Catalog browser — renders but limited backend integration",
+        "Proxy/NAT management views — render but no backend connection",
+        "Global search — searches hardcoded static data only",
+        "WebSocket real-time events — Web3Events system defined but not connected to components",
+        "STOQ WebAssembly integration — StoqWasmClient loads but doesn't execute protocol",
+        "Node join flow — no UI for connecting to public network",
+        "Component unit tests (Vitest, 3 test files — limited coverage)"
       ],
       "planned": [
+        "Connect UI to real blockmatrix HTTP API (port 9293) via TypeScript SDK",
         "Live STOQ WebSocket data connections",
-        "Real-time metrics streaming",
+        "Real-time metrics streaming from engauge",
         "Multi-node cluster topology visualization",
         "Security monitoring with live alerts",
-        "Native desktop dashboard (Tauri cross-platform)",
-        "Caesar wallet and transaction management UI",
-        "Engauge analytics and reward distribution dashboard",
-        "Remote device/resource/asset management hub",
-        "First-run onboarding flow (sovereign node setup, network join)"
+        "Caesar wallet and transaction management with real EVP data",
+        "First-run onboarding flow (sovereign node setup, network join)",
+        "Native desktop dashboard (Tauri cross-platform)"
       ]
     },
-    "completion": 32
+    "completion": 39
   }
 ];

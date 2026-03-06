@@ -20,10 +20,14 @@ items = [
 [features.in_development]
 items = []
 
+[features.in_development]
+items = [
+    "Domain API (register, list, join, invite) — available in HTTP SDKs (sdk/typescript, sdk/python, etc.)",
+    "Dashboard API (deploy, list, info) — available in HTTP SDKs",
+    "Config API (show, get, set) — available in HTTP SDKs",
+]
+
 [features.planned]
 items = [
-    "Domain API (register, list, join, invite)",
-    "Dashboard API (deploy, list, info)",
-    "Config API (show, get, set)",
     "Event subscription (streaming daemon events)",
 ]

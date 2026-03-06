@@ -28,8 +28,9 @@ items = []
 
 [features.planned]
 items = [
-    "TypeScript/Node.js bindings (NAPI-RS or WASM)",
-    "Go bindings (cgo wrapper)",
-    "Python bindings (ctypes/cffi wrapper)",
-    "C# bindings (P/Invoke wrapper)",
+    "TypeScript/Node.js FFI bindings (NAPI-RS or WASM) — HTTP SDK exists at sdk/typescript/",
+    "Go FFI bindings (cgo wrapper) — HTTP SDK exists at sdk/go/",
+    "Python FFI bindings (ctypes/cffi wrapper) — HTTP SDK exists at sdk/python/",
+    "C# FFI bindings (P/Invoke wrapper) — HTTP SDK exists at sdk/csharp/",
+    "C++ FFI bindings (direct linking) — HTTP SDK exists at sdk/cpp/",
 ]
