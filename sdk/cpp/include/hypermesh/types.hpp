@@ -447,4 +447,511 @@ inline void to_json(nlohmann::json& j, const DomainJoinResponse& r) {
     j = r.data;
 }
 
+// ── Caesar ──
+
+struct CaesarWalletInfo {
+    double balance_grams = 0.0;
+    double balance_usd = 0.0;
+    std::string tier;
+    std::string node_id;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarWalletInfo& w) {
+    j.at("balance_grams").get_to(w.balance_grams);
+    j.at("balance_usd").get_to(w.balance_usd);
+    j.at("tier").get_to(w.tier);
+    j.at("node_id").get_to(w.node_id);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarWalletInfo& w) {
+    j = nlohmann::json{
+        {"balance_grams", w.balance_grams},
+        {"balance_usd", w.balance_usd},
+        {"tier", w.tier},
+        {"node_id", w.node_id}
+    };
+}
+
+struct CaesarBalance {
+    double gold_grams = 0.0;
+    double usd_equivalent = 0.0;
+    std::string tier;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarBalance& b) {
+    j.at("gold_grams").get_to(b.gold_grams);
+    j.at("usd_equivalent").get_to(b.usd_equivalent);
+    j.at("tier").get_to(b.tier);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarBalance& b) {
+    j = nlohmann::json{
+        {"gold_grams", b.gold_grams},
+        {"usd_equivalent", b.usd_equivalent},
+        {"tier", b.tier}
+    };
+}
+
+struct CaesarTransaction {
+    std::string id;
+    std::string from;
+    std::string to;
+    double amount_grams = 0.0;
+    double fee = 0.0;
+    std::string status;
+    uint64_t timestamp = 0;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarTransaction& t) {
+    j.at("id").get_to(t.id);
+    j.at("from").get_to(t.from);
+    j.at("to").get_to(t.to);
+    j.at("amount_grams").get_to(t.amount_grams);
+    j.at("fee").get_to(t.fee);
+    j.at("status").get_to(t.status);
+    j.at("timestamp").get_to(t.timestamp);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarTransaction& t) {
+    j = nlohmann::json{
+        {"id", t.id}, {"from", t.from}, {"to", t.to},
+        {"amount_grams", t.amount_grams}, {"fee", t.fee},
+        {"status", t.status}, {"timestamp", t.timestamp}
+    };
+}
+
+struct CaesarTransactionList {
+    uint64_t count = 0;
+    std::vector<CaesarTransaction> transactions;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarTransactionList& l) {
+    j.at("count").get_to(l.count);
+    j.at("transactions").get_to(l.transactions);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarTransactionList& l) {
+    j = nlohmann::json{{"count", l.count}, {"transactions", l.transactions}};
+}
+
+struct CaesarRewardInfo {
+    double total_earned = 0.0;
+    double pending = 0.0;
+    double tier_multiplier = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarRewardInfo& r) {
+    j.at("total_earned").get_to(r.total_earned);
+    j.at("pending").get_to(r.pending);
+    j.at("tier_multiplier").get_to(r.tier_multiplier);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarRewardInfo& r) {
+    j = nlohmann::json{
+        {"total_earned", r.total_earned},
+        {"pending", r.pending},
+        {"tier_multiplier", r.tier_multiplier}
+    };
+}
+
+struct CaesarRouteResult {
+    std::string packet_id;
+    std::string status;
+    double fee = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarRouteResult& r) {
+    j.at("packet_id").get_to(r.packet_id);
+    j.at("status").get_to(r.status);
+    j.at("fee").get_to(r.fee);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarRouteResult& r) {
+    j = nlohmann::json{
+        {"packet_id", r.packet_id},
+        {"status", r.status},
+        {"fee", r.fee}
+    };
+}
+
+struct CaesarGovernorParams {
+    double velocity = 0.0;
+    double fee_rate = 0.0;
+    double demurrage_rate = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, CaesarGovernorParams& p) {
+    j.at("velocity").get_to(p.velocity);
+    j.at("fee_rate").get_to(p.fee_rate);
+    j.at("demurrage_rate").get_to(p.demurrage_rate);
+}
+
+inline void to_json(nlohmann::json& j, const CaesarGovernorParams& p) {
+    j = nlohmann::json{
+        {"velocity", p.velocity},
+        {"fee_rate", p.fee_rate},
+        {"demurrage_rate", p.demurrage_rate}
+    };
+}
+
+// ── TrustChain ──
+
+struct TrustChainCertificate {
+    std::string id;
+    std::string subject;
+    std::string scope;
+    std::string valid_from;
+    std::string valid_to;
+    std::string pem;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainCertificate& c) {
+    j.at("id").get_to(c.id);
+    j.at("subject").get_to(c.subject);
+    j.at("scope").get_to(c.scope);
+    j.at("valid_from").get_to(c.valid_from);
+    j.at("valid_to").get_to(c.valid_to);
+    j.at("pem").get_to(c.pem);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainCertificate& c) {
+    j = nlohmann::json{
+        {"id", c.id}, {"subject", c.subject}, {"scope", c.scope},
+        {"valid_from", c.valid_from}, {"valid_to", c.valid_to}, {"pem", c.pem}
+    };
+}
+
+struct TrustChainCertificateList {
+    uint64_t count = 0;
+    std::vector<TrustChainCertificate> certificates;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainCertificateList& l) {
+    j.at("count").get_to(l.count);
+    j.at("certificates").get_to(l.certificates);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainCertificateList& l) {
+    j = nlohmann::json{{"count", l.count}, {"certificates", l.certificates}};
+}
+
+struct TrustChainValidationResult {
+    bool valid = false;
+    std::vector<std::string> errors;
+    bool chain_valid = false;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainValidationResult& v) {
+    j.at("valid").get_to(v.valid);
+    if (j.contains("errors") && !j["errors"].is_null()) {
+        j["errors"].get_to(v.errors);
+    }
+    j.at("chain_valid").get_to(v.chain_valid);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainValidationResult& v) {
+    j = nlohmann::json{
+        {"valid", v.valid},
+        {"errors", v.errors},
+        {"chain_valid", v.chain_valid}
+    };
+}
+
+struct TrustChainRevokeResult {
+    bool revoked = false;
+    std::string cert_id;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainRevokeResult& r) {
+    j.at("revoked").get_to(r.revoked);
+    j.at("cert_id").get_to(r.cert_id);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainRevokeResult& r) {
+    j = nlohmann::json{{"revoked", r.revoked}, {"cert_id", r.cert_id}};
+}
+
+struct TrustChainDnsZone {
+    std::string name;
+    uint64_t records = 0;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainDnsZone& z) {
+    j.at("name").get_to(z.name);
+    j.at("records").get_to(z.records);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainDnsZone& z) {
+    j = nlohmann::json{{"name", z.name}, {"records", z.records}};
+}
+
+struct TrustChainDnsZoneList {
+    uint64_t count = 0;
+    std::vector<TrustChainDnsZone> zones;
+};
+
+inline void from_json(const nlohmann::json& j, TrustChainDnsZoneList& l) {
+    j.at("count").get_to(l.count);
+    j.at("zones").get_to(l.zones);
+}
+
+inline void to_json(nlohmann::json& j, const TrustChainDnsZoneList& l) {
+    j = nlohmann::json{{"count", l.count}, {"zones", l.zones}};
+}
+
+// ── Engauge ──
+
+struct EngaugeCapacityMetrics {
+    uint64_t bytes_served = 0;
+    double compute_delivered = 0.0;
+    uint64_t storage = 0;
+    double bandwidth = 0.0;
+    double uptime = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeCapacityMetrics& m) {
+    j.at("bytes_served").get_to(m.bytes_served);
+    j.at("compute_delivered").get_to(m.compute_delivered);
+    j.at("storage").get_to(m.storage);
+    j.at("bandwidth").get_to(m.bandwidth);
+    j.at("uptime").get_to(m.uptime);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeCapacityMetrics& m) {
+    j = nlohmann::json{
+        {"bytes_served", m.bytes_served},
+        {"compute_delivered", m.compute_delivered},
+        {"storage", m.storage},
+        {"bandwidth", m.bandwidth},
+        {"uptime", m.uptime}
+    };
+}
+
+struct EngaugeTrafficMetrics {
+    double organic_ratio = 0.0;
+    double speculative_ratio = 0.0;
+    uint64_t total_requests = 0;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeTrafficMetrics& m) {
+    j.at("organic_ratio").get_to(m.organic_ratio);
+    j.at("speculative_ratio").get_to(m.speculative_ratio);
+    j.at("total_requests").get_to(m.total_requests);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeTrafficMetrics& m) {
+    j = nlohmann::json{
+        {"organic_ratio", m.organic_ratio},
+        {"speculative_ratio", m.speculative_ratio},
+        {"total_requests", m.total_requests}
+    };
+}
+
+struct EngaugeListing {
+    std::string id;
+    std::string resource_type;
+    double price = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeListing& l) {
+    j.at("id").get_to(l.id);
+    j.at("resource_type").get_to(l.resource_type);
+    j.at("price").get_to(l.price);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeListing& l) {
+    j = nlohmann::json{
+        {"id", l.id},
+        {"resource_type", l.resource_type},
+        {"price", l.price}
+    };
+}
+
+struct EngaugeListingList {
+    uint64_t count = 0;
+    std::vector<EngaugeListing> listings;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeListingList& l) {
+    j.at("count").get_to(l.count);
+    j.at("listings").get_to(l.listings);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeListingList& l) {
+    j = nlohmann::json{{"count", l.count}, {"listings", l.listings}};
+}
+
+struct EngaugeNodeMetrics {
+    double activity_score = 0.0;
+    uint64_t receipts = 0;
+    double bandwidth = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeNodeMetrics& m) {
+    j.at("activity_score").get_to(m.activity_score);
+    j.at("receipts").get_to(m.receipts);
+    j.at("bandwidth").get_to(m.bandwidth);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeNodeMetrics& m) {
+    j = nlohmann::json{
+        {"activity_score", m.activity_score},
+        {"receipts", m.receipts},
+        {"bandwidth", m.bandwidth}
+    };
+}
+
+struct EngaugeLease {
+    std::string id;
+    std::string resource_type;
+    std::string status;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeLease& l) {
+    j.at("id").get_to(l.id);
+    j.at("resource_type").get_to(l.resource_type);
+    j.at("status").get_to(l.status);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeLease& l) {
+    j = nlohmann::json{
+        {"id", l.id},
+        {"resource_type", l.resource_type},
+        {"status", l.status}
+    };
+}
+
+struct EngaugeLeaseList {
+    uint64_t count = 0;
+    std::vector<EngaugeLease> leases;
+};
+
+inline void from_json(const nlohmann::json& j, EngaugeLeaseList& l) {
+    j.at("count").get_to(l.count);
+    j.at("leases").get_to(l.leases);
+}
+
+inline void to_json(nlohmann::json& j, const EngaugeLeaseList& l) {
+    j = nlohmann::json{{"count", l.count}, {"leases", l.leases}};
+}
+
+// ── Catalog ──
+
+struct CatalogPackage {
+    std::string name;
+    std::string version;
+    std::string description;
+    std::string author;
+    uint64_t downloads = 0;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogPackage& p) {
+    j.at("name").get_to(p.name);
+    j.at("version").get_to(p.version);
+    j.at("description").get_to(p.description);
+    j.at("author").get_to(p.author);
+    j.at("downloads").get_to(p.downloads);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogPackage& p) {
+    j = nlohmann::json{
+        {"name", p.name}, {"version", p.version},
+        {"description", p.description}, {"author", p.author},
+        {"downloads", p.downloads}
+    };
+}
+
+struct CatalogPackageList {
+    uint64_t count = 0;
+    std::vector<CatalogPackage> packages;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogPackageList& l) {
+    j.at("count").get_to(l.count);
+    j.at("packages").get_to(l.packages);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogPackageList& l) {
+    j = nlohmann::json{{"count", l.count}, {"packages", l.packages}};
+}
+
+struct CatalogSearchResult {
+    std::string name;
+    std::string version;
+    std::string description;
+    double relevance = 0.0;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogSearchResult& r) {
+    j.at("name").get_to(r.name);
+    j.at("version").get_to(r.version);
+    j.at("description").get_to(r.description);
+    j.at("relevance").get_to(r.relevance);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogSearchResult& r) {
+    j = nlohmann::json{
+        {"name", r.name}, {"version", r.version},
+        {"description", r.description}, {"relevance", r.relevance}
+    };
+}
+
+struct CatalogSearchResults {
+    uint64_t count = 0;
+    std::vector<CatalogSearchResult> results;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogSearchResults& r) {
+    j.at("count").get_to(r.count);
+    j.at("results").get_to(r.results);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogSearchResults& r) {
+    j = nlohmann::json{{"count", r.count}, {"results", r.results}};
+}
+
+struct CatalogPackageInfo {
+    std::string name;
+    std::string version;
+    std::string description;
+    std::string author;
+    uint64_t downloads = 0;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogPackageInfo& p) {
+    j.at("name").get_to(p.name);
+    j.at("version").get_to(p.version);
+    j.at("description").get_to(p.description);
+    j.at("author").get_to(p.author);
+    j.at("downloads").get_to(p.downloads);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogPackageInfo& p) {
+    j = nlohmann::json{
+        {"name", p.name}, {"version", p.version},
+        {"description", p.description}, {"author", p.author},
+        {"downloads", p.downloads}
+    };
+}
+
+struct CatalogRegistryStats {
+    uint64_t package_count = 0;
+    uint64_t publisher_count = 0;
+    uint64_t total_downloads = 0;
+};
+
+inline void from_json(const nlohmann::json& j, CatalogRegistryStats& s) {
+    j.at("package_count").get_to(s.package_count);
+    j.at("publisher_count").get_to(s.publisher_count);
+    j.at("total_downloads").get_to(s.total_downloads);
+}
+
+inline void to_json(nlohmann::json& j, const CatalogRegistryStats& s) {
+    j = nlohmann::json{
+        {"package_count", s.package_count},
+        {"publisher_count", s.publisher_count},
+        {"total_downloads", s.total_downloads}
+    };
+}
+
 } // namespace hypermesh

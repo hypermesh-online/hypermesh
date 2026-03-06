@@ -5,8 +5,17 @@
 
 namespace hypermesh {
 
-HyperMeshClient::HyperMeshClient(const std::string& base_url)
-    : http_(base_url) {}
+HyperMeshClient::HyperMeshClient(
+    const std::string& base_url,
+    const std::string& caesar_url,
+    const std::string& trustchain_url,
+    const std::string& engauge_url,
+    const std::string& catalog_url)
+    : http_(base_url),
+      caesar_http_(caesar_url),
+      trustchain_http_(trustchain_url),
+      engauge_http_(engauge_url),
+      catalog_http_(catalog_url) {}
 
 NodeApi HyperMeshClient::node() const {
     return NodeApi(http_);
@@ -42,6 +51,22 @@ ConfigApi HyperMeshClient::config() const {
 
 DomainApi HyperMeshClient::domain() const {
     return DomainApi(http_);
+}
+
+CaesarApi HyperMeshClient::caesar() const {
+    return CaesarApi(caesar_http_);
+}
+
+TrustChainApi HyperMeshClient::trustchain() const {
+    return TrustChainApi(trustchain_http_);
+}
+
+EngaugeApi HyperMeshClient::engauge() const {
+    return EngaugeApi(engauge_http_);
+}
+
+CatalogApi HyperMeshClient::catalog() const {
+    return CatalogApi(catalog_http_);
 }
 
 const HttpClient& HyperMeshClient::http() const {

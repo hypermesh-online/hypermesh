@@ -163,3 +163,176 @@ export interface DomainRegisterResponse {
 export interface DomainJoinResponse {
   [key: string]: unknown;
 }
+
+// ── Caesar ──
+
+export interface CaesarWalletInfo {
+  balance_grams: number;
+  balance_usd: number;
+  tier: string;
+  node_id: string;
+}
+
+export interface CaesarBalance {
+  gold_grams: number;
+  usd_equivalent: number;
+  tier: string;
+}
+
+export interface CaesarTransaction {
+  id: string;
+  from: string;
+  to: string;
+  amount_grams: number;
+  fee: number;
+  status: string;
+  timestamp: number;
+}
+
+export interface CaesarTransactionList {
+  count: number;
+  transactions: CaesarTransaction[];
+}
+
+export interface CaesarRewardInfo {
+  total_earned: number;
+  pending: number;
+  tier_multiplier: number;
+}
+
+export interface CaesarRouteResult {
+  packet_id: string;
+  status: string;
+  fee: number;
+}
+
+export interface CaesarGovernorParams {
+  velocity: number;
+  fee_rate: number;
+  demurrage_rate: number;
+}
+
+// ── TrustChain ──
+
+export interface TrustChainCertificate {
+  id: string;
+  subject: string;
+  scope: string;
+  valid_from: string;
+  valid_to: string;
+  pem: string;
+}
+
+export interface TrustChainCertificateList {
+  count: number;
+  certificates: TrustChainCertificate[];
+}
+
+export interface TrustChainValidationResult {
+  valid: boolean;
+  errors: string[];
+  chain_valid: boolean;
+}
+
+export interface TrustChainRevokeResult {
+  revoked: boolean;
+  cert_id: string;
+}
+
+export interface TrustChainDnsZone {
+  name: string;
+  records: number;
+  [key: string]: unknown;
+}
+
+export interface TrustChainDnsZoneList {
+  count: number;
+  zones: TrustChainDnsZone[];
+}
+
+// ── Engauge ──
+
+export interface EngaugeCapacityMetrics {
+  bytes_served: number;
+  compute_delivered: number;
+  storage: number;
+  bandwidth: number;
+  uptime: number;
+}
+
+export interface EngaugeTrafficMetrics {
+  organic_ratio: number;
+  speculative_ratio: number;
+  total_requests: number;
+}
+
+export interface EngaugeListing {
+  id: string;
+  resource_type: string;
+  price: number;
+  [key: string]: unknown;
+}
+
+export interface EngaugeListingList {
+  count: number;
+  listings: EngaugeListing[];
+}
+
+export interface EngaugeNodeMetrics {
+  activity_score: number;
+  receipts: number;
+  bandwidth: number;
+}
+
+export interface EngaugeLease {
+  id: string;
+  resource_type: string;
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface EngaugeLeaseList {
+  count: number;
+  leases: EngaugeLease[];
+}
+
+// ── Catalog ──
+
+export interface CatalogPackage {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  downloads: number;
+}
+
+export interface CatalogPackageList {
+  count: number;
+  packages: CatalogPackage[];
+}
+
+export interface CatalogSearchResult {
+  name: string;
+  version: string;
+  description: string;
+  relevance: number;
+}
+
+export interface CatalogSearchResults {
+  count: number;
+  results: CatalogSearchResult[];
+}
+
+export interface CatalogPackageInfo {
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  downloads: number;
+}
+
+export interface CatalogRegistryStats {
+  package_count: number;
+  publisher_count: number;
+  total_downloads: number;
+}

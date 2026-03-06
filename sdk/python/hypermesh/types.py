@@ -164,3 +164,195 @@ class DomainList:
 
     count: int
     domains: list[Domain]
+
+
+# ── Caesar ──
+
+
+@dataclass
+class CaesarWalletInfo:
+    """Response from GET /api/v1/caesar/wallet."""
+
+    balance_grams: float
+    balance_usd: float
+    tier: str
+    node_id: str
+
+
+@dataclass
+class CaesarBalance:
+    """Response from GET /api/v1/caesar/balance."""
+
+    gold_grams: float
+    usd_equivalent: float
+    tier: str
+
+
+@dataclass
+class CaesarTransactionList:
+    """Response from GET /api/v1/caesar/transactions."""
+
+    count: int
+    transactions: list[dict[str, Any]]
+
+
+@dataclass
+class CaesarRewardInfo:
+    """Response from GET /api/v1/caesar/rewards."""
+
+    total_earned: float
+    pending: float
+    tier_multiplier: float
+
+
+@dataclass
+class CaesarRouteResult:
+    """Response from POST /api/v1/caesar/route."""
+
+    packet_id: str
+    status: str
+    fee: float
+
+
+@dataclass
+class CaesarGovernorParams:
+    """Response from GET /api/v1/caesar/governor/params."""
+
+    velocity: float
+    fee_rate: float
+    demurrage_rate: float
+
+
+# ── TrustChain ──
+
+
+@dataclass
+class TrustChainCertificate:
+    """A TrustChain certificate."""
+
+    id: str
+    subject: str
+    scope: str
+    valid_from: str
+    valid_to: str
+    pem: str
+
+
+@dataclass
+class TrustChainCertificateList:
+    """Response from GET /api/v1/trustchain/certificates."""
+
+    count: int
+    certificates: list[TrustChainCertificate]
+
+
+@dataclass
+class TrustChainValidationResult:
+    """Response from POST /api/v1/trustchain/validate."""
+
+    valid: bool
+    errors: list[str] = field(default_factory=list)
+    chain_valid: bool = False
+
+
+@dataclass
+class TrustChainRevokeResult:
+    """Response from POST /api/v1/trustchain/revoke."""
+
+    revoked: bool
+    cert_id: str
+
+
+@dataclass
+class TrustChainDnsZoneList:
+    """Response from GET /api/v1/trustchain/dns/zones."""
+
+    count: int
+    zones: list[dict[str, Any]]
+
+
+# ── Engauge ──
+
+
+@dataclass
+class EngaugeCapacityMetrics:
+    """Response from GET /api/v1/engauge/capacity."""
+
+    bytes_served: int
+    compute_delivered: float
+    storage: int
+    bandwidth: float
+    uptime: float
+
+
+@dataclass
+class EngaugeTrafficMetrics:
+    """Response from GET /api/v1/engauge/traffic."""
+
+    organic_ratio: float
+    speculative_ratio: float
+    total_requests: int
+
+
+@dataclass
+class EngaugeListingList:
+    """Response from GET /api/v1/engauge/marketplace/listings."""
+
+    count: int
+    listings: list[dict[str, Any]]
+
+
+@dataclass
+class EngaugeNodeMetrics:
+    """Response from GET /api/v1/engauge/node/metrics."""
+
+    activity_score: float
+    receipts: int
+    bandwidth: float
+
+
+@dataclass
+class EngaugeLeaseList:
+    """Response from GET /api/v1/engauge/leases."""
+
+    count: int
+    leases: list[dict[str, Any]]
+
+
+# ── Catalog ──
+
+
+@dataclass
+class CatalogPackageInfo:
+    """A catalog package."""
+
+    name: str
+    version: str
+    description: str
+    author: str
+    downloads: int
+
+
+@dataclass
+class CatalogPackageList:
+    """Response from GET /api/v1/catalog/browse."""
+
+    count: int
+    packages: list[CatalogPackageInfo]
+
+
+@dataclass
+class CatalogSearchResults:
+    """Response from GET /api/v1/catalog/search."""
+
+    count: int
+    results: list[dict[str, Any]]
+
+
+@dataclass
+class CatalogRegistryStats:
+    """Response from GET /api/v1/catalog/registry/stats."""
+
+    package_count: int
+    publisher_count: int
+    total_downloads: int

@@ -15,6 +15,18 @@ const (
 	// DefaultBaseURL is the default HyperMesh node API address.
 	DefaultBaseURL = "http://localhost:9293"
 
+	// DefaultCaesarURL is the default Caesar EVP service address.
+	DefaultCaesarURL = "http://localhost:9294"
+
+	// DefaultTrustChainURL is the default TrustChain service address.
+	DefaultTrustChainURL = "http://localhost:8444"
+
+	// DefaultCatalogURL is the default Catalog service address.
+	DefaultCatalogURL = "http://localhost:9295"
+
+	// DefaultEngaugeURL is the default Engauge service address.
+	DefaultEngaugeURL = "http://localhost:9296"
+
 	// DefaultTimeout is the default HTTP client timeout.
 	DefaultTimeout = 30 * time.Second
 )
@@ -31,14 +43,22 @@ type Client struct {
 	Dashboard  *DashboardApi
 	Config     *ConfigApi
 	Domain     *DomainApi
+	Caesar     *CaesarApi
+	TrustChain *TrustChainApi
+	Engauge    *EngaugeApi
+	Catalog    *CatalogApi
 }
 
 // Option configures the Client.
 type Option func(*clientConfig)
 
 type clientConfig struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL       string
+	caesarURL     string
+	trustChainURL string
+	catalogURL    string
+	engaugeURL    string
+	httpClient    *http.Client
 }
 
 // WithHTTPClient sets a custom http.Client for all requests.
@@ -57,6 +77,34 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
+// WithCaesarURL sets a custom Caesar EVP service URL.
+func WithCaesarURL(url string) Option {
+	return func(cfg *clientConfig) {
+		cfg.caesarURL = strings.TrimRight(url, "/")
+	}
+}
+
+// WithTrustChainURL sets a custom TrustChain service URL.
+func WithTrustChainURL(url string) Option {
+	return func(cfg *clientConfig) {
+		cfg.trustChainURL = strings.TrimRight(url, "/")
+	}
+}
+
+// WithCatalogURL sets a custom Catalog service URL.
+func WithCatalogURL(url string) Option {
+	return func(cfg *clientConfig) {
+		cfg.catalogURL = strings.TrimRight(url, "/")
+	}
+}
+
+// WithEngaugeURL sets a custom Engauge service URL.
+func WithEngaugeURL(url string) Option {
+	return func(cfg *clientConfig) {
+		cfg.engaugeURL = strings.TrimRight(url, "/")
+	}
+}
+
 // NewClient creates a new HyperMesh SDK client.
 //
 // The baseURL should be the scheme + host + port of the node API
@@ -67,7 +115,13 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 
-	cfg := &clientConfig{baseURL: baseURL}
+	cfg := &clientConfig{
+		baseURL:       baseURL,
+		caesarURL:     DefaultCaesarURL,
+		trustChainURL: DefaultTrustChainURL,
+		catalogURL:    DefaultCatalogURL,
+		engaugeURL:    DefaultEngaugeURL,
+	}
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -77,6 +131,10 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	}
 
 	h := newHTTPClient(cfg.baseURL, cfg.httpClient)
+	caesarH := newHTTPClient(cfg.caesarURL, cfg.httpClient)
+	trustChainH := newHTTPClient(cfg.trustChainURL, cfg.httpClient)
+	catalogH := newHTTPClient(cfg.catalogURL, cfg.httpClient)
+	engaugeH := newHTTPClient(cfg.engaugeURL, cfg.httpClient)
 
 	return &Client{
 		Node:       &NodeApi{http: h},
@@ -88,5 +146,9 @@ func NewClient(baseURL string, opts ...Option) *Client {
 		Dashboard:  &DashboardApi{http: h},
 		Config:     &ConfigApi{http: h},
 		Domain:     &DomainApi{http: h},
+		Caesar:     &CaesarApi{http: caesarH},
+		TrustChain: &TrustChainApi{http: trustChainH},
+		Engauge:    &EngaugeApi{http: engaugeH},
+		Catalog:    &CatalogApi{http: catalogH},
 	}
 }

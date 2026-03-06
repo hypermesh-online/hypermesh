@@ -26,6 +26,10 @@ set(SDK_SOURCES
     src/api/dashboard.cpp
     src/api/config.cpp
     src/api/domain.cpp
+    src/api/caesar.cpp
+    src/api/trustchain.cpp
+    src/api/engauge.cpp
+    src/api/catalog.cpp
 )
 
 add_library(hypermesh_sdk ${SDK_SOURCES})

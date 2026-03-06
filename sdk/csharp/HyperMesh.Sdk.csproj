@@ -12,4 +12,8 @@
     <Version>0.1.0</Version>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="examples/**" />
+  </ItemGroup>
+
 </Project>

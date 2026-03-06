@@ -16,6 +16,10 @@
 #include <hypermesh/api/dashboard.hpp>
 #include <hypermesh/api/config.hpp>
 #include <hypermesh/api/domain.hpp>
+#include <hypermesh/api/caesar.hpp>
+#include <hypermesh/api/trustchain.hpp>
+#include <hypermesh/api/engauge.hpp>
+#include <hypermesh/api/catalog.hpp>
 
 namespace hypermesh {
 
@@ -25,12 +29,17 @@ namespace hypermesh {
 ///   auto client = hypermesh::HyperMeshClient("http://localhost:9293");
 ///   auto status = client.node().status();
 ///   auto height = client.blockchain().height();
+///   auto wallet = client.caesar().wallet();
 class HyperMeshClient {
 public:
     /// Construct a client targeting the given base URL.
     /// Default: http://localhost:9293
     explicit HyperMeshClient(
-        const std::string& base_url = "http://localhost:9293");
+        const std::string& base_url = "http://localhost:9293",
+        const std::string& caesar_url = "http://localhost:9294",
+        const std::string& trustchain_url = "http://localhost:8444",
+        const std::string& engauge_url = "http://localhost:9296",
+        const std::string& catalog_url = "http://localhost:9295");
 
     /// Access the node status API.
     NodeApi node() const;
@@ -59,11 +68,27 @@ public:
     /// Access the domain API.
     DomainApi domain() const;
 
+    /// Access the Caesar EVP API.
+    CaesarApi caesar() const;
+
+    /// Access the TrustChain API.
+    TrustChainApi trustchain() const;
+
+    /// Access the Engauge API.
+    EngaugeApi engauge() const;
+
+    /// Access the Catalog API.
+    CatalogApi catalog() const;
+
     /// Get the underlying HTTP client (for advanced use).
     const HttpClient& http() const;
 
 private:
     HttpClient http_;
+    HttpClient caesar_http_;
+    HttpClient trustchain_http_;
+    HttpClient engauge_http_;
+    HttpClient catalog_http_;
 };
 
 } // namespace hypermesh
