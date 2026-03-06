@@ -87,7 +87,7 @@ export const crateStatuses: CrateStatus[] = [
         "Domain CLI (register, create, list, nodes, invite subcommands)",
         "Join command — join a domain network with optional invitation token",
         "Domain IPC handlers (domain.register, domain.list, domain.join)",
-        "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private/admin)",
+        "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private)",
         "Dashboard CLI (deploy, list, info, init/scaffold)",
         "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs",
         "Dashboard asset type (BaseSystemType::Dashboard, AssetType::Dashboard) — first-class blockchain asset",
@@ -95,7 +95,7 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard IPC deploy — registers Dashboard asset on blockchain, stores bundle keyed by content hash",
         "Dashboard IPC list/info — queries blockchain for Dashboard-type assets (chain is source of truth)",
         "HTTP API serves dashboards from blockchain — resolves active Dashboard asset, loads bundle by content hash, unbundles, serves scope-aware",
-        "Default system dashboard auto-registered as blockchain asset on first boot (public/private/admin scopes)",
+        "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
         "HTTP API server ([::1]:9293) — 20+ endpoints bridging HTTP to IPC for dashboard JS access",
         "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing"
       ],
