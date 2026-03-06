@@ -12,7 +12,7 @@ export const crateStats: CrateStats[] = [
   {
     "id": "block-matrix",
     "files": 410,
-    "linesOfCode": 147405,
+    "linesOfCode": 147428,
     "testCount": 1967
   },
   {
@@ -91,7 +91,7 @@ export const crateStats: CrateStats[] = [
 
 export const totalStats = {
   "totalFiles": 1077,
-  "totalLines": 329920,
+  "totalLines": 329943,
   "totalTests": 4118,
   "crateCount": 13
 };
