@@ -87,19 +87,19 @@ items = [
     "Domain CLI (register, create, list, nodes, invite subcommands)",
     "Join command — join a domain network with optional invitation token",
     "Domain IPC handlers (domain.register, domain.list, domain.join)",
-    # Dashboard system (Phase 3)
-    "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private/admin)",
+    # Dashboard system (Phase 3) — dashboards are blockchain assets
+    "Dashboard manifest (dashboard.toml) with parse/validate, scope-aware access (public/private)",
     "Dashboard CLI (deploy, list, info, init/scaffold)",
-    "Dashboard IPC handlers (dashboard.list, dashboard.info)",
-    "Default dashboard HTML (public welcome, private live metrics, admin controls)",
     "Dashboard scaffold generator — creates project structure with dashboard.toml and scope dirs",
-    # Dashboard asset pipeline (deploy → register → serve)
-    "Dashboard asset type (BaseSystemType::Dashboard, AssetType::Dashboard) — blockchain-registered",
-    "Dashboard deploy pipeline — collect files, BLAKE3 hash, register as blockchain asset, persist to disk",
-    "Dashboard IPC handlers (dashboard.deploy, dashboard.list, dashboard.info) — real data from disk",
-    "HTTP API server ([::1]:9293) — 20 endpoints bridging HTTP to IPC for dashboard JS access",
-    "Default dashboard auto-registration on first connect (public/private/admin HTML with live API calls)",
-    "SDK-integrated default dashboards (public onboarding, private live metrics, admin controls)",
+    # Dashboard as blockchain asset (deploy → register on chain → store bundle → serve from chain)
+    "Dashboard asset type (BaseSystemType::Dashboard, AssetType::Dashboard) — first-class blockchain asset",
+    "Dashboard deploy pipeline — bundle files → BLAKE3 content hash → register on blockchain → store in asset store",
+    "Dashboard IPC deploy — registers Dashboard asset on blockchain, stores bundle keyed by content hash",
+    "Dashboard IPC list/info — queries blockchain for Dashboard-type assets (chain is source of truth)",
+    "HTTP API serves dashboards from blockchain — resolves active Dashboard asset, loads bundle by content hash, unbundles, serves scope-aware",
+    "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
+    "HTTP API server ([::1]:9293) — 20+ endpoints bridging HTTP to IPC for dashboard JS access",
+    "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing",
 ]
 
 [features.in_development]

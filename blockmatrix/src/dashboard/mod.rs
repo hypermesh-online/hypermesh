@@ -34,11 +34,12 @@ pub struct DashboardMeta {
 }
 
 /// Access scope definitions pointing to content directories.
+///
+/// Two scopes: `public` (landing/onboarding) and `private` (full node UI).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DashboardAccess {
     pub public: Option<String>,
     pub private: Option<String>,
-    pub admin: Option<String>,
 }
 
 /// Parse a TOML string into a [`DashboardManifest`].
@@ -71,16 +72,14 @@ pub fn validate_manifest(
     // At least one access scope must be defined
     if manifest.access.public.is_none()
         && manifest.access.private.is_none()
-        && manifest.access.admin.is_none()
     {
-        errors.push("at least one access scope (public/private/admin) must be defined".into());
+        errors.push("at least one access scope (public/private) must be defined".into());
     }
 
     // Check referenced directories exist
     for (name, path_opt) in [
         ("public", &manifest.access.public),
         ("private", &manifest.access.private),
-        ("admin", &manifest.access.admin),
     ] {
         if let Some(rel_path) = path_opt {
             let full_path = base_dir.join(rel_path);
@@ -112,7 +111,6 @@ domain = "{project_name}.hypermesh"
 [access]
 public = "dist/public/"
 private = "dist/private/"
-admin = "dist/admin/"
 "#
     )
 }
@@ -120,7 +118,6 @@ admin = "dist/admin/"
 /// Generate a minimal HTML page for scaffolding.
 pub fn scaffold_html(project_name: &str, section: &str) -> String {
     let title = match section {
-        "admin" => format!("{project_name} Admin"),
         "private" => format!("{project_name} Dashboard"),
         _ => format!("Welcome to {project_name}"),
     };
@@ -142,7 +139,6 @@ domain = "test.hypermesh"
 [access]
 public = "dist/public/"
 private = "dist/private/"
-admin = "dist/admin/"
 
 [dependencies]
 charts = "0.2.0"
@@ -191,7 +187,6 @@ public = "dist/"
             access: DashboardAccess {
                 public: Some("x/".into()),
                 private: None,
-                admin: None,
             },
             dependencies: HashMap::new(),
         };
@@ -211,7 +206,6 @@ public = "dist/"
             access: DashboardAccess {
                 public: None,
                 private: None,
-                admin: None,
             },
             dependencies: HashMap::new(),
         };
@@ -233,7 +227,6 @@ public = "dist/"
             access: DashboardAccess {
                 public: Some("dist".into()),
                 private: None,
-                admin: None,
             },
             dependencies: HashMap::new(),
         };
@@ -253,7 +246,6 @@ public = "dist/"
             access: DashboardAccess {
                 public: Some("nonexistent/".into()),
                 private: None,
-                admin: None,
             },
             dependencies: HashMap::new(),
         };
@@ -282,6 +274,5 @@ public = "dist/"
     fn test_scaffold_html_sections() {
         assert!(scaffold_html("app", "public").contains("Welcome to app"));
         assert!(scaffold_html("app", "private").contains("app Dashboard"));
-        assert!(scaffold_html("app", "admin").contains("app Admin"));
     }
 }

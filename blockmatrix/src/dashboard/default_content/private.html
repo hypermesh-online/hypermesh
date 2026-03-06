@@ -37,14 +37,55 @@
         .empty { color: #444; font-style: italic; padding: 12px; text-align: center; font-size: 0.85em; }
         .hash { color: #888; font-size: 0.8em; font-family: inherit; }
         .divider { color: #222; margin-bottom: 8px; }
+        .form-section {
+            background: #0d1117; border: 1px solid #1a1a1a; border-radius: 6px;
+            padding: 16px 20px; margin: 8px 0 20px;
+        }
+        .form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+        input[type="text"] {
+            background: #111; border: 1px solid #333; color: #e0e0e0;
+            padding: 8px 12px; border-radius: 4px; font-family: inherit;
+            font-size: 0.85em; flex: 1; min-width: 140px;
+        }
+        input[type="text"]:focus { outline: none; border-color: #00ff88; }
+        input[type="text"]::placeholder { color: #444; }
+        button {
+            background: #00ff88; color: #0a0a0a; border: none;
+            padding: 8px 16px; border-radius: 4px; cursor: pointer;
+            font-family: inherit; font-size: 0.85em; font-weight: bold;
+            white-space: nowrap;
+        }
+        button:hover { background: #00cc6e; }
+        button.danger { background: #ff4444; color: #fff; }
+        button.danger:hover { background: #cc3333; }
+        button.secondary { background: #333; color: #c8c8c8; }
+        button.secondary:hover { background: #444; }
+        .result {
+            margin-top: 8px; padding: 8px 12px; border-radius: 4px;
+            font-size: 0.85em; display: none;
+        }
+        .result.ok { background: #0a1a0a; border: 1px solid #114411; color: #00ff88; display: block; }
+        .result.err { background: #1a0a0a; border: 1px solid #441111; color: #ff6666; display: block; }
+        .config-view {
+            background: #111; border: 1px solid #1a1a1a; border-radius: 4px;
+            padding: 12px 16px; font-size: 0.8em; white-space: pre-wrap;
+            word-break: break-all; max-height: 300px; overflow-y: auto; color: #aaa;
+        }
         .error-banner {
             background: #1a0a0a; border: 1px solid #441111; border-radius: 6px;
             padding: 10px 14px; color: #ff6666; margin-bottom: 16px; display: none;
         }
+        .shutdown-zone {
+            background: #1a0a0a; border: 1px solid #441111; border-radius: 6px;
+            padding: 16px 20px; margin-top: 40px;
+        }
+        .shutdown-zone h2 { color: #ff4444; margin-top: 0; }
         @media (max-width: 600px) {
             body { padding: 20px 12px; }
             .metrics { grid-template-columns: 1fr 1fr; }
             .header-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .form-row { flex-direction: column; }
+            input[type="text"] { width: 100%; }
         }
     </style>
 </head>
@@ -55,6 +96,7 @@
     </div>
     <div id="error" class="error-banner"></div>
 
+    <!-- Status Metrics -->
     <div class="metrics">
         <div class="metric-card">
             <div class="metric-label">Chain Height</div>
@@ -82,9 +124,10 @@
         </div>
     </div>
 
+    <!-- Latest Block -->
     <h2>Latest Block</h2>
     <div class="divider">------------</div>
-    <div class="metrics" id="latest-block">
+    <div class="metrics">
         <div class="metric-card">
             <div class="metric-label">Height</div>
             <div class="metric-value" id="block-height">--</div>
@@ -95,17 +138,19 @@
         </div>
     </div>
 
-    <h2>Connected Peers</h2>
-    <div class="divider">---------------</div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Peer ID</th><th>Address</th><th>Coordinate</th></tr></thead>
-            <tbody id="peers-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
-        </table>
+    <!-- DNS Registration -->
+    <h2>DNS Registration</h2>
+    <div class="divider">----------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="dns-name" placeholder="Name (e.g. my-service)" />
+            <input type="text" id="dns-addr" placeholder="IPv6 Address (e.g. fd00::1)" />
+            <button onclick="registerDns()">Register DNS</button>
+        </div>
+        <div id="dns-result" class="result"></div>
     </div>
 
-    <h2>DNS Records</h2>
-    <div class="divider">-----------</div>
+    <!-- DNS Records -->
     <div class="table-wrap">
         <table>
             <thead><tr><th>Name</th><th>Address</th><th>TTL</th></tr></thead>
@@ -113,6 +158,45 @@
         </table>
     </div>
 
+    <!-- Peer Connect -->
+    <h2>Peer Connect</h2>
+    <div class="divider">------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="peer-addr" placeholder="Peer address (e.g. [::1]:9292)" />
+            <button onclick="connectPeer()">Connect</button>
+        </div>
+        <div id="peer-result" class="result"></div>
+    </div>
+
+    <!-- Connected Peers -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Peer ID</th><th>Address</th><th>Coordinate</th></tr></thead>
+            <tbody id="peers-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Domain Registration -->
+    <h2>Domain Registration</h2>
+    <div class="divider">-------------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <input type="text" id="domain-name" placeholder="Domain name" />
+            <button onclick="registerDomain()">Register Domain</button>
+        </div>
+        <div id="domain-result" class="result"></div>
+    </div>
+
+    <!-- Domains -->
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Domain</th><th>Role</th><th>Scope</th></tr></thead>
+            <tbody id="domains-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Assets -->
     <h2>Assets</h2>
     <div class="divider">------</div>
     <div class="table-wrap">
@@ -122,15 +206,7 @@
         </table>
     </div>
 
-    <h2>Domains</h2>
-    <div class="divider">-------</div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Domain</th><th>Role</th><th>Scope</th></tr></thead>
-            <tbody id="domains-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
-        </table>
-    </div>
-
+    <!-- Recent Blocks -->
     <h2>Recent Blocks</h2>
     <div class="divider">-------------</div>
     <div class="table-wrap">
@@ -138,6 +214,34 @@
             <thead><tr><th>Height</th><th>Hash</th><th>Transactions</th></tr></thead>
             <tbody id="blocks-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
         </table>
+    </div>
+
+    <!-- Config Viewer -->
+    <h2>Node Configuration</h2>
+    <div class="divider">------------------</div>
+    <div class="form-section">
+        <div class="form-row">
+            <button class="secondary" onclick="loadConfig()">Reload Config</button>
+        </div>
+        <div id="config-view" class="config-view">Click "Reload Config" to view current configuration.</div>
+    </div>
+
+    <!-- Deployed Dashboards -->
+    <h2>Deployed Dashboards</h2>
+    <div class="divider">-------------------</div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Version</th><th>Hash</th></tr></thead>
+            <tbody id="dashboards-body"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Shutdown -->
+    <div class="shutdown-zone">
+        <h2>Danger Zone</h2>
+        <p style="color:#888; font-size:0.85em; margin: 8px 0 12px;">Shut down this node. This action cannot be undone remotely.</p>
+        <button class="danger" onclick="shutdownNode()">Shutdown Node</button>
+        <div id="shutdown-result" class="result"></div>
     </div>
 
     <script>
@@ -178,11 +282,30 @@
             return d.innerHTML;
         }
 
+        function showResult(id, ok, msg) {
+            var el = document.getElementById(id);
+            el.textContent = msg;
+            el.className = 'result ' + (ok ? 'ok' : 'err');
+        }
+
         async function fetchJson(path) {
             var r = await fetch(API + path);
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
         }
+
+        async function postJson(path, body) {
+            var r = await fetch(API + path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            var data = null;
+            try { data = await r.json(); } catch (_) {}
+            return { ok: r.ok, status: r.status, data: data };
+        }
+
+        /* --- Data Loading --- */
 
         async function loadStatus() {
             try {
@@ -337,6 +460,109 @@
             }
         }
 
+        async function loadDashboards() {
+            try {
+                var d = await fetchJson('/dashboard/list');
+                var dashes = d.dashboards || d || [];
+                var body = document.getElementById('dashboards-body');
+                if (dashes.length === 0) {
+                    body.innerHTML = emptyRow(3, 'No dashboards deployed (using defaults)');
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < dashes.length; i++) {
+                    var db = dashes[i];
+                    html += '<tr><td>' + esc(db.name || '') + '</td>'
+                        + '<td>' + esc(db.version || '--') + '</td>'
+                        + '<td class="hash">' + esc(truncHash(db.hash || '')) + '</td></tr>';
+                }
+                body.innerHTML = html;
+            } catch (_) {
+                document.getElementById('dashboards-body').innerHTML = emptyRow(3, 'Failed to load dashboards');
+            }
+        }
+
+        /* --- Actions --- */
+
+        async function registerDns() {
+            var name = document.getElementById('dns-name').value.trim();
+            var addr = document.getElementById('dns-addr').value.trim();
+            if (!name) { showResult('dns-result', false, 'Name is required'); return; }
+            if (!addr) { showResult('dns-result', false, 'Address is required'); return; }
+            try {
+                var r = await postJson('/dns/register', { name: name, addr: addr });
+                if (r.ok) {
+                    showResult('dns-result', true, 'Registered: ' + name + ' -> ' + addr);
+                    document.getElementById('dns-name').value = '';
+                    document.getElementById('dns-addr').value = '';
+                    loadDns();
+                } else {
+                    showResult('dns-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('dns-result', false, 'Error: ' + e.message);
+            }
+        }
+
+        async function connectPeer() {
+            var addr = document.getElementById('peer-addr').value.trim();
+            if (!addr) { showResult('peer-result', false, 'Address is required'); return; }
+            try {
+                var r = await postJson('/network/connect', { addr: addr });
+                if (r.ok) {
+                    showResult('peer-result', true, 'Connected to ' + addr);
+                    document.getElementById('peer-addr').value = '';
+                    loadPeers();
+                } else {
+                    showResult('peer-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('peer-result', false, 'Error: ' + e.message);
+            }
+        }
+
+        async function registerDomain() {
+            var name = document.getElementById('domain-name').value.trim();
+            if (!name) { showResult('domain-result', false, 'Domain name is required'); return; }
+            try {
+                var r = await postJson('/domain/register', { name: name });
+                if (r.ok) {
+                    showResult('domain-result', true, 'Domain registered: ' + name);
+                    document.getElementById('domain-name').value = '';
+                    loadDomains();
+                } else {
+                    showResult('domain-result', false, 'Failed: ' + (r.data && r.data.error ? r.data.error : 'HTTP ' + r.status));
+                }
+            } catch (e) {
+                showResult('domain-result', false, 'Error: ' + e.message);
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                var d = await fetchJson('/config/show');
+                document.getElementById('config-view').textContent = JSON.stringify(d, null, 2);
+            } catch (e) {
+                document.getElementById('config-view').textContent = 'Failed to load config: ' + e.message;
+            }
+        }
+
+        function shutdownNode() {
+            if (!confirm('Are you sure you want to shut down this node? You will lose remote access.')) return;
+            if (!confirm('This is your final confirmation. The node will stop immediately.')) return;
+            postJson('/shutdown', {}).then(function(r) {
+                if (r.ok) {
+                    showResult('shutdown-result', true, 'Node is shutting down...');
+                } else {
+                    showResult('shutdown-result', false, 'Shutdown failed');
+                }
+            }).catch(function(e) {
+                showResult('shutdown-result', false, 'Error: ' + e.message);
+            });
+        }
+
+        /* --- Refresh Loop --- */
+
         async function refreshAll() {
             await Promise.all([
                 loadStatus(),
@@ -345,7 +571,8 @@
                 loadDns(),
                 loadAssets(),
                 loadDomains(),
-                loadRecentBlocks()
+                loadRecentBlocks(),
+                loadDashboards()
             ]);
         }
 

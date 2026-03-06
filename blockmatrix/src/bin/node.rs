@@ -1525,10 +1525,14 @@ async fn run_connect(
 
     // HTTP API server for dashboard access (localhost only)
     let http_handler = handler.clone();
+    let http_data_dir = data_dir.to_path_buf();
+    let http_blockchain = bootstrap.blockchain().clone();
     tokio::spawn(async move {
         if let Err(e) = ipc::http_api::run_http_api(
             http_handler,
             ipc::http_api::DEFAULT_HTTP_API_PORT,
+            http_data_dir,
+            http_blockchain,
         )
         .await
         {
@@ -1536,33 +1540,70 @@ async fn run_connect(
         }
     });
 
-    // Register default dashboard if none exists yet
+    // Register default system dashboard as a blockchain asset if none exists
     {
-        let dash_dir = data_dir.join("dashboards").join("default");
-        if !dash_dir.exists() {
-            info!("Registering default dashboard...");
-            if let Err(e) = std::fs::create_dir_all(dash_dir.join("public")) {
-                warn!("Failed to create default dashboard dir: {}", e);
-            } else {
-                let _ = std::fs::create_dir_all(dash_dir.join("private"));
-                let _ = std::fs::create_dir_all(dash_dir.join("admin"));
-                let _ = std::fs::write(
-                    dash_dir.join("public").join("index.html"),
-                    blockmatrix::dashboard::default::DEFAULT_PUBLIC_HTML,
-                );
-                let _ = std::fs::write(
-                    dash_dir.join("private").join("index.html"),
-                    blockmatrix::dashboard::default::DEFAULT_PRIVATE_HTML,
-                );
-                let _ = std::fs::write(
-                    dash_dir.join("admin").join("index.html"),
-                    blockmatrix::dashboard::default::DEFAULT_ADMIN_HTML,
-                );
-                let manifest = format!(
-                    "[meta]\nname = \"default\"\nversion = \"1.0.0\"\ndescription = \"Default HyperMesh node dashboard\"\n\n[access]\npublic = \"public\"\nprivate = \"private\"\nadmin = \"admin\"\n"
-                );
-                let _ = std::fs::write(dash_dir.join("dashboard.toml"), &manifest);
-                info!("Default dashboard registered at {}", dash_dir.display());
+        use blockmatrix::dashboard::deploy;
+        let chain = bootstrap.blockchain().get_chain().await;
+        if deploy::find_active_dashboard(&chain).is_none() {
+            info!("Registering default system dashboard as blockchain asset...");
+
+            let mut files = std::collections::BTreeMap::new();
+            files.insert(
+                "public/index.html".to_string(),
+                blockmatrix::dashboard::default::DEFAULT_PUBLIC_HTML.as_bytes().to_vec(),
+            );
+            files.insert(
+                "private/index.html".to_string(),
+                blockmatrix::dashboard::default::DEFAULT_PRIVATE_HTML.as_bytes().to_vec(),
+            );
+
+            let bundle = deploy::bundle_files(&files);
+
+            let manifest_toml = r#"[dashboard]
+name = "default"
+version = "1.0.0"
+description = "Default HyperMesh node dashboard"
+domain = "localhost.hypermesh"
+
+[access]
+public = "public"
+private = "private"
+"#;
+
+            // Register as Dashboard asset on blockchain
+            let asset_data = blockmatrix::assets::core::AssetData {
+                config: b"DASHBOARD:DEPLOY:default".to_vec(),
+                definition: bundle.clone(),
+                metadata: manifest_toml.as_bytes().to_vec(),
+            };
+            let registration = blockmatrix::assets::core::AssetRegistration::from_asset_data(
+                &asset_data,
+                blockmatrix::assets::core::NetworkScope::Global,
+                blockmatrix::assets::core::AssetCategory::BaseSystem(
+                    blockmatrix::assets::core::BaseSystemType::Dashboard,
+                ),
+            );
+            let content_hash = registration.content_hash;
+            let state_proof = blockmatrix::StateProof::new_for_testing();
+            match bootstrap
+                .blockchain()
+                .register_asset_record(registration, &state_proof)
+                .await
+            {
+                Ok(block) => {
+                    // Store bundle in asset store (keyed by blockchain content hash)
+                    if let Err(e) = deploy::store_dashboard_bundle(
+                        &data_dir, &content_hash, manifest_toml, &bundle,
+                    ) {
+                        warn!("Failed to store dashboard bundle: {}", e);
+                    }
+                    info!(
+                        "Default dashboard registered as asset (block #{}, hash {})",
+                        block.index,
+                        hex::encode(content_hash)
+                    );
+                }
+                Err(e) => warn!("Failed to register default dashboard: {}", e),
             }
         }
     }
@@ -2155,9 +2196,8 @@ async fn main() -> Result<()> {
                         std::process::exit(1);
                     }
 
-                    // Bundle and hash
+                    // Bundle files
                     let bundle = blockmatrix::dashboard::deploy::bundle_files(&files);
-                    let content_hash = blockmatrix::dashboard::deploy::blake3_hash(&bundle);
 
                     // Check if daemon is running -- prefer IPC for deploy
                     let client = ipc::IpcClient::new();
@@ -2202,7 +2242,7 @@ async fn main() -> Result<()> {
                                 manifest.dashboard.name
                             )
                             .into_bytes(),
-                            definition: bundle,
+                            definition: bundle.clone(),
                             metadata: toml_str.as_bytes().to_vec(),
                         };
                         let registration = AssetRegistration::from_asset_data(
@@ -2210,6 +2250,7 @@ async fn main() -> Result<()> {
                             NetworkScope::Global,
                             AssetCategory::BaseSystem(BaseSystemType::Dashboard),
                         );
+                        let content_hash = registration.content_hash;
                         let state_proof = StateProof::new_for_testing();
                         let block = bootstrap
                             .blockchain()
@@ -2217,11 +2258,11 @@ async fn main() -> Result<()> {
                             .await
                             .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
 
-                        // Save files to data dir for local serving
-                        blockmatrix::dashboard::deploy::persist_dashboard(
-                            &data_dir, &manifest.dashboard.name, &toml_str, &files,
+                        // Store bundle in asset store (keyed by blockchain content hash)
+                        blockmatrix::dashboard::deploy::store_dashboard_bundle(
+                            &data_dir, &content_hash, &toml_str, &bundle,
                         )
-                        .with_context(|| "failed to persist dashboard files")?;
+                        .with_context(|| "failed to store dashboard bundle")?;
 
                         println!();
                         println!("  Dashboard Deployed");
@@ -2280,7 +2321,6 @@ async fn main() -> Result<()> {
                     let dir = std::path::PathBuf::from(&project_name);
                     std::fs::create_dir_all(dir.join("dist/public"))?;
                     std::fs::create_dir_all(dir.join("dist/private"))?;
-                    std::fs::create_dir_all(dir.join("dist/admin"))?;
 
                     let manifest_toml =
                         blockmatrix::dashboard::scaffold_manifest(&project_name);
@@ -2294,16 +2334,11 @@ async fn main() -> Result<()> {
                         dir.join("dist/private/index.html"),
                         blockmatrix::dashboard::scaffold_html(&project_name, "private"),
                     )?;
-                    std::fs::write(
-                        dir.join("dist/admin/index.html"),
-                        blockmatrix::dashboard::scaffold_html(&project_name, "admin"),
-                    )?;
 
                     println!("Created dashboard project at ./{project_name}/");
                     println!("  dashboard.toml");
                     println!("  dist/public/index.html");
                     println!("  dist/private/index.html");
-                    println!("  dist/admin/index.html");
                     println!(
                         "\nDeploy with: hypermesh dashboard deploy ./{project_name}/"
                     );

@@ -2,6 +2,11 @@
 // Licensed under the Business Source License 1.1.
 
 //! Dashboard IPC handlers: deploy, list, info.
+//!
+//! Dashboards are first-class blockchain assets (type `Dashboard`). Deploy
+//! registers the asset on chain and stores the bundle blob in the asset store
+//! keyed by content hash. List/info query the blockchain — the chain is the
+//! source of truth.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -23,6 +28,11 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 /// `dashboard.deploy` -- deploy a dashboard from provided manifest and files.
 ///
 /// Params: `{ name: str, manifest_toml: str, files: { path: base64_content } }`
+///
+/// 1. Bundle files into a binary blob
+/// 2. BLAKE3 hash the bundle
+/// 3. Register as a Dashboard asset on the blockchain
+/// 4. Store the bundle in the asset store keyed by content hash
 fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     let s = state.clone();
     handler.register(
@@ -86,14 +96,14 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     files.insert(path.clone(), content);
                 }
 
-                // Bundle and hash
+                // Bundle files
                 let bundle = deploy::bundle_files(&files);
-                let content_hash = deploy::blake3_hash(&bundle);
 
-                // Register as blockchain asset
+                // Register as blockchain asset — content_hash includes
+                // scope + category + all data fields
                 let asset_data = AssetData {
                     config: format!("DASHBOARD:DEPLOY:{name}").into_bytes(),
-                    definition: bundle,
+                    definition: bundle.clone(),
                     metadata: manifest_toml.as_bytes().to_vec(),
                 };
                 let registration = AssetRegistration::from_asset_data(
@@ -101,6 +111,7 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     NetworkScope::Global,
                     AssetCategory::BaseSystem(BaseSystemType::Dashboard),
                 );
+                let content_hash = registration.content_hash;
                 let state_proof = StateProof::new_for_testing();
                 let block = s
                     .blockchain
@@ -112,13 +123,14 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         data: None,
                     })?;
 
-                // Persist to disk for local serving
-                deploy::persist_dashboard(&s.data_dir, &name, &manifest_toml, &files)
-                    .map_err(|e| RpcError {
-                        code: INTERNAL_ERROR,
-                        message: format!("failed to persist dashboard: {e}"),
-                        data: None,
-                    })?;
+                // Store bundle in asset store (keyed by blockchain content hash)
+                deploy::store_dashboard_bundle(
+                    &s.data_dir, &content_hash, &manifest_toml, &bundle,
+                ).map_err(|e| RpcError {
+                    code: INTERNAL_ERROR,
+                    message: format!("failed to store dashboard bundle: {e}"),
+                    data: None,
+                })?;
 
                 Ok(serde_json::json!({
                     "status": "deployed",
@@ -134,7 +146,7 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     );
 }
 
-/// `dashboard.list` -- scan `<data_dir>/dashboards/` for deployed dashboards.
+/// `dashboard.list` -- query blockchain for deployed Dashboard assets.
 fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     let s = state.clone();
     handler.register(
@@ -142,23 +154,35 @@ fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         Arc::new(move |_params| {
             let s = s.clone();
             Box::pin(async move {
-                let names = deploy::list_dashboards(&s.data_dir);
-                let dashboards: Vec<serde_json::Value> = names
+                let chain = s.blockchain.get_chain().await;
+                let assets = deploy::find_dashboard_assets(&chain);
+
+                let dashboards: Vec<serde_json::Value> = assets
                     .iter()
-                    .map(|name| {
-                        if let Some(m) = deploy::load_dashboard_manifest(&s.data_dir, name) {
-                            serde_json::json!({
-                                "name": m.dashboard.name,
-                                "version": m.dashboard.version,
-                                "domain": m.dashboard.domain,
-                                "description": m.dashboard.description,
-                            })
-                        } else {
-                            serde_json::json!({
-                                "name": name,
-                                "error": "failed to parse manifest",
-                            })
+                    .filter_map(|(hash, block_idx, timestamp)| {
+                        // Try to load manifest from asset store
+                        if let Some((manifest_toml, _bundle)) =
+                            deploy::load_dashboard_bundle(&s.data_dir, hash)
+                        {
+                            if let Ok(m) = crate::dashboard::parse_manifest(&manifest_toml) {
+                                return Some(serde_json::json!({
+                                    "name": m.dashboard.name,
+                                    "version": m.dashboard.version,
+                                    "domain": m.dashboard.domain,
+                                    "description": m.dashboard.description,
+                                    "hash": hex::encode(hash),
+                                    "block": block_idx,
+                                    "registered_at": timestamp.to_rfc3339(),
+                                }));
+                            }
                         }
+                        // Asset on chain but bundle not in local store
+                        Some(serde_json::json!({
+                            "hash": hex::encode(hash),
+                            "block": block_idx,
+                            "registered_at": timestamp.to_rfc3339(),
+                            "error": "bundle not in local asset store",
+                        }))
                     })
                     .collect();
 
@@ -171,7 +195,7 @@ fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     );
 }
 
-/// `dashboard.info` -- return manifest data for a specific dashboard.
+/// `dashboard.info` -- return manifest data for a specific dashboard by name or hash.
 fn register_info(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     let s = state.clone();
     handler.register(
@@ -188,38 +212,44 @@ fn register_info(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         data: None,
                     })?;
 
-                match deploy::load_dashboard_manifest(&s.data_dir, name) {
-                    Some(m) => {
-                        // Count files on disk
-                        let dash_dir = s.data_dir.join("dashboards").join(name);
-                        let file_count = walkdir::WalkDir::new(&dash_dir)
-                            .into_iter()
-                            .filter_map(|e| e.ok())
-                            .filter(|e| {
-                                e.file_type().is_file()
-                                    && e.file_name() != "dashboard.toml"
-                            })
-                            .count();
+                // Scan blockchain for Dashboard assets, find by name
+                let chain = s.blockchain.get_chain().await;
+                let assets = deploy::find_dashboard_assets(&chain);
 
-                        Ok(serde_json::json!({
-                            "name": m.dashboard.name,
-                            "version": m.dashboard.version,
-                            "domain": m.dashboard.domain,
-                            "description": m.dashboard.description,
-                            "found": true,
-                            "files": file_count,
-                            "access": {
-                                "public": m.access.public,
-                                "private": m.access.private,
-                                "admin": m.access.admin,
-                            },
-                        }))
+                for (hash, block_idx, timestamp) in assets.iter().rev() {
+                    if let Some((manifest_toml, bundle)) =
+                        deploy::load_dashboard_bundle(&s.data_dir, hash)
+                    {
+                        if let Ok(m) = crate::dashboard::parse_manifest(&manifest_toml) {
+                            if m.dashboard.name == name {
+                                let file_count = deploy::unbundle_files(&bundle)
+                                    .map(|f| f.len())
+                                    .unwrap_or(0);
+
+                                return Ok(serde_json::json!({
+                                    "name": m.dashboard.name,
+                                    "version": m.dashboard.version,
+                                    "domain": m.dashboard.domain,
+                                    "description": m.dashboard.description,
+                                    "found": true,
+                                    "hash": hex::encode(hash),
+                                    "block": block_idx,
+                                    "registered_at": timestamp.to_rfc3339(),
+                                    "files": file_count,
+                                    "access": {
+                                        "public": m.access.public,
+                                        "private": m.access.private,
+                                    },
+                                }));
+                            }
+                        }
                     }
-                    None => Ok(serde_json::json!({
-                        "name": name,
-                        "found": false,
-                    })),
                 }
+
+                Ok(serde_json::json!({
+                    "name": name,
+                    "found": false,
+                }))
             })
         }),
     );
@@ -350,15 +380,17 @@ public = "dist/public/"
         assert_eq!(result["files"], 1);
         assert!(result["block"].as_u64().is_some());
 
-        // Now list should show it
+        // Now list should show it (from blockchain)
         let req = RpcRequest::new("dashboard.list", serde_json::json!({}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
         assert_eq!(result["count"], 1);
         assert_eq!(result["dashboards"][0]["name"], "my-dash");
+        assert!(result["dashboards"][0]["hash"].as_str().is_some());
+        assert!(result["dashboards"][0]["block"].as_u64().is_some());
 
-        // Info should return details
+        // Info should return details (found by name via blockchain scan)
         let req = RpcRequest::new(
             "dashboard.info",
             serde_json::json!({"name": "my-dash"}),

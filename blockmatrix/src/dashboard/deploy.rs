@@ -42,7 +42,6 @@ pub fn collect_dashboard_files(
     for (scope, rel_opt) in [
         ("public", &access.public),
         ("private", &access.private),
-        ("admin", &access.admin),
     ] {
         if let Some(rel) = rel_opt {
             let scope_dir = base_dir.join(rel);
@@ -74,10 +73,116 @@ pub fn blake3_hash(data: &[u8]) -> [u8; 32] {
     *blake3::hash(data).as_bytes()
 }
 
+/// Store a dashboard bundle blob in the asset store, keyed by its BLAKE3 content hash.
+///
+/// Path: `<data_dir>/assets/dashboards/<hex_hash>.bundle`
+///
+/// The bundle contains both the manifest and all file data so that a single
+/// content-hash lookup is sufficient to serve any dashboard.
+pub fn store_dashboard_bundle(
+    data_dir: &Path,
+    content_hash: &[u8; 32],
+    manifest_toml: &str,
+    bundle: &[u8],
+) -> std::io::Result<()> {
+    let store_dir = data_dir.join("assets").join("dashboards");
+    std::fs::create_dir_all(&store_dir)?;
+
+    // Write the bundle (binary file map produced by bundle_files)
+    let hash_hex = hex::encode(content_hash);
+    std::fs::write(store_dir.join(format!("{hash_hex}.bundle")), bundle)?;
+
+    // Write manifest alongside it for quick metadata access
+    std::fs::write(store_dir.join(format!("{hash_hex}.toml")), manifest_toml)?;
+
+    Ok(())
+}
+
+/// Load a dashboard bundle blob from the asset store by content hash.
+///
+/// Returns `(manifest_toml, bundle_bytes)` or `None` if not found.
+pub fn load_dashboard_bundle(
+    data_dir: &Path,
+    content_hash: &[u8; 32],
+) -> Option<(String, Vec<u8>)> {
+    let store_dir = data_dir.join("assets").join("dashboards");
+    let hash_hex = hex::encode(content_hash);
+
+    let bundle = std::fs::read(store_dir.join(format!("{hash_hex}.bundle"))).ok()?;
+    let manifest = std::fs::read_to_string(store_dir.join(format!("{hash_hex}.toml"))).ok()?;
+
+    Some((manifest, bundle))
+}
+
+/// Decode a binary bundle back into a file map.
+///
+/// Inverse of [`bundle_files`]. Returns `None` on malformed data.
+pub fn unbundle_files(bundle: &[u8]) -> Option<BTreeMap<String, Vec<u8>>> {
+    let mut files = BTreeMap::new();
+    let mut cursor = bundle;
+
+    while cursor.len() >= 4 {
+        let path_len = u32::from_le_bytes(cursor[..4].try_into().ok()?) as usize;
+        cursor = &cursor[4..];
+        if cursor.len() < path_len {
+            return None;
+        }
+        let path = std::str::from_utf8(&cursor[..path_len]).ok()?.to_string();
+        cursor = &cursor[path_len..];
+
+        if cursor.len() < 4 {
+            return None;
+        }
+        let content_len = u32::from_le_bytes(cursor[..4].try_into().ok()?) as usize;
+        cursor = &cursor[4..];
+        if cursor.len() < content_len {
+            return None;
+        }
+        let content = cursor[..content_len].to_vec();
+        cursor = &cursor[content_len..];
+
+        files.insert(path, content);
+    }
+
+    Some(files)
+}
+
+/// Scan the blockchain for all Dashboard-type asset registrations.
+///
+/// Returns `Vec<(content_hash, block_index, timestamp)>` ordered by block index
+/// (most recent last).
+pub fn find_dashboard_assets(
+    blocks: &[crate::blockchain::block::Block],
+) -> Vec<([u8; 32], u64, chrono::DateTime<chrono::Utc>)> {
+    use crate::assets::core::{AssetCategory, BaseSystemType};
+
+    let mut results = Vec::new();
+    for block in blocks {
+        for asset in block.get_assets() {
+            if asset.category == AssetCategory::BaseSystem(BaseSystemType::Dashboard) {
+                results.push((asset.content_hash, block.index, block.timestamp));
+            }
+        }
+    }
+    results
+}
+
+/// Find the most recently registered dashboard asset (by block index).
+///
+/// Returns `(content_hash, block_index)` or `None`.
+pub fn find_active_dashboard(
+    blocks: &[crate::blockchain::block::Block],
+) -> Option<([u8; 32], u64)> {
+    find_dashboard_assets(blocks)
+        .last()
+        .map(|(hash, idx, _)| (*hash, *idx))
+}
+
+// --- Legacy filesystem helpers (retained for migration) ---
+
 /// Save dashboard files to `<data_dir>/dashboards/<name>/`.
 ///
-/// Writes each file at its relative path and also persists the raw
-/// `dashboard.toml` manifest alongside it.
+/// **Deprecated**: prefer `store_dashboard_bundle` (asset-store based).
 pub fn persist_dashboard(
     data_dir: &Path,
     name: &str,
@@ -103,7 +208,7 @@ pub fn persist_dashboard(
 
 /// List dashboards stored under `<data_dir>/dashboards/`.
 ///
-/// Returns the names of subdirectories that contain a `dashboard.toml`.
+/// **Deprecated**: prefer scanning the blockchain via `find_dashboard_assets`.
 pub fn list_dashboards(data_dir: &Path) -> Vec<String> {
     let dir = data_dir.join("dashboards");
     let mut names = Vec::new();
@@ -122,7 +227,7 @@ pub fn list_dashboards(data_dir: &Path) -> Vec<String> {
 
 /// Load a dashboard manifest from `<data_dir>/dashboards/<name>/dashboard.toml`.
 ///
-/// Returns `None` if the file does not exist or cannot be parsed.
+/// **Deprecated**: prefer `load_dashboard_bundle`.
 pub fn load_dashboard_manifest(
     data_dir: &Path,
     name: &str,
@@ -227,5 +332,53 @@ public = "dist/public/"
     fn test_load_dashboard_manifest_missing() {
         let tmp = TempDir::new().expect("test: tmpdir");
         assert!(load_dashboard_manifest(tmp.path(), "nope").is_none());
+    }
+
+    #[test]
+    fn test_unbundle_roundtrip() {
+        let mut files = BTreeMap::new();
+        files.insert("index.html".into(), b"<h1>hello</h1>".to_vec());
+        files.insert("assets/app.js".into(), b"console.log('hi')".to_vec());
+
+        let bundle = bundle_files(&files);
+        let unbundled = unbundle_files(&bundle).expect("test: unbundle");
+        assert_eq!(files, unbundled);
+    }
+
+    #[test]
+    fn test_unbundle_empty() {
+        let files = BTreeMap::new();
+        let bundle = bundle_files(&files);
+        let unbundled = unbundle_files(&bundle).expect("test: unbundle empty");
+        assert!(unbundled.is_empty());
+    }
+
+    #[test]
+    fn test_store_and_load_dashboard_bundle() {
+        let tmp = TempDir::new().expect("test: tmpdir");
+        let mut files = BTreeMap::new();
+        files.insert("public/index.html".into(), b"<h1>hi</h1>".to_vec());
+        let bundle = bundle_files(&files);
+        let hash = blake3_hash(&bundle);
+        let manifest = "[dashboard]\nname = \"test\"\nversion = \"1.0.0\"\n";
+
+        store_dashboard_bundle(tmp.path(), &hash, manifest, &bundle)
+            .expect("test: store bundle");
+
+        let (loaded_manifest, loaded_bundle) =
+            load_dashboard_bundle(tmp.path(), &hash).expect("test: load bundle");
+        assert_eq!(loaded_manifest, manifest);
+        assert_eq!(loaded_bundle, bundle);
+
+        // Unbundle and verify files match
+        let unbundled = unbundle_files(&loaded_bundle).expect("test: unbundle");
+        assert_eq!(files, unbundled);
+    }
+
+    #[test]
+    fn test_load_dashboard_bundle_missing() {
+        let tmp = TempDir::new().expect("test: tmpdir");
+        let hash = [0u8; 32];
+        assert!(load_dashboard_bundle(tmp.path(), &hash).is_none());
     }
 }
