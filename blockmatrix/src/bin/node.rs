@@ -82,6 +82,10 @@ struct Cli {
     #[clap(short = 's', long, default_value = "9292")]
     stoq_port: u16,
 
+    /// HTTP API port for dashboard and REST endpoints
+    #[clap(long, default_value = "9293")]
+    http_port: u16,
+
     /// Run as a reflector (public peer that accepts and relays)
     #[clap(long)]
     reflector: bool,
@@ -1523,14 +1527,15 @@ async fn run_connect(
         }
     };
 
-    // HTTP API server for dashboard access (localhost only)
+    // HTTP API server for dashboard access
     let http_handler = handler.clone();
+    let http_port = cli.http_port;
     let http_data_dir = data_dir.to_path_buf();
     let http_blockchain = bootstrap.blockchain().clone();
     tokio::spawn(async move {
         if let Err(e) = ipc::http_api::run_http_api(
             http_handler,
-            ipc::http_api::DEFAULT_HTTP_API_PORT,
+            http_port,
             http_data_dir,
             http_blockchain,
         )

@@ -47,7 +47,8 @@ pub async fn run_http_api(
     data_dir: PathBuf,
     blockchain: Arc<NodeBlockchain>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let addr = format!("[::1]:{}", port);
+    // Bind to all interfaces so external visitors can reach the dashboard
+    let addr = format!("[::]:{}", port);
     let listener = TcpListener::bind(&addr).await?;
     tracing::info!("HTTP API listening on {}", addr);
 
@@ -63,8 +64,11 @@ pub async fn run_http_api(
         let handler = handler.clone();
         let data_dir = data_dir.clone();
         let blockchain = blockchain.clone();
+        let is_local = peer.ip().is_loopback();
         tokio::spawn(async move {
-            if let Err(e) = handle_connection(stream, &handler, &data_dir, &blockchain).await {
+            if let Err(e) =
+                handle_connection(stream, &handler, &data_dir, &blockchain, is_local).await
+            {
                 debug!("HTTP connection from {} error: {}", peer, e);
             }
         });
@@ -351,6 +355,7 @@ async fn handle_connection(
     handler: &RequestHandler,
     data_dir: &Path,
     blockchain: &NodeBlockchain,
+    is_local: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut reader = BufReader::new(tcp_stream);
     let req = parse_request(&mut reader).await?;
@@ -379,7 +384,11 @@ async fn handle_connection(
         let files = load_active_dashboard(data_dir, blockchain).await;
 
         if let Some(files) = files {
-            // Default scope: private (the real UI). Public scope via /public/*
+            // Scope routing:
+            // - /public/* always serves public scope
+            // - /private/* always serves private scope (node management UI)
+            // - Root path: local connections get private (node operator),
+            //   external connections get public (visitor-facing)
             let (scope, file_path) = if req.path.starts_with("/public") {
                 let rest = req.path.strip_prefix("/public").unwrap_or("/");
                 let rest = if rest.is_empty() || rest == "/" {
@@ -388,14 +397,23 @@ async fn handle_connection(
                     rest.to_string()
                 };
                 ("public", rest)
+            } else if req.path.starts_with("/private") {
+                let rest = req.path.strip_prefix("/private").unwrap_or("/");
+                let rest = if rest.is_empty() || rest == "/" {
+                    "/index.html".to_string()
+                } else {
+                    rest.to_string()
+                };
+                ("private", rest)
             } else {
-                // Everything else is private scope (the real UI)
+                // Default scope depends on connection origin
+                let default_scope = if is_local { "private" } else { "public" };
                 let file_path = if req.path == "/" {
                     "/index.html".to_string()
                 } else {
                     req.path.clone()
                 };
-                ("private", file_path)
+                (default_scope, file_path)
             };
 
             if serve_from_bundle(&mut stream, &files, scope, &file_path).await? {
@@ -780,7 +798,7 @@ private = "private"
         let bc = test_blockchain();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc)
+            handle_connection(stream, &h, &dd, &bc, true)
                 .await
                 .expect("test: handle");
         });
@@ -825,7 +843,7 @@ private = "private"
         let bc = test_blockchain();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc)
+            handle_connection(stream, &h, &dd, &bc, true)
                 .await
                 .expect("test: handle");
         });
@@ -887,7 +905,7 @@ private = "private"
         let bc2 = bc.clone();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc2)
+            handle_connection(stream, &h, &dd, &bc2, true)
                 .await
                 .expect("test: handle");
         });
@@ -944,7 +962,7 @@ private = "private"
         let bc2 = bc.clone();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc2)
+            handle_connection(stream, &h, &dd, &bc2, true)
                 .await
                 .expect("test: handle");
         });
@@ -997,7 +1015,7 @@ private = "private"
         let bc2 = bc.clone();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc2)
+            handle_connection(stream, &h, &dd, &bc2, true)
                 .await
                 .expect("test: handle");
         });
@@ -1050,7 +1068,7 @@ private = "private"
         let bc2 = bc.clone();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc2)
+            handle_connection(stream, &h, &dd, &bc2, true)
                 .await
                 .expect("test: handle");
         });
@@ -1096,7 +1114,7 @@ private = "private"
         let bc = test_blockchain();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc)
+            handle_connection(stream, &h, &dd, &bc, true)
                 .await
                 .expect("test: handle");
         });
@@ -1139,7 +1157,7 @@ private = "private"
         let bc = test_blockchain();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("test: accept");
-            handle_connection(stream, &h, &dd, &bc)
+            handle_connection(stream, &h, &dd, &bc, true)
                 .await
                 .expect("test: handle");
         });
