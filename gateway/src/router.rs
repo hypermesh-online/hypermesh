@@ -16,6 +16,9 @@ use crate::middleware::{CircuitBreaker, CorsMiddleware, LoggingMiddleware, Reque
 use crate::pool::ConnectionPool;
 use crate::proxy::{transform_backend_path, Http3Proxy};
 
+use crate::dashboard_server::{DashboardScope, DashboardServer};
+use crate::onboarding::{GATEWAY_ADMIN_HTML, GATEWAY_PRIVATE_HTML, GATEWAY_PUBLIC_HTML};
+
 /// Gateway router for routing requests to backend services
 pub struct GatewayRouter {
     trustchain_pool: ConnectionPool,
@@ -38,6 +41,7 @@ pub struct GatewayRouter {
     _catalog_addr: SocketAddr,
     /// engauge service address (retained for health check routing)
     _engauge_addr: SocketAddr,
+    dashboard: DashboardServer,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
     trustchain_breaker: Arc<CircuitBreaker>,
@@ -117,6 +121,18 @@ impl GatewayRouter {
 
         let engauge_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
+        // Initialize dashboard server with onboarding HTML
+        let dashboard = DashboardServer::new(Duration::from_secs(3600));
+        dashboard
+            .load_defaults(
+                "trust.hypermesh.online",
+                "gateway-node",
+                GATEWAY_PUBLIC_HTML,
+                GATEWAY_PRIVATE_HTML,
+                GATEWAY_ADMIN_HTML,
+            )
+            .await;
+
         Ok(Self {
             trustchain_pool,
             blockmatrix_pool,
@@ -133,6 +149,7 @@ impl GatewayRouter {
             _caesar_addr: config.caesar_addr,
             _catalog_addr: config.catalog_addr,
             _engauge_addr: config.engauge_addr,
+            dashboard,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
             trustchain_breaker,
@@ -170,6 +187,28 @@ impl GatewayRouter {
 
         let mut response = if path == "/health" {
             self.handle_health_check().await?
+        } else if path == "/" || path == "/index.html" || path.starts_with("/dashboard") {
+            // Serve dashboard content for root and dashboard paths
+            let scope = DashboardScope::Public;
+            match self
+                .dashboard
+                .serve("trust.hypermesh.online", &path, scope)
+                .await
+            {
+                Some(served) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", &served.content_type)
+                    .body(Bytes::from(served.content))
+                    .map_err(|e| anyhow!("failed to build dashboard response: {e}"))?,
+                None => {
+                    let body = json!({"error": "Not found", "message": "Dashboard content not available"});
+                    Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .header("content-type", "application/json")
+                        .body(Bytes::from(serde_json::to_vec(&body).unwrap_or_default()))
+                        .map_err(|e| anyhow!("failed to build 404 response: {e}"))?
+                }
+            }
         } else {
             let (proxy, breaker, backend_prefix) = self.select_backend(&path)?;
 

@@ -134,9 +134,9 @@ impl BlockchainStorage {
         })
     }
 
-    /// Write a block to storage
+    /// Write a block to storage (WAL + storage files)
     pub async fn write_block(&self, block: &Block) -> PersistenceResult<()> {
-        // Write to WAL first
+        // Write to WAL first for crash recovery
         if let Some(wal) = self.wal.write().await.as_mut() {
             wal.write_entry(WalEntry {
                 op_type: WalOperation::AddBlock,
@@ -145,14 +145,26 @@ impl BlockchainStorage {
             })?;
         }
 
-        // Determine which file to write to
+        // Write to storage files
+        self.write_block_to_storage(block).await?;
+
+        // WAL entry is no longer needed — data is committed to storage
+        self.truncate_wal().await?;
+
+        Ok(())
+    }
+
+    /// Write block to storage files without WAL logging.
+    ///
+    /// Used internally by `write_block` (after WAL write) and by `replay_wal`
+    /// (where re-logging to WAL would be circular).
+    async fn write_block_to_storage(&self, block: &Block) -> PersistenceResult<()> {
         let file_id = (block.index / BLOCKS_PER_FILE) as u32;
         let file_path = self
             .storage_dir
             .join("blocks")
             .join(format!("{file_id:08}.blk"));
 
-        // Append block to file
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
@@ -198,6 +210,25 @@ impl BlockchainStorage {
             block.index, file_id, offset
         );
 
+        Ok(())
+    }
+
+    /// Truncate the WAL after blocks have been committed to storage.
+    ///
+    /// Drops the current WAL writer, truncates the file to zero bytes,
+    /// then re-opens a fresh WAL writer.
+    async fn truncate_wal(&self) -> PersistenceResult<()> {
+        let wal_path = self.storage_dir.join("wal.log");
+        let mut wal = self.wal.write().await;
+        // Drop existing writer so the file handle is released
+        *wal = None;
+        // Truncate file to zero bytes
+        OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(&wal_path)?;
+        // Re-open fresh WAL writer
+        *wal = Some(WalWriter::new(wal_path)?);
         Ok(())
     }
 
@@ -350,7 +381,11 @@ impl BlockchainStorage {
         bincode::deserialize(&data).map_err(|e| PersistenceError::Deserialization(e.to_string()))
     }
 
-    /// Replay WAL entries
+    /// Replay WAL entries for crash recovery.
+    ///
+    /// Skips blocks already present in the index (committed before crash)
+    /// and only writes blocks that are genuinely missing from storage.
+    /// Truncates the WAL after successful replay.
     pub async fn replay_wal(&self) -> PersistenceResult<u32> {
         let wal_path = self.storage_dir.join("wal.log");
         if !wal_path.exists() {
@@ -359,25 +394,44 @@ impl BlockchainStorage {
 
         info!("Replaying WAL from {:?}", wal_path);
         let entries = WalReader::read_all(&wal_path)?;
-        let count = entries.len() as u32;
 
-        for entry in entries {
+        if entries.is_empty() {
+            return Ok(0);
+        }
+
+        let total = entries.len() as u32;
+        let mut replayed = 0u32;
+
+        for entry in &entries {
             if entry.op_type == WalOperation::AddBlock {
-                // Re-apply the block write (without WAL)
-                let mut wal = self.wal.write().await;
-                *wal = None; // Temporarily disable WAL
-                drop(wal);
+                // Skip blocks already committed to storage
+                let already_exists = self
+                    .block_index
+                    .read()
+                    .await
+                    .contains_key(&entry.block.hash);
+                if already_exists {
+                    info!(
+                        "WAL replay: block {} already in storage, skipping",
+                        entry.block.index
+                    );
+                    continue;
+                }
 
-                self.write_block(&entry.block).await?;
-
-                // Re-enable WAL
-                let mut wal = self.wal.write().await;
-                *wal = Some(WalWriter::new(wal_path.clone())?);
+                self.write_block_to_storage(&entry.block).await?;
+                replayed += 1;
             }
         }
 
-        info!("Replayed {} WAL entries", count);
-        Ok(count)
+        // Truncate WAL — all entries are now committed
+        self.truncate_wal().await?;
+
+        info!(
+            "Replayed {} WAL entries ({} skipped, already in storage)",
+            replayed,
+            total - replayed
+        );
+        Ok(replayed)
     }
 
     /// Flush WAL to storage
@@ -533,32 +587,121 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wal_replay() {
+    async fn test_wal_replay_crash_recovery() {
+        // Simulate a crash: WAL has an entry but storage was never written.
         let temp_dir = TempDir::new().expect("test: temp dir creation");
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let block = Block::genesis(coord);
 
+        // Set up storage directory and write a WAL entry directly (simulating
+        // a crash between WAL write and storage commit).
+        let blockchain_dir = temp_dir
+            .path()
+            .join("test_node")
+            .join("blockchain");
+        std::fs::create_dir_all(blockchain_dir.join("blocks"))
+            .expect("test: create dirs");
+
+        let wal_path = blockchain_dir.join("wal.log");
         {
-            let storage =
-                BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-                    .await
-                    .expect("test: expected success");
-
-            let block = Block::genesis(coord);
-            storage.write_block(&block).await.expect("test: async operation");
+            let mut wal_writer = WalWriter::new(wal_path).expect("test: wal writer");
+            wal_writer
+                .write_entry(WalEntry {
+                    op_type: WalOperation::AddBlock,
+                    block: block.clone(),
+                    timestamp: chrono::Utc::now(),
+                })
+                .expect("test: wal write");
         }
 
-        // Create new storage instance and replay WAL
+        // Open storage (block NOT in index) and replay WAL
         let storage =
             BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
                 .await
                 .expect("test: expected success");
 
         let replayed = storage.replay_wal().await.expect("test: async operation");
-        assert!(replayed > 0);
+        assert_eq!(replayed, 1, "should replay the one missing block");
 
-        // Verify block exists after replay
-        let block = storage.read_block(BlockQuery::ByIndex(0)).await.expect("test: async operation");
-        assert!(block.is_some());
+        // Verify block is now in storage
+        let read = storage
+            .read_block(BlockQuery::ByIndex(0))
+            .await
+            .expect("test: async operation");
+        assert!(read.is_some());
+        assert_eq!(read.expect("test: assertion value").hash, block.hash);
+
+        // Verify WAL is truncated after replay
+        let wal_path = blockchain_dir.join("wal.log");
+        let wal_size = std::fs::metadata(&wal_path)
+            .expect("test: wal metadata")
+            .len();
+        assert_eq!(wal_size, 0, "WAL should be truncated after replay");
+    }
+
+    #[tokio::test]
+    async fn test_wal_replay_skips_already_persisted() {
+        // Write a block normally (WAL truncated after commit), then manually
+        // re-add the same block to WAL. Replay should skip it.
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let block = Block::genesis(coord);
+
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
+
+        // Write block normally (commits to storage + truncates WAL)
+        storage
+            .write_block(&block)
+            .await
+            .expect("test: async operation");
+
+        // Manually append the same block to WAL (simulates stale WAL from old code)
+        {
+            let mut wal = storage.wal.write().await;
+            if let Some(w) = wal.as_mut() {
+                w.write_entry(WalEntry {
+                    op_type: WalOperation::AddBlock,
+                    block: block.clone(),
+                    timestamp: chrono::Utc::now(),
+                })
+                .expect("test: wal write");
+            }
+        }
+
+        // Replay should skip the already-persisted block
+        let replayed = storage.replay_wal().await.expect("test: async operation");
+        assert_eq!(replayed, 0, "should skip already-persisted block");
+    }
+
+    #[tokio::test]
+    async fn test_wal_truncated_after_write() {
+        let temp_dir = TempDir::new().expect("test: temp dir creation");
+        let storage =
+            BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+                .await
+                .expect("test: expected success");
+
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
+        let block = Block::genesis(coord);
+
+        storage
+            .write_block(&block)
+            .await
+            .expect("test: async operation");
+
+        // WAL should be truncated (0 bytes) after successful write
+        let wal_path = temp_dir
+            .path()
+            .join("test_node")
+            .join("blockchain")
+            .join("wal.log");
+        let wal_size = std::fs::metadata(&wal_path)
+            .expect("test: wal metadata")
+            .len();
+        assert_eq!(wal_size, 0, "WAL should be empty after committed write");
     }
 
     #[tokio::test]

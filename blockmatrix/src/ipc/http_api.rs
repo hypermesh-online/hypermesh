@@ -211,6 +211,31 @@ fn route(req: &HttpRequest) -> Option<(String, serde_json::Value)> {
     }
 }
 
+/// Write an HTML response to the stream.
+async fn write_html_response(
+    stream: &mut tokio::net::TcpStream,
+    status: u16,
+    status_text: &str,
+    body: &[u8],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let header = format!(
+        "HTTP/1.1 {} {}\r\n\
+         Content-Type: text/html; charset=utf-8\r\n\
+         Content-Length: {}\r\n\
+         {}\r\n\
+         Connection: close\r\n\
+         \r\n",
+        status,
+        status_text,
+        body.len(),
+        CORS_HEADERS,
+    );
+    stream.write_all(header.as_bytes()).await?;
+    stream.write_all(body).await?;
+    stream.flush().await?;
+    Ok(())
+}
+
 /// Write a complete HTTP response to the stream.
 async fn write_response(
     stream: &mut tokio::net::TcpStream,
@@ -260,6 +285,27 @@ async fn handle_connection(
         stream.write_all(header.as_bytes()).await?;
         stream.flush().await?;
         return Ok(());
+    }
+
+    // Serve dashboard HTML for root and scope pages
+    if req.method == "GET" {
+        let html = match req.path.as_str() {
+            "/" | "/index.html" | "/public.html" => {
+                Some(include_str!("../dashboard/default_content/public.html"))
+            }
+            "/private.html" => {
+                Some(include_str!("../dashboard/default_content/private.html"))
+            }
+            "/admin.html" => {
+                Some(include_str!("../dashboard/default_content/admin.html"))
+            }
+            _ => None,
+        };
+
+        if let Some(html_content) = html {
+            write_html_response(&mut stream, 200, "OK", html_content.as_bytes()).await?;
+            return Ok(());
+        }
     }
 
     // Route HTTP path to IPC method
@@ -646,6 +692,57 @@ mod tests {
 
         assert!(response.starts_with("HTTP/1.1 204 No Content"));
         assert!(response.contains("Access-Control-Allow-Origin: *"));
+
+        server.await.expect("test: server join");
+    }
+
+    #[test]
+    fn test_route_root_not_api() {
+        // Root path should NOT go through the API router (it's handled earlier)
+        let req = HttpRequest {
+            method: "GET".into(),
+            path: "/".into(),
+            body: String::new(),
+        };
+        assert!(route(&req).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_http_api_serves_dashboard_html() {
+        let handler = Arc::new(RequestHandler::new());
+
+        let listener = TcpListener::bind("[::1]:0")
+            .await
+            .expect("test: bind");
+        let port = listener.local_addr().expect("test: addr").port();
+
+        let h = handler.clone();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("test: accept");
+            handle_connection(stream, &h)
+                .await
+                .expect("test: handle");
+        });
+
+        let mut client = tokio::net::TcpStream::connect(format!("[::1]:{}", port))
+            .await
+            .expect("test: connect");
+
+        let request = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        client
+            .write_all(request.as_bytes())
+            .await
+            .expect("test: write");
+
+        let mut buf = vec![0u8; 8192];
+        let n = tokio::io::AsyncReadExt::read(&mut client, &mut buf)
+            .await
+            .expect("test: read");
+        let response = String::from_utf8_lossy(&buf[..n]);
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("text/html; charset=utf-8"));
+        assert!(response.contains("Hello, HyperMesh!"));
 
         server.await.expect("test: server join");
     }
