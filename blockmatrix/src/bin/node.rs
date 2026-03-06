@@ -1548,13 +1548,48 @@ async fn run_connect(
             info!("Registering default system dashboard as blockchain asset...");
 
             let mut files = std::collections::BTreeMap::new();
+
+            // Try to load the built React UI from ui/frontend/dist/
+            // Check multiple possible locations relative to the binary
+            let ui_dist_candidates = [
+                std::path::PathBuf::from("ui/frontend/dist"),
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|d| d.join("../ui/frontend/dist")))
+                    .unwrap_or_default(),
+                data_dir.join("ui/dist"),
+            ];
+
+            let mut loaded_ui = false;
+            for ui_dist in &ui_dist_candidates {
+                if ui_dist.join("index.html").exists() {
+                    match deploy::collect_dir_files(ui_dist) {
+                        Ok(ui_files) if !ui_files.is_empty() => {
+                            info!("Loading UI from {}", ui_dist.display());
+                            for (path, content) in &ui_files {
+                                files.insert(format!("private/{path}"), content.clone());
+                            }
+                            loaded_ui = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Fallback: use embedded placeholder HTML
+            if !loaded_ui {
+                info!("Built UI not found, using embedded fallback dashboard");
+                files.insert(
+                    "private/index.html".to_string(),
+                    blockmatrix::dashboard::default::DEFAULT_PRIVATE_HTML.as_bytes().to_vec(),
+                );
+            }
+
+            // Public scope: always use the embedded onboarding page
             files.insert(
                 "public/index.html".to_string(),
                 blockmatrix::dashboard::default::DEFAULT_PUBLIC_HTML.as_bytes().to_vec(),
-            );
-            files.insert(
-                "private/index.html".to_string(),
-                blockmatrix::dashboard::default::DEFAULT_PRIVATE_HTML.as_bytes().to_vec(),
             );
 
             let bundle = deploy::bundle_files(&files);
