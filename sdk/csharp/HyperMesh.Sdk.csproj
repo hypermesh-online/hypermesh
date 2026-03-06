@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>HyperMesh.Sdk</RootNamespace>
+    <AssemblyName>HyperMesh.Sdk</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Description>C# SDK for the HyperMesh node HTTP REST API</Description>
+    <PackageId>HyperMesh.Sdk</PackageId>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>
