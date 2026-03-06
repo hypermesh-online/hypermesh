@@ -56,13 +56,11 @@ export const crateStatuses: CrateStatus[] = [
         "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
         "Peer handshake PoS token exchange — connect_to_peer()/accept_connections() generate+validate StateProof tokens",
         "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes",
-        "Cross-node block sync — SyncManager+ReflectorPool+BlockPropagator wired into node start, 5s sync loop",
-        "Cross-node shard distribution — shards distributed to up to 6 nearest peers after pipeline store",
-        "DNS block propagation — DNS blocks propagate via block sync to connected peers",
-        "Network scope blockchain — reflector nodes join Network chain, TransportSyncDriver runs sync rounds",
-        "Reflector pool block relay — ReflectorPool tracks peers, prunes stale, heartbeat in sync loop",
-        "BLAKE3 shard integrity verification — incoming shards verified before storage",
         "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
+        "BlockPropagator sends BLOCK_ANNOUNCE to NearestN(6) peers via STOQ streams",
+        "SyncManager state machine — join/leave networks, track sync state (Discovering→Syncing→Synchronized)",
+        "ReflectorPool tracks peers, prunes stale every 5s, health scoring",
+        "TransportSyncDriver runs active sync rounds every 5s",
         "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
         "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
         "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
@@ -96,10 +94,16 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard IPC list/info — queries blockchain for Dashboard-type assets (chain is source of truth)",
         "HTTP API serves dashboards from blockchain — resolves active Dashboard asset, loads bundle by content hash, unbundles, serves scope-aware",
         "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
-        "HTTP API server ([::1]:9293) — 20+ endpoints bridging HTTP to IPC for dashboard JS access",
+        "HTTP API server (configurable --http-port, scope-aware: localhost=private, external=public) — 20+ REST endpoints",
         "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing"
       ],
       "inDevelopment": [
+        "Post-handshake message dispatch — incoming MatrixMessage never routed to SyncDispatcher after handshake",
+        "SyncDispatcher instantiation — 827 lines of routing logic defined but never called from node binary",
+        "Reflector heartbeat send/receive — heartbeats never broadcast by reflectors or processed by peers",
+        "BLOCK_ANNOUNCE receive handler — blocks sent via STOQ but never deserialized on receiver side",
+        "Incoming shard stream handler — StoqShardTransport handler exists but never called from accept loop",
+        "BLAKE3 shard integrity verification — verification code exists, not wired to incoming stream handler",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
@@ -115,7 +119,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 87
+    "completion": 81
   },
   {
     "id": "caesar",
