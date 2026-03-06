@@ -429,20 +429,21 @@ export function getCertificateExpiryWarning(validTo: string): 'none' | 'warning'
  * Web3 API Configuration
  */
 export const WEB3_CONFIG = {
-  // API Endpoints (Unified Server)
+  // API Endpoints (BlockMatrix HTTP API)
   ENDPOINTS: {
-    TRUSTCHAIN: '[::1]:8443',
-    STOQ: '[::1]:8443',
-    HYPERMESH: '[::1]:8443',
-    INTEGRATION: '[::1]:8443'
+    BLOCKMATRIX: 'localhost:9293',
+    TRUSTCHAIN: 'localhost:9293',
+    STOQ: 'localhost:9293',
+    HYPERMESH: 'localhost:9293',
+    INTEGRATION: 'localhost:9293'
   },
-  
-  // WebSocket URLs (Unified Server)
+
+  // WebSocket URLs (not currently functional)
   WEBSOCKETS: {
-    TRUSTCHAIN: 'wss://[::1]:8443/ws',
-    STOQ: 'wss://[::1]:8443/ws',
-    HYPERMESH: 'wss://[::1]:8443/ws',
-    INTEGRATION: 'wss://[::1]:8443/ws'
+    TRUSTCHAIN: 'ws://localhost:9293/ws',
+    STOQ: 'ws://localhost:9293/ws',
+    HYPERMESH: 'ws://localhost:9293/ws',
+    INTEGRATION: 'ws://localhost:9293/ws'
   },
   
   // Performance Targets

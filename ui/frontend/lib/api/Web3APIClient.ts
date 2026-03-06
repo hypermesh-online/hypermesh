@@ -68,31 +68,31 @@ export class Web3APIClient {
   private readonly serviceConfigs: Record<ServiceType, Web3ServiceConfig> = {
     trustchain: {
       name: 'TrustChain',
-      baseUrl: '[::1]:8443',
-      port: 8443,
+      baseUrl: 'localhost:9293',
+      port: 9293,
       requiresCertificate: false,
-      ipv6Only: true
+      ipv6Only: false
     },
     stoq: {
       name: 'STOQ',
-      baseUrl: '[::1]:8443',
-      port: 8443,
+      baseUrl: 'localhost:9293',
+      port: 9293,
       requiresCertificate: false,
-      ipv6Only: true
+      ipv6Only: false
     },
     hypermesh: {
       name: 'HyperMesh',
-      baseUrl: '[::1]:8443',
-      port: 8443,
+      baseUrl: 'localhost:9293',
+      port: 9293,
       requiresCertificate: false,
-      ipv6Only: true
+      ipv6Only: false
     },
     integration: {
       name: 'Integration',
-      baseUrl: '[::1]:8443',
-      port: 8443,
+      baseUrl: 'localhost:9293',
+      port: 9293,
       requiresCertificate: false,
-      ipv6Only: true
+      ipv6Only: false
     }
   };
 

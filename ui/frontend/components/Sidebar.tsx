@@ -5,65 +5,58 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useHardware } from '@/lib/hooks/useHardware';
-import { 
+import { useNodeStatus } from '@/lib/hooks/useBlockMatrix';
+import {
   Home,
   Network,
   Package,
   Shield,
   Coins,
   Activity,
-  Zap
 } from 'lucide-react';
 
 const navigation = [
-  { 
-    name: 'Dashboard', 
-    href: '/', 
-    icon: Home, 
-    description: 'User experience, journey & system overview' 
+  {
+    name: 'Dashboard',
+    href: '/',
+    icon: Home,
+    description: 'System overview and node status'
   },
-  { 
-    name: 'Monitor', 
-    href: '/monitor', 
-    icon: Activity, 
-    description: 'Real-time system monitoring & performance' 
+  {
+    name: 'Monitor',
+    href: '/monitor',
+    icon: Activity,
+    description: 'Real-time system monitoring'
   },
-  { 
-    name: 'STOQ Demo', 
-    href: '/stoq-demo', 
-    icon: Zap, 
-    description: 'Internet 2.0 native protocol demonstration' 
+  {
+    name: 'HyperMesh',
+    href: '/hypermesh',
+    icon: Network,
+    description: 'System resources and sharing'
   },
-  { 
-    name: 'HyperMesh', 
-    href: '/hypermesh', 
-    icon: Network, 
-    description: 'System resources & federated sharing' 
+  {
+    name: 'Catalog',
+    href: '/catalog',
+    icon: Package,
+    description: 'Asset package manager'
   },
-  { 
-    name: 'Catalog', 
-    href: '/catalog', 
-    icon: Package, 
-    description: 'Asset package manager & library' 
+  {
+    name: 'TrustChain',
+    href: '/trustchain',
+    icon: Shield,
+    description: 'Network connections and Proof of State'
   },
-  { 
-    name: 'TrustChain', 
-    href: '/trustchain', 
-    icon: Shield, 
-    description: 'Network connections & proof of state'
-  },
-  { 
-    name: 'Caesar', 
-    href: '/caesar', 
-    icon: Coins, 
-    description: 'Token integration & economics' 
+  {
+    name: 'Caesar',
+    href: '/caesar',
+    icon: Coins,
+    description: 'Token integration and economics'
   },
 ];
 
 export function Sidebar() {
   const location = useLocation();
-  const { capabilities, sharing } = useHardware();
+  const { data: status } = useNodeStatus(10_000);
 
   return (
     <div className="w-72 bg-black/80 backdrop-blur-lg border-r border-cyan-500/20">
@@ -78,7 +71,7 @@ export function Sidebar() {
           </div>
         </div>
         <div className="text-xs text-gray-400 font-mono">
-          node-7f8a9b2c.hypermesh
+          {status ? status.node_id : 'not connected'}
         </div>
       </div>
       
@@ -117,21 +110,27 @@ export function Sidebar() {
       <div className="p-4 mt-6 border-t border-gray-700">
         <div className="text-xs text-gray-400 space-y-2">
           <div className="flex justify-between">
-            <span>Network Status:</span>
-            <span className="text-green-400">Connected</span>
+            <span>Daemon:</span>
+            <span className={status ? "text-green-400" : "text-red-400"}>
+              {status ? 'Connected' : 'Offline'}
+            </span>
           </div>
-          <div className="flex justify-between">
-            <span>Resources:</span>
-            <div className="text-right">
-              <div className="text-cyan-400">CPU: {capabilities?.cpu.logical_cores ?? '?'} cores</div>
-              <div className="text-cyan-400">RAM: {capabilities ? Math.round(capabilities.memory.total_bytes / (1024 * 1024 * 1024)) : '?'}GB</div>
-              <div className="text-cyan-400">Storage: {capabilities ? Math.round(capabilities.storage.reduce((s, d) => s + d.total_bytes, 0) / (1024 * 1024 * 1024)) : '?'}GB</div>
-            </div>
-          </div>
-          <div className="flex justify-between">
-            <span>Sharing Mode:</span>
-            <span className="text-purple-400">{sharing?.available_modes?.find(m => m.is_active)?.name || 'Device'}</span>
-          </div>
+          {status && (
+            <>
+              <div className="flex justify-between">
+                <span>Chain Height:</span>
+                <span className="text-cyan-400">{status.chain_height}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Peers:</span>
+                <span className="text-cyan-400">{status.peers}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Privacy:</span>
+                <span className="text-purple-400">{status.privacy_mode}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

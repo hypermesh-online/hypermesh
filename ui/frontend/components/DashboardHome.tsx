@@ -5,91 +5,54 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { ModuleCard } from '@/components/ui/ModuleCard';
 import { ActivityItem } from '@/components/ui/ActivityItem';
-import { ProgressMetric } from '@/components/ui/ProgressMetric';
 import { ModuleHeader } from '@/components/ui/ModuleHeader';
 import { NavigationHints } from '@/components/ui/NavigationHints';
 import { FlowIndicator } from '@/components/ui/FlowIndicator';
-import { UserJourney } from '@/components/ui/UserJourney';
 import { AccessibilityWrapper } from '@/components/ui/AccessibilityWrapper';
 import { ScreenReaderOnly } from '@/components/ui/ScreenReaderOnly';
-import { SystemStatusWidget } from '@/components/api/SystemStatusWidget';
-import { PerformanceMonitor } from '@/components/api/PerformanceMonitor';
-import { useSystemStatus, useAssets, useQUICConnections, usePerformanceMetrics, useBalance, useEarnings } from '@/lib/api';
-import { useHardware } from '@/lib/hooks/useHardware';
+import { useNodeStatus, useBlockchainHeight, useNetworkPeers, useAssetList } from '@/lib/hooks/useBlockMatrix';
 import { getCrateStatus } from '@/lib/data/crateStatus';
-import { 
-  Network, 
+import {
+  Network,
   Package,
-  Shield, 
+  Shield,
   Coins,
   Activity,
-  CheckCircle,
   Settings,
   ArrowRight,
-  Users,
   Server,
   Zap,
   AlertTriangle
 } from 'lucide-react';
 
-// Real-time system data using Web3 API with real hardware detection
+/**
+ * System overview using real BlockMatrix API data.
+ * Calls /api/v1/status, /api/v1/blockchain/height, /api/v1/network/peers,
+ * and /api/v1/asset/list from the running daemon on port 9293.
+ */
 function useSystemOverview() {
-  const { systemStatus } = useSystemStatus(true);
-  const { assets } = useAssets();
-  const { activeConnections } = useQUICConnections();
-  const { latestMetrics } = usePerformanceMetrics(undefined, undefined, true);
-  const { capabilities, allocation, sharing, isLoading: hardwareLoading } = useHardware(5000); // Refresh every 5 seconds
-  const caesarBalance = useBalance(); // Get real Caesar balance
-  const caesarEarnings = useEarnings(); // Get real earnings data
+  const statusQuery = useNodeStatus(10_000);
+  const heightQuery = useBlockchainHeight(10_000);
+  const peersQuery = useNetworkPeers(15_000);
+  const assetsQuery = useAssetList(15_000);
 
-  // Use real hardware data when available, fallback to defaults
-  const totalResources = capabilities ? {
-    cpu: capabilities.cpu.logical_cores,
-    ram: Math.round(capabilities.memory.total_bytes / (1024 * 1024 * 1024)), // Convert to GB
-    storage: Math.round(
-      capabilities.storage.reduce((sum, disk) => sum + disk.total_bytes, 0) / (1024 * 1024 * 1024)
-    ) // Convert to GB
-  } : { cpu: 8, ram: 32, storage: 1000 }; // Fallback values
-
-  const sharedResources = allocation ? {
-    cpu: Math.floor(allocation.cpu.allocated),
-    ram: Math.round(allocation.memory.allocated / (1024 * 1024 * 1024)), // Convert to GB
-    storage: Math.round(allocation.storage.allocated / (1024 * 1024 * 1024)) // Convert to GB
-  } : {
-    cpu: Math.floor(totalResources.cpu * 0.5),
-    ram: Math.floor(totalResources.ram * 0.5),
-    storage: Math.floor(totalResources.storage * 0.5)
-  };
-
-  // Calculate real network bandwidth
-  const networkBandwidth = capabilities ?
-    capabilities.network.reduce((sum, iface) => sum + iface.speed_mbps, 0) :
-    1000; // Default 1 Gbps
+  const status = statusQuery.data;
+  const isOnline = statusQuery.isSuccess && !!status;
 
   return {
-    totalResources,
-    sharedResources,
-    installedAssets: assets?.length || 0,
-    activeConnections: activeConnections?.length || 0,
-    tokenBalance: caesarBalance.data?.total || 0, // Real Caesar balance
-    todayEarnings: caesarEarnings.data?.earnings_24h || 0, // Real earnings today
-    networkHealth: systemStatus?.performance?.uptime || 0,
-    networkBandwidth,
-    isOnline: !!systemStatus,
-    hardwareDetected: !!capabilities,
-    cpuUsage: capabilities?.cpu.usage_percent || 0,
-    memoryUsage: capabilities?.memory.usage_percent || 0,
-    isTokenLoading: caesarBalance.isLoading,
-    isEarningsLoading: caesarEarnings.isLoading,
-    storageUsage: capabilities ?
-      (capabilities.storage.reduce((sum, disk) => sum + disk.used_bytes, 0) /
-       capabilities.storage.reduce((sum, disk) => sum + disk.total_bytes, 0)) * 100 : 0,
-    systemInfo: capabilities?.system,
-    activeSharingMode: sharing?.available_modes?.find(m => m.is_active)?.name || 'Device',
+    nodeId: status?.node_id ?? 'unknown',
+    coordinate: status?.coordinate ?? { x: 0, y: 0, z: 0 },
+    chainHeight: status?.chain_height ?? heightQuery.data?.height ?? 0,
+    privacyMode: status?.privacy_mode ?? 'Unknown',
+    peerCount: status?.peers ?? peersQuery.data?.length ?? 0,
+    uptimeSecs: status?.uptime_secs ?? 0,
+    assetCount: assetsQuery.data?.length ?? 0,
+    isOnline,
+    isLoading: statusQuery.isLoading,
+    error: statusQuery.error,
   };
 }
 
@@ -128,43 +91,34 @@ const quickActions = [
   }
 ];
 
-// Real-time activity from system events
-function useRecentActivity() {
-  const { systemStatus } = useSystemStatus(true);
-  const { assets } = useAssets();
-  const { connections } = useQUICConnections();
-  
-  // Generate activity from real system state
-  const activity = [];
-  
-  if (systemStatus) {
-    const servicesHealthy = Object.values(systemStatus.services).filter(s => s.status === 'healthy').length;
-    const totalServices = Object.values(systemStatus.services).length;
-    
-    if (servicesHealthy === totalServices) {
-      activity.push({ type: 'success', message: 'All services operational', time: 'Just now' });
-    } else {
-      activity.push({ type: 'warning', message: `${totalServices - servicesHealthy} services degraded`, time: 'Just now' });
-    }
+/** Generate activity items from real system state */
+function useRecentActivity(isOnline: boolean, peerCount: number, chainHeight: number, assetCount: number) {
+  const activity: Array<{ type: string; message: string; time: string }> = [];
+
+  if (isOnline) {
+    activity.push({ type: 'success', message: 'BlockMatrix daemon connected', time: 'Just now' });
   }
-  
-  if (connections?.length > 0) {
-    activity.push({ type: 'success', message: `${connections.length} QUIC connections active`, time: '2 minutes ago' });
+
+  if (chainHeight > 0) {
+    activity.push({ type: 'info', message: `Blockchain at height ${chainHeight}`, time: 'Just now' });
   }
-  
-  if (assets?.length > 0) {
-    activity.push({ type: 'info', message: `${assets.length} assets available`, time: '5 minutes ago' });
+
+  if (peerCount > 0) {
+    activity.push({ type: 'success', message: `${peerCount} peer(s) connected`, time: 'Recent' });
   }
-  
-  // Fallback for offline mode
+
+  if (assetCount > 0) {
+    activity.push({ type: 'info', message: `${assetCount} asset(s) registered`, time: 'Recent' });
+  }
+
   if (activity.length === 0) {
     return [
-      { type: 'warning', message: 'Running in offline mode', time: 'Now' },
-      { type: 'info', message: 'Waiting for backend services', time: '1 minute ago' },
+      { type: 'warning', message: 'Backend not connected (localhost:9293)', time: 'Now' },
+      { type: 'info', message: 'Start the daemon: hypermesh daemon start', time: '' },
     ];
   }
-  
-  return activity.slice(0, 4); // Keep last 4 activities
+
+  return activity.slice(0, 4);
 }
 
 const userJourneySteps = [
@@ -199,11 +153,23 @@ const userJourneySteps = [
 ];
 
 export function DashboardHome() {
-  const systemOverview = useSystemOverview();
-  const recentActivity = useRecentActivity();
-  const { systemStatus } = useSystemStatus(true);
-  const { latestMetrics } = usePerformanceMetrics(undefined, undefined, true);
-  
+  const overview = useSystemOverview();
+  const recentActivity = useRecentActivity(
+    overview.isOnline,
+    overview.peerCount,
+    overview.chainHeight,
+    overview.assetCount,
+  );
+
+  /** Format uptime seconds to human-readable */
+  const formatUptime = (secs: number): string => {
+    if (secs < 60) return `${secs}s`;
+    if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    return `${h}h ${m}m`;
+  };
+
   return (
     <AccessibilityWrapper
       role="main"
@@ -213,7 +179,7 @@ export function DashboardHome() {
       <ScreenReaderOnly>
         <h1>HyperMesh Dashboard</h1>
         <p>
-          Welcome to HyperMesh, your federated resource sharing platform. 
+          Welcome to HyperMesh, your federated resource sharing platform.
           Navigate through system overview, resources, assets, and network connections.
         </p>
       </ScreenReaderOnly>
@@ -224,6 +190,19 @@ export function DashboardHome() {
         gradient="from-cyan-400 via-blue-500 to-purple-600"
         centered
       />
+
+      {/* Connection Banner */}
+      {!overview.isOnline && !overview.isLoading && (
+        <div className="bg-orange-900/30 border border-orange-500/40 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-orange-400 shrink-0" />
+          <div>
+            <p className="text-orange-300 font-medium">Backend not connected</p>
+            <p className="text-orange-400/70 text-sm">
+              The BlockMatrix daemon at localhost:9293 is not responding. Start it with: <code className="bg-black/30 px-1 rounded">hypermesh daemon start</code>
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* User Journey Progress */}
       <section aria-labelledby="journey-heading">
@@ -238,58 +217,48 @@ export function DashboardHome() {
         />
       </section>
 
-      {/* System Overview */}
+      {/* System Overview -- real data from /api/v1/status */}
       <section aria-labelledby="overview-heading">
         <h2 id="overview-heading" className="text-2xl font-bold text-white flex items-center gap-2 mb-4">
           <Activity className="h-6 w-6 text-cyan-400" />
           System Overview
+          {overview.isOnline && (
+            <Badge variant="outline" className="text-xs text-green-400 border-green-400 ml-2">Live</Badge>
+          )}
         </h2>
         <div className="grid gap-4 md:grid-cols-4">
           <ModuleCard
-            title="CPU Cores"
-            value={`${systemOverview.sharedResources.cpu}/${systemOverview.totalResources.cpu}`}
-            subtitle={systemOverview.hardwareDetected ?
-              `${systemOverview.cpuUsage.toFixed(1)}% usage` :
-              (systemOverview.isOnline ? "Shared / Available" : "Offline Mode")}
+            title="Chain Height"
+            value={overview.chainHeight}
+            subtitle={overview.isOnline ? `Node: ${overview.nodeId.slice(0, 12)}...` : "Offline"}
             icon={Zap}
-            iconColor={systemOverview.hardwareDetected ?
-              (systemOverview.cpuUsage > 80 ? "text-red-400" :
-               systemOverview.cpuUsage > 50 ? "text-yellow-400" : "text-cyan-400") :
-              "text-gray-400"}
-            progress={systemOverview.hardwareDetected ? systemOverview.cpuUsage :
-              (systemOverview.sharedResources.cpu / systemOverview.totalResources.cpu) * 100}
+            iconColor={overview.isOnline ? "text-cyan-400" : "text-gray-400"}
           />
 
           <ModuleCard
-            title="Memory (GB)"
-            value={`${systemOverview.sharedResources.ram}/${systemOverview.totalResources.ram}`}
-            subtitle={systemOverview.hardwareDetected ?
-              `${systemOverview.memoryUsage.toFixed(1)}% usage` :
-              (systemOverview.isOnline ? "Shared / Available" : "Offline Mode")}
+            title="Peers"
+            value={overview.peerCount}
+            subtitle={overview.isOnline ? `Privacy: ${overview.privacyMode}` : "Offline"}
             icon={Server}
-            iconColor={systemOverview.hardwareDetected ?
-              (systemOverview.memoryUsage > 80 ? "text-red-400" :
-               systemOverview.memoryUsage > 50 ? "text-yellow-400" : "text-green-400") :
-              "text-gray-400"}
-            progress={systemOverview.hardwareDetected ? systemOverview.memoryUsage :
-              (systemOverview.sharedResources.ram / systemOverview.totalResources.ram) * 100}
+            iconColor={overview.peerCount > 0 ? "text-green-400" : "text-gray-400"}
           />
 
           <ModuleCard
-            title="Installed Assets"
-            value={systemOverview.installedAssets}
-            subtitle={systemOverview.isOnline ? "Ready to use" : "Offline Mode"}
+            title="Assets"
+            value={overview.assetCount}
+            subtitle={overview.isOnline ? "Blockchain-registered" : "Offline"}
             icon={Package}
-            iconColor={systemOverview.isOnline ? "text-purple-400" : "text-gray-400"}
+            iconColor={overview.isOnline ? "text-purple-400" : "text-gray-400"}
           />
 
           <ModuleCard
-            title="Network Health"
-            value={`${systemOverview.networkHealth.toFixed(1)}%`}
-            subtitle={systemOverview.isOnline ? "All systems operational" : "Offline Mode"}
+            title="Uptime"
+            value={overview.isOnline ? formatUptime(overview.uptimeSecs) : '--'}
+            subtitle={overview.isOnline
+              ? `Position: (${overview.coordinate.x},${overview.coordinate.y},${overview.coordinate.z})`
+              : "Offline"}
             icon={Network}
-            iconColor={systemOverview.isOnline ? "text-blue-400" : "text-gray-400"}
-            progress={systemOverview.networkHealth}
+            iconColor={overview.isOnline ? "text-blue-400" : "text-gray-400"}
           />
         </div>
       </section>
@@ -331,12 +300,12 @@ export function DashboardHome() {
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Active Shares:</span>
-                  <span className="text-cyan-400">{systemOverview.activeConnections}</span>
+                  <span className="text-gray-400">Peers:</span>
+                  <span className="text-cyan-400">{overview.peerCount}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Mode:</span>
-                  <span className="text-purple-400">{systemOverview.activeSharingMode}</span>
+                  <span className="text-purple-400">{overview.privacyMode}</span>
                 </div>
               </div>
               <Button 
@@ -368,7 +337,7 @@ export function DashboardHome() {
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Installed:</span>
-                  <span className="text-purple-400">{systemOverview.installedAssets} assets</span>
+                  <span className="text-purple-400">{overview.assetCount} assets</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">Development:</span>
@@ -406,8 +375,8 @@ export function DashboardHome() {
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Networks:</span>
-                  <span className="text-green-400">{systemOverview.activeConnections} connected</span>
+                  <span className="text-gray-400">Peers:</span>
+                  <span className="text-green-400">{overview.peerCount} connected</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-400">PoS Validation:</span>
@@ -443,20 +412,12 @@ export function DashboardHome() {
               </p>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Balance:</span>
-                  {systemOverview.isTokenLoading ? (
-                    <span className="h-3 w-16 bg-gray-700 rounded animate-pulse inline-block" />
-                  ) : (
-                    <span className="text-yellow-400">{systemOverview.tokenBalance.toFixed(2)} CSR</span>
-                  )}
+                  <span className="text-gray-400">Status:</span>
+                  <span className="text-yellow-400/60">Not connected</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Earnings:</span>
-                  {systemOverview.isEarningsLoading ? (
-                    <span className="h-3 w-16 bg-gray-700 rounded animate-pulse inline-block" />
-                  ) : (
-                    <span className="text-yellow-400">+{systemOverview.todayEarnings.toFixed(2)} today</span>
-                  )}
+                  <span className="text-gray-400">Backend:</span>
+                  <span className="text-yellow-400/60">Caesar service required</span>
                 </div>
               </div>
               <Button 
@@ -472,31 +433,31 @@ export function DashboardHome() {
         </div>
       </section>
 
-      {/* Activity and Alerts */}
+      {/* Activity and Node Info */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Activity className="h-5 w-5 text-cyan-400" />
               Recent Activity
-              {systemOverview.isOnline && (
+              {overview.isOnline && (
                 <Badge variant="outline" className="text-xs text-green-400 border-green-400">
                   Live
                 </Badge>
               )}
             </CardTitle>
             <CardDescription className="text-gray-400">
-              {systemOverview.isOnline ? 'Latest system events and updates' : 'System running in offline mode'}
+              {overview.isOnline ? 'Live data from BlockMatrix daemon' : 'Daemon not connected'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4" role="log" aria-label="Recent system activity">
-              {recentActivity.map((activity, index) => (
+              {recentActivity.map((act, index) => (
                 <ActivityItem
                   key={index}
-                  type={activity.type as any}
-                  message={activity.message}
-                  time={activity.time}
+                  type={act.type as any}
+                  message={act.message}
+                  time={act.time}
                   theme="cyan"
                 />
               ))}
@@ -504,8 +465,58 @@ export function DashboardHome() {
           </CardContent>
         </Card>
 
-        {/* Real-time System Status Widget */}
-        <SystemStatusWidget />
+        {/* Node Details Card */}
+        <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Server className="h-5 w-5 text-cyan-400" />
+              Node Details
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              {overview.isOnline ? 'Real-time node information' : 'Connect to see node details'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {overview.isOnline ? (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Node ID</span>
+                  <span className="text-white font-mono text-xs">{overview.nodeId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Matrix Position</span>
+                  <span className="text-cyan-400">
+                    ({overview.coordinate.x}, {overview.coordinate.y}, {overview.coordinate.z})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Chain Height</span>
+                  <span className="text-white">{overview.chainHeight} blocks</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Privacy Mode</span>
+                  <span className="text-purple-400">{overview.privacyMode}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Connected Peers</span>
+                  <span className="text-green-400">{overview.peerCount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Uptime</span>
+                  <span className="text-blue-400">{formatUptime(overview.uptimeSecs)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Registered Assets</span>
+                  <span className="text-purple-400">{overview.assetCount}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-gray-500 text-sm py-4 text-center">
+                Start the BlockMatrix daemon to see node details
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AccessibilityWrapper>
   );

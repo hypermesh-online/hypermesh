@@ -68,11 +68,12 @@ export class Web3Events {
   private connectionStatus = new Map<ServiceType, ConnectionStatus>();
   private apiClient: Web3APIClient | null = null;
 
+  // WebSocket URLs -- not currently functional on the BlockMatrix HTTP API
   private readonly wsUrls: Record<ServiceType, string> = {
-    trustchain: 'wss://[::1]:8443/ws',
-    stoq: 'wss://[::1]:8443/ws',
-    hypermesh: 'wss://[::1]:8443/ws',
-    integration: 'wss://[::1]:8443/ws'
+    trustchain: 'ws://localhost:9293/ws',
+    stoq: 'ws://localhost:9293/ws',
+    hypermesh: 'ws://localhost:9293/ws',
+    integration: 'ws://localhost:9293/ws'
   };
 
   /**

@@ -51,8 +51,9 @@ export function getConfig(): AppConfig {
     },
 
     api: {
+      // BlockMatrix HTTP API on port 9293 (the real working backend)
       baseUrl: env.VITE_API_BASE_URL ||
-        (isProduction ? 'https://hypermesh.online' : 'http://localhost:8443'),
+        (isProduction ? 'https://hypermesh.online' : 'http://localhost:9293'),
     },
 
     environment,
