@@ -39,17 +39,77 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         _ => crate::bootstrap::PrivacyMode::PRIVATE,
                     };
 
+                    // Load existing domains and check for duplicate
+                    let domains_path = s
+                        .data_dir
+                        .join(&s.node_id)
+                        .join("domain_registrations.json");
+                    let mut domains =
+                        crate::dns::domain::load_domains(&domains_path).unwrap_or_default();
+
+                    if domains.iter().any(|d| d.domain_name == name) {
+                        return Err(crate::ipc::protocol::RpcError {
+                            code: INVALID_PARAMS,
+                            message: format!("domain '{}' already registered", name),
+                            data: None,
+                        });
+                    }
+
                     let reg = crate::dns::domain::DomainRegistration::new(
                         name,
                         privacy_mode,
                         s.node_id.clone(),
                     );
 
+                    // Register as blockchain asset (DNS-as-asset, R10)
+                    let dns_data_str = format!("DOMAIN:REGISTER:{name}");
+                    let asset_data = crate::assets::core::AssetData {
+                        config: dns_data_str.as_bytes().to_vec(),
+                        definition: format!("domain-registration:{name}").into_bytes(),
+                        metadata: format!(
+                            "network_id={},privacy={privacy_str}",
+                            reg.network_id
+                        )
+                        .into_bytes(),
+                    };
+                    let registration =
+                        crate::assets::core::AssetRegistration::from_asset_data(
+                            &asset_data,
+                            crate::assets::core::NetworkScope::Global,
+                            crate::assets::core::AssetCategory::BaseSystem(
+                                crate::assets::core::BaseSystemType::Dns,
+                            ),
+                        );
+                    let state_proof =
+                        trustchain::proof_of_state::StateProof::new_for_testing();
+
+                    let block = s
+                        .blockchain
+                        .register_asset_record(registration, &state_proof)
+                        .await
+                        .map_err(|e| crate::ipc::protocol::RpcError {
+                            code: -32603,
+                            message: format!("blockchain write failed: {e}"),
+                            data: None,
+                        })?;
+
+                    // Persist to disk
+                    domains.push(reg.clone());
+                    if let Some(parent) = domains_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if let Err(e) =
+                        crate::dns::domain::save_domains(&domains, &domains_path)
+                    {
+                        tracing::warn!("Failed to persist domain registration: {e}");
+                    }
+
                     Ok(serde_json::json!({
                         "domain": name,
                         "network_id": reg.network_id,
                         "privacy": privacy_str,
                         "owner": s.node_id,
+                        "block": block.index,
                         "status": "registered",
                     }))
                 })
