@@ -8,40 +8,38 @@ phase = "alpha"
 items = [
     # UI framework and components (real React, renders in browser)
     "React 19 + TypeScript + Vite + Tailwind 4 build system",
-    "Dashboard home with ecosystem overview and hardware detection",
-    "Module pages with sub-routing (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
+    "Module pages with sub-routing (HyperMesh, TrustChain, Catalog, Caesar, Engauge)",
     "Component library (45+ Radix UI primitives: buttons, cards, tabs, alerts, badges, etc.)",
     "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
     "Accessibility wrappers (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly)",
     "React Router page routing with sidebar navigation and dark theme",
-    "React Query state management (30s staleTime, retry logic, window focus config)",
-    "Unified API client architecture (STOQ native -> STOQ WASM -> HTTP -> mock fallback)",
-    "16 custom React hooks for API integration (useSystemStatus, useCertificates, useAssets, etc.)",
-    "7 API service classes (HyperMeshAPI, TrustChainAPI, STOQAPI, CaesarAPI, EngaugeAPI, SearchAPI, Types)",
+    "React Query state management (variable staleTime per data type, retry logic)",
     "Storybook component documentation (5 stories)",
     "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
+    # Real backend connectivity (blockmatrix HTTP API on localhost:9293)
+    "Singleton blockmatrix-api.ts client targeting localhost:9293 with typed responses",
+    "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
+    "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
+    "Sidebar shows real daemon status, chain height, peer count, privacy mode",
+    "No mock fallbacks — shows 'not connected' when daemon offline",
 ]
 
 [features.in_development]
 items = [
-    # Almost all pages render with mock data — backend connections are stubs or fallback
-    "Backend API connectivity — UI calls endpoints at [::1]:8443 but most return mock/fallback data",
+    # Service-specific pages still render with static/mock data
     "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
     "TrustChain management views — 21 components render with static data, no real cert operations",
     "Asset management views — creation wizard renders but no real asset creation backend",
-    "Engauge analytics views — renders but metrics are mock data",
+    "Engauge analytics views — renders but metrics are mock data (15 pre-existing TS errors in engauge module)",
     "Catalog browser — renders but limited backend integration",
-    "Proxy/NAT management views — render but no backend connection",
     "Global search — searches hardcoded static data only",
     "WebSocket real-time events — Web3Events system defined but not connected to components",
-    "STOQ WebAssembly integration — StoqWasmClient loads but doesn't execute protocol",
     "Node join flow — no UI for connecting to public network",
     "Component unit tests (Vitest, 3 test files — limited coverage)",
 ]
 
 [features.planned]
 items = [
-    "Connect UI to real blockmatrix HTTP API (port 9293) via TypeScript SDK",
     "Live STOQ WebSocket data connections",
     "Real-time metrics streaming from engauge",
     "Multi-node cluster topology visualization",

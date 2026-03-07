@@ -104,7 +104,7 @@ export const crateStatuses: CrateStatus[] = [
         "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, Engauge:9296, Catalog:9295)",
         "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
         "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
-        "CLI --mode flag (auto/ffi/ipc/stoq) and per-service URL flags",
+        "CLI --mode flag (auto/ffi/ipc/http) and per-service URL flags",
         "Config [services] section (ConnectionMode, per-service URLs in config.toml)"
       ],
       "inDevelopment": [
@@ -338,7 +338,10 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-crate integration tests — 33 compile-time tests in cross_crate_integration.rs + 17 integration tests (asset_pipeline, blockchain_scope, privacy_consistency)",
         "Unified cross-crate identity model (NodeId BLAKE3([u8;32]), ScopedIdentity, WorkloadType — all crates use lib canonical types)",
         "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)",
-        "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)"
+        "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)",
+        "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
+        "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
+        "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay"
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
@@ -355,7 +358,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real partition/chaos testing framework"
       ]
     },
-    "completion": 47
+    "completion": 55
   },
   {
     "id": "hypermesh-ebpf",
@@ -414,7 +417,7 @@ export const crateStatuses: CrateStatus[] = [
         "C header file (include/hypermesh.h with extern C guards)",
         "NULL-safe — all functions handle NULL client gracefully",
         "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
-        "TrustChain API (hypermesh_trustchain_certs, issue, validate, revoke, dns_zones)",
+        "TrustChain API (hypermesh_trustchain_certificates, issue, validate, revoke, dns_zones)",
         "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
         "Catalog API (hypermesh_catalog_browse, search, package_info, registry_stats)",
         "TypeScript FFI loader (ffi-napi + ref-napi, optional dependency)",
@@ -603,35 +606,32 @@ export const crateStatuses: CrateStatus[] = [
     "features": {
       "working": [
         "React 19 + TypeScript + Vite + Tailwind 4 build system",
-        "Dashboard home with ecosystem overview and hardware detection",
-        "Module pages with sub-routing (STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh)",
+        "Module pages with sub-routing (HyperMesh, TrustChain, Catalog, Caesar, Engauge)",
         "Component library (45+ Radix UI primitives: buttons, cards, tabs, alerts, badges, etc.)",
         "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
         "Accessibility wrappers (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly)",
         "React Router page routing with sidebar navigation and dark theme",
-        "React Query state management (30s staleTime, retry logic, window focus config)",
-        "Unified API client architecture (STOQ native -> STOQ WASM -> HTTP -> mock fallback)",
-        "16 custom React hooks for API integration (useSystemStatus, useCertificates, useAssets, etc.)",
-        "7 API service classes (HyperMeshAPI, TrustChainAPI, STOQAPI, CaesarAPI, EngaugeAPI, SearchAPI, Types)",
+        "React Query state management (variable staleTime per data type, retry logic)",
         "Storybook component documentation (5 stories)",
-        "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)"
+        "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
+        "Singleton blockmatrix-api.ts client targeting localhost:9293 with typed responses",
+        "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
+        "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
+        "Sidebar shows real daemon status, chain height, peer count, privacy mode",
+        "No mock fallbacks — shows 'not connected' when daemon offline"
       ],
       "inDevelopment": [
-        "Backend API connectivity — UI calls endpoints at [::1]:8443 but most return mock/fallback data",
         "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
         "TrustChain management views — 21 components render with static data, no real cert operations",
         "Asset management views — creation wizard renders but no real asset creation backend",
-        "Engauge analytics views — renders but metrics are mock data",
+        "Engauge analytics views — renders but metrics are mock data (15 pre-existing TS errors in engauge module)",
         "Catalog browser — renders but limited backend integration",
-        "Proxy/NAT management views — render but no backend connection",
         "Global search — searches hardcoded static data only",
         "WebSocket real-time events — Web3Events system defined but not connected to components",
-        "STOQ WebAssembly integration — StoqWasmClient loads but doesn't execute protocol",
         "Node join flow — no UI for connecting to public network",
         "Component unit tests (Vitest, 3 test files — limited coverage)"
       ],
       "planned": [
-        "Connect UI to real blockmatrix HTTP API (port 9293) via TypeScript SDK",
         "Live STOQ WebSocket data connections",
         "Real-time metrics streaming from engauge",
         "Multi-node cluster topology visualization",
@@ -641,6 +641,6 @@ export const crateStatuses: CrateStatus[] = [
         "Native desktop dashboard (Tauri cross-platform)"
       ]
     },
-    "completion": 39
+    "completion": 47
   }
 ];

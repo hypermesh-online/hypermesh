@@ -15,6 +15,9 @@ items = [
     "Unified cross-crate identity model (NodeId BLAKE3([u8;32]), ScopedIdentity, WorkloadType — all crates use lib canonical types)",
     "Scope-aware identity system (IdentityScope respects Device|Network scope + traceability axis, cert extensions, strategy scoping)",
     "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)",
+    "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
+    "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
+    "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
 ]
 
 [features.in_development]

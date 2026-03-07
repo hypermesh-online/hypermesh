@@ -109,7 +109,7 @@ items = [
     "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
     # CLI service subcommands (route through IPC daemon)
     "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
-    "CLI --mode flag (auto/ffi/ipc/stoq) and per-service URL flags",
+    "CLI --mode flag (auto/ffi/ipc/http) and per-service URL flags",
     # Config services section
     "Config [services] section (ConnectionMode, per-service URLs in config.toml)",
 ]
