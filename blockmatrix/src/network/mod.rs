@@ -130,7 +130,7 @@ impl NetworkManager {
         );
 
         // Create Matrix-STOQ integration layer
-        let node_id = Self::generate_node_id(&local_coordinate);
+        let node_id = blake3::hash(&identity_pubkey).to_hex().to_string();
         let stoq_integration = MatrixStoqIntegration::new(
             local_coordinate,
             node_id.clone(),
@@ -625,18 +625,7 @@ impl NetworkManager {
 
     /// Get local node ID
     fn get_node_id(&self) -> String {
-        Self::generate_node_id(&self.local_coordinate)
-    }
-
-    /// Generate node ID from coordinate
-    fn generate_node_id(coordinate: &MatrixCoordinate) -> String {
-        // Use coordinate hash as node ID for now
-        use blake3::Hasher;
-        let mut hasher = Hasher::new();
-        hasher.update(&coordinate.x.to_le_bytes());
-        hasher.update(&coordinate.y.to_le_bytes());
-        hasher.update(&coordinate.z.to_le_bytes());
-        hasher.finalize().to_hex().to_string()
+        blake3::hash(&self.identity_pubkey).to_hex().to_string()
     }
 
     /// Broadcast matrix position to connected nodes via STOQ

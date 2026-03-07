@@ -149,9 +149,9 @@ impl From<PrivacyModeArg> for PrivacyMode {
 enum Commands {
     /// Connect to the mesh (starts daemon if not running)
     Connect {
-        /// Privacy mode
+        /// Privacy mode for network participation
         #[clap(value_enum, default_value = "public")]
-        mode: PrivacyModeArg,
+        privacy: PrivacyModeArg,
         /// Run in foreground (don't background)
         #[clap(long)]
         foreground: bool,
@@ -243,6 +243,13 @@ enum Commands {
     Catalog {
         #[clap(subcommand)]
         action: CatalogAction,
+    },
+
+    /// Destroy all node data (blockchain, identity, shards, config)
+    Destroy {
+        /// Skip confirmation prompt
+        #[clap(long)]
+        chaotic: bool,
     },
 }
 
@@ -1569,11 +1576,8 @@ async fn run_connect(
         );
 
         // Load or create FALCON-1024 node identity for PoS signing
-        let data_dir = dirs::home_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-            .join(".hypermesh")
-            .join("identity");
-        let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(&data_dir)?;
+        let identity_dir = data_dir.join(nid).join("identity");
+        let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
         info!(
             "Node identity: {}... (FALCON-1024)",
             &falcon_identity.node_id[..16]
@@ -2141,6 +2145,96 @@ async fn main() -> Result<()> {
         }
     }
 
+    // --- Handle Destroy subcommand (manual-only, no bootstrap, no data-dir required) ---
+    if let Some(Commands::Destroy { chaotic }) = &cli.command {
+        // Resolve data dir from config or CLI defaults — never requires explicit --data-dir
+        let config = load_config(&cli);
+        let data_dir_str = if config.node.data_dir != "~/.blockmatrix" {
+            config.node.data_dir.clone()
+        } else {
+            cli.data_dir.clone()
+        };
+        let data_dir = if data_dir_str.starts_with('~') {
+            dirs::home_dir()
+                .context("could not determine home directory")?
+                .join(&data_dir_str[2..])
+        } else {
+            std::path::PathBuf::from(&data_dir_str)
+        };
+
+        if !data_dir.exists() {
+            eprintln!("Nothing to destroy: {} does not exist", data_dir.display());
+            return Ok(());
+        }
+
+        // Find all node_* dirs under data_dir
+        let mut node_dirs: Vec<std::path::PathBuf> = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&data_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                if name.to_string_lossy().starts_with("node_") && entry.path().is_dir() {
+                    node_dirs.push(entry.path());
+                }
+            }
+        }
+
+        if node_dirs.is_empty() {
+            eprintln!("Nothing to destroy: no node data found in {}", data_dir.display());
+            return Ok(());
+        }
+
+        eprintln!("Found {} node(s) to destroy:", node_dirs.len());
+        for d in &node_dirs {
+            eprintln!("  {}", d.display());
+        }
+
+        if !chaotic {
+            eprintln!("\nType 'yes' to confirm:");
+            let mut input = String::new();
+            std::io::stdin().read_line(&mut input)?;
+            if input.trim() != "yes" {
+                eprintln!("Aborted.");
+                return Ok(());
+            }
+        }
+
+        for d in &node_dirs {
+            std::fs::remove_dir_all(d)
+                .context(format!("failed to remove {}", d.display()))?;
+            println!("Destroyed {}", d.display());
+        }
+
+        // Clean IPC sockets (3-tier fallback locations)
+        if let Ok(sock) = std::env::var("HYPERMESH_SOCK") {
+            if std::path::Path::new(&sock).exists() {
+                std::fs::remove_file(&sock).ok();
+                println!("Removed socket {sock}");
+            }
+        }
+        if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
+            let sock_dir = std::path::PathBuf::from(runtime_dir).join("hypermesh");
+            if sock_dir.exists() {
+                std::fs::remove_dir_all(&sock_dir).ok();
+                println!("Removed {}", sock_dir.display());
+            }
+        }
+        if let Some(home) = dirs::home_dir() {
+            let sock = home.join(".hypermesh").join("ctl.sock");
+            if sock.exists() {
+                std::fs::remove_file(&sock).ok();
+                println!("Removed {}", sock.display());
+            }
+            // Clean legacy identity location
+            let old_identity = home.join(".hypermesh").join("identity");
+            if old_identity.exists() {
+                std::fs::remove_dir_all(&old_identity).ok();
+                println!("Cleaned legacy identity at ~/.hypermesh/identity/");
+            }
+        }
+
+        return Ok(());
+    }
+
     // --- Merge config file with CLI flags (CLI wins) ---
     let config = load_config(&cli);
     if cli.coord_x == 0 && config.node.coord_x != 0 {
@@ -2343,7 +2437,10 @@ async fn main() -> Result<()> {
                 &cli, coord, &nid, &data_dir, &bootstrap, persistence.clone(),
             ).await?;
         }
-        Some(Commands::Connect { .. }) => {
+        Some(Commands::Connect { privacy, .. }) => {
+            // Override global privacy with Connect subcommand's value
+            cli.privacy = privacy;
+
             // Check if daemon is already running
             let client = ipc::IpcClient::new();
             if client.is_daemon_running().await {
@@ -2879,6 +2976,10 @@ async fn main() -> Result<()> {
                     service_ipc_call("catalog.registry_stats", serde_json::json!({}), json).await?;
                 }
             }
+        }
+        Some(Commands::Destroy { .. }) => {
+            // Handled early (before bootstrap), should not reach here
+            unreachable!("destroy handled before bootstrap");
         }
         None => {
             // No command - just show bootstrap info
