@@ -31,6 +31,7 @@ pub enum TrustAssetKind {
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
     Dashboard,
+    Identity,
 }
 
 impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
@@ -48,6 +49,7 @@ impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
             SystemAssetKind::Dns => Self::Dns,
             SystemAssetKind::Transmission => Self::Transmission,
             SystemAssetKind::Dashboard => Self::Dashboard,
+            SystemAssetKind::Identity => Self::Identity,
         }
     }
 }
@@ -66,6 +68,7 @@ impl From<TrustAssetKind> for hypermesh_lib::asset::SystemAssetKind {
             TrustAssetKind::Dns => Self::Dns,
             TrustAssetKind::Transmission => Self::Transmission,
             TrustAssetKind::Dashboard => Self::Dashboard,
+            TrustAssetKind::Identity => Self::Identity,
         }
     }
 }

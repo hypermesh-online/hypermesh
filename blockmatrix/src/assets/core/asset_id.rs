@@ -87,6 +87,8 @@ pub enum BaseSystemType {
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
     Dashboard,
+    /// FALCON-1024 node identity keypair (R1/R10)
+    Identity,
 }
 
 /// Application domain for user assets
@@ -158,6 +160,8 @@ pub enum AssetType {
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
     Dashboard,
+    /// FALCON-1024 node identity keypair (R1/R10)
+    Identity,
 }
 
 impl AssetType {
@@ -175,6 +179,7 @@ impl AssetType {
             AssetType::Dns => 8,
             AssetType::Transmission => 9,
             AssetType::Dashboard => 10,
+            AssetType::Identity => 11,
         }
     }
 
@@ -192,6 +197,7 @@ impl AssetType {
             AssetType::Dns => "Dns",
             AssetType::Transmission => "Transmission",
             AssetType::Dashboard => "Dashboard",
+            AssetType::Identity => "Identity",
         }
     }
 }
@@ -218,6 +224,7 @@ impl From<AssetType> for hypermesh_lib::SystemAssetKind {
             AssetType::Dns => Self::Dns,
             AssetType::Transmission => Self::Transmission,
             AssetType::Dashboard => Self::Dashboard,
+            AssetType::Identity => Self::Identity,
         }
     }
 }
@@ -236,6 +243,7 @@ impl From<hypermesh_lib::SystemAssetKind> for AssetType {
             hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
             hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
+            hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
         }
     }
 }
@@ -254,6 +262,7 @@ impl From<BaseSystemType> for hypermesh_lib::SystemAssetKind {
             BaseSystemType::Dns => Self::Dns,
             BaseSystemType::Transmission => Self::Transmission,
             BaseSystemType::Dashboard => Self::Dashboard,
+            BaseSystemType::Identity => Self::Identity,
         }
     }
 }
@@ -272,6 +281,7 @@ impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
             hypermesh_lib::SystemAssetKind::Dns => Self::Dns,
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
             hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
+            hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
         }
     }
 }
@@ -334,6 +344,7 @@ impl AssetRegistration {
             AssetType::Dns => BaseSystemType::Dns,
             AssetType::Transmission => BaseSystemType::Transmission,
             AssetType::Dashboard => BaseSystemType::Dashboard,
+            AssetType::Identity => BaseSystemType::Identity,
         };
 
         Self {
@@ -414,6 +425,7 @@ impl AssetRegistration {
                     BaseSystemType::Dns => 8,
                     BaseSystemType::Transmission => 9,
                     BaseSystemType::Dashboard => 10,
+                    BaseSystemType::Identity => 11,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -598,6 +610,7 @@ impl AssetRegistration {
                 BaseSystemType::Dns => AssetType::Dns,
                 BaseSystemType::Transmission => AssetType::Transmission,
                 BaseSystemType::Dashboard => AssetType::Dashboard,
+                BaseSystemType::Identity => AssetType::Identity,
             }),
             AssetCategory::Application(_) => None,
         }

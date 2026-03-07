@@ -76,6 +76,7 @@ impl AdapterRegistry {
             AssetType::Dns => None,
             AssetType::Transmission => None,
             AssetType::Dashboard => None,
+            AssetType::Identity => None,
         }
     }
 

@@ -69,6 +69,8 @@ pub enum SystemAssetKind {
     /// Mesh relay bandwidth as a first-class asset (R10)
     Transmission,
     Dashboard,
+    /// FALCON-1024 node identity keypair (R1/R10: every resource is an asset)
+    Identity,
 }
 
 impl SystemAssetKind {
@@ -86,6 +88,7 @@ impl SystemAssetKind {
             Self::Dns => 8,
             Self::Transmission => 9,
             Self::Dashboard => 10,
+            Self::Identity => 11,
         }
     }
 
@@ -103,6 +106,7 @@ impl SystemAssetKind {
             Self::Dns => "Dns",
             Self::Transmission => "Transmission",
             Self::Dashboard => "Dashboard",
+            Self::Identity => "Identity",
         }
     }
 }

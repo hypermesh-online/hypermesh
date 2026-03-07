@@ -226,6 +226,7 @@ impl AssetManager {
                 BaseSystemType::Dns => AssetType::Dns,
                 BaseSystemType::Transmission => AssetType::Transmission,
                 BaseSystemType::Dashboard => AssetType::Dashboard,
+                BaseSystemType::Identity => AssetType::Identity,
             }),
             AssetCategory::Application(_) => Err(AssetError::AdapterError {
                 message: "Cannot determine asset type for application asset".to_string(),
@@ -502,6 +503,7 @@ impl AssetManager {
                     BaseSystemType::Dns => stats.dns_assets += 1,
                     BaseSystemType::Transmission => stats.transmission_assets += 1,
                     BaseSystemType::Dashboard => stats.dashboard_assets += 1,
+                    BaseSystemType::Identity => stats.identity_assets += 1,
                 },
                 AssetCategory::Application(_) => {
                     // Application assets not tracked separately yet
@@ -539,6 +541,7 @@ pub struct AssetStatistics {
     pub dns_assets: usize,
     pub transmission_assets: usize,
     pub dashboard_assets: usize,
+    pub identity_assets: usize,
     /// Assets by state
     pub available_assets: usize,
     pub allocated_assets: usize,

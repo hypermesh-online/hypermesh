@@ -27,6 +27,7 @@ pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
             SystemAssetKind::Dns => AssetType::Dns,
             SystemAssetKind::Transmission => AssetType::Transmission,
             SystemAssetKind::Dashboard => AssetType::Dashboard,
+            SystemAssetKind::Identity => AssetType::Identity,
         },
         AssetKind::UserDefined(_) => AssetType::Container,
     }
@@ -46,6 +47,7 @@ pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
         AssetType::Dns => SystemAssetKind::Dns,
         AssetType::Transmission => SystemAssetKind::Transmission,
         AssetType::Dashboard => SystemAssetKind::Dashboard,
+        AssetType::Identity => SystemAssetKind::Identity,
     })
 }
 
@@ -78,6 +80,7 @@ pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
         BaseSystemType::Dns => SystemAssetKind::Dns,
         BaseSystemType::Transmission => SystemAssetKind::Transmission,
         BaseSystemType::Dashboard => SystemAssetKind::Dashboard,
+        BaseSystemType::Identity => SystemAssetKind::Identity,
     }
 }
 
