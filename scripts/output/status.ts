@@ -334,9 +334,8 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral FALCON-1024 handshake + block sync wired, shard distribution wired, E2E testing in progress",
-        "Systemd unit fixes — correct binary names, port assignments, working directory setup",
-        "Port allocation plan — resolve 8446 conflict between trustchain API and blockmatrix, assign unique ports per service"
+        "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake.",
+        "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
         "Modular restructure for polyrepo/microservice — extract crates into independent repos with CI, versioned APIs, and publish pipeline",
@@ -347,7 +346,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real partition/chaos testing framework"
       ]
     },
-    "completion": 55
+    "completion": 57
   },
   {
     "id": "hypermesh-ebpf",
