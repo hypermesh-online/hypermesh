@@ -61,6 +61,21 @@ export const crateStatuses: CrateStatus[] = [
         "SyncManager state machine — join/leave networks, track sync state (Discovering→Syncing→Synchronized)",
         "ReflectorPool tracks peers, prunes stale every 5s, health scoring",
         "TransportSyncDriver runs active sync rounds every 5s",
+        "Post-handshake persistent message loop — tag-based dispatch (0x01 shard send, 0x02 fetch, 0x03 block, 0x10 sync)",
+        "BLOCK_ANNOUNCE receive handler — deserialize, BLAKE3 verify, insert_received_block, re-propagate",
+        "Incoming shard stream handler — BLAKE3 integrity verification on every received shard",
+        "Reflector heartbeat broadcast — reflectors broadcast heartbeats to all connected peers every 5s",
+        "SyncDispatcher wired — MatrixMessage routed to SyncManager/ReflectorPool from message loop",
+        "PeerContext shared state — Arc-wrapped blockchain/shards/sync/reflector/propagator passed to accept loop",
+        "50-peer connection limit enforced in accept_connections",
+        "FALCON-1024 node identity — keypair generated on first boot, persisted to ~/.hypermesh/identity/",
+        "SignedStateProof — StateProof wrapped with FALCON-1024 signature + signer pubkey + nonce",
+        "Real system queries — CPU-based stake, system clock validation, real disk stats via statvfs",
+        "Signed handshake — pos_token is FALCON-1024 signed, verified on receive with identity binding",
+        "3-message bilateral handshake — challenge-response with FALCON-1024 signed nonces (replay-proof)",
+        "Shard distribution after pipeline — shards distributed to nearest peers via STOQ after store",
+        "Network shard fetch fallback — 3-tier retrieval: local disk → IPC shard.fetch → error",
+        "IPC shard.fetch handler — ShardStore lookup + network fetch from connected peers with BLAKE3 verify",
         "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
         "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
         "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
@@ -108,28 +123,19 @@ export const crateStatuses: CrateStatus[] = [
         "Config [services] section (ConnectionMode, per-service URLs in config.toml)"
       ],
       "inDevelopment": [
-        "Post-handshake message dispatch — incoming MatrixMessage never routed to SyncDispatcher after handshake",
-        "SyncDispatcher instantiation — 827 lines of routing logic defined but never called from node binary",
-        "Reflector heartbeat send/receive — heartbeats never broadcast by reflectors or processed by peers",
-        "BLOCK_ANNOUNCE receive handler — blocks sent via STOQ but never deserialized on receiver side",
-        "Incoming shard stream handler — StoqShardTransport handler exists but never called from accept loop",
-        "BLAKE3 shard integrity verification — verification code exists, not wired to incoming stream handler",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
-        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
+        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
+        "Swarm O(log N) scaling — shard distribution works but no consumer-becomes-provider replication triggers"
       ],
       "planned": [
-        "FALCON-1024 certificate generation (currently using rcgen X.509, not post-quantum)",
-        "Real state proof generation (currently self-generated with hardcoded values)",
-        "Bilateral verification between nodes (R11 — no global quorum, verify with counterparty directly)",
-        "Swarm distribution protocol (R12 — announce/discover/serve with O(log N) scaling)",
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
         "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
         "Cross-network asset transfers with dual PoS validation",
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 83
+    "completion": 93
   },
   {
     "id": "caesar",
@@ -345,7 +351,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — peer discovery, shard transport over QUIC, end-to-end asset store/fetch across nodes",
+        "Network MVP — bilateral FALCON-1024 handshake + block sync wired, shard distribution wired, E2E testing in progress",
         "Systemd unit fixes — correct binary names, port assignments, working directory setup",
         "Port allocation plan — resolve 8446 conflict between trustchain API and blockmatrix, assign unique ports per service"
       ],
