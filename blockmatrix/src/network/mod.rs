@@ -34,6 +34,7 @@ use crate::blockchain::propagation::BlockPropagator;
 use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
 use crate::identity::FalconIdentity;
+use hypermesh_lib::NodeSigner;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::network::reflector_pool::ReflectorPool;
@@ -433,7 +434,7 @@ impl NetworkManager {
         hasher.update(proof_bytes);
         let digest = hasher.finalize();
 
-        let valid = FalconIdentity::verify(pubkey, digest.as_bytes(), signature)
+        let valid = FalconIdentity::verify_signature(pubkey, digest.as_bytes(), signature)
             .map_err(|e| anyhow!("FALCON verification error: {e}"))?;
         if !valid {
             return Err(anyhow!("FALCON challenge-response verification failed"));

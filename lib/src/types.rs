@@ -634,6 +634,50 @@ impl fmt::Display for AssetAddress {
 }
 
 // ===========================================================================
+// Identity and Proof Traits (API boundaries between crates)
+// ===========================================================================
+
+/// Trait for signing data with a node's FALCON-1024 identity key.
+///
+/// Implemented by TrustChain's FalconIdentity, consumed by STOQ's bilateral
+/// handshake protocol. This trait lives in lib so STOQ can accept any signer
+/// without depending on TrustChain (which would create a circular dependency).
+pub trait NodeSigner: Send + Sync {
+    /// The node's unique identifier (BLAKE3 hex of FALCON-1024 public key).
+    fn node_id(&self) -> &str;
+
+    /// Raw FALCON-1024 public key bytes for identity verification.
+    fn public_key_bytes(&self) -> &[u8];
+
+    /// Sign arbitrary data with the node's FALCON-1024 secret key.
+    fn sign(&self, data: &[u8]) -> anyhow::Result<Vec<u8>>;
+
+    /// Verify a FALCON-1024 signature against a public key.
+    fn verify_signature(pubkey: &[u8], data: &[u8], signature: &[u8]) -> anyhow::Result<bool>
+    where
+        Self: Sized;
+}
+
+/// Trait for providing and validating Proof of State data during handshakes.
+///
+/// Implemented by BlockMatrix (which has blockchain state), consumed by STOQ
+/// (which performs the bilateral handshake at protocol layer). STOQ sees proofs
+/// as opaque bytes — it never imports BlockMatrix or TrustChain types directly.
+#[async_trait::async_trait]
+pub trait StateProofProvider: Send + Sync {
+    /// Generate serialized state proof bytes for this node.
+    ///
+    /// The proof contains all four sub-proofs (PoSpace, PoStake, PoWork, PoTime)
+    /// serialized into a single byte vector.
+    async fn generate_proof(&self) -> anyhow::Result<Vec<u8>>;
+
+    /// Validate serialized state proof bytes received from a peer.
+    ///
+    /// Returns true if all four sub-proofs pass validation.
+    async fn validate_proof(&self, proof_bytes: &[u8]) -> anyhow::Result<bool>;
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

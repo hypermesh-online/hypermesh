@@ -323,4 +323,40 @@ impl Stream {
         self.metrics.record_bytes_received(data.len());
         Ok(data.into())
     }
+
+    /// Write a length-prefixed message WITHOUT closing the stream.
+    ///
+    /// Format: 4-byte big-endian length + payload.
+    /// Use this for multi-message protocols (e.g., bilateral handshake).
+    pub async fn write_msg(&mut self, data: &[u8]) -> Result<()> {
+        let len = u32::try_from(data.len())
+            .map_err(|_| anyhow::anyhow!("Message too large: {} bytes", data.len()))?;
+        self.send.write_all(&len.to_be_bytes()).await?;
+        self.send.write_all(data).await?;
+        self.metrics.record_bytes_sent(4 + data.len());
+        Ok(())
+    }
+
+    /// Read a length-prefixed message from the stream.
+    ///
+    /// Expects 4-byte big-endian length header followed by payload.
+    /// Max message size is 64KB.
+    pub async fn read_msg(&mut self) -> Result<Vec<u8>> {
+        let mut len_buf = [0u8; 4];
+        self.recv.read_exact(&mut len_buf).await?;
+        let len = u32::from_be_bytes(len_buf) as usize;
+        if len > 64 * 1024 {
+            return Err(anyhow::anyhow!("Message too large: {len} bytes (max 64KB)"));
+        }
+        let mut buf = vec![0u8; len];
+        self.recv.read_exact(&mut buf).await?;
+        self.metrics.record_bytes_received(4 + len);
+        Ok(buf)
+    }
+
+    /// Close the write half of the stream after all messages are sent.
+    pub fn finish_send(&mut self) -> Result<()> {
+        self.send.finish()?;
+        Ok(())
+    }
 }

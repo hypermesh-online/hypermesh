@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, trace};
 
+pub mod bilateral;
 pub mod falcon_trustchain;
 pub mod frame_codec;
 pub mod frames;

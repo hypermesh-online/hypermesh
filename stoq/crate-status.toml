@@ -33,8 +33,7 @@ items = [
 
 [features.in_development]
 items = [
-    # CRITICAL: Protocol-level handshake and PoS authentication should be HERE, not in blockmatrix
-    "Bilateral handshake at protocol layer — currently implemented in blockmatrix/src/network/mod.rs, needs to move to STOQ as protocol-level authentication (§5.7: PoS IS authentication, TLS IS encryption)",
+    "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, multi-message framing (write_msg/read_msg), blockmatrix not yet wired to use it",
     "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
     "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",

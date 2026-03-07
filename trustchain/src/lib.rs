@@ -12,6 +12,7 @@ pub mod api;
 pub mod ca;
 pub mod config;
 pub mod crypto; // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
+pub mod identity; // FALCON-1024 node identity (implements NodeSigner trait from lib)
 pub mod proof_of_state;
 pub mod ct;
 pub mod deployment; // NEW: Quality gates and deployment validation
@@ -31,6 +32,7 @@ pub use ca::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
 pub use config::{DnsConfig, TrustChainConfig};
 pub use proof_of_state::{StateProof, StateProofContext, StateRequirements};
 pub use crypto::{FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm, PostQuantumCrypto};
+pub use identity::FalconIdentity;
 pub use errors::{Result, TrustChainError};
 pub use security::{SecurityDashboard, SecurityMonitor, SecurityValidationResult};
 pub use stoq_client::{ServiceEndpoint, ServiceType, TrustChainStoqClient, TrustChainStoqConfig};
