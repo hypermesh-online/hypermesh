@@ -104,15 +104,12 @@ items = [
 
 [features.in_development]
 items = [
-    # CRITICAL ARCHITECTURE: Handshake and identity are in the WRONG CRATE
-    # FalconIdentity, bilateral handshake, and PoS token exchange live in blockmatrix/src/network/
-    # but they are transport-layer concerns that belong in STOQ (protocol-level authentication).
-    # BlockMatrix should provide asset data and blockchain proofs; STOQ should validate them.
-    "Bilateral handshake wiring — connect_to_peer() and accept_connections() now delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Not yet tested multi-node end-to-end.",
-    "Identity-as-asset — FALCON pubkey is NOT registered as a blockchain asset (violates R1/R10: all resources are assets)",
+    # Layer migration COMPLETE (Phases 1-5): FalconIdentity → TrustChain, bilateral handshake → STOQ, Identity as asset type
+    "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Not yet tested multi-node end-to-end.",
+    "Identity-as-asset — SystemAssetKind::Identity type added (R1/R10), actual FALCON pubkey registration during bootstrap not yet wired",
     "StateProof test fallback — handshake silently downgrades to StateProof::new_for_testing() when real PoS generation fails",
     # Mesh networking gaps (not yet wired end-to-end)
-    "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist but bilateral handshake is broken (identity mismatch + wrong layer), so no blocks actually sync between nodes",
+    "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist. Handshake now in correct layer (STOQ) but not yet tested multi-node end-to-end.",
     "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
