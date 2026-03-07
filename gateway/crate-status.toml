@@ -13,13 +13,13 @@ items = [
     "Router with path-based backend selection",
     "Circuit breaker and retry logic",
     "CORS middleware and request logging",
-    "HTTP/3 backend proxying",
+    "HTTP/3 backend proxying (gateway forwards HTTP/3 to TCP backends, NOT STOQ)",
     "Rate limiting and DDoS protection (token bucket per-IP/identity/global)",
     "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
     "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
     "Inbound proxy for HyperMesh dashboards",
     "Health check aggregation — /health checks all 5 backend services",
-    # Backend routing (real, deployed)
+    # Backend routing (real, deployed — HTTP/3 to TCP, not STOQ)
     "TrustChain backend routing (gateway -> [::1]:8444)",
     "BlockMatrix backend routing (gateway -> [::1]:9292)",
     "Caesar backend routing (gateway -> [::1]:9294)",
@@ -34,8 +34,8 @@ items = [
 
 [features.in_development]
 items = [
-    # Gateway talks HTTP/3 but backends speak STOQ — protocol bridge is incomplete
-    "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
+    # STOQ bridge: code compiles and has unit tests (194/194 pass) but modules are DEAD CODE — main.rs never instantiates them
+    "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs modules compile and pass tests but are NOT instantiated in main.rs. Gateway only speaks HTTP/3 to TCP backends via Http3Proxy",
     "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
     "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
     "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",

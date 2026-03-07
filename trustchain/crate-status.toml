@@ -10,16 +10,11 @@ items = [
     "X.509 certificate issuance via rcgen (real CA-signed leaf certs, proper hierarchy)",
     "Certificate PEM encoding (rcgen .pem() output, proper base64)",
     "KeyUsage/EKU enforcement in issued certs (digital signature, key encipherment, server/client auth)",
-    "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
-    "Scope-aware certificates (IdentityScopeExtension embedded via custom OID)",
     "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs)",
     "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
     "Persistent revocation storage (JSON on disk, survives restart)",
     "OCSP responder structure",
     "CRL generator and distributor structure",
-    # STOQ API (real QUIC server, accepts connections)
-    "STOQ-based API server (binds [::1]:8444, accepts QUIC, handles cert requests)",
-    "HTTP/3 handlers wired to real cert store (list, issue, validate)",
     # Identity types (real type system)
     "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
     "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
@@ -36,14 +31,23 @@ items = [
 
 [features.in_development]
 items = [
-    # CRITICAL: Core decentralization features that are missing or fake
-    "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS (encryption layer). FALCON-1024 is used for PoS authentication signatures. TLS=encryption, PoS=authentication (§5.7). Full PQ TLS requires Quinn upstream support.",
+    # CERTIFICATES: Not post-quantum yet
+    "FALCON-1024 certificate signing — crypto module exists at trustchain/src/crypto/falcon.rs but is NOT integrated into certificate issuance pipeline. All certs use rcgen (traditional RSA/ECDSA X.509)",
+    "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS. Full PQ TLS requires Quinn upstream support",
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-    "Real Proof of State validation in TrustChain CA — state proofs use hardcoded query values (BlockMatrix Sprint 32 has real system queries, TrustChain CA not yet updated)",
+    "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
+    "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
+    # PROOF OF STATE: Validation is fake
+    "Real Proof of State validation — StakeProof::verify_signature() is a STUB (checks non-empty fields, no cryptographic verification). State proofs pass validation with any non-zero values",
+    "StakeProof signature verification — sign() creates BLAKE3 display hash, verify_signature() does NOT actually verify it cryptographically",
+    # STOQ API: Exists but integration incomplete
+    "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
+    "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
+    # DECENTRALIZATION: Single-node only
     "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-    "DNS zone propagation in TrustChain — DNS resolver is a local HashMap (BlockMatrix DNS propagates via block sync to peers)",
+    "DNS zone propagation — DNS resolver is a local HashMap, no cross-node sync",
     "CT log federation sync — message types exist but no real cross-node sync",
-    "Cross-network CA federation — peer management structs exist but no real QUIC-based peer exchange",
+    "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
     "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
     "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
     "Production binary hardening (config file loading, graceful shutdown, health endpoint, signal handling)",

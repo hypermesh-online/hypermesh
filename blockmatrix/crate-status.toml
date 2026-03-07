@@ -47,37 +47,6 @@ items = [
     "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
     # Genesis and hardware (R1)
     "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
-    # Peer handshake PoS
-    "Peer handshake PoS token exchange — connect_to_peer()/accept_connections() generate+validate StateProof tokens",
-    "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes",
-    # Network sync (send + receive wired)
-    "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
-    "BlockPropagator sends BLOCK_ANNOUNCE to NearestN(6) peers via STOQ streams",
-    "SyncManager state machine — join/leave networks, track sync state (Discovering→Syncing→Synchronized)",
-    "ReflectorPool tracks peers, prunes stale every 5s, health scoring",
-    "TransportSyncDriver runs active sync rounds every 5s",
-    # Network sync receive-side (Sprint 31)
-    "Post-handshake persistent message loop — tag-based dispatch (0x01 shard send, 0x02 fetch, 0x03 block, 0x10 sync)",
-    "BLOCK_ANNOUNCE receive handler — deserialize, BLAKE3 verify, insert_received_block, re-propagate",
-    "Incoming shard stream handler — BLAKE3 integrity verification on every received shard",
-    "Reflector heartbeat broadcast — reflectors broadcast heartbeats to all connected peers every 5s",
-    "SyncDispatcher wired — MatrixMessage routed to SyncManager/ReflectorPool from message loop",
-    "PeerContext shared state — Arc-wrapped blockchain/shards/sync/reflector/propagator passed to accept loop",
-    "50-peer connection limit enforced in accept_connections",
-    # FALCON-1024 identity + signed PoS (Sprint 32)
-    "FALCON-1024 node identity — keypair generated on first boot, persisted to ~/.hypermesh/identity/",
-    "SignedStateProof — StateProof wrapped with FALCON-1024 signature + signer pubkey + nonce",
-    "Real system queries — CPU-based stake, system clock validation, real disk stats via statvfs",
-    "Signed handshake — pos_token is FALCON-1024 signed, verified on receive with identity binding",
-    # Bilateral verification (Sprint 33, R11)
-    "3-message bilateral handshake — challenge-response with FALCON-1024 signed nonces (replay-proof)",
-    # Shard distribution (Sprint 33, R12)
-    "Shard distribution after pipeline — shards distributed to nearest peers via STOQ after store",
-    "Network shard fetch fallback — 3-tier retrieval: local disk → IPC shard.fetch → error",
-    "IPC shard.fetch handler — ShardStore lookup + network fetch from connected peers with BLAKE3 verify",
-    # E2E verified (local ↔ trust.hypermesh.online)
-    "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
-    "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
     # IPC daemon architecture (Phase 1 Sprints 1-2)
     "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
     "Daemon lifecycle (connect/disconnect commands, PID file, graceful shutdown)",
@@ -135,7 +104,18 @@ items = [
 
 [features.in_development]
 items = [
+    # CRITICAL ARCHITECTURE: Handshake and identity are in the WRONG CRATE
+    # FalconIdentity, bilateral handshake, and PoS token exchange live in blockmatrix/src/network/
+    # but they are transport-layer concerns that belong in STOQ (protocol-level authentication).
+    # BlockMatrix should provide asset data and blockchain proofs; STOQ should validate them.
+    "Bilateral handshake — WRONG LAYER: 3-message challenge-response lives in blockmatrix/src/network/mod.rs but belongs in STOQ (transport-layer authentication)",
+    "FALCON-1024 identity — WRONG LAYER: blockmatrix/src/identity.rs generates keypairs but identity is a TrustChain/STOQ concern, not blockchain",
+    "Peer handshake PoS — WRONG LAYER: connect_to_peer()/accept_connections() do PoS exchange but this is protocol-level (STOQ), not blockchain-level",
+    "Identity-as-asset — FALCON pubkey is NOT registered as a blockchain asset (violates R1/R10: all resources are assets)",
+    "StateProof test fallback — handshake silently downgrades to StateProof::new_for_testing() when real PoS generation fails",
     # Mesh networking gaps (not yet wired end-to-end)
+    "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist but bilateral handshake is broken (identity mismatch + wrong layer), so no blocks actually sync between nodes",
+    "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",

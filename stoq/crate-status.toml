@@ -28,13 +28,15 @@ items = [
     "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
     "MetricsFrame protocol wiring to engauge",
     "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
-    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable), wired in Sprint 33",
-    "FALCON-1024 PoS token signing — StateProof signed with FALCON-1024, verified on receive (TLS certs remain rcgen X.509 by design: TLS=encryption, PoS=authentication §5.7)",
-    "Protocol-level PoS token validation — two-stage fast/full validation with FALCON-1024 signature verification",
+    "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
 ]
 
 [features.in_development]
 items = [
+    # CRITICAL: Protocol-level handshake and PoS authentication should be HERE, not in blockmatrix
+    "Bilateral handshake at protocol layer — currently implemented in blockmatrix/src/network/mod.rs, needs to move to STOQ as protocol-level authentication (§5.7: PoS IS authentication, TLS IS encryption)",
+    "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
+    "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
 ]

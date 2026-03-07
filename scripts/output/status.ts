@@ -54,30 +54,6 @@ export const crateStatuses: CrateStatus[] = [
         "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
         "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
         "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
-        "Peer handshake PoS token exchange — connect_to_peer()/accept_connections() generate+validate StateProof tokens",
-        "STOQ integration PoS tokens — MatrixNodeAnnouncement carries real pos_token bytes",
-        "StoqBlockTransportAdapter — real STOQ transport for block propagation (replaces SimulatedTransport)",
-        "BlockPropagator sends BLOCK_ANNOUNCE to NearestN(6) peers via STOQ streams",
-        "SyncManager state machine — join/leave networks, track sync state (Discovering→Syncing→Synchronized)",
-        "ReflectorPool tracks peers, prunes stale every 5s, health scoring",
-        "TransportSyncDriver runs active sync rounds every 5s",
-        "Post-handshake persistent message loop — tag-based dispatch (0x01 shard send, 0x02 fetch, 0x03 block, 0x10 sync)",
-        "BLOCK_ANNOUNCE receive handler — deserialize, BLAKE3 verify, insert_received_block, re-propagate",
-        "Incoming shard stream handler — BLAKE3 integrity verification on every received shard",
-        "Reflector heartbeat broadcast — reflectors broadcast heartbeats to all connected peers every 5s",
-        "SyncDispatcher wired — MatrixMessage routed to SyncManager/ReflectorPool from message loop",
-        "PeerContext shared state — Arc-wrapped blockchain/shards/sync/reflector/propagator passed to accept loop",
-        "50-peer connection limit enforced in accept_connections",
-        "FALCON-1024 node identity — keypair generated on first boot, persisted to ~/.hypermesh/identity/",
-        "SignedStateProof — StateProof wrapped with FALCON-1024 signature + signer pubkey + nonce",
-        "Real system queries — CPU-based stake, system clock validation, real disk stats via statvfs",
-        "Signed handshake — pos_token is FALCON-1024 signed, verified on receive with identity binding",
-        "3-message bilateral handshake — challenge-response with FALCON-1024 signed nonces (replay-proof)",
-        "Shard distribution after pipeline — shards distributed to nearest peers via STOQ after store",
-        "Network shard fetch fallback — 3-tier retrieval: local disk → IPC shard.fetch → error",
-        "IPC shard.fetch handler — ShardStore lookup + network fetch from connected peers with BLAKE3 verify",
-        "Multi-node peer connections — E2E tested local ↔ GCP, bilateral PoS handshake verified",
-        "Bootstrap sequence — self-signed cert + PoS handshake resolves cert/DNS/blockchain chicken-and-egg",
         "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
         "Daemon lifecycle (connect/disconnect commands, PID file, graceful shutdown)",
         "IPC handler dispatch (ping, shutdown, status methods)",
@@ -123,6 +99,13 @@ export const crateStatuses: CrateStatus[] = [
         "Config [services] section (ConnectionMode, per-service URLs in config.toml)"
       ],
       "inDevelopment": [
+        "Bilateral handshake — WRONG LAYER: 3-message challenge-response lives in blockmatrix/src/network/mod.rs but belongs in STOQ (transport-layer authentication)",
+        "FALCON-1024 identity — WRONG LAYER: blockmatrix/src/identity.rs generates keypairs but identity is a TrustChain/STOQ concern, not blockchain",
+        "Peer handshake PoS — WRONG LAYER: connect_to_peer()/accept_connections() do PoS exchange but this is protocol-level (STOQ), not blockchain-level",
+        "Identity-as-asset — FALCON pubkey is NOT registered as a blockchain asset (violates R1/R10: all resources are assets)",
+        "StateProof test fallback — handshake silently downgrades to StateProof::new_for_testing() when real PoS generation fails",
+        "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist but bilateral handshake is broken (identity mismatch + wrong layer), so no blocks actually sync between nodes",
+        "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
@@ -135,7 +118,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 93
+    "completion": 83
   },
   {
     "id": "caesar",
@@ -298,7 +281,7 @@ export const crateStatuses: CrateStatus[] = [
         "Router with path-based backend selection",
         "Circuit breaker and retry logic",
         "CORS middleware and request logging",
-        "HTTP/3 backend proxying",
+        "HTTP/3 backend proxying (gateway forwards HTTP/3 to TCP backends, NOT STOQ)",
         "Rate limiting and DDoS protection (token bucket per-IP/identity/global)",
         "Load balancing (RoundRobin/LeastConnections/WeightedRoundRobin/HealthAware)",
         "Multi-domain SNI routing (*.hypermesh.online wildcard support)",
@@ -315,7 +298,7 @@ export const crateStatuses: CrateStatus[] = [
         "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)"
       ],
       "inDevelopment": [
-        "STOQ protocol bridge — dual-listener exists but HTTP/3-to-STOQ translation is incomplete (backends speak STOQ, gateway speaks HTTP/3)",
+        "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs modules compile and pass tests but are NOT instantiated in main.rs. Gateway only speaks HTTP/3 to TCP backends via Http3Proxy",
         "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
         "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
@@ -492,19 +475,18 @@ export const crateStatuses: CrateStatus[] = [
         "Network API (peers, connect)",
         "Blockchain API (height, block by index, chain validation)",
         "Topology API (info, neighbors, routing cost, path finding)",
+        "Domain API (register, list, join)",
+        "Dashboard API (deploy, list, info)",
+        "Config API (show, get, set)",
         "SdkError enum (Connection, Ipc, Rpc, Serialization, Timeout, NotConnected)",
         "Typed response structs with serde deserialization"
       ],
-      "inDevelopment": [
-        "Domain API (register, list, join, invite) — available in HTTP SDKs (sdk/typescript, sdk/python, etc.)",
-        "Dashboard API (deploy, list, info) — available in HTTP SDKs",
-        "Config API (show, get, set) — available in HTTP SDKs"
-      ],
+      "inDevelopment": [],
       "planned": [
         "Event subscription (streaming daemon events)"
       ]
     },
-    "completion": 69
+    "completion": 92
   },
   {
     "id": "stoq",
@@ -534,11 +516,12 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
         "MetricsFrame protocol wiring to engauge",
         "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
-        "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable), wired in Sprint 33",
-        "FALCON-1024 PoS token signing — StateProof signed with FALCON-1024, verified on receive (TLS certs remain rcgen X.509 by design: TLS=encryption, PoS=authentication §5.7)",
-        "Protocol-level PoS token validation — two-stage fast/full validation with FALCON-1024 signature verification"
+        "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)"
       ],
       "inDevelopment": [
+        "Bilateral handshake at protocol layer — currently implemented in blockmatrix/src/network/mod.rs, needs to move to STOQ as protocol-level authentication (§5.7: PoS IS authentication, TLS IS encryption)",
+        "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
+        "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
       ],
@@ -548,7 +531,7 @@ export const crateStatuses: CrateStatus[] = [
         "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)"
       ]
     },
-    "completion": 83
+    "completion": 73
   },
   {
     "id": "trustchain",
@@ -560,15 +543,11 @@ export const crateStatuses: CrateStatus[] = [
         "X.509 certificate issuance via rcgen (real CA-signed leaf certs, proper hierarchy)",
         "Certificate PEM encoding (rcgen .pem() output, proper base64)",
         "KeyUsage/EKU enforcement in issued certs (digital signature, key encipherment, server/client auth)",
-        "Certificate lifecycle tied to scope (Anonymous=minutes, Private=days, Public=months validity)",
-        "Scope-aware certificates (IdentityScopeExtension embedded via custom OID)",
         "Certificate Transparency (Merkle tree with consistency checker, inclusion proofs)",
         "Certificate rotation (CertificateRotationManager scans store, rotates expiring certs)",
         "Persistent revocation storage (JSON on disk, survives restart)",
         "OCSP responder structure",
         "CRL generator and distributor structure",
-        "STOQ-based API server (binds [::1]:8444, accepts QUIC, handles cert requests)",
-        "HTTP/3 handlers wired to real cert store (list, issue, validate)",
         "Workload identity types (NodeIdentity, ServiceIdentity, AgentIdentity)",
         "Identity-typed certificates (CertificateSubjectType: Node/Service/Agent)",
         "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId)",
@@ -580,13 +559,19 @@ export const crateStatuses: CrateStatus[] = [
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
       "inDevelopment": [
-        "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS (encryption layer). FALCON-1024 is used for PoS authentication signatures. TLS=encryption, PoS=authentication (§5.7). Full PQ TLS requires Quinn upstream support.",
+        "FALCON-1024 certificate signing — crypto module exists at trustchain/src/crypto/falcon.rs but is NOT integrated into certificate issuance pipeline. All certs use rcgen (traditional RSA/ECDSA X.509)",
+        "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS. Full PQ TLS requires Quinn upstream support",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-        "Real Proof of State validation in TrustChain CA — state proofs use hardcoded query values (BlockMatrix Sprint 32 has real system queries, TrustChain CA not yet updated)",
+        "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
+        "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
+        "Real Proof of State validation — StakeProof::verify_signature() is a STUB (checks non-empty fields, no cryptographic verification). State proofs pass validation with any non-zero values",
+        "StakeProof signature verification — sign() creates BLAKE3 display hash, verify_signature() does NOT actually verify it cryptographically",
+        "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
+        "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
         "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-        "DNS zone propagation in TrustChain — DNS resolver is a local HashMap (BlockMatrix DNS propagates via block sync to peers)",
+        "DNS zone propagation — DNS resolver is a local HashMap, no cross-node sync",
         "CT log federation sync — message types exist but no real cross-node sync",
-        "Cross-network CA federation — peer management structs exist but no real QUIC-based peer exchange",
+        "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
         "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
         "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
         "Production binary hardening (config file loading, graceful shutdown, health endpoint, signal handling)",
@@ -601,7 +586,7 @@ export const crateStatuses: CrateStatus[] = [
         "Field device bootstrap with intermittent connectivity"
       ]
     },
-    "completion": 55
+    "completion": 43
   },
   {
     "id": "ui",

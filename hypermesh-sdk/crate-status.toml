@@ -13,16 +13,15 @@ items = [
     "Network API (peers, connect)",
     "Blockchain API (height, block by index, chain validation)",
     "Topology API (info, neighbors, routing cost, path finding)",
+    "Domain API (register, list, join)",
+    "Dashboard API (deploy, list, info)",
+    "Config API (show, get, set)",
     "SdkError enum (Connection, Ipc, Rpc, Serialization, Timeout, NotConnected)",
     "Typed response structs with serde deserialization",
 ]
 
 [features.in_development]
-items = [
-    "Domain API (register, list, join, invite) — available in HTTP SDKs (sdk/typescript, sdk/python, etc.)",
-    "Dashboard API (deploy, list, info) — available in HTTP SDKs",
-    "Config API (show, get, set) — available in HTTP SDKs",
-]
+items = []
 
 [features.planned]
 items = [
