@@ -98,6 +98,26 @@ struct Cli {
     #[clap(long, global = true)]
     json: bool,
 
+    /// Connection mode: auto, ffi, ipc, stoq
+    #[clap(long, global = true, default_value = "auto")]
+    mode: String,
+
+    /// Caesar service URL (used in stoq mode)
+    #[clap(long, global = true, default_value = "stoq://localhost:9294")]
+    caesar_url: String,
+
+    /// TrustChain service URL (used in stoq mode)
+    #[clap(long, global = true, default_value = "stoq://localhost:8444")]
+    trustchain_url: String,
+
+    /// Engauge service URL (used in stoq mode)
+    #[clap(long, global = true, default_value = "stoq://localhost:9296")]
+    engauge_url: String,
+
+    /// Catalog service URL (used in stoq mode)
+    #[clap(long, global = true, default_value = "stoq://localhost:9295")]
+    catalog_url: String,
+
     /// Path to config file
     #[clap(long, global = true)]
     config: Option<std::path::PathBuf>,
@@ -200,6 +220,30 @@ enum Commands {
         #[clap(subcommand)]
         action: DashboardAction,
     },
+
+    /// Caesar EVP operations
+    Caesar {
+        #[clap(subcommand)]
+        action: CaesarAction,
+    },
+
+    /// TrustChain CA operations
+    Trustchain {
+        #[clap(subcommand)]
+        action: TrustchainAction,
+    },
+
+    /// Engauge analytics operations
+    Engauge {
+        #[clap(subcommand)]
+        action: EngaugeAction,
+    },
+
+    /// Catalog registry operations
+    Catalog {
+        #[clap(subcommand)]
+        action: CatalogAction,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -298,6 +342,151 @@ enum DnsAction {
     },
     /// List all registered DNS names
     List,
+}
+
+#[derive(Subcommand, Debug)]
+enum CaesarAction {
+    /// Show wallet info
+    Wallet,
+    /// Show balance
+    Balance,
+    /// List recent transactions
+    Transactions {
+        /// Maximum number of transactions
+        #[clap(long, default_value = "10")]
+        limit: u32,
+    },
+    /// Show reward earnings
+    Rewards,
+    /// Route a payment packet
+    Route {
+        /// Destination node
+        destination: String,
+        /// Amount in gold grams
+        amount: f64,
+    },
+    /// Show governor parameters
+    Governor,
+}
+
+#[derive(Subcommand, Debug)]
+enum TrustchainAction {
+    /// List certificates
+    Certs,
+    /// Issue a new certificate
+    Issue {
+        /// Certificate subject
+        subject: String,
+        /// Scope (anonymous, private, public)
+        #[clap(long, default_value = "private")]
+        scope: String,
+    },
+    /// Validate a certificate
+    Validate {
+        /// Path to PEM certificate file
+        cert_path: String,
+    },
+    /// Revoke a certificate
+    Revoke {
+        /// Certificate ID
+        cert_id: String,
+    },
+    /// List DNS zones
+    Zones,
+}
+
+#[derive(Subcommand, Debug)]
+enum EngaugeAction {
+    /// Show capacity metrics
+    Capacity,
+    /// Show traffic analysis
+    Traffic,
+    /// List marketplace offerings
+    Marketplace,
+    /// Show node metrics
+    Metrics,
+    /// List active leases
+    Leases,
+}
+
+#[derive(Subcommand, Debug)]
+enum CatalogAction {
+    /// Browse packages
+    Browse {
+        /// Search query
+        #[clap(long)]
+        query: Option<String>,
+        /// Page number
+        #[clap(long, default_value = "1")]
+        page: u32,
+    },
+    /// Search packages
+    Search {
+        /// Search query
+        query: String,
+    },
+    /// Get package info
+    Info {
+        /// Package name
+        name: String,
+    },
+    /// Show registry statistics
+    Stats,
+}
+
+/// Call a service method via IPC and print the result.
+///
+/// Routes the call through the IPC daemon. If the daemon is not running,
+/// prints an offline message suggesting `hypermesh connect`.
+async fn service_ipc_call(
+    method: &str,
+    params: serde_json::Value,
+    json_output: bool,
+) -> Result<()> {
+    let client = ipc::IpcClient::new();
+    if !client.is_daemon_running().await {
+        if json_output {
+            let err = serde_json::json!({
+                "error": "daemon_offline",
+                "message": format!("Service method '{}' requires a running daemon", method),
+                "hint": "Start with: hypermesh connect public",
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&err).unwrap_or_default()
+            );
+        } else {
+            eprintln!(
+                "Service '{}' requires a running daemon.\nStart with: hypermesh connect public",
+                method.split('.').next().unwrap_or(method),
+            );
+        }
+        return Ok(());
+    }
+    match client.call_ok(method, params).await {
+        Ok(resp) => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&resp).unwrap_or_default()
+            );
+        }
+        Err(e) => {
+            if json_output {
+                let err = serde_json::json!({
+                    "error": "service_error",
+                    "method": method,
+                    "message": format!("{e}"),
+                });
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&err).unwrap_or_default()
+                );
+            } else {
+                eprintln!("Error calling {method}: {e}");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Propagate a newly-created block to connected peers via the BlockPropagator.
@@ -2382,6 +2571,124 @@ async fn main() -> Result<()> {
                     println!(
                         "\nDeploy with: hypermesh dashboard deploy ./{project_name}/"
                     );
+                }
+            }
+        }
+        Some(Commands::Caesar { action }) => {
+            let json = cli.json;
+            match action {
+                CaesarAction::Wallet => {
+                    service_ipc_call("caesar.wallet", serde_json::json!({}), json).await?;
+                }
+                CaesarAction::Balance => {
+                    service_ipc_call("caesar.balance", serde_json::json!({}), json).await?;
+                }
+                CaesarAction::Transactions { limit } => {
+                    service_ipc_call(
+                        "caesar.transactions",
+                        serde_json::json!({"limit": limit}),
+                        json,
+                    ).await?;
+                }
+                CaesarAction::Rewards => {
+                    service_ipc_call("caesar.rewards", serde_json::json!({}), json).await?;
+                }
+                CaesarAction::Route { destination, amount } => {
+                    service_ipc_call(
+                        "caesar.route",
+                        serde_json::json!({
+                            "destination": destination,
+                            "amount": amount,
+                        }),
+                        json,
+                    ).await?;
+                }
+                CaesarAction::Governor => {
+                    service_ipc_call("caesar.governor", serde_json::json!({}), json).await?;
+                }
+            }
+        }
+        Some(Commands::Trustchain { action }) => {
+            let json = cli.json;
+            match action {
+                TrustchainAction::Certs => {
+                    service_ipc_call("trustchain.certs", serde_json::json!({}), json).await?;
+                }
+                TrustchainAction::Issue { subject, scope } => {
+                    service_ipc_call(
+                        "trustchain.issue",
+                        serde_json::json!({
+                            "subject": subject,
+                            "scope": scope,
+                        }),
+                        json,
+                    ).await?;
+                }
+                TrustchainAction::Validate { cert_path } => {
+                    service_ipc_call(
+                        "trustchain.validate",
+                        serde_json::json!({"cert_path": cert_path}),
+                        json,
+                    ).await?;
+                }
+                TrustchainAction::Revoke { cert_id } => {
+                    service_ipc_call(
+                        "trustchain.revoke",
+                        serde_json::json!({"cert_id": cert_id}),
+                        json,
+                    ).await?;
+                }
+                TrustchainAction::Zones => {
+                    service_ipc_call("trustchain.zones", serde_json::json!({}), json).await?;
+                }
+            }
+        }
+        Some(Commands::Engauge { action }) => {
+            let json = cli.json;
+            match action {
+                EngaugeAction::Capacity => {
+                    service_ipc_call("engauge.capacity", serde_json::json!({}), json).await?;
+                }
+                EngaugeAction::Traffic => {
+                    service_ipc_call("engauge.traffic", serde_json::json!({}), json).await?;
+                }
+                EngaugeAction::Marketplace => {
+                    service_ipc_call("engauge.marketplace", serde_json::json!({}), json).await?;
+                }
+                EngaugeAction::Metrics => {
+                    service_ipc_call("engauge.metrics", serde_json::json!({}), json).await?;
+                }
+                EngaugeAction::Leases => {
+                    service_ipc_call("engauge.leases", serde_json::json!({}), json).await?;
+                }
+            }
+        }
+        Some(Commands::Catalog { action }) => {
+            let json = cli.json;
+            match action {
+                CatalogAction::Browse { query, page } => {
+                    service_ipc_call(
+                        "catalog.browse",
+                        serde_json::json!({"query": query, "page": page}),
+                        json,
+                    ).await?;
+                }
+                CatalogAction::Search { query } => {
+                    service_ipc_call(
+                        "catalog.search",
+                        serde_json::json!({"query": query}),
+                        json,
+                    ).await?;
+                }
+                CatalogAction::Info { name } => {
+                    service_ipc_call(
+                        "catalog.info",
+                        serde_json::json!({"name": name}),
+                        json,
+                    ).await?;
+                }
+                CatalogAction::Stats => {
+                    service_ipc_call("catalog.stats", serde_json::json!({}), json).await?;
                 }
             }
         }

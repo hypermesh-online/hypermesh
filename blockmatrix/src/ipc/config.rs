@@ -21,6 +21,106 @@ fn default_privacy() -> String {
 fn default_log_level() -> String {
     "info".to_string()
 }
+fn default_mode() -> String {
+    "auto".to_string()
+}
+fn default_blockmatrix_url() -> String {
+    "http://localhost:9293".to_string()
+}
+fn default_caesar_url() -> String {
+    "http://localhost:9294".to_string()
+}
+fn default_trustchain_url() -> String {
+    "http://localhost:8444".to_string()
+}
+fn default_engauge_url() -> String {
+    "http://localhost:9296".to_string()
+}
+fn default_catalog_url() -> String {
+    "http://localhost:9295".to_string()
+}
+fn default_gateway_url() -> String {
+    "http://trust.hypermesh.online".to_string()
+}
+
+/// Connection mode for service communication.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConnectionMode {
+    /// Try FFI -> IPC -> HTTP in order.
+    Auto,
+    /// Direct library linking.
+    Ffi,
+    /// Unix socket JSON-RPC to daemon.
+    Ipc,
+    /// HTTP REST API.
+    Http,
+}
+
+impl ConnectionMode {
+    /// Parse a connection mode from a string. Unknown values default to `Auto`.
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "ffi" => Self::Ffi,
+            "ipc" => Self::Ipc,
+            "http" => Self::Http,
+            _ => Self::Auto,
+        }
+    }
+}
+
+/// Service endpoint and connection configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServicesConfig {
+    /// Connection mode: "auto" | "ffi" | "ipc" | "http".
+    /// auto = try FFI -> IPC -> HTTP in order.
+    #[serde(default = "default_mode")]
+    pub mode: String,
+
+    /// BlockMatrix API (default: http://localhost:9293).
+    #[serde(default = "default_blockmatrix_url")]
+    pub blockmatrix_url: String,
+
+    /// Caesar EVP API (default: http://localhost:9294).
+    #[serde(default = "default_caesar_url")]
+    pub caesar_url: String,
+
+    /// TrustChain CA API (default: http://localhost:8444).
+    #[serde(default = "default_trustchain_url")]
+    pub trustchain_url: String,
+
+    /// Engauge Analytics API (default: http://localhost:9296).
+    #[serde(default = "default_engauge_url")]
+    pub engauge_url: String,
+
+    /// Catalog Registry API (default: http://localhost:9295).
+    #[serde(default = "default_catalog_url")]
+    pub catalog_url: String,
+
+    /// Gateway unified entry point (default: http://trust.hypermesh.online).
+    #[serde(default = "default_gateway_url")]
+    pub gateway_url: String,
+}
+
+impl Default for ServicesConfig {
+    fn default() -> Self {
+        Self {
+            mode: default_mode(),
+            blockmatrix_url: default_blockmatrix_url(),
+            caesar_url: default_caesar_url(),
+            trustchain_url: default_trustchain_url(),
+            engauge_url: default_engauge_url(),
+            catalog_url: default_catalog_url(),
+            gateway_url: default_gateway_url(),
+        }
+    }
+}
+
+impl ServicesConfig {
+    /// Parse the `mode` field into a [`ConnectionMode`] enum.
+    pub fn connection_mode(&self) -> ConnectionMode {
+        ConnectionMode::from_str(&self.mode)
+    }
+}
 
 /// Top-level HyperMesh configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +131,8 @@ pub struct HypermeshConfig {
     pub network: NetworkConfig,
     #[serde(default)]
     pub logging: LoggingConfig,
+    #[serde(default)]
+    pub services: ServicesConfig,
 }
 
 /// Node identity and data directory settings.
@@ -72,6 +174,7 @@ impl Default for HypermeshConfig {
             node: NodeConfig::default(),
             network: NetworkConfig::default(),
             logging: LoggingConfig::default(),
+            services: ServicesConfig::default(),
         }
     }
 }
@@ -205,6 +308,14 @@ mod tests {
         assert_eq!(config.network.privacy, "public");
         assert!(!config.network.reflector);
         assert_eq!(config.logging.level, "info");
+        assert_eq!(config.services.mode, "auto");
+        assert_eq!(config.services.blockmatrix_url, "http://localhost:9293");
+        assert_eq!(config.services.caesar_url, "http://localhost:9294");
+        assert_eq!(config.services.trustchain_url, "http://localhost:8444");
+        assert_eq!(config.services.engauge_url, "http://localhost:9296");
+        assert_eq!(config.services.catalog_url, "http://localhost:9295");
+        assert_eq!(config.services.gateway_url, "http://trust.hypermesh.online");
+        assert_eq!(config.services.connection_mode(), ConnectionMode::Auto);
     }
 
     #[test]
@@ -276,5 +387,114 @@ reflector = true
         set_dotpath(&mut value, "node.coord_x", serde_json::json!(99))
             .expect("test: set dotpath");
         assert_eq!(value["node"]["coord_x"], 99);
+    }
+
+    #[test]
+    fn test_connection_mode_parsing() {
+        assert_eq!(ConnectionMode::from_str("ffi"), ConnectionMode::Ffi);
+        assert_eq!(ConnectionMode::from_str("FFI"), ConnectionMode::Ffi);
+        assert_eq!(ConnectionMode::from_str("ipc"), ConnectionMode::Ipc);
+        assert_eq!(ConnectionMode::from_str("IPC"), ConnectionMode::Ipc);
+        assert_eq!(ConnectionMode::from_str("http"), ConnectionMode::Http);
+        assert_eq!(ConnectionMode::from_str("HTTP"), ConnectionMode::Http);
+        assert_eq!(ConnectionMode::from_str("auto"), ConnectionMode::Auto);
+        assert_eq!(ConnectionMode::from_str("unknown"), ConnectionMode::Auto);
+        assert_eq!(ConnectionMode::from_str(""), ConnectionMode::Auto);
+    }
+
+    #[test]
+    fn test_services_config_connection_mode() {
+        let mut svc = ServicesConfig::default();
+        assert_eq!(svc.connection_mode(), ConnectionMode::Auto);
+
+        svc.mode = "ffi".to_string();
+        assert_eq!(svc.connection_mode(), ConnectionMode::Ffi);
+
+        svc.mode = "ipc".to_string();
+        assert_eq!(svc.connection_mode(), ConnectionMode::Ipc);
+
+        svc.mode = "http".to_string();
+        assert_eq!(svc.connection_mode(), ConnectionMode::Http);
+    }
+
+    #[test]
+    fn test_parse_services_toml() {
+        let toml_str = r#"
+[services]
+mode = "http"
+blockmatrix_url = "http://10.0.0.1:9293"
+caesar_url = "http://10.0.0.1:9294"
+"#;
+        let config: HypermeshConfig =
+            toml::from_str(toml_str).expect("test: parse services toml");
+        assert_eq!(config.services.mode, "http");
+        assert_eq!(config.services.blockmatrix_url, "http://10.0.0.1:9293");
+        assert_eq!(config.services.caesar_url, "http://10.0.0.1:9294");
+        // Unset fields get defaults
+        assert_eq!(config.services.trustchain_url, "http://localhost:8444");
+        assert_eq!(config.services.gateway_url, "http://trust.hypermesh.online");
+        assert_eq!(config.services.connection_mode(), ConnectionMode::Http);
+    }
+
+    #[test]
+    fn test_dotpath_services() {
+        let config = HypermeshConfig::default();
+        let value = serde_json::to_value(&config).expect("test: serialize");
+
+        assert_eq!(
+            get_dotpath(&value, "services.mode"),
+            Some(&serde_json::json!("auto")),
+        );
+        assert_eq!(
+            get_dotpath(&value, "services.blockmatrix_url"),
+            Some(&serde_json::json!("http://localhost:9293")),
+        );
+        assert_eq!(
+            get_dotpath(&value, "services.gateway_url"),
+            Some(&serde_json::json!("http://trust.hypermesh.online")),
+        );
+    }
+
+    #[test]
+    fn test_set_dotpath_services() {
+        let config = HypermeshConfig::default();
+        let mut value = serde_json::to_value(&config).expect("test: serialize");
+
+        set_dotpath(
+            &mut value,
+            "services.mode",
+            serde_json::json!("ipc"),
+        )
+        .expect("test: set services.mode");
+        assert_eq!(value["services"]["mode"], "ipc");
+
+        set_dotpath(
+            &mut value,
+            "services.caesar_url",
+            serde_json::json!("http://remote:9294"),
+        )
+        .expect("test: set services.caesar_url");
+        assert_eq!(value["services"]["caesar_url"], "http://remote:9294");
+    }
+
+    #[test]
+    fn test_services_roundtrip() {
+        let dir = std::env::temp_dir().join("hypermesh_config_svc_test");
+        let path = dir.join("config.toml");
+
+        let mut config = HypermeshConfig::default();
+        config.services.mode = "ipc".to_string();
+        config.services.blockmatrix_url = "http://10.0.0.5:9293".to_string();
+        config.services.gateway_url = "http://my-gateway.local".to_string();
+        config.save_to(&path).expect("test: save config");
+
+        let loaded = HypermeshConfig::load_from(&path);
+        assert_eq!(loaded.services.mode, "ipc");
+        assert_eq!(loaded.services.blockmatrix_url, "http://10.0.0.5:9293");
+        assert_eq!(loaded.services.gateway_url, "http://my-gateway.local");
+        assert_eq!(loaded.services.caesar_url, "http://localhost:9294"); // default
+        assert_eq!(loaded.services.connection_mode(), ConnectionMode::Ipc);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

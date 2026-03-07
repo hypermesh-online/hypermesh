@@ -5,24 +5,32 @@
 
 mod asset;
 mod blockchain;
+mod caesar;
+mod catalog;
 mod config;
 mod dashboard;
 mod dns;
 mod domain;
+mod engauge;
 mod network;
 mod node;
 mod topology;
+mod trustchain;
 
 // Re-export all extern "C" functions so they appear in the shared library.
 pub use asset::*;
 pub use blockchain::*;
+pub use caesar::*;
+pub use catalog::*;
 pub use config::*;
 pub use dashboard::*;
 pub use dns::*;
 pub use domain::*;
+pub use engauge::*;
 pub use network::*;
 pub use node::*;
 pub use topology::*;
+pub use trustchain::*;
 
 use crate::error_state;
 use std::os::raw::c_char;

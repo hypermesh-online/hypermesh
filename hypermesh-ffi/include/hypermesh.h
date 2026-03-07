@@ -159,6 +159,92 @@ char *hypermesh_config_show(hypermesh_client_t *client);
 char *hypermesh_config_get(hypermesh_client_t *client, const char *key);
 
 /* -----------------------------------------------------------------------
+ * Typed API — Caesar EVP
+ * ----------------------------------------------------------------------- */
+
+/* Fetch the caller's Caesar wallet info. Returns JSON. */
+char *hypermesh_caesar_wallet(hypermesh_client_t *client);
+
+/* Fetch the current Caesar balance. Returns JSON. */
+char *hypermesh_caesar_balance(hypermesh_client_t *client);
+
+/* Fetch recent Caesar transactions (limit=0 for default). Returns JSON array. */
+char *hypermesh_caesar_transactions(hypermesh_client_t *client, uint32_t limit);
+
+/* Fetch accumulated Caesar rewards. Returns JSON. */
+char *hypermesh_caesar_rewards(hypermesh_client_t *client);
+
+/* Route a Caesar EVP packet to a destination. Returns JSON. */
+char *hypermesh_caesar_route_packet(hypermesh_client_t *client,
+                                    const char *destination,
+                                    double amount_grams);
+
+/* Fetch current Caesar Governor parameters. Returns JSON. */
+char *hypermesh_caesar_governor_params(hypermesh_client_t *client);
+
+/* -----------------------------------------------------------------------
+ * Typed API — TrustChain
+ * ----------------------------------------------------------------------- */
+
+/* List all TrustChain certificates. Returns JSON array. */
+char *hypermesh_trustchain_certificates(hypermesh_client_t *client);
+
+/* Issue a new certificate for a subject and scope. Returns JSON. */
+char *hypermesh_trustchain_issue(hypermesh_client_t *client,
+                                 const char *subject,
+                                 const char *scope);
+
+/* Validate a PEM-encoded certificate. Returns JSON validation result. */
+char *hypermesh_trustchain_validate(hypermesh_client_t *client,
+                                    const char *cert_pem);
+
+/* Revoke a certificate by ID. Returns JSON result. */
+char *hypermesh_trustchain_revoke(hypermesh_client_t *client,
+                                  const char *cert_id);
+
+/* List TrustChain DNS zones. Returns JSON array. */
+char *hypermesh_trustchain_dns_zones(hypermesh_client_t *client);
+
+/* -----------------------------------------------------------------------
+ * Typed API — Engauge Analytics
+ * ----------------------------------------------------------------------- */
+
+/* Fetch current node capacity metrics. Returns JSON. */
+char *hypermesh_engauge_capacity(hypermesh_client_t *client);
+
+/* Fetch current traffic statistics. Returns JSON. */
+char *hypermesh_engauge_traffic(hypermesh_client_t *client);
+
+/* Fetch marketplace resource pool info. Returns JSON. */
+char *hypermesh_engauge_marketplace(hypermesh_client_t *client);
+
+/* Fetch detailed node-level metrics. Returns JSON. */
+char *hypermesh_engauge_node_metrics(hypermesh_client_t *client);
+
+/* Fetch active resource leases. Returns JSON array. */
+char *hypermesh_engauge_leases(hypermesh_client_t *client);
+
+/* -----------------------------------------------------------------------
+ * Typed API — Catalog Registry
+ * ----------------------------------------------------------------------- */
+
+/* Browse catalog packages. query may be NULL. Returns paginated JSON. */
+char *hypermesh_catalog_browse(hypermesh_client_t *client,
+                               const char *query,
+                               uint32_t page);
+
+/* Search catalog packages by query string. Returns JSON array. */
+char *hypermesh_catalog_search(hypermesh_client_t *client,
+                               const char *query);
+
+/* Get detailed info about a specific catalog package. Returns JSON. */
+char *hypermesh_catalog_package_info(hypermesh_client_t *client,
+                                     const char *name);
+
+/* Fetch catalog registry statistics. Returns JSON. */
+char *hypermesh_catalog_registry_stats(hypermesh_client_t *client);
+
+/* -----------------------------------------------------------------------
  * Memory management
  * ----------------------------------------------------------------------- */
 

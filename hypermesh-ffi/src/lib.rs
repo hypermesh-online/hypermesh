@@ -234,6 +234,31 @@ mod tests {
             assert!(hypermesh_dashboard_deploy(null, p).is_null());
             assert!(hypermesh_config_show(null).is_null());
             assert!(hypermesh_config_get(null, p).is_null());
+            // Caesar
+            assert!(hypermesh_caesar_wallet(null).is_null());
+            assert!(hypermesh_caesar_balance(null).is_null());
+            assert!(hypermesh_caesar_transactions(null, 10).is_null());
+            assert!(hypermesh_caesar_rewards(null).is_null());
+            assert!(hypermesh_caesar_route_packet(null, p, 1.0).is_null());
+            assert!(hypermesh_caesar_governor_params(null).is_null());
+            // TrustChain
+            assert!(hypermesh_trustchain_certificates(null).is_null());
+            assert!(hypermesh_trustchain_issue(null, p, p).is_null());
+            assert!(hypermesh_trustchain_validate(null, p).is_null());
+            assert!(hypermesh_trustchain_revoke(null, p).is_null());
+            assert!(hypermesh_trustchain_dns_zones(null).is_null());
+            // Engauge
+            assert!(hypermesh_engauge_capacity(null).is_null());
+            assert!(hypermesh_engauge_traffic(null).is_null());
+            assert!(hypermesh_engauge_marketplace(null).is_null());
+            assert!(hypermesh_engauge_node_metrics(null).is_null());
+            assert!(hypermesh_engauge_leases(null).is_null());
+            // Catalog
+            assert!(hypermesh_catalog_browse(null, p, 0).is_null());
+            assert!(hypermesh_catalog_browse(null, std::ptr::null(), 0).is_null());
+            assert!(hypermesh_catalog_search(null, p).is_null());
+            assert!(hypermesh_catalog_package_info(null, p).is_null());
+            assert!(hypermesh_catalog_registry_stats(null).is_null());
         }
     }
 }

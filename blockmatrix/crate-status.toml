@@ -104,6 +104,14 @@ items = [
     "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping REST API",
     "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping REST API",
     "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API",
+    # Per-service SDK modules (Caesar, TrustChain, Engauge, Catalog) in all 5 languages
+    "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, Engauge:9296, Catalog:9295)",
+    "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
+    # CLI service subcommands (route through IPC daemon)
+    "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
+    "CLI --mode flag (auto/ffi/ipc/stoq) and per-service URL flags",
+    # Config services section
+    "Config [services] section (ConnectionMode, per-service URLs in config.toml)",
 ]
 
 [features.in_development]

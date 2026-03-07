@@ -100,7 +100,12 @@ export const crateStatuses: CrateStatus[] = [
         "Python SDK (hypermesh) — sync (urllib) + async (httpx) client wrapping REST API",
         "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping REST API",
         "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping REST API",
-        "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API"
+        "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API",
+        "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, Engauge:9296, Catalog:9295)",
+        "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
+        "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
+        "CLI --mode flag (auto/ffi/ipc/stoq) and per-service URL flags",
+        "Config [services] section (ConnectionMode, per-service URLs in config.toml)"
       ],
       "inDevelopment": [
         "Post-handshake message dispatch — incoming MatrixMessage never routed to SyncDispatcher after handshake",
@@ -124,7 +129,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 82
+    "completion": 83
   },
   {
     "id": "caesar",
@@ -407,7 +412,11 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard API (hypermesh_dashboard_list, dashboard_deploy)",
         "Config API (hypermesh_config_show, config_get)",
         "C header file (include/hypermesh.h with extern C guards)",
-        "NULL-safe — all functions handle NULL client gracefully"
+        "NULL-safe — all functions handle NULL client gracefully",
+        "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
+        "TrustChain API (hypermesh_trustchain_certs, issue, validate, revoke, dns_zones)",
+        "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
+        "Catalog API (hypermesh_catalog_browse, search, package_info, registry_stats)"
       ],
       "inDevelopment": [],
       "planned": [
@@ -418,7 +427,7 @@ export const crateStatuses: CrateStatus[] = [
         "C++ FFI bindings (direct linking) — HTTP SDK exists at sdk/cpp/"
       ]
     },
-    "completion": 75
+    "completion": 79
   },
   {
     "id": "hypermesh-lib",

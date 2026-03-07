@@ -15,7 +15,7 @@ pub mod server;
 pub mod state;
 
 pub use client::IpcClient;
-pub use config::HypermeshConfig;
+pub use config::{ConnectionMode, HypermeshConfig, ServicesConfig};
 pub use handler::{HandlerFn, RequestHandler};
 pub use handlers::register_all;
 pub use protocol::{RpcError, RpcRequest, RpcResponse};
