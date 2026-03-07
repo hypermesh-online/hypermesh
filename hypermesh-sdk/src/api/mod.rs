@@ -5,7 +5,10 @@
 
 pub mod asset;
 pub mod blockchain;
+pub mod config;
+pub mod dashboard;
 pub mod dns;
+pub mod domain;
 pub mod network;
 pub mod node;
 pub mod topology;

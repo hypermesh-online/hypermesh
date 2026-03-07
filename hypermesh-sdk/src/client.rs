@@ -197,6 +197,21 @@ impl HyperMeshClient {
     pub fn topology(&self) -> api::topology::TopologyApi<'_> {
         api::topology::TopologyApi { client: self }
     }
+
+    /// Access the domain API.
+    pub fn domain(&self) -> api::domain::DomainApi<'_> {
+        api::domain::DomainApi { client: self }
+    }
+
+    /// Access the dashboard API.
+    pub fn dashboard(&self) -> api::dashboard::DashboardApi<'_> {
+        api::dashboard::DashboardApi { client: self }
+    }
+
+    /// Access the config API.
+    pub fn config(&self) -> api::config::ConfigApi<'_> {
+        api::config::ConfigApi { client: self }
+    }
 }
 
 /// Resolve the Unix socket path using the 3-tier fallback:

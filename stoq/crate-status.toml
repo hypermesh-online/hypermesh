@@ -28,14 +28,14 @@ items = [
     "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
     "MetricsFrame protocol wiring to engauge",
     "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
+    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable), wired in Sprint 33",
+    "FALCON-1024 PoS token signing — StateProof signed with FALCON-1024, verified on receive (TLS certs remain rcgen X.509 by design: TLS=encryption, PoS=authentication §5.7)",
+    "Protocol-level PoS token validation — two-stage fast/full validation with FALCON-1024 signature verification",
 ]
 
 [features.in_development]
 items = [
-    "FALCON-1024 crypto — key generation and signing code exists but certificates are currently rcgen X.509 (not FALCON-signed)",
-    "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable)",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
-    "Protocol-level PoS token validation — two-stage fast/full code exists but proofs are self-generated fakes",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
 ]
 
@@ -43,5 +43,5 @@ items = [
 items = [
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
-    "FALCON-1024 signed QUIC handshakes (replace rcgen with real post-quantum)",
+    "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)",
 ]

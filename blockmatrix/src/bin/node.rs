@@ -1714,7 +1714,7 @@ async fn run_connect(
             }
         });
 
-        // Block sync + reflector heartbeat loop
+        // Block sync + reflector heartbeat loop + metrics reporting
         let sync_mgr_loop = sync_manager.clone();
         let refl_pool_loop = reflector_pool.clone();
         let blockchain_sync = bootstrap.blockchain().clone();
@@ -1723,11 +1723,18 @@ async fn run_connect(
         let block_transport_sync = block_transport.clone();
         let is_reflector = cli.reflector;
         let sync_coord = coord;
+        let shard_store_metrics = shard_store.clone();
+        let metrics_node_id = nid.to_string();
         tokio::spawn(async move {
             let mut interval =
                 tokio::time::interval(tokio::time::Duration::from_secs(5));
+            let mut metrics_reporter =
+                blockmatrix::network::MetricsReporter::new(metrics_node_id);
+            let os_abs = create_os_abstraction().ok();
+            let mut cycle_count: u64 = 0;
             loop {
                 interval.tick().await;
+                cycle_count += 1;
 
                 let addr_map = network_sync.get_node_address_map().await;
                 *node_map_sync.write().await = addr_map;
@@ -1804,10 +1811,27 @@ async fn run_connect(
                         }
                     }
                 }
+
+                // Emit node metrics every 30s (6 sync cycles)
+                if cycle_count % 6 == 0 {
+                    let chain_h = blockchain_sync.get_height().await;
+                    let peers = network_sync.get_connected_nodes().await.len();
+                    let shards = shard_store_metrics.count().await;
+                    let (cpu, mem) = os_abs
+                        .as_ref()
+                        .and_then(|os| os.get_resource_usage().ok())
+                        .map(|u| (u.cpu_usage_percent, u.memory_usage_percent))
+                        .unwrap_or((0.0, 0.0));
+                    let _frame_bytes = metrics_reporter.build_capacity_frame(
+                        chain_h, peers, shards, cpu, mem,
+                    );
+                    // TODO: Push frame_bytes to engauge STOQ API at [::1]:9296
+                    // when engauge is running as a co-located service
+                }
             }
         });
         info!(
-            "Block sync loop started (interval=5s, reflector={})",
+            "Block sync loop started (interval=5s, reflector={}, metrics_interval=30s)",
             cli.reflector
         );
 

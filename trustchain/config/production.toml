@@ -100,17 +100,6 @@ max_concurrent_streams = 100
 send_buffer_size = 1048576
 receive_buffer_size = 1048576
 
-[api]
-# API Server Configuration
-bind_address = "::"
-port = 8446
-enable_cors = true
-max_request_size = 1048576
-rate_limit_requests_per_minute = 1000
-# Native metrics endpoint (no external dependencies)
-enable_metrics = true
-metrics_port = 9090
-
 [logging]
 # Logging configuration
 level = "info"

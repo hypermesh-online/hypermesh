@@ -533,22 +533,22 @@ export const crateStatuses: CrateStatus[] = [
         "Cipher suite negotiation for Private/Anonymous networks (R8)",
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
         "MetricsFrame protocol wiring to engauge",
-        "Min-spec transport validation (R13 — bandwidth checks, connection budget)"
+        "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
+        "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable), wired in Sprint 33",
+        "FALCON-1024 PoS token signing — StateProof signed with FALCON-1024, verified on receive (TLS certs remain rcgen X.509 by design: TLS=encryption, PoS=authentication §5.7)",
+        "Protocol-level PoS token validation — two-stage fast/full validation with FALCON-1024 signature verification"
       ],
       "inDevelopment": [
-        "FALCON-1024 crypto — key generation and signing code exists but certificates are currently rcgen X.509 (not FALCON-signed)",
-        "StoqShardTransport — real ShardTransport impl over QUIC (send_shard/fetch_shard/is_reachable)",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
-        "Protocol-level PoS token validation — two-stage fast/full code exists but proofs are self-generated fakes",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
       ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements",
-        "FALCON-1024 signed QUIC handshakes (replace rcgen with real post-quantum)"
+        "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)"
       ]
     },
-    "completion": 72
+    "completion": 83
   },
   {
     "id": "trustchain",
@@ -580,12 +580,11 @@ export const crateStatuses: CrateStatus[] = [
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
       "inDevelopment": [
-        "FALCON-1024 certificate signing — currently using rcgen (traditional RSA/ECDSA X.509), NOT post-quantum FALCON-1024",
+        "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS (encryption layer). FALCON-1024 is used for PoS authentication signatures. TLS=encryption, PoS=authentication (§5.7). Full PQ TLS requires Quinn upstream support.",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-        "Real Proof of State validation — state proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
-        "StakeProof signature verification — currently checks non-empty string + positive number, no cryptographic verification",
+        "Real Proof of State validation in TrustChain CA — state proofs use hardcoded query values (BlockMatrix Sprint 32 has real system queries, TrustChain CA not yet updated)",
         "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-        "DNS zone propagation — DNS resolver is a local HashMap, no cross-node zone transfer",
+        "DNS zone propagation in TrustChain — DNS resolver is a local HashMap (BlockMatrix DNS propagates via block sync to peers)",
         "CT log federation sync — message types exist but no real cross-node sync",
         "Cross-network CA federation — peer management structs exist but no real QUIC-based peer exchange",
         "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
@@ -602,7 +601,7 @@ export const crateStatuses: CrateStatus[] = [
         "Field device bootstrap with intermittent connectivity"
       ]
     },
-    "completion": 54
+    "completion": 55
   },
   {
     "id": "ui",

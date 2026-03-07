@@ -37,12 +37,11 @@ items = [
 [features.in_development]
 items = [
     # CRITICAL: Core decentralization features that are missing or fake
-    "FALCON-1024 certificate signing — currently using rcgen (traditional RSA/ECDSA X.509), NOT post-quantum FALCON-1024",
+    "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS (encryption layer). FALCON-1024 is used for PoS authentication signatures. TLS=encryption, PoS=authentication (§5.7). Full PQ TLS requires Quinn upstream support.",
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
-    "Real Proof of State validation — state proofs are self-generated with hardcoded values (query_node_stake returns 10000, perform_ntp_sync returns 5ms, query_system_storage returns 100GB/50GB)",
-    "StakeProof signature verification — currently checks non-empty string + positive number, no cryptographic verification",
+    "Real Proof of State validation in TrustChain CA — state proofs use hardcoded query values (BlockMatrix Sprint 32 has real system queries, TrustChain CA not yet updated)",
     "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-    "DNS zone propagation — DNS resolver is a local HashMap, no cross-node zone transfer",
+    "DNS zone propagation in TrustChain — DNS resolver is a local HashMap (BlockMatrix DNS propagates via block sync to peers)",
     "CT log federation sync — message types exist but no real cross-node sync",
     "Cross-network CA federation — peer management structs exist but no real QUIC-based peer exchange",
     "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
