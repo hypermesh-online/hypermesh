@@ -110,6 +110,7 @@ mod tests {
             blockchain: bc,
             persistence,
             network: None,
+            shard_store: Arc::new(crate::network::shard_store::ShardStore::new()),
             coordinate: coord,
             node_id: "bc-test".into(),
             data_dir: PathBuf::from("/tmp"),

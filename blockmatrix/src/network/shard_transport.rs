@@ -314,6 +314,84 @@ impl ShardTransport for MockShardTransport {
     }
 }
 
+/// Handle a shard message when the tag byte has already been read.
+///
+/// `data` is the full message payload INCLUDING the tag byte at `data[0]`.
+/// This is the same logic as [`handle_incoming_shard_stream`] but can be
+/// called from a dispatch loop that has already received the stream data.
+///
+/// Returns `Ok(None)` for SHARD_SEND (no reply), `Ok(Some(bytes))` for
+/// SHARD_FETCH (response data to send back).
+pub async fn handle_shard_message(
+    data: &[u8],
+    store: &ShardStore,
+) -> Result<Option<Vec<u8>>, TransportError> {
+    if data.is_empty() {
+        return Err(TransportError::Protocol("empty shard message".into()));
+    }
+
+    let tag = data[0];
+
+    match tag {
+        0x01 => {
+            // SHARD_SEND: tag(1) + shard_id(32) + data_len(8) + data
+            if data.len() < 41 {
+                return Err(TransportError::Protocol("SHARD_SEND too short".into()));
+            }
+            let mut shard_id_bytes = [0u8; 32];
+            shard_id_bytes.copy_from_slice(&data[1..33]);
+            let shard_id = ContentHash(shard_id_bytes);
+
+            let data_len =
+                u64::from_le_bytes(data[33..41].try_into().map_err(|_| {
+                    TransportError::Protocol("SHARD_SEND invalid data_len".into())
+                })?) as usize;
+            if data.len() < 41 + data_len {
+                return Err(TransportError::Protocol("SHARD_SEND data truncated".into()));
+            }
+            let shard_data = data[41..41 + data_len].to_vec();
+
+            // Verify BLAKE3 integrity before storing
+            let computed_hash = blake3::hash(&shard_data);
+            if computed_hash.as_bytes() != &shard_id.0 {
+                tracing::warn!(
+                    "Shard BLAKE3 mismatch: expected {}, got {}",
+                    hex::encode(shard_id.0),
+                    hex::encode(computed_hash.as_bytes())
+                );
+                return Err(TransportError::Network("shard hash mismatch".into()));
+            }
+
+            store.store(shard_id, shard_data).await;
+            tracing::debug!("Stored shard {} from peer", hex::encode(shard_id_bytes));
+            Ok(None)
+        }
+        0x02 => {
+            // SHARD_FETCH: tag(1) + shard_id(32)
+            if data.len() < 33 {
+                return Err(TransportError::Protocol("SHARD_FETCH too short".into()));
+            }
+            let mut shard_id_bytes = [0u8; 32];
+            shard_id_bytes.copy_from_slice(&data[1..33]);
+            let shard_id = ContentHash(shard_id_bytes);
+
+            match store.get(&shard_id).await {
+                Some(shard_data) => {
+                    tracing::debug!("Serving shard {} to peer", hex::encode(shard_id_bytes));
+                    Ok(Some(shard_data))
+                }
+                None => {
+                    // Empty response indicates shard not found
+                    Ok(Some(Vec::new()))
+                }
+            }
+        }
+        _ => Err(TransportError::Protocol(format!(
+            "unknown shard tag: 0x{tag:02x}"
+        ))),
+    }
+}
+
 /// Handle an incoming shard stream from a peer.
 ///
 /// Reads the tag byte, then dispatches:

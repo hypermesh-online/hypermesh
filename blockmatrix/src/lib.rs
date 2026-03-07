@@ -185,6 +185,9 @@ pub mod integration;
 /// TrustChain and BlockMatrix are ONE SYSTEM, not separate components
 pub mod bootstrap;
 
+/// FALCON-1024 node identity for bilateral PoS authentication
+pub mod identity;
+
 /// Network module - Multi-node communication
 pub mod network;
 

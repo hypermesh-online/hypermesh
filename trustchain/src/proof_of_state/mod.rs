@@ -9,6 +9,8 @@
 //! Each proof is binary pass/fail. No voting, quorum, or leader election.
 
 use anyhow::{anyhow, Result};
+use pqcrypto_falcon::falcon1024;
+use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
@@ -277,6 +279,80 @@ impl StateProofContext {
     }
 }
 
+/// A state proof signed with FALCON-1024 for bilateral authentication.
+///
+/// Wraps a `StateProof` with a post-quantum FALCON-1024 detached signature,
+/// the signer's public key, and a replay-prevention nonce.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedStateProof {
+    /// The underlying four-proof state proof
+    pub proof: StateProof,
+    /// FALCON-1024 detached signature over BLAKE3(proof_bytes || nonce)
+    pub signature: Vec<u8>,
+    /// Signer's FALCON-1024 public key
+    pub signer_pubkey: Vec<u8>,
+    /// Random nonce to prevent replay attacks
+    pub nonce: [u8; 32],
+}
+
+impl SignedStateProof {
+    /// Create a signed state proof using FALCON-1024 keys.
+    pub fn sign(proof: StateProof, secret_key: &[u8], public_key: &[u8]) -> Result<Self> {
+        use rand::RngCore;
+        let mut nonce = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut nonce);
+
+        let proof_bytes = proof.to_bytes()?;
+        let mut message_input = Vec::with_capacity(proof_bytes.len() + 32);
+        message_input.extend_from_slice(&proof_bytes);
+        message_input.extend_from_slice(&nonce);
+        let message_hash = blake3::hash(&message_input);
+
+        let sk = falcon1024::SecretKey::from_bytes(secret_key)
+            .map_err(|e| anyhow!("Invalid FALCON-1024 secret key: {e}"))?;
+        let sig = falcon1024::detached_sign(message_hash.as_bytes(), &sk);
+
+        Ok(Self {
+            proof,
+            signature: sig.as_bytes().to_vec(),
+            signer_pubkey: public_key.to_vec(),
+            nonce,
+        })
+    }
+
+    /// Verify the FALCON-1024 signature on this proof.
+    pub fn verify(&self) -> Result<bool> {
+        let proof_bytes = self.proof.to_bytes()?;
+        let mut message_input = Vec::with_capacity(proof_bytes.len() + 32);
+        message_input.extend_from_slice(&proof_bytes);
+        message_input.extend_from_slice(&self.nonce);
+        let message_hash = blake3::hash(&message_input);
+
+        let pk = falcon1024::PublicKey::from_bytes(&self.signer_pubkey)
+            .map_err(|e| anyhow!("Invalid FALCON-1024 public key: {e}"))?;
+        let sig = falcon1024::DetachedSignature::from_bytes(&self.signature)
+            .map_err(|e| anyhow!("Invalid FALCON-1024 signature: {e}"))?;
+
+        Ok(falcon1024::verify_detached_signature(&sig, message_hash.as_bytes(), &pk).is_ok())
+    }
+
+    /// Derive the signer's node ID (BLAKE3 hex of public key).
+    pub fn signer_node_id(&self) -> String {
+        blake3::hash(&self.signer_pubkey).to_hex().to_string()
+    }
+
+    /// Serialize for network transmission (JSON).
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        serde_json::to_vec(self).map_err(|e| anyhow!("Failed to serialize SignedStateProof: {e}"))
+    }
+
+    /// Deserialize from network transmission (JSON).
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        serde_json::from_slice(data)
+            .map_err(|e| anyhow!("Failed to deserialize SignedStateProof: {e}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +422,74 @@ mod tests {
 
         assert_eq!(hash1, hash2);
         Ok(())
+    }
+
+    #[test]
+    fn test_signed_state_proof_roundtrip() {
+        let proof = StateProof::new_for_testing();
+        let (pk, sk) = falcon1024::keypair();
+
+        let signed = SignedStateProof::sign(
+            proof,
+            sk.as_bytes(),
+            pk.as_bytes(),
+        )
+        .expect("test: signing should succeed");
+
+        // Verify signature
+        assert!(
+            signed.verify().expect("test: verify should not error"),
+            "FALCON-1024 signature should verify"
+        );
+
+        // Verify signer node ID is deterministic
+        let node_id_1 = signed.signer_node_id();
+        let node_id_2 = signed.signer_node_id();
+        assert_eq!(node_id_1, node_id_2);
+        assert!(!node_id_1.is_empty());
+
+        // Serialize and deserialize
+        let bytes = signed.to_bytes().expect("test: serialization");
+        let deserialized =
+            SignedStateProof::from_bytes(&bytes).expect("test: deserialization");
+        assert!(
+            deserialized.verify().expect("test: verify after deser"),
+            "Signature should verify after deserialization"
+        );
+    }
+
+    #[test]
+    fn test_signed_state_proof_wrong_key_fails() {
+        let proof = StateProof::new_for_testing();
+        let (_pk1, sk1) = falcon1024::keypair();
+        let (pk2, _sk2) = falcon1024::keypair();
+
+        // Sign with sk1 but claim pk2
+        let mut signed = SignedStateProof::sign(
+            proof,
+            sk1.as_bytes(),
+            pk2.as_bytes(),
+        )
+        .expect("test: signing should succeed");
+
+        // Verification should fail (wrong key)
+        assert!(
+            !signed.verify().expect("test: verify should not error"),
+            "Signature should fail with wrong public key"
+        );
+
+        // Also test tampered nonce
+        let (pk3, sk3) = falcon1024::keypair();
+        signed = SignedStateProof::sign(
+            StateProof::new_for_testing(),
+            sk3.as_bytes(),
+            pk3.as_bytes(),
+        )
+        .expect("test: signing");
+        signed.nonce[0] ^= 0xFF;
+        assert!(
+            !signed.verify().expect("test: verify should not error"),
+            "Signature should fail with tampered nonce"
+        );
     }
 }

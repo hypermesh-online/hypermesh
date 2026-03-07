@@ -23,7 +23,7 @@ items = [
 [features.in_development]
 items = [
     "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-    "Network MVP — peer discovery, shard transport over QUIC, end-to-end asset store/fetch across nodes",
+    "Network MVP — bilateral FALCON-1024 handshake + block sync wired, shard distribution wired, E2E testing in progress",
     "Systemd unit fixes — correct binary names, port assignments, working directory setup",
     "Port allocation plan — resolve 8446 conflict between trustchain API and blockmatrix, assign unique ports per service",
 ]

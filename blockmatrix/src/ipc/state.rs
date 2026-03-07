@@ -6,6 +6,7 @@
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::bootstrap::DnsResolver;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::network::shard_store::ShardStore;
 use crate::network::NetworkManager;
 use crate::persistence::PersistenceManager;
 use std::path::PathBuf;
@@ -20,6 +21,8 @@ pub struct DaemonState {
     pub persistence: Arc<PersistenceManager>,
     /// Network manager (None if running in Private mode with no STOQ).
     pub network: Option<Arc<NetworkManager>>,
+    /// Local shard store for serving and caching shards.
+    pub shard_store: Arc<ShardStore>,
     /// This node's matrix coordinate.
     pub coordinate: MatrixCoordinate,
     /// Unique node identifier derived from the coordinate.

@@ -13,6 +13,7 @@ pub mod dashboard;
 pub mod dns;
 pub mod domain;
 pub mod network;
+pub mod shard;
 pub mod topology;
 
 use std::sync::Arc;
@@ -81,21 +82,23 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     topology::register(handler, &state);
     asset::register(handler, &state);
     dashboard::register(handler, &state);
+    shard::register(handler, &state);
     config::register(handler);
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::blockchain::node_chain::NodeBlockchain;
     use crate::ipc::protocol::RpcRequest;
     use crate::matrix::coordinate::MatrixCoordinate;
+    use crate::network::shard_store::ShardStore;
     use crate::persistence::{PersistenceConfig, PersistenceManager};
     use std::path::PathBuf;
     use std::time::Instant;
 
     /// Build a minimal DaemonState for testing.
-    async fn test_state() -> Arc<DaemonState> {
+    pub(crate) async fn test_state() -> Arc<DaemonState> {
         let coord =
             MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
         let blockchain = Arc::new(NodeBlockchain::new(coord));
@@ -115,6 +118,7 @@ mod tests {
             blockchain,
             persistence,
             network: None,
+            shard_store: Arc::new(ShardStore::new()),
             coordinate: coord,
             node_id: "test-node".to_string(),
             data_dir: PathBuf::from("/tmp"),

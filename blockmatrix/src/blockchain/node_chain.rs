@@ -284,6 +284,41 @@ impl NodeBlockchain {
         self.add_block(vec![asset_id], state_proof).await
     }
 
+    /// Insert a pre-built block received from a peer into the chain.
+    ///
+    /// Unlike [`add_block`] which creates a new block, this method inserts
+    /// an existing block that has already been validated by the sender.
+    /// The caller MUST verify the block hash before calling this method.
+    ///
+    /// Returns `Ok(())` if inserted, `Err` if duplicate or invalid.
+    pub async fn insert_received_block(&self, block: Block) -> Result<(), String> {
+        // Verify hash integrity
+        if !block.verify_hash() {
+            return Err(format!(
+                "Block {} hash mismatch: expected {}, got {}",
+                block.index,
+                block.calculate_hash(),
+                block.hash,
+            ));
+        }
+
+        // Check previous_hash linkage (skip for genesis)
+        if block.index > 0 {
+            let blocks = self.blocks.read().await;
+            if let Some(prev) = blocks.get(&(block.index - 1)) {
+                if block.previous_hash != prev.hash {
+                    return Err(format!(
+                        "Block {} previous_hash {} does not match block {}'s hash {}",
+                        block.index, block.previous_hash, block.index - 1, prev.hash,
+                    ));
+                }
+            }
+            // If we don't have the predecessor, we still insert (gap-fill later)
+        }
+
+        self.insert_block(block).await
+    }
+
     /// Insert a block into the chain (internal helper)
     async fn insert_block(&self, block: Block) -> Result<(), String> {
         let mut blocks = self.blocks.write().await;

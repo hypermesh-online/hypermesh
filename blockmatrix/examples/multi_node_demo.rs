@@ -136,8 +136,17 @@ async fn start_node(
             vec![]
         };
 
-        // Create network manager
-        let network = NetworkManager::new(coord, transport, privacy_mode, bootstrap_nodes).await?;
+        // Create network manager with FALCON-1024 identity
+        let identity = blockmatrix::identity::FalconIdentity::generate();
+        let network = NetworkManager::new(
+            coord,
+            transport,
+            privacy_mode,
+            bootstrap_nodes,
+            identity.public_key.clone(),
+            identity.secret_key_bytes().to_vec(),
+        )
+        .await?;
 
         // Start discovery
         network.start_discovery().await?;
@@ -147,7 +156,7 @@ async fn start_node(
         let acceptor = network_arc.clone();
 
         tokio::spawn(async move {
-            if let Err(e) = acceptor.accept_connections().await {
+            if let Err(e) = acceptor.accept_connections(None).await {
                 warn!("Connection acceptor error: {}", e);
             }
         });

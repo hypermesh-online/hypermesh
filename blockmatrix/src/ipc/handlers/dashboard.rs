@@ -284,6 +284,7 @@ mod tests {
             blockchain: bc,
             persistence,
             network: None,
+            shard_store: Arc::new(crate::network::shard_store::ShardStore::new()),
             coordinate: coord,
             node_id: "dash-test".into(),
             data_dir,

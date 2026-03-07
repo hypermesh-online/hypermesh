@@ -29,10 +29,16 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+use crate::blockchain::node_chain::NodeBlockchain;
+use crate::blockchain::propagation::BlockPropagator;
+use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
+use crate::identity::FalconIdentity;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
-use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
+use crate::network::reflector_pool::ReflectorPool;
+use crate::network::shard_store::ShardStore;
+use crate::network::stoq_integration::{MatrixMessage, MatrixNodeInfo, MatrixStoqIntegration};
 use crate::proof_of_state::StateProof;
 
 /// Node network information
@@ -63,6 +69,27 @@ impl std::fmt::Debug for NetworkNode {
     }
 }
 
+/// Shared context for peer message processing.
+///
+/// Passed to the per-connection message loop so that incoming blocks,
+/// shards, and sync messages can reach the appropriate subsystems.
+pub struct PeerContext {
+    /// The node's blockchain (for inserting received blocks).
+    pub blockchain: Arc<NodeBlockchain>,
+    /// Shard store (for shard send/fetch operations).
+    pub shard_store: Arc<ShardStore>,
+    /// Sync manager for chain synchronization state.
+    pub sync_manager: Arc<tokio::sync::Mutex<SyncManager>>,
+    /// Reflector pool for tracking block-serving peers.
+    pub reflector_pool: Arc<tokio::sync::Mutex<ReflectorPool>>,
+    /// Block propagator for re-propagating received blocks.
+    pub block_propagator: Arc<tokio::sync::Mutex<BlockPropagator>>,
+    /// Our matrix coordinate.
+    pub our_coordinate: MatrixCoordinate,
+    /// Our node ID.
+    pub node_id: String,
+}
+
 /// Network manager for multi-node communication
 pub struct NetworkManager {
     /// Local node coordinate
@@ -77,15 +104,25 @@ pub struct NetworkManager {
     privacy_mode: Arc<RwLock<PrivacyMode>>,
     /// Matrix-STOQ integration layer
     stoq_integration: Option<Arc<MatrixStoqIntegration>>,
+    /// FALCON-1024 public key for signing state proofs
+    identity_pubkey: Vec<u8>,
+    /// FALCON-1024 secret key for signing state proofs
+    identity_secret: Vec<u8>,
 }
 
 impl NetworkManager {
-    /// Create new network manager
+    /// Create new network manager with FALCON-1024 identity for PoS signing.
+    ///
+    /// `identity_pubkey` and `identity_secret` are raw FALCON-1024 key bytes
+    /// from `FalconIdentity`. State proofs sent during handshake are signed
+    /// with these keys.
     pub async fn new(
         local_coordinate: MatrixCoordinate,
         transport: Arc<stoq::StoqTransport>,
         privacy_mode: PrivacyMode,
         bootstrap_nodes: Vec<SocketAddr>,
+        identity_pubkey: Vec<u8>,
+        identity_secret: Vec<u8>,
     ) -> Result<Self> {
         info!(
             "Initializing network manager at ({},{},{}) in {:?} mode",
@@ -117,6 +154,8 @@ impl NetworkManager {
             bootstrap_nodes,
             privacy_mode: Arc::new(RwLock::new(privacy_mode)),
             stoq_integration,
+            identity_pubkey,
+            identity_secret,
         })
     }
 
@@ -229,23 +268,30 @@ impl NetworkManager {
         Ok(node_info.node_id)
     }
 
-    /// Exchange node information with peer
+    /// Exchange node information with peer using 3-message bilateral
+    /// challenge-response handshake (R11).
+    ///
+    /// Protocol:
+    ///   Message 1 (A->B): coordinate, node_id, privacy_mode, falcon_pubkey, nonce_a
+    ///   Message 2 (B->A): coordinate, node_id, privacy_mode, falcon_pubkey, nonce_b,
+    ///                      proof_bytes, signature (covers BLAKE3(nonce_a || proof_bytes))
+    ///   Message 3 (A->B): proof_bytes, signature (covers BLAKE3(nonce_b || proof_bytes))
+    ///
+    /// Both sides verify:
+    ///   1. BLAKE3(falcon_pubkey) == declared node_id (identity binding)
+    ///   2. FALCON signature covers OUR nonce (prevents replay)
+    ///   3. StateProof.validate() passes (PoS thresholds)
     async fn exchange_node_info(&self, connection: &Arc<stoq::Connection>) -> Result<NetworkNode> {
-        // Open a stream for handshake
         let mut stream = connection.open_stream().await?;
 
-        // Generate PoS proof for handshake
         let node_id_string = self.get_node_id();
-        let state_proof = StateProof::generate_from_network(&node_id_string)
-            .await
-            .unwrap_or_else(|e| {
-                warn!("PoS proof generation failed (using test fallback): {e}");
-                StateProof::new_for_testing()
-            });
-        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
 
-        // Send our node info with PoS token
-        let our_info = serde_json::json!({
+        // Generate 32-byte challenge nonce
+        let mut nonce_a = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_a);
+
+        // --- Message 1 (A->B): send our info + challenge nonce ---
+        let msg1 = serde_json::json!({
             "coordinate": {
                 "x": self.local_coordinate.x,
                 "y": self.local_coordinate.y,
@@ -253,68 +299,164 @@ impl NetworkManager {
             },
             "node_id": node_id_string,
             "privacy_mode": format!("{:?}", *self.privacy_mode.read().await),
-            "pos_token": hex::encode(&proof_bytes),
+            "falcon_pubkey": hex::encode(&self.identity_pubkey),
+            "nonce": hex::encode(nonce_a),
         });
+        stream.send(msg1.to_string().as_bytes()).await?;
 
-        stream.send(our_info.to_string().as_bytes()).await?;
+        // --- Receive Message 2 from B ---
+        let msg2_data = stream.receive().await?;
+        let msg2: serde_json::Value = serde_json::from_slice(&msg2_data)?;
 
-        // Receive peer info
-        let peer_data = stream.receive().await?;
-        let peer_info: serde_json::Value = serde_json::from_slice(&peer_data)?;
+        // Verify B's identity binding: BLAKE3(pubkey) == node_id
+        let peer_pubkey = Self::extract_and_verify_identity(&msg2)?;
 
-        // Validate peer's PoS proof
-        Self::validate_peer_pos_token(&peer_info)?;
+        // Verify B's challenge-response signature
+        let peer_proof_bytes = Self::extract_hex_field(&msg2, "proof_bytes")?;
+        let peer_signature = Self::extract_hex_field(&msg2, "signature")?;
+        Self::verify_challenge_response(&peer_pubkey, &nonce_a, &peer_proof_bytes, &peer_signature)?;
 
-        // Parse peer information — require valid coordinates
-        let x = peer_info["coordinate"]["x"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate x in peer handshake"))?;
-        let y = peer_info["coordinate"]["y"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate y in peer handshake"))?;
-        let z = peer_info["coordinate"]["z"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate z in peer handshake"))?;
-        let coordinate = MatrixCoordinate::new(x, y, z)?;
+        // Verify B's state proof
+        let peer_proof = StateProof::from_bytes(&peer_proof_bytes)
+            .map_err(|e| anyhow!("Failed to deserialize peer state proof: {e}"))?;
+        if !peer_proof.validate() {
+            return Err(anyhow!("Peer state proof validation failed"));
+        }
 
-        let node_id = peer_info["node_id"]
+        // Extract B's challenge nonce
+        let nonce_b = Self::extract_hex_field(&msg2, "nonce")?;
+        if nonce_b.len() != 32 {
+            return Err(anyhow!("Invalid peer nonce length: {}", nonce_b.len()));
+        }
+
+        // --- Message 3 (A->B): respond to B's challenge ---
+        let our_proof = StateProof::generate_from_network(&node_id_string)
+            .await
+            .unwrap_or_else(|e| {
+                warn!("PoS proof generation failed (using test fallback): {e}");
+                StateProof::new_for_testing()
+            });
+        let our_proof_bytes = our_proof
+            .to_bytes()
+            .map_err(|e| anyhow!("Failed to serialize state proof: {e}"))?;
+
+        // Sign BLAKE3(nonce_b || our_proof_bytes) with our FALCON key
+        let our_signature = Self::sign_challenge(&self.identity_secret, &nonce_b, &our_proof_bytes)?;
+
+        let msg3 = serde_json::json!({
+            "proof_bytes": hex::encode(&our_proof_bytes),
+            "signature": hex::encode(&our_signature),
+        });
+        stream.send(msg3.to_string().as_bytes()).await?;
+
+        // Parse peer coordinates
+        let coordinate = Self::parse_coordinate(&msg2)?;
+        let peer_node_id = msg2["node_id"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing node_id"))?
             .to_string();
+        let privacy_mode = Self::parse_privacy_mode(&msg2);
 
-        let privacy_mode = Self::parse_privacy_mode(&peer_info);
+        info!(
+            "Bilateral verification complete with peer {}",
+            &peer_node_id[..8.min(peer_node_id.len())]
+        );
 
         Ok(NetworkNode {
             coordinate,
             address: connection.endpoint().to_socket_addr(),
-            node_id,
+            node_id: peer_node_id,
             privacy_mode,
             connection: Some(connection.clone()),
         })
     }
 
-    /// Validate peer's PoS token from handshake JSON
-    fn validate_peer_pos_token(peer_info: &serde_json::Value) -> Result<()> {
-        let pos_hex = peer_info
-            .get("pos_token")
+    // ── Bilateral verification helpers ─────────────────────────────────
+
+    /// Extract a hex-encoded byte field from JSON.
+    fn extract_hex_field(msg: &serde_json::Value, field: &str) -> Result<Vec<u8>> {
+        let hex_str = msg
+            .get(field)
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Missing pos_token in peer handshake"))?;
+            .ok_or_else(|| anyhow!("Missing field '{field}' in handshake message"))?;
+        hex::decode(hex_str)
+            .map_err(|e| anyhow!("Invalid hex in field '{field}': {e}"))
+    }
 
-        let pos_bytes = hex::decode(pos_hex)
-            .map_err(|e| anyhow!("Invalid pos_token hex encoding: {e}"))?;
+    /// Extract peer's FALCON public key and verify identity binding.
+    ///
+    /// Checks that `BLAKE3(falcon_pubkey) == declared node_id`.
+    fn extract_and_verify_identity(msg: &serde_json::Value) -> Result<Vec<u8>> {
+        let pubkey = Self::extract_hex_field(msg, "falcon_pubkey")?;
+        let declared_id = msg["node_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing node_id in handshake"))?;
 
-        let peer_proof = StateProof::from_bytes(&pos_bytes)
-            .map_err(|e| anyhow!("Invalid state proof format: {e}"))?;
-
-        if !peer_proof.validate() {
-            return Err(anyhow!("Peer state proof validation failed"));
+        let computed_id = blake3::hash(&pubkey).to_hex().to_string();
+        if computed_id != declared_id {
+            return Err(anyhow!(
+                "Identity binding failed: BLAKE3(pubkey)={} != declared node_id={}",
+                &computed_id[..16],
+                &declared_id[..16.min(declared_id.len())],
+            ));
         }
+        Ok(pubkey)
+    }
 
-        debug!("Peer PoS token validated successfully");
+    /// Sign a challenge: FALCON-1024(BLAKE3(nonce || proof_bytes)).
+    fn sign_challenge(
+        secret_key: &[u8],
+        challenge_nonce: &[u8],
+        proof_bytes: &[u8],
+    ) -> Result<Vec<u8>> {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(challenge_nonce);
+        hasher.update(proof_bytes);
+        let digest = hasher.finalize();
+
+        use pqcrypto_traits::sign::{DetachedSignature, SecretKey as _};
+        let sk = pqcrypto_falcon::falcon1024::SecretKey::from_bytes(secret_key)
+            .map_err(|e| anyhow!("Invalid FALCON secret key: {e}"))?;
+        let sig = pqcrypto_falcon::falcon1024::detached_sign(digest.as_bytes(), &sk);
+        Ok(sig.as_bytes().to_vec())
+    }
+
+    /// Verify a challenge-response: check FALCON signature over BLAKE3(nonce || proof_bytes).
+    fn verify_challenge_response(
+        pubkey: &[u8],
+        our_nonce: &[u8],
+        proof_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<()> {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(our_nonce);
+        hasher.update(proof_bytes);
+        let digest = hasher.finalize();
+
+        let valid = FalconIdentity::verify(pubkey, digest.as_bytes(), signature)
+            .map_err(|e| anyhow!("FALCON verification error: {e}"))?;
+        if !valid {
+            return Err(anyhow!("FALCON challenge-response verification failed"));
+        }
+        debug!("FALCON challenge-response verified successfully");
         Ok(())
     }
 
-    /// Parse privacy mode from peer handshake JSON
+    /// Parse coordinate from handshake JSON message.
+    fn parse_coordinate(msg: &serde_json::Value) -> Result<MatrixCoordinate> {
+        let x = msg["coordinate"]["x"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate x in handshake"))?;
+        let y = msg["coordinate"]["y"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate y in handshake"))?;
+        let z = msg["coordinate"]["z"]
+            .as_i64()
+            .ok_or_else(|| anyhow!("Missing coordinate z in handshake"))?;
+        MatrixCoordinate::new(x, y, z).map_err(|e| anyhow!("Invalid coordinate: {e}"))
+    }
+
+    /// Parse privacy mode from peer handshake JSON.
     fn parse_privacy_mode(peer_info: &serde_json::Value) -> PrivacyMode {
         match peer_info["privacy_mode"].as_str().unwrap_or("Private") {
             "Anonymous" => PrivacyMode::ANONYMOUS,
@@ -555,28 +697,59 @@ impl NetworkManager {
         }
     }
 
-    /// Accept incoming connections
-    pub async fn accept_connections(&self) -> Result<()> {
+    /// Accept incoming connections.
+    ///
+    /// When `peer_ctx` is `Some`, a persistent message loop is spawned for
+    /// each successfully handshaked peer, enabling reception of blocks,
+    /// shards, and sync messages.
+    pub async fn accept_connections(&self, peer_ctx: Option<Arc<PeerContext>>) -> Result<()> {
         info!("Starting to accept incoming connections");
 
         loop {
             match self.transport.accept().await {
                 Ok(connection) => {
+                    // Enforce max peers
+                    if self.nodes.read().await.len() >= 50 {
+                        warn!("Max peers (50) reached, rejecting connection");
+                        continue;
+                    }
+
                     let nodes = self.nodes.clone();
                     let local_coord = self.local_coordinate;
                     let privacy_mode = self.privacy_mode.clone();
+                    let ctx = peer_ctx.clone();
+                    let id_pubkey = self.identity_pubkey.clone();
+                    let id_secret = self.identity_secret.clone();
 
                     // Handle connection in background
                     tokio::spawn(async move {
-                        if let Err(e) = Self::handle_incoming_handshake(
-                            connection,
+                        match Self::handle_incoming_handshake(
+                            connection.clone(),
                             nodes,
                             local_coord,
                             privacy_mode,
+                            id_pubkey,
+                            id_secret,
                         )
                         .await
                         {
-                            warn!("Incoming handshake failed: {e}");
+                            Ok((peer_node_id, peer_coord)) => {
+                                // Spawn persistent message loop if context available
+                                if let Some(ctx) = ctx {
+                                    tokio::spawn(async move {
+                                        run_peer_message_loop(
+                                            connection,
+                                            peer_node_id,
+                                            peer_coord,
+                                            ctx,
+                                        )
+                                        .await;
+                                    });
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Incoming handshake failed: {e}");
+                            }
                         }
                     });
                 }
@@ -587,44 +760,63 @@ impl NetworkManager {
         }
     }
 
-    /// Handle the handshake for an incoming connection
+    /// Handle the 3-message bilateral handshake for an incoming connection (R11).
+    ///
+    /// Protocol (acceptor/B side):
+    ///   Receive Message 1 from A (coordinate, node_id, falcon_pubkey, nonce_a)
+    ///   Send Message 2 to A (coordinate, node_id, falcon_pubkey, nonce_b,
+    ///                        proof_bytes, signature over BLAKE3(nonce_a || proof))
+    ///   Receive Message 3 from A (proof_bytes, signature over BLAKE3(nonce_b || proof))
+    ///
+    /// Returns `(peer_node_id, peer_coordinate)` on success.
     async fn handle_incoming_handshake(
         connection: Arc<stoq::Connection>,
         nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
         local_coord: MatrixCoordinate,
         privacy_mode: Arc<RwLock<PrivacyMode>>,
-    ) -> Result<()> {
-        debug!("Accepted incoming connection");
+        identity_pubkey: Vec<u8>,
+        identity_secret: Vec<u8>,
+    ) -> Result<(String, MatrixCoordinate)> {
+        debug!("Accepted incoming connection — starting bilateral handshake");
 
         let mut stream = connection.accept_stream().await?;
 
-        // Receive peer info
-        let peer_data = stream.receive().await?;
-        let peer_info: serde_json::Value = serde_json::from_slice(&peer_data)?;
+        // --- Receive Message 1 from A ---
+        let msg1_data = stream.receive().await?;
+        let msg1: serde_json::Value = serde_json::from_slice(&msg1_data)?;
 
-        // Validate peer's PoS token
-        Self::validate_peer_pos_token(&peer_info)?;
+        // Verify A's identity binding: BLAKE3(pubkey) == node_id
+        let peer_pubkey = Self::extract_and_verify_identity(&msg1)?;
 
-        // Generate our PoS proof for response
-        let node_id = {
-            let mut hasher = blake3::Hasher::new();
-            hasher.update(&local_coord.x.to_le_bytes());
-            hasher.update(&local_coord.y.to_le_bytes());
-            hasher.update(&local_coord.z.to_le_bytes());
-            hasher.finalize().to_hex().to_string()
-        };
+        // Extract A's challenge nonce
+        let nonce_a = Self::extract_hex_field(&msg1, "nonce")?;
+        if nonce_a.len() != 32 {
+            return Err(anyhow!("Invalid peer nonce length: {}", nonce_a.len()));
+        }
 
-        let state_proof = StateProof::generate_from_network(&node_id)
+        // --- Generate our challenge nonce and state proof ---
+        let mut nonce_b = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_b);
+
+        let node_id = blake3::hash(&identity_pubkey).to_hex().to_string();
+
+        let our_proof = StateProof::generate_from_network(&node_id)
             .await
             .unwrap_or_else(|e| {
                 warn!("PoS proof generation failed (using test fallback): {e}");
                 StateProof::new_for_testing()
             });
-        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
+        let our_proof_bytes = our_proof
+            .to_bytes()
+            .map_err(|e| anyhow!("Failed to serialize state proof: {e}"))?;
+
+        // Sign BLAKE3(nonce_a || our_proof_bytes) — proves we responded to A's challenge
+        let our_signature = Self::sign_challenge(&identity_secret, &nonce_a, &our_proof_bytes)?;
 
         let privacy_str = format!("{:?}", *privacy_mode.read().await);
 
-        let our_info = serde_json::json!({
+        // --- Send Message 2 to A ---
+        let msg2 = serde_json::json!({
             "coordinate": {
                 "x": local_coord.x,
                 "y": local_coord.y,
@@ -632,30 +824,36 @@ impl NetworkManager {
             },
             "node_id": node_id,
             "privacy_mode": privacy_str,
-            "pos_token": hex::encode(&proof_bytes),
+            "falcon_pubkey": hex::encode(&identity_pubkey),
+            "nonce": hex::encode(nonce_b),
+            "proof_bytes": hex::encode(&our_proof_bytes),
+            "signature": hex::encode(&our_signature),
         });
+        stream.send(msg2.to_string().as_bytes()).await?;
 
-        stream.send(our_info.to_string().as_bytes()).await?;
+        // --- Receive Message 3 from A ---
+        let msg3_data = stream.receive().await?;
+        let msg3: serde_json::Value = serde_json::from_slice(&msg3_data)?;
 
-        // Parse peer coordinates — require all three
-        let x = peer_info["coordinate"]["x"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate x from incoming peer"))?;
-        let y = peer_info["coordinate"]["y"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate y from incoming peer"))?;
-        let z = peer_info["coordinate"]["z"]
-            .as_i64()
-            .ok_or_else(|| anyhow!("Missing coordinate z from incoming peer"))?;
-        let coordinate = MatrixCoordinate::new(x, y, z)?;
+        // Verify A's challenge-response signature
+        let peer_proof_bytes = Self::extract_hex_field(&msg3, "proof_bytes")?;
+        let peer_signature = Self::extract_hex_field(&msg3, "signature")?;
+        Self::verify_challenge_response(&peer_pubkey, &nonce_b, &peer_proof_bytes, &peer_signature)?;
 
-        let peer_node_id = peer_info["node_id"]
+        // Verify A's state proof
+        let peer_proof = StateProof::from_bytes(&peer_proof_bytes)
+            .map_err(|e| anyhow!("Failed to deserialize peer state proof: {e}"))?;
+        if !peer_proof.validate() {
+            return Err(anyhow!("Peer state proof validation failed"));
+        }
+
+        // Parse peer info from Message 1
+        let coordinate = Self::parse_coordinate(&msg1)?;
+        let peer_node_id = msg1["node_id"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing node_id from incoming peer"))?
             .to_string();
-
-        // Parse peer's privacy mode instead of hardcoding PUBLIC
-        let peer_privacy_mode = Self::parse_privacy_mode(&peer_info);
+        let peer_privacy_mode = Self::parse_privacy_mode(&msg1);
 
         let node = NetworkNode {
             coordinate,
@@ -665,9 +863,251 @@ impl NetworkManager {
             connection: Some(connection),
         };
 
-        nodes.write().await.insert(peer_node_id, node);
-        info!("Added incoming node to network");
-        Ok(())
+        nodes.write().await.insert(peer_node_id.clone(), node);
+        info!(
+            "Bilateral verification complete — added incoming node {} to network",
+            &peer_node_id[..8.min(peer_node_id.len())]
+        );
+        Ok((peer_node_id, coordinate))
+    }
+}
+
+// ── Peer message loop and handlers ─────────────────────────────────
+
+/// Tag bytes for wire-protocol message types.
+const TAG_SHARD_SEND: u8 = 0x01;
+const TAG_SHARD_FETCH: u8 = 0x02;
+const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
+const TAG_SYNC_MESSAGE: u8 = 0x10;
+
+/// Persistent read loop for a connected peer.
+///
+/// Accepts new streams from the connection, reads the full payload,
+/// dispatches based on the first byte (tag), and handles the message.
+/// Runs until the connection is closed.
+async fn run_peer_message_loop(
+    connection: Arc<stoq::Connection>,
+    peer_node_id: String,
+    peer_coord: MatrixCoordinate,
+    ctx: Arc<PeerContext>,
+) {
+    info!(
+        "Starting message loop for peer {} at ({},{},{})",
+        &peer_node_id[..8.min(peer_node_id.len())],
+        peer_coord.x,
+        peer_coord.y,
+        peer_coord.z,
+    );
+
+    loop {
+        // Each message arrives on its own stream (one-shot pattern).
+        let mut stream = match connection.accept_stream().await {
+            Ok(s) => s,
+            Err(e) => {
+                debug!(
+                    "Peer {} connection closed: {}",
+                    &peer_node_id[..8.min(peer_node_id.len())],
+                    e,
+                );
+                break;
+            }
+        };
+
+        // Read full stream payload.
+        let data = match stream.receive().await {
+            Ok(d) if !d.is_empty() => d,
+            Ok(_) => continue, // empty stream, skip
+            Err(e) => {
+                debug!("Stream read error from {}: {}", &peer_node_id[..8.min(peer_node_id.len())], e);
+                continue;
+            }
+        };
+
+        let tag = data[0];
+
+        match tag {
+            TAG_SHARD_SEND | TAG_SHARD_FETCH => {
+                handle_shard_dispatch(&data, &mut stream, &ctx).await;
+            }
+            TAG_BLOCK_ANNOUNCE => {
+                handle_block_announce(&data, &peer_node_id, &ctx).await;
+            }
+            TAG_SYNC_MESSAGE => {
+                handle_sync_message(&data[1..], &mut stream, &peer_node_id, &peer_coord, &ctx).await;
+            }
+            _ => {
+                warn!(
+                    "Unknown message tag 0x{:02x} from peer {}",
+                    tag,
+                    &peer_node_id[..8.min(peer_node_id.len())],
+                );
+            }
+        }
+    }
+
+    info!(
+        "Message loop ended for peer {}",
+        &peer_node_id[..8.min(peer_node_id.len())],
+    );
+}
+
+/// Dispatch a shard send/fetch message to the shard store.
+async fn handle_shard_dispatch(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    ctx: &PeerContext,
+) {
+    match shard_transport::handle_shard_message(data, &ctx.shard_store).await {
+        Ok(Some(response_data)) => {
+            // SHARD_FETCH: send response back
+            if let Err(e) = stream.send(&response_data).await {
+                warn!("Failed to send shard response: {}", e);
+            }
+        }
+        Ok(None) => {
+            // SHARD_SEND: no response needed
+        }
+        Err(e) => {
+            warn!("Shard message error: {}", e);
+        }
+    }
+}
+
+/// Handle a received block announcement.
+///
+/// Wire format (from `StoqBlockTransportAdapter::build_wire_payload`):
+/// - `[0]`       tag 0x03
+/// - `[1..9]`    block_json_len: u64 LE
+/// - `[9..9+N]`  block JSON
+/// - `[9+N..17+N]` proof_hash_len: u64 LE
+/// - `[17+N..17+N+P]` proof_hash bytes
+async fn handle_block_announce(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    // Minimum: tag(1) + block_json_len(8) = 9
+    if data.len() < 9 {
+        warn!("Block announce too short ({} bytes)", data.len());
+        return;
+    }
+
+    let block_json_len = u64::from_le_bytes(
+        data[1..9].try_into().unwrap_or([0u8; 8]),
+    ) as usize;
+
+    if data.len() < 9 + block_json_len {
+        warn!(
+            "Block announce truncated: need {} bytes, have {}",
+            9 + block_json_len,
+            data.len(),
+        );
+        return;
+    }
+
+    let block: crate::blockchain::block::Block =
+        match serde_json::from_slice(&data[9..9 + block_json_len]) {
+            Ok(b) => b,
+            Err(e) => {
+                warn!("Invalid block JSON from {}: {}", &peer_node_id[..8.min(peer_node_id.len())], e);
+                return;
+            }
+        };
+
+    // Verify BLAKE3 hash integrity
+    if !block.verify_hash() {
+        warn!(
+            "Block {} hash mismatch from peer {}",
+            block.index,
+            &peer_node_id[..8.min(peer_node_id.len())],
+        );
+        return;
+    }
+
+    // Check if we already have this block
+    let our_height = ctx.blockchain.get_height().await;
+    if block.index <= our_height {
+        debug!(
+            "Already have block {} (our height: {}), skipping",
+            block.index, our_height,
+        );
+        return;
+    }
+
+    // Insert received block
+    match ctx.blockchain.insert_received_block(block.clone()).await {
+        Ok(()) => {
+            info!(
+                "Received and stored block #{} from peer {}",
+                block.index,
+                &peer_node_id[..8.min(peer_node_id.len())],
+            );
+        }
+        Err(e) => {
+            debug!(
+                "Block {} insertion failed: {} (from peer {})",
+                block.index,
+                e,
+                &peer_node_id[..8.min(peer_node_id.len())],
+            );
+        }
+    }
+}
+
+/// Handle a sync/reflector message (tag 0x10).
+///
+/// The payload after the tag byte is a JSON-encoded `MatrixMessage`.
+/// Dispatched through `SyncDispatcher` to update sync state and
+/// reflector pool. If the dispatcher produces a reply, it is sent
+/// back on the same stream.
+async fn handle_sync_message(
+    payload: &[u8],
+    stream: &mut stoq::Stream,
+    sender_node_id: &str,
+    sender_coord: &MatrixCoordinate,
+    ctx: &PeerContext,
+) {
+    let msg: MatrixMessage = match serde_json::from_slice(payload) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(
+                "Invalid sync message JSON from {}: {}",
+                &sender_node_id[..8.min(sender_node_id.len())],
+                e,
+            );
+            return;
+        }
+    };
+
+    let sender_pos = hypermesh_lib::MatrixPosition {
+        x: sender_coord.x as f64,
+        y: sender_coord.y as f64,
+        z: sender_coord.z as f64,
+    };
+
+    // Lock sync subsystems and dispatch
+    let mut sm = ctx.sync_manager.lock().await;
+    let mut rp = ctx.reflector_pool.lock().await;
+
+    let mut dispatcher = sync_dispatch::SyncDispatcher {
+        sync_manager: &mut sm,
+        reflector_pool: &mut rp,
+        block_provider: None,
+    };
+
+    let response = dispatcher.dispatch(msg, sender_node_id, sender_pos);
+
+    // Send reply if dispatcher produced one
+    if let sync_dispatch::DispatchResponse::Reply(reply_msg) = response {
+        if let Ok(reply_data) = serde_json::to_vec(&reply_msg) {
+            // Prefix with sync tag so receiver can dispatch
+            let mut tagged = Vec::with_capacity(1 + reply_data.len());
+            tagged.push(TAG_SYNC_MESSAGE);
+            tagged.extend_from_slice(&reply_data);
+            if let Err(e) = stream.send(&tagged).await {
+                debug!("Failed to send sync reply: {}", e);
+            }
+        }
     }
 }
 
@@ -695,9 +1135,18 @@ mod tests {
             }
         };
 
-        let manager = NetworkManager::new(coord, transport, PrivacyMode::PRIVATE, vec![])
-            .await
-            .expect("test: manager creation");
+        // Generate a test FALCON-1024 identity
+        let test_identity = crate::identity::FalconIdentity::generate();
+        let manager = NetworkManager::new(
+            coord,
+            transport,
+            PrivacyMode::PRIVATE,
+            vec![],
+            test_identity.public_key.clone(),
+            test_identity.secret_key_bytes().to_vec(),
+        )
+        .await
+        .expect("test: manager creation");
 
         assert_eq!(manager.get_node_count().await, 0);
     }

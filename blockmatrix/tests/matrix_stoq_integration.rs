@@ -269,12 +269,15 @@ async fn test_network_manager_with_stoq_integration() -> Result<()> {
     };
     let transport = Arc::new(StoqTransport::new(config).await?);
 
-    // Create network manager with STOQ integration
+    // Create network manager with STOQ integration and test identity
+    let test_identity = blockmatrix::identity::FalconIdentity::generate();
     let manager = NetworkManager::new(
         coordinate,
         transport,
         PrivacyMode::PUBLIC,
         vec![], // No bootstrap nodes for test
+        test_identity.public_key.clone(),
+        test_identity.secret_key_bytes().to_vec(),
     )
     .await?;
 

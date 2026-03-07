@@ -14,7 +14,7 @@
 //!
 //! Network participation is OPTIONAL based on privacy mode transition.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn, Level};
@@ -882,6 +882,12 @@ async fn run_store(path: std::path::PathBuf, dist_ctx: Option<&ShardDistribution
 
 /// Run the Fetch subcommand: load a shard map from disk, reconstruct the
 /// original file through the reverse pipeline, and write the output.
+///
+/// For each shard in the map:
+///   1. Try local ShardStore (if dist_ctx available)
+///   2. Try reading from disk file
+///   3. Try network fetch from connected peers (if dist_ctx available)
+///   4. BLAKE3 verify every fetched shard
 async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Result<()> {
     // 1. Locate shard map
     let maps_dir = shard_maps_dir()?;
@@ -904,14 +910,56 @@ async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Resu
         map.asset_id, map.shard_count, map.original_size,
     );
 
-    // 2. Load shard data from disk
+    // 2. Load shard data — try disk first, network fallback later
     let shards_dir = maps_dir.join(&asset_id);
     let mut shards: Vec<Shard> = Vec::with_capacity(map.shard_count);
+    let mut network_fetched = 0usize;
 
     for (i, hash_hex) in map.shard_hashes.iter().enumerate() {
+        let expected_hash = hex::decode(hash_hex)
+            .with_context(|| format!("invalid shard hash hex at index {i}"))?;
+
+        // Strategy 1: Read from local disk
         let shard_path = shards_dir.join(hash_hex);
-        let shard_data = std::fs::read(&shard_path)
-            .with_context(|| format!("failed to read shard {}", shard_path.display()))?;
+        let shard_data = match std::fs::read(&shard_path) {
+            Ok(data) => {
+                // BLAKE3 verify
+                let computed = blake3::hash(&data);
+                if computed.as_bytes() != expected_hash.as_slice() {
+                    warn!(
+                        "Shard {i} BLAKE3 mismatch on disk — expected {}, got {}",
+                        hash_hex,
+                        hex::encode(computed.as_bytes()),
+                    );
+                    None // fall through to network fetch
+                } else {
+                    Some(data)
+                }
+            }
+            Err(_) => None, // not on disk, try network
+        };
+
+        let shard_data = match shard_data {
+            Some(data) => data,
+            None => {
+                // Strategy 2: Try network fetch from connected peers
+                warn!("Shard {i} not available locally, attempting network fetch");
+                fetch_shard_from_network(hash_hex, &expected_hash)
+                    .await
+                    .with_context(|| {
+                        format!("shard {i} ({hash_hex}) not available locally or on network")
+                    })?
+            }
+        };
+
+        if shard_data.is_empty() {
+            anyhow::bail!("shard {i} ({hash_hex}) returned empty data");
+        }
+
+        // Track network-fetched count
+        if !shard_path.exists() {
+            network_fetched += 1;
+        }
 
         let metadata = if i < map.shard_metadata.len() {
             map.shard_metadata[i].clone()
@@ -931,7 +979,10 @@ async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Resu
         });
     }
 
-    info!("Loaded {} shards from disk", shards.len());
+    if network_fetched > 0 {
+        info!("Fetched {} shard(s) from network peers", network_fetched);
+    }
+    info!("Loaded {} shards total", shards.len());
 
     // 3. Reconstruct ProcessedAsset
     let processed = ProcessedAsset {
@@ -976,6 +1027,46 @@ async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Resu
     }
 
     Ok(())
+}
+
+/// Attempt to fetch a shard from connected network peers via IPC daemon.
+///
+/// Tries to connect to the local IPC daemon and request the shard. If the
+/// daemon is not running or no peer has the shard, returns an error.
+async fn fetch_shard_from_network(hash_hex: &str, expected_hash: &[u8]) -> Result<Vec<u8>> {
+    // Connect to local IPC daemon to request network shard fetch
+    let client = ipc::IpcClient::new();
+    if !client.is_daemon_running().await {
+        anyhow::bail!("no daemon running for network shard fetch");
+    }
+
+    // Request shard via IPC — the daemon has access to connected peers
+    let resp = client
+        .call_ok(
+            "shard.fetch",
+            serde_json::json!({ "shard_id": hash_hex }),
+        )
+        .await
+        .map_err(|e| anyhow!("IPC shard fetch failed: {e}"))?;
+
+    let shard_hex = resp["data"]
+        .as_str()
+        .ok_or_else(|| anyhow!("shard.fetch response missing 'data' field"))?;
+    let shard_data =
+        hex::decode(shard_hex).map_err(|e| anyhow!("invalid shard data hex: {e}"))?;
+
+    // BLAKE3 verify
+    let computed = blake3::hash(&shard_data);
+    if computed.as_bytes() != expected_hash {
+        anyhow::bail!(
+            "network shard BLAKE3 mismatch: expected {}, got {}",
+            hash_hex,
+            hex::encode(computed.as_bytes()),
+        );
+    }
+
+    info!("Fetched shard {} from network via IPC", hash_hex);
+    Ok(shard_data)
 }
 
 /// Run the Dns subcommand: register, resolve, or list DNS names.
@@ -1424,6 +1515,8 @@ async fn run_connect(
 
     // Network manager reference (populated if STOQ starts)
     let mut network_ref: Option<std::sync::Arc<NetworkManager>> = None;
+    // Shard store reference (populated if network starts, otherwise standalone)
+    let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
 
     // Initialize STOQ transport if not in Private mode
     let privacy_mode = bootstrap.privacy_mode().await;
@@ -1475,9 +1568,27 @@ async fn run_connect(
             shard_store.count().await
         );
 
+        // Load or create FALCON-1024 node identity for PoS signing
+        let data_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+            .join(".hypermesh")
+            .join("identity");
+        let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(&data_dir)?;
+        info!(
+            "Node identity: {}... (FALCON-1024)",
+            &falcon_identity.node_id[..16]
+        );
+
         // Create network manager
-        let network_manager =
-            NetworkManager::new(coord, transport.clone(), privacy_mode, bootstrap_nodes).await?;
+        let network_manager = NetworkManager::new(
+            coord,
+            transport.clone(),
+            privacy_mode,
+            bootstrap_nodes,
+            falcon_identity.public_key.clone(),
+            falcon_identity.secret_key_bytes().to_vec(),
+        )
+        .await?;
 
         // Start discovery based on privacy mode
         network_manager.start_discovery().await?;
@@ -1535,11 +1646,23 @@ async fn run_connect(
 
         info!("Block sync infrastructure initialized (propagation=NearestN(6))");
 
-        // Start accepting connections in background
+        // Create peer context for receive-side message handling
+        let peer_ctx = std::sync::Arc::new(blockmatrix::network::PeerContext {
+            blockchain: bootstrap.blockchain().clone(),
+            shard_store: shard_store.clone(),
+            sync_manager: sync_manager.clone(),
+            reflector_pool: reflector_pool.clone(),
+            block_propagator: block_propagator.clone(),
+            our_coordinate: coord,
+            node_id: nid.to_string(),
+        });
+
+        // Start accepting connections in background (with peer context for message loop)
         let network_clone = std::sync::Arc::new(network_manager);
         let network_accept = network_clone.clone();
+        let ctx_accept = peer_ctx.clone();
         tokio::spawn(async move {
-            if let Err(e) = network_accept.accept_connections().await {
+            if let Err(e) = network_accept.accept_connections(Some(ctx_accept)).await {
                 warn!("Connection acceptor error: {}", e);
             }
         });
@@ -1643,6 +1766,43 @@ async fn run_connect(
 
                 if is_reflector {
                     debug!("Reflector heartbeat: height={}", local_height);
+
+                    // Broadcast reflector heartbeat to connected peers
+                    let genesis_hash = blockchain_sync.get_head().await
+                        .map(|b| b.hash.clone())
+                        .unwrap_or_default();
+                    let network_id = format!(
+                        "public-{}",
+                        &genesis_hash[..16.min(genesis_hash.len())]
+                    );
+
+                    let heartbeat_msg = blockmatrix::network::stoq_integration::MatrixMessage::ReflectorHeartbeat {
+                        network_id,
+                        block_height: local_height,
+                        health_score: 1.0,
+                    };
+
+                    if let Ok(heartbeat_json) = serde_json::to_vec(&heartbeat_msg) {
+                        let mut tagged = Vec::with_capacity(1 + heartbeat_json.len());
+                        tagged.push(0x10u8); // TAG_SYNC_MESSAGE
+                        tagged.extend_from_slice(&heartbeat_json);
+
+                        let nodes = network_sync.get_connected_nodes().await;
+                        for node in &nodes {
+                            if let Some(ref conn) = node.connection {
+                                match conn.open_stream().await {
+                                    Ok(mut stream) => {
+                                        if let Err(e) = stream.send(&tagged).await {
+                                            debug!("Heartbeat send to {} failed: {}", &node.node_id[..8.min(node.node_id.len())], e);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        debug!("Heartbeat stream to {} failed: {}", &node.node_id[..8.min(node.node_id.len())], e);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -1668,22 +1828,26 @@ async fn run_connect(
         }
 
         // Keep infrastructure alive for the node's lifetime
-        let _shard_store = shard_store;
         let _shard_transport = shard_transport;
         let _block_propagator = block_propagator.clone();
         let _sync_manager = sync_manager.clone();
         let _reflector_pool = reflector_pool.clone();
 
         network_ref = Some(network_clone);
+        shard_store_ref = Some(shard_store);
     }
 
     // --- IPC Server Setup ---
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
+    // Use network shard store if available, otherwise create a standalone one
+    let daemon_shard_store = shard_store_ref.unwrap_or_else(|| std::sync::Arc::new(ShardStore::new()));
+
     let daemon_state = std::sync::Arc::new(ipc::DaemonState {
         blockchain: bootstrap.blockchain().clone(),
         persistence: persistence.clone(),
         network: network_ref,
+        shard_store: daemon_shard_store,
         coordinate: coord,
         node_id: nid.to_string(),
         data_dir: data_dir.to_path_buf(),
