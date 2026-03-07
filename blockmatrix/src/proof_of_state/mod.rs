@@ -411,6 +411,39 @@ pub mod stoq_handlers {
     }
 }
 
+/// [`StateProofProvider`] implementation for BlockMatrix.
+///
+/// Wraps TrustChain's `StateProof` generation and validation so that
+/// STOQ's bilateral handshake can use it via the trait from lib.
+pub struct BlockMatrixProofProvider {
+    node_id: String,
+}
+
+impl BlockMatrixProofProvider {
+    pub fn new(node_id: String) -> Self {
+        Self { node_id }
+    }
+}
+
+#[async_trait::async_trait]
+impl hypermesh_lib::StateProofProvider for BlockMatrixProofProvider {
+    async fn generate_proof(&self) -> anyhow::Result<Vec<u8>> {
+        let proof = StateProof::generate_from_network(&self.node_id)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!("PoS proof generation failed (using test fallback): {e}");
+                StateProof::new_for_testing()
+            });
+        proof.to_bytes().map_err(|e| anyhow::anyhow!("Failed to serialize state proof: {e}"))
+    }
+
+    async fn validate_proof(&self, proof_bytes: &[u8]) -> anyhow::Result<bool> {
+        let proof = StateProof::from_bytes(proof_bytes)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize state proof: {e}"))?;
+        Ok(proof.validate())
+    }
+}
+
 pub mod proof_of_state_integration {
     use super::*;
 

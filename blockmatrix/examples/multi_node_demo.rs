@@ -138,13 +138,21 @@ async fn start_node(
 
         // Create network manager with FALCON-1024 identity
         let identity = blockmatrix::identity::FalconIdentity::generate();
+        let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner> =
+            std::sync::Arc::new(identity);
+        let proof_provider: std::sync::Arc<dyn hypermesh_lib::StateProofProvider> =
+            std::sync::Arc::new(
+                blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
+                    signer.node_id().to_string(),
+                ),
+            );
         let network = NetworkManager::new(
             coord,
             transport,
             privacy_mode,
             bootstrap_nodes,
-            identity.public_key.clone(),
-            identity.secret_key_bytes().to_vec(),
+            signer,
+            proof_provider,
         )
         .await?;
 

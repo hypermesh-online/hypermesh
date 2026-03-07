@@ -1583,14 +1583,22 @@ async fn run_connect(
             &falcon_identity.node_id[..16]
         );
 
-        // Create network manager
+        // Create network manager with trait-based identity and proof provider
+        let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner> =
+            std::sync::Arc::new(falcon_identity);
+        let proof_provider: std::sync::Arc<dyn hypermesh_lib::StateProofProvider> =
+            std::sync::Arc::new(
+                blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
+                    signer.node_id().to_string(),
+                ),
+            );
         let network_manager = NetworkManager::new(
             coord,
             transport.clone(),
             privacy_mode,
             bootstrap_nodes,
-            falcon_identity.public_key.clone(),
-            falcon_identity.secret_key_bytes().to_vec(),
+            signer,
+            proof_provider,
         )
         .await?;
 
