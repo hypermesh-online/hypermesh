@@ -3,6 +3,9 @@
 Wraps the HyperMesh node HTTP REST API with typed dataclass responses
 and both sync (urllib) and async (httpx) transports.
 
+For local development with the native shared library, use
+:class:`HyperMeshFFI` instead of :class:`HyperMeshClient`.
+
 Usage::
 
     from hypermesh import HyperMeshClient
@@ -15,12 +18,18 @@ Usage::
     # Async (requires httpx)
     async_client = HyperMeshClient(async_mode=True)
     status = await async_client.node.status()
+
+    # Native FFI (requires libhypermesh_ffi)
+    from hypermesh import HyperMeshFFI
+    with HyperMeshFFI() as hm:
+        print(hm.status())
 """
 
 from __future__ import annotations
 
 from .client import AsyncTransport, SyncTransport
 from .errors import ApiError, ConnectionError, HyperMeshError, NotFoundError
+from .ffi import FFIError, HyperMeshFFI, LibraryNotFoundError
 from .types import (
     Asset,
     AssetList,
@@ -201,7 +210,10 @@ class HyperMeshClient:
 
 __all__ = [
     "HyperMeshClient",
+    "HyperMeshFFI",
     "HyperMeshError",
+    "FFIError",
+    "LibraryNotFoundError",
     "ApiError",
     "ConnectionError",
     "NotFoundError",

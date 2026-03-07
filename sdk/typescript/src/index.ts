@@ -77,6 +77,9 @@ export class HyperMeshClient {
   }
 }
 
+export { HyperMeshFFI, HyperMeshFFIError } from "./ffi.js";
+export type { HyperMeshFFIOptions } from "./ffi.js";
+
 export { HyperMeshError } from "./client.js";
 export type { HttpClient } from "./client.js";
 

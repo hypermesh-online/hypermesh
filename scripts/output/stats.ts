@@ -71,8 +71,8 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "sdk",
-    "files": 21,
-    "linesOfCode": 1086,
+    "files": 23,
+    "linesOfCode": 1667,
     "testCount": 0
   },
   {
@@ -96,8 +96,8 @@ export const crateStats: CrateStats[] = [
 ];
 
 export const totalStats = {
-  "totalFiles": 1104,
-  "totalLines": 332635,
+  "totalFiles": 1106,
+  "totalLines": 333216,
   "totalTests": 4124,
   "crateCount": 14
 };

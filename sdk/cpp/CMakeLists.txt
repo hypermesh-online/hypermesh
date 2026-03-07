@@ -41,6 +41,39 @@ target_link_libraries(hypermesh_sdk PUBLIC nlohmann_json::nlohmann_json)
 
 add_library(hypermesh::sdk ALIAS hypermesh_sdk)
 
+# ---------------------------------------------------------------------------
+# FFI client — links directly to libhypermesh_ffi (no HTTP overhead).
+#
+# The FFI shared library must be installed or its path added via
+# CMAKE_PREFIX_PATH / HYPERMESH_FFI_DIR.  Build with:
+#   cmake -DHYPERMESH_FFI_DIR=/path/to/hypermesh-ffi/target/release ..
+# ---------------------------------------------------------------------------
+option(HYPERMESH_BUILD_FFI "Build the FFI client (requires libhypermesh_ffi)" ON)
+
+if(HYPERMESH_BUILD_FFI)
+    add_library(hypermesh_ffi_client src/ffi_client.cpp)
+
+    target_include_directories(hypermesh_ffi_client PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../hypermesh-ffi/include>
+        $<INSTALL_INTERFACE:include>
+    )
+
+    # Locate or accept an explicit path to libhypermesh_ffi.
+    if(DEFINED HYPERMESH_FFI_DIR)
+        target_link_directories(hypermesh_ffi_client PUBLIC ${HYPERMESH_FFI_DIR})
+    endif()
+
+    target_link_libraries(hypermesh_ffi_client PUBLIC hypermesh_ffi)
+
+    add_library(hypermesh::ffi_client ALIAS hypermesh_ffi_client)
+
+    install(TARGETS hypermesh_ffi_client
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+    )
+endif()
+
 install(TARGETS hypermesh_sdk
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib

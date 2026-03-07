@@ -416,18 +416,17 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
         "TrustChain API (hypermesh_trustchain_certs, issue, validate, revoke, dns_zones)",
         "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
-        "Catalog API (hypermesh_catalog_browse, search, package_info, registry_stats)"
+        "Catalog API (hypermesh_catalog_browse, search, package_info, registry_stats)",
+        "TypeScript FFI loader (ffi-napi + ref-napi, optional dependency)",
+        "Python FFI loader (ctypes wrapper with library discovery)",
+        "C# FFI loader (P/Invoke with cross-platform NativeLibrary resolver)",
+        "Go FFI loader (cgo wrapper with build tag)",
+        "C++ FFI loader (direct linking via FfiClient class + CMake target)"
       ],
       "inDevelopment": [],
-      "planned": [
-        "TypeScript/Node.js FFI bindings (NAPI-RS or WASM) — HTTP SDK exists at sdk/typescript/",
-        "Go FFI bindings (cgo wrapper) — HTTP SDK exists at sdk/go/",
-        "Python FFI bindings (ctypes/cffi wrapper) — HTTP SDK exists at sdk/python/",
-        "C# FFI bindings (P/Invoke wrapper) — HTTP SDK exists at sdk/csharp/",
-        "C++ FFI bindings (direct linking) — HTTP SDK exists at sdk/cpp/"
-      ]
+      "planned": []
     },
-    "completion": 79
+    "completion": 100
   },
   {
     "id": "hypermesh-lib",
