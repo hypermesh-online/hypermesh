@@ -98,24 +98,24 @@ struct Cli {
     #[clap(long, global = true)]
     json: bool,
 
-    /// Connection mode: auto, ffi, ipc, stoq
+    /// Connection mode: auto, ffi, ipc, http
     #[clap(long, global = true, default_value = "auto")]
     mode: String,
 
-    /// Caesar service URL (used in stoq mode)
-    #[clap(long, global = true, default_value = "stoq://localhost:9294")]
+    /// Caesar service URL (used in http mode)
+    #[clap(long, global = true, default_value = "http://localhost:9294")]
     caesar_url: String,
 
-    /// TrustChain service URL (used in stoq mode)
-    #[clap(long, global = true, default_value = "stoq://localhost:8444")]
+    /// TrustChain service URL (used in http mode)
+    #[clap(long, global = true, default_value = "http://localhost:8444")]
     trustchain_url: String,
 
-    /// Engauge service URL (used in stoq mode)
-    #[clap(long, global = true, default_value = "stoq://localhost:9296")]
+    /// Engauge service URL (used in http mode)
+    #[clap(long, global = true, default_value = "http://localhost:9296")]
     engauge_url: String,
 
-    /// Catalog service URL (used in stoq mode)
-    #[clap(long, global = true, default_value = "stoq://localhost:9295")]
+    /// Catalog service URL (used in http mode)
+    #[clap(long, global = true, default_value = "http://localhost:9295")]
     catalog_url: String,
 
     /// Path to config file
@@ -2595,16 +2595,16 @@ async fn main() -> Result<()> {
                 }
                 CaesarAction::Route { destination, amount } => {
                     service_ipc_call(
-                        "caesar.route",
+                        "caesar.route_packet",
                         serde_json::json!({
                             "destination": destination,
-                            "amount": amount,
+                            "amount_grams": amount,
                         }),
                         json,
                     ).await?;
                 }
                 CaesarAction::Governor => {
-                    service_ipc_call("caesar.governor", serde_json::json!({}), json).await?;
+                    service_ipc_call("caesar.governor_params", serde_json::json!({}), json).await?;
                 }
             }
         }
@@ -2612,7 +2612,7 @@ async fn main() -> Result<()> {
             let json = cli.json;
             match action {
                 TrustchainAction::Certs => {
-                    service_ipc_call("trustchain.certs", serde_json::json!({}), json).await?;
+                    service_ipc_call("trustchain.certificates", serde_json::json!({}), json).await?;
                 }
                 TrustchainAction::Issue { subject, scope } => {
                     service_ipc_call(
@@ -2627,7 +2627,7 @@ async fn main() -> Result<()> {
                 TrustchainAction::Validate { cert_path } => {
                     service_ipc_call(
                         "trustchain.validate",
-                        serde_json::json!({"cert_path": cert_path}),
+                        serde_json::json!({"cert_pem": cert_path}),
                         json,
                     ).await?;
                 }
@@ -2639,7 +2639,7 @@ async fn main() -> Result<()> {
                     ).await?;
                 }
                 TrustchainAction::Zones => {
-                    service_ipc_call("trustchain.zones", serde_json::json!({}), json).await?;
+                    service_ipc_call("trustchain.dns_zones", serde_json::json!({}), json).await?;
                 }
             }
         }
@@ -2656,7 +2656,7 @@ async fn main() -> Result<()> {
                     service_ipc_call("engauge.marketplace", serde_json::json!({}), json).await?;
                 }
                 EngaugeAction::Metrics => {
-                    service_ipc_call("engauge.metrics", serde_json::json!({}), json).await?;
+                    service_ipc_call("engauge.node_metrics", serde_json::json!({}), json).await?;
                 }
                 EngaugeAction::Leases => {
                     service_ipc_call("engauge.leases", serde_json::json!({}), json).await?;
@@ -2682,13 +2682,13 @@ async fn main() -> Result<()> {
                 }
                 CatalogAction::Info { name } => {
                     service_ipc_call(
-                        "catalog.info",
+                        "catalog.package_info",
                         serde_json::json!({"name": name}),
                         json,
                     ).await?;
                 }
                 CatalogAction::Stats => {
-                    service_ipc_call("catalog.stats", serde_json::json!({}), json).await?;
+                    service_ipc_call("catalog.registry_stats", serde_json::json!({}), json).await?;
                 }
             }
         }

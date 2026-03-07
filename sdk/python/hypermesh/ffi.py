@@ -117,146 +117,146 @@ def _load_library(path: str) -> ctypes.CDLL:
 
     # -- Raw RPC --
     lib.hypermesh_call.argtypes = [client_p, ctypes.c_char_p, ctypes.c_char_p]
-    lib.hypermesh_call.restype = ctypes.c_char_p
+    lib.hypermesh_call.restype = ctypes.c_void_p
 
     # -- Node --
     lib.hypermesh_status.argtypes = [client_p]
-    lib.hypermesh_status.restype = ctypes.c_char_p
+    lib.hypermesh_status.restype = ctypes.c_void_p
 
     # -- DNS --
     lib.hypermesh_dns_resolve.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_dns_resolve.restype = ctypes.c_char_p
+    lib.hypermesh_dns_resolve.restype = ctypes.c_void_p
 
     lib.hypermesh_dns_list.argtypes = [client_p]
-    lib.hypermesh_dns_list.restype = ctypes.c_char_p
+    lib.hypermesh_dns_list.restype = ctypes.c_void_p
 
     lib.hypermesh_dns_register.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_char_p,
     ]
-    lib.hypermesh_dns_register.restype = ctypes.c_char_p
+    lib.hypermesh_dns_register.restype = ctypes.c_void_p
 
     # -- Network --
     lib.hypermesh_peers.argtypes = [client_p]
-    lib.hypermesh_peers.restype = ctypes.c_char_p
+    lib.hypermesh_peers.restype = ctypes.c_void_p
 
     # -- Blockchain --
     lib.hypermesh_blockchain_height.argtypes = [client_p]
-    lib.hypermesh_blockchain_height.restype = ctypes.c_char_p
+    lib.hypermesh_blockchain_height.restype = ctypes.c_void_p
 
     lib.hypermesh_blockchain_block.argtypes = [client_p, ctypes.c_uint64]
-    lib.hypermesh_blockchain_block.restype = ctypes.c_char_p
+    lib.hypermesh_blockchain_block.restype = ctypes.c_void_p
 
     # -- Topology --
     lib.hypermesh_topology_info.argtypes = [client_p]
-    lib.hypermesh_topology_info.restype = ctypes.c_char_p
+    lib.hypermesh_topology_info.restype = ctypes.c_void_p
 
     # -- Assets --
     lib.hypermesh_asset_list.argtypes = [client_p]
-    lib.hypermesh_asset_list.restype = ctypes.c_char_p
+    lib.hypermesh_asset_list.restype = ctypes.c_void_p
 
     lib.hypermesh_asset_store.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_asset_store.restype = ctypes.c_char_p
+    lib.hypermesh_asset_store.restype = ctypes.c_void_p
 
     lib.hypermesh_asset_fetch.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_char_p,
     ]
-    lib.hypermesh_asset_fetch.restype = ctypes.c_char_p
+    lib.hypermesh_asset_fetch.restype = ctypes.c_void_p
 
     # -- Domains --
     lib.hypermesh_domain_list.argtypes = [client_p]
-    lib.hypermesh_domain_list.restype = ctypes.c_char_p
+    lib.hypermesh_domain_list.restype = ctypes.c_void_p
 
     lib.hypermesh_domain_register.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_char_p,
     ]
-    lib.hypermesh_domain_register.restype = ctypes.c_char_p
+    lib.hypermesh_domain_register.restype = ctypes.c_void_p
 
     # -- Dashboards --
     lib.hypermesh_dashboard_list.argtypes = [client_p]
-    lib.hypermesh_dashboard_list.restype = ctypes.c_char_p
+    lib.hypermesh_dashboard_list.restype = ctypes.c_void_p
 
     lib.hypermesh_dashboard_deploy.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_dashboard_deploy.restype = ctypes.c_char_p
+    lib.hypermesh_dashboard_deploy.restype = ctypes.c_void_p
 
     # -- Config --
     lib.hypermesh_config_show.argtypes = [client_p]
-    lib.hypermesh_config_show.restype = ctypes.c_char_p
+    lib.hypermesh_config_show.restype = ctypes.c_void_p
 
     lib.hypermesh_config_get.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_config_get.restype = ctypes.c_char_p
+    lib.hypermesh_config_get.restype = ctypes.c_void_p
 
     # -- Caesar EVP --
     lib.hypermesh_caesar_wallet.argtypes = [client_p]
-    lib.hypermesh_caesar_wallet.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_wallet.restype = ctypes.c_void_p
 
     lib.hypermesh_caesar_balance.argtypes = [client_p]
-    lib.hypermesh_caesar_balance.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_balance.restype = ctypes.c_void_p
 
     lib.hypermesh_caesar_transactions.argtypes = [client_p, ctypes.c_uint32]
-    lib.hypermesh_caesar_transactions.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_transactions.restype = ctypes.c_void_p
 
     lib.hypermesh_caesar_rewards.argtypes = [client_p]
-    lib.hypermesh_caesar_rewards.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_rewards.restype = ctypes.c_void_p
 
     lib.hypermesh_caesar_route_packet.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_double,
     ]
-    lib.hypermesh_caesar_route_packet.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_route_packet.restype = ctypes.c_void_p
 
     lib.hypermesh_caesar_governor_params.argtypes = [client_p]
-    lib.hypermesh_caesar_governor_params.restype = ctypes.c_char_p
+    lib.hypermesh_caesar_governor_params.restype = ctypes.c_void_p
 
     # -- TrustChain --
     lib.hypermesh_trustchain_certificates.argtypes = [client_p]
-    lib.hypermesh_trustchain_certificates.restype = ctypes.c_char_p
+    lib.hypermesh_trustchain_certificates.restype = ctypes.c_void_p
 
     lib.hypermesh_trustchain_issue.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_char_p,
     ]
-    lib.hypermesh_trustchain_issue.restype = ctypes.c_char_p
+    lib.hypermesh_trustchain_issue.restype = ctypes.c_void_p
 
     lib.hypermesh_trustchain_validate.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_trustchain_validate.restype = ctypes.c_char_p
+    lib.hypermesh_trustchain_validate.restype = ctypes.c_void_p
 
     lib.hypermesh_trustchain_revoke.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_trustchain_revoke.restype = ctypes.c_char_p
+    lib.hypermesh_trustchain_revoke.restype = ctypes.c_void_p
 
     lib.hypermesh_trustchain_dns_zones.argtypes = [client_p]
-    lib.hypermesh_trustchain_dns_zones.restype = ctypes.c_char_p
+    lib.hypermesh_trustchain_dns_zones.restype = ctypes.c_void_p
 
     # -- Engauge --
     lib.hypermesh_engauge_capacity.argtypes = [client_p]
-    lib.hypermesh_engauge_capacity.restype = ctypes.c_char_p
+    lib.hypermesh_engauge_capacity.restype = ctypes.c_void_p
 
     lib.hypermesh_engauge_traffic.argtypes = [client_p]
-    lib.hypermesh_engauge_traffic.restype = ctypes.c_char_p
+    lib.hypermesh_engauge_traffic.restype = ctypes.c_void_p
 
     lib.hypermesh_engauge_marketplace.argtypes = [client_p]
-    lib.hypermesh_engauge_marketplace.restype = ctypes.c_char_p
+    lib.hypermesh_engauge_marketplace.restype = ctypes.c_void_p
 
     lib.hypermesh_engauge_node_metrics.argtypes = [client_p]
-    lib.hypermesh_engauge_node_metrics.restype = ctypes.c_char_p
+    lib.hypermesh_engauge_node_metrics.restype = ctypes.c_void_p
 
     lib.hypermesh_engauge_leases.argtypes = [client_p]
-    lib.hypermesh_engauge_leases.restype = ctypes.c_char_p
+    lib.hypermesh_engauge_leases.restype = ctypes.c_void_p
 
     # -- Catalog --
     lib.hypermesh_catalog_browse.argtypes = [
         client_p, ctypes.c_char_p, ctypes.c_uint32,
     ]
-    lib.hypermesh_catalog_browse.restype = ctypes.c_char_p
+    lib.hypermesh_catalog_browse.restype = ctypes.c_void_p
 
     lib.hypermesh_catalog_search.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_catalog_search.restype = ctypes.c_char_p
+    lib.hypermesh_catalog_search.restype = ctypes.c_void_p
 
     lib.hypermesh_catalog_package_info.argtypes = [client_p, ctypes.c_char_p]
-    lib.hypermesh_catalog_package_info.restype = ctypes.c_char_p
+    lib.hypermesh_catalog_package_info.restype = ctypes.c_void_p
 
     lib.hypermesh_catalog_registry_stats.argtypes = [client_p]
-    lib.hypermesh_catalog_registry_stats.restype = ctypes.c_char_p
+    lib.hypermesh_catalog_registry_stats.restype = ctypes.c_void_p
 
     # -- Memory management --
-    lib.hypermesh_free_string.argtypes = [ctypes.c_char_p]
+    lib.hypermesh_free_string.argtypes = [ctypes.c_void_p]
     lib.hypermesh_free_string.restype = None
 
     lib.hypermesh_last_error.argtypes = [client_p]
@@ -324,6 +324,8 @@ class HyperMeshFFI:
         """Call an FFI function that returns ``char*``.
 
         Returns the raw bytes before freeing, or raises on NULL.
+        Functions return c_void_p (int) to preserve the raw pointer for
+        proper freeing — c_char_p would auto-convert and leak.
         """
         result_ptr = func(self._handle, *args)
         if not result_ptr:
@@ -332,7 +334,7 @@ class HyperMeshFFI:
                 f"{func.__name__} returned NULL with no error message"
             )
         try:
-            raw = ctypes.c_char_p(result_ptr).value
+            raw = ctypes.cast(result_ptr, ctypes.c_char_p).value
         finally:
             self._lib.hypermesh_free_string(result_ptr)
         return raw
