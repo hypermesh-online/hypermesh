@@ -55,6 +55,7 @@ mod tests {
                     stake_holder_id: "test-holder-id".to_string(),
                     stake_amount: 75,
                     stake_timestamp: SystemTime::now(),
+
                 },
                 TimeProof {
                     network_time_offset: Duration::from_secs(10),

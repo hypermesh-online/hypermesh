@@ -222,8 +222,18 @@ impl TransferEngine {
             &intent.transfer_id,
             &intent.target_coord,
         );
+        let source_entry = crate::blockchain::block::BlockAssetEntry {
+            asset_hash: transfer_out_asset.content_hash,
+            proof_hash: *blake3::hash(
+                &serde_json::to_vec(&source_proof).unwrap_or_default(),
+            )
+            .as_bytes(),
+            state_proof: source_proof.clone(),
+            storage_pointer: crate::blockchain::block::StoragePointer::Genesis,
+            registration: transfer_out_asset,
+        };
         let source_block = source_chain
-            .add_block(vec![transfer_out_asset], &source_proof)
+            .add_block(vec![source_entry])
             .await
             .map_err(|e| TransferError::Blockchain(format!("source chain: {e}")))?;
 
@@ -236,8 +246,18 @@ impl TransferEngine {
             &intent.transfer_id,
             &intent.source_coord,
         );
+        let target_entry = crate::blockchain::block::BlockAssetEntry {
+            asset_hash: transfer_in_asset.content_hash,
+            proof_hash: *blake3::hash(
+                &serde_json::to_vec(&target_proof_typed).unwrap_or_default(),
+            )
+            .as_bytes(),
+            state_proof: target_proof_typed.clone(),
+            storage_pointer: crate::blockchain::block::StoragePointer::Genesis,
+            registration: transfer_in_asset,
+        };
         let target_block = target_chain
-            .add_block(vec![transfer_in_asset], &target_proof_typed)
+            .add_block(vec![target_entry])
             .await
             .map_err(|e| TransferError::Blockchain(format!("target chain: {e}")))?;
 

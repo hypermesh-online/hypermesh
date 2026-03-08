@@ -48,8 +48,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                             "index": block.index,
                             "hash": block.hash,
                             "previous_hash": block.previous_hash,
-                            "timestamp": block.timestamp,
-                            "asset_count": block.assets.len(),
+                            "asset_count": block.asset_count(),
                         })),
                         None => Ok(serde_json::json!({
                             "index": index,

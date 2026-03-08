@@ -134,7 +134,7 @@ pub trait Proof {
 pub struct StakeProof {
     /// Entity owning the asset (e.g., CA, CT log, DNS server)
     pub stake_holder: String,
-    /// ID of the validating node
+    /// ID of the validating node (BLAKE3 hex of FALCON pubkey)
     pub stake_holder_id: String,
     /// Economic stake amount
     pub stake_amount: u64,
@@ -578,7 +578,7 @@ pub enum WorkloadType {
     Storage,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WorkState {
     Pending,
     Running,

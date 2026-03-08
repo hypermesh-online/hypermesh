@@ -12,7 +12,7 @@
 //! inject synthetic capabilities without touching real `/proc`.
 
 use hypermesh_lib::{
-    asset::{GenesisAssetRecord, SystemAssetKind},
+    asset::{GenesisAssetRecord, IdentityAssetRecord, SystemAssetKind},
     protocol::HardwareCapabilities,
     types::{AssetAddress, AssetId, ContentHash},
 };
@@ -221,6 +221,53 @@ impl<P: HardwareProbe> GenesisAssessor<P> {
     }
 }
 
+/// Build a genesis identity asset record from the node's dual-key identity.
+///
+/// Content hash = `BLAKE3(Identity_type_id || falcon_pubkey || kyber_pubkey)`.
+/// This is the BLAKE3 hash of the asset itself — the blockchain record proving
+/// this node owns these keys.
+pub fn build_identity_record(
+    coordinate: &MatrixCoordinate,
+    falcon_pubkey: &[u8],
+    kyber_pubkey: &[u8],
+) -> Result<IdentityAssetRecord, String> {
+    let content_hash = compute_identity_content_hash(falcon_pubkey, kyber_pubkey);
+
+    let address = AssetAddress::new(
+        coordinate.x as i64,
+        coordinate.y as i64,
+        coordinate.z as i64,
+        &content_hash,
+    )
+    .map_err(|e| format!("address error for Identity: {e}"))?;
+
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+
+    Ok(IdentityAssetRecord {
+        asset_id: AssetId::from(format!("genesis-identity-{content_hash}")),
+        kind: SystemAssetKind::Identity,
+        address,
+        falcon_public_key: falcon_pubkey.to_vec(),
+        kyber_public_key: kyber_pubkey.to_vec(),
+        genesis_block_hash: ContentHash::zeroed(),
+        registered_at: now_ms,
+    })
+}
+
+/// Deterministic content hash for an identity asset.
+///
+/// `BLAKE3(Identity_type_id || falcon_pubkey || kyber_pubkey)`
+fn compute_identity_content_hash(falcon_pubkey: &[u8], kyber_pubkey: &[u8]) -> ContentHash {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&[SystemAssetKind::Identity.type_id()]);
+    hasher.update(falcon_pubkey);
+    hasher.update(kyber_pubkey);
+    ContentHash::from_bytes(*hasher.finalize().as_bytes())
+}
+
 /// Deterministic content hash for a genesis asset.
 fn compute_asset_content_hash(
     kind: SystemAssetKind,
@@ -341,5 +388,33 @@ mod tests {
 
         let h3 = compute_asset_content_hash(SystemAssetKind::Memory, &caps);
         assert_ne!(h1, h3, "different kind must produce different hash");
+    }
+
+    #[test]
+    fn identity_record_has_both_keys_and_valid_address() {
+        let falcon_pk = vec![0xFA; 64]; // mock FALCON pubkey
+        let kyber_pk = vec![0xBE; 128]; // mock Kyber pubkey
+
+        let record = build_identity_record(&test_coord(), &falcon_pk, &kyber_pk)
+            .expect("test: build identity record");
+
+        assert_eq!(record.kind, SystemAssetKind::Identity);
+        assert_eq!(record.falcon_public_key, falcon_pk);
+        assert_eq!(record.kyber_public_key, kyber_pk);
+        assert!(record.address.is_hypermesh());
+        assert!(record.asset_id.0.starts_with("genesis-identity-"));
+    }
+
+    #[test]
+    fn identity_content_hash_is_deterministic() {
+        let falcon_pk = vec![0xAA; 64];
+        let kyber_pk = vec![0xBB; 128];
+
+        let h1 = compute_identity_content_hash(&falcon_pk, &kyber_pk);
+        let h2 = compute_identity_content_hash(&falcon_pk, &kyber_pk);
+        assert_eq!(h1, h2, "same keys must produce same hash");
+
+        let h3 = compute_identity_content_hash(&falcon_pk, &vec![0xCC; 128]);
+        assert_ne!(h1, h3, "different kyber key must produce different hash");
     }
 }

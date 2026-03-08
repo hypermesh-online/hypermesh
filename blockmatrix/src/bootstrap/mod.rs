@@ -471,7 +471,7 @@ mod tests {
 
         // Verify genesis block
         assert_eq!(bootstrap.genesis_block().index, 0);
-        assert_eq!(bootstrap.genesis_block().node_coordinate, coord);
+        assert!(bootstrap.genesis_block().belongs_to_node(&coord));
 
         // Verify localhost certificate
         let cert = bootstrap.localhost_certificate();
@@ -576,7 +576,7 @@ mod tests {
         );
 
         // Each genesis belongs to its node
-        assert_eq!(bootstrap1.genesis_block().node_coordinate.x, 1);
-        assert_eq!(bootstrap2.genesis_block().node_coordinate.x, 2);
+        assert!(bootstrap1.genesis_block().belongs_to_node(&coord1));
+        assert!(bootstrap2.genesis_block().belongs_to_node(&coord2));
     }
 }

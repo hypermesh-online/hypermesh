@@ -18,7 +18,7 @@ use tracing::info;
 
 use super::{PersistenceError, PersistenceResult};
 use crate::blockchain::block::Block;
-use crate::blockchain::node_chain::ChainStats;
+use crate::blockchain::chain::ChainStats;
 
 /// Block file size threshold (1000 blocks per file)
 const BLOCKS_PER_FILE: u64 = 1000;
@@ -334,9 +334,7 @@ impl BlockchainStorage {
         ChainStats {
             total_blocks: metadata.total_blocks,
             chain_height: metadata.chain_height,
-            chain_start: Some(metadata.created_at),
-            avg_block_time_ms: 0.0, // Would need to calculate from blocks
-            total_data_size: 0,     // Would need to sum from index
+            total_data_size: 0, // Would need to sum from index
         }
     }
 
@@ -567,10 +565,23 @@ mod tests {
         let mut prev_block = Block::genesis(coord);
         storage.write_block(&prev_block).await.expect("test: async operation");
 
-        // Write additional blocks (each must contain at least one asset)
+        // Write additional blocks (each must contain at least one entry)
         for i in 1..10 {
-            let asset = AssetRegistration::genesis(coord);
-            let mut block = Block::new(i, vec![asset], prev_block.hash.clone(), coord);
+            use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
+            use trustchain::proof_of_state::StateProof;
+            let reg = AssetRegistration::genesis(coord);
+            let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+            let state_proof = StateProof::default();
+            let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+            let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+            let entry = BlockAssetEntry {
+                asset_hash: content_hash,
+                proof_hash,
+                state_proof,
+                storage_pointer: StoragePointer::Genesis,
+                registration: reg,
+            };
+            let mut block = Block::new(i, vec![entry], prev_block.hash.clone());
             block.hash = format!("hash_{i}"); // Simplified for testing
             storage.write_block(&block).await.expect("test: async operation");
             prev_block = block;

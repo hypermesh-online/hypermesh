@@ -19,12 +19,16 @@
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
 pub mod block;
+pub mod chain;
 pub mod errors;
 pub mod genesis_assessor;
 pub mod genesis_auth;
+pub mod genesis_ops;
+pub mod mutations;
 pub mod node_chain;
 pub mod propagation;
 pub mod state;
+pub mod stoq_transport;
 pub mod sync_manager;
 pub mod validation;
 
@@ -37,8 +41,8 @@ pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
 pub use node_chain::{ChainStats, NodeBlockchain};
 pub use propagation::{
     BlockPropagator, BlockTransport, PropagationResult, PropagationStrategy, SimulatedTransport,
-    StoqBlockTransportAdapter,
 };
+pub use stoq_transport::StoqBlockTransportAdapter;
 pub use state::{BlockQuery, ChainSnapshot, ChainStateManager, SortOrder, StorageStats};
 pub use sync_manager::{
     BlockProvider, NetworkMembership, NodeBlockchainBlockProvider, SyncConfig, SyncManager,

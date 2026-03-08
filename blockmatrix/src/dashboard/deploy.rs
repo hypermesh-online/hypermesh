@@ -149,18 +149,18 @@ pub fn unbundle_files(bundle: &[u8]) -> Option<BTreeMap<String, Vec<u8>>> {
 
 /// Scan the blockchain for all Dashboard-type asset registrations.
 ///
-/// Returns `Vec<(content_hash, block_index, timestamp)>` ordered by block index
+/// Returns `Vec<(content_hash, block_index)>` ordered by block index
 /// (most recent last).
 pub fn find_dashboard_assets(
     blocks: &[crate::blockchain::block::Block],
-) -> Vec<([u8; 32], u64, chrono::DateTime<chrono::Utc>)> {
+) -> Vec<([u8; 32], u64)> {
     use crate::assets::core::{AssetCategory, BaseSystemType};
 
     let mut results = Vec::new();
     for block in blocks {
         for asset in block.get_assets() {
             if asset.category == AssetCategory::BaseSystem(BaseSystemType::Dashboard) {
-                results.push((asset.content_hash, block.index, block.timestamp));
+                results.push((asset.content_hash, block.index));
             }
         }
     }
@@ -175,7 +175,7 @@ pub fn find_active_dashboard(
 ) -> Option<([u8; 32], u64)> {
     find_dashboard_assets(blocks)
         .last()
-        .map(|(hash, idx, _)| (*hash, *idx))
+        .map(|(hash, idx)| (*hash, *idx))
 }
 
 // --- Legacy filesystem helpers (retained for migration) ---

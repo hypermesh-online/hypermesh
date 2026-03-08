@@ -159,7 +159,7 @@ fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 
                 let dashboards: Vec<serde_json::Value> = assets
                     .iter()
-                    .filter_map(|(hash, block_idx, timestamp)| {
+                    .filter_map(|(hash, block_idx)| {
                         // Try to load manifest from asset store
                         if let Some((manifest_toml, _bundle)) =
                             deploy::load_dashboard_bundle(&s.data_dir, hash)
@@ -172,7 +172,6 @@ fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                                     "description": m.dashboard.description,
                                     "hash": hex::encode(hash),
                                     "block": block_idx,
-                                    "registered_at": timestamp.to_rfc3339(),
                                 }));
                             }
                         }
@@ -180,7 +179,6 @@ fn register_list(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         Some(serde_json::json!({
                             "hash": hex::encode(hash),
                             "block": block_idx,
-                            "registered_at": timestamp.to_rfc3339(),
                             "error": "bundle not in local asset store",
                         }))
                     })
@@ -216,7 +214,7 @@ fn register_info(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                 let chain = s.blockchain.get_chain().await;
                 let assets = deploy::find_dashboard_assets(&chain);
 
-                for (hash, block_idx, timestamp) in assets.iter().rev() {
+                for (hash, block_idx) in assets.iter().rev() {
                     if let Some((manifest_toml, bundle)) =
                         deploy::load_dashboard_bundle(&s.data_dir, hash)
                     {
@@ -234,7 +232,6 @@ fn register_info(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                                     "found": true,
                                     "hash": hex::encode(hash),
                                     "block": block_idx,
-                                    "registered_at": timestamp.to_rfc3339(),
                                     "files": file_count,
                                     "access": {
                                         "public": m.access.public,

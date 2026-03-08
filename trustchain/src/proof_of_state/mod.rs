@@ -39,7 +39,7 @@ pub use validator::*;
 /// - WHEN it occurred (PoTime)
 /// - WHERE it's stored (PoSpace)
 /// - WHAT computational work (PoWork)
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 pub struct StateProof {
     /// WHO owns/validates (economic security)
     pub stake_proof: StakeProof,

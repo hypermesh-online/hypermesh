@@ -80,6 +80,10 @@ pub enum DecryptionKey {
 pub struct ProcessedAsset {
     /// Original asset ID
     pub asset_id: String,
+    /// BLAKE3(Brotli(A)) — content hash of compressed asset, the blockchain address
+    pub content_hash: [u8; 32],
+    /// BLAKE3(P(A)) — content hash of the proof, the proof's blockchain address
+    pub proof_hash: [u8; 32],
     /// Shards of the encrypted blob
     pub shards: Vec<Shard>,
     /// Decryption material for the whole compressed blob
@@ -159,13 +163,16 @@ impl AssetPipeline {
 
     /// Process asset through complete pipeline
     ///
-    /// Pipeline order: Compress -> Encrypt (whole blob) -> Shard -> Distribute
+    /// Pipeline order per §3 R3:
+    /// 1. Compress (Brotli)
+    /// 2. Hash: H = BLAKE3(compressed) — content address
+    /// 3. Proof: P = PoS(A) — four-proof state proof for asset
+    /// 4. Proof hash: PH = BLAKE3(P) — proof content address
+    /// 5. Encrypt (Kyber-1024 KEM + AES-256-GCM, whole blob)
+    /// 6. Shard (Reed-Solomon)
+    /// 7. Distribute (tensor-based placement)
     ///
-    /// This order ensures:
-    /// 1. Compression operates on raw data for best ratio
-    /// 2. Encryption covers the entire compressed blob (not per-shard)
-    /// 3. Sharding splits already-encrypted data into erasure-coded shards
-    /// 4. Distribution places shards at optimal matrix positions
+    /// Ledger entry: L = { H, PH, shard_locations }
     pub async fn process_asset(&self, asset: Asset) -> PipelineResult<ProcessedAsset> {
         let start = std::time::Instant::now();
         let original_size = asset.data.len();
@@ -176,10 +183,9 @@ impl AssetPipeline {
             original_size
         );
 
-        // Stage 1: Compression (Brotli)
-        // Compress raw data first for best compression ratio
+        // Stage 1: Compress (Brotli)
         let (compressed_data, compression_stats) = if self.config.stages_enabled.compression {
-            tracing::debug!("Stage 1: Compression");
+            tracing::debug!("Stage 1: Compress");
             self.compressor.compress(&asset.data)?
         } else {
             (asset.data.clone(), CompressionStats::default())
@@ -192,13 +198,41 @@ impl AssetPipeline {
             compression_stats.ratio
         );
 
-        // Stage 2: Encryption (whole blob)
+        // Stage 2: Hash — H = BLAKE3(Brotli(A))
+        // Content address of the compressed asset. This is the blockchain identifier.
+        let content_hash: [u8; 32] = *blake3::hash(&compressed_data).as_bytes();
+        tracing::info!(
+            "Content hash: {}",
+            hex::encode(&content_hash[..8])
+        );
+
+        // Stage 3: Proof — P = PoS(A)
+        // Generate a state proof for this asset. The proof attests WHO/WHEN/WHERE/WHAT.
+        // For now we hash the asset metadata as a placeholder — the full PoS integration
+        // requires the caller to provide a StateProofProvider.
+        let proof_data = {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(b"proof-of-state:");
+            hasher.update(asset.id.as_bytes());
+            hasher.update(&content_hash);
+            hasher.finalize().as_bytes().to_vec()
+        };
+
+        // Stage 4: Proof hash — PH = BLAKE3(P(A))
+        // Content address of the proof itself.
+        let proof_hash: [u8; 32] = *blake3::hash(&proof_data).as_bytes();
+        tracing::info!(
+            "Proof hash: {}",
+            hex::encode(&proof_hash[..8])
+        );
+
+        // Stage 5: Encrypt (whole blob)
         // Encrypt the entire compressed blob, NOT per-shard.
         // Uses Kyber-1024 KEM + AES-256-GCM when quantum_resistant is true,
         // otherwise falls back to plain AES-256-GCM.
         let (encrypted_blob, decryption_key, encryption_stats) =
             if self.config.stages_enabled.encryption {
-                tracing::debug!("Stage 2: Encryption (whole blob)");
+                tracing::debug!("Stage 5: Encrypt (whole blob)");
                 if self.config.encryption.quantum_resistant {
                     let keypair = self.encryptor.generate_keypair()?;
                     let (result, stats) = self
@@ -231,12 +265,12 @@ impl AssetPipeline {
             encryption_stats.encrypted_size
         );
 
-        // Stage 3: Sharding (Reed-Solomon)
+        // Stage 6: Shard (Reed-Solomon)
         // Shard the encrypted blob into erasure-coded pieces.
         // When the pipeline config uses the default RS(10,4) AND the asset
         // size warrants different parameters, we use adaptive RS (R14).
         let (shards, sharding_stats) = if self.config.stages_enabled.sharding {
-            tracing::debug!("Stage 3: Sharding");
+            tracing::debug!("Stage 6: Shard");
             let adaptive_config =
                 ShardingConfig::adaptive_for_size(original_size as u64);
             let use_adaptive = self.config.sharding.data_shards
@@ -281,10 +315,10 @@ impl AssetPipeline {
             sharding_stats.parity_shards
         );
 
-        // Stage 4: Distribution (tensor-based)
+        // Stage 7: Distribute (tensor-based)
         // Place shards at optimal matrix positions
         let (distributed, distribution_stats) = if self.config.stages_enabled.distribution {
-            tracing::debug!("Stage 4: Distribution");
+            tracing::debug!("Stage 7: Distribute");
             self.distributor
                 .distribute(asset.id.clone(), shards.len())?
         } else {
@@ -339,6 +373,8 @@ impl AssetPipeline {
 
         Ok(ProcessedAsset {
             asset_id: asset.id,
+            content_hash,
+            proof_hash,
             shards,
             decryption_key,
             distributed,

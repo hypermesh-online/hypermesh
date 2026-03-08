@@ -22,7 +22,7 @@ use crate::matrix::coordinate::MatrixCoordinate;
 /// State snapshot of a blockchain at a specific point
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChainSnapshot {
-    /// Timestamp of the snapshot
+    /// Timestamp of the snapshot (when the snapshot was taken, NOT a block field)
     pub timestamp: DateTime<Utc>,
     /// Chain height at snapshot
     pub height: u64,
@@ -43,10 +43,6 @@ pub struct BlockQuery {
     pub from_index: Option<u64>,
     /// End index (inclusive)
     pub to_index: Option<u64>,
-    /// Start time (inclusive)
-    pub from_time: Option<DateTime<Utc>>,
-    /// End time (inclusive)
-    pub to_time: Option<DateTime<Utc>>,
     /// Maximum number of results
     pub limit: Option<usize>,
     /// Sort order
@@ -65,8 +61,6 @@ impl Default for BlockQuery {
         BlockQuery {
             from_index: None,
             to_index: None,
-            from_time: None,
-            to_time: None,
             limit: None,
             sort: SortOrder::Ascending,
         }
@@ -213,18 +207,6 @@ impl ChainStateManager {
             } else {
                 continue;
             };
-
-            // Apply time filters
-            if let Some(from_time) = query.from_time {
-                if block.timestamp < from_time {
-                    continue;
-                }
-            }
-            if let Some(to_time) = query.to_time {
-                if block.timestamp > to_time {
-                    continue;
-                }
-            }
 
             results.push(block);
 
@@ -396,8 +378,25 @@ pub struct StorageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::test_asset_ids;
+    use super::super::block::{BlockAssetEntry, StoragePointer};
+    use crate::assets::core::AssetRegistration;
+    use trustchain::proof_of_state::StateProof;
     use tempfile::TempDir;
+
+    fn test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
+        let reg = AssetRegistration::genesis(coord);
+        let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let state_proof = StateProof::default();
+        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+        BlockAssetEntry {
+            asset_hash: content_hash,
+            proof_hash,
+            state_proof,
+            storage_pointer: StoragePointer::Genesis,
+            registration: reg,
+        }
+    }
 
     async fn create_test_manager() -> (ChainStateManager, TempDir) {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
@@ -440,7 +439,7 @@ mod tests {
 
         // Add blocks beyond cache size
         for i in 0..5 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
             manager.store_block(&block).await.expect("test: block storage");
         }
 
@@ -457,7 +456,7 @@ mod tests {
 
         // Add some blocks
         for i in 0..10 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
             manager.store_block(&block).await.expect("test: block storage");
         }
 
@@ -482,7 +481,7 @@ mod tests {
 
         // Add blocks
         for i in 0..10 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
             manager.store_block(&block).await.expect("test: block storage");
         }
 
@@ -551,7 +550,7 @@ mod tests {
 
         // Add some blocks
         for i in 0..5 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
             manager.store_block(&block).await.expect("test: block storage");
         }
 
@@ -570,7 +569,7 @@ mod tests {
 
         // Add blocks
         for i in 0..5 {
-            let block = Block::new(i, test_asset_ids(1), format!("prev_{i}"), coord);
+            let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
             manager.store_block(&block).await.expect("test: block storage");
         }
 

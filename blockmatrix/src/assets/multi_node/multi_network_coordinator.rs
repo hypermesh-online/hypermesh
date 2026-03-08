@@ -758,6 +758,7 @@ mod tests {
                 stake_holder_id: "test-id".to_string(),
                 stake_amount: 1000,
                 stake_timestamp: SystemTime::now(),
+
             },
             work_proof: WorkProof {
                 owner_id: "test-owner".to_string(),

@@ -2,53 +2,82 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! FALCON-1024 Node Identity
+//! Post-Quantum Node Identity
 //!
-//! Each node has a persistent FALCON-1024 keypair used to sign state proofs
-//! for bilateral authentication during handshakes. The node ID is derived
-//! as BLAKE3(public_key).
+//! Each node has a dual-key identity:
+//! - **FALCON-1024** keypair for signing (proves WHO created/sent something)
+//! - **Kyber-1024** keypair for encryption (enables asset access control via KEM tokens)
+//!
+//! The node ID is derived as `BLAKE3(falcon_public_key)`.
 //!
 //! Keys are stored as raw DER bytes on disk and loaded on startup.
 //!
-//! This module implements the [`hypermesh_lib::NodeSigner`] trait so that
-//! STOQ can use the identity for protocol-level handshake signing without
-//! depending on TrustChain directly.
+//! This module implements [`hypermesh_lib::NodeSigner`] and [`hypermesh_lib::NodeEncryptor`]
+//! so that STOQ and the asset pipeline can use the identity without depending
+//! on TrustChain directly.
 
 use anyhow::{anyhow, Result};
-use hypermesh_lib::NodeSigner;
+use hypermesh_lib::{NodeEncryptor, NodeSigner};
 use pqcrypto_falcon::falcon1024;
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::kem::{Ciphertext as KemCiphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret};
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
 use std::path::Path;
 use tracing::info;
 
-/// Persistent FALCON-1024 identity for a HyperMesh node.
+/// Persistent dual-key identity for a HyperMesh node.
+///
+/// Contains both FALCON-1024 (signing) and Kyber-1024 (encryption) keypairs:
+/// - **FALCON**: Proves provenance — signs state proofs, handshake challenges, blocks
+/// - **Kyber**: Enables access control — peers encrypt assets using this node's Kyber
+///   pubkey, node decapsulates to recover shared secret, issues tokens to authorize
+///   specific peers to decrypt
+///
+/// The node ID is `BLAKE3(falcon_public_key)`.
 pub struct FalconIdentity {
-    /// Raw FALCON-1024 public key bytes
+    /// Raw FALCON-1024 public key bytes (signing/verification)
     pub public_key: Vec<u8>,
     /// Raw FALCON-1024 secret key bytes
     secret_key: Vec<u8>,
-    /// BLAKE3 hex digest of public_key — used as node ID
+    /// Raw Kyber-1024 public key bytes (KEM encapsulation)
+    pub kyber_public_key: Vec<u8>,
+    /// Raw Kyber-1024 secret key bytes (KEM decapsulation)
+    kyber_secret_key: Vec<u8>,
+    /// BLAKE3 hex digest of FALCON public_key — used as node ID
     pub node_id: String,
 }
 
 impl FalconIdentity {
-    /// Generate a fresh FALCON-1024 keypair.
+    /// Generate a fresh dual-key identity (FALCON-1024 + Kyber-1024).
     pub fn generate() -> Self {
         let (pk, sk) = falcon1024::keypair();
         let pk_bytes = pk.as_bytes().to_vec();
         let sk_bytes = sk.as_bytes().to_vec();
+
+        let (kyber_pk, kyber_sk) = kyber1024::keypair();
+        let kyber_pk_bytes = kyber_pk.as_bytes().to_vec();
+        let kyber_sk_bytes = kyber_sk.as_bytes().to_vec();
+
         let node_id = blake3::hash(&pk_bytes).to_hex().to_string();
         Self {
             public_key: pk_bytes,
             secret_key: sk_bytes,
+            kyber_public_key: kyber_pk_bytes,
+            kyber_secret_key: kyber_sk_bytes,
             node_id,
         }
     }
 
     /// Load an existing identity from `data_dir`, or generate and persist a new one.
+    ///
+    /// Persists 4 key files: FALCON (signing) + Kyber (encryption).
+    /// If FALCON keys exist but Kyber keys don't (upgrade path), generates
+    /// Kyber keys and persists them alongside the existing FALCON keys.
     pub fn load_or_create(data_dir: &Path) -> Result<Self> {
         let pk_path = data_dir.join("falcon_pubkey.der");
         let sk_path = data_dir.join("falcon_secretkey.der");
+        let kyber_pk_path = data_dir.join("kyber_pubkey.der");
+        let kyber_sk_path = data_dir.join("kyber_secretkey.der");
 
         if pk_path.exists() && sk_path.exists() {
             let pk_bytes = std::fs::read(&pk_path)
@@ -56,7 +85,7 @@ impl FalconIdentity {
             let sk_bytes = std::fs::read(&sk_path)
                 .map_err(|e| anyhow!("Failed to read FALCON secret key: {e}"))?;
 
-            // Validate key sizes before accepting
+            // Validate FALCON key sizes
             if pk_bytes.len() != falcon1024::public_key_bytes() {
                 return Err(anyhow!(
                     "FALCON public key size mismatch: expected {}, got {}",
@@ -72,11 +101,47 @@ impl FalconIdentity {
                 ));
             }
 
+            // Load or generate Kyber keys (upgrade path for existing nodes)
+            let (kyber_pk_bytes, kyber_sk_bytes) = if kyber_pk_path.exists() && kyber_sk_path.exists() {
+                let kpk = std::fs::read(&kyber_pk_path)
+                    .map_err(|e| anyhow!("Failed to read Kyber public key: {e}"))?;
+                let ksk = std::fs::read(&kyber_sk_path)
+                    .map_err(|e| anyhow!("Failed to read Kyber secret key: {e}"))?;
+
+                if kpk.len() != kyber1024::public_key_bytes() {
+                    return Err(anyhow!(
+                        "Kyber public key size mismatch: expected {}, got {}",
+                        kyber1024::public_key_bytes(),
+                        kpk.len()
+                    ));
+                }
+                if ksk.len() != kyber1024::secret_key_bytes() {
+                    return Err(anyhow!(
+                        "Kyber secret key size mismatch: expected {}, got {}",
+                        kyber1024::secret_key_bytes(),
+                        ksk.len()
+                    ));
+                }
+                (kpk, ksk)
+            } else {
+                info!("Generating Kyber-1024 encryption keys (upgrade from FALCON-only identity)");
+                let (kpk, ksk) = kyber1024::keypair();
+                let kpk_bytes = kpk.as_bytes().to_vec();
+                let ksk_bytes = ksk.as_bytes().to_vec();
+                std::fs::write(&kyber_pk_path, &kpk_bytes)
+                    .map_err(|e| anyhow!("Failed to write Kyber public key: {e}"))?;
+                std::fs::write(&kyber_sk_path, &ksk_bytes)
+                    .map_err(|e| anyhow!("Failed to write Kyber secret key: {e}"))?;
+                (kpk_bytes, ksk_bytes)
+            };
+
             let node_id = blake3::hash(&pk_bytes).to_hex().to_string();
-            info!("Loaded FALCON-1024 identity from {}", data_dir.display());
+            info!("Loaded dual-key identity from {}", data_dir.display());
             Ok(Self {
                 public_key: pk_bytes,
                 secret_key: sk_bytes,
+                kyber_public_key: kyber_pk_bytes,
+                kyber_secret_key: kyber_sk_bytes,
                 node_id,
             })
         } else {
@@ -87,17 +152,41 @@ impl FalconIdentity {
                 .map_err(|e| anyhow!("Failed to write FALCON public key: {e}"))?;
             std::fs::write(&sk_path, &identity.secret_key)
                 .map_err(|e| anyhow!("Failed to write FALCON secret key: {e}"))?;
+            std::fs::write(&kyber_pk_path, &identity.kyber_public_key)
+                .map_err(|e| anyhow!("Failed to write Kyber public key: {e}"))?;
+            std::fs::write(&kyber_sk_path, &identity.kyber_secret_key)
+                .map_err(|e| anyhow!("Failed to write Kyber secret key: {e}"))?;
             info!(
-                "Generated new FALCON-1024 identity at {}",
+                "Generated new dual-key identity at {}",
                 data_dir.display()
             );
             Ok(identity)
         }
     }
 
-    /// Return the raw secret key bytes.
+    /// Return the raw FALCON secret key bytes.
     pub fn secret_key_bytes(&self) -> &[u8] {
         &self.secret_key
+    }
+
+    /// Return the raw Kyber secret key bytes.
+    pub fn kyber_secret_key_bytes(&self) -> &[u8] {
+        &self.kyber_secret_key
+    }
+}
+
+impl NodeEncryptor for FalconIdentity {
+    fn encryption_public_key(&self) -> &[u8] {
+        &self.kyber_public_key
+    }
+
+    fn decapsulate(&self, kem_ciphertext: &[u8]) -> Result<Vec<u8>> {
+        let sk = kyber1024::SecretKey::from_bytes(&self.kyber_secret_key)
+            .map_err(|e| anyhow!("Invalid Kyber secret key: {e}"))?;
+        let ct = kyber1024::Ciphertext::from_bytes(kem_ciphertext)
+            .map_err(|e| anyhow!("Invalid Kyber KEM ciphertext: {e}"))?;
+        let shared_secret = kyber1024::decapsulate(&ct, &sk);
+        Ok(shared_secret.as_bytes().to_vec())
     }
 }
 
@@ -134,6 +223,7 @@ mod tests {
     fn test_generate_identity() {
         let id = FalconIdentity::generate();
         assert_eq!(id.public_key.len(), falcon1024::public_key_bytes());
+        assert_eq!(id.kyber_public_key.len(), kyber1024::public_key_bytes());
         assert!(!id.node_id.is_empty());
         assert_eq!(id.node_id.len(), 64); // BLAKE3 hex = 64 chars
     }
@@ -163,6 +253,7 @@ mod tests {
 
         assert_eq!(id1.node_id, id2.node_id);
         assert_eq!(id1.public_key, id2.public_key);
+        assert_eq!(id1.kyber_public_key, id2.kyber_public_key);
     }
 
     #[test]
@@ -182,5 +273,55 @@ mod tests {
     fn test_node_signer_trait_pubkey() {
         let id = FalconIdentity::generate();
         assert_eq!(NodeSigner::public_key_bytes(&id), id.public_key.as_slice());
+    }
+
+    #[test]
+    fn test_kyber_encapsulate_decapsulate() {
+        let id = FalconIdentity::generate();
+
+        // Encapsulate using the node's Kyber public key (what a peer would do)
+        let pk = kyber1024::PublicKey::from_bytes(&id.kyber_public_key)
+            .expect("test: valid kyber pubkey");
+        let (shared_secret_sender, kem_ciphertext) = kyber1024::encapsulate(&pk);
+
+        // Decapsulate using the trait (what this node does to recover the secret)
+        let shared_secret_receiver = id
+            .decapsulate(kem_ciphertext.as_bytes())
+            .expect("test: decapsulation");
+
+        // Both sides must derive the same shared secret
+        assert_eq!(shared_secret_sender.as_bytes(), shared_secret_receiver.as_slice());
+    }
+
+    #[test]
+    fn test_node_encryptor_trait() {
+        let id = FalconIdentity::generate();
+        assert_eq!(
+            NodeEncryptor::encryption_public_key(&id),
+            id.kyber_public_key.as_slice()
+        );
+    }
+
+    #[test]
+    fn test_load_or_create_upgrades_falcon_only() {
+        // Simulate an existing FALCON-only identity (no Kyber keys on disk)
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let path = dir.path().join("identity");
+
+        // Create FALCON-only identity manually
+        let id1 = FalconIdentity::generate();
+        std::fs::create_dir_all(&path).expect("test: mkdir");
+        std::fs::write(path.join("falcon_pubkey.der"), &id1.public_key).expect("test: write pk");
+        std::fs::write(path.join("falcon_secretkey.der"), &id1.secret_key).expect("test: write sk");
+        // Deliberately NOT writing kyber keys
+
+        // load_or_create should generate Kyber keys on upgrade
+        let id2 = FalconIdentity::load_or_create(&path).expect("test: upgrade");
+        assert_eq!(id2.node_id, id1.node_id); // Same FALCON identity
+        assert_eq!(id2.kyber_public_key.len(), kyber1024::public_key_bytes());
+
+        // Subsequent load should return same Kyber keys
+        let id3 = FalconIdentity::load_or_create(&path).expect("test: reload");
+        assert_eq!(id3.kyber_public_key, id2.kyber_public_key);
     }
 }

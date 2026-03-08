@@ -589,6 +589,8 @@ mod tests {
                     placements: vec![],
                     metadata: Default::default(),
                 },
+                content_hash: [0u8; 32],
+                proof_hash: [0u8; 32],
                 stats: Default::default(),
             })
         };

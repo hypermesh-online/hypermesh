@@ -24,7 +24,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 
                     for idx in 0..=height {
                         if let Some(block) = s.blockchain.get_block(idx).await {
-                            for reg in &block.assets {
+                            for reg in block.get_assets() {
                                 let hash_hex = hex::encode(reg.content_hash);
                                 assets.push(serde_json::json!({
                                     "block_index": idx,
@@ -68,7 +68,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 
                     for idx in 0..=height {
                         if let Some(block) = s.blockchain.get_block(idx).await {
-                            for reg in &block.assets {
+                            for reg in block.get_assets() {
                                 let hash_hex = hex::encode(reg.content_hash);
                                 if hash_hex.contains(&asset_id) {
                                     matches.push(serde_json::json!({

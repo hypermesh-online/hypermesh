@@ -421,6 +421,35 @@ pub struct GenesisAssetRecord {
     pub assessed_at: u64,
 }
 
+/// Genesis identity record — registered as a blockchain asset on first boot (R1, R10).
+///
+/// Bundles both post-quantum public keys into a single blockchain-registered asset:
+/// - **FALCON-1024 pubkey**: signing key — proves provenance (WHO created/sent)
+/// - **Kyber-1024 pubkey**: encryption key — enables access control (encrypt FOR this node)
+///
+/// Content hash = `BLAKE3(Identity_type_id || falcon_pubkey || kyber_pubkey)`
+///
+/// The Kyber pubkey allows peers to encrypt assets for this node. The node
+/// decapsulates the KEM ciphertext to recover the shared secret, then issues
+/// tokens (re-encrypted shared secrets) to authorize specific peers to decrypt.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdentityAssetRecord {
+    /// Content-addressed asset ID: `BLAKE3(type_id || falcon_pk || kyber_pk)`
+    pub asset_id: AssetId,
+    /// Always `SystemAssetKind::Identity`
+    pub kind: SystemAssetKind,
+    /// IPv6-encoded asset address (matrix position + content hash)
+    pub address: AssetAddress,
+    /// FALCON-1024 public key (signing/verification)
+    pub falcon_public_key: Vec<u8>,
+    /// Kyber-1024 public key (KEM encapsulation for asset encryption)
+    pub kyber_public_key: Vec<u8>,
+    /// BLAKE3 hash of the genesis block that created this asset
+    pub genesis_block_hash: ContentHash,
+    /// Timestamp of registration (UTC milliseconds since epoch)
+    pub registered_at: u64,
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

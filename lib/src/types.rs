@@ -658,6 +658,27 @@ pub trait NodeSigner: Send + Sync {
         Self: Sized;
 }
 
+/// Trait for Kyber-1024 KEM encryption operations on a node's identity.
+///
+/// Each node has a persistent Kyber-1024 keypair alongside its FALCON-1024
+/// signing keypair. Together they form the node's dual-key identity:
+/// - FALCON pubkey proves provenance (WHO created/sent something)
+/// - Kyber pubkey enables access control (encrypt FOR this node, issue tokens to authorize decryption)
+///
+/// Implemented by TrustChain's `NodeIdentityKeys`, consumed by the asset pipeline
+/// and handshake protocol.
+pub trait NodeEncryptor: Send + Sync {
+    /// Raw Kyber-1024 public key bytes for KEM encapsulation.
+    fn encryption_public_key(&self) -> &[u8];
+
+    /// Decapsulate a KEM ciphertext to recover the shared secret.
+    ///
+    /// Used when someone has encrypted an asset for this node — the node
+    /// decapsulates to get the AES key, then can issue tokens (re-encrypted
+    /// shared secrets) to authorize specific peers to decrypt.
+    fn decapsulate(&self, kem_ciphertext: &[u8]) -> anyhow::Result<Vec<u8>>;
+}
+
 /// Trait for providing and validating Proof of State data during handshakes.
 ///
 /// Implemented by BlockMatrix (which has blockchain state), consumed by STOQ

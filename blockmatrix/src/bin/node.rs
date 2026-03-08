@@ -34,9 +34,8 @@ use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
 use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
-use blockmatrix::blockchain::propagation::{
-    BlockPropagator, PropagationStrategy, StoqBlockTransportAdapter,
-};
+use blockmatrix::blockchain::propagation::{BlockPropagator, PropagationStrategy};
+use blockmatrix::blockchain::stoq_transport::StoqBlockTransportAdapter;
 use blockmatrix::blockchain::sync_manager::{NodeBlockchainBlockProvider, SyncConfig, SyncManager};
 use blockmatrix::bootstrap::{node_id, LocalhostCertificate, NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -532,7 +531,7 @@ async fn propagate_block(
 /// the persistence layer for nodes that have the original DNS records file.
 fn count_dns_assets_in_block(block: &blockmatrix::blockchain::block::Block) -> usize {
     block
-        .assets
+        .get_assets()
         .iter()
         .filter(|asset| {
             matches!(
@@ -1007,6 +1006,8 @@ async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Resu
                 distributed_at: 0,
             },
         },
+        content_hash: [0u8; 32],
+        proof_hash: [0u8; 32],
         stats: PipelineStats::default(),
     };
 
