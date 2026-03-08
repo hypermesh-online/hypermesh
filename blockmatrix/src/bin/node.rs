@@ -1666,6 +1666,9 @@ async fn run_connect(
         info!("Block sync infrastructure initialized (propagation=NearestN(6))");
 
         // Create peer context for receive-side message handling
+        let connected_peer_coords = std::sync::Arc::new(
+            tokio::sync::RwLock::new(Vec::<blockmatrix::matrix::coordinate::MatrixCoordinate>::new()),
+        );
         let peer_ctx = std::sync::Arc::new(blockmatrix::network::PeerContext {
             blockchain: bootstrap.blockchain().clone(),
             shard_store: shard_store.clone(),
@@ -1674,6 +1677,9 @@ async fn run_connect(
             block_propagator: block_propagator.clone(),
             our_coordinate: coord,
             node_id: nid.to_string(),
+            blockchain_scope: hypermesh_lib::BlockchainScope::Device,
+            spatial_bucket_assigner: None,
+            connected_peer_coords: connected_peer_coords.clone(),
         });
 
         // Start message loops for peers connected during discovery (before PeerContext existed)
@@ -1751,6 +1757,7 @@ async fn run_connect(
         let is_reflector = cli.reflector;
         let sync_coord = coord;
         let shard_store_metrics = shard_store.clone();
+        let peer_coords_sync = connected_peer_coords.clone();
         let metrics_node_id = nid.to_string();
         tokio::spawn(async move {
             let mut interval =
@@ -1765,6 +1772,10 @@ async fn run_connect(
 
                 let addr_map = network_sync.get_node_address_map().await;
                 *node_map_sync.write().await = addr_map;
+
+                // Keep PeerContext's connected coordinates in sync for re-propagation
+                let live_coords = network_sync.get_connected_coordinates().await;
+                *peer_coords_sync.write().await = live_coords;
 
                 let chain = blockchain_sync.get_chain().await;
                 let provider = NodeBlockchainBlockProvider::from_blocks(&chain);

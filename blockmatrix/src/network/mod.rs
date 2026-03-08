@@ -12,6 +12,7 @@ pub mod cluster;
 pub mod config;
 pub mod discovery;
 pub mod gossip;
+pub mod hash_bucket;
 pub mod isolation;
 pub mod multi_network;
 pub mod reflector_pool;
@@ -35,9 +36,11 @@ use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
+use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::reflector_pool::ReflectorPool;
 use crate::network::shard_store::ShardStore;
 use crate::network::stoq_integration::{MatrixMessage, MatrixNodeInfo, MatrixStoqIntegration};
+use hypermesh_lib::BlockchainScope;
 
 /// Node network information
 #[derive(Clone)]
@@ -86,6 +89,13 @@ pub struct PeerContext {
     pub our_coordinate: MatrixCoordinate,
     /// Our node ID.
     pub node_id: String,
+    /// Blockchain scope determining block handling behavior.
+    pub blockchain_scope: BlockchainScope,
+    /// Spatial bucket assigner for Public mode (Network scope + Public transport).
+    /// When `Some`, blocks are filtered by shard-placement proximity.
+    pub spatial_bucket_assigner: Option<Arc<RwLock<SpatialBucketAssigner>>>,
+    /// Live list of connected peer coordinates for block re-propagation.
+    pub connected_peer_coords: Arc<RwLock<Vec<MatrixCoordinate>>>,
 }
 
 /// Network manager for multi-node communication
@@ -786,15 +796,43 @@ async fn handle_shard_dispatch(
 /// - `[9..9+N]`  block JSON
 /// - `[9+N..17+N]` proof_hash_len: u64 LE
 /// - `[17+N..17+N+P]` proof_hash bytes
+///
+/// Dispatches to scope-specific handlers based on `PeerContext::blockchain_scope`.
 async fn handle_block_announce(
     data: &[u8],
     peer_node_id: &str,
     ctx: &PeerContext,
 ) {
-    // Minimum: tag(1) + block_json_len(8) = 9
+    let block = match parse_and_verify_block(data, peer_node_id) {
+        Some(b) => b,
+        None => return,
+    };
+
+    match ctx.blockchain_scope {
+        BlockchainScope::Device => {
+            handle_block_device_scope(&block, peer_node_id, ctx).await;
+        }
+        BlockchainScope::Network => {
+            if let Some(ref assigner) = ctx.spatial_bucket_assigner {
+                handle_block_public_scope(&block, peer_node_id, ctx, assigner).await;
+            } else {
+                handle_block_network_scope(&block, peer_node_id, ctx).await;
+            }
+        }
+    }
+}
+
+/// Parse a block announcement payload and verify its BLAKE3 hash.
+///
+/// Returns `None` (with appropriate log messages) on malformed or
+/// tampered payloads.
+fn parse_and_verify_block(
+    data: &[u8],
+    peer_node_id: &str,
+) -> Option<crate::blockchain::block::Block> {
     if data.len() < 9 {
         warn!("Block announce too short ({} bytes)", data.len());
-        return;
+        return None;
     }
 
     let block_json_len = u64::from_le_bytes(
@@ -807,7 +845,7 @@ async fn handle_block_announce(
             9 + block_json_len,
             data.len(),
         );
-        return;
+        return None;
     }
 
     let block: crate::blockchain::block::Block =
@@ -815,31 +853,97 @@ async fn handle_block_announce(
             Ok(b) => b,
             Err(e) => {
                 warn!("Invalid block JSON from {}: {}", &peer_node_id[..8.min(peer_node_id.len())], e);
-                return;
+                return None;
             }
         };
 
-    // Verify BLAKE3 hash integrity
     if !block.verify_hash() {
         warn!(
             "Block {} hash mismatch from peer {}",
             block.index,
             &peer_node_id[..8.min(peer_node_id.len())],
         );
-        return;
+        return None;
     }
 
-    // Check if we already have this block
+    Some(block)
+}
+
+/// Device scope: independent chains. Accept only if newer than our height.
+async fn handle_block_device_scope(
+    block: &crate::blockchain::block::Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
     let our_height = ctx.blockchain.get_height().await;
     if block.index <= our_height {
         debug!(
-            "Already have block {} (our height: {}), skipping",
+            "Device scope: already have block {} (height {}), skipping",
             block.index, our_height,
         );
         return;
     }
 
-    // Insert received block
+    insert_block(block, peer_node_id, ctx).await;
+}
+
+/// Network scope (Private): shared chain. Deduplicate by hash, not index.
+/// Re-propagate to other peers after successful insertion.
+async fn handle_block_network_scope(
+    block: &crate::blockchain::block::Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if ctx.blockchain.has_block(&block.hash).await {
+        debug!(
+            "Network scope: already have block {} by hash, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    if insert_block(block, peer_node_id, ctx).await {
+        repropagate_block(block, peer_node_id, ctx).await;
+    }
+}
+
+/// Public scope (Network + spatial bucket filtering): accept blocks
+/// whose shard placements fall within our neighborhood radius.
+/// Re-propagate accepted blocks to other peers.
+async fn handle_block_public_scope(
+    block: &crate::blockchain::block::Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+    assigner: &Arc<RwLock<SpatialBucketAssigner>>,
+) {
+    if ctx.blockchain.has_block(&block.hash).await {
+        debug!(
+            "Public scope: already have block {} by hash, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    let in_neighborhood = assigner.read().await.block_in_our_neighborhood(block);
+    if !in_neighborhood {
+        debug!(
+            "Public scope: block {} has no shard placements in our neighborhood, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    if insert_block(block, peer_node_id, ctx).await {
+        repropagate_block(block, peer_node_id, ctx).await;
+    }
+}
+
+/// Insert a block into our chain. Returns `true` on success.
+async fn insert_block(
+    block: &crate::blockchain::block::Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) -> bool {
     match ctx.blockchain.insert_received_block(block.clone()).await {
         Ok(()) => {
             info!(
@@ -847,6 +951,7 @@ async fn handle_block_announce(
                 block.index,
                 &peer_node_id[..8.min(peer_node_id.len())],
             );
+            true
         }
         Err(e) => {
             debug!(
@@ -855,7 +960,32 @@ async fn handle_block_announce(
                 e,
                 &peer_node_id[..8.min(peer_node_id.len())],
             );
+            false
         }
+    }
+}
+
+/// Re-propagate a block to peers via the block propagator.
+async fn repropagate_block(
+    block: &crate::blockchain::block::Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let coords = ctx.connected_peer_coords.read().await;
+    if coords.is_empty() {
+        debug!("No connected peers, skipping block re-propagation");
+        return;
+    }
+    let propagator = ctx.block_propagator.lock().await;
+    let result = propagator.propagate_block(block, &coords).await;
+    if !result.failed_nodes.is_empty() {
+        debug!(
+            "Re-propagation of block {} from {}: {} reached, {} failed",
+            block.index,
+            &peer_node_id[..8.min(peer_node_id.len())],
+            result.reached_nodes.len(),
+            result.failed_nodes.len(),
+        );
     }
 }
 
