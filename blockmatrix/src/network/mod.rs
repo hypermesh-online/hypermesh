@@ -189,7 +189,7 @@ impl NetworkManager {
 
         // Connect to bootstrap nodes if any
         for bootstrap_addr in &self.bootstrap_nodes {
-            if let Err(e) = self.connect_to_peer(*bootstrap_addr).await {
+            if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
                 warn!(
                     "Failed to connect to bootstrap node {}: {}",
                     bootstrap_addr, e
@@ -209,7 +209,7 @@ impl NetworkManager {
 
         // Connect to all bootstrap nodes
         for bootstrap_addr in &self.bootstrap_nodes {
-            match self.connect_to_peer(*bootstrap_addr).await {
+            match self.connect_to_peer(*bootstrap_addr, None).await {
                 Ok(node_id) => {
                     info!(
                         "Connected to bootstrap node {} ({})",
@@ -229,8 +229,16 @@ impl NetworkManager {
         Ok(())
     }
 
-    /// Connect to a specific peer
-    pub async fn connect_to_peer(&self, addr: SocketAddr) -> Result<String> {
+    /// Connect to a specific peer.
+    ///
+    /// When `peer_ctx` is `Some`, a persistent message loop is spawned for the
+    /// peer after a successful handshake (mirroring what `accept_connections`
+    /// does for incoming peers).
+    pub async fn connect_to_peer(
+        &self,
+        addr: SocketAddr,
+        peer_ctx: Option<Arc<PeerContext>>,
+    ) -> Result<String> {
         info!("Connecting to peer at {}", addr);
 
         // Always use the NetworkManager handshake path (flat JSON).
@@ -253,6 +261,7 @@ impl NetworkManager {
         // Store the connected node
         let mut nodes = self.nodes.write().await;
         nodes.insert(node_info.node_id.clone(), node_info.clone());
+        drop(nodes);
 
         info!(
             "Successfully connected to node {} at ({},{},{})",
@@ -261,6 +270,15 @@ impl NetworkManager {
             node_info.coordinate.y,
             node_info.coordinate.z
         );
+
+        // Spawn persistent message loop if context is available
+        if let Some(ctx) = peer_ctx {
+            let peer_node_id = node_info.node_id.clone();
+            let peer_coord = node_info.coordinate;
+            tokio::spawn(async move {
+                run_peer_message_loop(connection, peer_node_id, peer_coord, ctx).await;
+            });
+        }
 
         Ok(node_info.node_id)
     }
@@ -350,10 +368,13 @@ impl NetworkManager {
                 let message = state.build_message();
                 drop(state);
 
-                let data = match serde_json::to_vec(&message) {
+                let json_data = match serde_json::to_vec(&message) {
                     Ok(d) => d,
                     Err(_) => continue,
                 };
+                let mut data = Vec::with_capacity(1 + json_data.len());
+                data.push(TAG_GOSSIP);
+                data.extend_from_slice(&json_data);
 
                 // Send to connected peers (best-effort)
                 for (node_id, node) in connected.iter() {
@@ -485,7 +506,7 @@ impl NetworkManager {
         );
         let mut connected_ids = Vec::new();
         for addr in peers {
-            match self.connect_to_peer(addr).await {
+            match self.connect_to_peer(addr, None).await {
                 Ok(node_id) => {
                     info!(
                         "Connected to domain '{}' peer: {}",
@@ -502,6 +523,23 @@ impl NetworkManager {
             }
         }
         Ok(connected_ids)
+    }
+
+    /// Start message loops for peers that were connected before PeerContext
+    /// was available (e.g. during `start_discovery`).
+    pub async fn start_peer_message_loops(&self, ctx: Arc<PeerContext>) {
+        let nodes = self.nodes.read().await;
+        for (node_id, node) in nodes.iter() {
+            if let Some(ref connection) = node.connection {
+                let conn = connection.clone();
+                let nid = node_id.clone();
+                let coord = node.coordinate;
+                let ctx = ctx.clone();
+                tokio::spawn(async move {
+                    run_peer_message_loop(conn, nid, coord, ctx).await;
+                });
+            }
+        }
     }
 
     /// Discover neighbors using STOQ integration
@@ -638,6 +676,7 @@ const TAG_SHARD_SEND: u8 = 0x01;
 const TAG_SHARD_FETCH: u8 = 0x02;
 const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
 const TAG_SYNC_MESSAGE: u8 = 0x10;
+const TAG_GOSSIP: u8 = 0x20;
 
 /// Persistent read loop for a connected peer.
 ///
@@ -693,6 +732,13 @@ async fn run_peer_message_loop(
             }
             TAG_SYNC_MESSAGE => {
                 handle_sync_message(&data[1..], &mut stream, &peer_node_id, &peer_coord, &ctx).await;
+            }
+            TAG_GOSSIP => {
+                debug!(
+                    "Gossip message from peer {} ({} bytes)",
+                    &peer_node_id[..8.min(peer_node_id.len())],
+                    data.len() - 1,
+                );
             }
             _ => {
                 warn!(

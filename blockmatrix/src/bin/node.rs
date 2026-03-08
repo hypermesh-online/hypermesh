@@ -1676,8 +1676,16 @@ async fn run_connect(
             node_id: nid.to_string(),
         });
 
-        // Start accepting connections in background (with peer context for message loop)
+        // Start message loops for peers connected during discovery (before PeerContext existed)
         let network_clone = std::sync::Arc::new(network_manager);
+        network_clone.start_peer_message_loops(peer_ctx.clone()).await;
+
+        // Immediately seed the block transport node_map so propagation works
+        // (the 5s sync loop would otherwise leave it empty for the first cycle)
+        let addr_map = network_clone.get_node_address_map().await;
+        *node_map.write().await = addr_map;
+
+        // Start accepting connections in background (with peer context for message loop)
         let network_accept = network_clone.clone();
         let ctx_accept = peer_ctx.clone();
         tokio::spawn(async move {
