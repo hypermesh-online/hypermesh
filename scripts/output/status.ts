@@ -51,8 +51,10 @@ export const crateStatuses: CrateStatus[] = [
         "Capability-based GPU detection (honest fallback, no fake hardware)",
         "StateAuthenticator trait (binary authentication interface)",
         "PeerIdentity bridges to lib NodeId",
-        "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
-        "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
+        "Proof of State validation on block creation — add_block() requires Vec<BlockAssetEntry>, each entry carries its own StateProof",
+        "Per-entry proof hash — hπ = BLAKE3(StateProof) in every BlockAssetEntry, validated independently",
+        "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
+        "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
         "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
         "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
         "Daemon lifecycle (connect/disconnect commands, PID file, graceful shutdown)",
@@ -99,12 +101,10 @@ export const crateStatuses: CrateStatus[] = [
         "Config [services] section (ConnectionMode, per-service URLs in config.toml)"
       ],
       "inDevelopment": [
-        "Bilateral handshake — WRONG LAYER: 3-message challenge-response lives in blockmatrix/src/network/mod.rs but belongs in STOQ (transport-layer authentication)",
-        "FALCON-1024 identity — WRONG LAYER: blockmatrix/src/identity.rs generates keypairs but identity is a TrustChain/STOQ concern, not blockchain",
-        "Peer handshake PoS — WRONG LAYER: connect_to_peer()/accept_connections() do PoS exchange but this is protocol-level (STOQ), not blockchain-level",
-        "Identity-as-asset — FALCON pubkey is NOT registered as a blockchain asset (violates R1/R10: all resources are assets)",
+        "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Not yet tested multi-node end-to-end.",
+        "Identity-as-asset — SystemAssetKind::Identity type added (R1/R10), actual FALCON pubkey registration during bootstrap not yet wired",
         "StateProof test fallback — handshake silently downgrades to StateProof::new_for_testing() when real PoS generation fails",
-        "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist but bilateral handshake is broken (identity mismatch + wrong layer), so no blocks actually sync between nodes",
+        "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist. Handshake now in correct layer (STOQ) but not yet tested multi-node end-to-end.",
         "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
@@ -118,7 +118,7 @@ export const crateStatuses: CrateStatus[] = [
         "Container runtime with real process isolation"
       ]
     },
-    "completion": 83
+    "completion": 86
   },
   {
     "id": "caesar",
@@ -518,7 +518,7 @@ export const crateStatuses: CrateStatus[] = [
         "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)"
       ],
       "inDevelopment": [
-        "Bilateral handshake at protocol layer — currently implemented in blockmatrix/src/network/mod.rs, needs to move to STOQ as protocol-level authentication (§5.7: PoS IS authentication, TLS IS encryption)",
+        "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, multi-message framing (write_msg/read_msg). BlockMatrix wired to call initiate_handshake()/accept_handshake(). Not yet tested multi-node end-to-end.",
         "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
         "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
@@ -552,6 +552,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-crate identity integration (AuthenticatedNode wraps lib::NodeId)",
         "TrustAssetKind includes Transmission variant (R10)",
         "StateAuthenticator (binary PoS authentication interface)",
+        "FALCON-1024 node identity (FalconIdentity implements NodeSigner trait, keypair gen, persistence, BLAKE3 node ID — canonical implementation used by blockmatrix)",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
         "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
@@ -585,7 +586,7 @@ export const crateStatuses: CrateStatus[] = [
         "Field device bootstrap with intermittent connectivity"
       ]
     },
-    "completion": 43
+    "completion": 44
   },
   {
     "id": "ui",
