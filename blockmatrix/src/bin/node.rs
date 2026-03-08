@@ -1212,7 +1212,9 @@ async fn run_domain(
                 NetworkScope::Global,
                 AssetCategory::BaseSystem(BaseSystemType::Dns),
             );
-            let state_proof = StateProof::new_for_testing();
+            let state_proof = StateProof::generate_from_network(node_id)
+                .await
+                .context("PoS proof generation failed for domain registration")?;
             let block = bootstrap
                 .blockchain()
                 .register_asset_record(registration, &state_proof)
@@ -1264,7 +1266,9 @@ async fn run_domain(
                 NetworkScope::Global,
                 AssetCategory::BaseSystem(BaseSystemType::Dns),
             );
-            let state_proof = StateProof::new_for_testing();
+            let state_proof = StateProof::generate_from_network(node_id)
+                .await
+                .context("PoS proof generation failed for subdomain creation")?;
             let block = bootstrap
                 .blockchain()
                 .register_asset_record(registration, &state_proof)
@@ -1449,7 +1453,9 @@ async fn run_dns(
                 NetworkScope::Global,
                 AssetCategory::BaseSystem(BaseSystemType::Dns),
             );
-            let state_proof = StateProof::new_for_testing();
+            let state_proof = StateProof::generate_from_network(node_id)
+                .await
+                .context("PoS proof generation failed for DNS registration")?;
             let block = bc
                 .register_asset_record(registration, &state_proof)
                 .await
@@ -2014,26 +2020,30 @@ private = "private"
                 ),
             );
             let content_hash = registration.content_hash;
-            let state_proof = blockmatrix::StateProof::new_for_testing();
-            match bootstrap
-                .blockchain()
-                .register_asset_record(registration, &state_proof)
-                .await
-            {
-                Ok(block) => {
-                    // Store bundle in asset store (keyed by blockchain content hash)
-                    if let Err(e) = deploy::store_dashboard_bundle(
-                        &data_dir, &content_hash, manifest_toml, &bundle,
-                    ) {
-                        warn!("Failed to store dashboard bundle: {}", e);
+            match blockmatrix::StateProof::generate_from_network(&nid).await {
+                Ok(state_proof) => {
+                    match bootstrap
+                        .blockchain()
+                        .register_asset_record(registration, &state_proof)
+                        .await
+                    {
+                        Ok(block) => {
+                            // Store bundle in asset store (keyed by blockchain content hash)
+                            if let Err(e) = deploy::store_dashboard_bundle(
+                                &data_dir, &content_hash, manifest_toml, &bundle,
+                            ) {
+                                warn!("Failed to store dashboard bundle: {}", e);
+                            }
+                            info!(
+                                "Default dashboard registered as asset (block #{}, hash {})",
+                                block.index,
+                                hex::encode(content_hash)
+                            );
+                        }
+                        Err(e) => warn!("Failed to register default dashboard: {}", e),
                     }
-                    info!(
-                        "Default dashboard registered as asset (block #{}, hash {})",
-                        block.index,
-                        hex::encode(content_hash)
-                    );
                 }
-                Err(e) => warn!("Failed to register default dashboard: {}", e),
+                Err(e) => warn!("Failed to generate PoS for default dashboard: {}", e),
             }
         }
     }
@@ -2387,24 +2397,28 @@ async fn main() -> Result<()> {
         info!("Assessing node hardware for asset registration (R1)...");
         match assess_hardware_assets() {
             Ok(hw_assets) => {
-                let state_proof = StateProof::new_for_testing();
-                match bootstrap
-                    .blockchain()
-                    .register_asset_records(hw_assets, &state_proof)
-                    .await
-                {
-                    Ok(block) => {
-                        info!(
-                            "Registered hardware assets in block #{} (hash: {})",
-                            block.index,
-                            &block.hash[..16],
-                        );
-                        // Persist the hardware asset block
-                        if let Err(e) = persistence.save_block(&block).await {
-                            warn!("Failed to persist hardware asset block: {e}");
+                match StateProof::generate_from_network(&nid).await {
+                    Ok(state_proof) => {
+                        match bootstrap
+                            .blockchain()
+                            .register_asset_records(hw_assets, &state_proof)
+                            .await
+                        {
+                            Ok(block) => {
+                                info!(
+                                    "Registered hardware assets in block #{} (hash: {})",
+                                    block.index,
+                                    &block.hash[..16],
+                                );
+                                // Persist the hardware asset block
+                                if let Err(e) = persistence.save_block(&block).await {
+                                    warn!("Failed to persist hardware asset block: {e}");
+                                }
+                            }
+                            Err(e) => warn!("Failed to register hardware assets: {e}"),
                         }
                     }
-                    Err(e) => warn!("Failed to register hardware assets: {e}"),
+                    Err(e) => warn!("Failed to generate PoS for hardware assets: {e}"),
                 }
             }
             Err(e) => warn!("Hardware assessment failed: {e}"),
@@ -2774,7 +2788,9 @@ async fn main() -> Result<()> {
                             AssetCategory::BaseSystem(BaseSystemType::Dashboard),
                         );
                         let content_hash = registration.content_hash;
-                        let state_proof = StateProof::new_for_testing();
+                        let state_proof = StateProof::generate_from_network(&nid)
+                            .await
+                            .context("PoS proof generation failed for dashboard deploy")?;
                         let block = bootstrap
                             .blockchain()
                             .register_asset_record(registration, &state_proof)

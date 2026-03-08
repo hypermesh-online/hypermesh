@@ -430,10 +430,7 @@ impl hypermesh_lib::StateProofProvider for BlockMatrixProofProvider {
     async fn generate_proof(&self) -> anyhow::Result<Vec<u8>> {
         let proof = StateProof::generate_from_network(&self.node_id)
             .await
-            .unwrap_or_else(|e| {
-                tracing::warn!("PoS proof generation failed (using test fallback): {e}");
-                StateProof::new_for_testing()
-            });
+            .map_err(|e| anyhow::anyhow!("PoS proof generation failed: {e}"))?;
         proof.to_bytes().map_err(|e| anyhow::anyhow!("Failed to serialize state proof: {e}"))
     }
 

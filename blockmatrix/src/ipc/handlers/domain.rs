@@ -81,7 +81,13 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                             ),
                         );
                     let state_proof =
-                        trustchain::proof_of_state::StateProof::new_for_testing();
+                        trustchain::proof_of_state::StateProof::generate_from_network(&s.node_id)
+                            .await
+                            .map_err(|e| crate::ipc::protocol::RpcError {
+                                code: -32603,
+                                message: format!("PoS proof generation failed: {e}"),
+                                data: None,
+                            })?;
 
                     let block = s
                         .blockchain

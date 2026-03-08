@@ -62,8 +62,11 @@ impl AsyncStateProof for DefaultStateProof {
         _node_id: &PeerIdentity,
         _operation_type: &str,
     ) -> StateProofOpResult<StateProof> {
-        // In production, this would involve actual proof generation from network state
-        Ok(StateProof::new_for_testing())
+        StateProof::generate_from_network(&self.node_id)
+            .await
+            .map_err(|e| StateProofError::ValidationFailed(
+                format!("PoS generation failed: {e}")
+            ))
     }
 
     async fn validate_state_proof(&self, proof: &StateProof) -> StateProofOpResult<bool> {

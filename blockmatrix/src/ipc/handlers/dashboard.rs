@@ -112,7 +112,13 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     AssetCategory::BaseSystem(BaseSystemType::Dashboard),
                 );
                 let content_hash = registration.content_hash;
-                let state_proof = StateProof::new_for_testing();
+                let state_proof = StateProof::generate_from_network(&s.node_id)
+                    .await
+                    .map_err(|e| RpcError {
+                        code: INTERNAL_ERROR,
+                        message: format!("PoS proof generation failed: {e}"),
+                        data: None,
+                    })?;
                 let block = s
                     .blockchain
                     .register_asset_record(registration, &state_proof)

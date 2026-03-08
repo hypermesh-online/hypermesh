@@ -7,7 +7,7 @@
 //! This module provides the integration between the Matrix Foundation and STOQ transport layer.
 //! All matrix node communication goes through STOQ for secure, efficient transport.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context as _, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -256,14 +256,12 @@ impl MatrixStoqIntegration {
     }
 
     /// Generate PoS token bytes for handshake
-    async fn generate_pos_token(node_id: &str) -> Vec<u8> {
+    async fn generate_pos_token(node_id: &str) -> Result<Vec<u8>> {
         let state_proof = StateProof::generate_from_network(node_id)
             .await
-            .unwrap_or_else(|e| {
-                warn!("PoS proof generation failed (using test fallback): {e}");
-                StateProof::new_for_testing()
-            });
-        state_proof.to_bytes().unwrap_or_default()
+            .context("PoS proof generation failed")?;
+        state_proof.to_bytes()
+            .map_err(|e| anyhow!("Failed to serialize PoS token: {e}"))
     }
 
     /// Validate a peer's PoS token from announcement
@@ -293,7 +291,7 @@ impl MatrixStoqIntegration {
         let mut stream = connection.open_stream().await?;
 
         // Generate real PoS token for handshake
-        let pos_token_bytes = Self::generate_pos_token(&self.node_id).await;
+        let pos_token_bytes = Self::generate_pos_token(&self.node_id).await?;
 
         // Create our announcement with PoS token
         let announcement = MatrixNodeAnnouncement {
@@ -476,7 +474,7 @@ impl MatrixStoqIntegration {
                 Self::validate_peer_pos_token(&peer_announcement.pos_token)?;
 
                 // Generate real PoS token for our response
-                let pos_token_bytes = Self::generate_pos_token(&self.node_id).await;
+                let pos_token_bytes = Self::generate_pos_token(&self.node_id).await?;
 
                 // Send our announcement back with PoS token
                 let our_announcement = MatrixNodeAnnouncement {
