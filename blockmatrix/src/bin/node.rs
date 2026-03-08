@@ -1532,9 +1532,12 @@ async fn run_connect(
     // Shard store reference (populated if network starts, otherwise standalone)
     let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
 
-    // Initialize STOQ transport if not in Private mode
+    // Initialize STOQ transport for any mode that needs networking.
+    // Private mode starts STOQ when bootstrap peers are provided (bounded network).
+    // Only skip STOQ for purely local device-scope operation (private with no peers).
     let privacy_mode = bootstrap.privacy_mode().await;
-    if privacy_mode != PrivacyMode::PRIVATE {
+    let has_bootstrap_peers = !cli.bootstrap.is_empty();
+    if privacy_mode != PrivacyMode::PRIVATE || has_bootstrap_peers {
         info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
         // Configure STOQ transport based on privacy mode.
@@ -1677,7 +1680,11 @@ async fn run_connect(
             block_propagator: block_propagator.clone(),
             our_coordinate: coord,
             node_id: nid.to_string(),
-            blockchain_scope: hypermesh_lib::BlockchainScope::Device,
+            blockchain_scope: if has_bootstrap_peers || cli.reflector {
+                hypermesh_lib::BlockchainScope::Network
+            } else {
+                hypermesh_lib::BlockchainScope::Device
+            },
             spatial_bucket_assigner: None,
             connected_peer_coords: connected_peer_coords.clone(),
         });

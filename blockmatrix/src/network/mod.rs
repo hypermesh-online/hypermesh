@@ -171,7 +171,16 @@ impl NetworkManager {
         let mode = *self.privacy_mode.read().await;
 
         if mode == PrivacyMode::PRIVATE {
-            info!("Private mode: No network discovery (localhost only)");
+            if self.bootstrap_nodes.is_empty() {
+                info!("Private mode: No peers, running as local-only device");
+            } else {
+                info!("Private mode: Connecting to {} bootstrap peer(s) (bounded network)", self.bootstrap_nodes.len());
+                for bootstrap_addr in &self.bootstrap_nodes {
+                    if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
+                        warn!("Failed to connect to private peer {}: {}", bootstrap_addr, e);
+                    }
+                }
+            }
             Ok(())
         } else if mode == PrivacyMode::ANONYMOUS {
             info!("Anonymous mode: Starting ephemeral discovery");

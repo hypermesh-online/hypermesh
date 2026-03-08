@@ -498,6 +498,19 @@ DNS names are blockchain assets earning CAESAR rewards.
 - `/hypermesh-sdk/` - Typed Rust SDK for daemon IPC API
 - `/gateway/src/dashboard_server.rs` - Scope-aware dashboard serving
 
+### **Build & Deployment**
+
+- **Remote target (trust.hypermesh.online)**: Debian 12 with glibc 2.36. Local dev runs glibc 2.42.
+- **ALWAYS build with musl for deployment**: `cargo build --release --target x86_64-unknown-linux-musl -p blockmatrix --bin hypermesh`
+- **Binary**: ~9.5 MB static-pie ELF (no glibc dependency). NEVER deploy glibc builds — they need GLIBC_2.39+ symbols missing on the remote.
+- **Deploy key**: `~/.ssh/hypermesh_deploy` → `persist@35.208.78.211` (trust.hypermesh.online)
+- **Deploy script**: `scripts/deploy/deploy-to-gcp.sh trust.hypermesh.online`
+- **GCP project**: `project-f56ebf7e-1ca0-45ca-b92`, zone `us-central1-a`, instance tag `hypermesh-node`
+- **GCP firewall**: STOQ uses UDP (QUIC), NOT TCP. Must have firewall rule allowing UDP ingress on port 9292 for tag `hypermesh-node`. Rule name: `hypermesh-stoq-udp`. The instance service account lacks compute admin scope — create rules from GCP Console or authenticated local gcloud.
+- **STOQ is UDP-only**: `nc -z` (TCP) will always fail for STOQ ports. Use `nc -zu` for UDP check, but QUIC won't respond to raw UDP probes anyway. The real test is connecting a node.
+- **Old data wipe on block format change**: When the Block struct changes (e.g., adding BlockAssetEntry), old persisted data won't deserialize. Wipe with `rm -rf /var/lib/hypermesh/blockmatrix/node_*` on the remote before starting.
+- **Local multi-node test**: Use `HYPERMESH_SOCK=/tmp/hypermesh-e2e-test/node-X/ctl.sock` to isolate IPC sockets per node.
+
 ### **Architecture Decisions Made**
 
 **Core Architecture** (Implemented):
