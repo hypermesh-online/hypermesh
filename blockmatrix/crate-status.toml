@@ -47,6 +47,10 @@ items = [
     "Per-entry proof hash — hπ = BLAKE3(StateProof) in every BlockAssetEntry, validated independently",
     "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
     "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
+    # Scope-aware block sync (HashMatrix)
+    "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication), Public (HashMatrix spatial filtering)",
+    "SpatialBucketAssigner — adaptive neighborhood radius via sqrt(n) k-nearest peers, octree-like partitioning of 3D hash volume",
+    "Block re-propagation — Network/Public scope blocks re-propagated to connected peers after insertion",
     # Genesis and hardware (R1)
     "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
     # IPC daemon architecture (Phase 1 Sprints 1-2)
@@ -109,9 +113,8 @@ items = [
     # Layer migration COMPLETE (Phases 1-5): FalconIdentity → TrustChain, bilateral handshake → STOQ, Identity as asset type
     "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Not yet tested multi-node end-to-end.",
     "Identity-as-asset — SystemAssetKind::Identity type added (R1/R10), actual FALCON pubkey registration during bootstrap not yet wired",
-    "StateProof test fallback — handshake silently downgrades to StateProof::new_for_testing() when real PoS generation fails",
     # Mesh networking gaps (not yet wired end-to-end)
-    "Network sync wiring — StoqBlockTransportAdapter, BlockPropagator, SyncManager, ReflectorPool exist. Handshake now in correct layer (STOQ) but not yet tested multi-node end-to-end.",
+    "Network sync wiring — Scope-aware block handling implemented (Device/Network/Public), block transport over STOQ working. Full reflector-pool chain sync not yet end-to-end.",
     "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
