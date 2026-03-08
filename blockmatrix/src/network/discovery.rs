@@ -331,7 +331,7 @@ mod tests {
                     service: SERVICE_NAME.to_string(),
                     node_id: "peer1".to_string(),
                     coordinate: coord,
-                    stoq_port: 9293,
+                    stoq_port: 9292,
                     protocol_version: "1.0.0".to_string(),
                     timestamp: 0,
                 },

@@ -13,7 +13,7 @@ Requires Node.js 18+ (uses native `fetch`).
 ```typescript
 import { HyperMeshClient } from "@hypermesh/sdk";
 
-const client = new HyperMeshClient(); // defaults to http://localhost:9293
+const client = new HyperMeshClient(); // defaults to https://localhost:8443
 const status = await client.node.status();
 console.log(status.node_id, status.chain_height);
 ```
@@ -21,7 +21,7 @@ console.log(status.node_id, status.chain_height);
 Custom endpoint:
 
 ```typescript
-const client = new HyperMeshClient("http://192.168.1.50:9293");
+const client = new HyperMeshClient("https://192.168.1.50:8443");
 ```
 
 ## API Reference

@@ -7,11 +7,11 @@ namespace HyperMesh.Sdk;
 /// </summary>
 public sealed class HyperMeshClient : IDisposable
 {
-    private const string DefaultBaseUrl = "http://localhost:9293";
-    private const string DefaultCaesarUrl = "http://localhost:9294";
-    private const string DefaultTrustChainUrl = "http://localhost:8444";
-    private const string DefaultCatalogUrl = "http://localhost:9295";
-    private const string DefaultEngaugeUrl = "http://localhost:9296";
+    private const string DefaultBaseUrl = "https://localhost:8443";
+    private const string DefaultCaesarUrl = "https://localhost:8443";
+    private const string DefaultTrustChainUrl = "https://localhost:8443";
+    private const string DefaultCatalogUrl = "https://localhost:8443";
+    private const string DefaultEngaugeUrl = "https://localhost:8443";
 
     private readonly HttpApiClient _apiClient;
     private readonly HttpApiClient _caesarClient;
@@ -62,11 +62,11 @@ public sealed class HyperMeshClient : IDisposable
     /// <summary>
     /// Create a new HyperMesh client.
     /// </summary>
-    /// <param name="baseUrl">BlockMatrix API base URL (default: http://localhost:9293).</param>
-    /// <param name="caesarUrl">Caesar EVP API base URL (default: http://localhost:9294).</param>
-    /// <param name="trustChainUrl">TrustChain API base URL (default: http://localhost:8444).</param>
-    /// <param name="catalogUrl">Catalog API base URL (default: http://localhost:9295).</param>
-    /// <param name="engaugeUrl">Engauge API base URL (default: http://localhost:9296).</param>
+    /// <param name="baseUrl">Gateway API base URL (default: https://localhost:8443).</param>
+    /// <param name="caesarUrl">Caesar EVP API base URL (default: https://localhost:8443).</param>
+    /// <param name="trustChainUrl">TrustChain API base URL (default: https://localhost:8443).</param>
+    /// <param name="catalogUrl">Catalog API base URL (default: https://localhost:8443).</param>
+    /// <param name="engaugeUrl">Engauge API base URL (default: https://localhost:8443).</param>
     /// <param name="httpClient">Optional HttpClient instance for custom configuration.</param>
     public HyperMeshClient(
         string baseUrl = DefaultBaseUrl,

@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	client := hypermesh.NewClient("") // http://localhost:9293
+	client := hypermesh.NewClient("") // https://localhost:8443
 	ctx := context.Background()
 
 	// Ping the node

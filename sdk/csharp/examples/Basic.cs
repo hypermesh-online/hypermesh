@@ -5,7 +5,7 @@
 
 using HyperMesh.Sdk;
 
-using var client = new HyperMeshClient(); // http://localhost:9293
+using var client = new HyperMeshClient(); // https://localhost:8443
 
 // Ping the node
 var pong = await client.Node.PingAsync();

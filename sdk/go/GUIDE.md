@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-    client := hypermesh.NewClient("") // defaults to http://localhost:9293
+    client := hypermesh.NewClient("") // defaults to https://localhost:8443
 
     status, err := client.Node.Status(context.Background())
     if err != nil {
@@ -37,7 +37,7 @@ func main() {
 Custom endpoint:
 
 ```go
-client := hypermesh.NewClient("http://192.168.1.50:9293")
+client := hypermesh.NewClient("https://192.168.1.50:8443")
 ```
 
 With options:

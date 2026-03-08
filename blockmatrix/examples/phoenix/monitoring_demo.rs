@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create some connections
     let endpoints = vec![
-        Endpoint::new(std::net::Ipv6Addr::LOCALHOST, 9293),
+        Endpoint::new(std::net::Ipv6Addr::LOCALHOST, 9292),
         Endpoint::new(std::net::Ipv6Addr::LOCALHOST, 9294),
         Endpoint::new(std::net::Ipv6Addr::LOCALHOST, 9295),
     ];

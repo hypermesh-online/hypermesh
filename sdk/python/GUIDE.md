@@ -18,7 +18,7 @@ pip install hypermesh-sdk[async]
 ```python
 from hypermesh import HyperMeshClient
 
-client = HyperMeshClient()  # defaults to http://localhost:9293
+client = HyperMeshClient()  # defaults to https://localhost:8443
 status = client.node.status()
 print(status.node_id, status.chain_height)
 ```
@@ -26,7 +26,7 @@ print(status.node_id, status.chain_height)
 Custom endpoint:
 
 ```python
-client = HyperMeshClient("http://192.168.1.50:9293")
+client = HyperMeshClient("https://192.168.1.50:8443")
 ```
 
 Async mode (requires httpx):
@@ -191,7 +191,7 @@ Exception hierarchy:
 
 ```python
 client = HyperMeshClient(
-    base_url="http://localhost:9293",  # Node API address
+    base_url="https://localhost:8443",  # Node API address
     async_mode=False,                   # Set True for httpx async
     timeout=30.0,                       # Request timeout in seconds
 )

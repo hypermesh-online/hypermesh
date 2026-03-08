@@ -6,7 +6,7 @@ Run: python examples/basic.py
 from hypermesh import HyperMeshClient, HyperMeshError, NotFoundError
 
 def main() -> None:
-    client = HyperMeshClient()  # http://localhost:9293
+    client = HyperMeshClient()  # https://localhost:8443
 
     # Ping the node
     alive = client.node.ping()

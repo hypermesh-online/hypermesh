@@ -4,7 +4,7 @@
 /**
  * BlockMatrix API Client
  *
- * Simple singleton client for the real BlockMatrix HTTP API at localhost:9293.
+ * Simple singleton client for the BlockMatrix API via Gateway at localhost:8443.
  * All endpoints return JSON directly (no RPC wrapper on success).
  *
  * Working endpoints:

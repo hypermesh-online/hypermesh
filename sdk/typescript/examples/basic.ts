@@ -6,7 +6,7 @@
 import { HyperMeshClient, HyperMeshError } from "../src/index.js";
 
 async function main() {
-  const client = new HyperMeshClient(); // http://localhost:9293
+  const client = new HyperMeshClient(); // https://localhost:8443
 
   // Ping the node
   const pong = await client.node.ping();

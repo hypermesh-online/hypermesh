@@ -47,6 +47,11 @@ impl RequestHandler {
         self.handlers.insert(method.to_string(), handler);
     }
 
+    /// Return the names of all registered methods.
+    pub fn methods(&self) -> Vec<&str> {
+        self.handlers.keys().map(|k| k.as_str()).collect()
+    }
+
     /// Dispatch a request to the matching handler, returning an `RpcResponse`.
     pub async fn dispatch(&self, request: RpcRequest) -> RpcResponse {
         match self.handlers.get(&request.method) {

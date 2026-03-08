@@ -81,10 +81,6 @@ struct Cli {
     #[clap(short = 's', long, default_value = "9292")]
     stoq_port: u16,
 
-    /// HTTP API port for dashboard and REST endpoints
-    #[clap(long, default_value = "9293")]
-    http_port: u16,
-
     /// Run as a reflector (public peer that accepts and relays)
     #[clap(long)]
     reflector: bool,
@@ -96,26 +92,6 @@ struct Cli {
     /// Output in JSON format
     #[clap(long, global = true)]
     json: bool,
-
-    /// Connection mode: auto, ffi, ipc, http
-    #[clap(long, global = true, default_value = "auto")]
-    mode: String,
-
-    /// Caesar service URL (used in http mode)
-    #[clap(long, global = true, default_value = "http://localhost:9294")]
-    caesar_url: String,
-
-    /// TrustChain service URL (used in http mode)
-    #[clap(long, global = true, default_value = "http://localhost:8444")]
-    trustchain_url: String,
-
-    /// Engauge service URL (used in http mode)
-    #[clap(long, global = true, default_value = "http://localhost:9296")]
-    engauge_url: String,
-
-    /// Catalog service URL (used in http mode)
-    #[clap(long, global = true, default_value = "http://localhost:9295")]
-    catalog_url: String,
 
     /// Path to config file
     #[clap(long, global = true)]
@@ -1531,6 +1507,8 @@ async fn run_connect(
     let mut network_ref: Option<std::sync::Arc<NetworkManager>> = None;
     // Shard store reference (populated if network starts, otherwise standalone)
     let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
+    // STOQ transport reference (populated if network starts, used for API bridge)
+    let mut transport_ref: Option<std::sync::Arc<stoq::StoqTransport>> = None;
 
     // Initialize STOQ transport for any mode that needs networking.
     // Private mode starts STOQ when bootstrap peers are provided (bounded network).
@@ -1904,6 +1882,7 @@ async fn run_connect(
 
         network_ref = Some(network_clone);
         shard_store_ref = Some(shard_store);
+        transport_ref = Some(transport);
     }
 
     // --- IPC Server Setup ---
@@ -1949,23 +1928,19 @@ async fn run_connect(
         }
     };
 
-    // HTTP API server for dashboard access
-    let http_handler = handler.clone();
-    let http_port = cli.http_port;
-    let http_data_dir = data_dir.to_path_buf();
-    let http_blockchain = bootstrap.blockchain().clone();
-    tokio::spawn(async move {
-        if let Err(e) = ipc::http_api::run_http_api(
-            http_handler,
-            http_port,
-            http_data_dir,
-            http_blockchain,
-        )
-        .await
-        {
-            warn!("HTTP API error: {}", e);
-        }
-    });
+    // STOQ API bridge: expose all IPC handlers over STOQ protocol
+    if let Some(ref transport) = transport_ref {
+        let api_server = stoq::StoqApiServer::new(transport.clone());
+        blockmatrix::api::ipc_bridge::register_ipc_bridge(&api_server, handler.clone());
+        tokio::spawn(async move {
+            if let Err(e) = api_server.listen().await {
+                warn!("STOQ API server error: {}", e);
+            }
+        });
+        info!("STOQ API bridge started on STOQ transport");
+    } else {
+        info!("No STOQ transport available, API bridge not started (local-only mode)");
+    }
 
     // Register default system dashboard as a blockchain asset if none exists
     {

@@ -26,20 +26,20 @@ namespace hypermesh {
 /// Main entry point for the HyperMesh C++ SDK.
 ///
 /// Usage:
-///   auto client = hypermesh::HyperMeshClient("http://localhost:9293");
+///   auto client = hypermesh::HyperMeshClient("https://localhost:8443");
 ///   auto status = client.node().status();
 ///   auto height = client.blockchain().height();
 ///   auto wallet = client.caesar().wallet();
 class HyperMeshClient {
 public:
     /// Construct a client targeting the given base URL.
-    /// Default: http://localhost:9293
+    /// Default: https://localhost:8443 (Gateway)
     explicit HyperMeshClient(
-        const std::string& base_url = "http://localhost:9293",
-        const std::string& caesar_url = "http://localhost:9294",
-        const std::string& trustchain_url = "http://localhost:8444",
-        const std::string& engauge_url = "http://localhost:9296",
-        const std::string& catalog_url = "http://localhost:9295");
+        const std::string& base_url = "https://localhost:8443",
+        const std::string& caesar_url = "https://localhost:8443",
+        const std::string& trustchain_url = "https://localhost:8443",
+        const std::string& engauge_url = "https://localhost:8443",
+        const std::string& catalog_url = "https://localhost:8443");
 
     /// Access the node status API.
     NodeApi node() const;

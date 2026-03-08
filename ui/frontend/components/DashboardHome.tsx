@@ -31,7 +31,7 @@ import {
 /**
  * System overview using real BlockMatrix API data.
  * Calls /api/v1/status, /api/v1/blockchain/height, /api/v1/network/peers,
- * and /api/v1/asset/list from the running daemon on port 9293.
+ * and /api/v1/asset/list from the Gateway on port 8443.
  */
 function useSystemOverview() {
   const statusQuery = useNodeStatus(10_000);
@@ -113,7 +113,7 @@ function useRecentActivity(isOnline: boolean, peerCount: number, chainHeight: nu
 
   if (activity.length === 0) {
     return [
-      { type: 'warning', message: 'Backend not connected (localhost:9293)', time: 'Now' },
+      { type: 'warning', message: 'Backend not connected (Gateway localhost:8443)', time: 'Now' },
       { type: 'info', message: 'Start the daemon: hypermesh daemon start', time: '' },
     ];
   }
@@ -198,7 +198,7 @@ export function DashboardHome() {
           <div>
             <p className="text-orange-300 font-medium">Backend not connected</p>
             <p className="text-orange-400/70 text-sm">
-              The BlockMatrix daemon at localhost:9293 is not responding. Start it with: <code className="bg-black/30 px-1 rounded">hypermesh daemon start</code>
+              The Gateway at localhost:8443 is not responding. Start it with: <code className="bg-black/30 px-1 rounded">hypermesh daemon start</code>
             </p>
           </div>
         </div>

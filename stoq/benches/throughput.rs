@@ -67,7 +67,7 @@ fn benchmark_pure_transport_throughput(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             // Test connection pooling for adaptive network tiers performance
             let mut config = StoqConfig::default();
-            config.transport.port = 9293 + (std::process::id() % 1000) as u16; // Dynamic port
+            config.transport.port = 19292 + (std::process::id() % 1000) as u16; // Dynamic port
             let _stoq = StoqBuilder::new()
                 .with_config(config)
                 .build()

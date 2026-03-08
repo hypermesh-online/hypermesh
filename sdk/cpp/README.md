@@ -26,7 +26,7 @@ cmake --build .
 
 int main() {
     try {
-        auto client = hypermesh::HyperMeshClient("http://localhost:9293");
+        auto client = hypermesh::HyperMeshClient("https://localhost:8443");
 
         // Node
         auto status = client.node().status();

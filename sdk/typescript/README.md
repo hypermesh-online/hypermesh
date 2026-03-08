@@ -13,7 +13,7 @@ npm install @hypermesh/sdk
 ```typescript
 import { HyperMeshClient } from "@hypermesh/sdk";
 
-const client = new HyperMeshClient("http://localhost:9293");
+const client = new HyperMeshClient("https://localhost:8443");
 
 // Node
 const status = await client.node.status();

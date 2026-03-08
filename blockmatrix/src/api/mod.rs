@@ -7,8 +7,9 @@
 //! This module provides STOQ protocol APIs for interacting with
 //! the HyperMesh system, including extension management.
 
-pub mod proof_of_state_api;
 pub mod extensions;
+pub mod ipc_bridge;
+pub mod proof_of_state_api;
 
 use anyhow::Result;
 use std::net::Ipv6Addr;

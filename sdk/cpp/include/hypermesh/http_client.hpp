@@ -12,7 +12,7 @@ namespace hypermesh {
 /// Supports GET and POST with JSON bodies. No external dependencies.
 class HttpClient {
 public:
-    /// Construct with base URL, e.g. "http://localhost:9293".
+    /// Construct with base URL, e.g. "https://localhost:8443".
     explicit HttpClient(const std::string& base_url);
 
     /// Perform a GET request. Returns parsed JSON response body.

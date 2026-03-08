@@ -13,11 +13,11 @@ import { NodeApi } from "./api/node.js";
 import { TopologyApi } from "./api/topology.js";
 import { TrustChainApi } from "./api/trustchain.js";
 
-const DEFAULT_BASE_URL = "http://localhost:9293";
-const DEFAULT_CAESAR_URL = "http://localhost:9294";
-const DEFAULT_TRUSTCHAIN_URL = "http://localhost:8444";
-const DEFAULT_CATALOG_URL = "http://localhost:9295";
-const DEFAULT_ENGAUGE_URL = "http://localhost:9296";
+const DEFAULT_BASE_URL = "https://localhost:8443";
+const DEFAULT_CAESAR_URL = "https://localhost:8443";
+const DEFAULT_TRUSTCHAIN_URL = "https://localhost:8443";
+const DEFAULT_CATALOG_URL = "https://localhost:8443";
+const DEFAULT_ENGAUGE_URL = "https://localhost:8443";
 
 export interface HyperMeshClientOptions {
   baseUrl?: string;

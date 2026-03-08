@@ -71,11 +71,11 @@ from .types import (
     ValidationResult,
 )
 
-_DEFAULT_BASE_URL = "http://localhost:9293"
-_DEFAULT_CAESAR_URL = "http://localhost:9294"
-_DEFAULT_TRUSTCHAIN_URL = "http://localhost:8444"
-_DEFAULT_CATALOG_URL = "http://localhost:9295"
-_DEFAULT_ENGAUGE_URL = "http://localhost:9296"
+_DEFAULT_BASE_URL = "https://localhost:8443"
+_DEFAULT_CAESAR_URL = "https://localhost:8443"
+_DEFAULT_TRUSTCHAIN_URL = "https://localhost:8443"
+_DEFAULT_CATALOG_URL = "https://localhost:8443"
+_DEFAULT_ENGAUGE_URL = "https://localhost:8443"
 
 
 class HyperMeshClient:
@@ -84,15 +84,15 @@ class HyperMeshClient:
     Parameters
     ----------
     base_url:
-        Node HTTP address. Default ``http://localhost:9293``.
+        Gateway HTTP/3 address. Default ``https://localhost:8443``.
     caesar_url:
-        Caesar EVP service address. Default ``http://localhost:9294``.
+        Caesar EVP service address. Default ``https://localhost:8443``.
     trustchain_url:
-        TrustChain service address. Default ``http://localhost:8444``.
+        TrustChain service address. Default ``https://localhost:8443``.
     catalog_url:
-        Catalog service address. Default ``http://localhost:9295``.
+        Catalog service address. Default ``https://localhost:8443``.
     engauge_url:
-        Engauge service address. Default ``http://localhost:9296``.
+        Engauge service address. Default ``https://localhost:8443``.
     async_mode:
         When ``True``, use httpx-based async transport. All API
         methods become coroutines.

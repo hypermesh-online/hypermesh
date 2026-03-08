@@ -15,7 +15,7 @@ dotnet add reference path/to/HyperMesh.Sdk.csproj
 ```csharp
 using HyperMesh.Sdk;
 
-using var client = new HyperMeshClient("http://localhost:9293");
+using var client = new HyperMeshClient("https://localhost:8443");
 
 // Node status
 var status = await client.Node.StatusAsync();
@@ -78,7 +78,7 @@ Pass your own `HttpClient` for timeouts, proxies, or other configuration:
 
 ```csharp
 var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-using var client = new HyperMeshClient("http://localhost:9293", http);
+using var client = new HyperMeshClient("https://localhost:8443", http);
 ```
 
 ## API Reference

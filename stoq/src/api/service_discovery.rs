@@ -152,7 +152,7 @@ impl ServiceDiscovery {
             ServiceEndpoint {
                 name: "trustchain".to_string(),
                 address: Ipv6Addr::LOCALHOST,
-                port: 9293,
+                port: 9292,
                 server_name: Some("trust.hypermesh.online".to_string()),
                 metadata: ServiceMetadata {
                     version: Some("1.0.0".to_string()),
@@ -480,7 +480,7 @@ mod tests {
 
         // Test hardcoded services
         let trustchain = discovery.resolve("trustchain").expect("test: expected success");
-        assert_eq!(trustchain.port, 9293);
+        assert_eq!(trustchain.port, 9292);
 
         let hypermesh = discovery.resolve("hypermesh").expect("test: expected success");
         assert_eq!(hypermesh.port, 9292);

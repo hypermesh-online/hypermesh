@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     // Create 3 nodes with different matrix coordinates
     let nodes = [
         (0, 0, 0, 9292), // Bootstrap node
-        (1, 2, 0, 9293), // Node 1
+        (1, 2, 0, 9294), // Node 1
         (2, 4, 1, 9294), // Node 2
     ];
 

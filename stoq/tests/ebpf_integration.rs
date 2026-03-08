@@ -158,7 +158,7 @@ async fn test_fallback_without_ebpf() -> Result<()> {
     let transport = StoqTransport::new(config).await?;
 
     // Create endpoint
-    let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9293);
+    let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, 9292);
 
     // Start accepting connections in background
     let transport_clone = transport.clone();

@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
 
     // Configure STOQ API
     let config = TrustChainStoqConfig {
-        bind_address: "[::1]:9293".to_string(), // TrustChain default STOQ port
+        bind_address: "[::1]:9292".to_string(), // TrustChain default STOQ port
         service_name: "trustchain".to_string(),
         enable_logging: true,
     };
@@ -105,13 +105,13 @@ async fn main() -> Result<()> {
     let api = Arc::new(TrustChainStoqApi::new(ca, resolver, config).await?);
 
     info!("✅ TrustChain STOQ server ready");
-    info!("🎯 Listening on stoq://[::1]:9293");
+    info!("🎯 Listening on stoq://[::1]:9292");
     info!("");
     info!("Available STOQ endpoints:");
-    info!("  - stoq://[::1]:9293/trustchain/health");
-    info!("  - stoq://[::1]:9293/trustchain/validate_certificate");
-    info!("  - stoq://[::1]:9293/trustchain/issue_certificate");
-    info!("  - stoq://[::1]:9293/trustchain/resolve_dns");
+    info!("  - stoq://[::1]:9292/trustchain/health");
+    info!("  - stoq://[::1]:9292/trustchain/validate_certificate");
+    info!("  - stoq://[::1]:9292/trustchain/issue_certificate");
+    info!("  - stoq://[::1]:9292/trustchain/resolve_dns");
     info!("");
     info!("Press Ctrl+C to shutdown gracefully");
 

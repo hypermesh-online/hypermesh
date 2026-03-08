@@ -15,7 +15,7 @@ Requires .NET 8.0+. Uses `System.Text.Json` and `System.Net.Http` (no external d
 ```csharp
 using HyperMesh.Sdk;
 
-using var client = new HyperMeshClient(); // defaults to http://localhost:9293
+using var client = new HyperMeshClient(); // defaults to https://localhost:8443
 var status = await client.Node.StatusAsync();
 Console.WriteLine($"{status.NodeId} height={status.ChainHeight}");
 ```
@@ -23,14 +23,14 @@ Console.WriteLine($"{status.NodeId} height={status.ChainHeight}");
 Custom endpoint:
 
 ```csharp
-using var client = new HyperMeshClient("http://192.168.1.50:9293");
+using var client = new HyperMeshClient("https://192.168.1.50:8443");
 ```
 
 With a custom `HttpClient`:
 
 ```csharp
 var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-using var client = new HyperMeshClient("http://localhost:9293", httpClient);
+using var client = new HyperMeshClient("https://localhost:8443", httpClient);
 ```
 
 ## API Reference

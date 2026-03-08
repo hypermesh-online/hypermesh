@@ -34,7 +34,7 @@ pub struct TrustChainStoqConfig {
 impl Default for TrustChainStoqConfig {
     fn default() -> Self {
         Self {
-            bind_address: "[::1]:9293".to_string(), // TrustChain default port
+            bind_address: "[::1]:9292".to_string(), // TrustChain default STOQ port
             service_name: "trustchain".to_string(),
             enable_logging: true,
         }
@@ -432,9 +432,9 @@ impl TrustChainStoqApi {
             config.bind_address
         );
 
-        // Parse bind address (supports both "[::1]:9293" and "::1:9293" formats)
+        // Parse bind address (supports both "[::1]:9292" and "::1:9292" formats)
         let (bind_addr, port) = if config.bind_address.starts_with('[') {
-            // Format: [::1]:9293
+            // Format: [::1]:9292
             let parts: Vec<&str> = config.bind_address.rsplitn(2, "]:").collect();
             if parts.len() != 2 {
                 return Err(anyhow!(
@@ -453,7 +453,7 @@ impl TrustChainStoqApi {
 
             (bind_addr, port)
         } else {
-            // Format: ::1:9293 (last segment is port)
+            // Format: ::1:9292 (last segment is port)
             let parts: Vec<&str> = config.bind_address.rsplitn(2, ':').collect();
             if parts.len() != 2 {
                 return Err(anyhow!("Invalid bind address format"));

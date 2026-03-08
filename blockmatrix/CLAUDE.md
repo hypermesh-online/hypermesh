@@ -59,5 +59,6 @@ Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive r
 | `cli/` | Command executor, output formatting |
 | `os_integration/` | Cross-platform abstraction |
 | `container/` | Basic process isolation, cluster management |
-| `ipc/` | JSON-RPC 2.0 daemon, Unix socket IPC, config system |
+| `ipc/` | JSON-RPC 2.0 daemon, Unix socket IPC, config system (NO HTTP — removed) |
+| `api/` | STOQ API bridge (ipc_bridge.rs) — exposes IPC handlers over STOQ |
 | `dashboard/` | Dashboard manifest, default HTML, scaffold generator |

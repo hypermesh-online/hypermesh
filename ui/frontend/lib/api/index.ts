@@ -431,19 +431,19 @@ export function getCertificateExpiryWarning(validTo: string): 'none' | 'warning'
 export const WEB3_CONFIG = {
   // API Endpoints (BlockMatrix HTTP API)
   ENDPOINTS: {
-    BLOCKMATRIX: 'localhost:9293',
-    TRUSTCHAIN: 'localhost:9293',
-    STOQ: 'localhost:9293',
-    HYPERMESH: 'localhost:9293',
-    INTEGRATION: 'localhost:9293'
+    BLOCKMATRIX: 'localhost:8443',
+    TRUSTCHAIN: 'localhost:8443',
+    STOQ: 'localhost:8443',
+    HYPERMESH: 'localhost:8443',
+    INTEGRATION: 'localhost:8443'
   },
 
   // WebSocket URLs (not currently functional)
   WEBSOCKETS: {
-    TRUSTCHAIN: 'ws://localhost:9293/ws',
-    STOQ: 'ws://localhost:9293/ws',
-    HYPERMESH: 'ws://localhost:9293/ws',
-    INTEGRATION: 'ws://localhost:9293/ws'
+    TRUSTCHAIN: 'wss://localhost:8443/ws',
+    STOQ: 'wss://localhost:8443/ws',
+    HYPERMESH: 'wss://localhost:8443/ws',
+    INTEGRATION: 'wss://localhost:8443/ws'
   },
   
   // Performance Targets

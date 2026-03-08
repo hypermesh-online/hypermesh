@@ -131,7 +131,7 @@ The HTTP API serves SPA-style: any path not matching a file falls back to the sc
 
 ## API Endpoints
 
-Your dashboard JS can call these REST endpoints on the local HTTP API (`[::1]:9293`):
+Your dashboard JS can call these REST endpoints via the Gateway (`[::1]:8443`):
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|

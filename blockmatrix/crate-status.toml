@@ -88,16 +88,14 @@ items = [
     "Dashboard deploy pipeline — bundle files → BLAKE3 content hash → register on blockchain → store in asset store",
     "Dashboard IPC deploy — registers Dashboard asset on blockchain, stores bundle keyed by content hash",
     "Dashboard IPC list/info — queries blockchain for Dashboard-type assets (chain is source of truth)",
-    "HTTP API serves dashboards from blockchain — resolves active Dashboard asset, loads bundle by content hash, unbundles, serves scope-aware",
     "Default system dashboard auto-registered as blockchain asset on first boot (public/private scopes)",
-    "HTTP API server (configurable --http-port, scope-aware: localhost=private, external=public) — 20+ REST endpoints",
-    "SPA fallback — unknown paths fall back to scope's index.html for React/SPA routing",
-    # Language SDKs wrapping the HTTP REST API (all 20 endpoints)
-    "TypeScript SDK (@hypermesh/sdk) — typed client wrapping /api/v1/* REST endpoints",
-    "Python SDK (hypermesh) — sync (urllib) + async (httpx) client wrapping REST API",
-    "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping REST API",
-    "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping REST API",
-    "Go SDK (sdk-go) — zero-dep client with context.Context wrapping REST API",
+    "STOQ API bridge — all IPC handler methods (20+) exposed over STOQ protocol via IpcBridgeHandler adapter",
+    # Language SDKs wrapping Gateway REST API (all 20 endpoints)
+    "TypeScript SDK (@hypermesh/sdk) — typed client wrapping Gateway /api/v1/* endpoints",
+    "Python SDK (hypermesh) — sync (urllib) + async (httpx) client wrapping Gateway API",
+    "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping Gateway API",
+    "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping Gateway API",
+    "Go SDK (sdk-go) — zero-dep client with context.Context wrapping Gateway API",
     # Per-service SDK modules (Caesar, TrustChain, Engauge, Catalog) in all 5 languages
     "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, Engauge:9296, Catalog:9295)",
     "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",

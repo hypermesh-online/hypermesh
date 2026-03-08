@@ -14,7 +14,7 @@ pip install hypermesh-sdk[async]     # adds httpx for async support
 ```python
 from hypermesh import HyperMeshClient
 
-client = HyperMeshClient("http://localhost:9293")
+client = HyperMeshClient("https://localhost:8443")
 
 # Node
 status = client.node.status()
@@ -62,7 +62,7 @@ import asyncio
 from hypermesh import HyperMeshClient
 
 async def main():
-    client = HyperMeshClient("http://localhost:9293", async_mode=True)
+    client = HyperMeshClient("https://localhost:8443", async_mode=True)
     status = await client.node.status()
     print(status.node_id)
     await client.close()

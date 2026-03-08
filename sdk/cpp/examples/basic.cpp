@@ -9,7 +9,7 @@
 #include <iostream>
 
 int main() {
-    hypermesh::HyperMeshClient client; // http://localhost:9293
+    hypermesh::HyperMeshClient client; // https://localhost:8443
 
     // Ping the node
     auto pong = client.node().ping();

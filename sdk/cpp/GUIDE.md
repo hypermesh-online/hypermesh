@@ -30,7 +30,7 @@ target_link_libraries(your_target PRIVATE hypermesh_sdk)
 #include <iostream>
 
 int main() {
-    hypermesh::HyperMeshClient client; // defaults to http://localhost:9293
+    hypermesh::HyperMeshClient client; // defaults to https://localhost:8443
     auto status = client.node().status();
     std::cout << status.node_id << " height=" << status.chain_height << "\n";
     return 0;
@@ -40,7 +40,7 @@ int main() {
 Custom endpoint:
 
 ```cpp
-hypermesh::HyperMeshClient client("http://192.168.1.50:9293");
+hypermesh::HyperMeshClient client("https://192.168.1.50:8443");
 ```
 
 ## API Reference

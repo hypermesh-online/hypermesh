@@ -335,7 +335,7 @@ mod tests {
             node_id: "node2".to_string(),
             version: 5,
             coordinate: test_coord(10, 10, 10),
-            stoq_port: 9293,
+            stoq_port: 9292,
             available_assets: vec!["asset1".to_string()],
             privacy_mode: "Private".to_string(),
             updated_at: current_timestamp(),
@@ -360,7 +360,7 @@ mod tests {
             node_id: "node2".to_string(),
             version: 10,
             coordinate: test_coord(5, 5, 5),
-            stoq_port: 9293,
+            stoq_port: 9292,
             available_assets: vec![],
             privacy_mode: "Public".to_string(),
             updated_at: current_timestamp(),
@@ -384,7 +384,7 @@ mod tests {
         // State should still have version 10
         let entry = state.entries.get("node2").expect("test: entry exists");
         assert_eq!(entry.version, 10);
-        assert_eq!(entry.stoq_port, 9293);
+        assert_eq!(entry.stoq_port, 9292);
     }
 
     #[tokio::test]
@@ -399,7 +399,7 @@ mod tests {
         let proto2 = GossipProtocol::new(
             "node2".to_string(),
             test_coord(10, 10, 10),
-            9293,
+            9294,
             "Private".to_string(),
         );
 

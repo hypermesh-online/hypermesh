@@ -27,7 +27,7 @@ import (
 )
 
 func main() {
-    client := hypermesh.NewClient("http://localhost:9293")
+    client := hypermesh.NewClient("https://localhost:8443")
     ctx := context.Background()
 
     // Node status
@@ -111,12 +111,12 @@ if err != nil {
 
 ```go
 // Custom timeout
-client := hypermesh.NewClient("http://localhost:9293",
+client := hypermesh.NewClient("https://localhost:8443",
     hypermesh.WithTimeout(10 * time.Second),
 )
 
 // Custom http.Client
-client := hypermesh.NewClient("http://localhost:9293",
+client := hypermesh.NewClient("https://localhost:8443",
     hypermesh.WithHTTPClient(&http.Client{
         Timeout: 5 * time.Second,
         Transport: &http.Transport{

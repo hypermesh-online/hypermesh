@@ -70,10 +70,10 @@ export class Web3Events {
 
   // WebSocket URLs -- not currently functional on the BlockMatrix HTTP API
   private readonly wsUrls: Record<ServiceType, string> = {
-    trustchain: 'ws://localhost:9293/ws',
-    stoq: 'ws://localhost:9293/ws',
-    hypermesh: 'ws://localhost:9293/ws',
-    integration: 'ws://localhost:9293/ws'
+    trustchain: 'wss://localhost:8443/ws',
+    stoq: 'wss://localhost:8443/ws',
+    hypermesh: 'wss://localhost:8443/ws',
+    integration: 'wss://localhost:8443/ws'
   };
 
   /**

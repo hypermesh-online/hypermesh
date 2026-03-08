@@ -16,8 +16,8 @@ items = [
     "React Query state management (variable staleTime per data type, retry logic)",
     "Storybook component documentation (5 stories)",
     "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
-    # Real backend connectivity (blockmatrix HTTP API on localhost:9293)
-    "Singleton blockmatrix-api.ts client targeting localhost:9293 with typed responses",
+    # Real backend connectivity (Gateway API on localhost:8443)
+    "Singleton blockmatrix-api.ts client targeting Gateway (localhost:8443) with typed responses",
     "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
     "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
     "Sidebar shows real daemon status, chain height, peer count, privacy mode",

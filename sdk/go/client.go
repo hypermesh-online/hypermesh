@@ -13,19 +13,19 @@ import (
 
 const (
 	// DefaultBaseURL is the default HyperMesh node API address.
-	DefaultBaseURL = "http://localhost:9293"
+	DefaultBaseURL = "https://localhost:8443"
 
-	// DefaultCaesarURL is the default Caesar EVP service address.
-	DefaultCaesarURL = "http://localhost:9294"
+	// DefaultCaesarURL is the default Caesar EVP service address (via Gateway).
+	DefaultCaesarURL = "https://localhost:8443"
 
-	// DefaultTrustChainURL is the default TrustChain service address.
-	DefaultTrustChainURL = "http://localhost:8444"
+	// DefaultTrustChainURL is the default TrustChain service address (via Gateway).
+	DefaultTrustChainURL = "https://localhost:8443"
 
-	// DefaultCatalogURL is the default Catalog service address.
-	DefaultCatalogURL = "http://localhost:9295"
+	// DefaultCatalogURL is the default Catalog service address (via Gateway).
+	DefaultCatalogURL = "https://localhost:8443"
 
-	// DefaultEngaugeURL is the default Engauge service address.
-	DefaultEngaugeURL = "http://localhost:9296"
+	// DefaultEngaugeURL is the default Engauge service address (via Gateway).
+	DefaultEngaugeURL = "https://localhost:8443"
 
 	// DefaultTimeout is the default HTTP client timeout.
 	DefaultTimeout = 30 * time.Second
@@ -108,7 +108,7 @@ func WithEngaugeURL(url string) Option {
 // NewClient creates a new HyperMesh SDK client.
 //
 // The baseURL should be the scheme + host + port of the node API
-// (e.g. "http://localhost:9293"). If empty, DefaultBaseURL is used.
+// (e.g. "https://localhost:8443"). If empty, DefaultBaseURL is used.
 func NewClient(baseURL string, opts ...Option) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL

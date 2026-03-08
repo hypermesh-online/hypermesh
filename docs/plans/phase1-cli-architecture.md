@@ -838,7 +838,7 @@ let reflector = cli.reflector || config.network.reflector;
 Methods:
 - `config.show` -- returns current config as JSON
 - `config.get` -- params: `{ "key": "network.stoq_port" }` -- dot-path traversal into config struct, returns specific value
-- `config.set` -- params: `{ "key": "network.stoq_port", "value": "9293" }` -- updates in-memory config, writes to disk via `HypermeshConfig::save()`
+- `config.set` -- params: `{ "key": "network.stoq_port", "value": "9292" }` -- updates in-memory config, writes to disk via `HypermeshConfig::save()`
 
 Update `handlers/mod.rs` to add `pub mod config;` and wire registration.
 
@@ -935,7 +935,7 @@ config: Option<std::path::PathBuf>,
 1. `~/.hypermesh/config.toml` is loaded on startup; missing file uses defaults without error
 2. CLI flags override config file values (verify with explicit test)
 3. `hypermesh config show` prints current config as JSON (via IPC if daemon running, from file if not)
-4. `hypermesh config set network.stoq_port 9293` writes change to disk
+4. `hypermesh config set network.stoq_port 9292` writes change to disk
 5. `hypermesh status --json` prints machine-parsable JSON
 6. `hypermesh completions bash` outputs valid bash completion script (if `clap_complete` available)
 7. All previous tests still pass

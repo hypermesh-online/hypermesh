@@ -4,7 +4,7 @@
 /**
  * React Query hooks for the real BlockMatrix HTTP API.
  *
- * These hooks call the actual endpoints on localhost:9293 and
+ * These hooks call the actual endpoints on the Gateway (localhost:8443) and
  * return typed data. They intentionally do NOT fall back to mock
  * data -- if the backend is down the query will be in error state
  * and the UI should show a "not connected" indicator.

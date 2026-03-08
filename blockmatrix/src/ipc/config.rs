@@ -24,36 +24,21 @@ fn default_log_level() -> String {
 fn default_mode() -> String {
     "auto".to_string()
 }
-fn default_blockmatrix_url() -> String {
-    "http://localhost:9293".to_string()
-}
-fn default_caesar_url() -> String {
-    "http://localhost:9294".to_string()
-}
-fn default_trustchain_url() -> String {
-    "http://localhost:8444".to_string()
-}
-fn default_engauge_url() -> String {
-    "http://localhost:9296".to_string()
-}
-fn default_catalog_url() -> String {
-    "http://localhost:9295".to_string()
-}
 fn default_gateway_url() -> String {
-    "http://trust.hypermesh.online".to_string()
+    "stoq://trust.hypermesh.online".to_string()
 }
 
 /// Connection mode for service communication.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConnectionMode {
-    /// Try FFI -> IPC -> HTTP in order.
+    /// Try FFI -> IPC -> STOQ in order.
     Auto,
     /// Direct library linking.
     Ffi,
     /// Unix socket JSON-RPC to daemon.
     Ipc,
-    /// HTTP REST API.
-    Http,
+    /// STOQ protocol API.
+    Stoq,
 }
 
 impl ConnectionMode {
@@ -62,7 +47,9 @@ impl ConnectionMode {
         match s.to_lowercase().as_str() {
             "ffi" => Self::Ffi,
             "ipc" => Self::Ipc,
-            "http" => Self::Http,
+            "stoq" => Self::Stoq,
+            // Legacy: treat "http" as "stoq" for backward compatibility
+            "http" => Self::Stoq,
             _ => Self::Auto,
         }
     }
@@ -71,32 +58,12 @@ impl ConnectionMode {
 /// Service endpoint and connection configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServicesConfig {
-    /// Connection mode: "auto" | "ffi" | "ipc" | "http".
-    /// auto = try FFI -> IPC -> HTTP in order.
+    /// Connection mode: "auto" | "ffi" | "ipc" | "stoq".
+    /// auto = try FFI -> IPC -> STOQ in order.
     #[serde(default = "default_mode")]
     pub mode: String,
 
-    /// BlockMatrix API (default: http://localhost:9293).
-    #[serde(default = "default_blockmatrix_url")]
-    pub blockmatrix_url: String,
-
-    /// Caesar EVP API (default: http://localhost:9294).
-    #[serde(default = "default_caesar_url")]
-    pub caesar_url: String,
-
-    /// TrustChain CA API (default: http://localhost:8444).
-    #[serde(default = "default_trustchain_url")]
-    pub trustchain_url: String,
-
-    /// Engauge Analytics API (default: http://localhost:9296).
-    #[serde(default = "default_engauge_url")]
-    pub engauge_url: String,
-
-    /// Catalog Registry API (default: http://localhost:9295).
-    #[serde(default = "default_catalog_url")]
-    pub catalog_url: String,
-
-    /// Gateway unified entry point (default: http://trust.hypermesh.online).
+    /// Gateway unified entry point (default: stoq://trust.hypermesh.online).
     #[serde(default = "default_gateway_url")]
     pub gateway_url: String,
 }
@@ -105,11 +72,6 @@ impl Default for ServicesConfig {
     fn default() -> Self {
         Self {
             mode: default_mode(),
-            blockmatrix_url: default_blockmatrix_url(),
-            caesar_url: default_caesar_url(),
-            trustchain_url: default_trustchain_url(),
-            engauge_url: default_engauge_url(),
-            catalog_url: default_catalog_url(),
             gateway_url: default_gateway_url(),
         }
     }
@@ -309,12 +271,7 @@ mod tests {
         assert!(!config.network.reflector);
         assert_eq!(config.logging.level, "info");
         assert_eq!(config.services.mode, "auto");
-        assert_eq!(config.services.blockmatrix_url, "http://localhost:9293");
-        assert_eq!(config.services.caesar_url, "http://localhost:9294");
-        assert_eq!(config.services.trustchain_url, "http://localhost:8444");
-        assert_eq!(config.services.engauge_url, "http://localhost:9296");
-        assert_eq!(config.services.catalog_url, "http://localhost:9295");
-        assert_eq!(config.services.gateway_url, "http://trust.hypermesh.online");
+        assert_eq!(config.services.gateway_url, "stoq://trust.hypermesh.online");
         assert_eq!(config.services.connection_mode(), ConnectionMode::Auto);
     }
 
@@ -395,8 +352,10 @@ reflector = true
         assert_eq!(ConnectionMode::from_str("FFI"), ConnectionMode::Ffi);
         assert_eq!(ConnectionMode::from_str("ipc"), ConnectionMode::Ipc);
         assert_eq!(ConnectionMode::from_str("IPC"), ConnectionMode::Ipc);
-        assert_eq!(ConnectionMode::from_str("http"), ConnectionMode::Http);
-        assert_eq!(ConnectionMode::from_str("HTTP"), ConnectionMode::Http);
+        assert_eq!(ConnectionMode::from_str("stoq"), ConnectionMode::Stoq);
+        assert_eq!(ConnectionMode::from_str("STOQ"), ConnectionMode::Stoq);
+        // Legacy: "http" maps to Stoq
+        assert_eq!(ConnectionMode::from_str("http"), ConnectionMode::Stoq);
         assert_eq!(ConnectionMode::from_str("auto"), ConnectionMode::Auto);
         assert_eq!(ConnectionMode::from_str("unknown"), ConnectionMode::Auto);
         assert_eq!(ConnectionMode::from_str(""), ConnectionMode::Auto);
@@ -413,27 +372,22 @@ reflector = true
         svc.mode = "ipc".to_string();
         assert_eq!(svc.connection_mode(), ConnectionMode::Ipc);
 
-        svc.mode = "http".to_string();
-        assert_eq!(svc.connection_mode(), ConnectionMode::Http);
+        svc.mode = "stoq".to_string();
+        assert_eq!(svc.connection_mode(), ConnectionMode::Stoq);
     }
 
     #[test]
     fn test_parse_services_toml() {
         let toml_str = r#"
 [services]
-mode = "http"
-blockmatrix_url = "http://10.0.0.1:9293"
-caesar_url = "http://10.0.0.1:9294"
+mode = "stoq"
+gateway_url = "stoq://my-gateway.local"
 "#;
         let config: HypermeshConfig =
             toml::from_str(toml_str).expect("test: parse services toml");
-        assert_eq!(config.services.mode, "http");
-        assert_eq!(config.services.blockmatrix_url, "http://10.0.0.1:9293");
-        assert_eq!(config.services.caesar_url, "http://10.0.0.1:9294");
-        // Unset fields get defaults
-        assert_eq!(config.services.trustchain_url, "http://localhost:8444");
-        assert_eq!(config.services.gateway_url, "http://trust.hypermesh.online");
-        assert_eq!(config.services.connection_mode(), ConnectionMode::Http);
+        assert_eq!(config.services.mode, "stoq");
+        assert_eq!(config.services.gateway_url, "stoq://my-gateway.local");
+        assert_eq!(config.services.connection_mode(), ConnectionMode::Stoq);
     }
 
     #[test]
@@ -446,12 +400,8 @@ caesar_url = "http://10.0.0.1:9294"
             Some(&serde_json::json!("auto")),
         );
         assert_eq!(
-            get_dotpath(&value, "services.blockmatrix_url"),
-            Some(&serde_json::json!("http://localhost:9293")),
-        );
-        assert_eq!(
             get_dotpath(&value, "services.gateway_url"),
-            Some(&serde_json::json!("http://trust.hypermesh.online")),
+            Some(&serde_json::json!("stoq://trust.hypermesh.online")),
         );
     }
 
@@ -470,11 +420,11 @@ caesar_url = "http://10.0.0.1:9294"
 
         set_dotpath(
             &mut value,
-            "services.caesar_url",
-            serde_json::json!("http://remote:9294"),
+            "services.gateway_url",
+            serde_json::json!("stoq://remote:9292"),
         )
-        .expect("test: set services.caesar_url");
-        assert_eq!(value["services"]["caesar_url"], "http://remote:9294");
+        .expect("test: set services.gateway_url");
+        assert_eq!(value["services"]["gateway_url"], "stoq://remote:9292");
     }
 
     #[test]
@@ -484,15 +434,12 @@ caesar_url = "http://10.0.0.1:9294"
 
         let mut config = HypermeshConfig::default();
         config.services.mode = "ipc".to_string();
-        config.services.blockmatrix_url = "http://10.0.0.5:9293".to_string();
-        config.services.gateway_url = "http://my-gateway.local".to_string();
+        config.services.gateway_url = "stoq://my-gateway.local".to_string();
         config.save_to(&path).expect("test: save config");
 
         let loaded = HypermeshConfig::load_from(&path);
         assert_eq!(loaded.services.mode, "ipc");
-        assert_eq!(loaded.services.blockmatrix_url, "http://10.0.0.5:9293");
-        assert_eq!(loaded.services.gateway_url, "http://my-gateway.local");
-        assert_eq!(loaded.services.caesar_url, "http://localhost:9294"); // default
+        assert_eq!(loaded.services.gateway_url, "stoq://my-gateway.local");
         assert_eq!(loaded.services.connection_mode(), ConnectionMode::Ipc);
 
         let _ = std::fs::remove_dir_all(&dir);

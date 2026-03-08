@@ -346,7 +346,7 @@ async fn test_four_proof_validation() -> Result<()> {
     init_test_tracing();
     info!("=== Test: Four-Proof Validation ===");
 
-    let port = 19293;
+    let port = 19292;
     let _server = start_test_hypermesh_server(port).await?;
 
     let client_config = HyperMeshClientConfig::default();

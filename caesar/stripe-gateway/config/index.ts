@@ -240,7 +240,7 @@ export const config = {
 
   // WebSocket Configuration
   websocket: {
-    port: 9293,
+    port: 8443,
     heartbeatInterval: 30000, // 30 seconds
     connectionTimeout: 60000, // 1 minute
     maxConnections: 1000,
