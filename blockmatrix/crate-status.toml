@@ -43,8 +43,10 @@ items = [
     # Naming and identity
     "StateAuthenticator trait (binary authentication interface)",
     "PeerIdentity bridges to lib NodeId",
-    "Proof of State validation on block creation — add_block() requires StateProof, ValidationService validates before insert",
-    "State proof hash anchored in block header (BLAKE3 of StateProof in every non-genesis block)",
+    "Proof of State validation on block creation — add_block() requires Vec<BlockAssetEntry>, each entry carries its own StateProof",
+    "Per-entry proof hash — hπ = BLAKE3(StateProof) in every BlockAssetEntry, validated independently",
+    "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
+    "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
     # Genesis and hardware (R1)
     "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
     # IPC daemon architecture (Phase 1 Sprints 1-2)
