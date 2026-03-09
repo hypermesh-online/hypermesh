@@ -503,7 +503,14 @@ mod tests {
     use super::*;
 
     fn create_test_pos_token() -> PosToken {
-        PosToken {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+        use sha2::{Digest, Sha256};
+
+        let (pk, sk) = falcon1024::keypair();
+        let pubkey_bytes = pk.as_bytes().to_vec();
+
+        let mut token = PosToken {
             id: vec![1, 2, 3, 4],
             proof_of_space: ProofOfSpace {
                 commitment_hash: vec![5, 6, 7, 8],
@@ -511,12 +518,11 @@ mod tests {
                 capacity: 1024 * 1024,
             },
             proof_of_stake: ProofOfStake {
-                owner_pubkey: vec![9, 10, 11, 12],
+                owner_pubkey: pubkey_bytes.clone(),
                 stake_amount: 1000,
                 staked_until: SystemTime::now() + Duration::from_secs(3600),
             },
             proof_of_work: ProofOfWork {
-                // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
                 difficulty: 10,
                 nonce: 12345,
                 work_hash: vec![0, 0, 0x0F, 0xFF],
@@ -526,10 +532,23 @@ mod tests {
                 sequence: 1,
                 prev_hash: vec![17, 18, 19, 20],
             },
-            signature: vec![21, 22, 23, 24],
+            signature: Vec::new(),
             expires_at: SystemTime::now() + Duration::from_secs(300),
-            issuer_pubkey: Some(vec![25, 26, 27, 28]),
-        }
+            issuer_pubkey: Some(pubkey_bytes),
+        };
+
+        // Sign the canonical token data
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let token_data = validator.serialize_token_for_signing(&token);
+        let mut hasher = Sha256::new();
+        hasher.update(&token_data);
+        let message_hash: [u8; 32] = hasher.finalize().into();
+        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
+            .expect("test: reconstruct secret key");
+        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
+        token.signature = sig.as_bytes().to_vec();
+
+        token
     }
 
     #[tokio::test]

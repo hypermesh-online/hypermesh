@@ -29,12 +29,12 @@ items = [
     "MetricsFrame protocol wiring to engauge",
     "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
     "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
+    "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
 ]
 
 [features.in_development]
 items = [
     "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, length-prefixed multi-message framing (write_msg/read_msg), connection-type discriminator byte. BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake(). Framing verified correct (write_msg does NOT call finish()). Not yet tested multi-node end-to-end on separate hosts.",
-    "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
     "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",

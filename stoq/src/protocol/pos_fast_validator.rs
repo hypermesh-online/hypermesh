@@ -392,6 +392,56 @@ mod tests {
         }
     }
 
+    /// Create a properly FALCON-1024-signed token for tests that reach full validation.
+    fn create_falcon_signed_token() -> PosToken {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+        use sha2::{Digest, Sha256};
+
+        let (pk, sk) = falcon1024::keypair();
+        let pubkey_bytes = pk.as_bytes().to_vec();
+
+        let mut token = PosToken {
+            id: vec![1, 2, 3, 4],
+            proof_of_space: ProofOfSpace {
+                commitment_hash: vec![5, 6, 7, 8],
+                matrix_position: (1, 2, 3),
+                capacity: 1024 * 1024,
+            },
+            proof_of_stake: ProofOfStake {
+                owner_pubkey: pubkey_bytes.clone(),
+                stake_amount: 1000,
+                staked_until: SystemTime::now() + Duration::from_secs(3600),
+            },
+            proof_of_work: ProofOfWork {
+                difficulty: 10,
+                nonce: 12345,
+                work_hash: vec![0, 0, 0x0F, 0xFF],
+            },
+            proof_of_time: ProofOfTime {
+                timestamp: SystemTime::now(),
+                sequence: 1,
+                prev_hash: vec![17, 18, 19, 20],
+            },
+            signature: Vec::new(),
+            expires_at: SystemTime::now() + Duration::from_secs(300),
+            issuer_pubkey: Some(pubkey_bytes),
+        };
+
+        // Sign the canonical token data
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let token_data = validator.serialize_token_for_signing(&token);
+        let mut hasher = Sha256::new();
+        hasher.update(&token_data);
+        let message_hash: [u8; 32] = hasher.finalize().into();
+        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
+            .expect("test: reconstruct secret key");
+        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
+        token.signature = sig.as_bytes().to_vec();
+
+        token
+    }
+
     fn make_validator() -> PosFastValidator {
         let full = Arc::new(PosTokenValidator::new(Duration::from_secs(300)));
         PosFastValidator::new(FastValidationConfig::default(), full)
@@ -595,21 +645,22 @@ mod tests {
     #[test]
     fn test_tier_public_full() {
         let v = make_validator();
-        let token = create_valid_token();
+        let token = create_falcon_signed_token();
 
         let result = v
             .validate(&token, &PrivacyMode::PUBLIC)
             .expect("test: public validation should succeed");
 
-        // Valid token with all proofs should pass full validation
+        // Valid token with real FALCON signature should pass full validation
         assert!(
             result.is_valid,
-            "Valid token should pass full public validation"
+            "Valid token should pass full public validation, errors: {:?}",
+            result.errors
         );
 
         // Test with expired token (should fail full validation)
         // Use a different ID so the full validator's cache doesn't mask the failure.
-        let mut expired = create_valid_token();
+        let mut expired = create_falcon_signed_token();
         expired.id = vec![99, 98, 97, 96];
         expired.expires_at = SystemTime::now() - Duration::from_secs(60);
         let result2 = v

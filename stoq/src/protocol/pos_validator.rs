@@ -281,30 +281,31 @@ impl PosTokenValidator {
             errors.push("Invalid Proof of Time".to_string());
         }
 
-        // 6. Verify signature if TrustChain is available
-        if let Some(ref client) = self.trustchain_client {
-            // Serialize token data for signature verification
-            let token_data = self.serialize_token_for_signing(token);
+        // 6. Verify FALCON-1024 signature
+        // Use TrustChain client if available, otherwise verify directly with
+        // pqcrypto_falcon using the public key embedded in the token.
+        let token_data = self.serialize_token_for_signing(token);
+        let signer_pubkey = token
+            .issuer_pubkey
+            .as_deref()
+            .unwrap_or(&token.proof_of_stake.owner_pubkey);
 
-            match client.verify_signature(
-                &token.proof_of_stake.owner_pubkey,
-                &token_data,
-                &token.signature,
-            ) {
-                Ok(true) => {
-                    debug!("Token signature verified successfully");
-                }
-                Ok(false) => {
-                    errors.push("Invalid token signature".to_string());
-                }
-                Err(e) => {
-                    errors.push(format!("Signature verification failed: {e}"));
-                }
-            }
+        let sig_result = if let Some(ref client) = self.trustchain_client {
+            client.verify_signature(signer_pubkey, &token_data, &token.signature)
         } else {
-            // No TrustChain client configured. Wire FalconTrustChainClient
-            // via set_trustchain_client() for production FALCON-1024 verification.
-            debug!("TrustChain client not configured, skipping signature verification");
+            verify_falcon_signature(signer_pubkey, &token_data, &token.signature)
+        };
+
+        match sig_result {
+            Ok(true) => {
+                debug!("Token signature verified successfully");
+            }
+            Ok(false) => {
+                errors.push("Invalid token signature".to_string());
+            }
+            Err(e) => {
+                errors.push(format!("Signature verification failed: {e}"));
+            }
         }
 
         let is_valid = errors.is_empty();
@@ -436,7 +437,7 @@ impl PosTokenValidator {
     ///
     /// Each field is encoded as a u32 LE length prefix followed by the field bytes.
     /// This prevents ambiguity from variable-length field concatenation.
-    fn serialize_token_for_signing(&self, token: &PosToken) -> Vec<u8> {
+    pub fn serialize_token_for_signing(&self, token: &PosToken) -> Vec<u8> {
         let mut buf = Vec::new();
 
         // Helper closure: write u32 LE length prefix then field bytes
@@ -488,6 +489,42 @@ impl PosTokenValidator {
     }
 }
 
+/// Verify a FALCON-1024 signature directly using pqcrypto_falcon.
+///
+/// This performs local verification without requiring a TrustChain client connection.
+/// Uses the same SHA-256 message hashing convention as `FalconTrustChainClient`.
+fn verify_falcon_signature(pubkey: &[u8], data: &[u8], signature: &[u8]) -> Result<bool> {
+    use pqcrypto_falcon::falcon1024;
+    use pqcrypto_traits::sign::{DetachedSignature, PublicKey};
+    use sha2::{Digest, Sha256};
+
+    // Validate public key size (must be exactly FALCON-1024)
+    if pubkey.len() != falcon1024::public_key_bytes() {
+        return Ok(false);
+    }
+
+    // Reconstruct public key
+    let public_key = falcon1024::PublicKey::from_bytes(pubkey)
+        .map_err(|e| anyhow::anyhow!("Invalid FALCON-1024 public key: {e}"))?;
+
+    // Reconstruct detached signature
+    let detached_sig = match falcon1024::DetachedSignature::from_bytes(signature) {
+        Ok(sig) => sig,
+        Err(_) => return Ok(false),
+    };
+
+    // Hash the data (same convention as FalconTrustChainClient and FalconEngine)
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let message_hash: [u8; 32] = hasher.finalize().into();
+
+    // Verify FALCON-1024 signature against message hash
+    match falcon1024::verify_detached_signature(&detached_sig, &message_hash, &public_key) {
+        Ok(()) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}
+
 /// Count leading zero bits in a byte slice.
 ///
 /// Mirrors the algorithm in `hypermesh_ebpf::validation::count_leading_zero_bits`.
@@ -520,7 +557,8 @@ pub struct ValidationStats {
 mod tests {
     use super::*;
 
-    fn create_test_token() -> PosToken {
+    /// Create an unsigned test token with valid structural fields but a bogus signature.
+    fn create_unsigned_test_token() -> PosToken {
         PosToken {
             id: vec![1, 2, 3, 4],
             issuer_pubkey: Some(vec![20, 21, 22, 23]),
@@ -550,20 +588,86 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_token_validation() {
+    /// Create a properly FALCON-1024-signed test token.
+    fn create_signed_test_token() -> PosToken {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::{PublicKey, SecretKey};
+        use sha2::{Digest, Sha256};
+
+        let (pk, sk) = falcon1024::keypair();
+        let pubkey_bytes = pk.as_bytes().to_vec();
+
+        let mut token = PosToken {
+            id: vec![1, 2, 3, 4],
+            issuer_pubkey: Some(pubkey_bytes.clone()),
+            proof_of_space: ProofOfSpace {
+                commitment_hash: vec![5, 6, 7, 8],
+                matrix_position: (1, 2, 3),
+                capacity: 1024 * 1024,
+            },
+            proof_of_stake: ProofOfStake {
+                owner_pubkey: pubkey_bytes,
+                stake_amount: 1000,
+                staked_until: SystemTime::now() + Duration::from_secs(3600),
+            },
+            proof_of_work: ProofOfWork {
+                difficulty: 10,
+                nonce: 12345,
+                work_hash: vec![0, 0, 0x0F, 0xFF],
+            },
+            proof_of_time: ProofOfTime {
+                timestamp: SystemTime::now(),
+                sequence: 1,
+                prev_hash: vec![17, 18, 19, 20],
+            },
+            signature: Vec::new(), // placeholder, signed below
+            expires_at: SystemTime::now() + Duration::from_secs(300),
+        };
+
+        // Build the canonical token data and sign it
         let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token = create_test_token();
+        let token_data = validator.serialize_token_for_signing(&token);
+
+        let mut hasher = Sha256::new();
+        hasher.update(&token_data);
+        let message_hash: [u8; 32] = hasher.finalize().into();
+
+        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
+            .expect("test: reconstruct secret key");
+        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
+        token.signature = pqcrypto_traits::sign::DetachedSignature::as_bytes(&sig).to_vec();
+
+        token
+    }
+
+    #[test]
+    fn test_token_with_valid_falcon_signature() {
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let token = create_signed_test_token();
 
         let result = validator.validate_token(&token).expect("test: validation");
-        assert!(result.is_valid);
+        assert!(result.is_valid, "Errors: {:?}", result.errors);
         assert!(result.errors.is_empty());
+    }
+
+    #[test]
+    fn test_token_with_bogus_signature_rejected() {
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let token = create_unsigned_test_token();
+
+        let result = validator.validate_token(&token).expect("test: validation");
+        assert!(!result.is_valid);
+        assert!(
+            result.errors.iter().any(|e| e.contains("signature")),
+            "Expected signature error, got: {:?}",
+            result.errors
+        );
     }
 
     #[test]
     fn test_expired_token() {
         let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let mut token = create_test_token();
+        let mut token = create_signed_test_token();
         token.expires_at = SystemTime::now() - Duration::from_secs(60);
 
         let result = validator.validate_token(&token).expect("test: validation");
@@ -574,11 +678,11 @@ mod tests {
     #[test]
     fn test_cache_functionality() {
         let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token = create_test_token();
+        let token = create_signed_test_token();
 
         // First validation should miss cache
         let result1 = validator.validate_token(&token).expect("test: validation");
-        assert!(result1.is_valid);
+        assert!(result1.is_valid, "Errors: {:?}", result1.errors);
 
         let stats = validator.get_metrics();
         assert_eq!(stats.cache_misses, 1);
@@ -596,7 +700,7 @@ mod tests {
     #[test]
     fn test_validation_metrics() {
         let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token = create_test_token();
+        let token = create_signed_test_token();
 
         // Perform multiple validations
         for _ in 0..5 {
@@ -606,5 +710,29 @@ mod tests {
         let stats = validator.get_metrics();
         assert_eq!(stats.total_validations, 5);
         let _ = stats.avg_validation_time_us;
+    }
+
+    #[test]
+    fn test_tampered_token_rejected() {
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let mut token = create_signed_test_token();
+        // Tamper with the token data after signing
+        token.id = vec![99, 99, 99, 99];
+
+        let result = validator.validate_token(&token).expect("test: validation");
+        assert!(!result.is_valid);
+        assert!(
+            result.errors.iter().any(|e| e.contains("signature")),
+            "Expected signature error after tampering, got: {:?}",
+            result.errors
+        );
+    }
+
+    #[test]
+    fn test_verify_falcon_signature_wrong_key_size() {
+        // Wrong key size returns Ok(false), not an error
+        let result =
+            verify_falcon_signature(&[1, 2, 3], b"data", &[4, 5, 6]).expect("test: verify");
+        assert!(!result);
     }
 }
