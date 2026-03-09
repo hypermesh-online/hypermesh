@@ -78,6 +78,13 @@ pub struct GatewayConfig {
 
     /// Logging level
     pub log_level: String,
+
+    /// STOQ listener address (default [::]:8444).
+    /// Set to `None` to disable the STOQ listener entirely.
+    pub stoq_listen_addr: Option<SocketAddr>,
+
+    /// Maximum concurrent STOQ connections through the bridge.
+    pub stoq_max_connections: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -160,6 +167,12 @@ impl Default for GatewayConfig {
             retry: RetryConfig::default(),
             cors: CorsConfig::default(),
             log_level: "info".to_string(),
+            stoq_listen_addr: Some(
+                "[::]:8444"
+                    .parse()
+                    .expect("hardcoded default STOQ listen addr is valid"),
+            ),
+            stoq_max_connections: 100,
         }
     }
 }
@@ -267,6 +280,18 @@ impl GatewayConfig {
 
         if let Ok(level) = std::env::var("LOG_LEVEL") {
             config.log_level = level;
+        }
+
+        if let Ok(addr) = std::env::var("STOQ_LISTEN_ADDR") {
+            if addr.eq_ignore_ascii_case("none") || addr.eq_ignore_ascii_case("disabled") {
+                config.stoq_listen_addr = None;
+            } else {
+                config.stoq_listen_addr = Some(addr.parse()?);
+            }
+        }
+
+        if let Ok(max) = std::env::var("STOQ_MAX_CONNECTIONS") {
+            config.stoq_max_connections = max.parse()?;
         }
 
         Ok(config)

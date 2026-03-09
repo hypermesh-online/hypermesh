@@ -6,11 +6,14 @@ mod auth;
 mod bootstrap;
 mod config;
 mod dashboard_server;
+mod error;
 mod middleware;
 mod onboarding;
 mod pool;
 mod proxy;
 mod router;
+mod stoq_bridge;
+mod stoq_listener;
 
 use anyhow::Result;
 use bytes::{Buf, Bytes};
@@ -26,6 +29,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::GatewayConfig;
 use crate::router::GatewayRouter;
+use crate::stoq_bridge::{StoqBridge, StoqBridgeConfig};
+use crate::stoq_listener::StoqListener;
 
 /// Parse `--config <path>` from CLI arguments.
 /// Returns `Some(path)` if found, `None` otherwise.
@@ -95,7 +100,54 @@ async fn main() -> Result<()> {
     let endpoint = quinn::Endpoint::server(server_config, config.listen_addr)?;
     info!("HTTP/3 server listening on {}", config.listen_addr);
 
-    // Accept connections with graceful shutdown
+    // Start STOQ listener if configured (graceful degradation on failure)
+    let stoq_bridge: Option<Arc<StoqBridge>> = if let Some(stoq_addr) = config.stoq_listen_addr {
+        let bridge_config = StoqBridgeConfig {
+            bind_addr: stoq_addr,
+            max_connections: config.stoq_max_connections,
+            ..StoqBridgeConfig::default()
+        };
+
+        match StoqBridge::new(bridge_config).await {
+            Ok(bridge) => {
+                let bridge = Arc::new(bridge);
+                info!("STOQ bridge listening on {}", stoq_addr);
+                Some(bridge)
+            }
+            Err(e) => {
+                error!(
+                    "Failed to start STOQ bridge on {}: {} — continuing with HTTP/3 only",
+                    stoq_addr, e
+                );
+                None
+            }
+        }
+    } else {
+        info!("STOQ listener disabled by configuration");
+        None
+    };
+
+    // Spawn STOQ accept loop in the background (if bridge started successfully)
+    let stoq_handle = stoq_bridge.as_ref().map(|bridge| {
+        let listener = StoqListener::new(Arc::clone(bridge));
+        tokio::spawn(async move {
+            if let Err(e) = listener
+                .run(|info| async move {
+                    info!(
+                        connection_id = %info.connection_id,
+                        remote = %info.remote_addr,
+                        "Processing STOQ connection"
+                    );
+                    Ok(())
+                })
+                .await
+            {
+                error!("STOQ listener stopped: {}", e);
+            }
+        })
+    });
+
+    // Accept HTTP/3 connections with graceful shutdown
     info!("Gateway ready — press Ctrl+C to stop");
     loop {
         tokio::select! {
@@ -110,7 +162,7 @@ async fn main() -> Result<()> {
                         });
                     }
                     None => {
-                        info!("Endpoint closed, shutting down");
+                        info!("HTTP/3 endpoint closed, shutting down");
                         break;
                     }
                 }
@@ -121,6 +173,15 @@ async fn main() -> Result<()> {
                 break;
             }
         }
+    }
+
+    // Shutdown STOQ bridge gracefully
+    if let Some(bridge) = stoq_bridge.as_ref() {
+        info!("Shutting down STOQ bridge...");
+        bridge.shutdown().await;
+    }
+    if let Some(handle) = stoq_handle {
+        handle.abort();
     }
 
     info!("Gateway stopped");
