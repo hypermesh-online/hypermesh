@@ -8,6 +8,7 @@
 //! to discover and communicate with each other using STOQ transport.
 
 pub mod blockchain_integration;
+pub mod ca_enrollment;
 pub mod cluster;
 pub mod config;
 pub mod discovery;
@@ -213,6 +214,9 @@ impl NetworkManager {
             node_info.coordinate.z
         );
 
+        // Request CA certificate in background (Phase 2 bootstrap)
+        self.spawn_ca_enrollment_if_needed();
+
         // Spawn persistent message loop if context is available
         if let Some(ctx) = peer_ctx {
             let peer_node_id = node_info.node_id.clone();
@@ -319,6 +323,27 @@ impl NetworkManager {
         self.signer.node_id().to_string()
     }
 
+    /// Spawn a background CA certificate enrollment task.
+    ///
+    /// After a successful bilateral PoS handshake, this replaces the
+    /// self-signed bootstrap cert with a TrustChain CA-issued cert.
+    /// Failure is non-fatal; the node continues with its bootstrap cert.
+    fn spawn_ca_enrollment_if_needed(&self) {
+        let node_id = self.signer.node_id().to_string();
+        let cert_manager = self.transport.cert_manager.clone();
+
+        tokio::spawn(async move {
+            let state_proof = match ca_enrollment::generate_node_state_proof(&node_id).await {
+                Ok(sp) => sp,
+                Err(e) => {
+                    warn!("CA enrollment: failed to generate state proof: {e}");
+                    return;
+                }
+            };
+            ca_enrollment::spawn_ca_enrollment(cert_manager, node_id, state_proof);
+        });
+    }
+
     /// Broadcast matrix position to connected nodes via STOQ
     pub async fn broadcast_matrix_position(&self) -> Result<()> {
         if let Some(ref stoq_integration) = self.stoq_integration {
@@ -416,6 +441,7 @@ impl NetworkManager {
                     let ctx = peer_ctx.clone();
                     let signer = self.signer.clone();
                     let proof_provider = self.proof_provider.clone();
+                    let cert_manager = self.transport.cert_manager.clone();
 
                     // Handle connection in background — read discriminator
                     // to decide whether this is a handshake or a peer message.
@@ -426,6 +452,7 @@ impl NetworkManager {
                             local_coord,
                             signer,
                             proof_provider,
+                            cert_manager,
                             ctx,
                         )
                         .await

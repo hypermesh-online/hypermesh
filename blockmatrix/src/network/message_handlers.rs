@@ -391,6 +391,7 @@ pub(crate) async fn handle_incoming_connection(
     local_coord: MatrixCoordinate,
     signer: Arc<dyn hypermesh_lib::NodeSigner>,
     proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    cert_manager: Arc<stoq::transport::certificates::CertificateManager>,
     peer_ctx: Option<Arc<PeerContext>>,
 ) -> Result<()> {
     let mut stream = connection.accept_stream().await?;
@@ -398,7 +399,10 @@ pub(crate) async fn handle_incoming_connection(
 
     match conn_type {
         CONN_TYPE_HANDSHAKE => {
-            handle_handshake_connection(connection, &mut stream, nodes, local_coord, signer, proof_provider, peer_ctx).await
+            handle_handshake_connection(
+                connection, &mut stream, nodes, local_coord,
+                signer, proof_provider, cert_manager, peer_ctx,
+            ).await
         }
         CONN_TYPE_PEER_MESSAGE => {
             handle_peer_message_connection(&mut stream, &connection, local_coord, peer_ctx).await
@@ -418,6 +422,7 @@ async fn handle_handshake_connection(
     local_coord: MatrixCoordinate,
     signer: Arc<dyn hypermesh_lib::NodeSigner>,
     proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    cert_manager: Arc<stoq::transport::certificates::CertificateManager>,
     peer_ctx: Option<Arc<PeerContext>>,
 ) -> Result<()> {
     debug!("Accepted incoming connection — handshake discriminator");
@@ -454,6 +459,9 @@ async fn handle_handshake_connection(
         &peer_node_id[..8.min(peer_node_id.len())]
     );
 
+    // Request CA certificate in background (Phase 2 bootstrap)
+    spawn_acceptor_ca_enrollment(cert_manager, signer.node_id().to_string());
+
     // Register accepted peer as a reflector for proactive sync
     if let Some(ref ctx) = peer_ctx {
         register_peer_as_reflector(ctx, &peer_node_id, coordinate).await;
@@ -466,6 +474,23 @@ async fn handle_handshake_connection(
     }
 
     Ok(())
+}
+
+/// Spawn CA enrollment on the acceptor side after a successful handshake.
+fn spawn_acceptor_ca_enrollment(
+    cert_manager: Arc<stoq::transport::certificates::CertificateManager>,
+    node_id: String,
+) {
+    tokio::spawn(async move {
+        let state_proof = match super::ca_enrollment::generate_node_state_proof(&node_id).await {
+            Ok(sp) => sp,
+            Err(e) => {
+                warn!("CA enrollment (acceptor): state proof generation failed: {e}");
+                return;
+            }
+        };
+        super::ca_enrollment::spawn_ca_enrollment(cert_manager, node_id, state_proof);
+    });
 }
 
 /// Process a single peer-message connection (non-handshake).

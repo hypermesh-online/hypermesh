@@ -507,6 +507,27 @@ impl CertificateManager {
         Ok(hasher.finalize().to_vec())
     }
 
+    /// Replace the current certificate with a CA-issued one.
+    ///
+    /// Called after a successful bilateral PoS handshake when the node
+    /// receives a TrustChain CA-signed certificate to replace its
+    /// self-signed bootstrap cert. The new cert is persisted to disk
+    /// so all future STOQ connections use it.
+    ///
+    /// Note: existing QUIC connections continue with the old cert (QUIC
+    /// cannot hot-swap certs). Only new connections pick up the replacement.
+    pub async fn update_certificate(&self, cert: StoqNodeCertificate) -> Result<()> {
+        info!(
+            "Updating certificate: node_id={}, fingerprint={}",
+            cert.node_id,
+            cert.fingerprint()
+        );
+        *self.current_certificate.write().await = Some(cert);
+        self.persist_current_certificate().await;
+        info!("Certificate updated and persisted successfully");
+        Ok(())
+    }
+
     /// Internal: Rotate certificate
     async fn rotate_certificate(&self) -> Result<()> {
         info!("Rotating certificate");
