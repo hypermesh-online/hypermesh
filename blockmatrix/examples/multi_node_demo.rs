@@ -144,6 +144,7 @@ async fn start_node(
             std::sync::Arc::new(
                 blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
                     signer.node_id().to_string(),
+                    signer.clone(),
                 ),
             );
         let network = NetworkManager::new(

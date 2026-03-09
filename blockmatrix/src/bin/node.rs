@@ -1692,6 +1692,7 @@ async fn run_connect(
             std::sync::Arc::new(
                 blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
                     signer.node_id().to_string(),
+                    signer.clone(),
                 ),
             );
         let network_manager = NetworkManager::new(
@@ -2005,11 +2006,10 @@ async fn run_connect(
                         .and_then(|os| os.get_resource_usage().ok())
                         .map(|u| (u.cpu_usage_percent, u.memory_usage_percent))
                         .unwrap_or((0.0, 0.0));
-                    let _frame_bytes = metrics_reporter.build_capacity_frame(
+                    let frame_bytes = metrics_reporter.build_capacity_frame(
                         chain_h, peers, shards, cpu, mem,
                     );
-                    // TODO: Push frame_bytes to engauge STOQ API at [::1]:9296
-                    // when engauge is running as a co-located service
+                    metrics_reporter.push_to_engauge(&frame_bytes).await;
                 }
             }
         });

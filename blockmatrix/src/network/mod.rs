@@ -511,7 +511,7 @@ mod tests {
         let test_identity = crate::identity::FalconIdentity::generate();
         let signer: Arc<dyn hypermesh_lib::NodeSigner> = Arc::new(test_identity);
         let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> = Arc::new(
-            crate::proof_of_state::BlockMatrixProofProvider::new(signer.node_id().to_string()),
+            crate::proof_of_state::BlockMatrixProofProvider::new(signer.node_id().to_string(), signer.clone()),
         );
         let manager = NetworkManager::new(
             coord,

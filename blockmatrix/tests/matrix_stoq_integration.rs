@@ -273,7 +273,7 @@ async fn test_network_manager_with_stoq_integration() -> Result<()> {
     let test_identity = blockmatrix::identity::FalconIdentity::generate();
     let signer: Arc<dyn hypermesh_lib::NodeSigner> = Arc::new(test_identity);
     let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> = Arc::new(
-        blockmatrix::proof_of_state::BlockMatrixProofProvider::new(signer.node_id().to_string()),
+        blockmatrix::proof_of_state::BlockMatrixProofProvider::new(signer.node_id().to_string(), signer.clone()),
     );
     let manager = NetworkManager::new(
         coordinate,
