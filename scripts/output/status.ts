@@ -107,7 +107,8 @@ export const crateStatuses: CrateStatus[] = [
         "Stream type discrimination — CONN_TYPE_HANDSHAKE (0x00) and CONN_TYPE_PEER_MESSAGE (0x01) on every STOQ connection",
         "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
         "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
-        "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams"
+        "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
+        "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure"
       ],
       "inDevelopment": [
         "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired, block fetching protocol implemented. Not yet e2e verified multi-node.",
@@ -259,10 +260,11 @@ export const crateStatuses: CrateStatus[] = [
         "Swarm analytics data structures (ShardPopularity, demand maps, cascade tracker)",
         "Min-spec performance profiling (budget validation against R13 limits)",
         "Caesar in-transit/holding amount tracking (per-node economic state struct)",
-        "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)"
+        "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
+        "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline"
       ],
       "inDevelopment": [
-        "Real metrics ingestion from running services — no pipeline feeds actual data from blockmatrix/stoq/caesar into engauge",
+        "Real metrics ingestion from running services — blockmatrix pushes capacity frames via UDP, stoq/caesar not yet wired",
         "Metrics publisher/subscriber network delivery — push model code exists but no real STOQ connections to peers",
         "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
         "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
@@ -276,7 +278,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 66
+    "completion": 67
   },
   {
     "id": "gateway",
