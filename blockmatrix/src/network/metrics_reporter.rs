@@ -111,7 +111,9 @@ impl MetricsReporter {
             }
         }
 
-        let sock = self.socket.as_ref().expect("socket initialized above");
+        let Some(sock) = self.socket.as_ref() else {
+            return;
+        };
         match sock.send_to(frame_bytes, ENGAUGE_UDP_ADDR).await {
             Ok(sent) => {
                 debug!("Pushed {sent} bytes to engauge at {ENGAUGE_UDP_ADDR}");
