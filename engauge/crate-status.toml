@@ -26,12 +26,13 @@ items = [
     "Min-spec performance profiling (budget validation against R13 limits)",
     "Caesar in-transit/holding amount tracking (per-node economic state struct)",
     "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
+    "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
 ]
 
 [features.in_development]
 items = [
     # None of the network integration is functional — all metrics are local or mock
-    "Real metrics ingestion from running services — no pipeline feeds actual data from blockmatrix/stoq/caesar into engauge",
+    "Real metrics ingestion from running services — blockmatrix pushes capacity frames via UDP, stoq/caesar not yet wired",
     "Metrics publisher/subscriber network delivery — push model code exists but no real STOQ connections to peers",
     "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
     "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",

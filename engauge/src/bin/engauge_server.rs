@@ -8,9 +8,12 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::info;
+use tokio::sync::Mutex;
+use tracing::{info, warn};
 
 use engauge::api::stoq_api::{EngaugeAppState, EngaugeStoqApi, EngaugeStoqConfig};
+use engauge::ingestion::{IngestionConfig, MetricsIngestionPipeline};
+use engauge::udp_ingest::{self, UdpIngestConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,6 +34,7 @@ async fn main() -> Result<()> {
     // Parse CLI args
     let args: Vec<String> = std::env::args().collect();
     let mut bind_address = "[::1]:9296".to_string();
+    let mut udp_bind_address = udp_ingest::DEFAULT_UDP_BIND.to_string();
     let mut service_name = "engauge".to_string();
 
     let mut i = 1;
@@ -39,6 +43,12 @@ async fn main() -> Result<()> {
             "--bind" | "-b" => {
                 if i + 1 < args.len() {
                     bind_address = args[i + 1].clone();
+                    i += 1;
+                }
+            }
+            "--udp-bind" => {
+                if i + 1 < args.len() {
+                    udp_bind_address = args[i + 1].clone();
                     i += 1;
                 }
             }
@@ -54,7 +64,8 @@ async fn main() -> Result<()> {
                 println!("Usage: engauge-server [OPTIONS]");
                 println!();
                 println!("Options:");
-                println!("  --bind, -b <ADDR>           Bind address (default: [::1]:9296)");
+                println!("  --bind, -b <ADDR>           QUIC bind address (default: [::1]:9296)");
+                println!("  --udp-bind <ADDR>           UDP metrics bind address (default: [::1]:9297)");
                 println!("  --service-name, -s <NAME>   Service name (default: engauge)");
                 println!("  --help, -h                  Show this help message");
                 return Ok(());
@@ -75,9 +86,26 @@ async fn main() -> Result<()> {
     };
 
     // Create API server
-    let api = EngaugeStoqApi::new(config, app_state);
+    let api = EngaugeStoqApi::new(config, app_state.clone());
 
     info!("Engauge STOQ server configured for {}", bind_address);
+
+    // Create metrics ingestion pipeline for UDP listener
+    let pipeline = Arc::new(Mutex::new(MetricsIngestionPipeline::new(
+        IngestionConfig::default(),
+    )));
+
+    // Start UDP metrics ingestion listener
+    let udp_config = UdpIngestConfig {
+        bind_address: udp_bind_address.clone(),
+    };
+    let udp_pipeline = pipeline.clone();
+    let udp_state = app_state.clone();
+    let udp_handle = tokio::spawn(async move {
+        if let Err(e) = udp_ingest::run_udp_ingest(udp_config, udp_pipeline, udp_state).await {
+            warn!("UDP metrics listener failed: {e}");
+        }
+    });
 
     // Run with graceful shutdown
     tokio::select! {
@@ -85,6 +113,9 @@ async fn main() -> Result<()> {
             if let Err(e) = result {
                 tracing::error!("Server error: {}", e);
             }
+        }
+        _ = udp_handle => {
+            warn!("UDP listener exited unexpectedly");
         }
         _ = tokio::signal::ctrl_c() => {
             info!("Received shutdown signal");

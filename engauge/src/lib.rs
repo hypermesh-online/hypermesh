@@ -37,6 +37,7 @@ pub mod streaming;
 pub mod swarm_analytics;
 pub mod throttle;
 pub mod trending;
+pub mod udp_ingest;
 
 // Re-export primary types at crate root for convenience.
 pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
