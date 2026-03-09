@@ -775,6 +775,27 @@ fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -> St
     }
 }
 
+/// Build an `AssetRegistration` for the node's FALCON-1024 + Kyber-1024 identity.
+///
+/// Per R1 (sovereign genesis with asset instantiation) and R10 (universal asset
+/// model), the identity keypair is registered as a blockchain asset. The content
+/// hash is `BLAKE3(Identity_type_id || falcon_pubkey || kyber_pubkey)` matching
+/// the `IdentityAssetRecord` specification in `hypermesh_lib::asset`.
+fn build_identity_asset_registration(
+    identity: &blockmatrix::identity::FalconIdentity,
+) -> AssetRegistration {
+    let asset_data = AssetData {
+        config: Vec::new(),
+        definition: identity.public_key.clone(),
+        metadata: identity.kyber_public_key.clone(),
+    };
+    AssetRegistration::from_asset_data(
+        &asset_data,
+        NetworkScope::Global,
+        AssetCategory::BaseSystem(BaseSystemType::Identity),
+    )
+}
+
 /// Run the Store subcommand: ingest a file through the asset pipeline and
 /// persist the resulting shards + shard map locally.
 ///
@@ -2412,10 +2433,20 @@ async fn main() -> Result<()> {
 
         info!("Persisted genesis block and certificate to {}", data_dir.display());
 
-        // === R1: Assess hardware and register as assets in block #1 ===
+        // === R1/R10: Load identity and assess hardware for genesis asset registration ===
+        let identity_dir = data_dir.join(&nid).join("identity");
+        let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
+        info!(
+            "Genesis identity: {}... (FALCON-1024 + Kyber-1024)",
+            &falcon_identity.node_id[..16]
+        );
+
         info!("Assessing node hardware for asset registration (R1)...");
         match assess_hardware_assets() {
-            Ok(hw_assets) => {
+            Ok(mut hw_assets) => {
+                // Register FALCON+Kyber identity as a blockchain asset (R1/R10)
+                hw_assets.push(build_identity_asset_registration(&falcon_identity));
+
                 // Use genesis proof from real hardware assessment (not generate_from_network
                 // which may reject the node_id or produce insufficient stake).
                 let state_proof = build_hardware_state_proof(&nid, coord);
@@ -2426,9 +2457,13 @@ async fn main() -> Result<()> {
                 {
                     Ok(block) => {
                         info!(
-                            "Registered hardware assets in block #{} (hash: {})",
+                            "Registered hardware + identity assets in block #{} (hash: {})",
                             block.index,
                             &block.hash[..16],
+                        );
+                        info!(
+                            "Identity registered as blockchain asset (node_id: {})",
+                            &falcon_identity.node_id[..16],
                         );
                         // Persist the hardware asset block
                         if let Err(e) = persistence.save_block(&block).await {
