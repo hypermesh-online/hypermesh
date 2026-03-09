@@ -1,0 +1,491 @@
+// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Licensed under the Business Source License 1.1.
+// See the LICENSE file in the repository root for full license text.
+
+//! Peer message dispatch and block/shard/sync handlers.
+//!
+//! Extracted from `network/mod.rs` to keep each file under 500 lines.
+//! All functions operate on a [`PeerContext`] shared reference.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::{debug, info, warn};
+
+use anyhow::{anyhow, Result};
+
+use crate::blockchain::block::Block;
+use crate::bootstrap::PrivacyMode;
+use crate::matrix::coordinate::MatrixCoordinate;
+use crate::network::hash_bucket::SpatialBucketAssigner;
+use crate::network::shard_transport;
+use crate::network::stoq_integration::MatrixMessage;
+use crate::network::sync_dispatch;
+use hypermesh_lib::BlockchainScope;
+
+use super::{
+    NetworkNode, PeerContext,
+    CONN_TYPE_HANDSHAKE, CONN_TYPE_PEER_MESSAGE,
+};
+
+// ── Wire-protocol tag bytes ──────────────────────────────────────────
+
+/// Shard send (store a shard on this node).
+pub(crate) const TAG_SHARD_SEND: u8 = 0x01;
+/// Shard fetch (retrieve a shard from this node).
+pub(crate) const TAG_SHARD_FETCH: u8 = 0x02;
+/// Block announcement.
+pub(crate) const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
+/// Sync / reflector message.
+pub(crate) const TAG_SYNC_MESSAGE: u8 = 0x10;
+/// Gossip protocol message.
+pub(crate) const TAG_GOSSIP: u8 = 0x20;
+
+// ── Peer message loop ────────────────────────────────────────────────
+
+/// Persistent read loop for a connected peer.
+///
+/// Accepts new streams from the connection, reads the full payload,
+/// dispatches based on the first byte (tag), and handles the message.
+/// Runs until the connection is closed.
+pub(crate) async fn run_peer_message_loop(
+    connection: Arc<stoq::Connection>,
+    peer_node_id: String,
+    peer_coord: MatrixCoordinate,
+    ctx: Arc<PeerContext>,
+) {
+    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+    info!(
+        "Starting message loop for peer {} at ({},{},{})",
+        short_id, peer_coord.x, peer_coord.y, peer_coord.z,
+    );
+
+    loop {
+        let mut stream = match connection.accept_stream().await {
+            Ok(s) => s,
+            Err(e) => {
+                debug!("Peer {} connection closed: {}", short_id, e);
+                break;
+            }
+        };
+
+        let data = match stream.receive().await {
+            Ok(d) if !d.is_empty() => d,
+            Ok(_) => continue,
+            Err(e) => {
+                debug!("Stream read error from {}: {}", short_id, e);
+                continue;
+            }
+        };
+
+        dispatch_message(&data, &mut stream, &peer_node_id, &peer_coord, &ctx).await;
+    }
+
+    info!("Message loop ended for peer {}", short_id);
+}
+
+/// Route a single message payload to the appropriate handler.
+pub(crate) async fn dispatch_message(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    peer_coord: &MatrixCoordinate,
+    ctx: &PeerContext,
+) {
+    let tag = data[0];
+    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+
+    match tag {
+        TAG_SHARD_SEND | TAG_SHARD_FETCH => {
+            handle_shard_dispatch(&data, stream, ctx).await;
+        }
+        TAG_BLOCK_ANNOUNCE => {
+            handle_block_announce(&data, peer_node_id, ctx).await;
+        }
+        TAG_SYNC_MESSAGE => {
+            handle_sync_message(&data[1..], stream, peer_node_id, peer_coord, ctx).await;
+        }
+        TAG_GOSSIP => {
+            debug!(
+                "Gossip message from peer {} ({} bytes)",
+                short_id,
+                data.len() - 1,
+            );
+        }
+        _ => {
+            warn!("Unknown message tag 0x{:02x} from peer {}", tag, short_id);
+        }
+    }
+}
+
+// ── Shard handler ────────────────────────────────────────────────────
+
+/// Dispatch a shard send/fetch message to the shard store.
+async fn handle_shard_dispatch(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    ctx: &PeerContext,
+) {
+    match shard_transport::handle_shard_message(data, &ctx.shard_store).await {
+        Ok(Some(response_data)) => {
+            if let Err(e) = stream.send(&response_data).await {
+                warn!("Failed to send shard response: {}", e);
+            }
+        }
+        Ok(None) => {}
+        Err(e) => {
+            warn!("Shard message error: {}", e);
+        }
+    }
+}
+
+// ── Block handlers ───────────────────────────────────────────────────
+
+/// Handle a received block announcement (tag 0x03).
+/// Dispatches to scope-specific handlers based on `PeerContext::blockchain_scope`.
+async fn handle_block_announce(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let block = match parse_and_verify_block(data, peer_node_id) {
+        Some(b) => b,
+        None => return,
+    };
+
+    match ctx.blockchain_scope {
+        BlockchainScope::Device => {
+            handle_block_device_scope(&block, peer_node_id, ctx).await;
+        }
+        BlockchainScope::Network => {
+            if let Some(ref assigner) = ctx.spatial_bucket_assigner {
+                handle_block_public_scope(&block, peer_node_id, ctx, assigner).await;
+            } else {
+                handle_block_network_scope(&block, peer_node_id, ctx).await;
+            }
+        }
+    }
+}
+
+/// Parse a block announcement payload and verify its BLAKE3 hash.
+fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
+    if data.len() < 9 {
+        warn!("Block announce too short ({} bytes)", data.len());
+        return None;
+    }
+
+    let block_json_len = u64::from_le_bytes(
+        data[1..9].try_into().unwrap_or([0u8; 8]),
+    ) as usize;
+
+    if data.len() < 9 + block_json_len {
+        warn!(
+            "Block announce truncated: need {} bytes, have {}",
+            9 + block_json_len,
+            data.len(),
+        );
+        return None;
+    }
+
+    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+
+    let block: Block = match serde_json::from_slice(&data[9..9 + block_json_len]) {
+        Ok(b) => b,
+        Err(e) => {
+            warn!("Invalid block JSON from {}: {}", short_id, e);
+            return None;
+        }
+    };
+
+    if !block.verify_hash() {
+        warn!("Block {} hash mismatch from peer {}", block.index, short_id);
+        return None;
+    }
+
+    Some(block)
+}
+
+/// Device scope: independent chains. Accept only if newer than our height.
+async fn handle_block_device_scope(
+    block: &Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let our_height = ctx.blockchain.get_height().await;
+    if block.index <= our_height {
+        debug!(
+            "Device scope: already have block {} (height {}), skipping",
+            block.index, our_height,
+        );
+        return;
+    }
+
+    insert_block(block, peer_node_id, ctx).await;
+}
+
+/// Network scope (Private): shared chain. Deduplicate by hash, not index.
+/// Re-propagate to other peers after successful insertion.
+async fn handle_block_network_scope(
+    block: &Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if ctx.blockchain.has_block(&block.hash).await {
+        debug!(
+            "Network scope: already have block {} by hash, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    if insert_block(block, peer_node_id, ctx).await {
+        repropagate_block(block, peer_node_id, ctx).await;
+    }
+}
+
+/// Public scope (Network + spatial bucket filtering): accept blocks
+/// whose shard placements fall within our neighborhood radius.
+/// Re-propagate accepted blocks to other peers.
+async fn handle_block_public_scope(
+    block: &Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+    assigner: &Arc<RwLock<SpatialBucketAssigner>>,
+) {
+    if ctx.blockchain.has_block(&block.hash).await {
+        debug!(
+            "Public scope: already have block {} by hash, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    let in_neighborhood = assigner.read().await.block_in_our_neighborhood(block);
+    if !in_neighborhood {
+        debug!(
+            "Public scope: block {} has no shard placements in our neighborhood, skipping",
+            block.index,
+        );
+        return;
+    }
+
+    if insert_block(block, peer_node_id, ctx).await {
+        repropagate_block(block, peer_node_id, ctx).await;
+    }
+}
+
+/// Insert a block into our chain. Returns `true` on success.
+async fn insert_block(
+    block: &Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) -> bool {
+    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+    match ctx.blockchain.insert_received_block(block.clone()).await {
+        Ok(()) => {
+            info!("Received and stored block #{} from peer {}", block.index, short_id);
+            true
+        }
+        Err(e) => {
+            debug!(
+                "Block {} insertion failed: {} (from peer {})",
+                block.index, e, short_id,
+            );
+            false
+        }
+    }
+}
+
+/// Re-propagate a block to peers via the block propagator.
+async fn repropagate_block(
+    block: &Block,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let coords = ctx.connected_peer_coords.read().await;
+    if coords.is_empty() {
+        debug!("No connected peers, skipping block re-propagation");
+        return;
+    }
+    let propagator = ctx.block_propagator.lock().await;
+    let result = propagator.propagate_block(block, &coords).await;
+    if !result.failed_nodes.is_empty() {
+        let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+        debug!(
+            "Re-propagation of block {} from {}: {} reached, {} failed",
+            block.index, short_id, result.reached_nodes.len(), result.failed_nodes.len(),
+        );
+    }
+}
+
+// ── Incoming connection handler ───────────────────────────────────────
+
+/// Read the 1-byte discriminator to route handshake vs peer-message connections.
+pub(crate) async fn handle_incoming_connection(
+    connection: Arc<stoq::Connection>,
+    nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
+    local_coord: MatrixCoordinate,
+    signer: Arc<dyn hypermesh_lib::NodeSigner>,
+    proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    peer_ctx: Option<Arc<PeerContext>>,
+) -> Result<()> {
+    let mut stream = connection.accept_stream().await?;
+    let conn_type = stream.read_discriminator().await?;
+
+    match conn_type {
+        CONN_TYPE_HANDSHAKE => {
+            handle_handshake_connection(connection, &mut stream, nodes, local_coord, signer, proof_provider, peer_ctx).await
+        }
+        CONN_TYPE_PEER_MESSAGE => {
+            handle_peer_message_connection(&mut stream, &connection, local_coord, peer_ctx).await
+        }
+        other => {
+            warn!("Unknown connection discriminator 0x{:02x} — dropping", other);
+            Ok(())
+        }
+    }
+}
+
+/// Run bilateral PoS handshake, register the peer, optionally spawn message loop.
+async fn handle_handshake_connection(
+    connection: Arc<stoq::Connection>,
+    stream: &mut stoq::Stream,
+    nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
+    local_coord: MatrixCoordinate,
+    signer: Arc<dyn hypermesh_lib::NodeSigner>,
+    proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    peer_ctx: Option<Arc<PeerContext>>,
+) -> Result<()> {
+    debug!("Accepted incoming connection — handshake discriminator");
+    let coord_tuple = (local_coord.x, local_coord.y, local_coord.z);
+
+    let result = stoq::accept_handshake(
+        stream,
+        signer.as_ref(),
+        proof_provider.as_ref(),
+        coord_tuple,
+    )
+    .await?;
+
+    let coordinate = MatrixCoordinate::new(
+        result.peer_coordinate.0,
+        result.peer_coordinate.1,
+        result.peer_coordinate.2,
+    )
+    .map_err(|e| anyhow!("Invalid peer coordinate: {e}"))?;
+
+    let peer_node_id = result.peer_node_id;
+
+    let node = NetworkNode {
+        coordinate,
+        address: connection.endpoint().to_socket_addr(),
+        node_id: peer_node_id.clone(),
+        privacy_mode: PrivacyMode::PUBLIC,
+        connection: Some(connection.clone()),
+    };
+
+    nodes.write().await.insert(peer_node_id.clone(), node);
+    info!(
+        "Bilateral verification complete — added node {} to network",
+        &peer_node_id[..8.min(peer_node_id.len())]
+    );
+
+    if let Some(ctx) = peer_ctx {
+        tokio::spawn(async move {
+            run_peer_message_loop(connection, peer_node_id, coordinate, ctx).await;
+        });
+    }
+
+    Ok(())
+}
+
+/// Process a single peer-message connection (non-handshake).
+async fn handle_peer_message_connection(
+    stream: &mut stoq::Stream,
+    connection: &Arc<stoq::Connection>,
+    local_coord: MatrixCoordinate,
+    peer_ctx: Option<Arc<PeerContext>>,
+) -> Result<()> {
+    debug!("Accepted incoming connection — peer message discriminator");
+    let data = match stream.receive().await {
+        Ok(d) if !d.is_empty() => d.to_vec(),
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(anyhow!("Failed to read peer message: {e}")),
+    };
+
+    if let Some(ctx) = peer_ctx {
+        let remote = connection.endpoint().to_socket_addr();
+        let remote_str = remote.to_string();
+        let short_remote = &remote_str[..20.min(remote_str.len())];
+        let placeholder = MatrixCoordinate::new(0, 0, 0).unwrap_or(local_coord);
+        dispatch_message(&data, stream, short_remote, &placeholder, &ctx).await;
+    } else {
+        debug!("Peer message received but no PeerContext — dropping");
+    }
+
+    Ok(())
+}
+
+// ── Sync handler ─────────────────────────────────────────────────────
+
+/// Handle a sync/reflector message (tag 0x10).
+/// Dispatches through `SyncDispatcher` and sends reply if produced.
+async fn handle_sync_message(
+    payload: &[u8],
+    stream: &mut stoq::Stream,
+    sender_node_id: &str,
+    sender_coord: &MatrixCoordinate,
+    ctx: &PeerContext,
+) {
+    let msg: MatrixMessage = match serde_json::from_slice(payload) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(
+                "Invalid sync message JSON from {}: {}",
+                &sender_node_id[..8.min(sender_node_id.len())],
+                e,
+            );
+            return;
+        }
+    };
+
+    let sender_pos = hypermesh_lib::MatrixPosition {
+        x: sender_coord.x as f64,
+        y: sender_coord.y as f64,
+        z: sender_coord.z as f64,
+    };
+
+    let (mut sm, mut rp) = tokio::join!(
+        ctx.sync_manager.lock(),
+        ctx.reflector_pool.lock(),
+    );
+
+    let mut dispatcher = sync_dispatch::SyncDispatcher {
+        sync_manager: &mut sm,
+        reflector_pool: &mut rp,
+        block_provider: None,
+    };
+
+    let response = dispatcher.dispatch(msg, sender_node_id, sender_pos);
+
+    if let sync_dispatch::DispatchResponse::Reply(reply_msg) = response {
+        send_sync_reply(stream, &reply_msg).await;
+    }
+}
+
+/// Serialize and send a sync reply on the given stream.
+async fn send_sync_reply(stream: &mut stoq::Stream, reply_msg: &MatrixMessage) {
+    let reply_data = match serde_json::to_vec(reply_msg) {
+        Ok(d) => d,
+        Err(e) => {
+            debug!("Failed to serialize sync reply: {}", e);
+            return;
+        }
+    };
+    let mut tagged = Vec::with_capacity(1 + reply_data.len());
+    tagged.push(TAG_SYNC_MESSAGE);
+    tagged.extend_from_slice(&reply_data);
+    if let Err(e) = stream.send(&tagged).await {
+        debug!("Failed to send sync reply: {}", e);
+    }
+}

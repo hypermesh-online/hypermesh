@@ -87,6 +87,20 @@ pub async fn initiate_handshake(
     result
 }
 
+/// Execute the bilateral handshake as the INITIATOR on a pre-opened stream.
+///
+/// Use this when the caller needs to write a connection-type discriminator
+/// byte before the handshake messages. The caller is responsible for
+/// calling `stream.finish_send()` after this returns.
+pub async fn initiate_handshake_on_stream(
+    stream: &mut crate::Stream,
+    signer: &dyn NodeSigner,
+    proof_provider: &dyn StateProofProvider,
+    local_coordinate: (i64, i64, i64),
+) -> Result<HandshakeResult> {
+    do_initiate(stream, signer, proof_provider, local_coordinate).await
+}
+
 async fn do_initiate(
     stream: &mut Stream,
     signer: &dyn NodeSigner,

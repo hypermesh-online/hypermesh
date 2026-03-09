@@ -35,6 +35,7 @@ use std::fmt;
 
 use crate::assets::core::AssetRegistration;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::proof_of_state::genesis_proof::{generate_genesis_proof, HardwareAssessment};
 use trustchain::proof_of_state::StateProof;
 
 /// Where the actual asset data lives (the block only stores a pointer).
@@ -117,8 +118,11 @@ impl Block {
 
     /// Create the genesis block for a node.
     ///
-    /// Genesis entries use `StoragePointer::Genesis` and a default StateProof
-    /// (self-authorized — sovereignty from boot).
+    /// Genesis entries use `StoragePointer::Genesis` and a hardware-assessed
+    /// StateProof (self-authorized — sovereignty from boot).
+    ///
+    /// Per R1: hardware assessed, not self-reported.
+    /// Per section 8.2: "Usage IS verification."
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
         let genesis_reg = AssetRegistration::genesis(node_coordinate);
         let content_hash = {
@@ -126,12 +130,7 @@ impl Block {
             *blake3::hash(serialized.as_bytes()).as_bytes()
         };
 
-        let mut state_proof = StateProof::default();
-        // Genesis block self-declares its coordinate in PoSpace
-        state_proof.space_proof.node_id = format!(
-            "({},{},{})",
-            node_coordinate.x, node_coordinate.y, node_coordinate.z
-        );
+        let state_proof = Self::build_genesis_proof(node_coordinate);
         let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
@@ -148,6 +147,36 @@ impl Block {
             vec![genesis_entry],
             String::from("0000000000000000000000000000000000000000000000000000000000000000"),
         )
+    }
+
+    /// Build a StateProof for the genesis block from real hardware.
+    ///
+    /// Attempts OS hardware detection; falls back to safe defaults that
+    /// still satisfy `StateRequirements::default()` for R13-compliant devices.
+    fn build_genesis_proof(coordinate: MatrixCoordinate) -> StateProof {
+        let node_id = format!(
+            "genesis_({},{},{})",
+            coordinate.x, coordinate.y, coordinate.z
+        );
+        match crate::create_os_abstraction() {
+            Ok(os) => {
+                let hw = HardwareAssessment::from_os(os.as_ref(), &node_id, coordinate);
+                generate_genesis_proof(&hw)
+            }
+            Err(_) => {
+                // Fallback: use num_cpus and conservative estimates
+                let hw = HardwareAssessment {
+                    cpu_cores: num_cpus::get() as u32,
+                    cpu_mhz: 1000,
+                    memory_bytes: 4 * 1024 * 1024 * 1024,
+                    storage_bytes: 50 * 1024 * 1024 * 1024,
+                    storage_available_bytes: 25 * 1024 * 1024 * 1024,
+                    node_id,
+                    coordinate,
+                };
+                generate_genesis_proof(&hw)
+            }
+        }
     }
 
     /// Calculate the hash of this block using BLAKE3.

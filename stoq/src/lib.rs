@@ -63,7 +63,9 @@ pub use transport::multipath::{MultiPathConnection, PathPolicy, PathScheduler};
 pub use transport::reflector::{ReflectorMessage, StoqBlockTransport, SyncProtocol};
 
 // Re-export bilateral handshake protocol (R11)
-pub use protocol::bilateral::{accept_handshake, initiate_handshake, HandshakeResult};
+pub use protocol::bilateral::{
+    accept_handshake, initiate_handshake, initiate_handshake_on_stream, HandshakeResult,
+};
 
 // Backward compatibility: re-export modules for tests
 pub use transport::adaptive as phoenix;

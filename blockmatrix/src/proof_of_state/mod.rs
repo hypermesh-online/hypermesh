@@ -9,6 +9,7 @@
 //! Each proof is binary pass/fail. No voting, no quorum, no leader election.
 
 // Submodule for nested import compatibility
+pub mod genesis_proof;
 pub mod state_proof_impl;
 pub mod proof;
 pub mod validation;

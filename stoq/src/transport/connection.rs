@@ -354,6 +354,27 @@ impl Stream {
         Ok(buf)
     }
 
+    /// Write a single raw byte to the stream without framing.
+    ///
+    /// Used for connection-type discriminators that must be sent before
+    /// any length-prefixed messages.
+    pub async fn write_discriminator(&mut self, byte: u8) -> Result<()> {
+        self.send.write_all(&[byte]).await?;
+        self.metrics.record_bytes_sent(1);
+        Ok(())
+    }
+
+    /// Read a single raw byte from the stream without framing.
+    ///
+    /// Used for connection-type discriminators that arrive before
+    /// any length-prefixed messages.
+    pub async fn read_discriminator(&mut self) -> Result<u8> {
+        let mut buf = [0u8; 1];
+        self.recv.read_exact(&mut buf).await?;
+        self.metrics.record_bytes_received(1);
+        Ok(buf[0])
+    }
+
     /// Close the write half of the stream after all messages are sent.
     pub fn finish_send(&mut self) -> Result<()> {
         self.send.finish()?;

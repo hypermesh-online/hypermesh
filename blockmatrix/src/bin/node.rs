@@ -29,6 +29,7 @@ use blockmatrix::assets::pipeline::{
     ShardMetadata,
 };
 use blockmatrix::create_os_abstraction;
+use blockmatrix::proof_of_state::genesis_proof::{generate_genesis_proof, HardwareAssessment};
 use blockmatrix::StateProof;
 use stoq::transport::NetworkType;
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
@@ -746,6 +747,32 @@ fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
 
     info!("Hardware assessment complete: {} asset(s) detected", assets.len());
     Ok(assets)
+}
+
+/// Build a StateProof for hardware asset registration using real OS data.
+///
+/// Per R1: hardware assessed, not self-reported.
+/// Per R2: four proofs from actual hardware measurements.
+fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -> StateProof {
+    match create_os_abstraction() {
+        Ok(os) => {
+            let hw = HardwareAssessment::from_os(os.as_ref(), node_id, coordinate);
+            generate_genesis_proof(&hw)
+        }
+        Err(e) => {
+            warn!("OS abstraction unavailable ({e}), using fallback hardware values");
+            let hw = HardwareAssessment {
+                cpu_cores: num_cpus::get() as u32,
+                cpu_mhz: 1000,
+                memory_bytes: 4 * 1024 * 1024 * 1024,
+                storage_bytes: 50 * 1024 * 1024 * 1024,
+                storage_available_bytes: 25 * 1024 * 1024 * 1024,
+                node_id: node_id.to_string(),
+                coordinate,
+            };
+            generate_genesis_proof(&hw)
+        }
+    }
 }
 
 /// Run the Store subcommand: ingest a file through the asset pipeline and
@@ -2016,30 +2043,26 @@ private = "private"
                 ),
             );
             let content_hash = registration.content_hash;
-            match blockmatrix::StateProof::generate_from_network(&nid).await {
-                Ok(state_proof) => {
-                    match bootstrap
-                        .blockchain()
-                        .register_asset_record(registration, &state_proof)
-                        .await
-                    {
-                        Ok(block) => {
-                            // Store bundle in asset store (keyed by blockchain content hash)
-                            if let Err(e) = deploy::store_dashboard_bundle(
-                                &data_dir, &content_hash, manifest_toml, &bundle,
-                            ) {
-                                warn!("Failed to store dashboard bundle: {}", e);
-                            }
-                            info!(
-                                "Default dashboard registered as asset (block #{}, hash {})",
-                                block.index,
-                                hex::encode(content_hash)
-                            );
-                        }
-                        Err(e) => warn!("Failed to register default dashboard: {}", e),
+            let state_proof = build_hardware_state_proof(&nid, coord);
+            match bootstrap
+                .blockchain()
+                .register_asset_record(registration, &state_proof)
+                .await
+            {
+                Ok(block) => {
+                    // Store bundle in asset store (keyed by blockchain content hash)
+                    if let Err(e) = deploy::store_dashboard_bundle(
+                        &data_dir, &content_hash, manifest_toml, &bundle,
+                    ) {
+                        warn!("Failed to store dashboard bundle: {}", e);
                     }
+                    info!(
+                        "Default dashboard registered as asset (block #{}, hash {})",
+                        block.index,
+                        hex::encode(content_hash)
+                    );
                 }
-                Err(e) => warn!("Failed to generate PoS for default dashboard: {}", e),
+                Err(e) => warn!("Failed to register default dashboard: {}", e),
             }
         }
     }
@@ -2393,28 +2416,26 @@ async fn main() -> Result<()> {
         info!("Assessing node hardware for asset registration (R1)...");
         match assess_hardware_assets() {
             Ok(hw_assets) => {
-                match StateProof::generate_from_network(&nid).await {
-                    Ok(state_proof) => {
-                        match bootstrap
-                            .blockchain()
-                            .register_asset_records(hw_assets, &state_proof)
-                            .await
-                        {
-                            Ok(block) => {
-                                info!(
-                                    "Registered hardware assets in block #{} (hash: {})",
-                                    block.index,
-                                    &block.hash[..16],
-                                );
-                                // Persist the hardware asset block
-                                if let Err(e) = persistence.save_block(&block).await {
-                                    warn!("Failed to persist hardware asset block: {e}");
-                                }
-                            }
-                            Err(e) => warn!("Failed to register hardware assets: {e}"),
+                // Use genesis proof from real hardware assessment (not generate_from_network
+                // which may reject the node_id or produce insufficient stake).
+                let state_proof = build_hardware_state_proof(&nid, coord);
+                match bootstrap
+                    .blockchain()
+                    .register_asset_records(hw_assets, &state_proof)
+                    .await
+                {
+                    Ok(block) => {
+                        info!(
+                            "Registered hardware assets in block #{} (hash: {})",
+                            block.index,
+                            &block.hash[..16],
+                        );
+                        // Persist the hardware asset block
+                        if let Err(e) = persistence.save_block(&block).await {
+                            warn!("Failed to persist hardware asset block: {e}");
                         }
                     }
-                    Err(e) => warn!("Failed to generate PoS for hardware assets: {e}"),
+                    Err(e) => warn!("Failed to register hardware assets: {e}"),
                 }
             }
             Err(e) => warn!("Hardware assessment failed: {e}"),

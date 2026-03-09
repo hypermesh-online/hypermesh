@@ -162,9 +162,15 @@ impl BlockTransport for StoqBlockTransportAdapter {
             }
         };
 
-        // 4. Open a stream and send the payload.
+        // 4. Open a stream, write the PEER_MESSAGE discriminator, then payload.
         match conn.open_bi().await {
             Ok((mut send, _recv)) => {
+                // Write the connection-type discriminator so the acceptor
+                // knows this is a peer message, not a handshake.
+                if let Err(e) = send.write_all(&[crate::network::CONN_TYPE_PEER_MESSAGE]).await {
+                    warn!(coord = %key, error = %e, "discriminator write failed");
+                    return false;
+                }
                 if let Err(e) = send.write_all(&payload).await {
                     warn!(coord = %key, error = %e, "stream write failed");
                     return false;

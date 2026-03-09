@@ -14,7 +14,10 @@ pub mod discovery;
 pub mod gossip;
 pub mod hash_bucket;
 pub mod isolation;
+pub mod message_handlers;
+pub mod metrics_reporter;
 pub mod multi_network;
+mod peer_discovery;
 pub mod reflector_pool;
 pub mod shard_store;
 pub mod shard_transport;
@@ -28,18 +31,17 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::blockchain::propagation::BlockPropagator;
 use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::reflector_pool::ReflectorPool;
 use crate::network::shard_store::ShardStore;
-use crate::network::stoq_integration::{MatrixMessage, MatrixNodeInfo, MatrixStoqIntegration};
+use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
 use hypermesh_lib::BlockchainScope;
 
 /// Node network information
@@ -101,21 +103,21 @@ pub struct PeerContext {
 /// Network manager for multi-node communication
 pub struct NetworkManager {
     /// Local node coordinate
-    local_coordinate: MatrixCoordinate,
+    pub(super) local_coordinate: MatrixCoordinate,
     /// Local STOQ transport
-    transport: Arc<stoq::StoqTransport>,
+    pub(super) transport: Arc<stoq::StoqTransport>,
     /// Known nodes in the network
-    nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
+    pub(super) nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
     /// Bootstrap nodes
-    bootstrap_nodes: Vec<SocketAddr>,
+    pub(super) bootstrap_nodes: Vec<SocketAddr>,
     /// Current privacy mode
-    privacy_mode: Arc<RwLock<PrivacyMode>>,
+    pub(super) privacy_mode: Arc<RwLock<PrivacyMode>>,
     /// Matrix-STOQ integration layer
-    stoq_integration: Option<Arc<MatrixStoqIntegration>>,
+    pub(super) stoq_integration: Option<Arc<MatrixStoqIntegration>>,
     /// FALCON-1024 node signer (from TrustChain via lib trait)
-    signer: Arc<dyn hypermesh_lib::NodeSigner>,
+    pub(super) signer: Arc<dyn hypermesh_lib::NodeSigner>,
     /// State proof provider (BlockMatrix implementation)
-    proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    pub(super) proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
 }
 
 impl NetworkManager {
@@ -166,87 +168,8 @@ impl NetworkManager {
         })
     }
 
-    /// Start network discovery based on privacy mode
-    pub async fn start_discovery(&self) -> Result<()> {
-        let mode = *self.privacy_mode.read().await;
-
-        if mode == PrivacyMode::PRIVATE {
-            if self.bootstrap_nodes.is_empty() {
-                info!("Private mode: No peers, running as local-only device");
-            } else {
-                info!("Private mode: Connecting to {} bootstrap peer(s) (bounded network)", self.bootstrap_nodes.len());
-                for bootstrap_addr in &self.bootstrap_nodes {
-                    if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
-                        warn!("Failed to connect to private peer {}: {}", bootstrap_addr, e);
-                    }
-                }
-            }
-            Ok(())
-        } else if mode == PrivacyMode::ANONYMOUS {
-            info!("Anonymous mode: Starting ephemeral discovery");
-            self.discover_ephemeral_peers().await
-        } else if mode == PrivacyMode::PUBLIC {
-            info!("Public mode: Joining network with full discovery");
-            self.join_network().await
-        } else {
-            info!("Custom privacy mode ({:?}): Starting peer discovery", mode);
-            self.discover_peers().await
-        }
-    }
-
-    /// Discover ephemeral peers (Anonymous mode)
-    async fn discover_ephemeral_peers(&self) -> Result<()> {
-        // In anonymous mode, we only accept incoming connections
-        // No active discovery or persistent connections
-        info!("Anonymous mode: Listening for ephemeral connections");
-        Ok(())
-    }
-
-    /// Discover peers (P2P mode)
-    async fn discover_peers(&self) -> Result<()> {
-        info!("P2P mode: Discovering peers via bootstrap nodes");
-
-        // Connect to bootstrap nodes if any
-        for bootstrap_addr in &self.bootstrap_nodes {
-            if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
-                warn!(
-                    "Failed to connect to bootstrap node {}: {}",
-                    bootstrap_addr, e
-                );
-            }
-        }
-
-        // Start mDNS discovery for local network
-        self.start_mdns_discovery().await?;
-
-        Ok(())
-    }
-
-    /// Join the network (Public mode)
-    async fn join_network(&self) -> Result<()> {
-        info!("Public mode: Joining network with full participation");
-
-        // Connect to all bootstrap nodes
-        for bootstrap_addr in &self.bootstrap_nodes {
-            match self.connect_to_peer(*bootstrap_addr, None).await {
-                Ok(node_id) => {
-                    info!(
-                        "Connected to bootstrap node {} ({})",
-                        bootstrap_addr, node_id
-                    );
-                }
-                Err(e) => {
-                    error!("Failed to connect to bootstrap {}: {}", bootstrap_addr, e);
-                }
-            }
-        }
-
-        // Start full discovery protocols
-        self.start_mdns_discovery().await?;
-        self.start_gossip_protocol().await?;
-
-        Ok(())
-    }
+    // Discovery methods (start_discovery, join_network, etc.) are in
+    // peer_discovery.rs as a separate impl block.
 
     /// Connect to a specific peer.
     ///
@@ -302,20 +225,27 @@ impl NetworkManager {
 
     /// Perform bilateral handshake via STOQ protocol layer.
     ///
-    /// Delegates to `stoq::initiate_handshake()` which implements the
-    /// 3-message challenge-response protocol (R11) using NodeSigner
-    /// and StateProofProvider traits.
+    /// Opens a stream, writes a `CONN_TYPE_HANDSHAKE` discriminator byte,
+    /// then delegates to `stoq::initiate_handshake_on_stream()` which
+    /// implements the 3-message challenge-response protocol (R11) using
+    /// NodeSigner and StateProofProvider traits.
     async fn exchange_node_info(&self, connection: &Arc<stoq::Connection>) -> Result<NetworkNode> {
         let coord = self.local_coordinate;
         let local_coord = (coord.x, coord.y, coord.z);
 
-        let result = stoq::initiate_handshake(
-            connection,
+        // Open stream and write connection-type discriminator before handshake
+        let mut stream = connection.open_stream().await?;
+        stream.write_discriminator(CONN_TYPE_HANDSHAKE).await?;
+
+        let result = stoq::initiate_handshake_on_stream(
+            &mut stream,
             self.signer.as_ref(),
             self.proof_provider.as_ref(),
             local_coord,
         )
-        .await?;
+        .await;
+        let _ = stream.finish_send();
+        let result = result?;
 
         let coordinate = MatrixCoordinate::new(
             result.peer_coordinate.0,
@@ -333,121 +263,9 @@ impl NetworkManager {
         })
     }
 
-    /// Start mDNS discovery for local network.
-    async fn start_mdns_discovery(&self) -> Result<()> {
-        let node_id = self.get_node_id();
-        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
+    // mDNS and gossip methods are in peer_discovery.rs.
 
-        let mdns = discovery::MdnsDiscovery::new(node_id, self.local_coordinate, stoq_port);
-        match mdns.start().await {
-            Ok(()) => {
-                info!("mDNS discovery started on _hypermesh._udp.local");
-            }
-            Err(e) => {
-                // mDNS failure is non-fatal (may lack multicast permissions)
-                warn!("mDNS discovery failed to start: {e}");
-            }
-        }
-        Ok(())
-    }
-
-    /// Start gossip protocol for network state sharing.
-    async fn start_gossip_protocol(&self) -> Result<()> {
-        let node_id = self.get_node_id();
-        let mode = *self.privacy_mode.read().await;
-        let privacy_str = format!("{mode:?}");
-        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
-
-        let gossip_proto = gossip::GossipProtocol::new(
-            node_id,
-            self.local_coordinate,
-            stoq_port,
-            privacy_str,
-        );
-        gossip_proto.start().await;
-
-        // Spawn a background task that periodically gossips to connected peers
-        let nodes = self.nodes.clone();
-        let gossip_state = gossip_proto.state();
-        let interval = gossip_proto.gossip_interval();
-
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(interval).await;
-
-                let connected = nodes.read().await;
-                if connected.is_empty() {
-                    continue;
-                }
-
-                // Build gossip message
-                let state = gossip_state.read().await;
-                let message = state.build_message();
-                drop(state);
-
-                let json_data = match serde_json::to_vec(&message) {
-                    Ok(d) => d,
-                    Err(_) => continue,
-                };
-                let mut data = Vec::with_capacity(1 + json_data.len());
-                data.push(TAG_GOSSIP);
-                data.extend_from_slice(&json_data);
-
-                // Send to connected peers (best-effort)
-                for (node_id, node) in connected.iter() {
-                    if let Some(ref conn) = node.connection {
-                        match conn.open_stream().await {
-                            Ok(mut stream) => {
-                                if let Err(e) = stream.send(&data).await {
-                                    debug!("Gossip send to {node_id} failed: {e}");
-                                }
-                            }
-                            Err(e) => {
-                                debug!("Gossip stream to {node_id} failed: {e}");
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        info!("Gossip protocol started with {} second interval", interval.as_secs());
-        Ok(())
-    }
-
-    /// Find neighbors in the matrix topology
-    pub async fn find_matrix_neighbors(&self, radius: f64) -> Vec<NetworkNode> {
-        let nodes = self.nodes.read().await;
-
-        let candidates: Vec<MatrixCoordinate> = nodes.values().map(|n| n.coordinate).collect();
-
-        let neighbors = find_neighbors(&self.local_coordinate, &candidates, radius);
-
-        nodes
-            .values()
-            .filter(|n| neighbors.contains(&n.coordinate))
-            .cloned()
-            .collect()
-    }
-
-    /// Find K nearest neighbors
-    pub async fn find_k_nearest_nodes(&self, k: usize) -> Vec<(NetworkNode, f64)> {
-        let nodes = self.nodes.read().await;
-
-        let candidates: Vec<MatrixCoordinate> = nodes.values().map(|n| n.coordinate).collect();
-
-        let nearest = find_k_nearest(&self.local_coordinate, &candidates, k);
-
-        nearest
-            .into_iter()
-            .filter_map(|(coord, dist)| {
-                nodes
-                    .values()
-                    .find(|n| n.coordinate == coord)
-                    .map(|n| (n.clone(), dist))
-            })
-            .collect()
-    }
+    // find_matrix_neighbors and find_k_nearest_nodes are in peer_discovery.rs.
 
     /// Get all connected nodes
     pub async fn get_connected_nodes(&self) -> Vec<NetworkNode> {
@@ -495,7 +313,7 @@ impl NetworkManager {
     }
 
     /// Get local node ID
-    fn get_node_id(&self) -> String {
+    pub(super) fn get_node_id(&self) -> String {
         self.signer.node_id().to_string()
     }
 
@@ -597,34 +415,20 @@ impl NetworkManager {
                     let signer = self.signer.clone();
                     let proof_provider = self.proof_provider.clone();
 
-                    // Handle connection in background
+                    // Handle connection in background — read discriminator
+                    // to decide whether this is a handshake or a peer message.
                     tokio::spawn(async move {
-                        match Self::handle_incoming_handshake(
-                            connection.clone(),
+                        if let Err(e) = message_handlers::handle_incoming_connection(
+                            connection,
                             nodes,
                             local_coord,
                             signer,
                             proof_provider,
+                            ctx,
                         )
                         .await
                         {
-                            Ok((peer_node_id, peer_coord)) => {
-                                // Spawn persistent message loop if context available
-                                if let Some(ctx) = ctx {
-                                    tokio::spawn(async move {
-                                        run_peer_message_loop(
-                                            connection,
-                                            peer_node_id,
-                                            peer_coord,
-                                            ctx,
-                                        )
-                                        .await;
-                                    });
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Incoming handshake failed: {e}");
-                            }
+                            warn!("Incoming connection handling failed: {e}");
                         }
                     });
                 }
@@ -634,494 +438,21 @@ impl NetworkManager {
             }
         }
     }
-
-    /// Handle the bilateral handshake for an incoming connection (R11).
-    ///
-    /// Delegates to `stoq::accept_handshake()` which implements the
-    /// 3-message challenge-response protocol using NodeSigner and
-    /// StateProofProvider traits.
-    async fn handle_incoming_handshake(
-        connection: Arc<stoq::Connection>,
-        nodes: Arc<RwLock<HashMap<String, NetworkNode>>>,
-        local_coord: MatrixCoordinate,
-        signer: Arc<dyn hypermesh_lib::NodeSigner>,
-        proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
-    ) -> Result<(String, MatrixCoordinate)> {
-        debug!("Accepted incoming connection — starting bilateral handshake");
-
-        let mut stream = connection.accept_stream().await?;
-        let coord_tuple = (local_coord.x, local_coord.y, local_coord.z);
-
-        let result = stoq::accept_handshake(
-            &mut stream,
-            signer.as_ref(),
-            proof_provider.as_ref(),
-            coord_tuple,
-        )
-        .await?;
-
-        let coordinate = MatrixCoordinate::new(
-            result.peer_coordinate.0,
-            result.peer_coordinate.1,
-            result.peer_coordinate.2,
-        )
-        .map_err(|e| anyhow!("Invalid peer coordinate: {e}"))?;
-
-        let peer_node_id = result.peer_node_id;
-
-        let node = NetworkNode {
-            coordinate,
-            address: connection.endpoint().to_socket_addr(),
-            node_id: peer_node_id.clone(),
-            privacy_mode: PrivacyMode::PUBLIC, // Will be negotiated later
-            connection: Some(connection),
-        };
-
-        nodes.write().await.insert(peer_node_id.clone(), node);
-        info!(
-            "Bilateral verification complete — added incoming node {} to network",
-            &peer_node_id[..8.min(peer_node_id.len())]
-        );
-        Ok((peer_node_id, coordinate))
-    }
 }
 
 // ── Peer message loop and handlers ─────────────────────────────────
 
-/// Tag bytes for wire-protocol message types.
-const TAG_SHARD_SEND: u8 = 0x01;
-const TAG_SHARD_FETCH: u8 = 0x02;
-const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
-const TAG_SYNC_MESSAGE: u8 = 0x10;
-const TAG_GOSSIP: u8 = 0x20;
+/// Connection-type discriminator: first byte written on every new STOQ
+/// connection to distinguish handshake connections from peer-message
+/// connections.  Without this, the acceptor would try to parse a block
+/// propagation payload as a length-prefixed handshake message.
+pub const CONN_TYPE_HANDSHAKE: u8 = 0x00;
+pub const CONN_TYPE_PEER_MESSAGE: u8 = 0x01;
 
-/// Persistent read loop for a connected peer.
-///
-/// Accepts new streams from the connection, reads the full payload,
-/// dispatches based on the first byte (tag), and handles the message.
-/// Runs until the connection is closed.
-async fn run_peer_message_loop(
-    connection: Arc<stoq::Connection>,
-    peer_node_id: String,
-    peer_coord: MatrixCoordinate,
-    ctx: Arc<PeerContext>,
-) {
-    info!(
-        "Starting message loop for peer {} at ({},{},{})",
-        &peer_node_id[..8.min(peer_node_id.len())],
-        peer_coord.x,
-        peer_coord.y,
-        peer_coord.z,
-    );
+use message_handlers::run_peer_message_loop;
 
-    loop {
-        // Each message arrives on its own stream (one-shot pattern).
-        let mut stream = match connection.accept_stream().await {
-            Ok(s) => s,
-            Err(e) => {
-                debug!(
-                    "Peer {} connection closed: {}",
-                    &peer_node_id[..8.min(peer_node_id.len())],
-                    e,
-                );
-                break;
-            }
-        };
-
-        // Read full stream payload.
-        let data = match stream.receive().await {
-            Ok(d) if !d.is_empty() => d,
-            Ok(_) => continue, // empty stream, skip
-            Err(e) => {
-                debug!("Stream read error from {}: {}", &peer_node_id[..8.min(peer_node_id.len())], e);
-                continue;
-            }
-        };
-
-        let tag = data[0];
-
-        match tag {
-            TAG_SHARD_SEND | TAG_SHARD_FETCH => {
-                handle_shard_dispatch(&data, &mut stream, &ctx).await;
-            }
-            TAG_BLOCK_ANNOUNCE => {
-                handle_block_announce(&data, &peer_node_id, &ctx).await;
-            }
-            TAG_SYNC_MESSAGE => {
-                handle_sync_message(&data[1..], &mut stream, &peer_node_id, &peer_coord, &ctx).await;
-            }
-            TAG_GOSSIP => {
-                debug!(
-                    "Gossip message from peer {} ({} bytes)",
-                    &peer_node_id[..8.min(peer_node_id.len())],
-                    data.len() - 1,
-                );
-            }
-            _ => {
-                warn!(
-                    "Unknown message tag 0x{:02x} from peer {}",
-                    tag,
-                    &peer_node_id[..8.min(peer_node_id.len())],
-                );
-            }
-        }
-    }
-
-    info!(
-        "Message loop ended for peer {}",
-        &peer_node_id[..8.min(peer_node_id.len())],
-    );
-}
-
-/// Dispatch a shard send/fetch message to the shard store.
-async fn handle_shard_dispatch(
-    data: &[u8],
-    stream: &mut stoq::Stream,
-    ctx: &PeerContext,
-) {
-    match shard_transport::handle_shard_message(data, &ctx.shard_store).await {
-        Ok(Some(response_data)) => {
-            // SHARD_FETCH: send response back
-            if let Err(e) = stream.send(&response_data).await {
-                warn!("Failed to send shard response: {}", e);
-            }
-        }
-        Ok(None) => {
-            // SHARD_SEND: no response needed
-        }
-        Err(e) => {
-            warn!("Shard message error: {}", e);
-        }
-    }
-}
-
-/// Handle a received block announcement.
-///
-/// Wire format (from `StoqBlockTransportAdapter::build_wire_payload`):
-/// - `[0]`       tag 0x03
-/// - `[1..9]`    block_json_len: u64 LE
-/// - `[9..9+N]`  block JSON
-/// - `[9+N..17+N]` proof_hash_len: u64 LE
-/// - `[17+N..17+N+P]` proof_hash bytes
-///
-/// Dispatches to scope-specific handlers based on `PeerContext::blockchain_scope`.
-async fn handle_block_announce(
-    data: &[u8],
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
-    let block = match parse_and_verify_block(data, peer_node_id) {
-        Some(b) => b,
-        None => return,
-    };
-
-    match ctx.blockchain_scope {
-        BlockchainScope::Device => {
-            handle_block_device_scope(&block, peer_node_id, ctx).await;
-        }
-        BlockchainScope::Network => {
-            if let Some(ref assigner) = ctx.spatial_bucket_assigner {
-                handle_block_public_scope(&block, peer_node_id, ctx, assigner).await;
-            } else {
-                handle_block_network_scope(&block, peer_node_id, ctx).await;
-            }
-        }
-    }
-}
-
-/// Parse a block announcement payload and verify its BLAKE3 hash.
-///
-/// Returns `None` (with appropriate log messages) on malformed or
-/// tampered payloads.
-fn parse_and_verify_block(
-    data: &[u8],
-    peer_node_id: &str,
-) -> Option<crate::blockchain::block::Block> {
-    if data.len() < 9 {
-        warn!("Block announce too short ({} bytes)", data.len());
-        return None;
-    }
-
-    let block_json_len = u64::from_le_bytes(
-        data[1..9].try_into().unwrap_or([0u8; 8]),
-    ) as usize;
-
-    if data.len() < 9 + block_json_len {
-        warn!(
-            "Block announce truncated: need {} bytes, have {}",
-            9 + block_json_len,
-            data.len(),
-        );
-        return None;
-    }
-
-    let block: crate::blockchain::block::Block =
-        match serde_json::from_slice(&data[9..9 + block_json_len]) {
-            Ok(b) => b,
-            Err(e) => {
-                warn!("Invalid block JSON from {}: {}", &peer_node_id[..8.min(peer_node_id.len())], e);
-                return None;
-            }
-        };
-
-    if !block.verify_hash() {
-        warn!(
-            "Block {} hash mismatch from peer {}",
-            block.index,
-            &peer_node_id[..8.min(peer_node_id.len())],
-        );
-        return None;
-    }
-
-    Some(block)
-}
-
-/// Device scope: independent chains. Accept only if newer than our height.
-async fn handle_block_device_scope(
-    block: &crate::blockchain::block::Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
-    let our_height = ctx.blockchain.get_height().await;
-    if block.index <= our_height {
-        debug!(
-            "Device scope: already have block {} (height {}), skipping",
-            block.index, our_height,
-        );
-        return;
-    }
-
-    insert_block(block, peer_node_id, ctx).await;
-}
-
-/// Network scope (Private): shared chain. Deduplicate by hash, not index.
-/// Re-propagate to other peers after successful insertion.
-async fn handle_block_network_scope(
-    block: &crate::blockchain::block::Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
-    if ctx.blockchain.has_block(&block.hash).await {
-        debug!(
-            "Network scope: already have block {} by hash, skipping",
-            block.index,
-        );
-        return;
-    }
-
-    if insert_block(block, peer_node_id, ctx).await {
-        repropagate_block(block, peer_node_id, ctx).await;
-    }
-}
-
-/// Public scope (Network + spatial bucket filtering): accept blocks
-/// whose shard placements fall within our neighborhood radius.
-/// Re-propagate accepted blocks to other peers.
-async fn handle_block_public_scope(
-    block: &crate::blockchain::block::Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-    assigner: &Arc<RwLock<SpatialBucketAssigner>>,
-) {
-    if ctx.blockchain.has_block(&block.hash).await {
-        debug!(
-            "Public scope: already have block {} by hash, skipping",
-            block.index,
-        );
-        return;
-    }
-
-    let in_neighborhood = assigner.read().await.block_in_our_neighborhood(block);
-    if !in_neighborhood {
-        debug!(
-            "Public scope: block {} has no shard placements in our neighborhood, skipping",
-            block.index,
-        );
-        return;
-    }
-
-    if insert_block(block, peer_node_id, ctx).await {
-        repropagate_block(block, peer_node_id, ctx).await;
-    }
-}
-
-/// Insert a block into our chain. Returns `true` on success.
-async fn insert_block(
-    block: &crate::blockchain::block::Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) -> bool {
-    match ctx.blockchain.insert_received_block(block.clone()).await {
-        Ok(()) => {
-            info!(
-                "Received and stored block #{} from peer {}",
-                block.index,
-                &peer_node_id[..8.min(peer_node_id.len())],
-            );
-            true
-        }
-        Err(e) => {
-            debug!(
-                "Block {} insertion failed: {} (from peer {})",
-                block.index,
-                e,
-                &peer_node_id[..8.min(peer_node_id.len())],
-            );
-            false
-        }
-    }
-}
-
-/// Re-propagate a block to peers via the block propagator.
-async fn repropagate_block(
-    block: &crate::blockchain::block::Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
-    let coords = ctx.connected_peer_coords.read().await;
-    if coords.is_empty() {
-        debug!("No connected peers, skipping block re-propagation");
-        return;
-    }
-    let propagator = ctx.block_propagator.lock().await;
-    let result = propagator.propagate_block(block, &coords).await;
-    if !result.failed_nodes.is_empty() {
-        debug!(
-            "Re-propagation of block {} from {}: {} reached, {} failed",
-            block.index,
-            &peer_node_id[..8.min(peer_node_id.len())],
-            result.reached_nodes.len(),
-            result.failed_nodes.len(),
-        );
-    }
-}
-
-/// Handle a sync/reflector message (tag 0x10).
-///
-/// The payload after the tag byte is a JSON-encoded `MatrixMessage`.
-/// Dispatched through `SyncDispatcher` to update sync state and
-/// reflector pool. If the dispatcher produces a reply, it is sent
-/// back on the same stream.
-async fn handle_sync_message(
-    payload: &[u8],
-    stream: &mut stoq::Stream,
-    sender_node_id: &str,
-    sender_coord: &MatrixCoordinate,
-    ctx: &PeerContext,
-) {
-    let msg: MatrixMessage = match serde_json::from_slice(payload) {
-        Ok(m) => m,
-        Err(e) => {
-            warn!(
-                "Invalid sync message JSON from {}: {}",
-                &sender_node_id[..8.min(sender_node_id.len())],
-                e,
-            );
-            return;
-        }
-    };
-
-    let sender_pos = hypermesh_lib::MatrixPosition {
-        x: sender_coord.x as f64,
-        y: sender_coord.y as f64,
-        z: sender_coord.z as f64,
-    };
-
-    // Lock sync subsystems and dispatch
-    let mut sm = ctx.sync_manager.lock().await;
-    let mut rp = ctx.reflector_pool.lock().await;
-
-    let mut dispatcher = sync_dispatch::SyncDispatcher {
-        sync_manager: &mut sm,
-        reflector_pool: &mut rp,
-        block_provider: None,
-    };
-
-    let response = dispatcher.dispatch(msg, sender_node_id, sender_pos);
-
-    // Send reply if dispatcher produced one
-    if let sync_dispatch::DispatchResponse::Reply(reply_msg) = response {
-        if let Ok(reply_data) = serde_json::to_vec(&reply_msg) {
-            // Prefix with sync tag so receiver can dispatch
-            let mut tagged = Vec::with_capacity(1 + reply_data.len());
-            tagged.push(TAG_SYNC_MESSAGE);
-            tagged.extend_from_slice(&reply_data);
-            if let Err(e) = stream.send(&tagged).await {
-                debug!("Failed to send sync reply: {}", e);
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// MetricsReporter — collects node metrics for engauge streaming pipeline
-// ---------------------------------------------------------------------------
-
-/// Lightweight metrics reporter that collects real node data and produces
-/// engauge-compatible `MetricsFrame` JSON for the streaming pipeline.
-///
-/// Emits structured `tracing` events that engauge can ingest, and optionally
-/// pushes frames to engauge's STOQ API at `[::1]:9296` when connected.
-pub struct MetricsReporter {
-    node_id: String,
-    sequence: u64,
-}
-
-impl MetricsReporter {
-    /// Create a new reporter for the given node.
-    pub fn new(node_id: String) -> Self {
-        Self {
-            node_id,
-            sequence: 0,
-        }
-    }
-
-    /// Build a capacity metrics frame from current node state.
-    ///
-    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
-    pub fn build_capacity_frame(
-        &mut self,
-        chain_height: u64,
-        peer_count: usize,
-        shard_count: usize,
-        cpu_usage: f64,
-        memory_usage: f64,
-    ) -> Vec<u8> {
-        self.sequence += 1;
-        let now_us = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_micros() as u64)
-            .unwrap_or(0);
-
-        let frame = serde_json::json!({
-            "source_node": self.node_id,
-            "timestamp_us": now_us,
-            "privacy_mode": { "scope": "Unbounded", "tracked": true },
-            "sequence": self.sequence,
-            "payload": {
-                "Capacity": {
-                    "bytes_served": 0u64,
-                    "compute_delivered": chain_height,
-                    "storage_maintained_bytes": shard_count as u64 * 65536,
-                    "bandwidth_available_bps": 0u64,
-                    "uptime_ratio": 1.0,
-                }
-            }
-        });
-
-        info!(
-            target: "engauge::metrics",
-            chain_height,
-            peer_count,
-            shard_count,
-            cpu_usage_pct = format!("{:.1}", cpu_usage),
-            memory_usage_pct = format!("{:.1}", memory_usage),
-            "node_metrics"
-        );
-
-        serde_json::to_vec(&frame).unwrap_or_default()
-    }
-}
+// Re-export MetricsReporter at the same path for backwards compatibility.
+pub use metrics_reporter::MetricsReporter;
 
 #[cfg(test)]
 mod tests {
