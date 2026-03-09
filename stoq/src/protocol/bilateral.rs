@@ -41,6 +41,12 @@ pub struct HandshakeResult {
     pub peer_coordinate: (i64, i64, i64),
     /// Peer's state proof bytes (opaque to STOQ)
     pub peer_proof: Vec<u8>,
+    /// Key rotation chain from peer (empty if no rotations).
+    ///
+    /// Each entry is a JSON-serialized `KeyRotationEntry` from trustchain.
+    /// Consumers (e.g. blockmatrix) can deserialize and verify the chain
+    /// to confirm identity continuity after key rotation.
+    pub peer_rotation_chain: Vec<String>,
 }
 
 /// Handshake message 1: initiator introduces itself with challenge nonce.
@@ -50,6 +56,11 @@ struct Msg1 {
     falcon_pubkey: String, // hex
     nonce: String,         // hex, 32 bytes
     coordinate: (i64, i64, i64),
+    /// Optional key rotation chain: JSON-serialized KeyRotationEntry items.
+    /// Present when the node has rotated keys since genesis.
+    /// The peer verifies this chain to confirm identity continuity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rotation_chain: Vec<String>,
 }
 
 /// Handshake message 2: responder introduces itself, answers challenge,
@@ -62,6 +73,9 @@ struct Msg2 {
     coordinate: (i64, i64, i64),
     proof_bytes: String,  // hex
     signature: String,    // hex — FALCON sig over BLAKE3(nonce_a || proof)
+    /// Optional key rotation chain: JSON-serialized KeyRotationEntry items.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    rotation_chain: Vec<String>,
 }
 
 /// Handshake message 3: initiator answers responder's challenge.
@@ -116,6 +130,7 @@ async fn do_initiate(
         falcon_pubkey: hex::encode(signer.public_key_bytes()),
         nonce: hex::encode(&nonce_a),
         coordinate: local_coordinate,
+        rotation_chain: signer.rotation_chain(),
     };
     let msg1_bytes = serde_json::to_vec(&msg1)?;
     stream.write_msg(&msg1_bytes).await?;
@@ -170,6 +185,7 @@ async fn do_initiate(
         peer_pubkey,
         peer_coordinate: msg2.coordinate,
         peer_proof: peer_proof_bytes,
+        peer_rotation_chain: msg2.rotation_chain,
     })
 }
 
@@ -211,6 +227,7 @@ pub async fn accept_handshake(
         coordinate: local_coordinate,
         proof_bytes: hex::encode(&our_proof),
         signature: hex::encode(&our_signature),
+        rotation_chain: signer.rotation_chain(),
     };
     let msg2_bytes = serde_json::to_vec(&msg2)?;
     stream.write_msg(&msg2_bytes).await?;
@@ -244,6 +261,7 @@ pub async fn accept_handshake(
         peer_pubkey,
         peer_coordinate: msg1.coordinate,
         peer_proof: peer_proof_bytes,
+        peer_rotation_chain: msg1.rotation_chain,
     })
 }
 
@@ -425,5 +443,56 @@ mod tests {
             &signer.pubkey, &wrong_nonce, proof, &sig,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_handshake_result_has_empty_rotation_chain() {
+        // Default TestSigner uses the default rotation_chain() which returns empty
+        let signer = TestSigner::generate();
+        let chain = signer.rotation_chain();
+        assert!(chain.is_empty(), "Default rotation chain should be empty");
+    }
+
+    #[test]
+    fn test_msg1_serializes_without_rotation_chain() {
+        let msg = Msg1 {
+            node_id: "abc".to_string(),
+            falcon_pubkey: "def".to_string(),
+            nonce: "012".to_string(),
+            coordinate: (1, 2, 3),
+            rotation_chain: Vec::new(),
+        };
+        let json = serde_json::to_string(&msg).expect("test: serialize Msg1");
+        // skip_serializing_if = "Vec::is_empty" should omit the field
+        assert!(
+            !json.contains("rotation_chain"),
+            "Empty rotation_chain should be omitted from JSON"
+        );
+    }
+
+    #[test]
+    fn test_msg1_deserializes_without_rotation_chain() {
+        // Simulate a message from an older node that doesn't include rotation_chain
+        let json = r#"{"node_id":"abc","falcon_pubkey":"def","nonce":"012","coordinate":[1,2,3]}"#;
+        let msg: Msg1 = serde_json::from_str(json).expect("test: deserialize Msg1");
+        assert!(msg.rotation_chain.is_empty(), "Missing field should default to empty");
+    }
+
+    #[test]
+    fn test_msg2_roundtrips_with_rotation_chain() {
+        let chain = vec!["entry1".to_string(), "entry2".to_string()];
+        let msg = Msg2 {
+            node_id: "n".to_string(),
+            falcon_pubkey: "fp".to_string(),
+            nonce: "nn".to_string(),
+            coordinate: (0, 0, 0),
+            proof_bytes: "pb".to_string(),
+            signature: "sig".to_string(),
+            rotation_chain: chain.clone(),
+        };
+        let json = serde_json::to_string(&msg).expect("test: serialize Msg2");
+        assert!(json.contains("rotation_chain"), "Non-empty chain should be serialized");
+        let back: Msg2 = serde_json::from_str(&json).expect("test: deserialize Msg2");
+        assert_eq!(back.rotation_chain, chain);
     }
 }

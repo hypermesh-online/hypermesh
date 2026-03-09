@@ -20,6 +20,7 @@ items = [
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
     "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
     "Transmission asset type in SystemAssetKind (R10)",
+    "SystemAssetKind::Identity and KeyRotation variants for MFA identity lifecycle (§6.2)",
     "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
     "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
     "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash)",

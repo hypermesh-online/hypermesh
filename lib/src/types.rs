@@ -656,6 +656,15 @@ pub trait NodeSigner: Send + Sync {
     fn verify_signature(pubkey: &[u8], data: &[u8], signature: &[u8]) -> anyhow::Result<bool>
     where
         Self: Sized;
+
+    /// Return serialized key rotation entries, empty if no rotations.
+    ///
+    /// Nodes that have rotated keys include their rotation chain so peers
+    /// can verify identity continuity from genesis pubkey to current pubkey.
+    /// Default returns empty -- nodes that haven't rotated don't send anything.
+    fn rotation_chain(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Trait for Kyber-1024 KEM encryption operations on a node's identity.

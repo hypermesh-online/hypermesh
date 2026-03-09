@@ -336,6 +336,11 @@ impl NodeEncryptor for FalconIdentity {
 }
 
 impl NodeSigner for FalconIdentity {
+    // rotation_chain() returns empty (default) — rotation history is on the
+    // blockchain, not in the identity struct. A higher-level wrapper (in
+    // blockmatrix) should implement NodeSigner by querying the chain for
+    // KeyRotationEntry items and serializing them as JSON strings.
+
     fn node_id(&self) -> &str {
         &self.node_id
     }

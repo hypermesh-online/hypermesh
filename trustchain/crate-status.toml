@@ -22,6 +22,8 @@ items = [
     "TrustAssetKind includes Transmission variant (R10)",
     "StateAuthenticator (binary PoS authentication interface)",
     "FALCON-1024 node identity (FalconIdentity implements NodeSigner trait, keypair gen, persistence, BLAKE3 node ID — canonical implementation used by blockmatrix)",
+    "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
+    "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
     "BLAKE3 content hashing",
     "Canonical ProofType from hypermesh-lib",
     # DNS zones (config entries, not propagated)
@@ -63,4 +65,7 @@ items = [
     "Cascading revocation across federated CAs",
     "Offline device grace period renewal",
     "Field device bootstrap with intermittent connectivity",
+    "Recovery execution — passphrase-based key recovery, threshold peer attestation (k-of-n), Shamir key backup distribution (§6.2.3)",
+    "Rotation chain verification wired into bilateral PoS handshake — peers verify key continuity on reconnect",
+    "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)",
 ]

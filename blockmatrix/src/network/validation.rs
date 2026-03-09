@@ -7,7 +7,7 @@
 //! This module provides validation services for matrix positions during
 //! network operations, neighbor discovery, and topology management.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
@@ -371,6 +371,51 @@ impl ValidationCache {
     }
 }
 
+/// Verify that a peer's key rotation chain is valid from genesis to current key.
+///
+/// Call this AFTER a bilateral handshake completes, using the `peer_rotation_chain`
+/// from `HandshakeResult`. This confirms identity continuity: the peer who now
+/// holds `current_pubkey` is the same entity that held `genesis_pubkey`.
+///
+/// Returns `Ok(true)` if the chain is valid or empty (no rotations with matching key).
+/// Returns `Ok(false)` if the chain is invalid or the final key doesn't match.
+///
+/// # Arguments
+/// * `genesis_pubkey` - The FALCON-1024 public key on record for this peer's node_id
+/// * `rotation_chain` - JSON-serialized `KeyRotationEntry` items from handshake
+/// * `current_pubkey` - The FALCON-1024 public key the peer used in this handshake
+pub fn verify_peer_rotation(
+    genesis_pubkey: &[u8],
+    rotation_chain: &[String],
+    current_pubkey: &[u8],
+) -> Result<bool> {
+    use trustchain::identity::{FalconIdentity, KeyRotationEntry};
+
+    if rotation_chain.is_empty() {
+        // No rotations — genesis key should be the current key
+        return Ok(genesis_pubkey == current_pubkey);
+    }
+
+    // Deserialize each entry
+    let mut entries = Vec::with_capacity(rotation_chain.len());
+    for (i, json_str) in rotation_chain.iter().enumerate() {
+        let entry: KeyRotationEntry = serde_json::from_str(json_str)
+            .map_err(|e| anyhow!("Failed to deserialize rotation entry {i}: {e}"))?;
+        entries.push(entry);
+    }
+
+    // Verify the cryptographic chain from genesis through all rotations
+    if !FalconIdentity::verify_rotation_chain(genesis_pubkey, &entries)? {
+        return Ok(false);
+    }
+
+    // Verify the last entry's new_pubkey matches current_pubkey
+    match entries.last() {
+        Some(last) => Ok(last.new_pubkey == current_pubkey),
+        None => Ok(false),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,5 +493,56 @@ mod tests {
         // Check stats
         let stats = validator.get_validation_stats().await;
         assert!(stats.cached_validations > 0);
+    }
+
+    #[test]
+    fn test_verify_peer_rotation_no_rotations() {
+        use trustchain::identity::FalconIdentity;
+        use hypermesh_lib::NodeSigner;
+
+        let id = FalconIdentity::generate();
+        let pubkey = id.public_key_bytes().to_vec();
+
+        // No rotation chain, genesis == current => valid
+        let result = verify_peer_rotation(&pubkey, &[], &pubkey)
+            .expect("test: verify_peer_rotation");
+        assert!(result, "Same genesis and current key with no rotations should be valid");
+
+        // No rotation chain, genesis != current => invalid
+        let other = FalconIdentity::generate();
+        let result = verify_peer_rotation(&pubkey, &[], other.public_key_bytes())
+            .expect("test: verify_peer_rotation");
+        assert!(!result, "Different keys with no rotation chain should be invalid");
+    }
+
+    #[test]
+    fn test_verify_peer_rotation_with_chain() {
+        use trustchain::identity::{FalconIdentity, KeyRotationReason};
+
+        let id0 = FalconIdentity::generate();
+        let genesis_pubkey = id0.public_key.clone();
+
+        let (entry1, id1) = id0
+            .rotate_keys(1, KeyRotationReason::Scheduled)
+            .expect("test: rotate 1");
+        let (entry2, id2) = id1
+            .rotate_keys(5, KeyRotationReason::Upgrade)
+            .expect("test: rotate 2");
+
+        let chain: Vec<String> = vec![
+            serde_json::to_string(&entry1).expect("test: serialize entry1"),
+            serde_json::to_string(&entry2).expect("test: serialize entry2"),
+        ];
+
+        // Valid chain: genesis -> entry1 -> entry2 -> current(id2)
+        let result = verify_peer_rotation(&genesis_pubkey, &chain, &id2.public_key)
+            .expect("test: verify valid chain");
+        assert!(result, "Valid rotation chain should verify");
+
+        // Wrong current key should fail
+        let wrong = FalconIdentity::generate();
+        let result = verify_peer_rotation(&genesis_pubkey, &chain, &wrong.public_key)
+            .expect("test: verify wrong current");
+        assert!(!result, "Chain ending at wrong key should fail");
     }
 }
