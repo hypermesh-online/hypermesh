@@ -227,6 +227,7 @@ impl AssetManager {
                 BaseSystemType::Transmission => AssetType::Transmission,
                 BaseSystemType::Dashboard => AssetType::Dashboard,
                 BaseSystemType::Identity => AssetType::Identity,
+                BaseSystemType::KeyRotation => AssetType::KeyRotation,
             }),
             AssetCategory::Application(_) => Err(AssetError::AdapterError {
                 message: "Cannot determine asset type for application asset".to_string(),
@@ -504,6 +505,7 @@ impl AssetManager {
                     BaseSystemType::Transmission => stats.transmission_assets += 1,
                     BaseSystemType::Dashboard => stats.dashboard_assets += 1,
                     BaseSystemType::Identity => stats.identity_assets += 1,
+                    BaseSystemType::KeyRotation => { /* counted in identity_assets */ },
                 },
                 AssetCategory::Application(_) => {
                     // Application assets not tracked separately yet

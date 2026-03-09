@@ -77,6 +77,7 @@ impl AdapterRegistry {
             AssetType::Transmission => None,
             AssetType::Dashboard => None,
             AssetType::Identity => None,
+            AssetType::KeyRotation => None,
         }
     }
 

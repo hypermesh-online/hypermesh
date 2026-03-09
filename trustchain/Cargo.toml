@@ -71,6 +71,7 @@ bincode = { workspace = true }
 
 # State proof and blockchain
 sha2 = { workspace = true }
+hkdf = "0.12"
 blake3 = { workspace = true }
 merkletree = { workspace = true }
 

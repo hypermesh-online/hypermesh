@@ -89,6 +89,8 @@ pub enum BaseSystemType {
     Dashboard,
     /// FALCON-1024 node identity keypair (R1/R10)
     Identity,
+    /// Key rotation event recorded on-chain (§6.2.2)
+    KeyRotation,
 }
 
 /// Application domain for user assets
@@ -162,6 +164,8 @@ pub enum AssetType {
     Dashboard,
     /// FALCON-1024 node identity keypair (R1/R10)
     Identity,
+    /// Key rotation event recorded on-chain (§6.2.2)
+    KeyRotation,
 }
 
 impl AssetType {
@@ -180,6 +184,7 @@ impl AssetType {
             AssetType::Transmission => 9,
             AssetType::Dashboard => 10,
             AssetType::Identity => 11,
+            AssetType::KeyRotation => 12,
         }
     }
 
@@ -198,6 +203,7 @@ impl AssetType {
             AssetType::Transmission => "Transmission",
             AssetType::Dashboard => "Dashboard",
             AssetType::Identity => "Identity",
+            AssetType::KeyRotation => "KeyRotation",
         }
     }
 }
@@ -225,6 +231,7 @@ impl From<AssetType> for hypermesh_lib::SystemAssetKind {
             AssetType::Transmission => Self::Transmission,
             AssetType::Dashboard => Self::Dashboard,
             AssetType::Identity => Self::Identity,
+            AssetType::KeyRotation => Self::KeyRotation,
         }
     }
 }
@@ -244,6 +251,7 @@ impl From<hypermesh_lib::SystemAssetKind> for AssetType {
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
             hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
             hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
+            hypermesh_lib::SystemAssetKind::KeyRotation => Self::KeyRotation,
         }
     }
 }
@@ -263,6 +271,7 @@ impl From<BaseSystemType> for hypermesh_lib::SystemAssetKind {
             BaseSystemType::Transmission => Self::Transmission,
             BaseSystemType::Dashboard => Self::Dashboard,
             BaseSystemType::Identity => Self::Identity,
+            BaseSystemType::KeyRotation => Self::KeyRotation,
         }
     }
 }
@@ -282,6 +291,7 @@ impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
             hypermesh_lib::SystemAssetKind::Transmission => Self::Transmission,
             hypermesh_lib::SystemAssetKind::Dashboard => Self::Dashboard,
             hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
+            hypermesh_lib::SystemAssetKind::KeyRotation => Self::KeyRotation,
         }
     }
 }
@@ -345,6 +355,7 @@ impl AssetRegistration {
             AssetType::Transmission => BaseSystemType::Transmission,
             AssetType::Dashboard => BaseSystemType::Dashboard,
             AssetType::Identity => BaseSystemType::Identity,
+            AssetType::KeyRotation => BaseSystemType::KeyRotation,
         };
 
         Self {
@@ -426,6 +437,7 @@ impl AssetRegistration {
                     BaseSystemType::Transmission => 9,
                     BaseSystemType::Dashboard => 10,
                     BaseSystemType::Identity => 11,
+                    BaseSystemType::KeyRotation => 12,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -611,6 +623,7 @@ impl AssetRegistration {
                 BaseSystemType::Transmission => AssetType::Transmission,
                 BaseSystemType::Dashboard => AssetType::Dashboard,
                 BaseSystemType::Identity => AssetType::Identity,
+                BaseSystemType::KeyRotation => AssetType::KeyRotation,
             }),
             AssetCategory::Application(_) => None,
         }

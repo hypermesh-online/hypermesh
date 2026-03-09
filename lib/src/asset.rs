@@ -71,6 +71,8 @@ pub enum SystemAssetKind {
     Dashboard,
     /// FALCON-1024 node identity keypair (R1/R10: every resource is an asset)
     Identity,
+    /// Key rotation event recorded on-chain (§6.2.2)
+    KeyRotation,
 }
 
 impl SystemAssetKind {
@@ -89,6 +91,7 @@ impl SystemAssetKind {
             Self::Transmission => 9,
             Self::Dashboard => 10,
             Self::Identity => 11,
+            Self::KeyRotation => 12,
         }
     }
 
@@ -107,6 +110,7 @@ impl SystemAssetKind {
             Self::Transmission => "Transmission",
             Self::Dashboard => "Dashboard",
             Self::Identity => "Identity",
+            Self::KeyRotation => "KeyRotation",
         }
     }
 }

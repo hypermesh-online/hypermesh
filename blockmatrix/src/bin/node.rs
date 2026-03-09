@@ -784,8 +784,14 @@ fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -> St
 fn build_identity_asset_registration(
     identity: &blockmatrix::identity::FalconIdentity,
 ) -> AssetRegistration {
+    // Store recovery commitment in config field (§6.2 identity lifecycle).
+    // TODO: prompt user or generate a unique passphrase instead of default.
+    let recovery_commitment = trustchain::identity::compute_recovery_commitment(
+        "default-recovery-phrase",
+        &identity.node_id,
+    );
     let asset_data = AssetData {
-        config: Vec::new(),
+        config: recovery_commitment.to_vec(),
         definition: identity.public_key.clone(),
         metadata: identity.kyber_public_key.clone(),
     };

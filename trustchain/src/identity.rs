@@ -17,11 +17,14 @@
 //! on TrustChain directly.
 
 use anyhow::{anyhow, Result};
+use hkdf::Hkdf;
 use hypermesh_lib::{NodeEncryptor, NodeSigner};
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{Ciphertext as KemCiphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret};
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+use serde::{Deserialize, Serialize};
+use sha2::Sha512;
 use std::path::Path;
 use tracing::info;
 
@@ -173,6 +176,148 @@ impl FalconIdentity {
     pub fn kyber_secret_key_bytes(&self) -> &[u8] {
         &self.kyber_secret_key
     }
+
+    /// Rotate keys: generate new FALCON-1024 + Kyber-1024 keypair, sign the
+    /// transition with the old FALCON key.
+    ///
+    /// Returns `(KeyRotationEntry, new_identity)`. The new identity's `node_id`
+    /// will be `BLAKE3(new_falcon_pubkey)` -- the **caller** must override it
+    /// to the genesis-derived node ID before persisting. The rotation entry
+    /// records the cryptographic proof of authorized key change (§6.2.2).
+    pub fn rotate_keys(
+        &self,
+        block_index: u64,
+        reason: KeyRotationReason,
+    ) -> Result<(KeyRotationEntry, FalconIdentity)> {
+        let new_identity = FalconIdentity::generate();
+
+        let old_pubkey_hash = *blake3::hash(&self.public_key).as_bytes();
+
+        let entry = KeyRotationEntry {
+            old_pubkey_hash,
+            new_pubkey: new_identity.public_key.clone(),
+            new_kyber_pubkey: new_identity.kyber_public_key.clone(),
+            rotation_signature: Vec::new(), // placeholder, filled below
+            block_index,
+            reason,
+        };
+
+        let message = entry.rotation_message();
+        let sk = falcon1024::SecretKey::from_bytes(&self.secret_key)
+            .map_err(|e| anyhow!("Invalid old FALCON secret key: {e}"))?;
+        let sig = falcon1024::detached_sign(&message, &sk);
+        let entry = KeyRotationEntry {
+            rotation_signature: sig.as_bytes().to_vec(),
+            ..entry
+        };
+
+        Ok((entry, new_identity))
+    }
+
+    /// Verify a key rotation chain from genesis to current.
+    ///
+    /// Each entry must have a valid `rotation_signature` produced by the
+    /// previous key. Returns `Ok(true)` if the entire chain is valid,
+    /// `Ok(false)` if any signature or hash check fails.
+    pub fn verify_rotation_chain(
+        genesis_pubkey: &[u8],
+        rotations: &[KeyRotationEntry],
+    ) -> Result<bool> {
+        let mut current_key = genesis_pubkey.to_vec();
+
+        for (i, entry) in rotations.iter().enumerate() {
+            // Verify old_pubkey_hash matches BLAKE3 of current key
+            let expected_hash = *blake3::hash(&current_key).as_bytes();
+            if entry.old_pubkey_hash != expected_hash {
+                info!(
+                    "Rotation chain entry {i}: old_pubkey_hash mismatch"
+                );
+                return Ok(false);
+            }
+
+            let message = entry.rotation_message();
+            let pk = falcon1024::PublicKey::from_bytes(&current_key)
+                .map_err(|e| anyhow!("Invalid FALCON public key at rotation {i}: {e}"))?;
+            let sig = falcon1024::DetachedSignature::from_bytes(
+                &entry.rotation_signature,
+            )
+            .map_err(|e| anyhow!("Invalid FALCON signature at rotation {i}: {e}"))?;
+
+            if falcon1024::verify_detached_signature(&sig, &message, &pk).is_err() {
+                info!("Rotation chain entry {i}: signature verification failed");
+                return Ok(false);
+            }
+
+            current_key = entry.new_pubkey.clone();
+        }
+
+        Ok(true)
+    }
+}
+
+/// Represents a key rotation event stored as a BlockAssetEntry.
+///
+/// Per §6.2.2: old key signs authorization of new key, recorded on-chain.
+/// The node_id does NOT change -- it remains `BLAKE3(genesis_falcon_pubkey)`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRotationEntry {
+    /// BLAKE3 hash of the outgoing FALCON public key.
+    pub old_pubkey_hash: [u8; 32],
+    /// Full incoming FALCON-1024 public key (1793 bytes).
+    pub new_pubkey: Vec<u8>,
+    /// Full incoming Kyber-1024 public key (1568 bytes).
+    pub new_kyber_pubkey: Vec<u8>,
+    /// Old key signs `BLAKE3(old_pubkey_hash || new_pubkey || new_kyber_pubkey || block_index)`.
+    pub rotation_signature: Vec<u8>,
+    /// Block index at which this rotation was recorded.
+    pub block_index: u64,
+    /// Reason for the rotation.
+    pub reason: KeyRotationReason,
+}
+
+impl KeyRotationEntry {
+    /// Build the canonical message that is signed during rotation.
+    ///
+    /// Format: `old_pubkey_hash || new_pubkey || new_kyber_pubkey || block_index_le`
+    pub fn rotation_message(&self) -> Vec<u8> {
+        let mut msg = Vec::with_capacity(
+            32 + self.new_pubkey.len() + self.new_kyber_pubkey.len() + 8,
+        );
+        msg.extend_from_slice(&self.old_pubkey_hash);
+        msg.extend_from_slice(&self.new_pubkey);
+        msg.extend_from_slice(&self.new_kyber_pubkey);
+        msg.extend_from_slice(&self.block_index.to_le_bytes());
+        msg
+    }
+}
+
+/// Reason for a key rotation event.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum KeyRotationReason {
+    /// Periodic scheduled rotation.
+    Scheduled,
+    /// Key compromise detected.
+    Compromise,
+    /// Cryptographic upgrade.
+    Upgrade,
+    /// Recovery from lost key material.
+    Recovery,
+}
+
+/// Compute a recovery commitment from a passphrase.
+///
+/// The commitment is stored in the genesis block's Identity asset entry
+/// (`AssetData.config`). During recovery, the operator provides the
+/// passphrase and the system verifies it against this commitment.
+///
+/// Uses HKDF-SHA512 for key derivation then BLAKE3 for the final commitment
+/// hash, binding the commitment to the specific `node_id`.
+pub fn compute_recovery_commitment(passphrase: &str, node_id: &str) -> [u8; 32] {
+    let hk = Hkdf::<Sha512>::new(Some(node_id.as_bytes()), passphrase.as_bytes());
+    let mut okm = [0u8; 32];
+    hk.expand(b"hypermesh-recovery-v1", &mut okm)
+        .expect("HKDF expand cannot fail for 32-byte output");
+    *blake3::hash(&okm).as_bytes()
 }
 
 impl NodeEncryptor for FalconIdentity {
@@ -300,6 +445,117 @@ mod tests {
             NodeEncryptor::encryption_public_key(&id),
             id.kyber_public_key.as_slice()
         );
+    }
+
+    #[test]
+    fn test_key_rotation_creates_valid_entry() {
+        let id = FalconIdentity::generate();
+        let (entry, new_id) = id
+            .rotate_keys(42, KeyRotationReason::Scheduled)
+            .expect("test: rotate_keys");
+
+        assert_eq!(entry.old_pubkey_hash, *blake3::hash(&id.public_key).as_bytes());
+        assert_eq!(entry.new_pubkey, new_id.public_key);
+        assert_eq!(entry.new_kyber_pubkey, new_id.kyber_public_key);
+        assert_eq!(entry.block_index, 42);
+        assert_eq!(entry.reason, KeyRotationReason::Scheduled);
+        assert!(!entry.rotation_signature.is_empty());
+        // New identity has different keys
+        assert_ne!(id.public_key, new_id.public_key);
+        assert_ne!(id.kyber_public_key, new_id.kyber_public_key);
+    }
+
+    #[test]
+    fn test_rotation_signature_verification() {
+        let id = FalconIdentity::generate();
+        let (entry, _new_id) = id
+            .rotate_keys(100, KeyRotationReason::Upgrade)
+            .expect("test: rotate_keys");
+
+        // Manually verify the signature using the old pubkey
+        let mut message = Vec::new();
+        message.extend_from_slice(&entry.old_pubkey_hash);
+        message.extend_from_slice(&entry.new_pubkey);
+        message.extend_from_slice(&entry.new_kyber_pubkey);
+        message.extend_from_slice(&100u64.to_le_bytes());
+
+        let valid = FalconIdentity::verify_signature(&id.public_key, &message, &entry.rotation_signature)
+            .expect("test: verify_signature");
+        assert!(valid, "Rotation signature should verify with old pubkey");
+    }
+
+    #[test]
+    fn test_verify_rotation_chain_single() {
+        let id = FalconIdentity::generate();
+        let (entry, _new_id) = id
+            .rotate_keys(1, KeyRotationReason::Scheduled)
+            .expect("test: rotate_keys");
+
+        let valid = FalconIdentity::verify_rotation_chain(&id.public_key, &[entry])
+            .expect("test: verify_rotation_chain");
+        assert!(valid, "Single-rotation chain should verify");
+    }
+
+    #[test]
+    fn test_verify_rotation_chain_multiple() {
+        let id0 = FalconIdentity::generate();
+        let (entry1, id1) = id0
+            .rotate_keys(1, KeyRotationReason::Scheduled)
+            .expect("test: rotate 1");
+        let (entry2, id2) = id1
+            .rotate_keys(5, KeyRotationReason::Upgrade)
+            .expect("test: rotate 2");
+        let (entry3, _id3) = id2
+            .rotate_keys(10, KeyRotationReason::Scheduled)
+            .expect("test: rotate 3");
+
+        let valid = FalconIdentity::verify_rotation_chain(
+            &id0.public_key,
+            &[entry1, entry2, entry3],
+        )
+        .expect("test: verify_rotation_chain");
+        assert!(valid, "Three-rotation chain should verify");
+    }
+
+    #[test]
+    fn test_verify_rotation_chain_tampered() {
+        let id0 = FalconIdentity::generate();
+        let (entry1, id1) = id0
+            .rotate_keys(1, KeyRotationReason::Scheduled)
+            .expect("test: rotate 1");
+        let (mut entry2, _id2) = id1
+            .rotate_keys(5, KeyRotationReason::Upgrade)
+            .expect("test: rotate 2");
+
+        // Tamper with the second entry's new pubkey
+        if let Some(byte) = entry2.new_pubkey.get_mut(0) {
+            *byte ^= 0xFF;
+        }
+
+        let valid = FalconIdentity::verify_rotation_chain(
+            &id0.public_key,
+            &[entry1, entry2],
+        )
+        .expect("test: verify_rotation_chain");
+        assert!(!valid, "Tampered chain should fail verification");
+    }
+
+    #[test]
+    fn test_recovery_commitment_deterministic() {
+        let c1 = compute_recovery_commitment("my-secret-phrase", "node-abc123");
+        let c2 = compute_recovery_commitment("my-secret-phrase", "node-abc123");
+        assert_eq!(c1, c2, "Same inputs should produce same commitment");
+    }
+
+    #[test]
+    fn test_recovery_commitment_different_passphrase() {
+        let c1 = compute_recovery_commitment("phrase-one", "node-abc123");
+        let c2 = compute_recovery_commitment("phrase-two", "node-abc123");
+        assert_ne!(c1, c2, "Different passphrases should produce different commitments");
+
+        let c3 = compute_recovery_commitment("my-secret-phrase", "node-111");
+        let c4 = compute_recovery_commitment("my-secret-phrase", "node-222");
+        assert_ne!(c3, c4, "Different node_ids should produce different commitments");
     }
 
     #[test]

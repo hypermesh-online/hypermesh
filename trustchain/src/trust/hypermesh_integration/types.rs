@@ -32,6 +32,8 @@ pub enum TrustAssetKind {
     Transmission,
     Dashboard,
     Identity,
+    /// Key rotation event recorded on-chain (§6.2.2)
+    KeyRotation,
 }
 
 impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
@@ -50,6 +52,7 @@ impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
             SystemAssetKind::Transmission => Self::Transmission,
             SystemAssetKind::Dashboard => Self::Dashboard,
             SystemAssetKind::Identity => Self::Identity,
+            SystemAssetKind::KeyRotation => Self::KeyRotation,
         }
     }
 }
@@ -69,6 +72,7 @@ impl From<TrustAssetKind> for hypermesh_lib::asset::SystemAssetKind {
             TrustAssetKind::Transmission => Self::Transmission,
             TrustAssetKind::Dashboard => Self::Dashboard,
             TrustAssetKind::Identity => Self::Identity,
+            TrustAssetKind::KeyRotation => Self::KeyRotation,
         }
     }
 }
