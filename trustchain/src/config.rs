@@ -438,6 +438,44 @@ impl TrustChainConfig {
         }
     }
 
+    /// Load configuration with the following precedence:
+    /// 1. `TRUSTCHAIN_CONFIG` env var (path to config file)
+    /// 2. `~/.hypermesh/trustchain.toml` (user config)
+    /// 3. `/etc/hypermesh/trustchain.toml` (system config)
+    /// 4. Default (localhost testing)
+    ///
+    /// Returns the loaded config and the source path (if any).
+    pub fn load() -> Result<(Self, Option<String>)> {
+        // 1. Check env var
+        if let Ok(path) = std::env::var("TRUSTCHAIN_CONFIG") {
+            let config = Self::from_file(&path)?;
+            tracing::info!("Loaded config from TRUSTCHAIN_CONFIG={}", path);
+            return Ok((config, Some(path)));
+        }
+
+        // 2. Check ~/.hypermesh/trustchain.toml
+        if let Some(home) = dirs_path() {
+            let user_path = format!("{home}/.hypermesh/trustchain.toml");
+            if std::path::Path::new(&user_path).exists() {
+                let config = Self::from_file(&user_path)?;
+                tracing::info!("Loaded config from {}", user_path);
+                return Ok((config, Some(user_path)));
+            }
+        }
+
+        // 3. Check /etc/hypermesh/trustchain.toml
+        let system_path = "/etc/hypermesh/trustchain.toml";
+        if std::path::Path::new(system_path).exists() {
+            let config = Self::from_file(system_path)?;
+            tracing::info!("Loaded config from {}", system_path);
+            return Ok((config, Some(system_path.to_string())));
+        }
+
+        // 4. Fall back to defaults
+        tracing::info!("No config file found, using defaults");
+        Ok((Self::default(), None))
+    }
+
     /// Load configuration from file
     pub fn from_file(path: &str) -> Result<Self> {
         let contents = std::fs::read_to_string(path)
@@ -510,6 +548,11 @@ impl TrustChainConfig {
 
         Ok(())
     }
+}
+
+/// Get the user's home directory path as a String.
+fn dirs_path() -> Option<String> {
+    std::env::var("HOME").ok()
 }
 
 #[cfg(test)]

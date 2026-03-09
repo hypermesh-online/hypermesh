@@ -14,9 +14,8 @@ use tracing::{error, info};
 
 use trustchain::{
     api::stoq_api::{TrustChainStoqApi, TrustChainStoqConfig},
-    ca::{CAConfig, CAMode, TrustChainCA},
-    config::DnsConfig,
-    proof_of_state::{StateRequirements, HyperMeshClientConfig},
+    ca::TrustChainCA,
+    config::TrustChainConfig,
     dns::DnsResolver,
 };
 
@@ -35,67 +34,29 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("🚀 Starting TrustChain STOQ Server (Pure STOQ, No HTTP)");
-    info!("📡 Protocol: STOQ (QUIC over IPv6)");
-    info!("🔒 Transport: End-to-end encrypted QUIC");
+    info!("Starting TrustChain STOQ Server (Pure STOQ, No HTTP)");
+    info!("Protocol: STOQ (QUIC over IPv6)");
+    info!("Transport: End-to-end encrypted QUIC");
+
+    // Load configuration (env var -> ~/.hypermesh/trustchain.toml -> /etc -> defaults)
+    let (tc_config, config_source) = TrustChainConfig::load()?;
+    match &config_source {
+        Some(path) => info!("Configuration loaded from: {}", path),
+        None => info!("Using default configuration (no config file found)"),
+    }
 
     // Initialize TrustChain CA
     info!("Initializing TrustChain Certificate Authority...");
-    let ca_config = CAConfig {
-        ca_id: "trustchain-stoq-ca".to_string(),
-        bind_address: std::net::Ipv6Addr::LOCALHOST,
-        port: 9294,
-        cert_validity_days: 365,
-        rotation_interval: std::time::Duration::from_secs(30 * 24 * 60 * 60), // 30 days
-        mode: CAMode::Production,
-        state_requirements: StateRequirements {
-            minimum_stake: 1000,
-            max_time_offset: std::time::Duration::from_secs(5),
-            minimum_storage: 1000000, // 1MB minimum
-            minimum_compute: 100,
-        },
-        hypermesh_client_config: HyperMeshClientConfig {
-            request_timeout: std::time::Duration::from_secs(10),
-            max_retries: 3,
-            retry_backoff: std::time::Duration::from_secs(1),
-            enable_caching: true,
-            cache_ttl: std::time::Duration::from_secs(300),
-        },
-    };
-    let ca = Arc::new(TrustChainCA::new(ca_config).await?);
+    let ca = Arc::new(TrustChainCA::new(tc_config.ca.clone()).await?);
 
     // Initialize DNS resolver
     info!("Initializing DNS resolver...");
-    let dns_config = DnsConfig {
-        server_id: "trustchain-dns".to_string(),
-        bind_address: std::net::Ipv6Addr::LOCALHOST,
-        quic_port: 9295,
-        port: 53,
-        dns_port: None, // IPv6-only, no legacy DNS
-        upstream_resolvers: vec![
-            std::net::Ipv6Addr::from([0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888]), // Google
-            std::net::Ipv6Addr::from([0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111]), // Cloudflare
-        ],
-        cache_ttl: std::time::Duration::from_secs(300),
-        enable_cert_validation: true,
-        trustchain_domains: vec![
-            "hypermesh".to_string(),
-            "caesar".to_string(),
-            "trust".to_string(),
-            "assets".to_string(),
-        ],
-        state_requirements: StateRequirements {
-            minimum_stake: 500,
-            max_time_offset: std::time::Duration::from_secs(3),
-            minimum_storage: 500000, // 500KB minimum for DNS
-            minimum_compute: 50,
-        },
-    };
-    let resolver = Arc::new(DnsResolver::new(dns_config).await?);
+    let resolver = Arc::new(DnsResolver::new(tc_config.dns.clone()).await?);
 
     // Configure STOQ API
+    let stoq_bind = format!("[::1]:{}", tc_config.api.port);
     let config = TrustChainStoqConfig {
-        bind_address: "[::1]:9292".to_string(), // TrustChain default STOQ port
+        bind_address: stoq_bind.clone(),
         service_name: "trustchain".to_string(),
         enable_logging: true,
     };
@@ -104,15 +65,13 @@ async fn main() -> Result<()> {
     info!("Creating TrustChain STOQ API server...");
     let api = Arc::new(TrustChainStoqApi::new(ca, resolver, config).await?);
 
-    info!("✅ TrustChain STOQ server ready");
-    info!("🎯 Listening on stoq://[::1]:9292");
-    info!("");
+    info!("TrustChain STOQ server ready");
+    info!("Listening on stoq://{}", stoq_bind);
     info!("Available STOQ endpoints:");
-    info!("  - stoq://[::1]:9292/trustchain/health");
-    info!("  - stoq://[::1]:9292/trustchain/validate_certificate");
-    info!("  - stoq://[::1]:9292/trustchain/issue_certificate");
-    info!("  - stoq://[::1]:9292/trustchain/resolve_dns");
-    info!("");
+    info!("  - stoq://{}/trustchain/health", stoq_bind);
+    info!("  - stoq://{}/trustchain/validate_certificate", stoq_bind);
+    info!("  - stoq://{}/trustchain/issue_certificate", stoq_bind);
+    info!("  - stoq://{}/trustchain/resolve_dns", stoq_bind);
     info!("Press Ctrl+C to shutdown gracefully");
 
     // Start server with graceful shutdown
@@ -126,13 +85,13 @@ async fn main() -> Result<()> {
     // Wait for shutdown signal
     shutdown_signal().await;
 
-    info!("⏸️  Shutting down TrustChain STOQ server...");
+    info!("Shutting down TrustChain STOQ server...");
     api.stop();
 
-    // Wait for server task to complete
+    // Wait for server task to complete (5s timeout)
     let _ = tokio::time::timeout(std::time::Duration::from_secs(5), server_task).await;
 
-    info!("👋 TrustChain STOQ server shutdown complete");
+    info!("TrustChain STOQ server shutdown complete");
 
     Ok(())
 }

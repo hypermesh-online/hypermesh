@@ -26,6 +26,7 @@ items = [
     "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
     "BLAKE3 content hashing",
     "Canonical ProofType from hypermesh-lib",
+    "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
     # DNS zones (config entries, not propagated)
     "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
     # Metrics
@@ -52,7 +53,6 @@ items = [
     "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
     "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
     "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
-    "Production binary hardening (config file loading, graceful shutdown, health endpoint, signal handling)",
     "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
 ]
 

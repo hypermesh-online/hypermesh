@@ -5,13 +5,15 @@
 use anyhow::Result;
 use http::{Request, Response, StatusCode};
 use serde::Serialize;
-use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
+use tokio::signal;
 use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use trustchain::ca::certificate_store::CertificateStore;
-use trustchain::ca::{CAConfig, TrustChainCA};
+use trustchain::ca::TrustChainCA;
+use trustchain::config::TrustChainConfig;
 use trustchain::http3::handlers::{
     self, DnsResolveRequest as HandlerDnsResolveRequest, HttpHandlerContext,
     IssueCertificateRequest, RevokeCertificateRequest, ValidateCertificateRequest,
@@ -101,9 +103,15 @@ async fn main() -> Result<()> {
 
     info!("TrustChain HTTP/3 Server starting...");
 
+    // Load configuration (env var -> ~/.hypermesh/trustchain.toml -> /etc -> defaults)
+    let (tc_config, config_source) = TrustChainConfig::load()?;
+    match &config_source {
+        Some(path) => info!("Configuration loaded from: {}", path),
+        None => info!("Using default configuration (no config file found)"),
+    }
+
     // Initialize real service components
-    let ca_config = CAConfig::default();
-    let ca = Arc::new(TrustChainCA::new(ca_config).await?);
+    let ca = Arc::new(TrustChainCA::new(tc_config.ca.clone()).await?);
 
     let certificate_store = Arc::new(CertificateStore::new().await?);
 
@@ -120,12 +128,31 @@ async fn main() -> Result<()> {
     // Create router with all endpoints wired to real handler functions
     let router = build_router(ctx);
 
-    // Start server on IPv6 localhost port 50053 using STOQ transport
-    let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 50053);
+    // Start server using configured bind address and port
+    let bind_addr = tc_config.api.bind_address;
+    let bind_port = if tc_config.api.port == 0 { 50053 } else { tc_config.api.port };
+    let addr = SocketAddr::new(IpAddr::V6(bind_addr), bind_port);
     let server = Http3StoqServer::new(addr, router);
 
-    info!("TrustChain HTTP/3 server (STOQ transport) starting on https://[::1]:50053");
-    server.run().await?;
+    info!("TrustChain HTTP/3 server (STOQ transport) listening on https://[{}]:{}", bind_addr, bind_port);
+
+    // Run server with graceful shutdown
+    let server_task = tokio::spawn(async move {
+        if let Err(e) = server.run().await {
+            error!("HTTP/3 server error: {}", e);
+        }
+    });
+
+    // Wait for shutdown signal
+    shutdown_signal().await;
+
+    info!("Shutting down TrustChain HTTP/3 server...");
+
+    // Abort server task (Http3StoqServer doesn't expose a stop method)
+    server_task.abort();
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), server_task).await;
+
+    info!("TrustChain HTTP/3 server shutdown complete");
 
     Ok(())
 }
@@ -364,4 +391,33 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
             uuid::Uuid::new_v4().to_string(),
         )
     })
+}
+
+/// Graceful shutdown signal handler (SIGTERM + Ctrl+C)
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C signal");
+        },
+        _ = terminate => {
+            info!("Received SIGTERM signal");
+        },
+    }
 }
