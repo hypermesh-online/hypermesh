@@ -2,10 +2,30 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! HyperMesh Validation Logic
+//! HyperMesh Validation Logic — Structural Pre-Validation Layer
 //!
-//! Implements validation for Proof of State, Asset Hashes, and other
-//! HyperMesh intelligence components.
+//! Implements fast structural pre-validation for Proof of State headers,
+//! Asset Hashes, and other HyperMesh intelligence components.
+//!
+//! ## Architectural boundary
+//!
+//! This module performs **non-cryptographic structural checks** that can run
+//! at wire speed in the eBPF/XDP fast path (or its userspace fallback).
+//! Full asymmetric signature verification (FALCON-1024, Ed25519, ECDSA)
+//! is architecturally impossible in the BPF instruction set and MUST happen
+//! in userspace via TrustChain after packets pass structural pre-validation.
+//!
+//! ### What this layer validates
+//! - **PoTime (WHEN)**: Timestamp freshness (clock skew + max age)
+//! - **PoStake (WHO)**: Algorithm indicator byte + public key prefix density
+//! - **PoWork (WHAT)**: Leading zero bits meet configurable difficulty
+//! - **PoSpace (WHERE)**: Valid IPv6 prefix or finite matrix coordinates
+//!
+//! ### What this layer does NOT validate
+//! - Cryptographic signature correctness (FALCON-1024/Ed25519/ECDSA)
+//! - Public key authenticity (TrustChain CA chain verification)
+//! - PoW challenge-response correctness (only difficulty prefix)
+//! - PoSpace storage commitment proofs (only format validity)
 
 use crate::hypermesh_headers::*;
 use anyhow::{anyhow, Result};
@@ -41,7 +61,12 @@ impl FastValidationResult {
     }
 }
 
-/// Proof of State validator
+/// Proof of State structural pre-validator.
+///
+/// Performs fast non-cryptographic checks suitable for eBPF/XDP wire-speed
+/// filtering. Rejects obviously invalid packets before they reach userspace.
+/// Full cryptographic verification (FALCON-1024 signatures, CA chain
+/// validation) happens in TrustChain after this layer passes the packet.
 pub struct ProofOfStateValidator {
     /// Maximum allowed clock skew (microseconds)
     max_clock_skew: u64,
