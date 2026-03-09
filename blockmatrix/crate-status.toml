@@ -104,15 +104,19 @@ items = [
     "CLI --mode flag (auto/ffi/ipc/http) and per-service URL flags",
     # Config services section
     "Config [services] section (ConnectionMode, per-service URLs in config.toml)",
+    # Identity, DNS propagation, CA enrollment (Phases 1-4)
+    "Identity-as-asset — FALCON-1024 + Kyber-1024 keypair registered as SystemAssetKind::Identity blockchain asset in genesis block (R1/R10)",
+    "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq bilateral handshake via NodeSigner+StateProofProvider traits, tested two-node local and local-to-GCP",
+    "DNS propagation via blockchain — DnsBlockEntry serialized into BlockAssetEntry with BaseSystemType::Dns, extracted on receive, re-populated on restart",
+    "CA certificate enrollment — after bilateral PoS handshake, TrustChain CA issues cert to replace self-signed bootstrap cert (§5.7 Phase 2)",
+    "Stream type discrimination — CONN_TYPE_HANDSHAKE (0x00) and CONN_TYPE_PEER_MESSAGE (0x01) on every STOQ connection",
+    "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
 ]
 
 [features.in_development]
 items = [
-    # Layer migration COMPLETE (Phases 1-5): FalconIdentity → TrustChain, bilateral handshake → STOQ, Identity as asset type
-    "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Tested two-node locally (Private mode, block propagation verified).",
-    "Identity-as-asset — SystemAssetKind::Identity type added (R1/R10), actual FALCON pubkey registration during bootstrap not yet wired",
     # Mesh networking gaps (not yet wired end-to-end)
-    "Network sync wiring — Scope-aware block handling implemented (Device/Network/Public), block transport over STOQ working. Full reflector-pool chain sync not yet end-to-end.",
+    "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired. Full end-to-end reflector-pool chain fetch not yet complete.",
     "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
@@ -126,4 +130,6 @@ items = [
     "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
     "Cross-network asset transfers with dual PoS validation",
     "Container runtime with real process isolation",
+    "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
+    "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
 ]
