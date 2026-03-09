@@ -21,6 +21,7 @@ items = [
     "Dashboard manifest types (DashboardManifest parse/validate, shared with blockmatrix)",
     "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness)",
     "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)",
+    "Catalog server binary stability (standalone STOQ API — LRU cache OOM bug fixed)",
 ]
 
 [features.in_development]
@@ -32,7 +33,6 @@ items = [
     "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
     "Peer-to-peer sharing — announce/discover code exists but local-only until DHT remote I/O is wired",
     "HyperMesh execution delegation — allocate/query/terminate lifecycle code exists but no real remote execution",
-    "Catalog server binary stability (standalone STOQ API — known OOM bug with default LRU cache size)",
     "DHT remote I/O — wire to real STOQ transport for cross-node package discovery",
     "Shared asset library — browse and install packages across nodes on the public network",
 ]

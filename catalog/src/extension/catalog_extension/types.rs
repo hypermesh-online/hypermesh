@@ -91,10 +91,18 @@ impl CatalogExtension {
             })),
         };
 
+        // Convert byte-based cache_size to entry count for L2 cache.
+        // Estimated ~10KB per cached package entry (metadata + content refs + overhead).
+        // Cap at 10_000 entries to prevent OOM from HashMap pre-allocation.
+        const ESTIMATED_ENTRY_SIZE_BYTES: u64 = 10 * 1024;
+        const MAX_L2_ENTRIES: usize = 10_000;
+        let l2_entry_count = (config.cache_size / ESTIMATED_ENTRY_SIZE_BYTES) as usize;
+        let l2_cache_size = l2_entry_count.min(MAX_L2_ENTRIES).max(100);
+
         let library_config = LibraryConfig {
             enable_cache: true,
             l1_cache_size: 100,
-            l2_cache_size: config.cache_size as usize,
+            l2_cache_size,
             l3_cache_path: Some(config.library_path.to_string_lossy().to_string()),
             enable_zero_copy: true,
             max_concurrent_ops: 100,
