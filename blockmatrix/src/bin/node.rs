@@ -1672,8 +1672,8 @@ async fn run_connect(
             ReflectorPool::new(ReflectorConfig::default()),
         ));
 
-        // If reflector, join a Network scope chain
-        if cli.reflector {
+        // Join a Network scope chain if we have peers or are a reflector
+        if has_bootstrap_peers || cli.reflector {
             let network_id = format!(
                 "public-{}",
                 &genesis_hash[..16.min(genesis_hash.len())]
@@ -1687,7 +1687,7 @@ async fn run_connect(
                 .await
                 .join_network(network_id.clone(), privacy_mode, now_secs)
             {
-                Ok(()) => info!("Joined Network scope: {}", network_id),
+                Ok(()) => info!("Joined Network scope chain: {}", network_id),
                 Err(e) => warn!("Failed to join network scope: {}", e),
             }
         }
@@ -1718,6 +1718,41 @@ async fn run_connect(
         // Start message loops for peers connected during discovery (before PeerContext existed)
         let network_clone = std::sync::Arc::new(network_manager);
         network_clone.start_peer_message_loops(peer_ctx.clone()).await;
+
+        // Register discovered peers as reflectors so sync requests have targets
+        if has_bootstrap_peers || cli.reflector {
+            let discovered_peers = network_clone.get_connected_nodes().await;
+            let network_id = format!(
+                "public-{}",
+                &genesis_hash[..16.min(genesis_hash.len())]
+            );
+            let now_secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let mut rp = reflector_pool.lock().await;
+            for peer in &discovered_peers {
+                let reflector = blockmatrix::network::reflector_pool::Reflector {
+                    node_id: peer.node_id.clone(),
+                    position: hypermesh_lib::MatrixPosition {
+                        x: peer.coordinate.x as f64,
+                        y: peer.coordinate.y as f64,
+                        z: peer.coordinate.z as f64,
+                    },
+                    last_seen: now_secs,
+                    block_height: 0,
+                    health_score: 1.0,
+                    privacy_mode,
+                };
+                rp.register_reflector(&network_id, reflector);
+                info!(
+                    "Registered peer {} as reflector for {}",
+                    &peer.node_id[..8.min(peer.node_id.len())],
+                    &network_id,
+                );
+            }
+            drop(rp);
+        }
 
         // Immediately seed the block transport node_map so propagation works
         // (the 5s sync loop would otherwise leave it empty for the first cycle)

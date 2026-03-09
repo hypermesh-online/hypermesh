@@ -390,6 +390,11 @@ async fn handle_handshake_connection(
         &peer_node_id[..8.min(peer_node_id.len())]
     );
 
+    // Register accepted peer as a reflector for proactive sync
+    if let Some(ref ctx) = peer_ctx {
+        register_peer_as_reflector(ctx, &peer_node_id, coordinate).await;
+    }
+
     if let Some(ctx) = peer_ctx {
         tokio::spawn(async move {
             run_peer_message_loop(connection, peer_node_id, coordinate, ctx).await;
@@ -430,6 +435,8 @@ async fn handle_peer_message_connection(
 
 /// Handle a sync/reflector message (tag 0x10).
 /// Dispatches through `SyncDispatcher` and sends reply if produced.
+/// Wires `NodeBlockchainBlockProvider` so sync request responses
+/// contain real block hashes from the local chain.
 async fn handle_sync_message(
     payload: &[u8],
     stream: &mut stoq::Stream,
@@ -455,6 +462,11 @@ async fn handle_sync_message(
         z: sender_coord.z as f64,
     };
 
+    // Build a snapshot-based BlockProvider from the current chain
+    let chain = ctx.blockchain.get_chain().await;
+    let provider =
+        crate::blockchain::sync_manager::NodeBlockchainBlockProvider::from_blocks(&chain);
+
     let (mut sm, mut rp) = tokio::join!(
         ctx.sync_manager.lock(),
         ctx.reflector_pool.lock(),
@@ -463,7 +475,7 @@ async fn handle_sync_message(
     let mut dispatcher = sync_dispatch::SyncDispatcher {
         sync_manager: &mut sm,
         reflector_pool: &mut rp,
-        block_provider: None,
+        block_provider: Some(&provider),
     };
 
     let response = dispatcher.dispatch(msg, sender_node_id, sender_pos);
@@ -471,6 +483,53 @@ async fn handle_sync_message(
     if let sync_dispatch::DispatchResponse::Reply(reply_msg) = response {
         send_sync_reply(stream, &reply_msg).await;
     }
+}
+
+/// Register a newly-accepted peer as a reflector in the ReflectorPool.
+///
+/// Derives the network_id from the local blockchain's genesis hash and
+/// registers the peer with default health so that `TransportSyncDriver`
+/// can target it during proactive sync rounds.
+async fn register_peer_as_reflector(
+    ctx: &PeerContext,
+    peer_node_id: &str,
+    peer_coord: MatrixCoordinate,
+) {
+    let chain = ctx.blockchain.get_chain().await;
+    let genesis_hash = chain.first().map(|b| b.hash.as_str()).unwrap_or("");
+    if genesis_hash.is_empty() {
+        return;
+    }
+    let network_id = format!("public-{}", &genesis_hash[..16.min(genesis_hash.len())]);
+
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let reflector = crate::network::reflector_pool::Reflector {
+        node_id: peer_node_id.to_string(),
+        position: hypermesh_lib::MatrixPosition {
+            x: peer_coord.x as f64,
+            y: peer_coord.y as f64,
+            z: peer_coord.z as f64,
+        },
+        last_seen: now_secs,
+        block_height: 0,
+        health_score: 1.0,
+        privacy_mode: crate::bootstrap::PrivacyMode::PUBLIC,
+    };
+
+    ctx.reflector_pool
+        .lock()
+        .await
+        .register_reflector(&network_id, reflector);
+
+    info!(
+        "Registered accepted peer {} as reflector for {}",
+        &peer_node_id[..8.min(peer_node_id.len())],
+        &network_id,
+    );
 }
 
 /// Serialize and send a sync reply on the given stream.
