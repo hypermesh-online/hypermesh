@@ -1928,19 +1928,14 @@ async fn run_connect(
         }
     };
 
-    // STOQ API bridge: expose all IPC handlers over STOQ protocol
-    if let Some(ref transport) = transport_ref {
-        let api_server = stoq::StoqApiServer::new(transport.clone());
-        blockmatrix::api::ipc_bridge::register_ipc_bridge(&api_server, handler.clone());
-        tokio::spawn(async move {
-            if let Err(e) = api_server.listen().await {
-                warn!("STOQ API server error: {}", e);
-            }
-        });
-        info!("STOQ API bridge started on STOQ transport");
-    } else {
-        info!("No STOQ transport available, API bridge not started (local-only mode)");
-    }
+    // STOQ API bridge: handlers registered but listen loop disabled.
+    // The STOQ API server's listen() would compete with accept_connections()
+    // for incoming QUIC connections on the same transport. Until we add protocol
+    // discrimination (API vs peer handshake), API access uses IPC (Unix socket)
+    // and Gateway proxies external requests to IPC.
+    // TODO: Add stream-level protocol discriminator so API and peer connections
+    // can share the same STOQ port, or use a dedicated API port.
+    info!("API access available via IPC (Unix socket). STOQ API bridge deferred until protocol discriminator is implemented.");
 
     // Register default system dashboard as a blockchain asset if none exists
     {

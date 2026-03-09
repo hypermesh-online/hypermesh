@@ -109,7 +109,7 @@ items = [
 [features.in_development]
 items = [
     # Layer migration COMPLETE (Phases 1-5): FalconIdentity → TrustChain, bilateral handshake → STOQ, Identity as asset type
-    "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Not yet tested multi-node end-to-end.",
+    "Bilateral handshake wiring — connect_to_peer()/accept_connections() delegate to stoq::initiate_handshake()/accept_handshake() via NodeSigner+StateProofProvider traits. Tested two-node locally (Private mode, block propagation verified).",
     "Identity-as-asset — SystemAssetKind::Identity type added (R1/R10), actual FALCON pubkey registration during bootstrap not yet wired",
     # Mesh networking gaps (not yet wired end-to-end)
     "Network sync wiring — Scope-aware block handling implemented (Device/Network/Public), block transport over STOQ working. Full reflector-pool chain sync not yet end-to-end.",

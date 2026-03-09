@@ -263,13 +263,11 @@ impl NetworkManager {
         // Always use the NetworkManager handshake path (flat JSON).
         // MatrixStoqIntegration::connect_to_node sends MatrixMessage::Announcement
         // which is incompatible with handle_incoming_handshake on the accept side.
-        let endpoint = stoq::Endpoint::new(
-            match addr {
-                SocketAddr::V6(v6) => *v6.ip(),
-                _ => return Err(anyhow!("Only IPv6 addresses supported")),
-            },
-            addr.port(),
-        );
+        let ipv6 = match addr {
+            SocketAddr::V6(v6) => *v6.ip(),
+            SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
+        };
+        let endpoint = stoq::Endpoint::new(ipv6, addr.port());
 
         // Connect via STOQ
         let connection = self.transport.connect(&endpoint).await?;
