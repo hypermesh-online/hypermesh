@@ -14,8 +14,10 @@ use tracing::{debug, info, warn};
 
 use anyhow::{anyhow, Result};
 
+use crate::assets::core::asset_id::{AssetCategory, BaseSystemType};
 use crate::blockchain::block::Block;
 use crate::bootstrap::PrivacyMode;
+use crate::dns::DnsBlockEntry;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::shard_transport;
@@ -284,6 +286,7 @@ async fn insert_block(
     match ctx.blockchain.insert_received_block(block.clone()).await {
         Ok(()) => {
             info!("Received and stored block #{} from peer {}", block.index, short_id);
+            extract_dns_entries_from_block(block, ctx).await;
             true
         }
         Err(e) => {
@@ -293,6 +296,67 @@ async fn insert_block(
             );
             false
         }
+    }
+}
+
+/// Scan a block's entries for DNS assets and register them in the local resolver.
+async fn extract_dns_entries_from_block(block: &Block, ctx: &PeerContext) {
+    let resolver = match ctx.dns_resolver.as_ref() {
+        Some(r) => r,
+        None => return,
+    };
+
+    for entry in &block.entries {
+        let is_dns = matches!(
+            entry.registration.category,
+            AssetCategory::BaseSystem(BaseSystemType::Dns)
+        );
+        if !is_dns {
+            continue;
+        }
+
+        // DNS data is stored as JSON in StoragePointer::Local { path }
+        let dns_json = match &entry.storage_pointer {
+            crate::blockchain::block::StoragePointer::Local { path } => path.as_str(),
+            _ => {
+                debug!(
+                    "Block #{} DNS entry has no local storage data, skipping",
+                    block.index,
+                );
+                continue;
+            }
+        };
+
+        let dns_entry: DnsBlockEntry = match serde_json::from_str(dns_json) {
+            Ok(e) => e,
+            Err(e) => {
+                debug!(
+                    "Block #{} DNS entry parse failed: {}",
+                    block.index, e,
+                );
+                continue;
+            }
+        };
+
+        // Extract IP address from the DNS record data
+        let ip_addr = match &dns_entry.record_data {
+            crate::dns::DnsRecordData::AAAA(addr) => {
+                std::net::IpAddr::V6(*addr)
+            }
+            _ => {
+                debug!(
+                    "Block #{} DNS entry '{}' is not AAAA, skipping resolver insert",
+                    block.index, dns_entry.domain_name,
+                );
+                continue;
+            }
+        };
+
+        info!(
+            "Extracted DNS from block #{}: {} -> {}",
+            block.index, dns_entry.domain_name, ip_addr,
+        );
+        resolver.register(dns_entry.domain_name, ip_addr).await;
     }
 }
 

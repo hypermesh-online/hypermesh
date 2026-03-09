@@ -36,7 +36,7 @@ pub use invitation::{
 };
 pub use pools::{DnsPool, DnsPoolManager, DnsPoolType, PoolVisibility};
 pub use records::{DnsRecord, DnsRecordData, DnsRecordType};
-pub use registration::{DnsRegistrar, DnsRegistration, RegistrationStatus};
+pub use registration::{DnsBlockEntry, DnsRegistrar, DnsRegistration, RegistrationStatus};
 pub use resolver::{DnsQuery, DnsResolutionTier, DnsResolver, DnsResponse};
 pub use trustchain::{TrustChainDnsClient, TrustChainDnsService};
 pub use validation::{DnsValidator, ValidationResult};

@@ -36,7 +36,7 @@ use tracing::{debug, info, warn};
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::blockchain::propagation::BlockPropagator;
 use crate::blockchain::sync_manager::SyncManager;
-use crate::bootstrap::PrivacyMode;
+use crate::bootstrap::{DnsResolver, PrivacyMode};
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::reflector_pool::ReflectorPool;
@@ -98,6 +98,8 @@ pub struct PeerContext {
     pub spatial_bucket_assigner: Option<Arc<RwLock<SpatialBucketAssigner>>>,
     /// Live list of connected peer coordinates for block re-propagation.
     pub connected_peer_coords: Arc<RwLock<Vec<MatrixCoordinate>>>,
+    /// DNS resolver for populating DNS entries extracted from received blocks.
+    pub dns_resolver: Option<DnsResolver>,
 }
 
 /// Network manager for multi-node communication

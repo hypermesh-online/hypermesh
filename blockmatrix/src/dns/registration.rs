@@ -6,9 +6,13 @@
 //!
 //! Handles DNS record registration with blockchain integration.
 
-use super::{DnsError, DnsPoolManager, DnsRecord, DnsResult, Domain};
+use super::{DnsError, DnsPoolManager, DnsRecord, DnsRecordData, DnsRecordType, DnsResult, Domain};
 use super::domain::DomainRegistration;
 use super::pools::PoolVisibility;
+use crate::assets::core::asset_id::{
+    AssetCategory, AssetData, BaseSystemType, NetworkScope,
+};
+use crate::assets::core::AssetRegistration;
 use crate::blockchain::NodeBlockchain;
 use crate::bootstrap::PrivacyMode;
 use crate::proof_of_state::StateProof;
@@ -18,6 +22,25 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+
+/// DNS record data stored inside a blockchain block entry.
+///
+/// Serialized as JSON into the `AssetData::definition` field so that
+/// peers receiving the block can reconstruct the DNS record without
+/// access to the original registration request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DnsBlockEntry {
+    /// Fully-qualified domain name (e.g. "nike", "admin.nike")
+    pub domain_name: String,
+    /// DNS record type (AAAA, CNAME, TXT, etc.)
+    pub record_type: DnsRecordType,
+    /// DNS record payload
+    pub record_data: DnsRecordData,
+    /// Time-to-live in seconds
+    pub ttl: u32,
+    /// Owner node ID
+    pub owner: String,
+}
 
 /// Registration status
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -310,18 +333,37 @@ impl DnsRegistrar {
 
         match blockchain_opt.as_ref() {
             Some(blockchain) => {
-                // Create blockchain transaction for DNS registration
                 let bc = blockchain.write().await;
-                let tx_data = format!("DNS Registration: {} -> {:?}", domain.full, record.data);
+
+                let dns_entry = DnsBlockEntry {
+                    domain_name: domain.full.clone(),
+                    record_type: record.record_type.clone(),
+                    record_data: record.data.clone(),
+                    ttl: record.ttl,
+                    owner: record.owner.clone(),
+                };
+                let dns_bytes = serde_json::to_vec(&dns_entry)
+                    .map_err(|e| DnsError::BlockchainError(e.to_string()))?;
+
+                let asset_data = AssetData {
+                    config: domain.full.as_bytes().to_vec(),
+                    definition: dns_bytes.clone(),
+                    metadata: Vec::new(),
+                };
+                let registration = AssetRegistration::from_asset_data(
+                    &asset_data,
+                    NetworkScope::Global,
+                    AssetCategory::BaseSystem(BaseSystemType::Dns),
+                );
+
                 let block = bc
-                    .add_block_with_data(tx_data.into_bytes(), proof)
+                    .register_dns_asset(registration, proof, dns_bytes)
                     .await
                     .map_err(|e| DnsError::BlockchainError(e.to_string()))?;
 
                 Ok(block.hash.clone())
             }
             None => {
-                // No blockchain available - generate mock transaction hash
                 warn!("No blockchain instance available, using mock transaction");
                 Ok(format!("mock-tx-{}", uuid::Uuid::new_v4()))
             }

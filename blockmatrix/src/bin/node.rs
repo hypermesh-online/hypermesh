@@ -1143,6 +1143,51 @@ async fn load_persisted_dns(
     }
 }
 
+/// Scan the blockchain for DNS-typed block entries and register them
+/// in the local resolver. Called on startup after blockchain is loaded
+/// from persistence, so that DNS names propagated from peers are available.
+async fn extract_dns_from_blockchain(
+    dns: &blockmatrix::bootstrap::DnsResolver,
+    bootstrap: &NodeBootstrap,
+) {
+    let chain = bootstrap.blockchain().get_chain().await;
+    let mut count = 0u64;
+
+    for block in &chain {
+        for entry in &block.entries {
+            let is_dns = matches!(
+                entry.registration.category,
+                AssetCategory::BaseSystem(BaseSystemType::Dns)
+            );
+            if !is_dns {
+                continue;
+            }
+
+            let dns_json = match &entry.storage_pointer {
+                blockmatrix::blockchain::block::StoragePointer::Local { path } => path.as_str(),
+                _ => continue,
+            };
+
+            let dns_entry: blockmatrix::dns::DnsBlockEntry = match serde_json::from_str(dns_json) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+
+            let ip_addr = match &dns_entry.record_data {
+                blockmatrix::dns::DnsRecordData::AAAA(addr) => std::net::IpAddr::V6(*addr),
+                _ => continue,
+            };
+
+            dns.register(dns_entry.domain_name, ip_addr).await;
+            count += 1;
+        }
+    }
+
+    if count > 0 {
+        info!("Extracted {count} DNS record(s) from blockchain");
+    }
+}
+
 /// Persist a single DNS record by updating the on-disk JSON file.
 fn persist_dns_record(
     data_dir: &std::path::Path,
@@ -1466,11 +1511,26 @@ async fn run_dns(
 
             // 3. Register on local blockchain (DNS-as-asset, R10)
             let bc = bootstrap.blockchain();
-            let dns_data_str = format!("DNS:REGISTER:{name}:{target_addr}");
+
+            // Build DnsBlockEntry so peers can extract the record from the block
+            let ipv6_addr = match target_addr {
+                std::net::IpAddr::V6(v6) => v6,
+                std::net::IpAddr::V4(v4) => v4.to_ipv6_mapped(),
+            };
+            let dns_entry = blockmatrix::dns::DnsBlockEntry {
+                domain_name: name.clone(),
+                record_type: blockmatrix::dns::DnsRecordType::AAAA,
+                record_data: blockmatrix::dns::DnsRecordData::AAAA(ipv6_addr),
+                ttl: 300,
+                owner: node_id.to_string(),
+            };
+            let dns_bytes = serde_json::to_vec(&dns_entry)
+                .context("failed to serialize DNS entry")?;
+
             let asset_data = AssetData {
-                config: dns_data_str.as_bytes().to_vec(),
-                definition: format!("dns-record:{name}").into_bytes(),
-                metadata: format!("addr={target_addr}").into_bytes(),
+                config: name.as_bytes().to_vec(),
+                definition: dns_bytes.clone(),
+                metadata: Vec::new(),
             };
             let registration = AssetRegistration::from_asset_data(
                 &asset_data,
@@ -1481,7 +1541,7 @@ async fn run_dns(
                 .await
                 .context("PoS proof generation failed for DNS registration")?;
             let block = bc
-                .register_asset_record(registration, &state_proof)
+                .register_dns_asset(registration, &state_proof, dns_bytes)
                 .await
                 .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
 
@@ -1713,6 +1773,7 @@ async fn run_connect(
             },
             spatial_bucket_assigner: None,
             connected_peer_coords: connected_peer_coords.clone(),
+            dns_resolver: Some(bootstrap.dns().clone()),
         });
 
         // Start message loops for peers connected during discovery (before PeerContext existed)
@@ -2518,6 +2579,9 @@ async fn main() -> Result<()> {
 
     // Load persisted DNS records (user-registered names survive restarts)
     load_persisted_dns(bootstrap.dns(), &data_dir, &nid).await;
+
+    // Extract DNS entries from blockchain (propagated from peers)
+    extract_dns_from_blockchain(bootstrap.dns(), &bootstrap).await;
 
     // Verify self-sufficiency
     bootstrap.verify_self_sufficient().await?;

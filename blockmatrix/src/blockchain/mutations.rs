@@ -176,6 +176,43 @@ impl NodeBlockchain {
         self.add_block(vec![entry]).await
     }
 
+    /// Register a DNS asset on this node's blockchain.
+    ///
+    /// Unlike [`register_asset_record`] which uses `StoragePointer::Genesis`,
+    /// this stores the serialized DNS record JSON in `StoragePointer::Local`
+    /// so that peers receiving the block can extract and resolve the name.
+    pub async fn register_dns_asset(
+        &self,
+        registration: AssetRegistration,
+        state_proof: &StateProof,
+        dns_json: Vec<u8>,
+    ) -> Result<Block, String> {
+        info!(
+            "Registering DNS asset on blockchain at ({},{},{})",
+            self.node_coordinate.x,
+            self.node_coordinate.y,
+            self.node_coordinate.z,
+        );
+
+        let asset_hash = registration.content_hash;
+        let proof_bytes = serde_json::to_vec(state_proof).unwrap_or_default();
+        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+
+        // Store serialized DnsBlockEntry in the path field so receivers
+        // can deserialize it without reversing the content hash.
+        let dns_payload = String::from_utf8(dns_json).unwrap_or_default();
+
+        let entry = BlockAssetEntry {
+            asset_hash,
+            proof_hash,
+            state_proof: state_proof.clone(),
+            storage_pointer: StoragePointer::Local { path: dns_payload },
+            registration,
+        };
+
+        self.add_block(vec![entry]).await
+    }
+
     /// Register multiple asset records in a single block.
     ///
     /// Useful during genesis to batch all hardware assets into one block.
