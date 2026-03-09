@@ -219,7 +219,8 @@ export const crateStatuses: CrateStatus[] = [
         "Dependency resolution (topological sort, transitive resolution, circular detection)",
         "Dashboard manifest types (DashboardManifest parse/validate, shared with blockmatrix)",
         "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness)",
-        "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)"
+        "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)",
+        "Catalog server binary stability (standalone STOQ API — LRU cache OOM bug fixed)"
       ],
       "inDevelopment": [
         "STOQ transport for real cross-node distribution — transport code exists but not tested between nodes",
@@ -228,13 +229,12 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
         "Peer-to-peer sharing — announce/discover code exists but local-only until DHT remote I/O is wired",
         "HyperMesh execution delegation — allocate/query/terminate lifecycle code exists but no real remote execution",
-        "Catalog server binary stability (standalone STOQ API — known OOM bug with default LRU cache size)",
         "DHT remote I/O — wire to real STOQ transport for cross-node package discovery",
         "Shared asset library — browse and install packages across nodes on the public network"
       ],
       "planned": []
     },
-    "completion": 61
+    "completion": 65
   },
   {
     "id": "engauge",
@@ -308,10 +308,10 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge API routing (/api/v1/engauge)",
         "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)",
         "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
-        "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)"
+        "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
+        "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable"
       ],
       "inDevelopment": [
-        "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs modules compile and pass tests but are NOT instantiated in main.rs. Gateway only speaks HTTP/3 to TCP backends via Http3Proxy",
         "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
         "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
@@ -323,7 +323,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 70
+    "completion": 73
   },
   {
     "id": "hypermesh",
@@ -347,7 +347,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake. PoS validation is now real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames).",
+        "Network MVP — bilateral handshake protocol in STOQ (stoq/src/protocol/bilateral.rs) with length-prefixed multi-message framing (write_msg/read_msg). BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake() with connection-type discriminator byte. Block sync infrastructure wired. PoS validation is real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames). Not yet tested multi-node end-to-end on separate hosts.",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
@@ -532,7 +532,7 @@ export const crateStatuses: CrateStatus[] = [
         "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)"
       ],
       "inDevelopment": [
-        "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, multi-message framing (write_msg/read_msg). BlockMatrix wired to call initiate_handshake()/accept_handshake(). Not yet tested multi-node end-to-end.",
+        "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, length-prefixed multi-message framing (write_msg/read_msg), connection-type discriminator byte. BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake(). Framing verified correct (write_msg does NOT call finish()). Not yet tested multi-node end-to-end on separate hosts.",
         "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
         "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
@@ -571,6 +571,7 @@ export const crateStatuses: CrateStatus[] = [
         "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
+        "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
         "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
@@ -589,7 +590,6 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
         "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
         "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
-        "Production binary hardening (config file loading, graceful shutdown, health endpoint, signal handling)",
         "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS"
       ],
       "planned": [
@@ -604,7 +604,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 44
+    "completion": 47
   },
   {
     "id": "ui",
