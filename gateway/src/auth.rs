@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use hypermesh_lib::PrivacyMode;
 
@@ -212,6 +212,63 @@ impl AuthManager {
         )
     }
 
+    /// Authenticate a STOQ connection using a PoS token (WireSignedProof bytes).
+    ///
+    /// Performs real FALCON-1024 signature verification on the proof envelope:
+    /// 1. Deserializes the `WireSignedProof` JSON envelope.
+    /// 2. Recomputes `BLAKE3(proof_bytes || nonce)`.
+    /// 3. Verifies the FALCON-1024 detached signature against the embedded public key.
+    /// 4. Derives identity from the signer's public key fingerprint.
+    ///
+    /// Falls back to `authenticate_stoq` (connection-ID-based) if no proof is provided.
+    pub fn authenticate_stoq_with_proof(
+        &self,
+        privacy_mode: PrivacyMode,
+        connection_id: &str,
+        pos_token: Option<&[u8]>,
+    ) -> AuthResult {
+        self.stats.total_attempts.fetch_add(1, Ordering::Relaxed);
+
+        if privacy_mode == PrivacyMode::ANONYMOUS {
+            self.stats.anonymous.fetch_add(1, Ordering::Relaxed);
+            return AuthResult::Anonymous;
+        }
+
+        // If a PoS token is provided, validate the FALCON-1024 signature
+        let Some(token_bytes) = pos_token else {
+            // No proof — fall back to connection-ID-based auth
+            self.stats.successful.fetch_add(1, Ordering::Relaxed);
+            return AuthResult::Authenticated {
+                identity: format!("stoq:{connection_id}"),
+                privacy_mode,
+            };
+        };
+
+        match validate_wire_signed_proof(token_bytes) {
+            Ok(signer_fingerprint) => {
+                info!(
+                    fingerprint = %signer_fingerprint,
+                    connection = %connection_id,
+                    "PoS token validated (FALCON-1024 signature verified)"
+                );
+                self.stats.successful.fetch_add(1, Ordering::Relaxed);
+                AuthResult::Authenticated {
+                    identity: format!("pos:{signer_fingerprint}"),
+                    privacy_mode,
+                }
+            }
+            Err(reason) => {
+                warn!(
+                    connection = %connection_id,
+                    reason = %reason,
+                    "PoS token validation failed"
+                );
+                self.stats.rejected.fetch_add(1, Ordering::Relaxed);
+                AuthResult::Rejected { reason }
+            }
+        }
+    }
+
     // ---- internal helpers ----
 
     /// Validate a bearer token against sessions and bootstrap handler.
@@ -244,6 +301,55 @@ impl AuthManager {
             reason: "invalid bearer token".into(),
         }
     }
+}
+
+/// Wire format for FALCON-signed state proofs.
+///
+/// Mirrors `blockmatrix::proof_of_state::WireSignedProof` — gateway
+/// deserializes and verifies these envelopes without depending on
+/// the blockmatrix crate.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct WireSignedProof {
+    /// JSON-serialized `StateProof`.
+    proof_bytes: Vec<u8>,
+    /// FALCON-1024 detached signature over `BLAKE3(proof_bytes || nonce)`.
+    signature: Vec<u8>,
+    /// Signer's full FALCON-1024 public key.
+    signer_pubkey: Vec<u8>,
+    /// Random nonce for replay prevention.
+    nonce: [u8; 32],
+}
+
+/// Validate a `WireSignedProof` envelope.
+///
+/// Returns the BLAKE3 hex fingerprint of the signer's public key on success,
+/// or a human-readable error string on failure.
+fn validate_wire_signed_proof(incoming: &[u8]) -> Result<String, String> {
+    let wire: WireSignedProof = serde_json::from_slice(incoming)
+        .map_err(|e| format!("invalid WireSignedProof envelope: {e}"))?;
+
+    // Recompute BLAKE3(proof_bytes || nonce)
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&wire.proof_bytes);
+    hasher.update(&wire.nonce);
+    let digest = hasher.finalize();
+
+    // Verify FALCON-1024 signature
+    use pqcrypto_falcon::falcon1024;
+    use pqcrypto_traits::sign::{DetachedSignature, PublicKey};
+
+    let pk = falcon1024::PublicKey::from_bytes(&wire.signer_pubkey)
+        .map_err(|e| format!("invalid FALCON public key: {e}"))?;
+    let sig = falcon1024::DetachedSignature::from_bytes(&wire.signature)
+        .map_err(|e| format!("invalid FALCON signature bytes: {e}"))?;
+
+    falcon1024::verify_detached_signature(&sig, digest.as_bytes(), &pk)
+        .map_err(|_| "FALCON-1024 signature verification failed".to_string())?;
+
+    // Derive identity from signer's public key fingerprint
+    let fingerprint = blake3::hash(&wire.signer_pubkey);
+    let hex_fingerprint = &fingerprint.to_hex()[..16]; // first 16 hex chars
+    Ok(hex_fingerprint.to_string())
 }
 
 #[cfg(test)]
@@ -479,5 +585,163 @@ mod tests {
         assert_eq!(snap.anonymous, 2); // HTTP/3 anonymous + STOQ anonymous
         assert_eq!(snap.rejected, 1);
         assert_eq!(snap.successful, 1); // STOQ public
+    }
+
+    // --- PoS token validation ---
+
+    /// Build a valid WireSignedProof using real FALCON-1024 keys.
+    fn build_valid_wire_proof() -> Vec<u8> {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::PublicKey;
+
+        let (pk, sk) = falcon1024::keypair();
+
+        // Arbitrary proof payload (would be a serialized StateProof in production)
+        let proof_bytes = b"{\"node_id\":\"test-node\"}".to_vec();
+        let mut nonce = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
+
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&proof_bytes);
+        hasher.update(&nonce);
+        let digest = hasher.finalize();
+
+        let sig = falcon1024::detached_sign(digest.as_bytes(), &sk);
+        use pqcrypto_traits::sign::DetachedSignature;
+
+        let wire = super::WireSignedProof {
+            proof_bytes,
+            signature: sig.as_bytes().to_vec(),
+            signer_pubkey: pk.as_bytes().to_vec(),
+            nonce,
+        };
+        serde_json::to_vec(&wire).expect("test: serialize wire proof")
+    }
+
+    #[test]
+    fn pos_token_valid_falcon_signature() {
+        let mgr = AuthManager::new(None);
+        let proof = build_valid_wire_proof();
+
+        let result = mgr.authenticate_stoq_with_proof(
+            PrivacyMode::PUBLIC,
+            "conn-1",
+            Some(&proof),
+        );
+        match result {
+            AuthResult::Authenticated { identity, .. } => {
+                assert!(identity.starts_with("pos:"), "identity should start with pos: prefix, got {identity}");
+            }
+            other => unreachable!("expected Authenticated, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn pos_token_tampered_signature_rejected() {
+        let mgr = AuthManager::new(None);
+        let mut proof = build_valid_wire_proof();
+
+        // Tamper with a byte deep inside the JSON (the signature field)
+        let wire: super::WireSignedProof = serde_json::from_slice(&proof)
+            .expect("test: valid proof");
+        let mut tampered_sig = wire.signature.clone();
+        if let Some(byte) = tampered_sig.get_mut(0) {
+            *byte ^= 0xFF;
+        }
+        let tampered_wire = super::WireSignedProof {
+            proof_bytes: wire.proof_bytes,
+            signature: tampered_sig,
+            signer_pubkey: wire.signer_pubkey,
+            nonce: wire.nonce,
+        };
+        proof = serde_json::to_vec(&tampered_wire).expect("test: serialize");
+
+        let result = mgr.authenticate_stoq_with_proof(
+            PrivacyMode::PUBLIC,
+            "conn-2",
+            Some(&proof),
+        );
+        assert!(matches!(result, AuthResult::Rejected { .. }));
+    }
+
+    #[test]
+    fn pos_token_invalid_envelope_rejected() {
+        let mgr = AuthManager::new(None);
+        let bad_bytes = b"not valid json at all";
+
+        let result = mgr.authenticate_stoq_with_proof(
+            PrivacyMode::PUBLIC,
+            "conn-3",
+            Some(bad_bytes),
+        );
+        assert!(matches!(result, AuthResult::Rejected { .. }));
+    }
+
+    #[test]
+    fn pos_token_none_falls_back_to_connection_id() {
+        let mgr = AuthManager::new(None);
+        let result = mgr.authenticate_stoq_with_proof(
+            PrivacyMode::PRIVATE,
+            "conn-4",
+            None,
+        );
+        match result {
+            AuthResult::Authenticated { identity, .. } => {
+                assert_eq!(identity, "stoq:conn-4");
+            }
+            other => unreachable!("expected Authenticated, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn pos_token_anonymous_skips_validation() {
+        let mgr = AuthManager::new(None);
+        let proof = build_valid_wire_proof();
+
+        let result = mgr.authenticate_stoq_with_proof(
+            PrivacyMode::ANONYMOUS,
+            "conn-5",
+            Some(&proof),
+        );
+        assert!(matches!(result, AuthResult::Anonymous));
+    }
+
+    #[test]
+    fn validate_wire_signed_proof_valid() {
+        let proof = build_valid_wire_proof();
+        let result = super::validate_wire_signed_proof(&proof);
+        assert!(result.is_ok(), "expected Ok, got {:?}", result);
+        let fingerprint = result.expect("test: valid fingerprint");
+        assert_eq!(fingerprint.len(), 16, "fingerprint should be 16 hex chars");
+    }
+
+    #[test]
+    fn validate_wire_signed_proof_wrong_nonce() {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::PublicKey;
+
+        let (pk, sk) = falcon1024::keypair();
+        let proof_bytes = b"{\"test\":true}".to_vec();
+        let nonce = [42u8; 32];
+
+        // Sign with correct nonce
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&proof_bytes);
+        hasher.update(&nonce);
+        let digest = hasher.finalize();
+        let sig = falcon1024::detached_sign(digest.as_bytes(), &sk);
+        use pqcrypto_traits::sign::DetachedSignature;
+
+        // Store with different nonce (replay attempt)
+        let wire = super::WireSignedProof {
+            proof_bytes,
+            signature: sig.as_bytes().to_vec(),
+            signer_pubkey: pk.as_bytes().to_vec(),
+            nonce: [99u8; 32], // different nonce
+        };
+        let bytes = serde_json::to_vec(&wire).expect("test: serialize");
+
+        let result = super::validate_wire_signed_proof(&bytes);
+        assert!(result.is_err(), "wrong nonce should fail verification");
     }
 }

@@ -34,11 +34,16 @@ pin-project = "1.1"
 thiserror = "2.0"
 async-trait = { workspace = true }
 chrono = { workspace = true }
+blake3 = { workspace = true }
+pqcrypto-falcon = { workspace = true }
+pqcrypto-traits = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 tower = "0.5"
 hyper = "1.5"
+tempfile = { workspace = true }
 
 [[bin]]
 name = "gateway"

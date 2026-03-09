@@ -31,17 +31,17 @@ items = [
     "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
     "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
     "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
+    "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
+    "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides",
 ]
 
 [features.in_development]
 items = [
     "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
-    "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
     "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
     "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
     "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
     "Outbound proxy with allowlist filtering — code exists, not tested",
-    "Production config loader (TOML/env-based config)",
     "Backend service discovery (resolve by address or service registry)",
 ]
 

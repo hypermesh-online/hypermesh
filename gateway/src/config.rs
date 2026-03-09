@@ -222,6 +222,109 @@ impl Default for CorsConfig {
 }
 
 impl GatewayConfig {
+    /// Default config file path: `~/.hypermesh/gateway.toml`.
+    pub fn default_path() -> PathBuf {
+        let home = std::env::var("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("."));
+        home.join(".hypermesh").join("gateway.toml")
+    }
+
+    /// Load configuration with cascading priority:
+    ///
+    /// 1. `GATEWAY_CONFIG` env var (explicit file path)
+    /// 2. `~/.hypermesh/gateway.toml` (user config)
+    /// 3. Environment variable overrides (applied on top)
+    /// 4. Built-in defaults (for any fields not set)
+    ///
+    /// If no config file exists, returns defaults with env overrides.
+    pub fn load() -> Result<Self> {
+        // Check for explicit config path via env var
+        if let Ok(path) = std::env::var("GATEWAY_CONFIG") {
+            let file_path = Path::new(&path);
+            if file_path.exists() {
+                let mut config = Self::from_file(file_path)?;
+                config.apply_env_overrides()?;
+                return Ok(config);
+            }
+            anyhow::bail!(
+                "GATEWAY_CONFIG points to non-existent file: {}",
+                file_path.display()
+            );
+        }
+
+        // Try default path
+        let default = Self::default_path();
+        let mut config = if default.exists() {
+            Self::from_file(&default)?
+        } else {
+            Self::default()
+        };
+
+        config.apply_env_overrides()?;
+        Ok(config)
+    }
+
+    /// Apply environment variable overrides to an existing config.
+    fn apply_env_overrides(&mut self) -> Result<()> {
+        if let Ok(addr) = std::env::var("GATEWAY_LISTEN_ADDR") {
+            self.listen_addr = addr.parse()?;
+        }
+        if let Ok(addr) = std::env::var("TRUSTCHAIN_ADDR") {
+            self.trustchain_addr = addr.parse()?;
+        }
+        if let Ok(addr) = std::env::var("BLOCKMATRIX_ADDR") {
+            self.blockmatrix_addr = addr.parse()?;
+        }
+        if let Ok(addr) = std::env::var("CAESAR_ADDR") {
+            self.caesar_addr = addr.parse()?;
+        }
+        if let Ok(name) = std::env::var("TRUSTCHAIN_SERVER_NAME") {
+            self.trustchain_server_name = name;
+        }
+        if let Ok(name) = std::env::var("BLOCKMATRIX_SERVER_NAME") {
+            self.blockmatrix_server_name = name;
+        }
+        if let Ok(name) = std::env::var("CAESAR_SERVER_NAME") {
+            self.caesar_server_name = name;
+        }
+        if let Ok(addr) = std::env::var("CATALOG_ADDR") {
+            self.catalog_addr = addr.parse()?;
+        }
+        if let Ok(name) = std::env::var("CATALOG_SERVER_NAME") {
+            self.catalog_server_name = name;
+        }
+        if let Ok(addr) = std::env::var("ENGAUGE_ADDR") {
+            self.engauge_addr = addr.parse()?;
+        }
+        if let Ok(name) = std::env::var("ENGAUGE_SERVER_NAME") {
+            self.engauge_server_name = name;
+        }
+        if let Ok(path) = std::env::var("CERT_PATH") {
+            self.cert_path = PathBuf::from(path);
+        }
+        if let Ok(path) = std::env::var("KEY_PATH") {
+            self.key_path = PathBuf::from(path);
+        }
+        if let Ok(level) = std::env::var("LOG_LEVEL") {
+            self.log_level = level;
+        }
+        if let Ok(addr) = std::env::var("STOQ_LISTEN_ADDR") {
+            if addr.eq_ignore_ascii_case("none") || addr.eq_ignore_ascii_case("disabled") {
+                self.stoq_listen_addr = None;
+            } else {
+                self.stoq_listen_addr = Some(addr.parse()?);
+            }
+        }
+        if let Ok(max) = std::env::var("STOQ_MAX_CONNECTIONS") {
+            self.stoq_max_connections = max.parse()?;
+        }
+        Ok(())
+    }
+
+    /// Load configuration from environment variables only (legacy API).
+    ///
+    /// Prefer [`GatewayConfig::load`] which supports TOML files + env overrides.
     pub fn from_env() -> Result<Self> {
         let mut config = Self::default();
 
@@ -304,5 +407,151 @@ impl GatewayConfig {
         let config: Self = toml::from_str(&contents)
             .with_context(|| format!("failed to parse config file: {}", path.display()))?;
         Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn default_config_is_valid() {
+        let config = GatewayConfig::default();
+        assert_eq!(config.listen_addr.port(), 8443);
+        assert_eq!(config.stoq_max_connections, 100);
+        assert_eq!(config.log_level, "info");
+    }
+
+    #[test]
+    fn default_path_contains_gateway_toml() {
+        let path = GatewayConfig::default_path();
+        assert!(path.ends_with("gateway.toml"));
+        assert!(path.to_string_lossy().contains(".hypermesh"));
+    }
+
+    #[test]
+    fn from_file_parses_toml() {
+        let dir = tempfile::tempdir().expect("test: create temp dir");
+        let file_path = dir.path().join("gateway.toml");
+
+        let toml_content = r#"
+listen_addr = "[::]:9999"
+trustchain_addr = "[::1]:8444"
+blockmatrix_addr = "[::1]:9292"
+caesar_addr = "[::1]:9294"
+catalog_addr = "[::1]:9295"
+engauge_addr = "[::1]:9296"
+trustchain_server_name = "tc"
+blockmatrix_server_name = "bm"
+caesar_server_name = "cs"
+catalog_server_name = "cat"
+engauge_server_name = "eng"
+cert_path = "/tmp/cert.pem"
+key_path = "/tmp/key.pem"
+log_level = "debug"
+stoq_max_connections = 50
+
+[pool]
+max_connections = 5
+idle_timeout = { secs = 60, nanos = 0 }
+connect_timeout = { secs = 5, nanos = 0 }
+keep_alive_interval = { secs = 15, nanos = 0 }
+
+[retry]
+max_attempts = 2
+base_delay = { secs = 0, nanos = 200000000 }
+max_delay = { secs = 3, nanos = 0 }
+multiplier = 1.5
+
+[cors]
+allowed_origins = ["http://localhost:3000"]
+allowed_methods = ["GET", "POST"]
+allowed_headers = ["Content-Type"]
+allow_credentials = false
+max_age = 1800
+"#;
+        let mut f = std::fs::File::create(&file_path).expect("test: create file");
+        f.write_all(toml_content.as_bytes())
+            .expect("test: write toml");
+
+        let config = GatewayConfig::from_file(&file_path).expect("test: parse config");
+        assert_eq!(config.listen_addr.port(), 9999);
+        assert_eq!(config.log_level, "debug");
+        assert_eq!(config.stoq_max_connections, 50);
+        assert_eq!(config.pool.max_connections, 5);
+        assert_eq!(config.retry.max_attempts, 2);
+        assert!(!config.cors.allow_credentials);
+    }
+
+    #[test]
+    fn from_file_missing_returns_error() {
+        let result = GatewayConfig::from_file(Path::new("/tmp/nonexistent-gateway.toml"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn load_returns_defaults_when_no_config_exists() {
+        // Clear env vars that might interfere
+        std::env::remove_var("GATEWAY_CONFIG");
+        // load() will try ~/.hypermesh/gateway.toml which likely doesn't exist
+        // in test env — should fall through to defaults
+        let config = GatewayConfig::load().expect("test: load should succeed with defaults");
+        assert_eq!(config.listen_addr.port(), 8443);
+    }
+
+    #[test]
+    fn load_uses_gateway_config_env() {
+        let dir = tempfile::tempdir().expect("test: create temp dir");
+        let file_path = dir.path().join("custom-gateway.toml");
+
+        // Write a minimal valid config
+        let toml_content = format!(
+            r#"
+listen_addr = "[::]:7777"
+trustchain_addr = "[::1]:8444"
+blockmatrix_addr = "[::1]:9292"
+caesar_addr = "[::1]:9294"
+catalog_addr = "[::1]:9295"
+engauge_addr = "[::1]:9296"
+trustchain_server_name = "tc"
+blockmatrix_server_name = "bm"
+caesar_server_name = "cs"
+catalog_server_name = "cat"
+engauge_server_name = "eng"
+cert_path = "certs/server.crt"
+key_path = "certs/server.key"
+log_level = "warn"
+stoq_max_connections = 25
+
+[pool]
+max_connections = 10
+idle_timeout = {{ secs = 300, nanos = 0 }}
+connect_timeout = {{ secs = 10, nanos = 0 }}
+keep_alive_interval = {{ secs = 30, nanos = 0 }}
+
+[retry]
+max_attempts = 3
+base_delay = {{ secs = 0, nanos = 100000000 }}
+max_delay = {{ secs = 5, nanos = 0 }}
+multiplier = 2.0
+
+[cors]
+allowed_origins = ["http://localhost:5173"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allowed_headers = ["Content-Type", "Authorization", "X-Request-ID"]
+allow_credentials = true
+max_age = 3600
+"#
+        );
+        std::fs::write(&file_path, toml_content).expect("test: write config");
+
+        std::env::set_var("GATEWAY_CONFIG", file_path.to_str().expect("test: path"));
+        let config = GatewayConfig::load().expect("test: load from GATEWAY_CONFIG");
+        std::env::remove_var("GATEWAY_CONFIG");
+
+        assert_eq!(config.listen_addr.port(), 7777);
+        assert_eq!(config.log_level, "warn");
+        assert_eq!(config.stoq_max_connections, 25);
     }
 }
