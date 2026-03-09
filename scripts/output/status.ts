@@ -108,7 +108,8 @@ export const crateStatuses: CrateStatus[] = [
         "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
         "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
         "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
-        "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure"
+        "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
+        "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider"
       ],
       "inDevelopment": [
         "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired, block fetching protocol implemented. Not yet e2e verified multi-node.",
@@ -346,7 +347,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake.",
+        "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake. PoS validation is now real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames).",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
@@ -579,8 +580,7 @@ export const crateStatuses: CrateStatus[] = [
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
         "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
         "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
-        "Real Proof of State validation — StakeProof::verify_signature() is a STUB (checks non-empty fields, no cryptographic verification). State proofs pass validation with any non-zero values",
-        "StakeProof signature verification — sign() creates BLAKE3 display hash, verify_signature() does NOT actually verify it cryptographically",
+        "StakeProof::verify_signature() is structural-only (non-empty fields check). Cryptographic FALCON-1024 verification is handled by BlockMatrix's WireSignedProof envelope, not by TrustChain directly",
         "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
         "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
         "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
@@ -604,7 +604,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 43
+    "completion": 44
   },
   {
     "id": "ui",
