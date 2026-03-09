@@ -23,7 +23,7 @@ items = [
 [features.in_development]
 items = [
     "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-    "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake.",
+    "Network MVP — bilateral handshake exists but is in WRONG LAYER (blockmatrix instead of STOQ), identity binding fixed but handshake not functional yet due to Stream::send() closing write half (needs multi-message framing). Block sync infrastructure wired but depends on working handshake. PoS validation is now real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames).",
     "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)",
 ]
 

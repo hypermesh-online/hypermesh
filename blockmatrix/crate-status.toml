@@ -114,6 +114,7 @@ items = [
     "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
     "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
     "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
+    "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider",
 ]
 
 [features.in_development]

@@ -40,9 +40,8 @@ items = [
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
     "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
     "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
-    # PROOF OF STATE: Validation is fake
-    "Real Proof of State validation — StakeProof::verify_signature() is a STUB (checks non-empty fields, no cryptographic verification). State proofs pass validation with any non-zero values",
-    "StakeProof signature verification — sign() creates BLAKE3 display hash, verify_signature() does NOT actually verify it cryptographically",
+    # PROOF OF STATE: TrustChain structural only, cryptographic verification in BlockMatrix
+    "StakeProof::verify_signature() is structural-only (non-empty fields check). Cryptographic FALCON-1024 verification is handled by BlockMatrix's WireSignedProof envelope, not by TrustChain directly",
     # STOQ API: Exists but integration incomplete
     "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
     "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
