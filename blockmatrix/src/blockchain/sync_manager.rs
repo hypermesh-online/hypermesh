@@ -11,15 +11,20 @@
 //!
 //! PrivacyMode controls WHO can participate in a network.
 //! BlockchainScope controls WHETHER chains synchronize.
+//!
+//! Wire-level message types and the snapshot-based block provider live in
+//! the sibling `sync_protocol` module.
 
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
-use crate::blockchain::propagation::PropagationStrategy;
 use crate::bootstrap::PrivacyMode;
 use hypermesh_lib::BlockchainScope;
+
+// Re-export extracted types so the public API is unchanged.
+pub use super::sync_protocol::{NodeBlockchainBlockProvider, PropagationStrategyConfig, SyncMessage};
 
 /// Provides block data to the SyncManager for responding to sync requests.
 ///
@@ -56,7 +61,7 @@ pub struct SyncManager {
     sync_states: HashMap<String, SyncState>,
     /// Configuration
     config: SyncConfig,
-    /// Optional observer notified on sync completion (Gap 4)
+    /// Optional observer notified on sync completion
     observer: Option<Box<dyn SyncObserver>>,
 }
 
@@ -114,34 +119,6 @@ pub struct SyncConfig {
     pub propagation_strategy: PropagationStrategyConfig,
 }
 
-/// Serializable wrapper around PropagationStrategy selection.
-///
-/// We keep this separate from the runtime `PropagationStrategy` enum
-/// so that SyncConfig can be serialized/deserialized cleanly.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PropagationStrategyConfig {
-    /// Send to all immediate neighbours
-    Broadcast,
-    /// Send to closest N neighbours
-    NearestN(usize),
-    /// Use optimal routing paths
-    RoutedPath,
-    /// Send to nodes within distance threshold
-    DistanceThreshold(f64),
-}
-
-impl PropagationStrategyConfig {
-    /// Convert to the runtime `PropagationStrategy` used by the propagator
-    pub fn to_runtime(&self) -> PropagationStrategy {
-        match self {
-            Self::Broadcast => PropagationStrategy::Broadcast,
-            Self::NearestN(n) => PropagationStrategy::NearestN(*n),
-            Self::RoutedPath => PropagationStrategy::RoutedPath,
-            Self::DistanceThreshold(d) => PropagationStrategy::DistanceThreshold(*d),
-        }
-    }
-}
-
 impl Default for SyncConfig {
     fn default() -> Self {
         Self {
@@ -151,29 +128,6 @@ impl Default for SyncConfig {
             propagation_strategy: PropagationStrategyConfig::Broadcast,
         }
     }
-}
-
-/// Messages exchanged during synchronization
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SyncMessage {
-    /// Request blocks from a peer starting at a given height
-    Request {
-        network_id: String,
-        from_height: u64,
-        max_blocks: u32,
-    },
-    /// Response containing block hashes and the peer's current height
-    Response {
-        network_id: String,
-        block_hashes: Vec<String>,
-        peer_height: u64,
-    },
-    /// Announce a new block to the network
-    Announce {
-        network_id: String,
-        block_height: u64,
-        block_hash: String,
-    },
 }
 
 impl SyncManager {
@@ -210,9 +164,6 @@ impl SyncManager {
     }
 
     /// Join a Network scope chain
-    ///
-    /// Returns an error string if the maximum number of networks is reached
-    /// or if the node is already a member.
     pub fn join_network(
         &mut self,
         network_id: String,
@@ -252,15 +203,12 @@ impl SyncManager {
     }
 
     /// Leave a Network scope chain
-    ///
-    /// Returns an error string if the node is not a member of the network.
     pub fn leave_network(&mut self, network_id: &str) -> Result<(), String> {
         if self.network_memberships.remove(network_id).is_none() {
             return Err(format!("Not a member of network {network_id}"));
         }
 
         self.sync_states.remove(network_id);
-
         info!(network = %network_id, "Left network");
 
         Ok(())
@@ -487,42 +435,6 @@ impl SyncManager {
             })
             .map(|(id, _)| id.as_str())
             .collect()
-    }
-}
-
-/// Snapshot-based [`BlockProvider`] for `NodeBlockchain`.
-///
-/// Created from a pre-fetched list of blocks, avoiding the need for async
-/// inside the synchronous `BlockProvider` trait. Typical usage:
-///
-/// ```ignore
-/// let blocks = node_blockchain.get_chain().await;
-/// let provider = NodeBlockchainBlockProvider::from_blocks(&blocks);
-/// sync_manager.process_sync_message_with_provider(msg, Some(&provider));
-/// ```
-pub struct NodeBlockchainBlockProvider {
-    block_hashes: Vec<String>,
-    chain_height: u64,
-}
-
-impl NodeBlockchainBlockProvider {
-    /// Create from a slice of [`Block`]s (typically from `NodeBlockchain::get_chain()`).
-    pub fn from_blocks(blocks: &[super::block::Block]) -> Self {
-        Self {
-            block_hashes: blocks.iter().map(|b| b.hash.clone()).collect(),
-            chain_height: blocks.len() as u64,
-        }
-    }
-}
-
-impl BlockProvider for NodeBlockchainBlockProvider {
-    fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64) {
-        let start = from_height as usize;
-        if start >= self.block_hashes.len() {
-            return (vec![], self.chain_height);
-        }
-        let end = (start + max_blocks as usize).min(self.block_hashes.len());
-        (self.block_hashes[start..end].to_vec(), self.chain_height)
     }
 }
 

@@ -23,6 +23,7 @@ pub mod chain;
 pub mod errors;
 pub mod genesis_assessor;
 pub mod genesis_auth;
+pub mod genesis_crypto;
 pub mod genesis_ops;
 pub mod mutations;
 pub mod node_chain;
@@ -30,6 +31,7 @@ pub mod propagation;
 pub mod state;
 pub mod stoq_transport;
 pub mod sync_manager;
+pub mod sync_protocol;
 pub mod validation;
 
 pub use block::Block;
