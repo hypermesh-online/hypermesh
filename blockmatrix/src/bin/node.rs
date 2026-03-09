@@ -37,7 +37,7 @@ use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::blockchain::propagation::{BlockPropagator, PropagationStrategy};
 use blockmatrix::blockchain::stoq_transport::StoqBlockTransportAdapter;
-use blockmatrix::blockchain::sync_manager::{NodeBlockchainBlockProvider, SyncConfig, SyncManager};
+use blockmatrix::blockchain::sync_manager::{SyncConfig, SyncManager};
 use blockmatrix::bootstrap::{node_id, LocalhostCertificate, NodeBootstrap, PrivacyMode};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::reflector_pool::{ReflectorConfig, ReflectorPool};
@@ -1882,7 +1882,7 @@ async fn run_connect(
         let blockchain_sync = bootstrap.blockchain().clone();
         let network_sync = network_clone.clone();
         let node_map_sync = node_map.clone();
-        let block_transport_sync = block_transport.clone();
+        let transport_sync = transport.clone();
         let is_reflector = cli.reflector;
         let sync_coord = coord;
         let shard_store_metrics = shard_store.clone();
@@ -1906,25 +1906,34 @@ async fn run_connect(
                 let live_coords = network_sync.get_connected_coordinates().await;
                 *peer_coords_sync.write().await = live_coords;
 
-                let chain = blockchain_sync.get_chain().await;
-                let provider = NodeBlockchainBlockProvider::from_blocks(&chain);
-                let local_height = blockchain_sync.get_height().await;
+                let addr_map_snapshot = node_map_sync.read().await.clone();
 
-                {
+                let fetched_blocks = {
                     let mut sm = sync_mgr_loop.lock().await;
                     let rp = refl_pool_loop.lock().await;
-                    let synced = TransportSyncDriver::run_sync_round(
+                    TransportSyncDriver::run_sync_round(
                         &mut sm,
                         &rp,
-                        Some(&provider),
-                        block_transport_sync.as_ref(),
-                        local_height,
+                        &blockchain_sync,
+                        &transport_sync,
+                        &addr_map_snapshot,
                         &sync_coord,
                     )
-                    .await;
-                    if synced > 0 {
-                        info!("Sync round: {} network(s) synchronized", synced);
+                    .await
+                };
+
+                for block in &fetched_blocks {
+                    match blockchain_sync.insert_received_block(block.clone()).await {
+                        Ok(()) => {
+                            info!("Inserted synced block #{}", block.index);
+                        }
+                        Err(e) => {
+                            debug!("Synced block #{} insertion failed: {}", block.index, e);
+                        }
                     }
+                }
+                if !fetched_blocks.is_empty() {
+                    info!("Sync round: fetched {} block(s)", fetched_blocks.len());
                 }
 
                 {
@@ -1939,6 +1948,7 @@ async fn run_connect(
                 }
 
                 if is_reflector {
+                    let local_height = blockchain_sync.get_height().await;
                     debug!("Reflector heartbeat: height={}", local_height);
 
                     // Broadcast reflector heartbeat to connected peers

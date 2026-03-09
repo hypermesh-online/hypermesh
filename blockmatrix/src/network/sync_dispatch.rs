@@ -11,9 +11,14 @@
 //! - Converting `MatrixMessage::ReflectorHeartbeat` into a
 //!   `register_reflector` / `update_health` call on `ReflectorPool`.
 
-use tracing::debug;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use tracing::{debug, info, warn};
 
+use crate::blockchain::block::Block;
+use crate::blockchain::node_chain::NodeBlockchain;
 use crate::blockchain::sync_manager::{BlockProvider, SyncManager, SyncMessage};
+use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::reflector_pool::{Reflector, ReflectorPool};
 use crate::network::stoq_integration::MatrixMessage;
 
@@ -196,107 +201,283 @@ impl<'a> SyncDispatcher<'a> {
     }
 }
 
-/// Drives sync operations using a real `BlockTransport` implementation.
+/// Drives sync operations over real STOQ connections.
 ///
-/// Given a `SyncManager` that tracks which networks need syncing and a
-/// `BlockTransport` for sending blocks to peers, `TransportSyncDriver`
-/// runs a single sync round:
-///
-/// 1. For each network needing sync, generate a sync request.
-/// 2. Send the request via `BlockTransport` to the best reflector.
-/// 3. Process the response and update `SyncManager` state.
-///
-/// This bridges the gap between the state-machine (`SyncManager`) and
-/// actual network I/O (`BlockTransport`).
+/// For each network needing sync:
+/// 1. Opens a STOQ stream to the best reflector.
+/// 2. Sends a `SyncRequest`, reads the `SyncResponse`.
+/// 3. Identifies missing block hashes.
+/// 4. Opens a second stream with a `BlockFetchRequest` for those hashes.
+/// 5. Reads the `BlockFetchResponse` containing serialized blocks.
+/// 6. Returns fetched blocks for the caller to insert.
 pub struct TransportSyncDriver;
 
 impl TransportSyncDriver {
     /// Run one sync round for all networks that need syncing.
     ///
-    /// `block_transport` sends blocks/messages to peers.
-    /// `reflector_pool` provides the best reflectors per network.
-    /// `local_height` is the current device chain height.
-    ///
-    /// Returns the number of networks that advanced to Synchronized.
+    /// Returns blocks fetched from peers. The caller is responsible for
+    /// inserting them into the blockchain and extracting DNS entries.
     pub async fn run_sync_round(
         sync_manager: &mut SyncManager,
         reflector_pool: &ReflectorPool,
-        block_provider: Option<&dyn BlockProvider>,
-        block_transport: &dyn crate::blockchain::propagation::BlockTransport,
-        local_height: u64,
-        local_coordinate: &crate::matrix::coordinate::MatrixCoordinate,
-    ) -> usize {
+        blockchain: &NodeBlockchain,
+        transport: &stoq::StoqTransport,
+        node_map: &HashMap<String, (String, SocketAddr)>,
+        local_coordinate: &MatrixCoordinate,
+    ) -> Vec<Block> {
         let networks: Vec<String> = sync_manager
             .networks_needing_sync()
             .iter()
             .map(|s| s.to_string())
             .collect();
 
-        let mut synced_count = 0;
+        let mut fetched_blocks = Vec::new();
 
         for network_id in &networks {
-            // Generate sync request
-            let _request = match sync_manager.generate_sync_request(network_id, local_height) {
+            let local_height = blockchain.get_height().await;
+
+            let request = match sync_manager.generate_sync_request(network_id, local_height) {
                 Some(r) => r,
                 None => continue,
             };
 
-            // Find the best reflector to ask
             let reflectors = reflector_pool.get_best_reflectors(network_id, 1);
             let reflector = match reflectors.first() {
                 Some(r) => r,
                 None => {
-                    debug!(
-                        network = %network_id,
-                        "No reflectors available for sync"
-                    );
+                    debug!(network = %network_id, "No reflectors available for sync");
                     continue;
                 }
             };
 
-            // Encode the sync request as a block announcement to the reflector
-            // (The actual protocol would use a dedicated message channel; here
-            // we model it as a block send to exercise the transport trait.)
-            let sync_block = crate::blockchain::block::Block::genesis(*local_coordinate);
-            let reflector_coord = match crate::matrix::coordinate::MatrixCoordinate::new(
-                reflector.position.x as i64,
-                reflector.position.y as i64,
-                reflector.position.z as i64,
-            ) {
-                Ok(c) => c,
-                Err(_) => *local_coordinate,
-            };
+            match Self::sync_from_reflector(
+                &request,
+                reflector,
+                blockchain,
+                transport,
+                node_map,
+                local_coordinate,
+            )
+            .await
+            {
+                Ok((blocks, peer_height)) => {
+                    let response = SyncMessage::Response {
+                        network_id: network_id.clone(),
+                        block_hashes: Vec::new(),
+                        peer_height,
+                    };
+                    sync_manager.process_sync_message(response);
 
-            let sent = block_transport
-                .send_block(&sync_block, &reflector_coord, local_coordinate)
-                .await;
-
-            if sent {
-                debug!(
-                    network = %network_id,
-                    reflector = %reflector.node_id,
-                    "Sync request sent via transport"
-                );
-
-                // Simulate receiving a response (the reflector replies with its height)
-                let response = SyncMessage::Response {
-                    network_id: network_id.clone(),
-                    block_hashes: Vec::new(),
-                    peer_height: reflector.block_height,
-                };
-                sync_manager.process_sync_message_with_provider(response, block_provider);
-
-                // Check if we reached Synchronized
-                if matches!(
-                    sync_manager.sync_state(network_id),
-                    Some(crate::blockchain::sync_manager::SyncState::Synchronized { .. })
-                ) {
-                    synced_count += 1;
+                    if !blocks.is_empty() {
+                        info!(
+                            network = %network_id,
+                            count = blocks.len(),
+                            "Fetched blocks from reflector {}",
+                            &reflector.node_id[..8.min(reflector.node_id.len())],
+                        );
+                    }
+                    fetched_blocks.extend(blocks);
+                }
+                Err(e) => {
+                    debug!(
+                        network = %network_id,
+                        reflector = %reflector.node_id,
+                        error = %e,
+                        "Sync round failed for network",
+                    );
                 }
             }
         }
 
-        synced_count
+        fetched_blocks
+    }
+
+    /// Perform sync exchange with a single reflector.
+    ///
+    /// Returns `(fetched_blocks, peer_height)`.
+    async fn sync_from_reflector(
+        request: &SyncMessage,
+        reflector: &Reflector,
+        blockchain: &NodeBlockchain,
+        transport: &stoq::StoqTransport,
+        node_map: &HashMap<String, (String, SocketAddr)>,
+        _local_coordinate: &MatrixCoordinate,
+    ) -> anyhow::Result<(Vec<Block>, u64)> {
+        let addr = resolve_reflector_addr(reflector, node_map)?;
+        let connection = connect_to_peer(transport, addr).await?;
+
+        // Step 1: Send SyncRequest, get SyncResponse
+        let (block_hashes, peer_height) =
+            send_sync_request(&connection, request).await?;
+
+        // Step 2: Filter to hashes we don't have
+        let missing: Vec<String> = filter_missing_hashes(&block_hashes, blockchain).await;
+
+        if missing.is_empty() {
+            return Ok((Vec::new(), peer_height));
+        }
+
+        // Step 3: Fetch missing blocks
+        let blocks = fetch_blocks(&connection, missing).await?;
+
+        Ok((blocks, peer_height))
+    }
+}
+
+/// Resolve a reflector's node_id to a SocketAddr via the node_map.
+fn resolve_reflector_addr(
+    reflector: &Reflector,
+    node_map: &HashMap<String, (String, SocketAddr)>,
+) -> anyhow::Result<SocketAddr> {
+    for (_key, (node_id, addr)) in node_map {
+        if *node_id == reflector.node_id {
+            return Ok(*addr);
+        }
+    }
+    Err(anyhow::anyhow!(
+        "Reflector {} not found in node map",
+        &reflector.node_id[..8.min(reflector.node_id.len())],
+    ))
+}
+
+/// Establish a STOQ connection to a peer address.
+async fn connect_to_peer(
+    transport: &stoq::StoqTransport,
+    addr: SocketAddr,
+) -> anyhow::Result<std::sync::Arc<stoq::Connection>> {
+    let ipv6 = match addr {
+        SocketAddr::V6(v6) => *v6.ip(),
+        SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
+    };
+    let endpoint = stoq::Endpoint::new(ipv6, addr.port());
+    transport.connect(&endpoint).await
+}
+
+/// Open a stream, send a SyncRequest, and read the SyncResponse.
+///
+/// Returns `(block_hashes, peer_height)` from the response.
+async fn send_sync_request(
+    connection: &stoq::Connection,
+    request: &SyncMessage,
+) -> anyhow::Result<(Vec<String>, u64)> {
+    let matrix_msg = match request {
+        SyncMessage::Request {
+            network_id,
+            from_height,
+            max_blocks,
+        } => MatrixMessage::SyncRequest {
+            network_id: network_id.clone(),
+            from_height: *from_height,
+            max_blocks: *max_blocks,
+        },
+        _ => return Err(anyhow::anyhow!("Expected SyncMessage::Request")),
+    };
+
+    let payload = serde_json::to_vec(&matrix_msg)?;
+
+    let mut stream = connection.open_stream().await?;
+    stream
+        .write_discriminator(crate::network::CONN_TYPE_PEER_MESSAGE)
+        .await?;
+
+    // Write tag + payload as a single message
+    let mut tagged = Vec::with_capacity(1 + payload.len());
+    tagged.push(super::message_handlers::TAG_SYNC_MESSAGE);
+    tagged.extend_from_slice(&payload);
+    stream.send(&tagged).await?;
+
+    // send() closes our write half. The peer reads our message via
+    // read_to_end (which completes once our write side is finished),
+    // processes it, and writes a reply via send() (closing their write
+    // half). We read their reply via receive() on our still-open recv half.
+    let response_data = stream.receive().await?;
+
+    // Response has TAG_SYNC_MESSAGE prefix
+    if response_data.is_empty() {
+        return Err(anyhow::anyhow!("Empty sync response"));
+    }
+    if response_data[0] != super::message_handlers::TAG_SYNC_MESSAGE {
+        return Err(anyhow::anyhow!(
+            "Unexpected response tag: 0x{:02x}",
+            response_data[0],
+        ));
+    }
+
+    let response_msg: MatrixMessage = serde_json::from_slice(&response_data[1..])?;
+    match response_msg {
+        MatrixMessage::SyncResponse {
+            block_hashes,
+            peer_height,
+            ..
+        } => Ok((block_hashes, peer_height)),
+        other => Err(anyhow::anyhow!(
+            "Expected SyncResponse, got {:?}",
+            std::mem::discriminant(&other),
+        )),
+    }
+}
+
+/// Filter block hashes to only those missing from the local blockchain.
+async fn filter_missing_hashes(
+    hashes: &[String],
+    blockchain: &NodeBlockchain,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    for hash in hashes {
+        if !blockchain.has_block(hash).await {
+            missing.push(hash.clone());
+        }
+    }
+    missing
+}
+
+/// Open a new stream and fetch blocks by hash from the peer.
+async fn fetch_blocks(
+    connection: &stoq::Connection,
+    block_hashes: Vec<String>,
+) -> anyhow::Result<Vec<Block>> {
+    let request = MatrixMessage::BlockFetchRequest { block_hashes };
+    let payload = serde_json::to_vec(&request)?;
+
+    let mut stream = connection.open_stream().await?;
+    stream
+        .write_discriminator(crate::network::CONN_TYPE_PEER_MESSAGE)
+        .await?;
+
+    let mut tagged = Vec::with_capacity(1 + payload.len());
+    tagged.push(super::message_handlers::TAG_BLOCK_FETCH_REQUEST);
+    tagged.extend_from_slice(&payload);
+    stream.send(&tagged).await?;
+
+    let response_data = stream.receive().await?;
+    if response_data.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let response_msg: MatrixMessage = serde_json::from_slice(&response_data)?;
+    match response_msg {
+        MatrixMessage::BlockFetchResponse { blocks } => {
+            let mut result = Vec::with_capacity(blocks.len());
+            for block_json in &blocks {
+                match serde_json::from_str::<Block>(block_json) {
+                    Ok(block) => {
+                        if block.verify_hash() {
+                            result.push(block);
+                        } else {
+                            warn!("Fetched block failed hash verification, discarding");
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to deserialize fetched block: {}", e);
+                    }
+                }
+            }
+            Ok(result)
+        }
+        other => Err(anyhow::anyhow!(
+            "Expected BlockFetchResponse, got {:?}",
+            std::mem::discriminant(&other),
+        )),
     }
 }
 
@@ -692,135 +873,143 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // 5.2 tests: TransportSyncDriver with BlockTransport
+    // TransportSyncDriver helper tests
     // ------------------------------------------------------------------
 
-    /// A deterministic BlockTransport that always succeeds.
-    struct AlwaysSucceedTransport;
+    #[test]
+    fn test_resolve_reflector_addr_found() {
+        let mut node_map = HashMap::new();
+        let addr: SocketAddr = "[::1]:9292".parse().expect("test: parse addr");
+        node_map.insert("1,2,3".to_string(), ("node-abc".to_string(), addr));
 
-    #[async_trait::async_trait]
-    impl crate::blockchain::propagation::BlockTransport for AlwaysSucceedTransport {
-        async fn send_block(
-            &self,
-            _block: &crate::blockchain::block::Block,
-            _target: &crate::matrix::coordinate::MatrixCoordinate,
-            _origin: &crate::matrix::coordinate::MatrixCoordinate,
-        ) -> bool {
-            true
+        let reflector = Reflector {
+            node_id: "node-abc".to_string(),
+            position: zero_position(),
+            last_seen: 0,
+            block_height: 0,
+            health_score: 1.0,
+            privacy_mode: PrivacyMode::PUBLIC,
+        };
+
+        let result = super::resolve_reflector_addr(&reflector, &node_map);
+        assert!(result.is_ok());
+        assert_eq!(result.expect("test: addr"), addr);
+    }
+
+    #[test]
+    fn test_resolve_reflector_addr_not_found() {
+        let node_map = HashMap::new();
+
+        let reflector = Reflector {
+            node_id: "missing-node".to_string(),
+            position: zero_position(),
+            last_seen: 0,
+            block_height: 0,
+            health_score: 1.0,
+            privacy_mode: PrivacyMode::PUBLIC,
+        };
+
+        let result = super::resolve_reflector_addr(&reflector, &node_map);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_block_fetch_request_serialization() {
+        let msg = MatrixMessage::BlockFetchRequest {
+            block_hashes: vec!["abc123".to_string(), "def456".to_string()],
+        };
+        let json = serde_json::to_string(&msg).expect("test: serialize");
+        let parsed: MatrixMessage =
+            serde_json::from_str(&json).expect("test: deserialize");
+        match parsed {
+            MatrixMessage::BlockFetchRequest { block_hashes } => {
+                assert_eq!(block_hashes.len(), 2);
+                assert_eq!(block_hashes[0], "abc123");
+                assert_eq!(block_hashes[1], "def456");
+            }
+            other => unreachable!("test: expected BlockFetchRequest, got {:?}", other),
         }
     }
 
-    /// A deterministic BlockTransport that always fails.
-    struct AlwaysFailTransport;
+    #[test]
+    fn test_block_fetch_response_serialization() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let block = Block::genesis(coord);
+        let block_json =
+            serde_json::to_string(&block).expect("test: serialize block");
 
-    #[async_trait::async_trait]
-    impl crate::blockchain::propagation::BlockTransport for AlwaysFailTransport {
-        async fn send_block(
-            &self,
-            _block: &crate::blockchain::block::Block,
-            _target: &crate::matrix::coordinate::MatrixCoordinate,
-            _origin: &crate::matrix::coordinate::MatrixCoordinate,
-        ) -> bool {
-            false
+        let msg = MatrixMessage::BlockFetchResponse {
+            blocks: vec![block_json.clone()],
+        };
+        let json = serde_json::to_string(&msg).expect("test: serialize");
+        let parsed: MatrixMessage =
+            serde_json::from_str(&json).expect("test: deserialize");
+        match parsed {
+            MatrixMessage::BlockFetchResponse { blocks } => {
+                assert_eq!(blocks.len(), 1);
+                let deserialized: Block =
+                    serde_json::from_str(&blocks[0]).expect("test: deserialize block");
+                assert_eq!(deserialized.index, block.index);
+                assert!(deserialized.verify_hash());
+            }
+            other => unreachable!("test: expected BlockFetchResponse, got {:?}", other),
         }
     }
 
     #[tokio::test]
-    async fn test_transport_sync_driver_synchronizes_via_reflector() {
-        // Setup: two simulated nodes — our node and a reflector
-        let mut sm = make_sync_manager();
-        sm.join_network("net-sync-1".to_string(), PrivacyMode::PUBLIC, 100)
-            .expect("test: join");
+    async fn test_filter_missing_hashes() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let blockchain = NodeBlockchain::new(coord);
+        let chain = blockchain.get_chain().await;
+        let genesis_hash = chain.first().map(|b| b.hash.clone()).unwrap_or_default();
 
-        let mut rp = make_reflector_pool();
-        rp.register_reflector(
-            "net-sync-1",
-            Reflector {
-                node_id: "reflector-1".to_string(),
-                position: MatrixPosition {
-                    x: 5.0,
-                    y: 5.0,
-                    z: 5.0,
-                },
-                last_seen: 9999,
-                block_height: 42,
-                health_score: 0.9,
-                privacy_mode: PrivacyMode::PUBLIC,
-            },
-        );
+        let hashes = vec![
+            genesis_hash.clone(),
+            "nonexistent_hash_1".to_string(),
+            "nonexistent_hash_2".to_string(),
+        ];
 
-        let transport = AlwaysSucceedTransport;
-        let local_coord = crate::matrix::coordinate::MatrixCoordinate::new(0, 0, 0)
-            .expect("test: coord");
-
-        let synced = super::TransportSyncDriver::run_sync_round(
-            &mut sm,
-            &rp,
-            None,
-            &transport,
-            0,
-            &local_coord,
-        )
-        .await;
-
-        // Should have synchronized with the reflector's height
-        assert_eq!(synced, 1, "Expected 1 network to sync");
-
-        use crate::blockchain::sync_manager::SyncState;
-        assert_eq!(
-            sm.sync_state("net-sync-1"),
-            Some(&SyncState::Synchronized {
-                last_block_height: 42
-            }),
-            "Should be synchronized at reflector height"
-        );
+        let missing = super::filter_missing_hashes(&hashes, &blockchain).await;
+        // Genesis hash exists, the other two do not
+        assert_eq!(missing.len(), 2);
+        assert!(!missing.contains(&genesis_hash));
+        assert!(missing.contains(&"nonexistent_hash_1".to_string()));
+        assert!(missing.contains(&"nonexistent_hash_2".to_string()));
     }
 
     #[tokio::test]
-    async fn test_transport_sync_driver_no_sync_when_transport_fails() {
+    async fn test_run_sync_round_no_reflectors_returns_empty() {
         let mut sm = make_sync_manager();
-        sm.join_network("net-fail-1".to_string(), PrivacyMode::PUBLIC, 100)
+        sm.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
             .expect("test: join");
 
-        let mut rp = make_reflector_pool();
-        rp.register_reflector(
-            "net-fail-1",
-            Reflector {
-                node_id: "reflector-fail".to_string(),
-                position: MatrixPosition {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 1.0,
-                },
-                last_seen: 9999,
-                block_height: 100,
-                health_score: 0.8,
-                privacy_mode: PrivacyMode::PUBLIC,
-            },
-        );
+        let rp = make_reflector_pool();
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let blockchain = NodeBlockchain::new(coord);
+        let node_map = HashMap::new();
 
-        let transport = AlwaysFailTransport;
-        let local_coord = crate::matrix::coordinate::MatrixCoordinate::new(0, 0, 0)
-            .expect("test: coord");
+        // Cannot create a real StoqTransport in unit tests without binding,
+        // but with no reflectors the driver never connects.
+        let config = stoq::TransportConfig {
+            port: 0,
+            bind_address: std::net::Ipv6Addr::LOCALHOST,
+            ..stoq::TransportConfig::default()
+        };
+        let transport = match stoq::StoqTransport::new(config).await {
+            Ok(t) => t,
+            Err(_) => return, // Skip if socket binding fails
+        };
 
-        let synced = super::TransportSyncDriver::run_sync_round(
+        let blocks = TransportSyncDriver::run_sync_round(
             &mut sm,
             &rp,
-            None,
+            &blockchain,
             &transport,
-            0,
-            &local_coord,
+            &node_map,
+            &coord,
         )
         .await;
 
-        assert_eq!(synced, 0, "No networks should sync when transport fails");
-
-        // Should still be in Discovering state
-        use crate::blockchain::sync_manager::SyncState;
-        assert_eq!(
-            sm.sync_state("net-fail-1"),
-            Some(&SyncState::Discovering),
-            "Should remain in Discovering when transport fails"
-        );
+        assert!(blocks.is_empty(), "No reflectors means no blocks fetched");
     }
 }

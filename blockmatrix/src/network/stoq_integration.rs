@@ -131,6 +131,17 @@ pub enum MatrixMessage {
         /// Reflector's self-reported health score (0.0 to 1.0)
         health_score: f64,
     },
+
+    /// Request specific blocks by hash from a peer
+    BlockFetchRequest {
+        /// BLAKE3 hex hashes of blocks to fetch
+        block_hashes: Vec<String>,
+    },
+    /// Response containing requested blocks
+    BlockFetchResponse {
+        /// Serialized blocks (JSON strings)
+        blocks: Vec<String>,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager

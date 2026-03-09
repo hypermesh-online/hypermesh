@@ -116,7 +116,7 @@ items = [
 [features.in_development]
 items = [
     # Mesh networking gaps (not yet wired end-to-end)
-    "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired. Full end-to-end reflector-pool chain fetch not yet complete.",
+    "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired. Block fetching protocol (SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse) implemented, not yet e2e verified multi-node.",
     "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
@@ -130,6 +130,7 @@ items = [
     "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
     "Cross-network asset transfers with dual PoS validation",
     "Container runtime with real process isolation",
+    "MFA identity lifecycle — key rotation as blockchain entries, recovery passphrase commitment, threshold peer recovery (§6.2)",
     "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
     "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
 ]

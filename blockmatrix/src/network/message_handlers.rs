@@ -40,6 +40,8 @@ pub(crate) const TAG_SHARD_FETCH: u8 = 0x02;
 pub(crate) const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
 /// Sync / reflector message.
 pub(crate) const TAG_SYNC_MESSAGE: u8 = 0x10;
+/// Block fetch request (pull specific blocks by hash).
+pub(crate) const TAG_BLOCK_FETCH_REQUEST: u8 = 0x11;
 /// Gossip protocol message.
 pub(crate) const TAG_GOSSIP: u8 = 0x20;
 
@@ -106,6 +108,9 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SYNC_MESSAGE => {
             handle_sync_message(&data[1..], stream, peer_node_id, peer_coord, ctx).await;
+        }
+        TAG_BLOCK_FETCH_REQUEST => {
+            handle_block_fetch_request(&data[1..], stream, peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(
@@ -518,6 +523,81 @@ async fn handle_peer_message_connection(
     }
 
     Ok(())
+}
+
+// ── Block fetch handler ──────────────────────────────────────────────
+
+/// Handle a block fetch request (tag 0x11).
+///
+/// Looks up each requested block hash in the local blockchain,
+/// serializes found blocks as JSON, and sends a `BlockFetchResponse`
+/// back on the same stream.
+async fn handle_block_fetch_request(
+    payload: &[u8],
+    stream: &mut stoq::Stream,
+    sender_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let short_id = &sender_node_id[..8.min(sender_node_id.len())];
+
+    let msg: MatrixMessage = match serde_json::from_slice(payload) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!("Invalid block fetch JSON from {}: {}", short_id, e);
+            return;
+        }
+    };
+
+    let hashes = match msg {
+        MatrixMessage::BlockFetchRequest { block_hashes } => block_hashes,
+        other => {
+            warn!(
+                "Expected BlockFetchRequest from {}, got {:?}",
+                short_id, other,
+            );
+            return;
+        }
+    };
+
+    debug!(
+        "Block fetch request from {}: {} hash(es)",
+        short_id,
+        hashes.len(),
+    );
+
+    let mut serialized_blocks = Vec::with_capacity(hashes.len());
+    for hash in &hashes {
+        if let Some(block) = ctx.blockchain.get_block_by_hash(hash).await {
+            match serde_json::to_string(&block) {
+                Ok(json) => serialized_blocks.push(json),
+                Err(e) => {
+                    debug!("Failed to serialize block {}: {}", hash, e);
+                }
+            }
+        }
+    }
+
+    info!(
+        "Serving {} of {} requested block(s) to {}",
+        serialized_blocks.len(),
+        hashes.len(),
+        short_id,
+    );
+
+    let response = MatrixMessage::BlockFetchResponse {
+        blocks: serialized_blocks,
+    };
+    let response_data = match serde_json::to_vec(&response) {
+        Ok(d) => d,
+        Err(e) => {
+            debug!("Failed to serialize BlockFetchResponse: {}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = stream.send(&response_data).await {
+        debug!("Failed to send block fetch response to {}: {}", short_id, e);
+    }
 }
 
 // ── Sync handler ─────────────────────────────────────────────────────
