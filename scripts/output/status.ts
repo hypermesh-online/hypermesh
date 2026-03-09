@@ -105,10 +105,12 @@ export const crateStatuses: CrateStatus[] = [
         "DNS propagation via blockchain — DnsBlockEntry serialized into BlockAssetEntry with BaseSystemType::Dns, extracted on receive, re-populated on restart",
         "CA certificate enrollment — after bilateral PoS handshake, TrustChain CA issues cert to replace self-signed bootstrap cert (§5.7 Phase 2)",
         "Stream type discrimination — CONN_TYPE_HANDSHAKE (0x00) and CONN_TYPE_PEER_MESSAGE (0x01) on every STOQ connection",
-        "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake"
+        "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
+        "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
+        "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams"
       ],
       "inDevelopment": [
-        "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired. Block fetching protocol (SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse) implemented, not yet e2e verified multi-node.",
+        "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired, block fetching protocol implemented. Not yet e2e verified multi-node.",
         "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
@@ -120,12 +122,13 @@ export const crateStatuses: CrateStatus[] = [
         "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
         "Cross-network asset transfers with dual PoS validation",
         "Container runtime with real process isolation",
-        "MFA identity lifecycle — key rotation as blockchain entries, recovery passphrase commitment, threshold peer recovery (§6.2)",
+        "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
+        "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
         "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 87
+    "completion": 86
   },
   {
     "id": "caesar",
@@ -446,6 +449,7 @@ export const crateStatuses: CrateStatus[] = [
         "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
         "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
         "Transmission asset type in SystemAssetKind (R10)",
+        "SystemAssetKind::Identity and KeyRotation variants for MFA identity lifecycle (§6.2)",
         "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
         "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
         "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash)",
@@ -560,6 +564,8 @@ export const crateStatuses: CrateStatus[] = [
         "TrustAssetKind includes Transmission variant (R10)",
         "StateAuthenticator (binary PoS authentication interface)",
         "FALCON-1024 node identity (FalconIdentity implements NodeSigner trait, keypair gen, persistence, BLAKE3 node ID — canonical implementation used by blockmatrix)",
+        "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
+        "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
         "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
@@ -590,10 +596,13 @@ export const crateStatuses: CrateStatus[] = [
         "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
         "Cascading revocation across federated CAs",
         "Offline device grace period renewal",
-        "Field device bootstrap with intermittent connectivity"
+        "Field device bootstrap with intermittent connectivity",
+        "Recovery execution — passphrase-based key recovery, threshold peer attestation (k-of-n), Shamir key backup distribution (§6.2.3)",
+        "Rotation chain verification wired into bilateral PoS handshake — peers verify key continuity on reconnect",
+        "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 44
+    "completion": 43
   },
   {
     "id": "ui",
