@@ -309,21 +309,21 @@ export const crateStatuses: CrateStatus[] = [
         "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)",
         "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
         "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
-        "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable"
+        "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
+        "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
+        "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides"
       ],
       "inDevelopment": [
         "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
-        "PoS authentication — session management structs exist but proofs are not validated (state proofs are fake)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
         "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
         "Outbound proxy with allowlist filtering — code exists, not tested",
-        "Production config loader (TOML/env-based config)",
         "Backend service discovery (resolve by address or service registry)"
       ],
       "planned": []
     },
-    "completion": 73
+    "completion": 80
   },
   {
     "id": "hypermesh",
@@ -381,19 +381,20 @@ export const crateStatuses: CrateStatus[] = [
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
         "Unified intelligence + transport metrics collection",
         "Multi-queue AF_XDP load balancing (RoundRobin/LeastLoaded/FlowHash strategies)",
-        "Hardware offload detection and opportunistic NIC offload"
+        "Hardware offload detection and opportunistic NIC offload",
+        "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
+        "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
+        "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format"
       ],
       "inDevelopment": [
-        "PoS pre-validation pipeline — header parsing and difficulty checks exist but validate against self-generated proofs",
-        "Kernel-space PoS validation — structural checks work but full crypto (FALCON-1024) not integrated",
-        "Matrix routing path validation — IPv6 + matrix encoding exists but not tested with real multi-node traffic"
+        "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
+        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)"
       ],
       "planned": [
-        "Real FALCON-1024 signature verification in eBPF fast path",
         "Production multi-node eBPF policy distribution"
       ]
     },
-    "completion": 74
+    "completion": 85
   },
   {
     "id": "hypermesh-ffi",
@@ -529,11 +530,11 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge METRICS frame type (0xfe000007) — feature-gated handler",
         "MetricsFrame protocol wiring to engauge",
         "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
-        "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)"
+        "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
+        "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed"
       ],
       "inDevelopment": [
         "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, length-prefixed multi-message framing (write_msg/read_msg), connection-type discriminator byte. BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake(). Framing verified correct (write_msg does NOT call finish()). Not yet tested multi-node end-to-end on separate hosts.",
-        "FALCON-1024 PoS signature verification — pos_validator.rs has verify path but TrustChain client is NEVER wired (set_trustchain_client() never called), so signature verification is always SKIPPED",
         "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
@@ -544,7 +545,7 @@ export const crateStatuses: CrateStatus[] = [
         "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)"
       ]
     },
-    "completion": 73
+    "completion": 77
   },
   {
     "id": "trustchain",
