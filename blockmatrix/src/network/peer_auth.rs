@@ -13,6 +13,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
+/// Maximum time a peer remains authenticated before re-handshake is required.
+const AUTH_TTL: std::time::Duration = std::time::Duration::from_secs(3600);
+
 /// A peer that has completed bilateral PoS handshake verification.
 #[derive(Clone, Debug)]
 pub struct AuthenticatedPeer {
@@ -95,26 +98,39 @@ pub async fn verify_peer_access(
     node_id: &str,
     our_network_id: &str,
 ) -> bool {
-    let map = peers.read().await;
     let short_id = &node_id[..8.min(node_id.len())];
 
-    match map.get(node_id) {
-        None => {
-            warn!(
-                "Rejected message from unauthenticated peer {}",
-                short_id,
-            );
-            false
+    let expired = {
+        let map = peers.read().await;
+        match map.get(node_id) {
+            None => {
+                warn!(
+                    "Rejected message from unauthenticated peer {}",
+                    short_id,
+                );
+                return false;
+            }
+            Some(peer) if peer.network_id != our_network_id => {
+                warn!(
+                    "Rejected message from peer {} (network '{}' != ours '{}')",
+                    short_id, peer.network_id, our_network_id,
+                );
+                return false;
+            }
+            Some(peer) => peer.authenticated_at.elapsed() > AUTH_TTL,
         }
-        Some(peer) if peer.network_id != our_network_id => {
-            warn!(
-                "Rejected message from peer {} (network '{}' != ours '{}')",
-                short_id, peer.network_id, our_network_id,
-            );
-            false
-        }
-        Some(_) => true,
+    };
+
+    if expired {
+        warn!(
+            "Rejected message from peer {} (auth expired after {:?})",
+            short_id, AUTH_TTL,
+        );
+        peers.write().await.remove(node_id);
+        return false;
     }
+
+    true
 }
 
 #[cfg(test)]
@@ -181,5 +197,18 @@ mod tests {
         register_authenticated_peer(&peers, make_peer("nodeY456", "other-net")).await;
 
         assert!(!verify_peer_access(&peers, "nodeY456", "main").await);
+    }
+
+    #[tokio::test]
+    async fn expired_auth_is_rejected() {
+        let peers = new_authenticated_peers();
+        let mut peer = make_peer("expiredAA", "net-1");
+        peer.authenticated_at =
+            std::time::Instant::now() - std::time::Duration::from_secs(7200);
+
+        peers.write().await.insert(peer.node_id.clone(), peer);
+
+        assert!(!verify_peer_access(&peers, "expiredAA", "net-1").await);
+        assert!(!peers.read().await.contains_key("expiredAA"));
     }
 }

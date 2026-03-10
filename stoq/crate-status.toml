@@ -34,10 +34,11 @@ items = [
 
 [features.in_development]
 items = [
-    "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, length-prefixed multi-message framing (write_msg/read_msg), connection-type discriminator byte. BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake(). Framing verified correct (write_msg does NOT call finish()). Not yet tested multi-node end-to-end on separate hosts.",
-    "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
+    "Bilateral handshake protocol — 3-message challenge-response framing verified, works local-only, NOT tested on separate hosts. Code lives in blockmatrix (migration pending)",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
+    "Metrics transport over STOQ — engauge metrics currently use raw UDP ([::1]:9297), must migrate to STOQ streams for cross-node distribution",
+    "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move FROM blockmatrix INTO STOQ (transport-layer concerns in blockchain crate)",
 ]
 
 [features.planned]

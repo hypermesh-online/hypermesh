@@ -1665,8 +1665,10 @@ async fn run_connect(
             info!("Bootstrap nodes: {:?}", bootstrap_nodes);
         }
 
-        // Create shard infrastructure
-        let shard_store = std::sync::Arc::new(ShardStore::new());
+        // Create shard infrastructure (disk-backed for persistence across restarts)
+        let shard_store = std::sync::Arc::new(ShardStore::new_with_dir(
+            data_dir.join(nid).join("shards"),
+        ));
         let shard_transport =
             std::sync::Arc::new(StoqShardTransport::new(transport.clone()));
         info!(
@@ -2063,8 +2065,12 @@ async fn run_connect(
     // --- IPC Server Setup ---
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
-    // Use network shard store if available, otherwise create a standalone one
-    let daemon_shard_store = shard_store_ref.unwrap_or_else(|| std::sync::Arc::new(ShardStore::new()));
+    // Use network shard store if available, otherwise create a standalone one (disk-backed)
+    let daemon_shard_store = shard_store_ref.unwrap_or_else(|| {
+        std::sync::Arc::new(ShardStore::new_with_dir(
+            data_dir.join(nid).join("shards"),
+        ))
+    });
 
     let daemon_state = std::sync::Arc::new(ipc::DaemonState {
         blockchain: bootstrap.blockchain().clone(),

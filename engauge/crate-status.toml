@@ -32,8 +32,10 @@ items = [
 [features.in_development]
 items = [
     # None of the network integration is functional — all metrics are local or mock
-    "Real metrics ingestion from running services — blockmatrix pushes capacity frames via UDP, stoq/caesar not yet wired",
-    "Metrics publisher/subscriber network delivery — push model code exists but no real STOQ connections to peers",
+    "Real metrics ingestion from running services — blockmatrix pushes capacity frames via raw UDP, must migrate to STOQ transport; stoq/caesar not yet wired",
+    "Metrics publisher/subscriber network delivery — push model code exists but uses raw UDP, needs STOQ transport for real peer delivery",
+    "Network scope sync intelligence — WHERE to replicate, popularity detection, dispersion decisions for BlockMatrix shard placement (engauge owns intelligence, BlockMatrix owns mechanism)",
+    "Swarm replication triggers — ReplicationTrigger logic exists but not wired to BlockMatrix shard transport for consumer-becomes-provider (R12)",
     "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
     "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
     "Swarm replication triggers — ReplicationTrigger logic exists but not wired to actual shard transport",

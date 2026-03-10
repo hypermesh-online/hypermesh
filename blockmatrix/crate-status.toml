@@ -120,15 +120,17 @@ items = [
     "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
     "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
     "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
+    "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
+    "Auth TTL — authenticated peers expire after 1 hour, re-authentication required",
+    "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops",
 ]
 
 [features.in_development]
 items = [
     # Mesh networking gaps (sync + sharding work, scale not verified)
-    "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
-    "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
+    "Gossip protocol integration — GossipState struct exists, mesh coordination driven by engauge intelligence (not standalone gossip)",
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
-    "Swarm O(log N) scaling — shard distribution works but no consumer-becomes-provider replication triggers",
+    "Swarm O(log N) scaling — shard distribution works, consumer-becomes-provider triggers pending (requires engauge ReplicationTrigger wiring)",
 ]
 
 [features.planned]

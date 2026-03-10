@@ -35,23 +35,24 @@ items = [
 
 [features.in_development]
 items = [
-    # CERTIFICATES: Not post-quantum yet
-    "FALCON-1024 certificate signing — crypto module exists at trustchain/src/crypto/falcon.rs but is NOT integrated into certificate issuance pipeline. All certs use rcgen (traditional RSA/ECDSA X.509)",
-    "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS. Full PQ TLS requires Quinn upstream support",
+    # CERTIFICATES: Not post-quantum yet — #1 PRIORITY
+    "FALCON-1024 certificate signing — crypto module exists but NOT integrated into cert issuance. All certs use rcgen. #1 PRIORITY",
+    "Post-quantum TLS certificates — requires Quinn upstream support for non-standard X.509",
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
     "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
     "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
-    # PROOF OF STATE: TrustChain structural only, cryptographic verification in BlockMatrix
-    "StakeProof::verify_signature() is structural-only (non-empty fields check). Cryptographic FALCON-1024 verification is handled by BlockMatrix's WireSignedProof envelope, not by TrustChain directly",
-    # STOQ API: Exists but integration incomplete
-    "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
-    "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
+    # PROOF OF STATE
+    "StakeProof::verify_signature() — structural only (non-empty fields check), cryptographic FALCON verification at WireSignedProof level",
+    # IDENTITY: peer discovery
+    "Peer discovery (mDNS) — PeerAnnouncement struct exists, not tested multi-node",
+    # API: incomplete integration
+    "STOQ-based API server — binds [::1]:8444, handler-to-cert-store wiring not fully verified",
+    "HTTP/3 handlers — exist but real cert operation flow not tested end-to-end",
     # DECENTRALIZATION: Single-node only
-    "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-    "DNS zone propagation — DNS resolver is a local HashMap, no cross-node sync",
+    "Decentralized CA — single-node only, no peer CA discovery or certificate exchange",
     "CT log federation sync — message types exist but no real cross-node sync",
-    "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
-    "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
+    "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real peer exchange",
+    "Byzantine detection — ByzantineDetector monitors local node only",
     "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
     "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
 ]

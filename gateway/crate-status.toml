@@ -37,9 +37,10 @@ items = [
 
 [features.in_development]
 items = [
-    "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
-    "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
-    "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
+    "Bootstrap token flow — HTTP/3 side complete (token gen + response), STOQ-side validation missing (no token-to-PoS correlation)",
+    "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
+    "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
+    "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
     "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
     "Outbound proxy with allowlist filtering — code exists, not tested",
     "Backend service discovery (resolve by address or service registry)",

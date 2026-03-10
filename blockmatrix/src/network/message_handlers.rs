@@ -86,7 +86,19 @@ pub(crate) async fn run_peer_message_loop(
         dispatch_message(&data, &mut stream, &peer_node_id, &peer_coord, &ctx).await;
     }
 
-    info!("Message loop ended for peer {}", short_id);
+    // Clean up peer from authenticated map
+    peer_auth::remove_authenticated_peer(&ctx.authenticated_peers, &peer_node_id).await;
+
+    // Remove from connected peer coords
+    {
+        let mut coords = ctx.connected_peer_coords.write().await;
+        coords.retain(|c| !(c.x == peer_coord.x && c.y == peer_coord.y && c.z == peer_coord.z));
+    }
+
+    info!(
+        "Cleaned up peer {} from auth and coord maps",
+        &peer_node_id[..8.min(peer_node_id.len())],
+    );
 }
 
 /// Route a single message payload to the appropriate handler.
