@@ -50,6 +50,9 @@ cargo build -p catalog --release
 cargo test -p catalog
 ```
 
+## Recent Changes
+- **OOM cache bug fixed**: LRU cache byte-to-entry count conversion corrected with 10K entry cap
+
 ## STOQ API
 
 `CatalogStoqApi` binds on `[::1]:9295` with 6 handlers:

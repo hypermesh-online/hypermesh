@@ -71,6 +71,10 @@ cargo build -p trustchain --release
 cargo test -p trustchain
 ```
 
+## Recent Changes
+- **Production binary hardening**: Config loading, graceful shutdown, signal handling
+- **Recovery commitment**: HKDF-SHA512 + BLAKE3 commitment scheme implemented
+
 ## Integration
 
 - **STOQ**: Certificate-based transport authentication, FALCON-1024 handshake signing

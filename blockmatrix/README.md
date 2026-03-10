@@ -32,6 +32,10 @@ Node Boot
 - **Network sync** -- SyncManager, ReflectorPool, SyncDispatcher, BlockTransport trait
 - **eBPF security** -- XDP attachment, policy enforcement, Privacy-eBPF bridge with sync_to_kernel
 - **Cross-platform** -- OsAbstraction for Linux/macOS/BSD/Windows with hardware detection
+- **FALCON-1024 signed state proofs** -- WireSignedProof envelope with real signature verification (verified E2E)
+- **Block fetching protocol** -- pull missing blocks from reflectors via STOQ streams
+- **Metrics emission** -- UDP capacity frames to engauge every 30s
+- **Identity as blockchain asset** -- FALCON keypair registered in genesis block, key rotation entries
 - **BLAKE3** content hashing throughout, FALCON-1024 for protocol signing
 - **IPC daemon** with JSON-RPC 2.0 over Unix domain sockets
 - **TOML configuration system** with CLI overrides

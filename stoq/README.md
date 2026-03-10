@@ -57,6 +57,10 @@ cargo test -p stoq
 - **Tensor Routing**: Multi-hop routing with matrix topology awareness
 - **Engauge METRICS Frame**: Custom frame type (0xfe000007) for streaming MetricsFrame payloads (feature-gated)
 
+## Recent Changes
+- **Local FALCON-1024 PoS verification**: PoS validator verifies FALCON-1024 signatures locally (no TrustChain client needed)
+- **E2E bilateral handshake**: Verified end-to-end between two real nodes
+
 ## Security
 - TLS 1.3 with QUIC integration
 - Certificate-based authentication via TrustChain

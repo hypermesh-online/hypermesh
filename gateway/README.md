@@ -89,6 +89,11 @@ cargo build -p gateway --release
 cargo test -p gateway
 ```
 
+## Recent Changes
+- **STOQ bridge wired into main.rs**: Dual HTTP/3 + STOQ listener active in production binary
+- **Real PoS authentication**: WireSignedProof FALCON-1024 signature verification
+- **TOML config loader**: Configuration file support with environment variable overrides
+
 ## Configuration
 
 - `GatewayMode`: Bootstrap | InboundProxy | OutboundProxy | InterNetwork
