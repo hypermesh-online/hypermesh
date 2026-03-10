@@ -120,9 +120,12 @@ export const crateStatuses: CrateStatus[] = [
         "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops"
       ],
       "inDevelopment": [
-        "Gossip protocol integration — GossipState struct exists, mesh coordination driven by engauge intelligence (not standalone gossip)",
-        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
-        "Swarm O(log N) scaling — shard distribution works, consumer-becomes-provider triggers pending (requires engauge ReplicationTrigger wiring)"
+        "Metrics over STOQ — MetricsReporter must send via STOQ streams (CONN_TYPE_METRICS=0x02), not raw UDP. Include eBPF wire metrics in frames",
+        "Gossip protocol wiring — GossipProtocol (482 lines, 7 tests) never spawned in sync loop. Must send via STOQ (CONN_TYPE_GOSSIP=0x03), populate available_assets from ShardStore",
+        "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
+        "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",
+        "Routing intelligence feedback — engauge RoutingAdvisor/PathAdvisor never called. Must wire to BlockPropagator weights + STOQ path scheduler + eBPF routing rules",
+        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
       ],
       "planned": [
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
@@ -135,7 +138,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 90
+    "completion": 87
   },
   {
     "id": "caesar",
@@ -270,23 +273,19 @@ export const crateStatuses: CrateStatus[] = [
         "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline"
       ],
       "inDevelopment": [
-        "Real metrics ingestion from running services — blockmatrix pushes capacity frames via raw UDP, must migrate to STOQ transport; stoq/caesar not yet wired",
-        "Metrics publisher/subscriber network delivery — push model code exists but uses raw UDP, needs STOQ transport for real peer delivery",
-        "Network scope sync intelligence — WHERE to replicate, popularity detection, dispersion decisions for BlockMatrix shard placement (engauge owns intelligence, BlockMatrix owns mechanism)",
-        "Swarm replication triggers — ReplicationTrigger logic exists but not wired to BlockMatrix shard transport for consumer-becomes-provider (R12)",
+        "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP). eBPF wire metrics must be merged into frames at MetricsFrameBridge level",
+        "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery (blockmatrix sends, engauge receives)",
+        "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
+        "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
+        "eBPF policy feedback loop — engauge routing decisions must feed back to eBPF set_routing_rule() for wire-level path enforcement",
         "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
-        "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
-        "Swarm replication triggers — ReplicationTrigger logic exists but not wired to actual shard transport",
-        "Dispersion intelligence — k-means clustering code exists but not receiving real demand data",
-        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
-        "Real-time routing intelligence feed — RoutingIntelFeed code exists but not connected to live STOQ transport"
+        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
       ],
       "planned": [
-        "End-to-end metrics pipeline (services -> engauge -> analytics -> routing decisions)",
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 63
+    "completion": 71
   },
   {
     "id": "gateway",
@@ -397,13 +396,15 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
-        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)"
+        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
+        "eBPF metrics → engauge pipeline — HyperMeshMetrics (5 categories) collected but never pulled by STOQ. MetricsFrameBridge must accept eBPF data",
+        "Engauge → eBPF feedback loop — set_routing_rule()/set_privacy_tier() APIs exist but never called from engauge intelligence layer"
       ],
       "planned": [
         "Production multi-node eBPF policy distribution"
       ]
     },
-    "completion": 85
+    "completion": 77
   },
   {
     "id": "hypermesh-ffi",
@@ -544,11 +545,11 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed"
       ],
       "inDevelopment": [
-        "Bilateral handshake protocol — 3-message challenge-response framing verified, works local-only, NOT tested on separate hosts. Code lives in blockmatrix (migration pending)",
+        "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
-        "Metrics transport over STOQ — engauge metrics currently use raw UDP ([::1]:9297), must migrate to STOQ streams for cross-node distribution",
-        "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move FROM blockmatrix INTO STOQ (transport-layer concerns in blockchain crate)"
+        "MetricsFrameBridge eBPF integration — publish_transport_metrics() only accepts STOQ TransportSnapshot, must also merge HyperMeshMetrics (packets/drops/latency/throughput from eBPF)",
+        "Path scheduling feedback — PathPolicyRecommendation from engauge must feed into STOQ multi-path scheduler for bandwidth-weighted/latency-aware routing decisions"
       ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",

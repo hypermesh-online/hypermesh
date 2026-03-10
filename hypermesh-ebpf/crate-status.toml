@@ -30,6 +30,10 @@ items = [
 items = [
     "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
     "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
+    # Sprint B1: eBPF metrics must flow into STOQ MetricsFrameBridge (STOQ pulls via ebpf.metrics().collect())
+    "eBPF metrics → engauge pipeline — HyperMeshMetrics (5 categories) collected but never pulled by STOQ. MetricsFrameBridge must accept eBPF data",
+    # Sprint B2: engauge intelligence must feed back into eBPF routing rules
+    "Engauge → eBPF feedback loop — set_routing_rule()/set_privacy_tier() APIs exist but never called from engauge intelligence layer",
 ]
 
 [features.planned]

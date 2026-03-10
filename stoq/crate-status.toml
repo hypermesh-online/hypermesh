@@ -35,11 +35,13 @@ items = [
 
 [features.in_development]
 items = [
-    "Bilateral handshake protocol — 3-message challenge-response framing verified, works local-only, NOT tested on separate hosts. Code lives in blockmatrix (migration pending)",
+    "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
-    "Metrics transport over STOQ — engauge metrics currently use raw UDP ([::1]:9297), must migrate to STOQ streams for cross-node distribution",
-    "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move FROM blockmatrix INTO STOQ (transport-layer concerns in blockchain crate)",
+    # Sprint B1: MetricsFrameBridge must merge eBPF wire metrics into frames
+    "MetricsFrameBridge eBPF integration — publish_transport_metrics() only accepts STOQ TransportSnapshot, must also merge HyperMeshMetrics (packets/drops/latency/throughput from eBPF)",
+    # Sprint B2: Path scheduling feedback from engauge
+    "Path scheduling feedback — PathPolicyRecommendation from engauge must feed into STOQ multi-path scheduler for bandwidth-weighted/latency-aware routing decisions",
 ]
 
 [features.planned]

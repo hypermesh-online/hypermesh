@@ -31,21 +31,19 @@ items = [
 
 [features.in_development]
 items = [
-    # None of the network integration is functional — all metrics are local or mock
-    "Real metrics ingestion from running services — blockmatrix pushes capacity frames via raw UDP, must migrate to STOQ transport; stoq/caesar not yet wired",
-    "Metrics publisher/subscriber network delivery — push model code exists but uses raw UDP, needs STOQ transport for real peer delivery",
-    "Network scope sync intelligence — WHERE to replicate, popularity detection, dispersion decisions for BlockMatrix shard placement (engauge owns intelligence, BlockMatrix owns mechanism)",
-    "Swarm replication triggers — ReplicationTrigger logic exists but not wired to BlockMatrix shard transport for consumer-becomes-provider (R12)",
+    # Sprint B1: Metrics pipeline wiring (engauge receives, doesn't need code changes — blockmatrix/STOQ do the sending)
+    "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP). eBPF wire metrics must be merged into frames at MetricsFrameBridge level",
+    "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery (blockmatrix sends, engauge receives)",
+    # Sprint B2: Intelligence feedback wiring (engauge code exists, callers must wire)
+    "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
+    "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
+    "eBPF policy feedback loop — engauge routing decisions must feed back to eBPF set_routing_rule() for wire-level path enforcement",
+    # Post-B2
     "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
-    "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
-    "Swarm replication triggers — ReplicationTrigger logic exists but not wired to actual shard transport",
-    "Dispersion intelligence — k-means clustering code exists but not receiving real demand data",
     "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
-    "Real-time routing intelligence feed — RoutingIntelFeed code exists but not connected to live STOQ transport",
 ]
 
 [features.planned]
 items = [
-    "End-to-end metrics pipeline (services -> engauge -> analytics -> routing decisions)",
     "Cross-node metrics federation via reflector pool",
 ]
