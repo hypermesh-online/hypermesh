@@ -581,6 +581,8 @@ export const crateStatuses: CrateStatus[] = [
         "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
         "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
         "TrustChainProofProvider — implements StateProofProvider with FALCON-1024 signed WireSignedProof envelope (BLAKE3+FALCON signing/verification, replay-prevention nonce)",
+        "FALCON-1024 identity signing — bilateral handshake proofs are FALCON-signed end-to-end (generate→sign→wire→verify), StakeProof covered by WireSignedProof envelope",
+        "Dual cert model — rcgen X.509 for QUIC/TLS encryption, FALCON identity for PoS authentication (independent layers)",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
         "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
@@ -588,12 +590,10 @@ export const crateStatuses: CrateStatus[] = [
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
       "inDevelopment": [
-        "FALCON-1024 certificate signing — crypto module exists but NOT integrated into cert issuance. All certs use rcgen. #1 PRIORITY",
-        "Post-quantum TLS certificates — requires Quinn upstream support for non-standard X.509",
+        "Post-quantum TLS certificates — TLS 1.3 (RFC 8446) only supports RSA/ECDSA/EdDSA, FALCON not supported by rustls/Quinn. Requires upstream post-quantum TLS standardization",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
         "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
         "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
-        "StakeProof::verify_signature() — structural only (non-empty fields check), cryptographic FALCON verification at WireSignedProof level",
         "Peer discovery (mDNS) — PeerAnnouncement struct exists, not tested multi-node",
         "STOQ-based API server — binds [::1]:8444, handler-to-cert-store wiring not fully verified",
         "HTTP/3 handlers — exist but real cert operation flow not tested end-to-end",
@@ -616,7 +616,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 48
+    "completion": 52
   },
   {
     "id": "ui",
