@@ -108,7 +108,7 @@ export const crateStatuses: CrateStatus[] = [
         "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
         "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
         "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
-        "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
+        "Metrics emission to engauge — MetricsReporter pushes Capacity + Congestion + Routing frames (eBPF-sourced) via UDP to [::1]:9297 every 30s with backoff",
         "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
         "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
         "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
@@ -120,7 +120,7 @@ export const crateStatuses: CrateStatus[] = [
         "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops"
       ],
       "inDevelopment": [
-        "Metrics over STOQ — MetricsReporter must send via STOQ streams (CONN_TYPE_METRICS=0x02), not raw UDP. Include eBPF wire metrics in frames",
+        "Metrics over STOQ — MetricsReporter must switch from raw UDP to STOQ streams (CONN_TYPE_METRICS=0x02). Frame content now includes eBPF data.",
         "Gossip protocol wiring — GossipProtocol (482 lines, 7 tests) never spawned in sync loop. Must send via STOQ (CONN_TYPE_GOSSIP=0x03), populate available_assets from ShardStore",
         "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
         "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",
@@ -270,14 +270,14 @@ export const crateStatuses: CrateStatus[] = [
         "Min-spec performance profiling (budget validation against R13 limits)",
         "Caesar in-transit/holding amount tracking (per-node economic state struct)",
         "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
-        "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline"
+        "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
+        "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()"
       ],
       "inDevelopment": [
-        "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP). eBPF wire metrics must be merged into frames at MetricsFrameBridge level",
-        "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery (blockmatrix sends, engauge receives)",
+        "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP)",
+        "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
         "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
         "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
-        "eBPF policy feedback loop — engauge routing decisions must feed back to eBPF set_routing_rule() for wire-level path enforcement",
         "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
       ],
@@ -285,7 +285,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 71
+    "completion": 75
   },
   {
     "id": "gateway",
@@ -387,7 +387,7 @@ export const crateStatuses: CrateStatus[] = [
         "Privacy tier eBPF enforcement with per-policy flag control",
         "Orchestrator state storage — routing rules, asset hashes, PoS validation state",
         "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
-        "Unified intelligence + transport metrics collection",
+        "Unified intelligence + transport metrics collection — HyperMeshMetrics (5 categories) consumed by STOQ MetricsFrameBridge for Congestion/Routing frames",
         "Multi-queue AF_XDP load balancing (RoundRobin/LeastLoaded/FlowHash strategies)",
         "Hardware offload detection and opportunistic NIC offload",
         "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
@@ -397,14 +397,13 @@ export const crateStatuses: CrateStatus[] = [
       "inDevelopment": [
         "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
         "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
-        "eBPF metrics → engauge pipeline — HyperMeshMetrics (5 categories) collected but never pulled by STOQ. MetricsFrameBridge must accept eBPF data",
-        "Engauge → eBPF feedback loop — set_routing_rule()/set_privacy_tier() APIs exist but never called from engauge intelligence layer"
+        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf"
       ],
       "planned": [
         "Production multi-node eBPF policy distribution"
       ]
     },
-    "completion": 77
+    "completion": 81
   },
   {
     "id": "hypermesh-ffi",
@@ -542,13 +541,13 @@ export const crateStatuses: CrateStatus[] = [
         "MetricsFrame protocol wiring to engauge",
         "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
         "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
-        "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed"
+        "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
+        "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames"
       ],
       "inDevelopment": [
         "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
-        "MetricsFrameBridge eBPF integration — publish_transport_metrics() only accepts STOQ TransportSnapshot, must also merge HyperMeshMetrics (packets/drops/latency/throughput from eBPF)",
         "Path scheduling feedback — PathPolicyRecommendation from engauge must feed into STOQ multi-path scheduler for bandwidth-weighted/latency-aware routing decisions"
       ],
       "planned": [
@@ -557,7 +556,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 75
+    "completion": 78
   },
   {
     "id": "trustchain",

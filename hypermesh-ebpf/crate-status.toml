@@ -18,7 +18,7 @@ items = [
     "Privacy tier eBPF enforcement with per-policy flag control",
     "Orchestrator state storage — routing rules, asset hashes, PoS validation state",
     "build.rs auto-compilation of C eBPF programs (ebpf-loader feature gate)",
-    "Unified intelligence + transport metrics collection",
+    "Unified intelligence + transport metrics collection — HyperMeshMetrics (5 categories) consumed by STOQ MetricsFrameBridge for Congestion/Routing frames",
     "Multi-queue AF_XDP load balancing (RoundRobin/LeastLoaded/FlowHash strategies)",
     "Hardware offload detection and opportunistic NIC offload",
     "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
@@ -30,10 +30,8 @@ items = [
 items = [
     "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
     "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
-    # Sprint B1: eBPF metrics must flow into STOQ MetricsFrameBridge (STOQ pulls via ebpf.metrics().collect())
-    "eBPF metrics → engauge pipeline — HyperMeshMetrics (5 categories) collected but never pulled by STOQ. MetricsFrameBridge must accept eBPF data",
-    # Sprint B2: engauge intelligence must feed back into eBPF routing rules
-    "Engauge → eBPF feedback loop — set_routing_rule()/set_privacy_tier() APIs exist but never called from engauge intelligence layer",
+    # Sprint B2: engauge intelligence must feed back into eBPF routing rules (trait exists, impl needed)
+    "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
 ]
 
 [features.planned]

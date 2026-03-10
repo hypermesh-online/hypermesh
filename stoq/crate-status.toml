@@ -31,6 +31,7 @@ items = [
     "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
     "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
     "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
+    "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames",
 ]
 
 [features.in_development]
@@ -38,8 +39,6 @@ items = [
     "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
     "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
-    # Sprint B1: MetricsFrameBridge must merge eBPF wire metrics into frames
-    "MetricsFrameBridge eBPF integration — publish_transport_metrics() only accepts STOQ TransportSnapshot, must also merge HyperMeshMetrics (packets/drops/latency/throughput from eBPF)",
     # Sprint B2: Path scheduling feedback from engauge
     "Path scheduling feedback — PathPolicyRecommendation from engauge must feed into STOQ multi-path scheduler for bandwidth-weighted/latency-aware routing decisions",
 ]
