@@ -23,7 +23,7 @@ items = [
 [features.in_development]
 items = [
     "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-    "Network MVP — bilateral handshake protocol in STOQ (stoq/src/protocol/bilateral.rs) with length-prefixed multi-message framing (write_msg/read_msg). BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake() with connection-type discriminator byte. Block sync infrastructure wired. PoS validation is real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames). Not yet tested multi-node end-to-end on separate hosts.",
+    "Network MVP — bilateral handshake + block sync verified E2E (two-node QUIC). Shared --network-id, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS. Not yet tested on separate hosts or at scale.",
     "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)",
 ]
 

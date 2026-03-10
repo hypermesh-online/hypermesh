@@ -115,13 +115,14 @@ items = [
     "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
     "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
     "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider",
+    "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
+    "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
 ]
 
 [features.in_development]
 items = [
-    # Mesh networking gaps (not yet wired end-to-end)
-    "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired, block fetching protocol implemented. Not yet e2e verified multi-node.",
-    "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
+    # Mesh networking gaps (partial — sync MVP works, scale not verified)
+    "Shard distribution — distribute_shards_to_network() sends to peers, needs sync MVP integration",
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
