@@ -117,12 +117,14 @@ items = [
     "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider",
     "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
     "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
+    "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
+    "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
+    "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
 ]
 
 [features.in_development]
 items = [
-    # Mesh networking gaps (partial — sync MVP works, scale not verified)
-    "Shard distribution — distribute_shards_to_network() sends to peers, needs sync MVP integration",
+    # Mesh networking gaps (sync + sharding work, scale not verified)
     "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
     "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
