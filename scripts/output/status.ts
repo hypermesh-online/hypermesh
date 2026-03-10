@@ -109,11 +109,14 @@ export const crateStatuses: CrateStatus[] = [
         "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
         "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
         "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
-        "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider"
+        "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider",
+        "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
+        "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
+        "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
+        "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
+        "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport"
       ],
       "inDevelopment": [
-        "Network sync wiring — Scope-aware block handling, reflector pool registration, BlockProvider wired, block fetching protocol implemented. Not yet e2e verified multi-node.",
-        "Shard distribution — distribute_shards_to_network() sends to peers but requires working handshake first",
         "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
         "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
@@ -130,7 +133,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 86
+    "completion": 89
   },
   {
     "id": "caesar",
@@ -347,7 +350,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral handshake protocol in STOQ (stoq/src/protocol/bilateral.rs) with length-prefixed multi-message framing (write_msg/read_msg). BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake() with connection-type discriminator byte. Block sync infrastructure wired. PoS validation is real (FALCON-1024 WireSignedProof envelope in BlockMatrix). Metrics emission to engauge wired (UDP capacity frames). Not yet tested multi-node end-to-end on separate hosts.",
+        "Network MVP — bilateral handshake + block sync verified E2E (two-node QUIC). Shared --network-id, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS. Not yet tested on separate hosts or at scale.",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
