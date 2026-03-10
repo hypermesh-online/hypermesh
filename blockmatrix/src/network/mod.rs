@@ -18,7 +18,9 @@ pub mod isolation;
 pub mod message_handlers;
 pub mod metrics_reporter;
 pub mod multi_network;
+pub mod peer_auth;
 mod peer_discovery;
+pub mod shard_distribution;
 pub mod reflector_pool;
 pub mod shard_store;
 pub mod shard_transport;
@@ -42,6 +44,7 @@ use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::reflector_pool::ReflectorPool;
 use crate::network::shard_store::ShardStore;
+use crate::network::peer_auth::AuthenticatedPeers;
 use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
 use hypermesh_lib::BlockchainScope;
 
@@ -103,6 +106,8 @@ pub struct PeerContext {
     pub connected_peer_coords: Arc<RwLock<Vec<MatrixCoordinate>>>,
     /// DNS resolver for populating DNS entries extracted from received blocks.
     pub dns_resolver: Option<DnsResolver>,
+    /// Authenticated peers map — only peers in this map can send us data.
+    pub authenticated_peers: AuthenticatedPeers,
 }
 
 /// Network manager for multi-node communication
@@ -123,6 +128,8 @@ pub struct NetworkManager {
     pub(super) signer: Arc<dyn hypermesh_lib::NodeSigner>,
     /// State proof provider (BlockMatrix implementation)
     pub(super) proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+    /// Authenticated peers map shared with PeerContext.
+    pub(super) authenticated_peers: AuthenticatedPeers,
 }
 
 impl NetworkManager {
@@ -170,6 +177,7 @@ impl NetworkManager {
             stoq_integration,
             signer,
             proof_provider,
+            authenticated_peers: peer_auth::new_authenticated_peers(),
         })
     }
 
@@ -215,6 +223,28 @@ impl NetworkManager {
             node_info.coordinate.y,
             node_info.coordinate.z
         );
+
+        // Register as authenticated peer after successful handshake
+        let auth_network_id = peer_ctx
+            .as_ref()
+            .map(|c| c.network_id.clone())
+            .unwrap_or_default();
+        peer_auth::register_authenticated_peer(
+            &self.authenticated_peers,
+            peer_auth::AuthenticatedPeer {
+                node_id: node_info.node_id.clone(),
+                pubkey: Vec::new(),
+                coordinate: (
+                    node_info.coordinate.x as i32,
+                    node_info.coordinate.y as i32,
+                    node_info.coordinate.z as i32,
+                ),
+                network_id: auth_network_id,
+                authenticated_at: std::time::Instant::now(),
+                proof_bytes: Vec::new(),
+            },
+        )
+        .await;
 
         // Request CA certificate in background (Phase 2 bootstrap)
         self.spawn_ca_enrollment_if_needed();
@@ -318,6 +348,14 @@ impl NetworkManager {
         self.start_discovery().await?;
 
         Ok(())
+    }
+
+    /// Get the shared authenticated peers map.
+    ///
+    /// Callers constructing a [`PeerContext`] should clone this to ensure
+    /// the peer context and network manager share the same map.
+    pub fn authenticated_peers(&self) -> AuthenticatedPeers {
+        self.authenticated_peers.clone()
     }
 
     /// Get local node ID
@@ -444,6 +482,7 @@ impl NetworkManager {
                     let signer = self.signer.clone();
                     let proof_provider = self.proof_provider.clone();
                     let cert_manager = self.transport.cert_manager.clone();
+                    let auth_peers = self.authenticated_peers.clone();
 
                     // Handle connection in background — read discriminator
                     // to decide whether this is a handshake or a peer message.
@@ -456,6 +495,7 @@ impl NetworkManager {
                             proof_provider,
                             cert_manager,
                             ctx,
+                            auth_peers,
                         )
                         .await
                         {

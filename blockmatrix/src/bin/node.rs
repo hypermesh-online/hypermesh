@@ -532,46 +532,32 @@ struct ShardDistributionCtx {
     shard_transport: std::sync::Arc<StoqShardTransport>,
 }
 
-/// Distribute shards to connected network peers (best-effort).
+/// Distribute shards to connected network peers using placement-aware routing.
 ///
-/// Sends each shard to up to 6 nearest peers. Failures are logged but
+/// Uses the pipeline's placement map to send each shard to the peer whose
+/// matrix coordinate is closest to the shard's target position. Shards
+/// without a reachable peer are kept locally. Failures are logged but
 /// do not abort the operation.
 async fn distribute_shards_to_network(
     ctx: &ShardDistributionCtx,
     shards: &[(ContentHash, Vec<u8>)],
+    placements: &[blockmatrix::assets::pipeline::distribution::ShardPlacement],
 ) {
-    let connected_nodes = ctx.network.get_connected_nodes().await;
-    if connected_nodes.is_empty() {
-        info!("No connected peers for shard distribution (local-only storage)");
-        return;
-    }
+    use blockmatrix::network::shard_distribution::distribute_to_peers;
 
-    let mut distributed = 0usize;
-    let mut failed = 0usize;
-    for (shard_hash, shard_data) in shards {
-        // Send to up to 6 nearest peers
-        for node in connected_nodes.iter().take(6) {
-            let node_id = hypermesh_lib::NodeId::from_bytes(
-                *blake3::hash(node.node_id.as_bytes()).as_bytes(),
-            );
-            match ctx
-                .shard_transport
-                .send_shard(&node_id, shard_hash, shard_data)
-                .await
-            {
-                Ok(()) => distributed += 1,
-                Err(e) => {
-                    warn!(
-                        "Failed to distribute shard to {}: {}",
-                        &node.node_id[..8.min(node.node_id.len())],
-                        e
-                    );
-                    failed += 1;
-                }
-            }
-        }
-    }
-    info!("Shard distribution: {} sent, {} failed", distributed, failed);
+    let connected_nodes = ctx.network.get_connected_nodes().await;
+    let result = distribute_to_peers(
+        shards,
+        placements,
+        &connected_nodes,
+        ctx.shard_transport.as_ref(),
+    )
+    .await;
+
+    info!(
+        "Shard distribution: {} sent, {} kept locally, {} failed",
+        result.sent, result.kept_local, result.failed,
+    );
 }
 
 /// Shard map persisted to disk after Store, used by Fetch to reconstruct.
@@ -908,7 +894,12 @@ async fn run_store(path: std::path::PathBuf, dist_ctx: Option<&ShardDistribution
                 (ContentHash(hash_bytes), s.data.clone())
             })
             .collect();
-        distribute_shards_to_network(ctx, &shard_pairs).await;
+        distribute_shards_to_network(
+            ctx,
+            &shard_pairs,
+            &processed.distributed.placements,
+        )
+        .await;
     } else {
         debug!("Standalone store: no network available for shard distribution");
     }
@@ -1627,6 +1618,8 @@ async fn run_connect(
     let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
     // STOQ transport reference (populated if network starts, used for API bridge)
     let mut transport_ref: Option<std::sync::Arc<stoq::StoqTransport>> = None;
+    // Shard transport reference (populated if network starts, used for distribution)
+    let mut shard_transport_ref: Option<std::sync::Arc<StoqShardTransport>> = None;
 
     // Initialize STOQ transport for any mode that needs networking.
     // Private mode starts STOQ when bootstrap peers are provided (bounded network).
@@ -1783,6 +1776,7 @@ async fn run_connect(
             spatial_bucket_assigner: None,
             connected_peer_coords: connected_peer_coords.clone(),
             dns_resolver: Some(bootstrap.dns().clone()),
+            authenticated_peers: network_manager.authenticated_peers(),
         });
 
         // Start message loops for peers connected during discovery (before PeerContext existed)
@@ -1862,6 +1856,12 @@ async fn run_connect(
                     shard_transport_sync
                         .register_node_address(&node_id, node.address)
                         .await;
+                    // Cache the STOQ connection so send_shard avoids re-dialing
+                    if let Some(ref conn) = node.connection {
+                        shard_transport_sync
+                            .register_connection(&node_id, conn.clone())
+                            .await;
+                    }
                 }
 
                 let node_count = nodes.len();
@@ -2050,13 +2050,13 @@ async fn run_connect(
         }
 
         // Keep infrastructure alive for the node's lifetime
-        let _shard_transport = shard_transport;
         let _block_propagator = block_propagator.clone();
         let _sync_manager = sync_manager.clone();
         let _reflector_pool = reflector_pool.clone();
 
         network_ref = Some(network_clone);
         shard_store_ref = Some(shard_store);
+        shard_transport_ref = Some(shard_transport);
         transport_ref = Some(transport);
     }
 
@@ -2071,6 +2071,7 @@ async fn run_connect(
         persistence: persistence.clone(),
         network: network_ref,
         shard_store: daemon_shard_store,
+        shard_transport: shard_transport_ref,
         coordinate: coord,
         node_id: nid.to_string(),
         data_dir: data_dir.to_path_buf(),

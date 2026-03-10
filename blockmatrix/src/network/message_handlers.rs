@@ -29,6 +29,7 @@ use super::{
     NetworkNode, PeerContext,
     CONN_TYPE_HANDSHAKE, CONN_TYPE_PEER_MESSAGE,
 };
+use crate::network::peer_auth::{self, AuthenticatedPeers};
 
 // ── Wire-protocol tag bytes ──────────────────────────────────────────
 
@@ -89,6 +90,11 @@ pub(crate) async fn run_peer_message_loop(
 }
 
 /// Route a single message payload to the appropriate handler.
+///
+/// All data-bearing messages (blocks, shards, sync, block-fetch) are
+/// gated on the sender being in the [`AuthenticatedPeers`] map AND
+/// belonging to the same network. Gossip and unknown tags are logged
+/// but not gated (they carry no state-changing data).
 pub(crate) async fn dispatch_message(
     data: &[u8],
     stream: &mut stoq::Stream,
@@ -98,6 +104,23 @@ pub(crate) async fn dispatch_message(
 ) {
     let tag = data[0];
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+
+    // Gate all state-changing messages on peer authentication + network scope.
+    let needs_auth = matches!(
+        tag,
+        TAG_SHARD_SEND | TAG_SHARD_FETCH | TAG_BLOCK_ANNOUNCE
+            | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
+    );
+    if needs_auth
+        && !peer_auth::verify_peer_access(
+            &ctx.authenticated_peers,
+            peer_node_id,
+            &ctx.network_id,
+        )
+        .await
+    {
+        return;
+    }
 
     match tag {
         TAG_SHARD_SEND | TAG_SHARD_FETCH => {
@@ -174,7 +197,8 @@ async fn handle_block_announce(
     }
 }
 
-/// Parse a block announcement payload and verify its BLAKE3 hash.
+/// Parse a block announcement payload and verify its BLAKE3 hash
+/// and per-entry proof integrity.
 fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
     if data.len() < 9 {
         warn!("Block announce too short ({} bytes)", data.len());
@@ -207,6 +231,36 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
     if !block.verify_hash() {
         warn!("Block {} hash mismatch from peer {}", block.index, short_id);
         return None;
+    }
+
+    // Verify proof integrity for each block entry:
+    // proof_hash must equal BLAKE3(serialize(state_proof)) and proof must validate.
+    for (i, entry) in block.entries.iter().enumerate() {
+        let proof_bytes = match serde_json::to_vec(&entry.state_proof) {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(
+                    "Block {} entry {} proof serialization failed from {}: {}",
+                    block.index, i, short_id, e,
+                );
+                return None;
+            }
+        };
+        let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
+        if computed_hash != entry.proof_hash {
+            warn!(
+                "Block {} entry {} proof_hash mismatch from peer {}",
+                block.index, i, short_id,
+            );
+            return None;
+        }
+        if !entry.state_proof.validate() {
+            warn!(
+                "Block {} entry {} state proof validation failed from peer {}",
+                block.index, i, short_id,
+            );
+            return None;
+        }
     }
 
     Some(block)
@@ -398,6 +452,7 @@ pub(crate) async fn handle_incoming_connection(
     proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
     cert_manager: Arc<stoq::transport::certificates::CertificateManager>,
     peer_ctx: Option<Arc<PeerContext>>,
+    authenticated_peers: AuthenticatedPeers,
 ) -> Result<()> {
     let mut stream = connection.accept_stream().await?;
     let conn_type = stream.read_discriminator().await?;
@@ -407,6 +462,7 @@ pub(crate) async fn handle_incoming_connection(
             handle_handshake_connection(
                 connection, &mut stream, nodes, local_coord,
                 signer, proof_provider, cert_manager, peer_ctx,
+                authenticated_peers,
             ).await
         }
         CONN_TYPE_PEER_MESSAGE => {
@@ -429,6 +485,7 @@ async fn handle_handshake_connection(
     proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
     cert_manager: Arc<stoq::transport::certificates::CertificateManager>,
     peer_ctx: Option<Arc<PeerContext>>,
+    authenticated_peers: AuthenticatedPeers,
 ) -> Result<()> {
     debug!("Accepted incoming connection — handshake discriminator");
     let coord_tuple = (local_coord.x, local_coord.y, local_coord.z);
@@ -459,8 +516,27 @@ async fn handle_handshake_connection(
     };
 
     nodes.write().await.insert(peer_node_id.clone(), node);
+
+    // Register the accepted peer as authenticated (PoS handshake passed)
+    let auth_network_id = peer_ctx
+        .as_ref()
+        .map(|c| c.network_id.clone())
+        .unwrap_or_default();
+    peer_auth::register_authenticated_peer(
+        &authenticated_peers,
+        peer_auth::AuthenticatedPeer {
+            node_id: peer_node_id.clone(),
+            pubkey: result.peer_pubkey.clone(),
+            coordinate: (coordinate.x as i32, coordinate.y as i32, coordinate.z as i32),
+            network_id: auth_network_id,
+            authenticated_at: std::time::Instant::now(),
+            proof_bytes: result.peer_proof.clone(),
+        },
+    )
+    .await;
+
     info!(
-        "Bilateral verification complete — added node {} to network",
+        "Bilateral verification complete — added authenticated node {} to network",
         &peer_node_id[..8.min(peer_node_id.len())]
     );
 
