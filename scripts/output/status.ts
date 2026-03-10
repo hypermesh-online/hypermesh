@@ -109,18 +109,20 @@ export const crateStatuses: CrateStatus[] = [
         "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
         "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
         "Metrics emission to engauge — MetricsReporter pushes capacity frames via UDP to [::1]:9297 every 30s with backoff on failure",
-        "Real FALCON-1024 signed state proofs — WireSignedProof envelope with BLAKE3+FALCON signing/verification in BlockMatrixProofProvider",
+        "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
         "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
         "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
         "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
         "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
-        "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport"
+        "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
+        "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
+        "Auth TTL — authenticated peers expire after 1 hour, re-authentication required",
+        "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops"
       ],
       "inDevelopment": [
-        "Gossip protocol integration — GossipState struct exists, not producing real mesh coordination",
-        "mDNS peer discovery — PeerAnnouncement struct exists, not tested multi-node",
+        "Gossip protocol integration — GossipState struct exists, mesh coordination driven by engauge intelligence (not standalone gossip)",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
-        "Swarm O(log N) scaling — shard distribution works but no consumer-becomes-provider replication triggers"
+        "Swarm O(log N) scaling — shard distribution works, consumer-becomes-provider triggers pending (requires engauge ReplicationTrigger wiring)"
       ],
       "planned": [
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
@@ -133,7 +135,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 89
+    "completion": 90
   },
   {
     "id": "caesar",
@@ -268,8 +270,10 @@ export const crateStatuses: CrateStatus[] = [
         "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline"
       ],
       "inDevelopment": [
-        "Real metrics ingestion from running services — blockmatrix pushes capacity frames via UDP, stoq/caesar not yet wired",
-        "Metrics publisher/subscriber network delivery — push model code exists but no real STOQ connections to peers",
+        "Real metrics ingestion from running services — blockmatrix pushes capacity frames via raw UDP, must migrate to STOQ transport; stoq/caesar not yet wired",
+        "Metrics publisher/subscriber network delivery — push model code exists but uses raw UDP, needs STOQ transport for real peer delivery",
+        "Network scope sync intelligence — WHERE to replicate, popularity detection, dispersion decisions for BlockMatrix shard placement (engauge owns intelligence, BlockMatrix owns mechanism)",
+        "Swarm replication triggers — ReplicationTrigger logic exists but not wired to BlockMatrix shard transport for consumer-becomes-provider (R12)",
         "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
         "Routing intelligence integration with BlockMatrix — TensorWeightModifier trait exists but not called by real router",
         "Swarm replication triggers — ReplicationTrigger logic exists but not wired to actual shard transport",
@@ -282,7 +286,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 67
+    "completion": 63
   },
   {
     "id": "gateway",
@@ -317,16 +321,17 @@ export const crateStatuses: CrateStatus[] = [
         "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides"
       ],
       "inDevelopment": [
-        "Bootstrap token flow — HTTP/3 to STOQ transition code exists but not tested end-to-end",
-        "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional",
-        "Federation bridge — trust level structs exist but no real cross-network STOQ relay",
+        "Bootstrap token flow — HTTP/3 side complete (token gen + response), STOQ-side validation missing (no token-to-PoS correlation)",
+        "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
+        "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
+        "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
         "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
         "Outbound proxy with allowlist filtering — code exists, not tested",
         "Backend service discovery (resolve by address or service registry)"
       ],
       "planned": []
     },
-    "completion": 80
+    "completion": 77
   },
   {
     "id": "hypermesh",
@@ -346,11 +351,12 @@ export const crateStatuses: CrateStatus[] = [
         "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)",
         "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
         "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
-        "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay"
+        "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
+        "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control"
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral handshake + block sync verified E2E (two-node QUIC). Shared --network-id, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS. Not yet tested on separate hosts or at scale.",
+        "Network MVP — bilateral handshake + block sync verified E2E local (two-node QUIC), shared --network-id, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution. NOT tested on separate hosts.",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
@@ -362,7 +368,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real partition/chaos testing framework"
       ]
     },
-    "completion": 57
+    "completion": 59
   },
   {
     "id": "hypermesh-ebpf",
@@ -537,10 +543,11 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed"
       ],
       "inDevelopment": [
-        "Bilateral handshake protocol — 3-message challenge-response in stoq/src/protocol/bilateral.rs using NodeSigner+StateProofProvider traits, length-prefixed multi-message framing (write_msg/read_msg), connection-type discriminator byte. BlockMatrix NetworkManager wired to call initiate_handshake_on_stream()/accept_handshake(). Framing verified correct (write_msg does NOT call finish()). Not yet tested multi-node end-to-end on separate hosts.",
-        "StoqShardTransport — FALSELY CLAIMED as stoq feature in previous status; actual impl is in blockmatrix/src/network/shard_transport.rs, not in stoq crate",
+        "Bilateral handshake protocol — 3-message challenge-response framing verified, works local-only, NOT tested on separate hosts. Code lives in blockmatrix (migration pending)",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
-        "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
+        "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
+        "Metrics transport over STOQ — engauge metrics currently use raw UDP ([::1]:9297), must migrate to STOQ streams for cross-node distribution",
+        "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move FROM blockmatrix INTO STOQ (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
@@ -548,7 +555,7 @@ export const crateStatuses: CrateStatus[] = [
         "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)"
       ]
     },
-    "completion": 77
+    "completion": 74
   },
   {
     "id": "trustchain",
@@ -573,6 +580,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 node identity (FalconIdentity implements NodeSigner trait, keypair gen, persistence, BLAKE3 node ID — canonical implementation used by blockmatrix)",
         "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
         "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
+        "TrustChainProofProvider — implements StateProofProvider with FALCON-1024 signed WireSignedProof envelope (BLAKE3+FALCON signing/verification, replay-prevention nonce)",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
         "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
@@ -580,19 +588,19 @@ export const crateStatuses: CrateStatus[] = [
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
       "inDevelopment": [
-        "FALCON-1024 certificate signing — crypto module exists at trustchain/src/crypto/falcon.rs but is NOT integrated into certificate issuance pipeline. All certs use rcgen (traditional RSA/ECDSA X.509)",
-        "Post-quantum TLS certificates — QUIC/Quinn requires standard X.509 for TLS. Full PQ TLS requires Quinn upstream support",
+        "FALCON-1024 certificate signing — crypto module exists but NOT integrated into cert issuance. All certs use rcgen. #1 PRIORITY",
+        "Post-quantum TLS certificates — requires Quinn upstream support for non-standard X.509",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
         "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
         "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",
-        "StakeProof::verify_signature() is structural-only (non-empty fields check). Cryptographic FALCON-1024 verification is handled by BlockMatrix's WireSignedProof envelope, not by TrustChain directly",
-        "STOQ-based API server — binds [::1]:8444, accepts QUIC, but handler-to-cert-store wiring not fully verified",
-        "HTTP/3 handlers wired to cert store — handlers exist but real cert operation flow not tested end-to-end",
-        "Decentralized CA — currently single-node only, no peer CA discovery or certificate exchange",
-        "DNS zone propagation — DNS resolver is a local HashMap, no cross-node sync",
+        "StakeProof::verify_signature() — structural only (non-empty fields check), cryptographic FALCON verification at WireSignedProof level",
+        "Peer discovery (mDNS) — PeerAnnouncement struct exists, not tested multi-node",
+        "STOQ-based API server — binds [::1]:8444, handler-to-cert-store wiring not fully verified",
+        "HTTP/3 handlers — exist but real cert operation flow not tested end-to-end",
+        "Decentralized CA — single-node only, no peer CA discovery or certificate exchange",
         "CT log federation sync — message types exist but no real cross-node sync",
-        "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real QUIC-based peer exchange",
-        "Byzantine detection — ByzantineDetector struct exists but only monitors local node",
+        "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real peer exchange",
+        "Byzantine detection — ByzantineDetector monitors local node only",
         "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
         "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS"
       ],
@@ -608,7 +616,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 47
+    "completion": 48
   },
   {
     "id": "ui",

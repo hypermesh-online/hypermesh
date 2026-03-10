@@ -194,7 +194,7 @@ impl StakeProof {
     /// This method validates that the proof has a non-empty holder ID and
     /// positive stake amount. It does NOT perform cryptographic signature
     /// verification -- that happens at the `WireSignedProof` envelope level
-    /// in `BlockMatrixProofProvider`, where the entire `StateProof` (including
+    /// in `TrustChainProofProvider`, where the entire `StateProof` (including
     /// this `StakeProof`) is covered by a FALCON-1024 detached signature.
     pub fn verify_signature(&self) -> bool {
         !self.stake_holder_id.is_empty() && self.stake_amount > 0

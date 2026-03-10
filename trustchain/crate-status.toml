@@ -24,6 +24,7 @@ items = [
     "FALCON-1024 node identity (FalconIdentity implements NodeSigner trait, keypair gen, persistence, BLAKE3 node ID — canonical implementation used by blockmatrix)",
     "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
     "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
+    "TrustChainProofProvider — implements StateProofProvider with FALCON-1024 signed WireSignedProof envelope (BLAKE3+FALCON signing/verification, replay-prevention nonce)",
     "BLAKE3 content hashing",
     "Canonical ProofType from hypermesh-lib",
     "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
