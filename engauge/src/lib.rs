@@ -59,8 +59,8 @@ pub use organic_detection::{
 };
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
-    PathAdvisor, PathPolicyRecommendation, RoutingAdvisor, RoutingIntelFeed, RoutingIntelligence,
-    RoutingUpdate, TensorWeightModifier,
+    EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, PathAdvisor, PathPolicyRecommendation,
+    RoutingAdvisor, RoutingIntelFeed, RoutingIntelligence, RoutingUpdate, TensorWeightModifier,
 };
 pub use streaming::{
     MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator,

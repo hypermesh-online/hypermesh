@@ -8,11 +8,20 @@
 //! JSON. Emits structured `tracing` events and pushes frames to engauge's
 //! UDP ingestion endpoint at `[::1]:9297` (best-effort, fire-and-forget).
 
+use hypermesh_ebpf::metrics::HyperMeshMetrics;
 use tokio::net::UdpSocket;
 use tracing::{debug, info, warn};
 
 /// Default engauge UDP ingestion address.
 const ENGAUGE_UDP_ADDR: &str = "[::1]:9297";
+
+/// Current unix epoch timestamp in microseconds.
+fn timestamp_us() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_micros() as u64)
+        .unwrap_or(0)
+}
 
 /// Number of cycles to skip after a send failure before retrying.
 const BACKOFF_CYCLES: u64 = 10;
@@ -51,10 +60,7 @@ impl MetricsReporter {
         memory_usage: f64,
     ) -> Vec<u8> {
         self.sequence += 1;
-        let now_us = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_micros() as u64)
-            .unwrap_or(0);
+        let now_us = timestamp_us();
 
         let frame = serde_json::json!({
             "source_node": self.node_id,
@@ -80,6 +86,77 @@ impl MetricsReporter {
             cpu_usage_pct = format!("{:.1}", cpu_usage),
             memory_usage_pct = format!("{:.1}", memory_usage),
             "node_metrics"
+        );
+
+        serde_json::to_vec(&frame).unwrap_or_default()
+    }
+
+    /// Build a congestion metrics frame from eBPF transport data.
+    ///
+    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
+    pub fn build_congestion_frame(&mut self, ebpf: &HyperMeshMetrics) -> Vec<u8> {
+        self.sequence += 1;
+        let now_us = timestamp_us();
+        let t = &ebpf.transport_metrics;
+        let total = t.total_packets.max(1);
+        let drop_ratio = t.kernel_drops as f64 / total as f64;
+
+        let frame = serde_json::json!({
+            "source_node": self.node_id,
+            "timestamp_us": now_us,
+            "privacy_mode": { "scope": "Unbounded", "tracked": true },
+            "sequence": self.sequence,
+            "payload": {
+                "Congestion": {
+                    "buffer_fullness_ratio": drop_ratio.clamp(0.0, 1.0),
+                    "queue_depth": t.kernel_drops.min(u32::MAX as u64),
+                    "dropped_packets_epoch": t.kernel_drops,
+                    "avg_queue_wait_us": t.latency_avg_us,
+                }
+            }
+        });
+
+        debug!(
+            target: "engauge::metrics",
+            drops = t.kernel_drops,
+            latency_us = t.latency_avg_us,
+            drop_ratio = format!("{:.4}", drop_ratio),
+            "ebpf_congestion_frame"
+        );
+
+        serde_json::to_vec(&frame).unwrap_or_default()
+    }
+
+    /// Build a routing metrics frame from eBPF transport and routing data.
+    ///
+    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
+    pub fn build_routing_frame(&mut self, ebpf: &HyperMeshMetrics) -> Vec<u8> {
+        self.sequence += 1;
+        let now_us = timestamp_us();
+        let t = &ebpf.transport_metrics;
+        let r = &ebpf.routing_metrics;
+
+        let frame = serde_json::json!({
+            "source_node": self.node_id,
+            "timestamp_us": now_us,
+            "privacy_mode": { "scope": "Unbounded", "tracked": true },
+            "sequence": self.sequence,
+            "payload": {
+                "Routing": {
+                    "avg_latency_us": t.latency_avg_us,
+                    "throughput_bps": (t.bytes_per_second * 8.0) as u64,
+                    "path_count": r.successful.min(u16::MAX as u64),
+                    "active_connections": t.af_xdp_redirects.min(u32::MAX as u64),
+                }
+            }
+        });
+
+        debug!(
+            target: "engauge::metrics",
+            latency_us = t.latency_avg_us,
+            throughput_gbps = format!("{:.2}", t.throughput_gbps()),
+            routing_success = r.successful,
+            "ebpf_routing_frame"
         );
 
         serde_json::to_vec(&frame).unwrap_or_default()
@@ -159,6 +236,90 @@ mod tests {
                 serde_json::from_slice(&bytes).expect("test: valid JSON");
             assert_eq!(parsed["sequence"], expected_seq);
         }
+    }
+
+    fn test_ebpf_metrics() -> HyperMeshMetrics {
+        use hypermesh_ebpf::metrics::*;
+        HyperMeshMetrics {
+            transport_metrics: TransportMetrics {
+                total_packets: 5_000,
+                packets_per_second: 250.0,
+                bytes_per_second: 31_250_000.0,
+                total_bytes: 7_500_000,
+                kernel_drops: 25,
+                af_xdp_redirects: 4_000,
+                zero_copy_ops: 3_800,
+                memcpy_ops: 200,
+                latency_min_us: 50,
+                latency_max_us: 8_000,
+                latency_avg_us: 1_500,
+            },
+            routing_metrics: MatrixRoutingMetrics {
+                total_validations: 100,
+                successful: 95,
+                path_failures: 5,
+                topology_violations: 1,
+                avg_path_length: 2.8,
+                avg_validation_us: 40,
+            },
+            pos_metrics: ProofOfStateMetrics::default(),
+            asset_metrics: AssetHashMetrics::default(),
+            privacy_metrics: PrivacyTierMetrics::default(),
+        }
+    }
+
+    #[test]
+    fn build_congestion_frame_from_ebpf() {
+        let mut reporter = MetricsReporter::new("ebpf-cong-node".to_string());
+        let bytes = reporter.build_congestion_frame(&test_ebpf_metrics());
+
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("test: valid JSON");
+
+        assert_eq!(parsed["source_node"], "ebpf-cong-node");
+        assert_eq!(parsed["payload"]["Congestion"]["dropped_packets_epoch"], 25);
+        assert_eq!(parsed["payload"]["Congestion"]["avg_queue_wait_us"], 1_500);
+    }
+
+    #[test]
+    fn build_routing_frame_from_ebpf() {
+        let mut reporter = MetricsReporter::new("ebpf-route-node".to_string());
+        let bytes = reporter.build_routing_frame(&test_ebpf_metrics());
+
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("test: valid JSON");
+
+        assert_eq!(parsed["source_node"], "ebpf-route-node");
+        assert_eq!(parsed["payload"]["Routing"]["avg_latency_us"], 1_500);
+        // 31_250_000 * 8 = 250_000_000
+        assert_eq!(parsed["payload"]["Routing"]["throughput_bps"], 250_000_000u64);
+        assert_eq!(parsed["payload"]["Routing"]["path_count"], 95);
+    }
+
+    #[test]
+    fn ebpf_frames_fit_in_udp_datagram() {
+        let mut reporter = MetricsReporter::new("size-ebpf".to_string());
+        let congestion = reporter.build_congestion_frame(&test_ebpf_metrics());
+        let routing = reporter.build_routing_frame(&test_ebpf_metrics());
+
+        assert!(congestion.len() < 1024, "congestion frame too large");
+        assert!(routing.len() < 1024, "routing frame too large");
+    }
+
+    #[test]
+    fn ebpf_frames_increment_sequence() {
+        let mut reporter = MetricsReporter::new("seq-ebpf".to_string());
+        let _ = reporter.build_capacity_frame(1, 0, 0, 0.0, 0.0); // seq 1
+        let congestion = reporter.build_congestion_frame(&test_ebpf_metrics()); // seq 2
+        let routing = reporter.build_routing_frame(&test_ebpf_metrics()); // seq 3
+
+        let c: serde_json::Value =
+            serde_json::from_slice(&congestion).expect("test: valid JSON");
+        let r: serde_json::Value =
+            serde_json::from_slice(&routing).expect("test: valid JSON");
+
+        assert_eq!(c["sequence"], 2);
+        assert_eq!(r["sequence"], 3);
     }
 
     #[test]

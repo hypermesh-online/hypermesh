@@ -15,6 +15,62 @@ use crate::streaming::protocol::MetricsPayload;
 use crate::streaming::subscriber::MetricsSubscriber;
 use crate::trending::EpochTracker;
 
+// ---------------------------------------------------------------------------
+// eBPF policy feedback trait (Workstream 3)
+// ---------------------------------------------------------------------------
+
+/// Routing rule for eBPF kernel-level forwarding.
+///
+/// Represents a single destination → next_hop mapping that should be pushed
+/// to the eBPF XDP layer for packet-level routing decisions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EbpfRoutingRule {
+    /// Destination matrix position.
+    pub dest: MatrixPosition,
+    /// Next hop matrix position for forwarding.
+    pub next_hop: MatrixPosition,
+}
+
+/// Privacy tier update for eBPF enforcement.
+///
+/// Maps a congestion level to an eBPF privacy enforcement mode.
+/// High congestion may trigger stricter packet filtering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EbpfPrivacyAction {
+    /// No changes needed.
+    NoChange,
+    /// Tighten enforcement (drop non-essential traffic).
+    Tighten,
+    /// Relax enforcement (allow more traffic through).
+    Relax,
+}
+
+/// Trait for pushing routing intelligence decisions back to the eBPF layer.
+///
+/// Implementors translate engauge routing recommendations into eBPF policy
+/// updates (routing rules, privacy tier changes). BlockMatrix implements
+/// this trait to bridge the feedback loop.
+pub trait EbpfPolicyFeedback: Send + Sync {
+    /// Push routing rules derived from routing intelligence to eBPF.
+    ///
+    /// Each rule maps a destination to a next-hop for kernel-level forwarding.
+    fn apply_routing_rules(&self, rules: &[EbpfRoutingRule]) -> Result<(), String>;
+
+    /// Signal a privacy enforcement action based on congestion analysis.
+    fn apply_privacy_action(&self, action: EbpfPrivacyAction) -> Result<(), String>;
+}
+
+/// Determine the eBPF privacy action from a congestion level.
+pub fn privacy_action_from_congestion(congestion_level: f64) -> EbpfPrivacyAction {
+    if congestion_level > CONGESTION_HIGH {
+        EbpfPrivacyAction::Tighten
+    } else if congestion_level < CONGESTION_LOW {
+        EbpfPrivacyAction::Relax
+    } else {
+        EbpfPrivacyAction::NoChange
+    }
+}
+
 /// A routing weight adjustment for a single candidate node.
 ///
 /// Positive values increase routing preference, negative decrease.
@@ -281,6 +337,8 @@ pub type RoutingUpdateCallback = Box<dyn Fn(&RoutingUpdate) + Send + Sync>;
 pub struct RoutingIntelFeed {
     intelligence: RoutingIntelligence,
     subscribers: Vec<RoutingUpdateCallback>,
+    /// Optional eBPF policy feedback sink.
+    ebpf_feedback: Option<Box<dyn EbpfPolicyFeedback>>,
 }
 
 impl RoutingIntelFeed {
@@ -289,7 +347,16 @@ impl RoutingIntelFeed {
         Self {
             intelligence: RoutingIntelligence::new(window_size),
             subscribers: Vec::new(),
+            ebpf_feedback: None,
         }
+    }
+
+    /// Attach an eBPF policy feedback sink.
+    ///
+    /// When set, [`publish_update`] will automatically push routing
+    /// decisions and congestion-derived privacy actions to the eBPF layer.
+    pub fn set_ebpf_feedback(&mut self, feedback: Box<dyn EbpfPolicyFeedback>) {
+        self.ebpf_feedback = Some(feedback);
     }
 
     /// Subscribe to routing updates.
@@ -337,6 +404,14 @@ impl RoutingIntelFeed {
         // Notify all subscribers.
         for subscriber in &self.subscribers {
             subscriber(&update);
+        }
+
+        // Push routing decisions to eBPF layer if feedback sink is attached.
+        if let Some(ref feedback) = self.ebpf_feedback {
+            let action = privacy_action_from_congestion(policy.congestion_level);
+            if let Err(e) = feedback.apply_privacy_action(action) {
+                tracing::warn!("eBPF privacy feedback failed: {e}");
+            }
         }
 
         update
@@ -635,6 +710,101 @@ mod tests {
         let rec = intel.recommend_path_policy(&agg);
         assert_eq!(rec.strategy, SchedulingStrategy::BandwidthWeighted);
         assert!(!rec.enable_redundant);
+    }
+
+    // -- EbpfPolicyFeedback tests --
+
+    #[test]
+    fn privacy_action_from_high_congestion() {
+        assert_eq!(
+            privacy_action_from_congestion(0.85),
+            EbpfPrivacyAction::Tighten
+        );
+    }
+
+    #[test]
+    fn privacy_action_from_low_congestion() {
+        assert_eq!(
+            privacy_action_from_congestion(0.1),
+            EbpfPrivacyAction::Relax
+        );
+    }
+
+    #[test]
+    fn privacy_action_from_moderate_congestion() {
+        assert_eq!(
+            privacy_action_from_congestion(0.5),
+            EbpfPrivacyAction::NoChange
+        );
+    }
+
+    /// Mock eBPF feedback sink for testing.
+    struct MockEbpfFeedback {
+        rules_applied: std::sync::Mutex<Vec<EbpfRoutingRule>>,
+        actions_applied: std::sync::Mutex<Vec<EbpfPrivacyAction>>,
+    }
+
+    impl MockEbpfFeedback {
+        fn new() -> Self {
+            Self {
+                rules_applied: std::sync::Mutex::new(Vec::new()),
+                actions_applied: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl EbpfPolicyFeedback for MockEbpfFeedback {
+        fn apply_routing_rules(&self, rules: &[EbpfRoutingRule]) -> Result<(), String> {
+            self.rules_applied
+                .lock()
+                .expect("test: lock")
+                .extend_from_slice(rules);
+            Ok(())
+        }
+
+        fn apply_privacy_action(&self, action: EbpfPrivacyAction) -> Result<(), String> {
+            self.actions_applied
+                .lock()
+                .expect("test: lock")
+                .push(action);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn routing_feed_pushes_ebpf_feedback() {
+        let feedback = std::sync::Arc::new(MockEbpfFeedback::new());
+        let feedback_clone = feedback.clone();
+
+        let mut feed = RoutingIntelFeed::new(30);
+        // Wrap Arc in a Box<dyn EbpfPolicyFeedback>
+        feed.set_ebpf_feedback(Box::new(ArcFeedbackWrapper(feedback_clone)));
+
+        // Ingest some congestion data -- low congestion should trigger Relax
+        feed.ingest(make_congestion_frame("node-a", 0.1));
+        let candidates = vec![NodeId::from_public_key(b"node-a")];
+        feed.publish_update(&origin(), &dest(), &candidates);
+
+        let actions = feedback
+            .actions_applied
+            .lock()
+            .expect("test: lock");
+        assert_eq!(actions.len(), 1);
+        // Empty aggregator produces 0 congestion → Relax
+        assert_eq!(actions[0], EbpfPrivacyAction::Relax);
+    }
+
+    /// Wrapper to use Arc<MockEbpfFeedback> as Box<dyn EbpfPolicyFeedback>.
+    struct ArcFeedbackWrapper(std::sync::Arc<MockEbpfFeedback>);
+
+    impl EbpfPolicyFeedback for ArcFeedbackWrapper {
+        fn apply_routing_rules(&self, rules: &[EbpfRoutingRule]) -> Result<(), String> {
+            self.0.apply_routing_rules(rules)
+        }
+
+        fn apply_privacy_action(&self, action: EbpfPrivacyAction) -> Result<(), String> {
+            self.0.apply_privacy_action(action)
+        }
     }
 
     // -- RoutingIntelFeed tests (7.9) --
