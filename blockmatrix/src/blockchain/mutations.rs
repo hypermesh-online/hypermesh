@@ -7,7 +7,7 @@
 //! All mutation methods that create new blocks or insert received blocks
 //! live here.  Core chain state and queries are in [`super::chain`].
 
-use tracing::info;
+use tracing::{info, warn};
 
 use super::block::{Block, BlockAssetEntry, StoragePointer};
 use super::chain::NodeBlockchain;
@@ -130,13 +130,25 @@ impl NodeBlockchain {
             let blocks = self.blocks.read().await;
             if let Some(prev) = blocks.get(&(block.index - 1)) {
                 if block.previous_hash != prev.hash {
-                    return Err(format!(
-                        "Block {} previous_hash {} does not match block {}'s hash {}",
-                        block.index,
-                        block.previous_hash,
-                        block.index - 1,
-                        prev.hash,
-                    ));
+                    // For cross-genesis sync: when a peer's block at index 1
+                    // references its own genesis (not ours), allow insertion
+                    // with a warning rather than rejecting outright.
+                    if block.index == 1 {
+                        warn!(
+                            "Block 1 previous_hash differs from our genesis \
+                             (cross-genesis sync): peer={}, ours={}",
+                            &block.previous_hash[..16.min(block.previous_hash.len())],
+                            &prev.hash[..16.min(prev.hash.len())],
+                        );
+                    } else {
+                        return Err(format!(
+                            "Block {} previous_hash {} does not match block {}'s hash {}",
+                            block.index,
+                            block.previous_hash,
+                            block.index - 1,
+                            prev.hash,
+                        ));
+                    }
                 }
             }
             // If we don't have the predecessor, we still insert (gap-fill later)

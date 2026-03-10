@@ -86,6 +86,10 @@ struct Cli {
     #[clap(long)]
     reflector: bool,
 
+    /// Network ID for multi-node sync (nodes with the same ID sync blocks)
+    #[arg(long, default_value = "public-hypermesh-alpha")]
+    network_id: String,
+
     /// Data directory for blockchain persistence
     #[clap(long, default_value = "~/.blockmatrix")]
     data_dir: String,
@@ -1740,11 +1744,8 @@ async fn run_connect(
         ));
 
         // Join a Network scope chain if we have peers or are a reflector
+        let network_id = cli.network_id.clone();
         if has_bootstrap_peers || cli.reflector {
-            let network_id = format!(
-                "public-{}",
-                &genesis_hash[..16.min(genesis_hash.len())]
-            );
             let now_secs = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -1773,6 +1774,7 @@ async fn run_connect(
             block_propagator: block_propagator.clone(),
             our_coordinate: coord,
             node_id: nid.to_string(),
+            network_id: network_id.clone(),
             blockchain_scope: if has_bootstrap_peers || cli.reflector {
                 hypermesh_lib::BlockchainScope::Network
             } else {
@@ -1790,10 +1792,6 @@ async fn run_connect(
         // Register discovered peers as reflectors so sync requests have targets
         if has_bootstrap_peers || cli.reflector {
             let discovered_peers = network_clone.get_connected_nodes().await;
-            let network_id = format!(
-                "public-{}",
-                &genesis_hash[..16.min(genesis_hash.len())]
-            );
             let now_secs = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs())
@@ -1895,6 +1893,8 @@ async fn run_connect(
         let shard_store_metrics = shard_store.clone();
         let peer_coords_sync = connected_peer_coords.clone();
         let metrics_node_id = nid.to_string();
+        let network_id_sync = network_id.clone();
+        let block_propagator_sync = block_propagator.clone();
         tokio::spawn(async move {
             let mut interval =
                 tokio::time::interval(tokio::time::Duration::from_secs(5));
@@ -1902,6 +1902,7 @@ async fn run_connect(
                 blockmatrix::network::MetricsReporter::new(metrics_node_id);
             let os_abs = create_os_abstraction().ok();
             let mut cycle_count: u64 = 0;
+            let mut last_propagated_height: u64 = blockchain_sync.get_height().await;
             loop {
                 interval.tick().await;
                 cycle_count += 1;
@@ -1943,6 +1944,28 @@ async fn run_connect(
                     info!("Sync round: fetched {} block(s)", fetched_blocks.len());
                 }
 
+                // Propagate locally-created blocks to connected peers
+                let current_height = blockchain_sync.get_height().await;
+                if current_height > last_propagated_height {
+                    let chain = blockchain_sync.get_chain().await;
+                    for block in chain.iter().filter(|b| b.index > last_propagated_height) {
+                        let coords = network_sync.get_connected_coordinates().await;
+                        if !coords.is_empty() {
+                            let result = block_propagator_sync
+                                .lock()
+                                .await
+                                .propagate_block(block, &coords)
+                                .await;
+                            info!(
+                                "Propagated block #{} to {} peer(s)",
+                                block.index,
+                                result.reached_nodes.len(),
+                            );
+                        }
+                    }
+                    last_propagated_height = current_height;
+                }
+
                 {
                     let now_ms = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -1959,16 +1982,8 @@ async fn run_connect(
                     debug!("Reflector heartbeat: height={}", local_height);
 
                     // Broadcast reflector heartbeat to connected peers
-                    let genesis_hash = blockchain_sync.get_head().await
-                        .map(|b| b.hash.clone())
-                        .unwrap_or_default();
-                    let network_id = format!(
-                        "public-{}",
-                        &genesis_hash[..16.min(genesis_hash.len())]
-                    );
-
                     let heartbeat_msg = blockmatrix::network::stoq_integration::MatrixMessage::ReflectorHeartbeat {
-                        network_id,
+                        network_id: network_id_sync.clone(),
                         block_height: local_height,
                         health_score: 1.0,
                     };

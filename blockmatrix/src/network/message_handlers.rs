@@ -656,20 +656,17 @@ async fn handle_sync_message(
 
 /// Register a newly-accepted peer as a reflector in the ReflectorPool.
 ///
-/// Derives the network_id from the local blockchain's genesis hash and
-/// registers the peer with default health so that `TransportSyncDriver`
-/// can target it during proactive sync rounds.
+/// Uses the shared `network_id` from the PeerContext so that all nodes
+/// on the same `--network-id` register reflectors under the same key.
 async fn register_peer_as_reflector(
     ctx: &PeerContext,
     peer_node_id: &str,
     peer_coord: MatrixCoordinate,
 ) {
-    let chain = ctx.blockchain.get_chain().await;
-    let genesis_hash = chain.first().map(|b| b.hash.as_str()).unwrap_or("");
-    if genesis_hash.is_empty() {
+    let network_id = ctx.network_id.clone();
+    if network_id.is_empty() {
         return;
     }
-    let network_id = format!("public-{}", &genesis_hash[..16.min(genesis_hash.len())]);
 
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

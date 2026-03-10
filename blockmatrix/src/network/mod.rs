@@ -92,6 +92,8 @@ pub struct PeerContext {
     pub our_coordinate: MatrixCoordinate,
     /// Our node ID.
     pub node_id: String,
+    /// Shared network ID for multi-node sync (nodes with the same ID sync blocks).
+    pub network_id: String,
     /// Blockchain scope determining block handling behavior.
     pub blockchain_scope: BlockchainScope,
     /// Spatial bucket assigner for Public mode (Network scope + Public transport).
