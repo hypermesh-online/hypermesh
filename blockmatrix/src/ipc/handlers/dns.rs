@@ -97,6 +97,7 @@ mod tests {
             persistence,
             network: None,
             shard_store: Arc::new(crate::network::shard_store::ShardStore::new()),
+            shard_transport: None,
             coordinate: coord,
             node_id: "dns-test".into(),
             data_dir: PathBuf::from("/tmp"),

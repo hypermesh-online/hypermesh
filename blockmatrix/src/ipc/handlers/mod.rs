@@ -14,6 +14,7 @@ pub mod dns;
 pub mod domain;
 pub mod network;
 pub mod shard;
+pub mod store;
 pub mod topology;
 
 use std::sync::Arc;
@@ -83,6 +84,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     asset::register(handler, &state);
     dashboard::register(handler, &state);
     shard::register(handler, &state);
+    store::register(handler, &state);
     config::register(handler);
 }
 
@@ -119,6 +121,7 @@ pub(crate) mod tests {
             persistence,
             network: None,
             shard_store: Arc::new(ShardStore::new()),
+            shard_transport: None,
             coordinate: coord,
             node_id: "test-node".to_string(),
             data_dir: PathBuf::from("/tmp"),
