@@ -16,6 +16,7 @@ items = [
     "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment",
     "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling",
     "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol",
+    "Post-quantum QUIC tunnel — X25519MLKEM768 hybrid key exchange via aws-lc-rs + rustls prefer-post-quantum",
     "BLAKE3 content hashing",
     "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
     "Identity-aware connection establishment (extract_node_id from X.509 SPKI)",
@@ -45,5 +46,5 @@ items = [
 items = [
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
-    "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)",
+    "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)",
 ]

@@ -27,7 +27,8 @@ futures = "0.3"
 
 # QUIC and networking
 quinn = "0.11"
-rustls = { version = "0.23", features = ["ring"] }
+# Post-quantum QUIC: X25519MLKEM768 hybrid key exchange via aws-lc-rs
+rustls = { version = "0.23", features = ["aws_lc_rs", "prefer-post-quantum"] }
 rustls-pemfile = "2.2"
 rcgen = "0.13"
 socket2 = "0.5"

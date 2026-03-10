@@ -143,6 +143,7 @@ Every asset gets a unique IPv6 address (`fd48:4d00` prefix) encoding matrix coor
 |-----------|---------|
 | FALCON-1024 | Protocol signing (TrustChain CA, STOQ handshake) |
 | Kyber-1024 | Asset encryption (KEM + AES-GCM) |
+| X25519MLKEM768 | QUIC tunnel key exchange (post-quantum hybrid via aws-lc-rs) |
 | BLAKE3 | All content hashing |
 
 SHA-256 is used only for X.509 certificate fingerprints (standard requirement) and OCI image digests.

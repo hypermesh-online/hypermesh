@@ -19,7 +19,7 @@ STOQ is not a simple QUIC wrapper. It provides protocol-level intelligence: Proo
 
 ### Transport
 - **Protocol**: QUIC over IPv6 (quinn-based) with intelligence extensions
-- **Crypto**: FALCON-1024 post-quantum signing (handshake + protocol signatures)
+- **Crypto**: X25519MLKEM768 key exchange (post-quantum hybrid) + FALCON-1024 signing (handshake + protocol signatures)
 - **Adaptive Tiers**: EWMA bandwidth estimation, MTU discovery, loss-based congestion control selection
 - **Multi-Path QUIC**: 4 schedulers (scope/privacy/federation policy, bandwidth-weighted, redundant mode)
 - **Reflector Pool**: Heartbeat/health tracking, quorum detection, sync protocol, MatrixMessage bridge

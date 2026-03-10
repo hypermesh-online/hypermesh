@@ -24,7 +24,7 @@ bytes = { version = "1.6", features = ["serde"] }
 
 # Server binary dependencies (optional to avoid stoq<->engauge cycle)
 quinn = { version = "0.11", optional = true }
-rustls = { version = "0.23", features = ["ring"], optional = true }
+rustls = { version = "0.23", features = ["aws_lc_rs", "prefer-post-quantum"], optional = true }
 rcgen = { version = "0.13", optional = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
 

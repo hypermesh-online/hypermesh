@@ -73,7 +73,7 @@ STOQ is the OS-level transport protocol. It runs QUIC over IPv6 with eBPF kernel
 
 **Responsibilities**:
 - Connection establishment, stream multiplexing, connection pooling
-- Post-quantum transport cryptography (FALCON-1024 signatures, X25519 key exchange)
+- Post-quantum transport cryptography (FALCON-1024 signatures, X25519MLKEM768 hybrid key exchange)
 - BLAKE3 protocol-level token and hash validation
 - Privacy tier enforcement at the transport level (Anonymous/Private/Public)
 - Adaptive congestion control (EWMA bandwidth, MTU discovery, loss-based CC)

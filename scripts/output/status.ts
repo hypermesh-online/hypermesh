@@ -527,6 +527,7 @@ export const crateStatuses: CrateStatus[] = [
         "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment",
         "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling",
         "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol",
+        "Post-quantum QUIC tunnel — X25519MLKEM768 hybrid key exchange via aws-lc-rs + rustls prefer-post-quantum",
         "BLAKE3 content hashing",
         "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
         "Identity-aware connection establishment (extract_node_id from X.509 SPKI)",
@@ -552,10 +553,10 @@ export const crateStatuses: CrateStatus[] = [
       "planned": [
         "Real jitter benchmarking under controlled partitions",
         "Partition recovery timing measurements",
-        "Full post-quantum TLS (replace rcgen X.509 with FALCON-1024 signed certs — requires Quinn upstream support)"
+        "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 74
+    "completion": 75
   },
   {
     "id": "trustchain",
@@ -582,7 +583,7 @@ export const crateStatuses: CrateStatus[] = [
         "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
         "TrustChainProofProvider — implements StateProofProvider with FALCON-1024 signed WireSignedProof envelope (BLAKE3+FALCON signing/verification, replay-prevention nonce)",
         "FALCON-1024 identity signing — bilateral handshake proofs are FALCON-signed end-to-end (generate→sign→wire→verify), StakeProof covered by WireSignedProof envelope",
-        "Dual cert model — rcgen X.509 for QUIC/TLS encryption, FALCON identity for PoS authentication (independent layers)",
+        "FALCON IS authentication — QUIC/TLS provides transport encryption only (AcceptAllVerifier bypasses cert verification), PoS bilateral handshake with FALCON-signed proofs is the sole authentication mechanism",
         "BLAKE3 content hashing",
         "Canonical ProofType from hypermesh-lib",
         "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
@@ -590,7 +591,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
       ],
       "inDevelopment": [
-        "Post-quantum TLS certificates — TLS 1.3 (RFC 8446) only supports RSA/ECDSA/EdDSA, FALCON not supported by rustls/Quinn. Requires upstream post-quantum TLS standardization",
+        "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
         "Kyber-1024 KEM integration — type exists but not used in certificate operations",
         "Certificate lifecycle tied to scope — scope-aware duration fields defined but not enforced in CA flow",
         "Scope-aware certificates — IdentityScopeExtension type defined but not embedded in issued certs",

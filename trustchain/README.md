@@ -35,6 +35,7 @@ Authentication is binary -- pass or fail. There are no trust scores, reputation 
 ### Cryptography
 - **FALCON-1024**: Post-quantum signing for all CA operations and protocol signatures
 - **Kyber-1024**: Key encapsulation for asset encryption
+- **X25519MLKEM768**: Hybrid post-quantum key exchange for STOQ QUIC tunnels (via aws-lc-rs)
 - **BLAKE3**: Content hashing for Proof of State and certificate transparency
 
 ### Privacy Model

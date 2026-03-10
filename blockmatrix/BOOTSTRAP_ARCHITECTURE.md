@@ -55,7 +55,8 @@ let localhost_cert = LocalhostCertificate {
     subject: "localhost",
     issuer: "self",
     is_self_signed: true,
-    // FALCON-1024 signature for quantum resistance
+    // rcgen X.509 (RSA/ECDSA) — FALCON not usable for X.509 cert signing
+    // QUIC tunnel independently uses X25519MLKEM768 hybrid post-quantum key exchange
 };
 ```
 
@@ -63,6 +64,8 @@ let localhost_cert = LocalhostCertificate {
 - No external CA required for bootstrap
 - Localhost communication always works
 - Node is self-sufficient from moment of creation
+- QUIC key exchange is post-quantum (X25519MLKEM768 via aws-lc-rs) independently of cert type
+- Certificate signing awaits upstream TLS spec for post-quantum signature algorithms
 
 ### 3. DNS Initialized with Localhost
 ```rust

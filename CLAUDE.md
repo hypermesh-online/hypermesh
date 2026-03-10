@@ -525,7 +525,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ Everything is a BlockMatrix Asset with remote NAT-like addressing
 - ✅ IPv6-only networking throughout ecosystem
 - ✅ Four-proof Proof of State (PoSpace, PoStake, PoWork, PoTime) for all operations
-- ✅ Quantum-resistant cryptography (FALCON-1024, Kyber)
+- ✅ Quantum-resistant cryptography (FALCON-1024 signing, Kyber-1024 asset encryption, X25519MLKEM768 QUIC key exchange)
 
 **Blockchain Architecture** (Clarified):
 - ✅ **Current State**: Single blockchain per node (Device scope only)
@@ -545,7 +545,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 ### **Removed Components & Features**
 - ❌ **Julia Language Support**: REMOVED - Execution delegation replaces local VM need
 - ❌ **Traditional Databases**: REMOVED - All storage is asset-based through BlockMatrix
-- ❌ **RSA Cryptography**: REMOVED - FALCON-1024 for protocol, Kyber for asset encryption
+- ❌ **RSA Cryptography**: REMOVED - FALCON-1024 for signing, Kyber-1024 for asset encryption, X25519MLKEM768 for QUIC key exchange
 - ❌ **HTTP/REST APIs**: REMOVED - Everything runs through STOQ protocol
 - ❌ **Lua VM Integration**: REMOVED - Remote execution on HyperMesh nodes only
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-STOQ's transport and protocol layers implement a sophisticated QUIC-based transport system with quantum-resistant cryptography, PoS token validation, and intelligent protocol extensions. This document describes the architectural design decisions and error handling patterns.
+STOQ's transport and protocol layers implement a sophisticated QUIC-based transport system with quantum-resistant cryptography, PoS token validation, and intelligent protocol extensions. The QUIC tunnel uses X25519MLKEM768 hybrid post-quantum key exchange (via aws-lc-rs + rustls `prefer-post-quantum`), providing quantum-resistant encryption for all connections regardless of certificate type. This document describes the architectural design decisions and error handling patterns.
 
 ## Error Handling Architecture
 
