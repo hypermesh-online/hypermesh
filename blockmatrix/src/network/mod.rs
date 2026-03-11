@@ -45,6 +45,7 @@ use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::reflector_pool::ReflectorPool;
 use crate::network::shard_store::ShardStore;
 use crate::network::peer_auth::AuthenticatedPeers;
+use crate::network::gossip::GossipProtocol;
 use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
 use hypermesh_lib::BlockchainScope;
 
@@ -108,6 +109,8 @@ pub struct PeerContext {
     pub dns_resolver: Option<DnsResolver>,
     /// Authenticated peers map — only peers in this map can send us data.
     pub authenticated_peers: AuthenticatedPeers,
+    /// Gossip protocol instance for mesh coordination.
+    pub gossip_protocol: Option<Arc<GossipProtocol>>,
 }
 
 /// Network manager for multi-node communication
@@ -519,6 +522,8 @@ impl NetworkManager {
 /// propagation payload as a length-prefixed handshake message.
 pub const CONN_TYPE_HANDSHAKE: u8 = 0x00;
 pub const CONN_TYPE_PEER_MESSAGE: u8 = 0x01;
+pub const CONN_TYPE_METRICS: u8 = 0x02;
+pub const CONN_TYPE_GOSSIP: u8 = 0x03;
 
 use message_handlers::run_peer_message_loop;
 

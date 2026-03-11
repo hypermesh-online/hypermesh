@@ -500,6 +500,43 @@ async fn propagate_block(
     );
 }
 
+/// Send a gossip message to a single peer over a STOQ stream.
+///
+/// Opens a bidirectional stream, writes the `CONN_TYPE_GOSSIP` discriminator
+/// followed by the serialized gossip message bytes.
+async fn send_gossip_to_peer(
+    node: &blockmatrix::network::NetworkNode,
+    msg_bytes: &[u8],
+) {
+    let conn = match node.connection.as_ref() {
+        Some(c) => c,
+        None => return,
+    };
+
+    let short_id = &node.node_id[..8.min(node.node_id.len())];
+
+    match conn.open_bi().await {
+        Ok((mut send, _recv)) => {
+            if let Err(e) = send.write_all(&[blockmatrix::network::CONN_TYPE_GOSSIP]).await {
+                debug!("Gossip discriminator write to {} failed: {}", short_id, e);
+                return;
+            }
+            if let Err(e) = send.write_all(msg_bytes).await {
+                debug!("Gossip write to {} failed: {}", short_id, e);
+                return;
+            }
+            if let Err(e) = send.finish() {
+                debug!("Gossip stream finish to {} failed: {}", short_id, e);
+                return;
+            }
+            debug!("Sent gossip to peer {}", short_id);
+        }
+        Err(e) => {
+            debug!("Gossip stream open to {} failed: {}", short_id, e);
+        }
+    }
+}
+
 /// Extract DNS registration data from a block's asset records.
 ///
 /// DNS registrations are identified by their `AssetCategory::BaseSystem(BaseSystemType::Dns)`
@@ -1757,6 +1794,16 @@ async fn run_connect(
 
         info!("Block sync infrastructure initialized (propagation=NearestN(6))");
 
+        // Create gossip protocol before PeerContext so inbound gossip can be dispatched
+        let gossip_proto = std::sync::Arc::new(
+            blockmatrix::network::gossip::GossipProtocol::new(
+                nid.to_string(),
+                coord,
+                cli.stoq_port,
+                format!("{:?}", privacy_mode),
+            ),
+        );
+
         // Create peer context for receive-side message handling
         let connected_peer_coords = std::sync::Arc::new(
             tokio::sync::RwLock::new(Vec::<blockmatrix::matrix::coordinate::MatrixCoordinate>::new()),
@@ -1779,6 +1826,7 @@ async fn run_connect(
             connected_peer_coords: connected_peer_coords.clone(),
             dns_resolver: Some(bootstrap.dns().clone()),
             authenticated_peers: network_manager.authenticated_peers(),
+            gossip_protocol: Some(gossip_proto.clone()),
         });
 
         // Start message loops for peers connected during discovery (before PeerContext existed)
@@ -2015,8 +2063,9 @@ async fn run_connect(
 
                 // Emit node metrics every 30s (6 sync cycles)
                 if cycle_count % 6 == 0 {
+                    let connected_nodes = network_sync.get_connected_nodes().await;
                     let chain_h = blockchain_sync.get_height().await;
-                    let peers = network_sync.get_connected_nodes().await.len();
+                    let peers = connected_nodes.len();
                     let shards = shard_store_metrics.count().await;
                     let (cpu, mem) = os_abs
                         .as_ref()
@@ -2026,7 +2075,7 @@ async fn run_connect(
                     let frame_bytes = metrics_reporter.build_capacity_frame(
                         chain_h, peers, shards, cpu, mem,
                     );
-                    metrics_reporter.push_to_engauge(&frame_bytes).await;
+                    metrics_reporter.push_to_peers(&frame_bytes, &connected_nodes).await;
                 }
             }
         });
@@ -2034,6 +2083,62 @@ async fn run_connect(
             "Block sync loop started (interval=5s, reflector={}, metrics_interval=30s)",
             cli.reflector
         );
+
+        // Gossip protocol loop — exchanges mesh state with peers every 15s
+        {
+            let gossip_network = network_clone.clone();
+            let gossip_shard_store = shard_store.clone();
+            let gossip_coord = coord;
+            let gossip_ref = gossip_proto.clone();
+            gossip_proto.start().await;
+
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(gossip_ref.gossip_interval());
+                loop {
+                    interval.tick().await;
+
+                    // Update local state with current shard count as available assets
+                    let shard_count = gossip_shard_store.count().await;
+                    let asset_ids: Vec<String> = (0..shard_count.min(100))
+                        .map(|i| format!("shard-{i}"))
+                        .collect();
+                    gossip_ref.update_local(gossip_coord, asset_ids).await;
+
+                    // Prune entries older than 5 minutes
+                    gossip_ref.prune_stale(300).await;
+
+                    // Send gossip to connected peers
+                    let nodes = gossip_network.get_connected_nodes().await;
+                    if nodes.is_empty() {
+                        continue;
+                    }
+
+                    let msg = gossip_ref.build_outgoing_message().await;
+                    let msg_bytes = match serde_json::to_vec(&msg) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            debug!("Failed to serialize gossip message: {}", e);
+                            continue;
+                        }
+                    };
+
+                    let targets = gossip_ref.select_gossip_targets().await;
+                    for node in &nodes {
+                        if !targets.contains(&node.node_id) {
+                            continue;
+                        }
+                        send_gossip_to_peer(node, &msg_bytes).await;
+                    }
+
+                    debug!(
+                        "Gossip round: sent to {} of {} peers",
+                        targets.len().min(nodes.len()),
+                        nodes.len(),
+                    );
+                }
+            });
+            info!("Gossip protocol started (interval=15s, fanout=3)");
+        }
 
         // Propagate any blocks created during bootstrap
         {

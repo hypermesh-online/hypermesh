@@ -27,7 +27,7 @@ use hypermesh_lib::BlockchainScope;
 
 use super::{
     NetworkNode, PeerContext,
-    CONN_TYPE_HANDSHAKE, CONN_TYPE_PEER_MESSAGE,
+    CONN_TYPE_HANDSHAKE, CONN_TYPE_PEER_MESSAGE, CONN_TYPE_METRICS, CONN_TYPE_GOSSIP,
 };
 use crate::network::peer_auth::{self, AuthenticatedPeers};
 
@@ -480,6 +480,12 @@ pub(crate) async fn handle_incoming_connection(
         CONN_TYPE_PEER_MESSAGE => {
             handle_peer_message_connection(&mut stream, &connection, local_coord, peer_ctx).await
         }
+        CONN_TYPE_METRICS => {
+            handle_metrics_connection(&mut stream, peer_ctx).await
+        }
+        CONN_TYPE_GOSSIP => {
+            handle_gossip_connection(&mut stream, peer_ctx).await
+        }
         other => {
             warn!("Unknown connection discriminator 0x{:02x} — dropping", other);
             Ok(())
@@ -608,6 +614,88 @@ async fn handle_peer_message_connection(
         dispatch_message(&data, stream, short_remote, &placeholder, &ctx).await;
     } else {
         debug!("Peer message received but no PeerContext — dropping");
+    }
+
+    Ok(())
+}
+
+// ── Metrics handler ─────────────────────────────────────────────
+
+/// Handle an incoming metrics stream (discriminator 0x02).
+///
+/// Reads the frame payload and logs it. In the future this should
+/// feed into engauge's `MetricsIngestionPipeline` if available.
+async fn handle_metrics_connection(
+    stream: &mut stoq::Stream,
+    peer_ctx: Option<Arc<PeerContext>>,
+) -> Result<()> {
+    let data = match stream.receive().await {
+        Ok(d) if !d.is_empty() => d.to_vec(),
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(anyhow!("Failed to read metrics frame: {e}")),
+    };
+
+    // Validate it's parseable JSON (MetricsFrame format)
+    match serde_json::from_slice::<serde_json::Value>(&data) {
+        Ok(frame) => {
+            let source = frame.get("source_node")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            debug!(
+                "Received metrics frame from {} ({} bytes)",
+                &source[..8.min(source.len())],
+                data.len(),
+            );
+        }
+        Err(e) => {
+            debug!("Invalid metrics frame ({} bytes): {}", data.len(), e);
+        }
+    }
+
+    let _ = peer_ctx; // Reserved for future engauge pipeline integration
+    Ok(())
+}
+
+// ── Gossip handler ──────────────────────────────────────────────
+
+/// Handle an incoming gossip stream (discriminator 0x03).
+///
+/// Reads the gossip message payload and processes it through the
+/// gossip protocol if a `PeerContext` is available. The gossip
+/// protocol merges newer entries into local state.
+async fn handle_gossip_connection(
+    stream: &mut stoq::Stream,
+    peer_ctx: Option<Arc<PeerContext>>,
+) -> Result<()> {
+    let data = match stream.receive().await {
+        Ok(d) if !d.is_empty() => d.to_vec(),
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(anyhow!("Failed to read gossip message: {e}")),
+    };
+
+    let msg: super::gossip::GossipMessage = match serde_json::from_slice(&data) {
+        Ok(m) => m,
+        Err(e) => {
+            debug!("Invalid gossip message ({} bytes): {}", data.len(), e);
+            return Ok(());
+        }
+    };
+
+    let sender_short = msg.sender[..8.min(msg.sender.len())].to_string();
+    let entry_count = msg.entries.len();
+
+    if let Some(ctx) = peer_ctx {
+        if let Some(ref gossip) = ctx.gossip_protocol {
+            let updated = gossip.process_incoming(msg).await;
+            debug!(
+                "Gossip from {}: {} entries, {} updated",
+                sender_short, entry_count, updated,
+            );
+        } else {
+            debug!("Gossip from {} but no gossip protocol configured", sender_short);
+        }
+    } else {
+        debug!("Gossip from {} but no PeerContext — dropping", sender_short);
     }
 
     Ok(())
