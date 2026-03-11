@@ -33,9 +33,6 @@ items = [
 [features.in_development]
 items = [
     "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
-    # Sprint B2: Intelligence feedback wiring (engauge code exists, callers must wire)
-    "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
-    "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
     # Post-B2
     "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
     "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",

@@ -119,12 +119,12 @@ export const crateStatuses: CrateStatus[] = [
         "Auth TTL — authenticated peers expire after 1 hour, re-authentication required",
         "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops",
         "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
-        "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch"
+        "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
+        "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
+        "Engauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
+        "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered"
       ],
       "inDevelopment": [
-        "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
-        "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",
-        "Routing intelligence feedback — engauge RoutingAdvisor/PathAdvisor never called. Must wire to BlockPropagator weights + STOQ path scheduler + eBPF routing rules",
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
       ],
       "planned": [
@@ -138,7 +138,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 89
+    "completion": 92
   },
   {
     "id": "caesar",
@@ -275,8 +275,6 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
-        "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
-        "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
         "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
       ],
@@ -284,7 +282,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 78
+    "completion": 84
   },
   {
     "id": "gateway",
@@ -541,13 +539,13 @@ export const crateStatuses: CrateStatus[] = [
         "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
         "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
         "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
-        "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames"
+        "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames",
+        "Path scheduling feedback — PathSelector.apply_recommendation() accepts engauge PathPolicyRecommendation, maps strategy to multi-path scheduler"
       ],
       "inDevelopment": [
         "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
         "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
-        "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
-        "Path scheduling feedback — PathPolicyRecommendation from engauge must feed into STOQ multi-path scheduler for bandwidth-weighted/latency-aware routing decisions"
+        "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
       ],
       "planned": [
         "Real jitter benchmarking under controlled partitions",
@@ -555,7 +553,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 78
+    "completion": 81
   },
   {
     "id": "trustchain",

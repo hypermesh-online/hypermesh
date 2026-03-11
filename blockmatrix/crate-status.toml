@@ -125,14 +125,13 @@ items = [
     "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops",
     "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
     "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
+    "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
+    "Engauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
+    "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered",
 ]
 
 [features.in_development]
 items = [
-    # Sprint B2: Swarm scaling + intelligence feedback
-    "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
-    "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",
-    "Routing intelligence feedback — engauge RoutingAdvisor/PathAdvisor never called. Must wire to BlockPropagator weights + STOQ path scheduler + eBPF routing rules",
     # Group C (deferred)
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
 ]
