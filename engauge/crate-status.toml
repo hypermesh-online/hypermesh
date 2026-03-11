@@ -32,8 +32,6 @@ items = [
 
 [features.in_development]
 items = [
-    # Sprint B1 remaining: Metrics over STOQ streams (not raw UDP)
-    "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP)",
     "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
     # Sprint B2: Intelligence feedback wiring (engauge code exists, callers must wire)
     "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",

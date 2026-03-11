@@ -83,6 +83,19 @@ pub struct PropagationResult {
     pub hop_count: usize,
 }
 
+/// A per-node weight modifier for prioritizing block propagation targets.
+///
+/// Supplied externally by engauge's `RoutingAdvisor` (when the `intelligence`
+/// feature is enabled). Positive factors increase propagation priority;
+/// values below 1.0 reduce it; zero means skip the node entirely.
+#[derive(Debug, Clone)]
+pub struct PropagationWeight {
+    /// Matrix coordinate this weight applies to.
+    pub coordinate: MatrixCoordinate,
+    /// Multiplicative factor (1.0 = neutral, >1 = prefer, <1 = avoid, 0 = skip).
+    pub weight: f64,
+}
+
 /// Block propagation manager for matrix topology
 pub struct BlockPropagator {
     /// This node's coordinate
@@ -93,6 +106,10 @@ pub struct BlockPropagator {
     seen_blocks: Arc<RwLock<HashMap<String, HashSet<MatrixCoordinate>>>>,
     /// Network transport for sending blocks to peers
     transport: Arc<dyn BlockTransport>,
+    /// Optional per-node weight modifiers from engauge routing intelligence.
+    /// When set, `propagate_block` sorts targets by weight (highest first)
+    /// and skips nodes with weight <= 0.
+    propagation_weights: Arc<RwLock<Vec<PropagationWeight>>>,
 }
 
 use std::collections::HashMap;
@@ -114,7 +131,14 @@ impl BlockPropagator {
             strategy,
             seen_blocks: Arc::new(RwLock::new(HashMap::new())),
             transport,
+            propagation_weights: Arc::new(RwLock::new(Vec::new())),
         }
+    }
+
+    /// Update the propagation weight modifiers (typically called by engauge
+    /// routing intelligence when new metrics arrive).
+    pub async fn set_propagation_weights(&self, weights: Vec<PropagationWeight>) {
+        *self.propagation_weights.write().await = weights;
     }
 
     /// Propagate a block to neighboring nodes
@@ -128,7 +152,10 @@ impl BlockPropagator {
         let mut failed_nodes = Vec::new();
 
         // Get target nodes based on strategy
-        let targets = self.select_propagation_targets(network_nodes).await;
+        let mut targets = self.select_propagation_targets(network_nodes).await;
+
+        // Apply engauge routing weights: filter out zero-weight nodes, sort by weight descending.
+        targets = self.apply_weights(targets).await;
 
         info!(
             "Propagating block {} from ({},{},{}) to {} targets",
@@ -318,6 +345,38 @@ impl BlockPropagator {
         seen.entry(block_hash.to_string())
             .or_insert_with(HashSet::new)
             .insert(*node);
+    }
+
+    /// Apply engauge routing weights to propagation targets.
+    ///
+    /// Filters out targets with weight <= 0 and sorts remaining targets
+    /// by weight descending (highest priority first). Targets without
+    /// a matching weight entry keep the default weight of 1.0.
+    async fn apply_weights(&self, targets: Vec<MatrixCoordinate>) -> Vec<MatrixCoordinate> {
+        let weights = self.propagation_weights.read().await;
+        if weights.is_empty() {
+            return targets;
+        }
+
+        let mut weighted: Vec<(MatrixCoordinate, f64)> = targets
+            .into_iter()
+            .map(|coord| {
+                let w = weights
+                    .iter()
+                    .find(|pw| pw.coordinate == coord)
+                    .map(|pw| pw.weight)
+                    .unwrap_or(1.0);
+                (coord, w)
+            })
+            .filter(|(_, w)| *w > 0.0)
+            .collect();
+
+        weighted.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        weighted.into_iter().map(|(coord, _)| coord).collect()
     }
 
     /// Flood propagation for critical blocks
@@ -520,5 +579,74 @@ mod tests {
             result.reached_nodes.len() + result.failed_nodes.len(),
             result.reached_nodes.len() + result.failed_nodes.len()
         );
+    }
+
+    #[tokio::test]
+    async fn test_apply_weights_filters_zero_weight() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
+
+        let skip = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let keep = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
+
+        propagator
+            .set_propagation_weights(vec![
+                PropagationWeight {
+                    coordinate: skip,
+                    weight: 0.0,
+                },
+                PropagationWeight {
+                    coordinate: keep,
+                    weight: 1.5,
+                },
+            ])
+            .await;
+
+        let result = propagator.apply_weights(vec![skip, keep]).await;
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], keep);
+    }
+
+    #[tokio::test]
+    async fn test_apply_weights_sorts_by_weight() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
+
+        let low = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let high = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
+
+        propagator
+            .set_propagation_weights(vec![
+                PropagationWeight {
+                    coordinate: low,
+                    weight: 0.5,
+                },
+                PropagationWeight {
+                    coordinate: high,
+                    weight: 2.0,
+                },
+            ])
+            .await;
+
+        let result = propagator.apply_weights(vec![low, high]).await;
+        assert_eq!(result.len(), 2);
+        // High weight should come first
+        assert_eq!(result[0], high);
+        assert_eq!(result[1], low);
+    }
+
+    #[tokio::test]
+    async fn test_apply_weights_empty_keeps_original_order() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let propagator = BlockPropagator::new(origin, PropagationStrategy::Broadcast);
+
+        let a = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let b = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
+
+        // No weights set
+        let result = propagator.apply_weights(vec![a, b]).await;
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], a);
+        assert_eq!(result[1], b);
     }
 }

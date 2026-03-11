@@ -30,6 +30,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 
 // Sub-modules for integration layer
+pub mod engauge_bridge;
 pub mod integration;
 pub mod metrics_bridge;
 pub mod performance;

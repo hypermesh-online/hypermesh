@@ -117,11 +117,11 @@ export const crateStatuses: CrateStatus[] = [
         "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
         "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
         "Auth TTL — authenticated peers expire after 1 hour, re-authentication required",
-        "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops"
+        "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops",
+        "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
+        "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch"
       ],
       "inDevelopment": [
-        "Metrics over STOQ — MetricsReporter must switch from raw UDP to STOQ streams (CONN_TYPE_METRICS=0x02). Frame content now includes eBPF data.",
-        "Gossip protocol wiring — GossipProtocol (482 lines, 7 tests) never spawned in sync loop. Must send via STOQ (CONN_TYPE_GOSSIP=0x03), populate available_assets from ShardStore",
         "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
         "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",
         "Routing intelligence feedback — engauge RoutingAdvisor/PathAdvisor never called. Must wire to BlockPropagator weights + STOQ path scheduler + eBPF routing rules",
@@ -138,7 +138,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 87
+    "completion": 89
   },
   {
     "id": "caesar",
@@ -274,7 +274,6 @@ export const crateStatuses: CrateStatus[] = [
         "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()"
       ],
       "inDevelopment": [
-        "Real metrics ingestion via STOQ — blockmatrix must send MetricsFrames over STOQ streams (not raw UDP)",
         "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
         "Routing intelligence integration — RoutingAdvisor/PathAdvisor traits + RoutingIntelFeed exist, must be called by blockmatrix (propagation weights) and STOQ (path scheduling)",
         "Swarm replication triggers — ReplicationTrigger + DispersionAdvisor + SwarmAnalytics exist, must be fed shard request data from blockmatrix and drive distribute_to_peers()",
@@ -285,7 +284,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 75
+    "completion": 78
   },
   {
     "id": "gateway",

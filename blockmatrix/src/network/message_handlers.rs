@@ -23,7 +23,7 @@ use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::shard_transport;
 use crate::network::stoq_integration::MatrixMessage;
 use crate::network::sync_dispatch;
-use hypermesh_lib::BlockchainScope;
+use hypermesh_lib::{BlockchainScope, ContentHash};
 
 use super::{
     NetworkNode, PeerContext,
@@ -136,6 +136,10 @@ pub(crate) async fn dispatch_message(
 
     match tag {
         TAG_SHARD_SEND | TAG_SHARD_FETCH => {
+            // Record shard fetch demand for engauge swarm intelligence.
+            if tag == TAG_SHARD_FETCH {
+                record_shard_demand(&data, peer_node_id, ctx).await;
+            }
             handle_shard_dispatch(&data, stream, ctx).await;
         }
         TAG_BLOCK_ANNOUNCE => {
@@ -179,6 +183,25 @@ async fn handle_shard_dispatch(
             warn!("Shard message error: {}", e);
         }
     }
+}
+
+/// Record shard fetch demand for engauge swarm analytics.
+///
+/// Extracts the shard_id from a SHARD_FETCH message (tag 0x02 + 32-byte hash)
+/// and records it in the swarm demand tracker. If the message is too short
+/// to contain a valid shard_id, the request is silently skipped.
+async fn record_shard_demand(data: &[u8], peer_node_id: &str, ctx: &PeerContext) {
+    // SHARD_FETCH format: tag(1) + shard_id(32)
+    if data.len() < 33 {
+        return;
+    }
+    let mut shard_id_bytes = [0u8; 32];
+    shard_id_bytes.copy_from_slice(&data[1..33]);
+    let shard_id = ContentHash(shard_id_bytes);
+
+    ctx.swarm_demand_tracker
+        .record_fetch(shard_id, peer_node_id)
+        .await;
 }
 
 // ── Block handlers ───────────────────────────────────────────────────

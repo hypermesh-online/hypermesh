@@ -77,6 +77,70 @@ impl std::fmt::Debug for NetworkNode {
     }
 }
 
+/// Tracks shard fetch demand from network peers.
+///
+/// Records which shards are being requested and by whom, providing
+/// the data needed for engauge's `SwarmAnalytics` to make replication
+/// and dispersion decisions.
+pub struct SwarmDemandTracker {
+    /// Per-shard request counts and last-access timestamps.
+    entries: tokio::sync::Mutex<HashMap<hypermesh_lib::ContentHash, DemandEntry>>,
+}
+
+/// A single shard's demand record.
+#[derive(Debug, Clone)]
+pub struct DemandEntry {
+    /// Total number of fetch requests for this shard.
+    pub request_count: u64,
+    /// Unix microsecond timestamp of last fetch request.
+    pub last_request_us: u64,
+    /// Node IDs of requesters (deduplicated for unique consumer count).
+    pub requester_ids: std::collections::HashSet<String>,
+}
+
+impl SwarmDemandTracker {
+    /// Create a new empty demand tracker.
+    pub fn new() -> Self {
+        Self {
+            entries: tokio::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Record a fetch request for a shard from a specific peer.
+    pub async fn record_fetch(
+        &self,
+        shard_id: hypermesh_lib::ContentHash,
+        requester_node_id: &str,
+    ) {
+        let now_us = chrono::Utc::now().timestamp_micros() as u64;
+        let mut entries = self.entries.lock().await;
+        let entry = entries.entry(shard_id).or_insert_with(|| DemandEntry {
+            request_count: 0,
+            last_request_us: 0,
+            requester_ids: std::collections::HashSet::new(),
+        });
+        entry.request_count += 1;
+        entry.last_request_us = now_us;
+        entry.requester_ids.insert(requester_node_id.to_string());
+    }
+
+    /// Get a snapshot of all demand entries for feeding into engauge.
+    pub async fn snapshot(&self) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
+        self.entries.lock().await.clone()
+    }
+
+    /// Get demand entry for a specific shard.
+    pub async fn get(&self, shard_id: &hypermesh_lib::ContentHash) -> Option<DemandEntry> {
+        self.entries.lock().await.get(shard_id).cloned()
+    }
+}
+
+impl Default for SwarmDemandTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Shared context for peer message processing.
 ///
 /// Passed to the per-connection message loop so that incoming blocks,
@@ -111,6 +175,9 @@ pub struct PeerContext {
     pub authenticated_peers: AuthenticatedPeers,
     /// Gossip protocol instance for mesh coordination.
     pub gossip_protocol: Option<Arc<GossipProtocol>>,
+    /// Swarm demand tracker for recording shard fetch requests.
+    /// Fed into engauge SwarmAnalytics when the `intelligence` feature is enabled.
+    pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
 }
 
 /// Network manager for multi-node communication
@@ -572,5 +639,35 @@ mod tests {
         .expect("test: manager creation");
 
         assert_eq!(manager.get_node_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_swarm_demand_tracker_records_fetches() {
+        let tracker = SwarmDemandTracker::new();
+        let hash = hypermesh_lib::ContentHash([0xCC; 32]);
+
+        tracker.record_fetch(hash, "peer-a").await;
+        tracker.record_fetch(hash, "peer-b").await;
+        tracker.record_fetch(hash, "peer-a").await; // duplicate peer
+
+        let entry = tracker.get(&hash).await.expect("test: entry exists");
+        assert_eq!(entry.request_count, 3);
+        assert_eq!(entry.requester_ids.len(), 2); // 2 unique peers
+        assert!(entry.last_request_us > 0);
+    }
+
+    #[tokio::test]
+    async fn test_swarm_demand_tracker_snapshot() {
+        let tracker = SwarmDemandTracker::new();
+        let h1 = hypermesh_lib::ContentHash([0xAA; 32]);
+        let h2 = hypermesh_lib::ContentHash([0xBB; 32]);
+
+        tracker.record_fetch(h1, "peer-1").await;
+        tracker.record_fetch(h2, "peer-2").await;
+
+        let snap = tracker.snapshot().await;
+        assert_eq!(snap.len(), 2);
+        assert!(snap.contains_key(&h1));
+        assert!(snap.contains_key(&h2));
     }
 }

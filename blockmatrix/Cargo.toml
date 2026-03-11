@@ -79,6 +79,9 @@ stoq = { path = "../stoq" }
 # HyperMesh eBPF Intelligence Layer
 hypermesh-ebpf = { path = "../hypermesh-ebpf" }
 
+# Engauge Intelligence Layer (optional — routing + swarm analytics)
+engauge = { path = "../engauge", optional = true }
+
 # Async runtime
 async-trait = { workspace = true }
 futures = { workspace = true }
@@ -192,6 +195,7 @@ proof-of-state = []
 assets = []
 multi-node = []
 future-tests = []
+intelligence = ["dep:engauge"]
 
 # Explicit example entries for gated examples (require future-tests feature)
 [[example]]

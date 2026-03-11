@@ -123,13 +123,12 @@ items = [
     "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
     "Auth TTL — authenticated peers expire after 1 hour, re-authentication required",
     "Peer cleanup on disconnect — authenticated peers and coords removed when QUIC connection drops",
+    "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
+    "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
 ]
 
 [features.in_development]
 items = [
-    # Sprint B1: Remaining — transport switch + gossip
-    "Metrics over STOQ — MetricsReporter must switch from raw UDP to STOQ streams (CONN_TYPE_METRICS=0x02). Frame content now includes eBPF data.",
-    "Gossip protocol wiring — GossipProtocol (482 lines, 7 tests) never spawned in sync loop. Must send via STOQ (CONN_TYPE_GOSSIP=0x03), populate available_assets from ShardStore",
     # Sprint B2: Swarm scaling + intelligence feedback
     "Shard distribution call — distribute_to_peers() (253 lines) never called after asset pipeline. Must wire into IPC store handler + replication trigger",
     "Swarm intelligence wiring — engauge ReplicationTrigger/DispersionAdvisor/SwarmAnalytics exist but never fed data. Must wire shard request tracking + demand-driven replication",

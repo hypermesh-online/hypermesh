@@ -1827,6 +1827,9 @@ async fn run_connect(
             dns_resolver: Some(bootstrap.dns().clone()),
             authenticated_peers: network_manager.authenticated_peers(),
             gossip_protocol: Some(gossip_proto.clone()),
+            swarm_demand_tracker: std::sync::Arc::new(
+                blockmatrix::network::SwarmDemandTracker::new(),
+            ),
         });
 
         // Start message loops for peers connected during discovery (before PeerContext existed)

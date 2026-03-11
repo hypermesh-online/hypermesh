@@ -150,6 +150,40 @@ impl PathSelector {
     pub fn set_strategy(&mut self, strategy: PathScheduler) {
         self.strategy = strategy;
     }
+
+    /// Apply an external scheduling recommendation (e.g., from engauge
+    /// routing intelligence). Maps the recommended strategy to the
+    /// internal `PathScheduler` enum. The `enable_redundant` flag forces
+    /// redundant mode regardless of the recommended strategy when `true`.
+    ///
+    /// Returns `true` if the strategy actually changed.
+    pub fn apply_recommendation(
+        &mut self,
+        enable_redundant: bool,
+        recommended: &str,
+    ) -> bool {
+        let new_strategy = if enable_redundant {
+            PathScheduler::Redundant
+        } else {
+            match recommended {
+                "BandwidthWeighted" => PathScheduler::BandwidthWeighted,
+                "LowestLatency" => PathScheduler::LowestLatency,
+                "Redundant" => PathScheduler::Redundant,
+                _ => PathScheduler::RoundRobin,
+            }
+        };
+
+        if self.strategy == new_strategy {
+            return false;
+        }
+
+        tracing::info!(
+            "PathSelector strategy changed: {:?} -> {:?} (redundant={})",
+            self.strategy, new_strategy, enable_redundant,
+        );
+        self.strategy = new_strategy;
+        true
+    }
 }
 
 #[cfg(test)]
@@ -283,5 +317,39 @@ mod tests {
         let selector = PathSelector::new(PathScheduler::RoundRobin);
         assert_eq!(selector.select(&[]), None);
         assert!(selector.select_all(&[]).is_empty());
+    }
+
+    #[test]
+    fn test_apply_recommendation_changes_strategy() {
+        let mut selector = PathSelector::new(PathScheduler::RoundRobin);
+        assert_eq!(*selector.strategy(), PathScheduler::RoundRobin);
+
+        let changed = selector.apply_recommendation(false, "LowestLatency");
+        assert!(changed);
+        assert_eq!(*selector.strategy(), PathScheduler::LowestLatency);
+
+        // Same recommendation should not report a change.
+        let not_changed = selector.apply_recommendation(false, "LowestLatency");
+        assert!(!not_changed);
+    }
+
+    #[test]
+    fn test_apply_recommendation_redundant_overrides() {
+        let mut selector = PathSelector::new(PathScheduler::RoundRobin);
+
+        let changed = selector.apply_recommendation(true, "BandwidthWeighted");
+        assert!(changed);
+        // enable_redundant=true overrides any strategy to Redundant.
+        assert_eq!(*selector.strategy(), PathScheduler::Redundant);
+    }
+
+    #[test]
+    fn test_apply_recommendation_unknown_falls_back() {
+        let mut selector = PathSelector::new(PathScheduler::LowestLatency);
+
+        let changed = selector.apply_recommendation(false, "UnknownStrategy");
+        assert!(changed);
+        // Unknown strategies fall back to RoundRobin.
+        assert_eq!(*selector.strategy(), PathScheduler::RoundRobin);
     }
 }
