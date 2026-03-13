@@ -21,7 +21,7 @@ pub mod byzantine;
 pub mod cascading_revocation;
 pub mod monitoring;
 pub mod revocation_propagation;
-pub mod trust_scoring;
+pub mod binary_auth;
 pub mod types;
 
 #[allow(ambiguous_glob_reexports)]
@@ -34,7 +34,7 @@ pub use monitoring::*;
 pub use revocation_propagation::{
     PropagationMessage, PropagationStatus, RevocationNotice, RevocationPropagator,
 };
-pub use trust_scoring::*;
+pub use binary_auth::*;
 pub use types::*;
 
 /// Security monitoring system with state proof integration

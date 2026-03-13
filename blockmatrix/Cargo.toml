@@ -16,7 +16,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "hypermesh"
-path = "src/bin/node.rs"
+path = "src/bin/node/main.rs"
 
 [[example]]
 name = "car_purchase"

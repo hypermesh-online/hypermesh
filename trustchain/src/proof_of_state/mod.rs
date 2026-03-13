@@ -16,21 +16,15 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 pub mod asset_integration;
-pub mod block_matrix;
 pub mod hypermesh_client;
-pub mod production_validator;
 pub mod proof;
-pub mod real_validator;
 pub mod validation;
 pub mod validator;
 
 pub use asset_integration::*;
-pub use block_matrix::*;
-#[allow(ambiguous_glob_reexports)]
 pub use hypermesh_client::*;
 pub use proof::*;
 pub use validation::*;
-#[allow(ambiguous_glob_reexports)]
 pub use validator::*;
 
 /// Proof of State Four-Proof Authentication
@@ -463,6 +457,38 @@ impl SignedStateProof {
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         serde_json::from_slice(data)
             .map_err(|e| anyhow!("Failed to deserialize SignedStateProof: {e}"))
+    }
+}
+
+impl From<SignedStateProof> for WireSignedProof {
+    /// Convert an in-memory `SignedStateProof` to wire format.
+    fn from(signed: SignedStateProof) -> Self {
+        let proof_bytes = signed.proof.to_bytes().unwrap_or_default();
+        Self {
+            proof_bytes,
+            signature: signed.signature,
+            signer_pubkey: signed.signer_pubkey,
+            nonce: signed.nonce,
+        }
+    }
+}
+
+impl TryFrom<WireSignedProof> for SignedStateProof {
+    type Error = anyhow::Error;
+
+    /// Convert a wire-format proof to the in-memory deserialized form.
+    fn try_from(wire: WireSignedProof) -> Result<Self> {
+        let proof = StateProof::from_bytes(&wire.proof_bytes)
+            .or_else(|_| {
+                serde_json::from_slice::<StateProof>(&wire.proof_bytes)
+                    .map_err(|e| anyhow!("Failed to deserialize proof_bytes: {e}"))
+            })?;
+        Ok(Self {
+            proof,
+            signature: wire.signature,
+            signer_pubkey: wire.signer_pubkey,
+            nonce: wire.nonce,
+        })
     }
 }
 
