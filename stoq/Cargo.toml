@@ -71,7 +71,6 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 
 # Configuration
-config = { workspace = true }
 clap = { workspace = true }
 
 # WebAssembly dependencies

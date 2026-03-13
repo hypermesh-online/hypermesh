@@ -21,8 +21,8 @@ use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use hickory_proto::op::ResponseCode;
-use hickory_proto::rr::{Name, RData, Record, RecordType};
+use trust_dns_proto::op::ResponseCode;
+use trust_dns_proto::rr::{Name, RData, Record, RecordType};
 
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 

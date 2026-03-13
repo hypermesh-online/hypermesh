@@ -104,7 +104,6 @@ base32 = "0.5"
 
 # Storage
 bincode = { workspace = true }
-sled = { workspace = true }
 
 # Collections and concurrency
 dashmap = { workspace = true }
@@ -126,10 +125,6 @@ rand = { workspace = true }
 # Configuration and file formats
 toml = { workspace = true }
 
-# Testing
-criterion = { workspace = true }
-proptest = { workspace = true }
-
 # Networking
 quinn = { workspace = true }
 rustls = { workspace = true }
@@ -149,7 +144,6 @@ socket2 = { workspace = true }
 # Missing dependencies now added
 # warp = ... # REMOVED: STOQ-only transport
 semver = { workspace = true, features = ["serde"] }
-config = { workspace = true }
 rust_decimal = { workspace = true }
 fastrand = { workspace = true }
 which = { workspace = true }

@@ -94,7 +94,6 @@ num_cpus = { workspace = true }
 time = { version = "0.3", features = ["macros", "formatting"] }
 
 # Configuration
-config = { workspace = true }
 clap = { workspace = true }
 
 # IPv6 networking

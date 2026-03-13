@@ -43,8 +43,43 @@ pub use validation::{DnsValidator, ValidationResult};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::net::Ipv6Addr;
+use std::net::{IpAddr, Ipv6Addr};
 use thiserror::Error;
+
+use crate::blockchain::block::Block;
+
+/// Extract DNS entries from a block's asset entries.
+///
+/// Returns `(domain_name, ip_addr)` pairs for all AAAA DNS assets in the block.
+pub fn extract_dns_entries_from_block(block: &Block) -> Vec<(String, IpAddr)> {
+    use crate::assets::core::{AssetCategory, BaseSystemType};
+    use crate::blockchain::block::StoragePointer;
+
+    let mut results = Vec::new();
+    for entry in &block.entries {
+        let is_dns = matches!(
+            entry.registration.category,
+            AssetCategory::BaseSystem(BaseSystemType::Dns)
+        );
+        if !is_dns {
+            continue;
+        }
+        let dns_json = match &entry.storage_pointer {
+            StoragePointer::Local { path } => path.as_str(),
+            _ => continue,
+        };
+        let dns_entry: DnsBlockEntry = match serde_json::from_str(dns_json) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        let ip_addr = match &dns_entry.record_data {
+            DnsRecordData::AAAA(addr) => IpAddr::V6(*addr),
+            _ => continue,
+        };
+        results.push((dns_entry.domain_name, ip_addr));
+    }
+    results
+}
 
 /// DNS-as-Asset error types
 #[derive(Debug, Error)]

@@ -224,8 +224,8 @@ impl From<rustls::Error> for TransportError {
     }
 }
 
-impl From<config::ConfigError> for TransportError {
-    fn from(err: config::ConfigError) -> Self {
+impl From<toml::de::Error> for TransportError {
+    fn from(err: toml::de::Error) -> Self {
         Self::Configuration(err.to_string())
     }
 }

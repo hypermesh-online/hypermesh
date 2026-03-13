@@ -30,7 +30,6 @@ pub(crate) mod hypermesh_integration;
 pub mod library;
 pub(crate) mod plugin;
 pub mod registry;
-pub mod scripting;
 pub mod security;
 pub mod settlement;
 pub mod sharing;
@@ -91,7 +90,6 @@ pub use registry::{
     SearchQuery, SearchResult, SearchResults, SortCriteria, TrustPolicy, TypeMetadata,
     TypeValidationResult, ValidationRule, ValidationRuleType,
 };
-pub use scripting::{ScriptResult, ScriptingEngine};
 pub use security::VerificationResult;
 pub use settlement::{
     CatalogRewardAdapter, ContributionMetrics, ContributionTracker, RewardDistribution,

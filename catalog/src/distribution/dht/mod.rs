@@ -6,9 +6,12 @@
 //!
 //! Implements a Kademlia-based DHT for decentralized package discovery
 
+mod routing_table;
+mod value_store;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
@@ -17,11 +20,15 @@ use tokio::sync::RwLock;
 use super::stoq_transport::{PackageAnnouncement, RequestType, ResponseData, StoqTransportLayer};
 use crate::assets::AssetPackageId;
 
+use routing_table::RoutingTable;
+use value_store::{StoredValue, ValueData, ValueKey, ValueStore};
+
+
 /// Kademlia DHT node identity (256-bit, XOR-distance).
 /// Distinct from hypermesh_lib::NodeId which is a human-readable string identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DhtNodeId {
-    id: [u8; 32],
+    pub(crate) id: [u8; 32],
 }
 
 impl DhtNodeId {
@@ -73,7 +80,7 @@ impl std::fmt::Display for DhtNodeId {
 
 /// XOR distance metric for Kademlia
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Distance([u8; 32]);
+pub struct Distance(pub(crate) [u8; 32]);
 
 impl Distance {
     /// Get the bucket index (0-255) for this distance
@@ -87,22 +94,6 @@ impl Distance {
         }
         0
     }
-}
-
-/// DHT Network implementation using Kademlia algorithm
-pub struct DhtNetwork {
-    /// Our node ID
-    local_id: DhtNodeId,
-    /// Transport layer for communication
-    transport: Arc<StoqTransportLayer>,
-    /// Routing table
-    routing_table: Arc<RwLock<RoutingTable>>,
-    /// Value store (package announcements)
-    value_store: Arc<RwLock<ValueStore>>,
-    /// Pending queries
-    _pending_queries: Arc<RwLock<HashMap<QueryId, PendingQuery>>>,
-    /// Configuration
-    config: DhtConfig,
 }
 
 /// DHT configuration
@@ -135,22 +126,6 @@ impl Default for DhtConfig {
     }
 }
 
-/// Routing table for Kademlia
-struct RoutingTable {
-    /// K-buckets indexed by distance
-    buckets: Vec<KBucket>,
-    /// Configuration
-    config: DhtConfig,
-}
-
-/// K-bucket for storing nodes at a specific distance
-struct KBucket {
-    /// Nodes in the bucket (most recently seen last)
-    nodes: Vec<NodeInfo>,
-    /// Replacement cache for full buckets
-    replacements: Vec<NodeInfo>,
-}
-
 /// Information about a node in the network
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeInfo {
@@ -164,88 +139,20 @@ pub struct NodeInfo {
     pub rtt: Option<u32>,
 }
 
-/// Value store for DHT
-struct ValueStore {
-    /// Stored values by key
-    values: HashMap<ValueKey, Vec<StoredValue>>,
-    /// Package index
-    package_index: HashMap<AssetPackageId, HashSet<ValueKey>>,
-}
-
-/// Key for stored values
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct ValueKey([u8; 32]);
-
-impl ValueKey {
-    /// Create key from package ID
-    fn from_package_id(id: &AssetPackageId) -> Self {
-        let hash = blake3::hash(id.as_bytes());
-        Self(*hash.as_bytes())
-    }
-
-    /// Create key from search query
-    fn from_query(query: &str) -> Self {
-        let hash = blake3::hash(query.as_bytes());
-        Self(*hash.as_bytes())
-    }
-}
-
-/// Stored value in DHT
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct StoredValue {
-    /// The actual value data
-    data: ValueData,
-    /// Publisher node ID
-    publisher: DhtNodeId,
-    /// Publication timestamp
-    published_at: SystemTime,
-    /// Expiration time
-    expires_at: SystemTime,
-}
-
-/// Value data types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum ValueData {
-    /// Package announcement
-    PackageAnnouncement(PackageAnnouncement),
-    /// Peer list for a package
-    PackagePeers {
-        package_id: AssetPackageId,
-        peers: Vec<DhtNodeId>,
-    },
-    /// Search index entry
-    SearchIndex {
-        keyword: String,
-        packages: Vec<AssetPackageId>,
-    },
-}
-
-/// Query ID for tracking pending queries
-type QueryId = [u8; 16];
-
-/// Pending query information
-struct PendingQuery {
-    /// Query type
-    _query_type: QueryType,
-    /// Target key
-    _target: ValueKey,
-    /// Nodes to query
-    _to_query: Vec<DhtNodeId>,
-    /// Nodes already queried
-    _queried: HashSet<DhtNodeId>,
-    /// Best nodes found so far
-    _best_nodes: BTreeMap<Distance, NodeInfo>,
-    /// Values found
-    _values: Vec<StoredValue>,
-    /// Query start time
-    _started_at: std::time::Instant,
-}
-
-/// Query types
-enum QueryType {
-    _FindNode,
-    _FindValue,
-    _Store,
+/// DHT Network implementation using Kademlia algorithm
+pub struct DhtNetwork {
+    /// Our node ID
+    local_id: DhtNodeId,
+    /// Transport layer for communication
+    transport: Arc<StoqTransportLayer>,
+    /// Routing table
+    routing_table: Arc<RwLock<RoutingTable>>,
+    /// Value store (package announcements)
+    value_store: Arc<RwLock<ValueStore>>,
+    /// Pending queries
+    _pending_queries: Arc<RwLock<HashMap<value_store::QueryId, value_store::PendingQuery>>>,
+    /// Configuration
+    config: DhtConfig,
 }
 
 impl DhtNetwork {
@@ -280,7 +187,6 @@ impl DhtNetwork {
 
     /// Bootstrap the DHT by connecting to known nodes
     async fn bootstrap(&self, bootstrap_nodes: Vec<String>) -> Result<()> {
-        // If no bootstrap nodes, start in standalone mode
         if bootstrap_nodes.is_empty() {
             return Ok(());
         }
@@ -290,10 +196,8 @@ impl DhtNetwork {
                 .parse::<std::net::SocketAddr>()
                 .context("Invalid bootstrap node address")?;
 
-            // Connect to bootstrap node
             let node_id = self.transport.connect(addr).await?;
 
-            // Add to routing table
             let node_info = NodeInfo {
                 id: node_id,
                 address: addr,
@@ -352,28 +256,24 @@ impl DhtNetwork {
         });
     }
 
-    /// Refresh routing table by iterating buckets and evicting stale entries.
-    /// For each bucket that has not been queried recently, a random key in that
-    /// bucket's range is generated and a lookup is simulated to keep the table
-    /// fresh.
-    async fn refresh_routing_table(routing_table: Arc<RwLock<RoutingTable>>) -> Result<()> {
+    /// Refresh routing table by evicting stale entries and promoting replacements.
+    pub(crate) async fn refresh_routing_table(
+        routing_table: Arc<RwLock<RoutingTable>>,
+    ) -> Result<()> {
         let mut rt = routing_table.write().await;
         let now = SystemTime::now();
         let stale_threshold = rt.config.node_ttl;
         let k = rt.config.k;
 
         for bucket in &mut rt.buckets {
-            // Remove stale nodes (not seen within node_ttl)
             bucket.nodes.retain(|node| {
                 now.duration_since(node.last_seen)
                     .unwrap_or(Duration::from_secs(0))
                     < stale_threshold
             });
 
-            // Promote replacements into freed slots
             while bucket.nodes.len() < k && !bucket.replacements.is_empty() {
                 if let Some(replacement) = bucket.replacements.pop() {
-                    // Only promote if the replacement is itself still fresh
                     if now
                         .duration_since(replacement.last_seen)
                         .unwrap_or(Duration::from_secs(0))
@@ -384,7 +284,6 @@ impl DhtNetwork {
                 }
             }
 
-            // Also clean stale replacements
             bucket.replacements.retain(|node| {
                 now.duration_since(node.last_seen)
                     .unwrap_or(Duration::from_secs(0))
@@ -395,13 +294,10 @@ impl DhtNetwork {
         Ok(())
     }
 
-    /// Republish locally-owned values to the DHT so they remain available.
-    /// Iterates all stored values and re-timestamps those published by us
-    /// that are approaching expiration.
-    async fn republish_values(value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
+    /// Republish locally-owned values approaching expiration.
+    pub(crate) async fn republish_values(value_store: Arc<RwLock<ValueStore>>) -> Result<()> {
         let mut store = value_store.write().await;
         let now = SystemTime::now();
-        // Threshold: republish values that are past 75% of their lifetime
         let renewal_fraction = 0.75;
 
         for values in store.values.values_mut() {
@@ -415,7 +311,6 @@ impl DhtNetwork {
                     .unwrap_or(Duration::from_secs(0));
 
                 if elapsed.as_secs_f64() > total_lifetime.as_secs_f64() * renewal_fraction {
-                    // Refresh: reset published_at and extend expiration
                     value.published_at = now;
                     value.expires_at = now + total_lifetime;
                 }
@@ -433,11 +328,10 @@ impl DhtNetwork {
     ) -> Result<()> {
         let key = ValueKey::from_package_id(&package_id);
 
-        // Create package announcement
         let announcement = PackageAnnouncement {
             package_id,
             metadata: super::stoq_transport::PackageMetadata {
-                name: String::new(), // TODO: Get actual metadata
+                name: String::new(),
                 version: String::new(),
                 size: 0,
                 chunk_count: 0,
@@ -455,13 +349,11 @@ impl DhtNetwork {
             expires_at: SystemTime::now() + self.config.value_ttl,
         };
 
-        // Store locally
         self.value_store
             .write()
             .await
             .store(key.clone(), value.clone());
 
-        // Store on k closest nodes
         let closest_nodes = self.find_closest_nodes(&key, self.config.k).await?;
         for node in closest_nodes {
             self.store_value_on_node(&node, key.clone(), value.clone())
@@ -475,7 +367,6 @@ impl DhtNetwork {
     pub async fn find_package_peers(&self, package_id: &AssetPackageId) -> Result<Vec<DhtNodeId>> {
         let key = ValueKey::from_package_id(package_id);
 
-        // Look up the value in DHT
         let values = self.lookup_value(&key).await?;
 
         let mut peers = Vec::new();
@@ -489,7 +380,6 @@ impl DhtNetwork {
             }
         }
 
-        // Deduplicate
         peers.sort();
         peers.dedup();
 
@@ -500,7 +390,6 @@ impl DhtNetwork {
     pub async fn search_packages(&self, query: &str) -> Result<Vec<AssetPackageId>> {
         let key = ValueKey::from_query(query);
 
-        // Look up the search index
         let values = self.lookup_value(&key).await?;
 
         let mut packages = Vec::new();
@@ -514,7 +403,6 @@ impl DhtNetwork {
             }
         }
 
-        // Deduplicate
         packages.sort();
         packages.dedup();
 
@@ -525,18 +413,15 @@ impl DhtNetwork {
     pub async fn register_as_seeder(&self, package_id: AssetPackageId) -> Result<()> {
         let key = ValueKey::from_package_id(&package_id);
 
-        // Get current peers list
         let mut peers = self
             .find_package_peers(&package_id)
             .await
             .unwrap_or_default();
 
-        // Add ourselves
         if !peers.contains(&self.local_id) {
             peers.push(self.local_id.clone());
         }
 
-        // Store updated peers list
         let value = StoredValue {
             data: ValueData::PackagePeers {
                 package_id,
@@ -547,13 +432,11 @@ impl DhtNetwork {
             expires_at: SystemTime::now() + self.config.value_ttl,
         };
 
-        // Store locally
         self.value_store
             .write()
             .await
             .store(key.clone(), value.clone());
 
-        // Store on k closest nodes
         let closest_nodes = self.find_closest_nodes(&key, self.config.k).await?;
         for node in closest_nodes {
             self.store_value_on_node(&node, key.clone(), value.clone())
@@ -571,12 +454,10 @@ impl DhtNetwork {
 
     /// Look up a value in the DHT
     async fn lookup_value(&self, key: &ValueKey) -> Result<Vec<StoredValue>> {
-        // Check local store first
         if let Some(values) = self.value_store.read().await.get(key) {
             return Ok(values);
         }
 
-        // Query network
         let closest_nodes = self.find_closest_nodes(key, self.config.k).await?;
 
         let mut found_values = Vec::new();
@@ -598,7 +479,6 @@ impl DhtNetwork {
             .await
             .get_closest_nodes(&target_id, k);
 
-        // Iterative lookup
         let mut queried = HashSet::new();
         let mut to_query = closest.clone();
 
@@ -609,7 +489,6 @@ impl DhtNetwork {
             }
             queried.insert(node.id.clone());
 
-            // Query node for closer nodes
             if let Ok(ResponseData::Peers(peers)) = self
                 .transport
                 .send_request(&node.id, RequestType::GetPeers)
@@ -617,17 +496,14 @@ impl DhtNetwork {
             {
                 for peer_id in peers {
                     if !queried.contains(&peer_id) {
-                        // TODO: Get full node info
-                        // to_query.push(node_info);
+                        // Peer info retrieval pending full implementation
                     }
                 }
             }
 
-            // Sort by distance
             to_query.sort_by_key(|n| target_id.distance(&n.id));
             to_query.truncate(k);
 
-            // Update closest
             closest.extend(to_query.iter().cloned());
             closest.sort_by_key(|n| target_id.distance(&n.id));
             closest.truncate(k);
@@ -658,134 +534,6 @@ impl DhtNetwork {
     }
 }
 
-impl RoutingTable {
-    fn new(config: DhtConfig) -> Self {
-        let mut buckets = Vec::with_capacity(256);
-        for _ in 0..256 {
-            buckets.push(KBucket {
-                nodes: Vec::new(),
-                replacements: Vec::new(),
-            });
-        }
-
-        Self { buckets, config }
-    }
-
-    /// Compute the XOR-distance-based bucket index for a node relative to
-    /// a local node ID. Returns 0..255 based on the position of the highest
-    /// differing bit.
-    fn bucket_for_key(local_id: &DhtNodeId, remote_id: &DhtNodeId) -> usize {
-        let distance = local_id.distance(remote_id);
-        distance.bucket_index()
-    }
-
-    fn add_node(&mut self, node: NodeInfo) {
-        let bucket_idx = Self::bucket_for_key(&DhtNodeId { id: [0u8; 32] }, &node.id);
-        let bucket = &mut self.buckets[bucket_idx];
-
-        // Check if node already exists -- update last_seen
-        if let Some(existing) = bucket.nodes.iter_mut().find(|n| n.id == node.id) {
-            existing.last_seen = node.last_seen;
-            existing.rtt = node.rtt;
-            return;
-        }
-
-        // Add new node
-        if bucket.nodes.len() < self.config.k {
-            bucket.nodes.push(node);
-        } else {
-            // Bucket full, add to replacements
-            bucket.replacements.push(node);
-            if bucket.replacements.len() > self.config.k {
-                bucket.replacements.remove(0);
-            }
-        }
-    }
-
-    fn add_node_with_local_id(&mut self, local_id: &DhtNodeId, node: NodeInfo) {
-        let bucket_idx = Self::bucket_for_key(local_id, &node.id);
-        let bucket = &mut self.buckets[bucket_idx];
-
-        if let Some(existing) = bucket.nodes.iter_mut().find(|n| n.id == node.id) {
-            existing.last_seen = node.last_seen;
-            existing.rtt = node.rtt;
-            return;
-        }
-
-        if bucket.nodes.len() < self.config.k {
-            bucket.nodes.push(node);
-        } else {
-            bucket.replacements.push(node);
-            if bucket.replacements.len() > self.config.k {
-                bucket.replacements.remove(0);
-            }
-        }
-    }
-
-    fn get_closest_nodes(&self, target: &DhtNodeId, k: usize) -> Vec<NodeInfo> {
-        let mut nodes = Vec::new();
-
-        // Collect all nodes
-        for bucket in &self.buckets {
-            nodes.extend(bucket.nodes.clone());
-        }
-
-        // Sort by distance
-        nodes.sort_by_key(|n| target.distance(&n.id));
-        nodes.truncate(k);
-
-        nodes
-    }
-}
-
-impl ValueStore {
-    fn new() -> Self {
-        Self {
-            values: HashMap::new(),
-            package_index: HashMap::new(),
-        }
-    }
-
-    fn store(&mut self, key: ValueKey, value: StoredValue) {
-        // Extract package ID if present
-        if let ValueData::PackageAnnouncement(ref announcement) = value.data {
-            self.package_index
-                .entry(announcement.package_id)
-                .or_default()
-                .insert(key.clone());
-        }
-
-        self.values.entry(key).or_default().push(value);
-    }
-
-    fn get(&self, key: &ValueKey) -> Option<Vec<StoredValue>> {
-        self.values.get(key).cloned()
-    }
-
-    fn clean_expired(&mut self) {
-        let now = SystemTime::now();
-
-        // Remove expired values
-        for values in self.values.values_mut() {
-            values.retain(|v| v.expires_at > now);
-        }
-
-        // Remove empty entries
-        self.values.retain(|_, v| !v.is_empty());
-
-        // Update package index
-        self.package_index.retain(|_, keys| {
-            keys.retain(|k| self.values.contains_key(k));
-            !keys.is_empty()
-        });
-    }
-}
-
-// Helper function for AssetPackageId
-fn _asset_package_id_as_bytes(id: &AssetPackageId) -> &[u8] {
-    id.as_bytes()
-}
-
 // For testing/compilation - implement getrandom
 mod getrandom {
     pub fn getrandom(buf: &mut [u8]) -> Result<(), ()> {
@@ -805,6 +553,7 @@ mod getrandom {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use routing_table::RoutingTable;
 
     #[test]
     fn test_node_id_distance() {
@@ -827,14 +576,12 @@ mod tests {
     #[test]
     fn test_bucket_for_key_xor_distance() {
         let local = DhtNodeId { id: [0u8; 32] };
-        // Remote with only the MSB of byte 0 set: distance bit 7 -> bucket 7
         let mut remote_id = [0u8; 32];
         remote_id[0] = 0x80;
         let remote = DhtNodeId { id: remote_id };
         let bucket = RoutingTable::bucket_for_key(&local, &remote);
         assert_eq!(bucket, 7, "highest bit in byte 0 should be bucket 7");
 
-        // Remote with bit 0 of byte 0 set: distance bit 0 -> bucket 0
         let mut remote_id2 = [0u8; 32];
         remote_id2[0] = 0x01;
         let remote2 = DhtNodeId { id: remote_id2 };
@@ -846,17 +593,18 @@ mod tests {
     fn test_routing_table_add_and_evict() {
         let local_id = DhtNodeId { id: [0u8; 32] };
         let mut config = DhtConfig::default();
-        config.k = 2; // Small bucket for testing
+        config.k = 2;
         let mut rt = RoutingTable::new(config);
 
-        // Add 3 nodes to same bucket (all have remote_id[0]=0x80 -> bucket 7)
         for i in 0..3u8 {
             let mut id = [0u8; 32];
             id[0] = 0x80;
             id[31] = i;
             let node = NodeInfo {
                 id: DhtNodeId { id },
-                address: format!("[::1]:{}", 1000 + i as u16).parse().expect("test: parse addr"),
+                address: format!("[::1]:{}", 1000 + i as u16)
+                    .parse()
+                    .expect("test: parse addr"),
                 last_seen: SystemTime::now(),
                 rtt: None,
             };
@@ -879,7 +627,6 @@ mod tests {
         config.node_ttl = Duration::from_secs(1);
         let rt = Arc::new(RwLock::new(RoutingTable::new(config)));
 
-        // Add a stale node (last_seen 10 seconds ago)
         {
             let mut table = rt.write().await;
             let node = NodeInfo {
@@ -891,7 +638,6 @@ mod tests {
             table.buckets[0].nodes.push(node);
         }
 
-        // Refresh should evict the stale node
         DhtNetwork::refresh_routing_table(rt.clone())
             .await
             .expect("test: refresh should succeed");
@@ -908,7 +654,6 @@ mod tests {
     async fn test_republish_values_refreshes_timestamps() {
         let vs = Arc::new(RwLock::new(ValueStore::new()));
 
-        // Store a value that is 90% through its lifetime (should be republished)
         {
             let mut store = vs.write().await;
             let key = ValueKey([42u8; 32]);
@@ -932,7 +677,6 @@ mod tests {
         let key = ValueKey([42u8; 32]);
         let values = store.get(&key).expect("test: value should exist");
         assert_eq!(values.len(), 1);
-        // After republish, expires_at should be further in the future
         let remaining = values[0]
             .expires_at
             .duration_since(SystemTime::now())
