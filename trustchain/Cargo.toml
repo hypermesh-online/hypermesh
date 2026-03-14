@@ -44,7 +44,7 @@ falcon-rust = "0.1"  # Alternative FALCON implementation
 serde_arrays = "0.1"  # For serializing fixed-size arrays
 
 # HTTP client (for bootstrap testing only)
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"], optional = true }
 
 # Compression
 flate2 = { workspace = true }
@@ -55,12 +55,12 @@ flate2 = { workspace = true }
 # tower-http = ... # REMOVED: STOQ-only transport
 # hyper = ... # REMOVED: STOQ-only transport
 
-# DNS
+# DNS (trust-dns only — hickory is the same project renamed, removed duplicate)
 trust-dns-client = { workspace = true }
-trust-dns-server = { workspace = true }
 trust-dns-proto = { workspace = true }
-hickory-client = { workspace = true }
-hickory-proto = { workspace = true }
+# trust-dns-server = ... # REMOVED: zero usage in codebase
+# hickory-client = ... # REMOVED: hickory IS trust-dns renamed, duplicate deps
+# hickory-proto = ... # REMOVED: hickory IS trust-dns renamed, duplicate deps
 
 # Data structures and serialization
 serde = { workspace = true }
@@ -119,7 +119,7 @@ tokio-test = { workspace = true }
 serial_test = "3"
 
 [features]
-default = ["ca", "ct", "dns", "proof-of-state", "localhost-testing"]
+default = ["ca", "ct", "dns", "proof-of-state", "localhost-testing", "http-bootstrap"]
 
 # Core features
 ca = []                # Certificate Authority
@@ -129,6 +129,7 @@ proof-of-state = []    # Proof of State validation integration
 
 # Testing and development
 localhost-testing = []
+http-bootstrap = ["dep:reqwest"]  # Only needed by trustchain-bootstrap binary
 production-ready = ["proof-of-state"]
 
 [lib]

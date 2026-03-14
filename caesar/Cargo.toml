@@ -34,9 +34,9 @@ redis = { workspace = true }  # For caching only
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# Blockchain integration
-ethers = "2.0"
-primitive-types = "0.12"
+# Blockchain integration (optional — only needed for cross-chain bridges)
+ethers = { version = "2.0", optional = true }
+primitive-types = { version = "0.12", optional = true }
 # reqwest = ... # REMOVED: STOQ-only transport
 
 # Security
@@ -86,3 +86,4 @@ development = []
 redis-cache = []
 hypermesh = []
 engauge = ["dep:engauge"]
+ethereum = ["dep:ethers", "dep:primitive-types"]

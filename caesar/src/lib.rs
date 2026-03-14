@@ -28,6 +28,7 @@ pub mod storage;
 pub mod banking_interop_bridge;
 pub mod banking_providers;
 pub mod cross_chain_bridge;
+#[cfg(feature = "ethereum")]
 pub mod crypto_exchange_providers;
 
 // Conservation law (whitepaper section 3.1)

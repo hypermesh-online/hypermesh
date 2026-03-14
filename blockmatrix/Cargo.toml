@@ -6,6 +6,7 @@ authors = ["HyperMesh Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/hypermesh/hypermesh"
 description = "HyperMesh - Distributed Computing Platform with Proof of State"
+autobins = false
 
 [lints]
 workspace = true
@@ -69,7 +70,7 @@ lazy_static = { workspace = true }
 
 # TrustChain - Proof of State and certificate system
 # NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
-trustchain = { path = "../trustchain", features = ["localhost-testing"] }
+trustchain = { path = "../trustchain", default-features = false, features = ["ca", "ct", "dns", "proof-of-state", "localhost-testing"] }
 
 # Blockchain dependencies already included below
 
@@ -131,7 +132,7 @@ rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 rcgen = { workspace = true }
 bytes = { workspace = true }
-socket2 = { workspace = true }
+socket2 = { workspace = true, features = ["all"] }
 # webpki-roots = { workspace = true }  # REMOVED: Use TrustChain CA only
 
 # HTTP
@@ -146,7 +147,7 @@ socket2 = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 rust_decimal = { workspace = true }
 fastrand = { workspace = true }
-which = { workspace = true }
+# which = ... # REMOVED: zero usage in codebase
 # prometheus = { workspace = true }  # REMOVED: Build native eBPF monitoring
 
 # OS Integration - Sprint 2

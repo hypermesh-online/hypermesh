@@ -74,11 +74,8 @@ der-parser = "9.0"
 pem = "3.0"
 der = "0.7"
 
-# DNS
-hickory-client = "0.24"
-hickory-proto = "0.24"
+# DNS (trust-dns only — hickory is the renamed project, removed duplicate)
 trust-dns-client = "0.23"
-trust-dns-server = "0.23"
 trust-dns-proto = "0.23"
 
 # Data structures
@@ -148,7 +145,7 @@ handlebars = "5.1"
 libloading = "0.8"
 semver = "1.0"
 fastrand = "2.0"
-which = "6.0"
+# which = ... # REMOVED: zero usage in codebase
 # prometheus = ... # REMOVED: Build native monitoring (100% standalone requirement)
 
 [package]
@@ -201,11 +198,11 @@ pqcrypto-kyber = { workspace = true }
 pqcrypto-traits = { workspace = true }
 aes-gcm = { workspace = true }
 
-# DNS resolution (embedded)
-hickory-client = { workspace = true }
-hickory-proto = { workspace = true }
+# DNS resolution: trustchain uses trust-dns-client/proto directly
+# hickory-client = ... # REMOVED: hickory IS trust-dns renamed, zero usage in root
+# hickory-proto = ... # REMOVED: same
 
-# HyperMesh Assets (embedded) - Consensus and asset management
+# HyperMesh Assets (embedded) - Proof of State and asset management
 sha2 = { workspace = true }
 sha1 = { workspace = true }
 sha3 = { workspace = true }
@@ -286,6 +283,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 debug = false
+strip = "symbols"
 
 [profile.dev]
 opt-level = 1

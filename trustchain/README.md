@@ -13,7 +13,7 @@ TrustChain implements the HyperMesh trust layer where every node is its own DNS 
 Authentication is binary -- pass or fail. There are no trust scores, reputation floats, or graduated levels.
 
 - `BinaryAuthenticator` -- pass/fail with revocation list (replaced `TrustScorer`)
-- `StateAuthenticator` trait -- renamed from `ConsensusValidator`
+- `StateAuthenticator` trait -- bilateral Proof of State validation
 - `PublisherAuthenticator` -- binary publisher validation (no reputation scoring)
 
 ### Modules
