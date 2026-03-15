@@ -473,7 +473,7 @@ impl PolicyEngine {
         }
     }
 
-    /// Evaluate a single rule
+    /// Evaluate a single rule against verification result
     fn evaluate_rule(&self, rule: &PolicyRule, verification: &VerificationResult) -> bool {
         match &rule.condition {
             RuleCondition::PublisherNotAuthenticated => !verification.publisher_authenticated,
@@ -482,8 +482,52 @@ impl PolicyEngine {
                 .as_ref()
                 .map(|p| p.common_name.contains(pattern))
                 .unwrap_or(false),
-            // TODO: Implement other conditions
-            _ => false,
+            RuleCondition::PackageNamePattern(_pattern) => {
+                // VerificationResult does not carry package name; rule cannot be evaluated here.
+                // Package-level rules should be checked at a higher layer that has package metadata.
+                tracing::debug!(
+                    "PackageNamePattern rule '{}' skipped: VerificationResult lacks package metadata",
+                    rule.name
+                );
+                false
+            }
+            RuleCondition::PackageSizeExceeds(_max_size) => {
+                // VerificationResult does not carry package size; rule cannot be evaluated here.
+                tracing::debug!(
+                    "PackageSizeExceeds rule '{}' skipped: VerificationResult lacks package metadata",
+                    rule.name
+                );
+                false
+            }
+            RuleCondition::ContainsFilePattern(_pattern) => {
+                // VerificationResult does not carry file list; rule cannot be evaluated here.
+                tracing::debug!(
+                    "ContainsFilePattern rule '{}' skipped: VerificationResult lacks package metadata",
+                    rule.name
+                );
+                false
+            }
+            RuleCondition::HasDependency(_dep_name) => {
+                // VerificationResult does not carry dependency list; rule cannot be evaluated here.
+                tracing::debug!(
+                    "HasDependency rule '{}' skipped: VerificationResult lacks package metadata",
+                    rule.name
+                );
+                false
+            }
+            RuleCondition::CertificateIssuer(issuer) => verification
+                .publisher
+                .as_ref()
+                .map(|p| p.cert_issuer.contains(issuer))
+                .unwrap_or(false),
+            RuleCondition::Custom(expr) => {
+                tracing::debug!(
+                    "Custom rule '{}' with expression '{}' skipped: custom rule runtime not implemented",
+                    rule.name,
+                    expr
+                );
+                false
+            }
         }
     }
 

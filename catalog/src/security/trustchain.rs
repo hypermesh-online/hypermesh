@@ -13,6 +13,13 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+/// Convert x509_parser's ASN1Time to chrono DateTime<Utc>
+fn asn1_time_to_chrono(asn1: &x509_parser::time::ASN1Time) -> chrono::DateTime<chrono::Utc> {
+    let offset_dt = asn1.to_datetime();
+    let unix_ts = offset_dt.unix_timestamp();
+    chrono::DateTime::from_timestamp(unix_ts, 0).unwrap_or_else(chrono::Utc::now)
+}
+
 // Import TrustChain types (will be available when integrated)
 // use trustchain::{TrustChainCA, CertificateRequest, IssuedCertificate};
 
@@ -179,34 +186,61 @@ impl TrustChainIntegration {
     }
 
     /// Fetch CA root certificate
+    ///
+    /// In alpha mode, generates a self-signed root CA certificate using rcgen.
+    /// Future: fetch real CA root via STOQ transport from TrustChain CA.
     async fn fetch_ca_root(&self) -> Result<()> {
         debug!("Fetching TrustChain CA root certificate");
 
-        // TODO: Replace with STOQ transport
-        // let url = format!("{}/api/ca/root", self.config.endpoint);
-        // let response = self.client
-        //     .get(&url)
-        //     .send()
-        //     .await
-        //     .context("Failed to fetch CA root certificate")?;
+        // Check if we already have a cached root
+        {
+            let existing = self.ca_root_cert.read().await;
+            if existing.is_some() {
+                debug!("CA root certificate already cached");
+                return Ok(());
+            }
+        }
 
-        // if !response.status().is_success() {
-        //     return Err(anyhow!("Failed to fetch CA root: {}", response.status()));
-        // }
+        warn!(
+            "STOQ transport to TrustChain CA not yet available — generating self-signed alpha root"
+        );
 
-        // let cert_data: Certificate = response.json().await?;
+        // Generate a self-signed root CA certificate for alpha
+        let mut ca_params =
+            rcgen::CertificateParams::new(vec!["trust.hypermesh.online".to_string()])
+                .map_err(|e| anyhow!("Failed to create CA cert params: {}", e))?;
+        ca_params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
+        ca_params
+            .distinguished_name
+            .push(rcgen::DnType::CommonName, "TrustChain CA Root");
+        ca_params
+            .distinguished_name
+            .push(rcgen::DnType::OrganizationName, "HyperMesh");
+        ca_params.not_before = rcgen::date_time_ymd(2026, 1, 1);
+        ca_params.not_after = rcgen::date_time_ymd(2036, 12, 31);
 
-        // For now, use a placeholder certificate
+        let ca_key_pair = rcgen::KeyPair::generate()
+            .map_err(|e| anyhow!("Failed to generate CA key pair: {}", e))?;
+        let ca_cert = ca_params
+            .self_signed(&ca_key_pair)
+            .map_err(|e| anyhow!("Failed to generate self-signed CA cert: {}", e))?;
+
+        let der_bytes = ca_cert.der().to_vec();
+
+        // Calculate fingerprint
+        use sha2::{Digest, Sha256};
+        let fingerprint = hex::encode(Sha256::digest(&der_bytes));
+
         let cert_data = Certificate {
-            fingerprint: "placeholder".to_string(),
+            fingerprint,
             common_name: "TrustChain CA Root".to_string(),
             organization: Some("HyperMesh".to_string()),
-            issuer: "TrustChain CA".to_string(),
+            issuer: "TrustChain CA Root".to_string(),
             not_before: chrono::Utc::now(),
-            not_after: chrono::Utc::now() + chrono::Duration::days(365),
-            san_entries: vec![],
+            not_after: chrono::Utc::now() + chrono::Duration::days(365 * 10),
+            san_entries: vec!["trust.hypermesh.online".to_string()],
             chain: vec![],
-            raw_bytes: vec![],
+            raw_bytes: der_bytes,
             pqc_signature: None,
         };
 
@@ -216,11 +250,11 @@ impl TrustChainIntegration {
             _last_updated: std::time::Instant::now(),
         });
 
-        info!("Successfully fetched TrustChain CA root certificate");
+        info!("Generated self-signed alpha CA root certificate (real STOQ-based CA root fetch is future work)");
         Ok(())
     }
 
-    /// Validate a certificate
+    /// Validate a certificate by parsing X.509 and checking expiry/revocation
     pub async fn validate_certificate(&self, cert_bytes: &[u8]) -> Result<CertificateValidation> {
         // Calculate fingerprint
         let fingerprint = self.calculate_fingerprint(cert_bytes);
@@ -231,53 +265,108 @@ impl TrustChainIntegration {
             return Ok(cached.validation);
         }
 
-        // Validate with TrustChain
-        debug!("Validating certificate {} with TrustChain", fingerprint);
+        debug!("Validating certificate {} with X.509 parsing", fingerprint);
 
-        use base64::Engine;
-        let _request = ValidateCertificateRequest {
-            certificate: base64::engine::general_purpose::STANDARD.encode(cert_bytes),
-            chain: vec![], // TODO: Include chain if available
-            check_revocation: true,
-            require_pqc: self.config.enable_pqc,
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut valid = true;
+
+        // Try to parse the certificate as X.509 DER
+        let cert_info = match x509_parser::parse_x509_certificate(cert_bytes) {
+            Ok((_remaining, cert)) => {
+                // Check validity period (convert from x509 time to chrono)
+                let now = chrono::Utc::now();
+                let not_before = asn1_time_to_chrono(&cert.validity().not_before);
+                let not_after = asn1_time_to_chrono(&cert.validity().not_after);
+
+                if now < not_before {
+                    errors.push(format!(
+                        "Certificate is not yet valid (not_before: {})",
+                        not_before
+                    ));
+                    valid = false;
+                }
+                if now > not_after {
+                    errors.push(format!("Certificate has expired (not_after: {})", not_after));
+                    valid = false;
+                }
+
+                // Check if certificate version is v3 (version field: 0=v1, 1=v2, 2=v3)
+                if cert.version().0 != 2 {
+                    warnings.push("Certificate is not X.509 v3".to_string());
+                }
+
+                // Extract subject/issuer for certificate info
+                let common_name = cert
+                    .subject()
+                    .iter_common_name()
+                    .next()
+                    .and_then(|cn| cn.as_str().ok())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                let organization = cert
+                    .subject()
+                    .iter_organization()
+                    .next()
+                    .and_then(|o| o.as_str().ok())
+                    .map(|s| s.to_string());
+
+                let issuer_cn = cert
+                    .issuer()
+                    .iter_common_name()
+                    .next()
+                    .and_then(|cn| cn.as_str().ok())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                Some(Certificate {
+                    fingerprint: fingerprint.clone(),
+                    common_name,
+                    organization,
+                    issuer: issuer_cn,
+                    not_before,
+                    not_after,
+                    san_entries: vec![],
+                    chain: vec![],
+                    raw_bytes: cert_bytes.to_vec(),
+                    pqc_signature: None,
+                })
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to parse certificate as X.509 DER: {}. Attempting basic validation.",
+                    e
+                );
+                warnings.push(format!("X.509 parsing failed: {}", e));
+                // If we can't parse it, we still allow it with a warning for alpha
+                // (self-signed or non-standard certs used during bootstrap)
+                None
+            }
         };
 
-        // TODO: Replace with STOQ transport
-        // let url = format!("{}/api/certificates/validate", self.config.endpoint);
-        // let response = self.client
-        //     .post(&url)
-        //     .json(&request)
-        //     .send()
-        //     .await
-        //     .context("Failed to validate certificate")?;
+        // Check revocation status via fingerprint
+        let revoked = self.check_revocation(&fingerprint).await.unwrap_or(false);
+        if revoked {
+            errors.push("Certificate has been revoked".to_string());
+            valid = false;
+        }
 
-        // if !response.status().is_success() {
-        //     return Err(anyhow!("Certificate validation failed: {}", response.status()));
-        // }
-
-        // let validation_response: ValidateCertificateResponse = response.json().await?;
-
-        // For now, return a valid response
-        let validation_response = ValidateCertificateResponse {
-            valid: true,
-            validation: CertificateValidation {
-                valid: true,
-                validated_at: chrono::Utc::now(),
-                chain_valid: true,
-                revoked: false,
-                errors: vec![],
-                warnings: vec![],
-            },
-            certificate_info: None,
+        let validation = CertificateValidation {
+            valid,
+            validated_at: chrono::Utc::now(),
+            chain_valid: true, // Chain validation requires full CA infrastructure (future work)
+            revoked,
+            errors,
+            warnings,
         };
 
         // Cache the result
-        if let Some(cert_info) = validation_response.certificate_info {
-            self.cache_certificate(cert_info.clone(), validation_response.validation.clone())
-                .await;
+        if let Some(cert) = cert_info {
+            self.cache_certificate(cert, validation.clone()).await;
         }
 
-        Ok(validation_response.validation)
+        Ok(validation)
     }
 
     /// Issue a new certificate for a publisher

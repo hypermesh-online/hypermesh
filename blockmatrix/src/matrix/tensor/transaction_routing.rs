@@ -155,6 +155,10 @@ pub struct TransactionRouter {
     config: TransactionRoutingConfig,
     nodes: HashMap<String, NodeEntry>,
     stats: RoutingStatistics,
+    /// Optional per-node weight adjustments from engauge routing intelligence.
+    /// Maps node_id to a multiplicative weight factor (e.g., 0.5 penalizes,
+    /// 1.5 boosts). Applied in relay scoring so congested routes are penalized.
+    weight_adjustments: Option<HashMap<String, f64>>,
 }
 
 impl TransactionRouter {
@@ -164,6 +168,20 @@ impl TransactionRouter {
             config,
             nodes: HashMap::new(),
             stats: RoutingStatistics::default(),
+            weight_adjustments: None,
+        }
+    }
+
+    /// Set per-node weight adjustments from engauge routing intelligence.
+    ///
+    /// Each entry maps a `node_id` to a multiplicative weight factor that is
+    /// applied during relay scoring. Values below 1.0 penalize congested nodes;
+    /// values above 1.0 boost preferred nodes.
+    pub fn set_weight_adjustments(&mut self, adjustments: Vec<(String, f64)>) {
+        if adjustments.is_empty() {
+            self.weight_adjustments = None;
+        } else {
+            self.weight_adjustments = Some(adjustments.into_iter().collect());
         }
     }
 
@@ -235,6 +253,11 @@ impl TransactionRouter {
 
     /// Select the best relay from `candidates` using direction alignment
     /// scoring (dot product via `routing_similarity`).
+    ///
+    /// When [`set_weight_adjustments`] has been called, each candidate's
+    /// alignment score is multiplied by its weight factor so that congested
+    /// nodes (weight < 1.0) are penalised and preferred nodes (weight > 1.0)
+    /// are boosted.
     pub fn find_optimal_relay(
         &self,
         from: &MatrixCoordinate,
@@ -254,8 +277,16 @@ impl TransactionRouter {
                 let dir_from_candidate = calculate_routing_vector(pos, to);
                 // Prefer candidates aligned with the overall direction AND
                 // positioned so that the second leg also aligns well.
-                let score = routing_similarity(&ideal_dir, &dir_to_candidate)
+                let mut score = routing_similarity(&ideal_dir, &dir_to_candidate)
                     + routing_similarity(&ideal_dir, &dir_from_candidate);
+
+                // Apply engauge weight adjustment if available for this node
+                if let Some(ref adjustments) = self.weight_adjustments {
+                    if let Some(&factor) = adjustments.get(id) {
+                        score *= factor;
+                    }
+                }
+
                 (id.clone(), *pos, score)
             })
             .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal))

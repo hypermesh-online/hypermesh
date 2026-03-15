@@ -9,6 +9,7 @@
 //! lowest-latency, or redundant (send on all paths).
 
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 /// Scheduling strategy for path selection.
 #[derive(Debug, Clone, PartialEq)]
@@ -38,10 +39,18 @@ pub struct PathCandidate {
     pub bytes_sent: u64,
 }
 
+/// Callback type for polling latest engauge recommendations.
+///
+/// Returns `Some((enable_redundant, strategy_name))` when a new
+/// recommendation is available, or `None` when nothing has changed.
+pub type MetricSourceFn = Arc<dyn Fn() -> Option<(bool, String)> + Send + Sync>;
+
 /// Selects paths based on the configured scheduling strategy.
 pub struct PathSelector {
     strategy: PathScheduler,
     round_robin_index: AtomicU32,
+    /// Optional callback to poll for engauge routing recommendations.
+    metric_source: Option<MetricSourceFn>,
 }
 
 impl PathSelector {
@@ -50,6 +59,34 @@ impl PathSelector {
         Self {
             strategy,
             round_robin_index: AtomicU32::new(0),
+            metric_source: None,
+        }
+    }
+
+    /// Register a callback that the selector can poll for the latest
+    /// engauge routing recommendation.
+    ///
+    /// The callback should return `Some((enable_redundant, strategy_name))`
+    /// when a new recommendation is available, or `None` when nothing has
+    /// changed since the last poll.
+    pub fn set_metric_source(&mut self, source_fn: MetricSourceFn) {
+        self.metric_source = Some(source_fn);
+    }
+
+    /// Poll the registered metric source for a new recommendation and
+    /// apply it if available.
+    ///
+    /// Returns `true` if the scheduling strategy changed as a result.
+    pub fn poll_recommendation(&mut self) -> bool {
+        let source = match &self.metric_source {
+            Some(s) => Arc::clone(s),
+            None => return false,
+        };
+        match source() {
+            Some((enable_redundant, strategy_name)) => {
+                self.apply_recommendation(enable_redundant, &strategy_name)
+            }
+            None => false,
         }
     }
 

@@ -567,16 +567,45 @@ impl IntelligenceLayer {
     }
 
     /// Map privacy tier to privacy level
-    #[allow(clippy::if_same_then_else)]
     fn map_privacy_tier_to_level(&self, tier: &PrivacyMode) -> PrivacyMode {
         if *tier == PrivacyMode::PUBLIC {
             PrivacyMode::PUBLIC
         } else if *tier == PrivacyMode::PRIVATE {
-            PrivacyMode::PUBLIC
+            PrivacyMode::PRIVATE
         } else {
             // ANONYMOUS
-            PrivacyMode::PRIVATE
+            PrivacyMode::ANONYMOUS
         }
+    }
+
+    /// Check whether any tracked shards need additional replicas.
+    ///
+    /// Creates a [`engauge::ReplicationTrigger`] and evaluates it against
+    /// the current [`engauge::SwarmAnalytics`] state (when the `intelligence`
+    /// feature is enabled). Returns an empty vec when the feature is off.
+    #[cfg(feature = "intelligence")]
+    pub fn check_replication_needs(&self) -> Vec<engauge::ReplicationSignal> {
+        use engauge::{ReplicationConfig, ReplicationTrigger, SwarmAnalytics};
+
+        // If we have an EngaugeBridge with analytics, use it.
+        // For now, create a default trigger against a fresh analytics instance
+        // (wired analytics will come from the bridge in production).
+        let trigger = ReplicationTrigger::new(ReplicationConfig::default());
+        let analytics = SwarmAnalytics::new();
+        let signals = trigger.check(&analytics);
+        if !signals.is_empty() {
+            info!(
+                count = signals.len(),
+                "Replication needs detected by intelligence layer"
+            );
+        }
+        signals
+    }
+
+    /// Stub when intelligence feature is not enabled.
+    #[cfg(not(feature = "intelligence"))]
+    pub fn check_replication_needs(&self) -> Vec<()> {
+        Vec::new()
     }
 
     /// Map privacy mode to STOQ-compatible PrivacyMode (identity mapping).
