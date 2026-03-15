@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { useAssets, useSystemStatus } from '@/lib/api';
-import { useNodeStatus, useConfigShow } from '@/lib/hooks/useBlockMatrix';
+import { useNodeStatus, useConfigShow, useConfigGet } from '@/lib/hooks/useBlockMatrix';
 import {
   Network,
   Users,
@@ -17,7 +18,9 @@ import {
   Globe,
   Cpu,
   MemoryStick,
-  HardDrive
+  HardDrive,
+  Search,
+  Settings
 } from 'lucide-react';
 
 export function ResourceConfiguration() {
@@ -29,6 +32,9 @@ export function ResourceConfiguration() {
   const [memoryLimit, setMemoryLimit] = React.useState(50);
   const [storageLimit, setStorageLimit] = React.useState(50);
   const [networkLimit, setNetworkLimit] = React.useState(50);
+  const [configFilter, setConfigFilter] = React.useState('');
+  const [configSearchKey, setConfigSearchKey] = React.useState<string | undefined>(undefined);
+  const configKeyResult = useConfigGet(configSearchKey);
 
   // Use real config data for system specs when available
   const configRecord = configData as Record<string, unknown> | undefined;
@@ -290,6 +296,100 @@ export function ResourceConfiguration() {
                 ))}
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Full Node Configuration Table */}
+      <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Settings className="h-5 w-5 text-cyan-400" />
+            Node Configuration
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            All configuration keys and values from the running node
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search / Filter */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Filter config keys..."
+                value={configFilter}
+                onChange={(e) => setConfigFilter(e.target.value)}
+                className="pl-9 bg-black/30 border-cyan-500/20 text-white placeholder:text-gray-500"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-cyan-500/30 text-cyan-400 whitespace-nowrap"
+              onClick={() => {
+                if (configFilter.trim()) {
+                  setConfigSearchKey(configFilter.trim());
+                }
+              }}
+            >
+              Lookup Key
+            </Button>
+          </div>
+
+          {/* Key lookup result */}
+          {configSearchKey && (
+            <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+              <div className="text-xs text-gray-400 mb-1">Lookup: <span className="text-cyan-400 font-mono">{configSearchKey}</span></div>
+              {configKeyResult.isLoading ? (
+                <Skeleton className="h-6 w-32" />
+              ) : configKeyResult.error ? (
+                <span className="text-sm text-gray-500">Key not found</span>
+              ) : (
+                <span className="text-sm text-white font-mono break-all">{JSON.stringify(configKeyResult.data)}</span>
+              )}
+            </div>
+          )}
+
+          {/* Config table */}
+          {configLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : configRecord ? (
+            <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-800">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-black/80 backdrop-blur">
+                  <tr className="border-b border-gray-800">
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Key</th>
+                    <th className="text-left py-2 px-3 text-gray-400 font-medium">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(configRecord)
+                    .filter(([key]) =>
+                      !configFilter || key.toLowerCase().includes(configFilter.toLowerCase())
+                    )
+                    .map(([key, value]) => (
+                      <tr key={key} className="border-b border-gray-800/50 hover:bg-cyan-500/5">
+                        <td className="py-2 px-3 text-cyan-400 font-mono text-xs">{key}</td>
+                        <td className="py-2 px-3 text-white font-mono text-xs break-all">
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {Object.entries(configRecord).filter(([key]) =>
+                !configFilter || key.toLowerCase().includes(configFilter.toLowerCase())
+              ).length === 0 && (
+                <p className="text-gray-500 text-center py-4 text-sm">No matching config keys</p>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">No configuration data available</p>
           )}
         </CardContent>
       </Card>

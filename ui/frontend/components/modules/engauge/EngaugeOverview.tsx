@@ -7,12 +7,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Activity, HardDrive, Cpu, Network, TrendingUp, TrendingDown, Minus, Gauge } from 'lucide-react';
+import { Activity, HardDrive, Cpu, Network, TrendingUp, TrendingDown, Minus, Gauge, AlertTriangle } from 'lucide-react';
 import { useEngaugeOverview } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function EngaugeOverview() {
-  const { capacity, traffic, trending, throttle, pools, isLoading } = useEngaugeOverview();
+  const { capacity, traffic, trending, throttle, pools, isLoading, error } = useEngaugeOverview();
+
+  if (error && !isLoading && !capacity.data && !traffic.data && !trending.data && !throttle.data && !pools.data) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-4">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-600 bg-clip-text text-transparent">
+            Capacity & Analytics Overview
+          </h2>
+        </div>
+        <Card className="bg-black/40 border-red-500/30 backdrop-blur-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
+            <p className="text-red-400 font-medium">Engauge service offline</p>
+            <p className="text-gray-500 text-sm mt-1">Unable to reach the engauge backend. Check that the service is running.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

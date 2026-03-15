@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Store, FileText, DollarSign } from 'lucide-react';
+import { Store, FileText, DollarSign, AlertTriangle } from 'lucide-react';
 import { useResourcePools, useLeases, usePricingInfo, useCreateLease } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,23 @@ export default function EngaugeMarketplace() {
   const pricing = usePricingInfo();
   const createLease = useCreateLease();
 
+  const allErrored = pools.error && leases.error && pricing.error;
+
+  if (allErrored) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-white">Resource Marketplace</h2>
+        <Card className="bg-black/40 border-red-500/30 backdrop-blur-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
+            <p className="text-red-400 font-medium">Engauge service offline</p>
+            <p className="text-gray-500 text-sm mt-1">Unable to reach the marketplace backend.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Resource Marketplace</h2>
@@ -38,7 +55,9 @@ export default function EngaugeMarketplace() {
           <CardDescription className="text-gray-400">Market tier multipliers for resource pricing</CardDescription>
         </CardHeader>
         <CardContent>
-          {pricing.isLoading ? <Skeleton className="h-24 w-full" /> : (
+          {pricing.isLoading ? <Skeleton className="h-24 w-full" /> : pricing.error ? (
+            <p className="text-gray-500 text-center py-4">Pricing data unavailable</p>
+          ) : (
             <div className="grid gap-3 md:grid-cols-4">
               {pricing.data?.map(p => (
                 <div key={p.tier} className="p-3 rounded-lg bg-black/20 border border-gray-800 text-center">
@@ -61,7 +80,9 @@ export default function EngaugeMarketplace() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {pools.isLoading ? <Skeleton className="h-40 w-full" /> : (
+          {pools.isLoading ? <Skeleton className="h-40 w-full" /> : pools.error ? (
+            <p className="text-gray-500 text-center py-4">Resource pool data unavailable</p>
+          ) : (
             <div className="space-y-2">
               {pools.data?.map(pool => (
                 <div key={pool.pool_id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">
@@ -98,7 +119,9 @@ export default function EngaugeMarketplace() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {leases.isLoading ? <Skeleton className="h-32 w-full" /> : (
+          {leases.isLoading ? <Skeleton className="h-32 w-full" /> : leases.error ? (
+            <p className="text-gray-500 text-center py-4">Lease data unavailable</p>
+          ) : (
             <div className="space-y-2">
               {leases.data?.map(lease => (
                 <div key={lease.lease_id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">

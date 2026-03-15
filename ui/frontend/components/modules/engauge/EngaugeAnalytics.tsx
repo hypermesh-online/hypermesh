@@ -7,18 +7,63 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Eye, ShieldOff, BarChart3 } from 'lucide-react';
-import { useTrafficAnalysis, useMetricsStream } from '@/lib/api';
+import { Eye, ShieldOff, BarChart3, Activity, HardDrive, Cpu, Network, AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useTrafficAnalysis, useMetricsStream, useCapacityMetrics, useTrendingMetrics } from '@/lib/api';
 import type { MetricsFrameType } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function EngaugeAnalytics() {
   const traffic = useTrafficAnalysis();
   const metrics = useMetricsStream();
+  const capacity = useCapacityMetrics();
+  const trending = useTrendingMetrics();
+
+  const allErrored = traffic.error && capacity.error && trending.error && metrics.error;
+
+  if (allErrored) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-white">Traffic Analytics</h2>
+        <Card className="bg-black/40 border-red-500/30 backdrop-blur-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
+            <p className="text-red-400 font-medium">Engauge service offline</p>
+            <p className="text-gray-500 text-sm mt-1">Unable to reach the analytics backend. Check that engauge is running.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Traffic Analytics</h2>
+
+      {/* Capacity Metrics */}
+      <div className="grid gap-4 md:grid-cols-4">
+        {[
+          { label: 'Bytes Served', value: capacity.data?.bytes_served, format: (v: number) => `${(v / (1024*1024*1024)).toFixed(2)} GB`, icon: Network },
+          { label: 'Compute', value: capacity.data?.compute_delivered, format: (v: number) => `${v.toFixed(1)} CPU-s`, icon: Cpu },
+          { label: 'Storage', value: capacity.data?.storage_committed, format: (v: number) => `${(v / (1024*1024*1024)).toFixed(2)} GB`, icon: HardDrive },
+          { label: 'Utilization', value: capacity.data?.utilization_percent, format: (v: number) => `${v.toFixed(1)}%`, icon: Activity },
+        ].map(({ label, value, format, icon: Icon }) => (
+          <Card key={label} className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">{label}</CardTitle>
+              <Icon className="h-4 w-4 text-orange-400" />
+            </CardHeader>
+            <CardContent>
+              {capacity.isLoading ? <Skeleton className="h-8 w-24" /> : capacity.error ? (
+                <span className="text-sm text-gray-500">--</span>
+              ) : (
+                <div className="text-2xl font-bold text-orange-400">
+                  {value != null ? format(value) : '--'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Organic vs Speculative */}
       <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
@@ -29,7 +74,9 @@ export default function EngaugeAnalytics() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {traffic.isLoading ? <Skeleton className="h-32 w-full" /> : traffic.data ? (
+          {traffic.isLoading ? <Skeleton className="h-32 w-full" /> : traffic.error ? (
+            <p className="text-gray-500 text-center py-8">Traffic analysis unavailable</p>
+          ) : traffic.data ? (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
@@ -97,6 +144,43 @@ export default function EngaugeAnalytics() {
         </CardContent>
       </Card>
 
+      {/* Trending Metrics */}
+      <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-orange-400" />
+            Trending Metrics
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {trending.isLoading ? <Skeleton className="h-32 w-full" /> : trending.error ? (
+            <p className="text-gray-500 text-center py-4">Trending data unavailable</p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {trending.data?.map((m) => (
+                <div key={m.metric_name} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">
+                  <div>
+                    <div className="text-sm text-white">{m.metric_name}</div>
+                    <div className="text-xs text-gray-400">{m.current_value.toFixed(2)}</div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {m.trend_direction === 'up' ? <TrendingUp className="h-4 w-4 text-green-400" /> :
+                     m.trend_direction === 'down' ? <TrendingDown className="h-4 w-4 text-red-400" /> :
+                     <Minus className="h-4 w-4 text-gray-400" />}
+                    <span className={cn("text-sm font-bold",
+                      m.trend_direction === 'up' ? 'text-green-400' :
+                      m.trend_direction === 'down' ? 'text-red-400' : 'text-gray-400'
+                    )}>
+                      {m.change_percent > 0 ? '+' : ''}{m.change_percent.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )) || <p className="text-gray-500 text-center py-4">No trending data</p>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Metrics Stream */}
       <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
         <CardHeader>
@@ -106,7 +190,9 @@ export default function EngaugeAnalytics() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {metrics.isLoading ? <Skeleton className="h-32 w-full" /> : (
+          {metrics.isLoading ? <Skeleton className="h-32 w-full" /> : metrics.error ? (
+            <p className="text-gray-500 text-center py-4">Metrics stream unavailable</p>
+          ) : (
             <div className="space-y-2">
               {metrics.data?.slice(0, 10).map((frame, i) => (
                 <div key={i} className="flex items-center justify-between p-2 rounded bg-black/20 border border-gray-800">

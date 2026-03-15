@@ -7,12 +7,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Route, Signal } from 'lucide-react';
-import { useRoutingAdvisory } from '@/lib/api';
+import { Route, Signal, Gauge, AlertTriangle } from 'lucide-react';
+import { useRoutingAdvisory, useThrottleStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function EngaugeRouting() {
   const advisory = useRoutingAdvisory();
+  const throttle = useThrottleStatus();
+
+  const allErrored = advisory.error && throttle.error;
+
+  if (allErrored) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-white">Routing Intelligence</h2>
+        <Card className="bg-black/40 border-red-500/30 backdrop-blur-lg">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
+            <p className="text-red-400 font-medium">Engauge service offline</p>
+            <p className="text-gray-500 text-sm mt-1">Unable to reach the routing intelligence backend.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -29,7 +47,9 @@ export default function EngaugeRouting() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {advisory.isLoading ? <Skeleton className="h-48 w-full" /> : advisory.data ? (
+          {advisory.isLoading ? <Skeleton className="h-48 w-full" /> : advisory.error ? (
+            <p className="text-gray-500 text-center py-8">Routing advisory unavailable</p>
+          ) : advisory.data ? (
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="p-4 rounded-lg bg-black/20 border border-gray-800">
@@ -63,6 +83,43 @@ export default function EngaugeRouting() {
               </div>
             </div>
           ) : <p className="text-gray-500 text-center py-8">No routing advisory data</p>}
+        </CardContent>
+      </Card>
+
+      {/* Governor Throttle */}
+      <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Gauge className="h-5 w-5 text-orange-400" />
+            Governor Throttle Status
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            PID controller signal and throttle state
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {throttle.isLoading ? <Skeleton className="h-16 w-full" /> : throttle.error ? (
+            <p className="text-gray-500 text-center py-4">Throttle data unavailable</p>
+          ) : throttle.data ? (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Governor Signal</span>
+                <span className={cn(
+                  "font-bold",
+                  throttle.data.governor_signal > 0.8 ? 'text-red-400' :
+                  throttle.data.governor_signal > 0.5 ? 'text-yellow-400' : 'text-green-400'
+                )}>
+                  {(throttle.data.governor_signal * 100).toFixed(1)}%
+                </span>
+              </div>
+              <Progress value={throttle.data.governor_signal * 100} className="h-3" />
+              {throttle.data.is_throttled ? (
+                <Badge className="bg-red-500/20 text-red-400">Throttled: {throttle.data.reason}</Badge>
+              ) : (
+                <Badge className="bg-green-500/20 text-green-400">Normal operation</Badge>
+              )}
+            </div>
+          ) : <p className="text-gray-500 text-center py-4">No throttle data</p>}
         </CardContent>
       </Card>
     </div>
