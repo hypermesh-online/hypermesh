@@ -143,6 +143,9 @@ pub(crate) async fn dispatch_command(
         Some(Commands::Destroy { .. }) => {
             unreachable!("destroy handled before bootstrap");
         }
+        Some(Commands::Ping { .. }) => {
+            unreachable!("ping handled before bootstrap");
+        }
         None => {
             info!("Node initialized successfully. Use 'connect' to run or 'status' to check.");
         }

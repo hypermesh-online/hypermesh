@@ -9,4 +9,5 @@ pub mod connect;
 pub mod dns;
 pub mod domain;
 mod services;
+pub mod ping;
 pub mod store;

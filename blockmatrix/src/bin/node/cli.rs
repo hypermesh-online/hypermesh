@@ -99,6 +99,15 @@ pub enum Commands {
     /// Disconnect from the mesh (stop daemon)
     Disconnect,
 
+    /// Ping a remote HyperMesh node (STOQ handshake + RTT)
+    Ping {
+        /// Target address (IPv4, IPv6, or hostname with optional :port, default port 9292)
+        target: String,
+        /// Number of pings
+        #[clap(short = 'c', long, default_value = "1")]
+        count: u32,
+    },
+
     /// [DEPRECATED] Use 'connect' instead
     #[clap(hide = true)]
     Start,

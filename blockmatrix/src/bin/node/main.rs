@@ -54,6 +54,14 @@ async fn main() -> Result<()> {
         return handle_destroy(*chaotic, &cli);
     }
 
+    // --- Handle Ping subcommand early (no bootstrap needed) ---
+    if matches!(cli.command, Some(Commands::Ping { .. })) {
+        merge_config_into_cli(&mut cli);
+        if let Some(Commands::Ping { ref target, count }) = cli.command {
+            return commands::ping::run_ping(target, count, &cli).await;
+        }
+    }
+
     // --- Merge config file with CLI flags (CLI wins) ---
     merge_config_into_cli(&mut cli);
 
