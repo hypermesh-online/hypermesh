@@ -512,25 +512,94 @@ impl DhtNetwork {
         Ok(closest)
     }
 
-    /// Store a value on a specific node
+    /// Store a value on a specific node via STOQ transport.
+    ///
+    /// Sends an AnnouncePackage request to the remote node so it can
+    /// index the value in its own ValueStore.
     async fn store_value_on_node(
         &self,
-        _node: &NodeInfo,
-        _key: ValueKey,
-        _value: StoredValue,
+        node: &NodeInfo,
+        key: ValueKey,
+        value: StoredValue,
     ) -> Result<()> {
-        // Pending: store request implementation
-        Ok(())
+        let announcement = match &value.data {
+            ValueData::PackageAnnouncement(ann) => ann.clone(),
+            _ => {
+                // For non-announcement values, wrap with key as content address
+                PackageAnnouncement {
+                    package_id: crate::assets::AssetPackageId::nil(),
+                    metadata: super::stoq_transport::PackageMetadata {
+                        name: String::new(),
+                        version: String::new(),
+                        size: 0,
+                        chunk_count: 0,
+                        chunk_size: 0,
+                        hash: hex::encode(key.0),
+                        created_at: chrono::Utc::now(),
+                    },
+                    content_addresses: vec![hex::encode(key.0)],
+                }
+            }
+        };
+
+        match self
+            .transport
+            .send_request(&node.id, RequestType::AnnouncePackage(announcement))
+            .await
+        {
+            Ok(ResponseData::Ack) => Ok(()),
+            Ok(ResponseData::Error(e)) => {
+                tracing::warn!("Remote node {} rejected store: {}", node.id, e);
+                Err(anyhow::anyhow!("Remote store rejected: {e}"))
+            }
+            Ok(_) => Ok(()),
+            Err(e) => {
+                tracing::debug!("Failed to store value on node {}: {}", node.id, e);
+                Err(e)
+            }
+        }
     }
 
-    /// Query a value from a specific node
+    /// Query a value from a specific node via STOQ transport.
+    ///
+    /// Sends a SearchPackages request with the hex-encoded key.
     async fn query_value_from_node(
         &self,
-        _node: &NodeInfo,
-        _key: &ValueKey,
+        node: &NodeInfo,
+        key: &ValueKey,
     ) -> Result<Vec<StoredValue>> {
-        // Pending: value query implementation
-        Ok(Vec::new())
+        let key_hex = hex::encode(key.0);
+
+        match self
+            .transport
+            .send_request(&node.id, RequestType::SearchPackages(key_hex))
+            .await
+        {
+            Ok(ResponseData::SearchResults(package_ids)) => {
+                let mut values = Vec::new();
+                for pkg_id in package_ids {
+                    values.push(StoredValue {
+                        data: ValueData::PackagePeers {
+                            package_id: pkg_id,
+                            peers: vec![node.id.clone()],
+                        },
+                        publisher: node.id.clone(),
+                        published_at: SystemTime::now(),
+                        expires_at: SystemTime::now() + self.config.value_ttl,
+                    });
+                }
+                Ok(values)
+            }
+            Ok(ResponseData::Error(e)) => {
+                tracing::debug!("Remote query error from {}: {}", node.id, e);
+                Ok(Vec::new())
+            }
+            Ok(_) => Ok(Vec::new()),
+            Err(e) => {
+                tracing::debug!("Failed to query from {}: {}", node.id, e);
+                Ok(Vec::new())
+            }
+        }
     }
 }
 

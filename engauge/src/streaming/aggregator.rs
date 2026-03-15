@@ -59,6 +59,10 @@ impl RegionalAggregate {
 /// Combines per-node metrics into regional aggregates for routing intelligence.
 pub struct RegionalAggregator {
     subscriber: MetricsSubscriber,
+    /// Total frames ingested since creation.
+    ingest_counter: u64,
+    /// Value of `ingest_counter` at the last successful `aggregate_periodic` call.
+    last_aggregate_ingest: u64,
 }
 
 impl RegionalAggregator {
@@ -66,12 +70,27 @@ impl RegionalAggregator {
     pub fn new(max_window_size: usize) -> Self {
         Self {
             subscriber: MetricsSubscriber::new(max_window_size),
+            ingest_counter: 0,
+            last_aggregate_ingest: 0,
         }
     }
 
     /// Ingest a frame (delegates to the underlying subscriber).
     pub fn ingest(&mut self, frame: MetricsFrame) {
         self.subscriber.receive(frame);
+        self.ingest_counter += 1;
+    }
+
+    /// Return an aggregate only if new data has been ingested since the last call.
+    ///
+    /// Returns `None` when no new frames have arrived, avoiding redundant
+    /// aggregation work in periodic loops.
+    pub fn aggregate_periodic(&mut self) -> Option<RegionalAggregate> {
+        if self.ingest_counter == self.last_aggregate_ingest {
+            return None;
+        }
+        self.last_aggregate_ingest = self.ingest_counter;
+        Some(self.aggregate())
     }
 
     /// Aggregate latest frames across **all** tracked sources.

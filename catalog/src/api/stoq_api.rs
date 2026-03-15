@@ -21,6 +21,8 @@ use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 use stoq::transport::{StoqTransport, TransportConfig};
 use stoq::StoqApiServer;
 
+use crate::registry::SortCriteria;
+
 // ---------------------------------------------------------------------------
 // Shared application state
 // ---------------------------------------------------------------------------
@@ -37,6 +39,8 @@ pub struct CatalogAppState {
     pub publisher_count: Arc<std::sync::atomic::AtomicU64>,
     /// Total downloads
     pub total_downloads: Arc<std::sync::atomic::AtomicU64>,
+    /// Catalog registry for real lookups (optional for backward compat)
+    pub registry: Option<crate::registry::CatalogRegistry>,
 }
 
 impl CatalogAppState {
@@ -48,6 +52,19 @@ impl CatalogAppState {
             package_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             publisher_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             total_downloads: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            registry: None,
+        }
+    }
+
+    /// Create new state with a CatalogRegistry for real lookups
+    pub fn with_registry(registry: crate::registry::CatalogRegistry) -> Self {
+        Self {
+            service_name: "catalog".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            package_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            publisher_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            total_downloads: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            registry: Some(registry),
         }
     }
 
@@ -67,6 +84,14 @@ impl CatalogAppState {
     pub fn increment_downloads(&self) {
         self.total_downloads
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sync atomic counters from registry statistics.
+    pub async fn sync_from_registry(&self) {
+        if let Some(ref registry) = self.registry {
+            let stats = registry.get_statistics().await;
+            self.set_package_count(stats.total_types as u64);
+        }
     }
 }
 
@@ -248,6 +273,112 @@ pub struct HealthResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers — map registry types to API response types
+// ---------------------------------------------------------------------------
+
+use crate::registry::asset_type::AssetTypeDefinition;
+
+/// Map a sort string from the API request to the registry's SortCriteria.
+fn parse_sort_criteria(s: &str) -> SortCriteria {
+    match s {
+        "name" => SortCriteria::Name,
+        "downloads" => SortCriteria::Downloads,
+        "rating" => SortCriteria::Rating,
+        "updated" => SortCriteria::Updated,
+        "published" => SortCriteria::Published,
+        _ => SortCriteria::Relevance,
+    }
+}
+
+/// Build a [`PackageSummary`] from a search result, enriched with type metadata
+/// when available.
+fn to_package_summary(
+    type_name: &str,
+    score: f64,
+    type_def: Option<&AssetTypeDefinition>,
+) -> PackageSummary {
+    match type_def {
+        Some(def) => PackageSummary {
+            name: type_name.to_string(),
+            version: def.metadata.version.clone(),
+            description: def.metadata.description.clone(),
+            author: def.metadata.author.clone(),
+            tags: def.metadata.tags.clone(),
+            download_count: 0,
+            score,
+            featured: false,
+        },
+        None => PackageSummary {
+            name: type_name.to_string(),
+            version: String::new(),
+            description: None,
+            author: None,
+            tags: Vec::new(),
+            download_count: 0,
+            score,
+            featured: false,
+        },
+    }
+}
+
+/// Build a full [`GetPackageResponse`] from a found type, enriched with
+/// metadata from the [`AssetTypeDefinition`] when available.
+fn build_package_response(
+    req: &GetPackageRequest,
+    state: &CatalogAppState,
+    type_def: Option<&AssetTypeDefinition>,
+) -> GetPackageResponse {
+    match type_def {
+        Some(def) => GetPackageResponse {
+            name: req.name.clone(),
+            version: req
+                .version
+                .clone()
+                .unwrap_or_else(|| def.metadata.version.clone()),
+            description: def.metadata.description.clone(),
+            author: def.metadata.author.clone(),
+            license: def.metadata.license.clone(),
+            homepage: None,
+            repository: None,
+            tags: def.metadata.tags.clone(),
+            download_count: state
+                .total_downloads
+                .load(std::sync::atomic::Ordering::Relaxed),
+            featured: false,
+            created_at: Some(def.metadata.created_at.to_rfc3339()),
+            updated_at: Some(def.metadata.updated_at.to_rfc3339()),
+            dependencies: def.dependencies.clone(),
+            publisher_authenticated: None,
+            schema: Some(def.schema.clone()),
+            validation_rules_count: def.validation_rules.len() as u32,
+        },
+        None => GetPackageResponse {
+            name: req.name.clone(),
+            version: req
+                .version
+                .clone()
+                .unwrap_or_else(|| "latest".to_string()),
+            description: None,
+            author: None,
+            license: None,
+            homepage: None,
+            repository: None,
+            tags: Vec::new(),
+            download_count: state
+                .total_downloads
+                .load(std::sync::atomic::Ordering::Relaxed),
+            featured: false,
+            created_at: None,
+            updated_at: None,
+            dependencies: Vec::new(),
+            publisher_authenticated: None,
+            schema: None,
+            validation_rules_count: 0,
+        },
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
@@ -264,13 +395,49 @@ impl ApiHandler for BrowseHandler {
         let req: BrowseRequest = serde_json::from_slice(&request.payload)
             .map_err(|e| ApiError::InvalidRequest(format!("Invalid browse request: {e}")))?;
 
-        // Return empty results — real data comes from wiring to CatalogRegistry
-        let response = BrowseResponse {
-            packages: Vec::new(),
-            total_count: self
+        // Query CatalogRegistry if available
+        let sort = parse_sort_criteria(&req.sort_by);
+        let (packages, total_count) = if let Some(ref registry) = self.state.registry {
+            let search_query = crate::registry::SearchQuery {
+                query: String::new(),
+                sort_by: sort,
+                limit: req.page_size as usize,
+                offset: (req.page * req.page_size) as usize,
+                ..Default::default()
+            };
+            match registry.search_types(&search_query).await {
+                Ok(search_results) => {
+                    let mut summaries = Vec::with_capacity(search_results.results.len());
+                    for r in &search_results.results {
+                        let meta = registry.get_type_definition(&r.type_name).await;
+                        summaries.push(to_package_summary(
+                            &r.type_name,
+                            r.score,
+                            meta.as_ref(),
+                        ));
+                    }
+                    let count = search_results.total_count as u64;
+                    (summaries, count)
+                }
+                Err(_) => {
+                    let count = self
+                        .state
+                        .package_count
+                        .load(std::sync::atomic::Ordering::Relaxed);
+                    (Vec::new(), count)
+                }
+            }
+        } else {
+            let count = self
                 .state
                 .package_count
-                .load(std::sync::atomic::Ordering::Relaxed),
+                .load(std::sync::atomic::Ordering::Relaxed);
+            (Vec::new(), count)
+        };
+
+        let response = BrowseResponse {
+            packages,
+            total_count,
             page: req.page,
             page_size: req.page_size,
         };
@@ -305,10 +472,39 @@ impl ApiHandler for SearchHandler {
         let req: SearchRequest = serde_json::from_slice(&request.payload)
             .map_err(|e| ApiError::InvalidRequest(format!("Invalid search request: {e}")))?;
 
-        // Return empty results — real data comes from wiring to CatalogRegistry
+        // Query CatalogRegistry if available
+        let (results, total_count) = if let Some(ref registry) = self.state.registry {
+            let search_query = crate::registry::SearchQuery {
+                query: req.query.clone(),
+                tags: req.tags.clone(),
+                author: req.author.clone(),
+                limit: req.limit as usize,
+                offset: req.offset as usize,
+                ..Default::default()
+            };
+            match registry.search_types(&search_query).await {
+                Ok(search_results) => {
+                    let mut summaries = Vec::with_capacity(search_results.results.len());
+                    for r in &search_results.results {
+                        let meta = registry.get_type_definition(&r.type_name).await;
+                        summaries.push(to_package_summary(
+                            &r.type_name,
+                            r.score,
+                            meta.as_ref(),
+                        ));
+                    }
+                    let count = search_results.total_count as u64;
+                    (summaries, count)
+                }
+                Err(_) => (Vec::new(), 0),
+            }
+        } else {
+            (Vec::new(), 0)
+        };
+
         let response = SearchResponse {
-            results: Vec::new(),
-            total_count: 0,
+            results,
+            total_count,
             query: req.query,
         };
 
@@ -342,7 +538,26 @@ impl ApiHandler for GetPackageHandler {
         let req: GetPackageRequest = serde_json::from_slice(&request.payload)
             .map_err(|e| ApiError::InvalidRequest(format!("Invalid package request: {e}")))?;
 
-        // Package not found — real lookup via CatalogRegistry
+        // Look up via CatalogRegistry if available
+        if let Some(ref registry) = self.state.registry {
+            if let Ok(_asset_id) = registry.find_type(&req.name).await {
+                self.state.increment_downloads();
+                let type_def = registry.get_type_definition(&req.name).await;
+                let response = build_package_response(&req, &self.state, type_def.as_ref());
+
+                let payload = serde_json::to_vec(&response)
+                    .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+                return Ok(ApiResponse {
+                    request_id: request.id,
+                    success: true,
+                    payload: payload.into(),
+                    error: None,
+                    metadata: HashMap::new(),
+                });
+            }
+        }
+
         Err(ApiError::NotFound(format!(
             "Package '{}' not found",
             req.name
@@ -367,7 +582,41 @@ impl ApiHandler for GetPublisherHandler {
         let req: GetPublisherRequest = serde_json::from_slice(&request.payload)
             .map_err(|e| ApiError::InvalidRequest(format!("Invalid publisher request: {e}")))?;
 
-        // Publisher not found — real lookup via PublisherAuthenticator
+        // Search registry for types published by this author
+        if let Some(ref registry) = self.state.registry {
+            let search_query = crate::registry::SearchQuery {
+                query: String::new(),
+                author: Some(req.publisher_id.clone()),
+                limit: 10_000,
+                ..Default::default()
+            };
+            if let Ok(search_results) = registry.search_types(&search_query).await {
+                if !search_results.results.is_empty() {
+                    let response = GetPublisherResponse {
+                        publisher_id: req.publisher_id,
+                        authenticated: true,
+                        total_packages: search_results.total_count as u64,
+                        total_downloads: self
+                            .state
+                            .total_downloads
+                            .load(std::sync::atomic::Ordering::Relaxed),
+                        member_since: None,
+                    };
+
+                    let payload = serde_json::to_vec(&response)
+                        .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+                    return Ok(ApiResponse {
+                        request_id: request.id,
+                        success: true,
+                        payload: payload.into(),
+                        error: None,
+                        metadata: HashMap::new(),
+                    });
+                }
+            }
+        }
+
         Err(ApiError::NotFound(format!(
             "Publisher '{}' not found",
             req.publisher_id
@@ -389,15 +638,28 @@ impl ApiHandler for RegistryStatsHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
         debug!("Handling catalog/stats: {}", request.id);
 
+        // Pull live counts from the registry when available
+        let (total_packages, total_publishers) =
+            if let Some(ref registry) = self.state.registry {
+                let stats = registry.get_statistics().await;
+                (stats.total_types as u64, self
+                    .state
+                    .publisher_count
+                    .load(std::sync::atomic::Ordering::Relaxed))
+            } else {
+                (
+                    self.state
+                        .package_count
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                    self.state
+                        .publisher_count
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                )
+            };
+
         let response = RegistryStatsResponse {
-            total_packages: self
-                .state
-                .package_count
-                .load(std::sync::atomic::Ordering::Relaxed),
-            total_publishers: self
-                .state
-                .publisher_count
-                .load(std::sync::atomic::Ordering::Relaxed),
+            total_packages,
+            total_publishers,
             total_downloads: self
                 .state
                 .total_downloads
@@ -716,6 +978,134 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_search_handler_with_registry() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use crate::registry::asset_type::AssetTypeDefinition;
+        use blockmatrix::proof_of_state::proof_of_state_integration::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
+        use blockmatrix::assets::StateProof;
+        use hypermesh_lib::PrivacyMode;
+
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        // Register a type
+        let schema = serde_json::json!({ "type": "object" });
+        let stake = StakeProof::new("h".into(), "i".into(), 1000);
+        let space = SpaceProof::new("n".into(), "/t".into(), 1024);
+        let work = WorkProof::new(
+            "o".into(), "w".into(), 12345, 100,
+            WorkloadType::Compute, WorkState::Completed,
+        );
+        let time = TimeProof::new(std::time::Duration::from_secs(10));
+        let proof = StateProof::new(stake, time, space, work);
+        let type_def = AssetTypeDefinition::new("GpuCompute".to_string(), schema, proof);
+        registry.register_type(type_def).await
+            .expect("test: register type");
+
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+        let handler = SearchHandler { state };
+
+        let req_body = SearchRequest {
+            query: "Gpu".to_string(),
+            tags: vec![],
+            author: None,
+            limit: 20,
+            offset: 0,
+        };
+
+        let api_req = ApiRequest {
+            id: "test-search-reg-1".to_string(),
+            service: "catalog".to_string(),
+            method: "search".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+
+        let resp = handler
+            .handle(api_req)
+            .await
+            .expect("test: search with registry should succeed");
+        assert!(resp.success);
+
+        let body: SearchResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        assert_eq!(body.total_count, 1);
+        assert_eq!(body.results[0].name, "GpuCompute");
+    }
+
+    #[tokio::test]
+    async fn test_get_package_with_registry() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use crate::registry::asset_type::AssetTypeDefinition;
+        use blockmatrix::proof_of_state::proof_of_state_integration::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
+        use blockmatrix::assets::StateProof;
+        use hypermesh_lib::PrivacyMode;
+
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        let schema = serde_json::json!({ "type": "object" });
+        let stake = StakeProof::new("h".into(), "i".into(), 1000);
+        let space = SpaceProof::new("n".into(), "/t".into(), 1024);
+        let work = WorkProof::new(
+            "o".into(), "w".into(), 12345, 100,
+            WorkloadType::Compute, WorkState::Completed,
+        );
+        let time = TimeProof::new(std::time::Duration::from_secs(10));
+        let proof = StateProof::new(stake, time, space, work);
+        let type_def = AssetTypeDefinition::new("MyPackage".to_string(), schema, proof);
+        registry.register_type(type_def).await
+            .expect("test: register type");
+
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+        let handler = GetPackageHandler { state };
+
+        // Found case
+        let req_body = GetPackageRequest {
+            name: "MyPackage".to_string(),
+            version: None,
+        };
+        let api_req = ApiRequest {
+            id: "test-pkg-found".to_string(),
+            service: "catalog".to_string(),
+            method: "package".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        let resp = handler.handle(api_req).await
+            .expect("test: package should be found");
+        assert!(resp.success);
+        let body: GetPackageResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        assert_eq!(body.name, "MyPackage");
+
+        // Not found case
+        let req_body2 = GetPackageRequest {
+            name: "NonExistent".to_string(),
+            version: None,
+        };
+        let api_req2 = ApiRequest {
+            id: "test-pkg-miss".to_string(),
+            service: "catalog".to_string(),
+            method: "package".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body2).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        let result = handler.handle(api_req2).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
     async fn test_stats_handler() {
         let state = Arc::new(CatalogAppState::new());
         state.set_package_count(100);
@@ -883,5 +1273,20 @@ mod tests {
             start_time: std::time::Instant::now(),
         };
         assert_eq!(health.path(), "catalog/health");
+    }
+
+    #[test]
+    fn test_with_registry_constructor() {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use hypermesh_lib::PrivacyMode;
+
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+        let state = CatalogAppState::with_registry(registry);
+        assert!(state.registry.is_some());
+        assert_eq!(state.service_name, "catalog");
     }
 }

@@ -14,6 +14,9 @@
 //!   into a strategy name string suitable for STOQ's `PathSelector::apply_recommendation`.
 
 #[cfg(feature = "intelligence")]
+use std::sync::Arc;
+
+#[cfg(feature = "intelligence")]
 use engauge::{
     PathPolicyRecommendation, RoutingAdvisor, RoutingIntelligence, SwarmAnalytics,
     TensorWeightModifier,
@@ -90,6 +93,74 @@ pub fn apply_path_recommendation(
         SchedulingStrategy::RoundRobin => "RoundRobin",
     };
     (rec.enable_redundant, strategy_name)
+}
+
+// ---------------------------------------------------------------------------
+// EngaugeBridge — periodic feeder + serialized demand summary
+// ---------------------------------------------------------------------------
+
+/// High-level bridge that owns references to the swarm demand tracker and
+/// analytics, providing periodic feed and serialised demand summaries for
+/// cross-node transmission.
+#[cfg(feature = "intelligence")]
+pub struct EngaugeBridge {
+    tracker: Arc<SwarmDemandTracker>,
+    analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
+    position: MatrixPosition,
+}
+
+#[cfg(feature = "intelligence")]
+impl EngaugeBridge {
+    /// Create a new bridge.
+    pub fn new(
+        tracker: Arc<SwarmDemandTracker>,
+        analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
+        position: MatrixPosition,
+    ) -> Self {
+        Self {
+            tracker,
+            analytics,
+            position,
+        }
+    }
+
+    /// Run a periodic loop that feeds swarm demand data into analytics.
+    ///
+    /// Calls [`feed_swarm_analytics`] every `interval_secs` seconds.
+    /// Designed to be spawned via `tokio::spawn`.
+    pub async fn run_periodic_feed(&self, interval_secs: u64) {
+        let interval = std::time::Duration::from_secs(interval_secs);
+        loop {
+            {
+                let mut analytics = self
+                    .analytics
+                    .lock()
+                    .expect("engauge bridge: analytics lock poisoned");
+                feed_swarm_analytics(&self.tracker, &mut analytics, self.position).await;
+            }
+            tokio::time::sleep(interval).await;
+        }
+    }
+
+    /// Produce serialized demand summaries suitable for cross-node transmission.
+    ///
+    /// Returns one JSON-encoded byte vector per tracked shard containing the
+    /// shard hash, request count, and unique consumer count.
+    pub async fn metrics_to_transmit(&self) -> Vec<Vec<u8>> {
+        let snapshot = self.tracker.snapshot().await;
+        snapshot
+            .iter()
+            .filter_map(|(hash, entry)| {
+                let summary = serde_json::json!({
+                    "shard_hash": hex::encode(hash.0),
+                    "request_count": entry.request_count,
+                    "unique_consumers": entry.requester_ids.len(),
+                    "last_request_us": entry.last_request_us,
+                });
+                serde_json::to_vec(&summary).ok()
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------

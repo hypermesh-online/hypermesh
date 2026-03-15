@@ -4,6 +4,8 @@
 //! MetricsPublisher — aggregates local metrics and produces privacy-filtered
 //! [`MetricsFrame`]s suitable for transmission to peer nodes.
 
+use std::sync::Arc;
+
 use chrono::Utc;
 use hypermesh_lib::{NodeId, PrivacyMode};
 
@@ -31,6 +33,8 @@ pub struct MetricsPublisher {
     sequence: u64,
     /// Publish interval hint (seconds); informational, not enforced here.
     publish_interval_secs: u64,
+    /// Optional transport callback invoked for each published frame.
+    transport_fn: Option<Arc<dyn Fn(MetricsFrame) + Send + Sync>>,
 }
 
 impl MetricsPublisher {
@@ -50,6 +54,7 @@ impl MetricsPublisher {
             filter: DifferentialPrivacyFilter::new(epsilon),
             sequence: 0,
             publish_interval_secs: interval_secs,
+            transport_fn: None,
         }
     }
 
@@ -58,13 +63,26 @@ impl MetricsPublisher {
         self.publish_interval_secs
     }
 
+    /// Register a transport callback invoked for each successfully published frame.
+    ///
+    /// The callback receives a clone of the privacy-filtered frame before it
+    /// is returned to the caller, enabling cross-node transmission without
+    /// changing the publish API.
+    pub fn set_transport(&mut self, f: Arc<dyn Fn(MetricsFrame) + Send + Sync>) {
+        self.transport_fn = Some(f);
+    }
+
     /// Publish a capacity frame from [`CapacityMetrics`].
     ///
     /// Returns `None` if the privacy filter suppresses the frame.
     pub fn publish_capacity(&mut self, metrics: &CapacityMetrics) -> Option<MetricsFrame> {
         let snapshot = CapacitySnapshot::from(metrics);
         let frame = self.build_frame(MetricsPayload::Capacity(snapshot));
-        self.filter.filter_frame(frame)
+        let filtered = self.filter.filter_frame(frame);
+        if let Some(ref f) = filtered {
+            self.invoke_transport(f);
+        }
+        filtered
     }
 
     /// Publish a congestion snapshot.
@@ -72,7 +90,11 @@ impl MetricsPublisher {
     /// Returns `None` if the privacy filter suppresses the frame.
     pub fn publish_congestion(&mut self, snapshot: CongestionSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Congestion(snapshot));
-        self.filter.filter_frame(frame)
+        let filtered = self.filter.filter_frame(frame);
+        if let Some(ref f) = filtered {
+            self.invoke_transport(f);
+        }
+        filtered
     }
 
     /// Publish a routing snapshot. Only passed through for Public privacy.
@@ -80,7 +102,11 @@ impl MetricsPublisher {
     /// Returns `None` if the privacy filter suppresses the frame.
     pub fn publish_routing(&mut self, snapshot: RoutingSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Routing(snapshot));
-        self.filter.filter_frame(frame)
+        let filtered = self.filter.filter_frame(frame);
+        if let Some(ref f) = filtered {
+            self.invoke_transport(f);
+        }
+        filtered
     }
 
     /// Publish an economic snapshot. Only passed through for Public privacy.
@@ -88,7 +114,11 @@ impl MetricsPublisher {
     /// Returns `None` if the privacy filter suppresses the frame.
     pub fn publish_economic(&mut self, snapshot: EconomicSnapshot) -> Option<MetricsFrame> {
         let frame = self.build_frame(MetricsPayload::Economic(snapshot));
-        self.filter.filter_frame(frame)
+        let filtered = self.filter.filter_frame(frame);
+        if let Some(ref f) = filtered {
+            self.invoke_transport(f);
+        }
+        filtered
     }
 
     /// Return and increment the per-source sequence counter.
@@ -99,6 +129,13 @@ impl MetricsPublisher {
     }
 
     // -- internal ----------------------------------------------------------
+
+    /// Invoke the transport callback with a clone of the frame, if set.
+    fn invoke_transport(&self, frame: &MetricsFrame) {
+        if let Some(ref cb) = self.transport_fn {
+            cb(frame.clone());
+        }
+    }
 
     /// Build a raw (un-filtered) frame with the next sequence number.
     fn build_frame(&mut self, payload: MetricsPayload) -> MetricsFrame {

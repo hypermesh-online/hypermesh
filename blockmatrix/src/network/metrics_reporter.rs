@@ -158,6 +158,32 @@ impl MetricsReporter {
         serde_json::to_vec(&frame).unwrap_or_default()
     }
 
+    /// Build capacity, congestion, and routing frames and serialize each
+    /// via the engauge-compatible JSON wire format.
+    ///
+    /// Returns a `Vec` of byte vectors (one per frame type). The caller
+    /// can transmit each individually over STOQ streams.
+    pub fn build_and_serialize_frames(
+        &mut self,
+        chain_height: u64,
+        peer_count: usize,
+        shard_count: usize,
+        cpu_usage: f64,
+        memory_usage: f64,
+        ebpf: &HyperMeshMetrics,
+    ) -> Vec<Vec<u8>> {
+        vec![
+            self.build_capacity_frame(chain_height, peer_count, shard_count, cpu_usage, memory_usage),
+            self.build_congestion_frame(ebpf),
+            self.build_routing_frame(ebpf),
+        ]
+    }
+
+    /// Number of distinct frame types produced by [`build_and_serialize_frames`].
+    pub fn frame_count(&self) -> usize {
+        3
+    }
+
     /// Push a pre-built frame to all connected peers over STOQ streams.
     ///
     /// Best-effort: if no peers are connected or sends fail, the error

@@ -105,6 +105,17 @@ impl MetricsSubscriber {
         Some(sum / count as f64)
     }
 
+    /// Deserialize a frame from raw bytes and ingest it.
+    ///
+    /// Uses [`MetricsFrame::decode`] internally, then delegates to [`receive`].
+    /// Returns an error string if decoding fails.
+    pub fn receive_from_bytes(&mut self, bytes: &[u8]) -> Result<(), String> {
+        let frame =
+            MetricsFrame::decode(bytes).map_err(|e| format!("MetricsFrame decode failed: {e}"))?;
+        self.receive(frame);
+        Ok(())
+    }
+
     /// All tracked source node identifiers.
     pub fn sources(&self) -> Vec<&NodeId> {
         self.windows.keys().collect()

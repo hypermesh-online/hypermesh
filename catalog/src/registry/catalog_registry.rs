@@ -317,6 +317,12 @@ impl CatalogRegistry {
         Ok(())
     }
 
+    /// Get a type definition by name
+    pub async fn get_type_definition(&self, name: &str) -> Option<AssetTypeDefinition> {
+        let defs = self.type_definitions.read().await;
+        defs.get(name).cloned()
+    }
+
     /// Get registry ID
     pub fn registry_id(&self) -> &AssetRegistration {
         &self.registry_id
