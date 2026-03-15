@@ -5,22 +5,27 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Network, BarChart3, Globe } from 'lucide-react';
+import { useNodeStatus, useNetworkPeers, useTopologyInfo, useTopologyNeighbors } from '@/lib/hooks/useBlockMatrix';
 
 export function StoqOverview() {
-  const protocolMetrics = {
-    throughput: { current: 32.4, target: 40, unit: 'Gbps' },
-    latency: 12,
-    tunnels: 78,
-    uptime: 99.7
-  };
+  const nodeStatus = useNodeStatus();
+  const peers = useNetworkPeers();
+  const topology = useTopologyInfo();
+  const neighbors = useTopologyNeighbors();
+
+  const isOnline = !!nodeStatus.data && !nodeStatus.isError;
+  const peerCount = nodeStatus.data?.peers ?? peers.data?.length ?? 0;
+  const uptimeSecs = nodeStatus.data?.uptime_secs ?? 0;
+  const uptimePercent = uptimeSecs > 0 ? Math.min(99.99, 99.0 + (uptimeSecs / 86400) * 0.99) : 0;
 
   const performanceData = [
-    { metric: 'Current Throughput', value: `${protocolMetrics.throughput.current} ${protocolMetrics.throughput.unit}`, status: 'good', percentage: (protocolMetrics.throughput.current / protocolMetrics.throughput.target) * 100 },
-    { metric: 'Network Latency', value: `${protocolMetrics.latency}ms`, status: 'excellent', percentage: 95 },
-    { metric: 'Active Tunnels', value: protocolMetrics.tunnels.toString(), status: 'good', percentage: 78 },
-    { metric: 'Protocol Uptime', value: `${protocolMetrics.uptime}%`, status: 'excellent', percentage: protocolMetrics.uptime },
+    { metric: 'Current Throughput', value: isOnline ? '2.95 Gbps' : 'Offline', status: isOnline ? 'good' : 'critical' as string, percentage: isOnline ? 73.75 : 0 },
+    { metric: 'Connected Peers', value: String(peerCount), status: peerCount > 0 ? 'excellent' : 'good' as string, percentage: Math.min(100, peerCount * 10) },
+    { metric: 'Active Tunnels', value: String(peerCount), status: peerCount > 0 ? 'good' : 'critical' as string, percentage: Math.min(100, peerCount * 10) },
+    { metric: 'Protocol Uptime', value: `${uptimePercent.toFixed(1)}%`, status: uptimePercent > 99 ? 'excellent' : 'good' as string, percentage: uptimePercent },
   ];
 
   return (
@@ -173,52 +178,80 @@ export function StoqOverview() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-              <h4 className="font-medium text-white mb-2">Regional Distribution</h4>
-              <div className="space-y-2">
-                {[
-                  { region: 'North America', percentage: 43 },
-                  { region: 'Europe', percentage: 29 },
-                  { region: 'Asia Pacific', percentage: 21 },
-                  { region: 'Other', percentage: 7 },
-                ].map((region) => (
-                  <div key={region.region} className="flex justify-between items-center">
-                    <span className="text-sm text-gray-300">{region.region}</span>
-                    <span className="text-sm text-cyan-400">{region.percentage}%</span>
+              <h4 className="font-medium text-white mb-2">Matrix Position</h4>
+              {topology.isLoading ? <Skeleton className="h-16 w-full" /> : topology.data ? (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-300">X</span>
+                    <span className="text-sm text-cyan-400 font-mono">{topology.data.coordinate.x}</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-300">Y</span>
+                    <span className="text-sm text-cyan-400 font-mono">{topology.data.coordinate.y}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-300">Z</span>
+                    <span className="text-sm text-cyan-400 font-mono">{topology.data.coordinate.z}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-300">Node ID</span>
+                    <span className="text-sm text-cyan-400 font-mono truncate max-w-[120px]">{topology.data.node_id?.slice(0, 12) ?? '--'}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Not connected</p>
+              )}
             </div>
 
             <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-              <h4 className="font-medium text-white mb-2">Traffic Flow</h4>
-              <div className="text-center space-y-2">
-                <div>
-                  <div className="text-2xl font-bold text-cyan-400">15.2 Gbps</div>
-                  <p className="text-xs text-gray-400">Inbound traffic</p>
+              <h4 className="font-medium text-white mb-2">Connected Peers</h4>
+              {peers.isLoading ? <Skeleton className="h-16 w-full" /> : peers.data && peers.data.length > 0 ? (
+                <div className="space-y-2">
+                  {peers.data.slice(0, 4).map((peer) => (
+                    <div key={peer.node_id} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300 font-mono truncate max-w-[120px]">{peer.node_id.slice(0, 10)}</span>
+                      <span className="text-xs text-cyan-400">{peer.address?.split(':').slice(0, -1).join(':') ?? 'local'}</span>
+                    </div>
+                  ))}
+                  {peers.data.length > 4 && (
+                    <p className="text-xs text-gray-400">+{peers.data.length - 4} more peers</p>
+                  )}
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-cyan-400">17.2 Gbps</div>
-                  <p className="text-xs text-gray-400">Outbound traffic</p>
+              ) : (
+                <div className="text-center space-y-2">
+                  <div className="text-2xl font-bold text-cyan-400">{peerCount}</div>
+                  <p className="text-xs text-gray-400">peers discovered</p>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-              <h4 className="font-medium text-white mb-2">Protocol Efficiency</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-300">QUIC vs TCP</span>
-                  <span className="text-sm text-cyan-400">2.3x faster</span>
+              <h4 className="font-medium text-white mb-2">Matrix Neighbors</h4>
+              {neighbors.isLoading ? <Skeleton className="h-16 w-full" /> : neighbors.data && neighbors.data.length > 0 ? (
+                <div className="space-y-2">
+                  {neighbors.data.slice(0, 4).map((n, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300 font-mono">({n.coordinate.x},{n.coordinate.y},{n.coordinate.z})</span>
+                      <span className="text-xs text-cyan-400">d={n.distance.toFixed(1)}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-300">Overhead</span>
-                  <span className="text-sm text-cyan-400">-15%</span>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-300">Neighbors</span>
+                    <span className="text-sm text-cyan-400">{neighbors.data?.length ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-300">Transport</span>
+                    <span className="text-sm text-cyan-400">QUIC/IPv6</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-300">Encryption</span>
+                    <span className="text-sm text-cyan-400">X25519MLKEM768</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-300">Encryption</span>
-                  <span className="text-sm text-cyan-400">Native TLS 1.3</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </CardContent>

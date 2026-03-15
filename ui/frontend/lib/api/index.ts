@@ -179,6 +179,38 @@ export type {
   StakeRequest
 } from './services/CaesarAPI';
 
+// Engauge Analytics & Marketplace
+export { engaugeAPI } from './services/EngaugeAPI';
+export type {
+  CapacityMetrics,
+  TrafficAnalysis,
+  MetricsFrame,
+  MetricsFrameType,
+  ResourcePool,
+  LeaseContract,
+  LeaseState,
+  PricingInfo,
+  RoutingAdvisory,
+  TrendingMetric,
+  ThrottleStatus,
+  CreateLeaseRequest
+} from './services/EngaugeAPI';
+
+// Engauge React Hooks
+export {
+  useCapacityMetrics,
+  useTrafficAnalysis,
+  useMetricsStream,
+  useResourcePools,
+  useLeases,
+  usePricingInfo,
+  useRoutingAdvisory,
+  useTrendingMetrics,
+  useThrottleStatus,
+  useCreateLease,
+  useEngaugeOverview
+} from './hooks/useEngauge';
+
 // Caesar React Hooks
 export {
   useWallet,

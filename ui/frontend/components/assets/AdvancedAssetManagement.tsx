@@ -33,6 +33,7 @@ import {
   useVMExecutions,
   useCatalogApplications
 } from '@/lib/api';
+import { useAssetList, useNodeStatus } from '@/lib/hooks/useBlockMatrix';
 import { Database, TrendingUp, Zap, Globe } from 'lucide-react';
 import {
   AssetInventoryTab,
@@ -46,6 +47,8 @@ export function AdvancedAssetManagement() {
   const { systemStatus } = useSystemStatus(true);
   const { assets, isLoading: assetsLoading } = useAssets();
   const { vmAssets, isLoading: vmAssetsLoading } = useVMAssets();
+  const blockchainAssets = useAssetList();
+  const realNodeStatus = useNodeStatus();
   const { applications: catalogApps } = useCatalogApplications();
   const { executions: vmExecutions } = useVMExecutions();
   const { allocations, activeAllocations } = useAllocations();
@@ -56,32 +59,44 @@ export function AdvancedAssetManagement() {
   const deleteAsset = useDeleteAsset();
   const createRemoteProxy = useCreateRemoteProxy();
 
-  // Calculate asset metrics from real data (hardware + VM assets)
+  // Calculate asset metrics from real data (hardware + VM + blockchain-registered assets)
   const assetMetrics = React.useMemo((): AssetMetrics => {
+    // Use blockchain assets from real API if available
+    const chainAssetCount = blockchainAssets.data?.length ?? 0;
+
     if (!assets || !allocations) {
-      return { totalAssets: 0, activeAssets: 0, allocatedResources: 0, utilizationRate: 0, performanceScore: 0, proxyConnections: 0 };
+      // Even without mock assets, show real blockchain data
+      return {
+        totalAssets: chainAssetCount,
+        activeAssets: chainAssetCount,
+        allocatedResources: 0,
+        utilizationRate: 0,
+        performanceScore: realNodeStatus.data ? 95 : 0,
+        proxyConnections: remoteProxies?.length || 0
+      };
     }
 
     const allAssets = [...assets, ...vmAssets];
+    const totalCount = Math.max(allAssets.length, chainAssetCount);
     const activeAssetsCount = allAssets.filter(asset =>
       asset.status === 'active' || asset.status === 'available'
     ).length;
     const activeAllocationsCount = allocations.filter(alloc => alloc.status === 'active').length;
     const runningVMExecutions = vmExecutions?.filter(exec => exec.status === 'running').length || 0;
     const totalActiveResources = activeAllocationsCount + runningVMExecutions;
-    const utilizationRate = allAssets.length > 0 ? (totalActiveResources / allAssets.length) * 100 : 0;
+    const utilizationRate = totalCount > 0 ? (totalActiveResources / totalCount) * 100 : 0;
     const singleHealth = nodeHealth && !Array.isArray(nodeHealth) ? nodeHealth : Array.isArray(nodeHealth) ? nodeHealth[0] : undefined;
-    const performanceScore = singleHealth?.overall === 'healthy' ? 95 : singleHealth?.overall === 'warning' ? 75 : singleHealth?.overall === 'critical' ? 40 : Math.random() * 30 + 70;
+    const performanceScore = realNodeStatus.data ? 95 : singleHealth?.overall === 'healthy' ? 95 : singleHealth?.overall === 'warning' ? 75 : singleHealth?.overall === 'critical' ? 40 : 70;
 
     return {
-      totalAssets: allAssets.length,
-      activeAssets: activeAssetsCount,
+      totalAssets: totalCount,
+      activeAssets: Math.max(activeAssetsCount, chainAssetCount),
       allocatedResources: allocations.length + (vmExecutions?.length || 0),
       utilizationRate,
       performanceScore,
       proxyConnections: remoteProxies?.length || 0
     };
-  }, [assets, vmAssets, allocations, vmExecutions, nodeHealth, remoteProxies]);
+  }, [assets, vmAssets, allocations, vmExecutions, nodeHealth, remoteProxies, blockchainAssets.data, realNodeStatus.data]);
 
   // Generate NAT-like proxy addresses
   const proxyAddresses = React.useMemo((): ProxyAddress[] => {

@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSystemStatus } from '@/lib/api';
+import { useNodeStatus, useNetworkPeers, useDomainList } from '@/lib/hooks/useBlockMatrix';
 import { MetricCard } from './shared/MetricCard';
 import { StatusIndicator } from './shared/StatusIndicator';
 import { getStatusColor, getTypeColor } from './utils/statusHelpers';
-import { 
+import {
   Network,
   Users,
   Shield,
@@ -30,40 +31,65 @@ interface NetworkConnection {
   description: string;
 }
 
-const networkConnections: NetworkConnection[] = [
-  {
-    id: 'public-main',
-    name: 'HyperMesh Public Network',
-    type: 'Public',
-    status: 'Connected',
-    validationStatus: 'verified',
-    peers: 15420,
-    verification: 'Proof of State',
-    description: 'Global public network with open access and bilateral verification'
-  },
-  {
-    id: 'p2p-local',
-    name: 'Local P2P Cluster',
-    type: 'P2P',
-    status: 'Connected',
-    validationStatus: 'verified',
-    peers: 12,
-    verification: 'Bilateral Verification',
-    description: 'Direct peer-to-peer connections with trusted nodes'
-  },
-  {
-    id: 'fed-enterprise',
-    name: 'Enterprise Federation',
-    type: 'Federated',
-    status: 'Connecting',
-    validationStatus: 'verified',
-    peers: 234,
-    verification: 'Federated State Proof',
-    description: 'Private federated network for enterprise resource sharing'
-  }
-];
+function useNetworkConnections(): NetworkConnection[] {
+  const nodeStatus = useNodeStatus();
+  const peers = useNetworkPeers();
+  const domains = useDomainList();
+
+  return React.useMemo(() => {
+    const connections: NetworkConnection[] = [];
+    const isOnline = !!nodeStatus.data && !nodeStatus.isError;
+    const peerCount = nodeStatus.data?.peers ?? peers.data?.length ?? 0;
+    const privacyMode = nodeStatus.data?.privacy_mode ?? 'Unknown';
+
+    // Primary network connection derived from node status
+    connections.push({
+      id: 'device-local',
+      name: 'Device Blockchain (Local)',
+      type: 'P2P' as const,
+      status: isOnline ? 'Connected' as const : 'Disconnected' as const,
+      validationStatus: isOnline ? 'verified' as const : 'rejected' as const,
+      peers: peerCount,
+      verification: 'Bilateral PoS',
+      description: `Local device chain - ${privacyMode} mode - ${peerCount} peers connected`
+    });
+
+    // Build connections from real peers
+    if (peers.data && peers.data.length > 0) {
+      connections.push({
+        id: 'stoq-mesh',
+        name: 'STOQ Mesh Network',
+        type: 'Public' as const,
+        status: 'Connected' as const,
+        validationStatus: 'verified' as const,
+        peers: peers.data.length,
+        verification: 'Proof of State',
+        description: `Connected peers via QUIC/IPv6 transport`
+      });
+    }
+
+    // Build connections from domains
+    if (domains.data && domains.data.length > 0) {
+      domains.data.forEach((domain) => {
+        connections.push({
+          id: `domain-${domain.name}`,
+          name: `Domain: ${domain.name}`,
+          type: 'Federated' as const,
+          status: 'Connected' as const,
+          validationStatus: 'verified' as const,
+          peers: 1,
+          verification: 'Domain PoS',
+          description: `Federated domain owned by ${domain.owner?.slice(0, 12) ?? 'unknown'}`
+        });
+      });
+    }
+
+    return connections;
+  }, [nodeStatus.data, nodeStatus.isError, peers.data, domains.data]);
+}
 
 function NetworkOverviewCards() {
+  const networkConnections = useNetworkConnections();
   const connectedCount = networkConnections.filter(n => n.status === 'Connected').length;
   const totalPeers = networkConnections.reduce((sum, n) => sum + n.peers, 0);
 
@@ -97,12 +123,14 @@ function NetworkOverviewCards() {
   );
 }
 
-function NetworkConnectionsList({ 
-  selectedNetwork, 
-  onSelectNetwork 
-}: { 
+function NetworkConnectionsList({
+  selectedNetwork,
+  onSelectNetwork,
+  networkConnections
+}: {
   selectedNetwork: string | null;
   onSelectNetwork: (id: string) => void;
+  networkConnections: NetworkConnection[];
 }) {
   return (
     <Card className="bg-black/40 border-green-500/30 backdrop-blur-lg">
@@ -117,7 +145,7 @@ function NetworkConnectionsList({
               Manage your connections to Public, P2P, and Federated networks
             </CardDescription>
           </div>
-          <Button 
+          <Button
             className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-black"
             onClick={() => alert('Network discovery interface would open here')}
           >
@@ -128,7 +156,12 @@ function NetworkConnectionsList({
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {networkConnections.map((network) => (
+          {networkConnections.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <Network className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No network connections. Start the BlockMatrix daemon to connect.</p>
+            </div>
+          ) : networkConnections.map((network) => (
             <NetworkConnectionCard
               key={network.id}
               network={network}
@@ -229,7 +262,7 @@ function NetworkConnectionCard({
   );
 }
 
-function NetworkDetailsPanel({ networkId }: { networkId: string }) {
+function NetworkDetailsPanel({ networkId, networkConnections }: { networkId: string; networkConnections: NetworkConnection[] }) {
   const network = networkConnections.find(n => n.id === networkId);
   if (!network) return null;
 
@@ -304,20 +337,21 @@ function NetworkSecurityStatus() {
 }
 
 export function NetworkManagement() {
-  const { systemStatus } = useSystemStatus(true);
+  const networkConnections = useNetworkConnections();
   const [selectedNetwork, setSelectedNetwork] = React.useState<string | null>(null);
-  
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Network Management</h2>
-      
+
       <NetworkOverviewCards />
-      <NetworkConnectionsList 
+      <NetworkConnectionsList
         selectedNetwork={selectedNetwork}
         onSelectNetwork={setSelectedNetwork}
+        networkConnections={networkConnections}
       />
-      
-      {selectedNetwork && <NetworkDetailsPanel networkId={selectedNetwork} />}
+
+      {selectedNetwork && <NetworkDetailsPanel networkId={selectedNetwork} networkConnections={networkConnections} />}
     </div>
   );
 }
