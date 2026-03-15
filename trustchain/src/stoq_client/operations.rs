@@ -65,6 +65,9 @@ impl TrustChainStoqClient {
             ewma_alpha: 0.125,
             mtu_probe_interval_secs: 30,
             loss_window_size: 10,
+            wan_enabled: false,
+            public_ipv6: None,
+            connection_migration_timeout_ms: 3000,
         };
 
         let transport = Arc::new(StoqTransport::new(transport_config).await.map_err(|e| {

@@ -566,6 +566,21 @@ impl MatrixStoqIntegration {
         Ok(())
     }
 
+    /// Get the local IPv6 address that the STOQ transport is bound to.
+    ///
+    /// Returns the configured bind address. When the transport is bound
+    /// to UNSPECIFIED (`::`) and a `public_ipv6` is configured, the
+    /// public address is returned instead.
+    pub fn get_local_addr(&self) -> Option<std::net::Ipv6Addr> {
+        let bind = self.transport.bind_address();
+        if bind.is_unspecified() {
+            // Prefer the explicitly configured public address
+            self.transport.public_ipv6().or(Some(bind))
+        } else {
+            Some(bind)
+        }
+    }
+
     /// Get current timestamp in seconds
     fn current_timestamp() -> u64 {
         std::time::SystemTime::now()

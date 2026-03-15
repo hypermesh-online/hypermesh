@@ -31,7 +31,7 @@ pub mod validation;
 
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
@@ -190,6 +190,15 @@ struct HandshakeData {
     peer_proof: Vec<u8>,
 }
 
+/// Check whether an IPv6 address is valid for WAN (non-loopback) connections.
+///
+/// Returns `false` for loopback (`::1`). All other addresses are considered
+/// valid WAN targets. Link-local addresses (`fe80::`) are valid but may not
+/// route across subnets.
+fn is_valid_wan_address(addr: &Ipv6Addr) -> bool {
+    !addr.is_loopback()
+}
+
 /// Network manager for multi-node communication
 pub struct NetworkManager {
     /// Local node coordinate
@@ -283,6 +292,23 @@ impl NetworkManager {
             SocketAddr::V6(v6) => *v6.ip(),
             SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
         };
+
+        // WAN address validation: reject loopback when WAN mode is active
+        let wan_enabled = self.transport.wan_enabled();
+        if wan_enabled && !is_valid_wan_address(&ipv6) {
+            return Err(anyhow!(
+                "Cannot connect to loopback address {} in WAN mode",
+                ipv6
+            ));
+        }
+
+        // Warn about link-local addresses over WAN — they may not route
+        if wan_enabled && (ipv6.segments()[0] & 0xffc0) == 0xfe80 {
+            warn!(
+                "Connecting to link-local address {} over WAN — may not route across subnets",
+                ipv6
+            );
+        }
         let endpoint = stoq::Endpoint::new(ipv6, addr.port());
 
         // Connect via STOQ

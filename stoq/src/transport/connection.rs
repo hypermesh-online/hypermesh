@@ -161,6 +161,8 @@ pub struct Connection {
     idle_timeout: u64, // Connection-specific idle timeout
     /// Bilateral PoS validation state — gates data exchange
     pos_state: std::sync::atomic::AtomicU8,
+    /// Last known local socket address for connection migration detection
+    last_local_addr: parking_lot::Mutex<Option<std::net::SocketAddr>>,
 }
 
 impl PosValidationState {
@@ -207,6 +209,35 @@ impl Connection {
             ),
             idle_timeout,
             pos_state: std::sync::atomic::AtomicU8::new(PosValidationState::Pending.to_u8()),
+            last_local_addr: parking_lot::Mutex::new(None),
+        }
+    }
+
+    /// Update the last known local address for migration detection.
+    pub fn update_local_addr(&self, addr: std::net::SocketAddr) {
+        *self.last_local_addr.lock() = Some(addr);
+    }
+
+    /// Check if the connection's local address has changed, indicating
+    /// a potential network migration (e.g., WiFi -> cellular).
+    pub fn migration_eligible(&self) -> bool {
+        let stored = *self.last_local_addr.lock();
+        match stored {
+            Some(last) => {
+                let current = self.inner.local_ip();
+                // If QUIC reports a local IP and it differs from last known, migration occurred
+                match current {
+                    Some(ip) => {
+                        let last_ip = match last {
+                            std::net::SocketAddr::V4(v4) => std::net::IpAddr::V4(*v4.ip()),
+                            std::net::SocketAddr::V6(v6) => std::net::IpAddr::V6(*v6.ip()),
+                        };
+                        ip != last_ip
+                    }
+                    None => false,
+                }
+            }
+            None => false, // No previous address recorded
         }
     }
 
@@ -329,6 +360,7 @@ impl Clone for Connection {
             pos_state: std::sync::atomic::AtomicU8::new(
                 self.pos_state.load(Ordering::Relaxed),
             ),
+            last_local_addr: parking_lot::Mutex::new(*self.last_local_addr.lock()),
         }
     }
 }

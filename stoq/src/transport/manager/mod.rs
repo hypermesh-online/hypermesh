@@ -63,6 +63,23 @@ pub struct StoqTransport {
     pub(crate) pos_fast_validator: Arc<PosFastValidator>,
 }
 
+impl StoqTransport {
+    /// Whether WAN mode is enabled in this transport's configuration.
+    pub fn wan_enabled(&self) -> bool {
+        self.config.wan_enabled
+    }
+
+    /// The configured bind address.
+    pub fn bind_address(&self) -> std::net::Ipv6Addr {
+        self.config.bind_address
+    }
+
+    /// The externally visible IPv6 address, if configured.
+    pub fn public_ipv6(&self) -> Option<std::net::Ipv6Addr> {
+        self.config.public_ipv6
+    }
+}
+
 impl Clone for StoqTransport {
     fn clone(&self) -> Self {
         Self {

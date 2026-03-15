@@ -29,30 +29,48 @@ use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, Sto
 
 use super::{StoqTransport, CRYPTO_INIT};
 
+/// Detect the primary outbound network interface name.
+///
+/// Probes common interface names and returns the first that exists.
+/// Falls back to "lo" if none are found.
+fn detect_outbound_interface() -> String {
+    // Check common interface names in priority order
+    for iface in &["eth0", "ens3", "ens4", "enp0s3", "wlan0", "wlp2s0"] {
+        let path = format!("/sys/class/net/{}", iface);
+        if std::path::Path::new(&path).exists() {
+            debug!("Detected outbound interface: {}", iface);
+            return iface.to_string();
+        }
+    }
+    debug!("No outbound interface detected, falling back to lo");
+    "lo".to_string()
+}
+
 /// Resolve the network interface name for eBPF XDP attachment.
 ///
 /// Priority:
 /// 1. Explicit `config.ebpf_interface` override (if set)
-/// 2. "lo" when bind_address is localhost or unspecified
-/// 3. "eth0" as a fallback for non-localhost addresses
-///
-/// In production with real routing tables, this would query the system
-/// for the outbound interface matching the bind address.
+/// 2. "lo" when bind_address is localhost (and NOT wan_enabled)
+/// 3. Auto-detected outbound interface when UNSPECIFIED or wan_enabled
+/// 4. "eth0" as a final fallback for non-localhost addresses
 fn resolve_ebpf_interface(config: &TransportConfig) -> String {
     // Explicit override takes priority
     if let Some(ref iface) = config.ebpf_interface {
         return iface.clone();
     }
 
-    // Localhost and unspecified addresses use loopback
-    if config.bind_address == Ipv6Addr::LOCALHOST || config.bind_address == Ipv6Addr::UNSPECIFIED {
+    // Localhost without WAN uses loopback
+    if config.bind_address == Ipv6Addr::LOCALHOST && !config.wan_enabled {
         return "lo".to_string();
     }
 
-    // For non-localhost addresses, default to eth0.
-    // A future enhancement could probe the routing table to find the
-    // correct interface for the bind address.
-    "eth0".to_string()
+    // UNSPECIFIED or wan_enabled: detect the real outbound interface
+    if config.bind_address == Ipv6Addr::UNSPECIFIED || config.wan_enabled {
+        return detect_outbound_interface();
+    }
+
+    // For non-localhost, non-unspecified addresses, try detection
+    detect_outbound_interface()
 }
 
 impl StoqTransport {
@@ -75,15 +93,20 @@ impl StoqTransport {
             config.enable_zero_copy, config.connection_pool_size, config.max_concurrent_streams
         );
 
-        // Initialize certificate manager with IPv6-only production configuration
-        let cert_config = if config.bind_address == Ipv6Addr::LOCALHOST {
-            crate::transport::certificates::CertificateConfig::default() // Localhost testing
-        } else {
+        // Initialize certificate manager with IPv6-only production configuration.
+        // Use production certs when wan_enabled or binding to a non-localhost address.
+        let cert_config = if config.wan_enabled
+            || (config.bind_address != Ipv6Addr::LOCALHOST
+                && config.bind_address != Ipv6Addr::UNSPECIFIED)
+        {
+            let advertised_addr = config.public_ipv6.unwrap_or(config.bind_address);
             crate::transport::certificates::CertificateConfig::production(
                 format!("{}-{}", "stoq-node", config.port),
                 "stoq.hypermesh.online".to_string(),
-                vec![config.bind_address],
+                vec![advertised_addr],
             )
+        } else {
+            crate::transport::certificates::CertificateConfig::default() // Localhost/testing
         };
 
         let cert_manager = Arc::new(CertificateManager::new(cert_config).await?);

@@ -163,6 +163,14 @@ pub struct TransportConfig {
     pub mtu_probe_interval_secs: u64,
     /// Number of loss observations in the sliding window (default 10)
     pub loss_window_size: usize,
+    /// Enable WAN-specific behavior (conservative MTU, interface detection).
+    /// When false (default), localhost assumptions are preserved for testing.
+    pub wan_enabled: bool,
+    /// Externally visible IPv6 address for NAT traversal.
+    /// When `Some`, advertised to peers instead of the bind address.
+    pub public_ipv6: Option<std::net::Ipv6Addr>,
+    /// Timeout in milliseconds for connection migration detection (default 3000)
+    pub connection_migration_timeout_ms: u64,
 }
 
 impl Default for TransportConfig {
@@ -174,7 +182,7 @@ impl Default for TransportConfig {
         let port = crate::DEFAULT_PORT;
 
         Self {
-            bind_address: std::net::Ipv6Addr::LOCALHOST, // Default to localhost for testing
+            bind_address: std::net::Ipv6Addr::UNSPECIFIED, // Accept connections from any interface
             port,
             max_connections: Some(100), // Limited for DoS protection
             connection_timeout: Duration::from_secs(5), // Reduced for performance
@@ -202,6 +210,9 @@ impl Default for TransportConfig {
             ewma_alpha: 0.125,               // Conservative smoothing
             mtu_probe_interval_secs: 30,     // Probe every 30 seconds
             loss_window_size: 10,            // Average over 10 observations
+            wan_enabled: false,              // Localhost behavior by default
+            public_ipv6: None,               // No NAT — use bind address
+            connection_migration_timeout_ms: 3000, // 3s migration detection window
         }
     }
 }

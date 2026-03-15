@@ -110,6 +110,9 @@ pub struct AdaptiveConnection {
     bandwidth_estimator: Arc<RwLock<EwmaBandwidthEstimator>>,
     mtu_discovery: Arc<RwLock<MtuDiscovery>>,
     loss_adjuster: Arc<RwLock<LossBasedAdjuster>>,
+    /// Per-path network condition tracking for multi-path QUIC (Sprint B2 scaffold).
+    /// Key is the QUIC path ID.
+    path_conditions: Arc<RwLock<std::collections::HashMap<u32, NetworkConditions>>>,
 }
 
 impl AdaptiveConnection {
@@ -151,7 +154,21 @@ impl AdaptiveConnection {
                 loss_downgrade_pct,
                 loss_upgrade_pct,
             ))),
+            path_conditions: Arc::new(RwLock::new(std::collections::HashMap::new())),
         }
+    }
+
+    /// Record network conditions for a specific QUIC path.
+    ///
+    /// Used by multi-path QUIC (Sprint B2) to track per-path quality
+    /// and make scheduling decisions.
+    pub fn record_path_condition(&self, path_id: u32, conditions: NetworkConditions) {
+        self.path_conditions.write().insert(path_id, conditions);
+    }
+
+    /// Get a snapshot of all per-path network conditions.
+    pub fn path_conditions(&self) -> std::collections::HashMap<u32, NetworkConditions> {
+        self.path_conditions.read().clone()
     }
 
     pub fn update_conditions(&self) {

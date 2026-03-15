@@ -21,6 +21,9 @@ pub struct MtuDiscovery {
     probe_state: MtuProbeState,
     last_probe: Instant,
     probe_interval: Duration,
+    /// When true, clamps MTU bounds to internet-safe values (1200–1500).
+    /// When false, allows probing up to jumbo frame sizes (9000).
+    wan_mode: bool,
 }
 
 impl MtuDiscovery {
@@ -36,6 +39,32 @@ impl MtuDiscovery {
             probe_state: MtuProbeState::Searching,
             last_probe: Instant::now() - probe_interval,
             probe_interval,
+            wan_mode: false,
+        }
+    }
+
+    /// Enable or disable WAN mode.
+    ///
+    /// In WAN mode, the MTU search bounds are clamped to internet-safe
+    /// values: minimum 1200 bytes, maximum 1500 bytes (standard Ethernet).
+    /// In LAN mode (default), probing can reach jumbo frame sizes (9000).
+    pub fn set_wan_mode(&mut self, wan: bool) {
+        self.wan_mode = wan;
+        if wan {
+            self.min_mtu = self.min_mtu.max(1200);
+            self.max_mtu = self.max_mtu.min(1500);
+            // Ensure max >= min after clamping
+            if self.max_mtu < self.min_mtu {
+                self.max_mtu = self.min_mtu;
+            }
+            self.search_low = self.search_low.max(self.min_mtu);
+            self.search_high = self.search_high.min(self.max_mtu);
+            if self.current_mtu > self.max_mtu {
+                self.current_mtu = self.max_mtu;
+            }
+            info!("MTU discovery: WAN mode enabled (bounds {}-{} bytes)", self.min_mtu, self.max_mtu);
+        } else {
+            info!("MTU discovery: LAN mode (jumbo frames allowed)");
         }
     }
 
