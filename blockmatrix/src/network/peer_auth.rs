@@ -46,16 +46,46 @@ pub fn new_authenticated_peers() -> AuthenticatedPeers {
 }
 
 /// Register a peer as authenticated after successful bilateral handshake.
+///
+/// Validates that the peer's proof bytes and public key are non-empty
+/// before registration. Empty proofs indicate a handshake that did not
+/// complete bilateral PoS verification (R11).
 pub async fn register_authenticated_peer(
     peers: &AuthenticatedPeers,
     peer: AuthenticatedPeer,
-) {
+) -> bool {
     let short_id = &peer.node_id[..8.min(peer.node_id.len())];
+
+    // Reject peers with empty proof bytes — bilateral PoS must have completed
+    if peer.proof_bytes.is_empty() {
+        warn!(
+            "Rejecting peer {} — empty proof_bytes (bilateral PoS handshake incomplete)",
+            short_id,
+        );
+        return false;
+    }
+
+    // Reject peers with empty public key — identity not established
+    if peer.pubkey.is_empty() {
+        warn!(
+            "Rejecting peer {} — empty pubkey (FALCON-1024 identity not established)",
+            short_id,
+        );
+        return false;
+    }
+
+    // Reject peers with empty node_id
+    if peer.node_id.is_empty() {
+        warn!("Rejecting peer — empty node_id");
+        return false;
+    }
+
     debug!(
-        "Registering authenticated peer {} (network={})",
-        short_id, peer.network_id,
+        "Registering authenticated peer {} (network={}, proof={} bytes, pubkey={} bytes)",
+        short_id, peer.network_id, peer.proof_bytes.len(), peer.pubkey.len(),
     );
     peers.write().await.insert(peer.node_id.clone(), peer);
+    true
 }
 
 /// Remove a peer from the authenticated set.
@@ -154,14 +184,49 @@ mod tests {
         let peer = make_peer("abc123def456", "net-1");
 
         assert!(!is_authenticated(&peers, "abc123def456").await);
-        register_authenticated_peer(&peers, peer).await;
+        assert!(register_authenticated_peer(&peers, peer).await);
         assert!(is_authenticated(&peers, "abc123def456").await);
+    }
+
+    #[tokio::test]
+    async fn test_register_rejects_empty_proof() {
+        let peers = new_authenticated_peers();
+        let mut peer = make_peer("emptyproof1", "net-1");
+        peer.proof_bytes = Vec::new();
+
+        assert!(!register_authenticated_peer(&peers, peer).await);
+        assert!(!is_authenticated(&peers, "emptyproof1").await);
+    }
+
+    #[tokio::test]
+    async fn test_register_rejects_empty_pubkey() {
+        let peers = new_authenticated_peers();
+        let mut peer = make_peer("emptypubk1", "net-1");
+        peer.pubkey = Vec::new();
+
+        assert!(!register_authenticated_peer(&peers, peer).await);
+        assert!(!is_authenticated(&peers, "emptypubk1").await);
+    }
+
+    #[tokio::test]
+    async fn test_register_rejects_empty_node_id() {
+        let peers = new_authenticated_peers();
+        let peer = AuthenticatedPeer {
+            node_id: String::new(),
+            pubkey: vec![1, 2, 3],
+            coordinate: (0, 0, 0),
+            network_id: "net-1".to_string(),
+            authenticated_at: std::time::Instant::now(),
+            proof_bytes: vec![4, 5, 6],
+        };
+
+        assert!(!register_authenticated_peer(&peers, peer).await);
     }
 
     #[tokio::test]
     async fn test_remove_peer() {
         let peers = new_authenticated_peers();
-        register_authenticated_peer(&peers, make_peer("node1234", "net-1")).await;
+        assert!(register_authenticated_peer(&peers, make_peer("node1234", "net-1")).await);
         assert!(is_authenticated(&peers, "node1234").await);
 
         remove_authenticated_peer(&peers, "node1234").await;
@@ -171,7 +236,7 @@ mod tests {
     #[tokio::test]
     async fn test_network_scoping() {
         let peers = new_authenticated_peers();
-        register_authenticated_peer(&peers, make_peer("nodeAAAA", "net-alpha")).await;
+        assert!(register_authenticated_peer(&peers, make_peer("nodeAAAA", "net-alpha")).await);
 
         assert!(is_same_network(&peers, "nodeAAAA", "net-alpha").await);
         assert!(!is_same_network(&peers, "nodeAAAA", "net-beta").await);
@@ -180,7 +245,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_peer_access_authenticated_same_network() {
         let peers = new_authenticated_peers();
-        register_authenticated_peer(&peers, make_peer("nodeX123", "main")).await;
+        assert!(register_authenticated_peer(&peers, make_peer("nodeX123", "main")).await);
 
         assert!(verify_peer_access(&peers, "nodeX123", "main").await);
     }
@@ -194,7 +259,7 @@ mod tests {
     #[tokio::test]
     async fn test_verify_peer_access_wrong_network() {
         let peers = new_authenticated_peers();
-        register_authenticated_peer(&peers, make_peer("nodeY456", "other-net")).await;
+        assert!(register_authenticated_peer(&peers, make_peer("nodeY456", "other-net")).await);
 
         assert!(!verify_peer_access(&peers, "nodeY456", "main").await);
     }

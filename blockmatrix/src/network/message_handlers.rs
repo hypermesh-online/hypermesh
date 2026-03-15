@@ -558,12 +558,14 @@ async fn handle_handshake_connection(
 
     nodes.write().await.insert(peer_node_id.clone(), node);
 
-    // Register the accepted peer as authenticated (PoS handshake passed)
+    // Register the accepted peer as authenticated (PoS handshake passed).
+    // register_authenticated_peer enforces that proof_bytes and pubkey are
+    // non-empty (R11 bilateral verification).
     let auth_network_id = peer_ctx
         .as_ref()
         .map(|c| c.network_id.clone())
         .unwrap_or_default();
-    peer_auth::register_authenticated_peer(
+    let registered = peer_auth::register_authenticated_peer(
         &authenticated_peers,
         peer_auth::AuthenticatedPeer {
             node_id: peer_node_id.clone(),
@@ -576,9 +578,23 @@ async fn handle_handshake_connection(
     )
     .await;
 
+    if !registered {
+        warn!(
+            "Peer {} failed authentication registration — bilateral PoS incomplete, disconnecting",
+            &peer_node_id[..8.min(peer_node_id.len())]
+        );
+        nodes.write().await.remove(&peer_node_id);
+        return Err(anyhow!(
+            "Peer {} bilateral PoS verification incomplete — proof or pubkey missing",
+            peer_node_id
+        ));
+    }
+
     info!(
-        "Bilateral verification complete — added authenticated node {} to network",
-        &peer_node_id[..8.min(peer_node_id.len())]
+        "Bilateral verification complete — added authenticated node {} (proof={} bytes, pubkey={} bytes)",
+        &peer_node_id[..8.min(peer_node_id.len())],
+        result.peer_proof.len(),
+        result.peer_pubkey.len(),
     );
 
     // Request CA certificate in background (Phase 2 bootstrap)

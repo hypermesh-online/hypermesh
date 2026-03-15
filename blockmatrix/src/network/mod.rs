@@ -180,6 +180,16 @@ pub struct PeerContext {
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
 }
 
+/// Result of a bilateral handshake including both network node info
+/// and the raw cryptographic proof data needed for peer authentication.
+struct HandshakeData {
+    node: NetworkNode,
+    /// FALCON-1024 public key of the peer
+    peer_pubkey: Vec<u8>,
+    /// Validated state proof bytes from the peer
+    peer_proof: Vec<u8>,
+}
+
 /// Network manager for multi-node communication
 pub struct NetworkManager {
     /// Local node coordinate
@@ -278,8 +288,9 @@ impl NetworkManager {
         // Connect via STOQ
         let connection = self.transport.connect(&endpoint).await?;
 
-        // Exchange node information
-        let node_info = self.exchange_node_info(&connection).await?;
+        // Exchange node information via bilateral PoS handshake (R11)
+        let handshake = self.exchange_node_info(&connection).await?;
+        let node_info = handshake.node;
 
         // Store the connected node
         let mut nodes = self.nodes.write().await;
@@ -287,23 +298,27 @@ impl NetworkManager {
         drop(nodes);
 
         info!(
-            "Successfully connected to node {} at ({},{},{})",
+            "Successfully connected to node {} at ({},{},{}) — bilateral PoS verified (proof={} bytes, pubkey={} bytes)",
             node_info.node_id,
             node_info.coordinate.x,
             node_info.coordinate.y,
-            node_info.coordinate.z
+            node_info.coordinate.z,
+            handshake.peer_proof.len(),
+            handshake.peer_pubkey.len(),
         );
 
-        // Register as authenticated peer after successful handshake
+        // Register as authenticated peer — proof_bytes and pubkey come from
+        // the bilateral handshake result. register_authenticated_peer will
+        // reject if either is empty (enforcing R11 bilateral verification).
         let auth_network_id = peer_ctx
             .as_ref()
             .map(|c| c.network_id.clone())
             .unwrap_or_default();
-        peer_auth::register_authenticated_peer(
+        let registered = peer_auth::register_authenticated_peer(
             &self.authenticated_peers,
             peer_auth::AuthenticatedPeer {
                 node_id: node_info.node_id.clone(),
-                pubkey: Vec::new(),
+                pubkey: handshake.peer_pubkey,
                 coordinate: (
                     node_info.coordinate.x as i32,
                     node_info.coordinate.y as i32,
@@ -311,10 +326,24 @@ impl NetworkManager {
                 ),
                 network_id: auth_network_id,
                 authenticated_at: std::time::Instant::now(),
-                proof_bytes: Vec::new(),
+                proof_bytes: handshake.peer_proof,
             },
         )
         .await;
+
+        if !registered {
+            // Peer failed authentication validation — disconnect
+            warn!(
+                "Peer {} failed authentication registration — disconnecting",
+                &node_info.node_id[..8.min(node_info.node_id.len())]
+            );
+            // Remove from nodes map since auth failed
+            self.nodes.write().await.remove(&node_info.node_id);
+            return Err(anyhow!(
+                "Peer {} bilateral PoS verification incomplete — proof or pubkey missing",
+                node_info.node_id
+            ));
+        }
 
         // Request CA certificate in background (Phase 2 bootstrap)
         self.spawn_ca_enrollment_if_needed();
@@ -337,7 +366,10 @@ impl NetworkManager {
     /// then delegates to `stoq::initiate_handshake_on_stream()` which
     /// implements the 3-message challenge-response protocol (R11) using
     /// NodeSigner and StateProofProvider traits.
-    async fn exchange_node_info(&self, connection: &Arc<stoq::Connection>) -> Result<NetworkNode> {
+    ///
+    /// Returns both the `NetworkNode` and the raw proof/pubkey data so
+    /// the caller can register a fully-verified `AuthenticatedPeer`.
+    async fn exchange_node_info(&self, connection: &Arc<stoq::Connection>) -> Result<HandshakeData> {
         let coord = self.local_coordinate;
         let local_coord = (coord.x, coord.y, coord.z);
 
@@ -362,12 +394,16 @@ impl NetworkManager {
         )
         .map_err(|e| anyhow!("Invalid peer coordinate: {e}"))?;
 
-        Ok(NetworkNode {
-            coordinate,
-            address: connection.endpoint().to_socket_addr(),
-            node_id: result.peer_node_id,
-            privacy_mode: PrivacyMode::PUBLIC, // Will be negotiated later
-            connection: Some(connection.clone()),
+        Ok(HandshakeData {
+            node: NetworkNode {
+                coordinate,
+                address: connection.endpoint().to_socket_addr(),
+                node_id: result.peer_node_id,
+                privacy_mode: PrivacyMode::PUBLIC, // Will be negotiated later
+                connection: Some(connection.clone()),
+            },
+            peer_pubkey: result.peer_pubkey,
+            peer_proof: result.peer_proof,
         })
     }
 

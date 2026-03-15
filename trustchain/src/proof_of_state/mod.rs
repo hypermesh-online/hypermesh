@@ -22,10 +22,26 @@ pub mod validation;
 pub mod validator;
 
 pub use asset_integration::*;
-pub use hypermesh_client::*;
 pub use proof::*;
 pub use validation::*;
-pub use validator::*;
+// Re-export validator types explicitly to avoid ambiguous glob with
+// hypermesh_client::ValidationMetrics (different struct, same name).
+pub use validator::{
+    FourProofValidator, MisbehaviorDetector, MisbehaviorThresholds, MaliciousNodeInfo,
+    ProofOfSpaceValidator, ProofOfStakeValidator, ProofOfWorkValidator, ProofOfTimeValidator,
+    SecurityConfig, SecurityViolationType, StateAuthenticator, StorageNodeInfo,
+    SuspiciousActivity, ValidationMetrics,
+};
+// Re-export hypermesh_client types explicitly, excluding ValidationMetrics
+// (which collides with validator::ValidationMetrics — different struct).
+pub use hypermesh_client::{
+    ByzantineFaultToleranceStatus, CertificateType, FourProofSet, FourProofValidationRequest,
+    HyperMeshClientConfig, HyperMeshStateProofClient, PerformanceStatistics,
+    ProofValidationResults, SpaceProofData, StakeProofData, StateProofClientMetrics,
+    StateProofValidationRequest, StateProofValidationResult, StateProofValidationService,
+    StateProofValidationStatus, TimeProofData, ValidationContext, ValidationDetails,
+    WorkProofData,
+};
 
 /// Proof of State Four-Proof Authentication
 ///
