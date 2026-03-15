@@ -27,13 +27,20 @@ items = [
     "STOQ module wired to real topology data",
     "Asset management wired to blockchain data",
     "Engauge API hooks re-exported",
+    "Caesar wallet/rewards/ngauge pages wired to real Caesar API",
+    "HyperMesh ResourceConfiguration wired to useConfigShow with full config table",
+    "HyperMesh SharingManagement wired to real peer data",
+    "Privacy mode badge in header from useNodeStatus",
+    "useConfigShow and useConfigGet hooks for config management",
+    "Engauge Analytics wired to real capacity/trending metrics",
+    "Engauge Routing wired to real throttle status and advisory",
+    "Engauge Marketplace wired to real pools/leases/pricing",
+    "Engauge Overview wired to real overview data",
+    "Config key filter search and lookup UI",
 ]
 
 [features.in_development]
 items = [
-    # Service-specific pages still render with static/mock data
-    "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
-    "Catalog browser — renders but limited backend integration",
     "Global search — searches hardcoded static data only",
     "WebSocket real-time events — Web3Events system defined but not connected to components",
     "Node join flow — no UI for connecting to public network",
@@ -43,10 +50,8 @@ items = [
 [features.planned]
 items = [
     "Live STOQ WebSocket data connections",
-    "Real-time metrics streaming from engauge",
     "Multi-node cluster topology visualization",
     "Security monitoring with live alerts",
-    "Caesar wallet and transaction management with real EVP data",
     "First-run onboarding flow (sovereign node setup, network join)",
     "Native desktop dashboard (Tauri cross-platform)",
 ]
