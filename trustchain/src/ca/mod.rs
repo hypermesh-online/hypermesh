@@ -507,6 +507,11 @@ impl TrustChainCA {
 
     /// Issue certificate with pre-validated state proof (skips HyperMesh network call).
     /// Used by SecurityIntegratedCA which already performed local state proof validation.
+    ///
+    /// IMPORTANT: The caller MUST have already validated the state proof via
+    /// FourProofValidator before calling this method. This method performs a
+    /// local four-proof validation as a safety net to ensure no certificate
+    /// is issued without PoS verification.
     pub async fn issue_certificate_local(
         &self,
         request: CertificateRequest,
@@ -515,6 +520,22 @@ impl TrustChainCA {
             "Processing certificate request for: {} (pre-validated state proof)",
             request.common_name
         );
+
+        // Safety net: validate state proof locally even for pre-validated requests.
+        // This ensures no certificate is ever issued without PoS verification.
+        {
+            let mut validator = self.state_proof_validator.lock().await;
+            let local_pos_result = validator
+                .validate_state_proof(&request.state_proof)
+                .await
+                .map_err(|e| anyhow!("Local PoS validation error: {e}"))?;
+            if !local_pos_result.is_valid() {
+                return Err(anyhow!(
+                    "Local four-proof PoS validation failed for certificate request: {}",
+                    request.common_name
+                ));
+            }
+        }
 
         // Validate certificate policy
         if !self.policy_engine.validate_request(&request).await? {

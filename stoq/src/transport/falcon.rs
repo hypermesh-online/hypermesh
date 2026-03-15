@@ -319,6 +319,31 @@ impl Default for FalconEngine {
     }
 }
 
+/// Sign arbitrary certificate data with a FALCON-1024 private key.
+///
+/// Thin wrapper around [`FalconEngine::sign`] for use by TrustChain
+/// certificate issuance — signs the DER-encoded certificate bytes so
+/// the receiver can verify the issuer used a post-quantum key.
+pub fn sign_certificate_data(
+    data: &[u8],
+    private_key: &FalconPrivateKey,
+) -> Result<FalconSignature> {
+    let engine = FalconEngine::new(private_key.variant);
+    engine.sign(private_key, data)
+}
+
+/// Verify a FALCON signature over certificate data.
+///
+/// Returns `true` if the signature is valid for the given data and public key.
+pub fn verify_certificate_signature(
+    data: &[u8],
+    signature: &FalconSignature,
+    public_key: &FalconPublicKey,
+) -> Result<bool> {
+    let engine = FalconEngine::new(public_key.variant);
+    engine.verify(public_key, signature, data)
+}
+
 /// FALCON transport integration for QUIC handshake
 pub struct FalconTransport {
     /// FALCON cryptographic engine
@@ -539,6 +564,25 @@ mod tests {
         assert_eq!(signature.signature_data, imported.signature_data);
         assert_eq!(signature.message_hash, imported.message_hash);
         assert_eq!(signature.signed_at, imported.signed_at);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_certificate_data() -> Result<(), Box<dyn std::error::Error>> {
+        let engine = FalconEngine::new(FalconVariant::Falcon1024);
+        let (private_key, public_key) = engine.generate_keypair()?;
+
+        let cert_data = b"fake DER certificate bytes for testing";
+        let sig = sign_certificate_data(cert_data, &private_key)?;
+        assert_eq!(sig.variant, FalconVariant::Falcon1024);
+
+        let valid = verify_certificate_signature(cert_data, &sig, &public_key)?;
+        assert!(valid, "FALCON cert signature should verify");
+
+        let tampered = b"tampered certificate bytes";
+        let invalid = verify_certificate_signature(tampered, &sig, &public_key)?;
+        assert!(!invalid, "Tampered data should fail verification");
+
         Ok(())
     }
 }

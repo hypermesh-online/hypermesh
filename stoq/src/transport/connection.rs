@@ -133,6 +133,23 @@ impl MemoryPool {
 unsafe impl Send for MemoryPool {}
 unsafe impl Sync for MemoryPool {}
 
+/// PoS validation state for a connection.
+///
+/// Tracks whether bilateral Proof of State validation has completed
+/// for this connection. Data exchange MUST NOT proceed until both
+/// sides have validated each other's PoS tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PosValidationState {
+    /// PoS validation has not yet been performed
+    Pending,
+    /// PoS validation passed — connection is authenticated
+    Validated,
+    /// PoS validation failed — connection should be rejected
+    Rejected,
+    /// PoS validation is not required (Anonymous mode)
+    NotRequired,
+}
+
 /// Active QUIC connection with adaptive network tiers optimizations
 pub struct Connection {
     pub(crate) inner: quinn::Connection,
@@ -142,6 +159,28 @@ pub struct Connection {
     frame_batch: Arc<Mutex<FrameBatch>>,
     last_activity: AtomicU64,
     idle_timeout: u64, // Connection-specific idle timeout
+    /// Bilateral PoS validation state — gates data exchange
+    pos_state: std::sync::atomic::AtomicU8,
+}
+
+impl PosValidationState {
+    fn to_u8(self) -> u8 {
+        match self {
+            PosValidationState::Pending => 0,
+            PosValidationState::Validated => 1,
+            PosValidationState::Rejected => 2,
+            PosValidationState::NotRequired => 3,
+        }
+    }
+
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => PosValidationState::Validated,
+            2 => PosValidationState::Rejected,
+            3 => PosValidationState::NotRequired,
+            _ => PosValidationState::Pending,
+        }
+    }
 }
 
 impl Connection {
@@ -167,7 +206,29 @@ impl Connection {
                     .as_secs(),
             ),
             idle_timeout,
+            pos_state: std::sync::atomic::AtomicU8::new(PosValidationState::Pending.to_u8()),
         }
+    }
+
+    /// Set the PoS validation state for this connection.
+    pub fn set_pos_state(&self, state: PosValidationState) {
+        self.pos_state.store(state.to_u8(), Ordering::Release);
+    }
+
+    /// Get the current PoS validation state.
+    pub fn pos_state(&self) -> PosValidationState {
+        PosValidationState::from_u8(self.pos_state.load(Ordering::Acquire))
+    }
+
+    /// Check if this connection has passed PoS validation or is exempt.
+    ///
+    /// Returns `true` if data exchange is allowed (Validated or NotRequired).
+    /// Returns `false` if still Pending or Rejected.
+    pub fn is_pos_authenticated(&self) -> bool {
+        matches!(
+            self.pos_state(),
+            PosValidationState::Validated | PosValidationState::NotRequired
+        )
     }
 
     /// Get the connection ID
@@ -265,6 +326,9 @@ impl Clone for Connection {
             frame_batch: self.frame_batch.clone(),
             last_activity: AtomicU64::new(self.last_activity.load(Ordering::Relaxed)),
             idle_timeout: self.idle_timeout,
+            pos_state: std::sync::atomic::AtomicU8::new(
+                self.pos_state.load(Ordering::Relaxed),
+            ),
         }
     }
 }

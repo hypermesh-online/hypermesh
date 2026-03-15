@@ -67,6 +67,23 @@ impl ExtensionValidator for StoqPosExtensionValidator {
             }
         };
 
+        // Verify ALL four proofs are present (not zero-length / empty)
+        if token.proof_of_space.commitment_hash.is_empty() {
+            anyhow::bail!("PoS token missing PoSpace commitment");
+        }
+        if token.proof_of_stake.owner_pubkey.is_empty() {
+            anyhow::bail!("PoS token missing PoStake owner public key");
+        }
+        if token.proof_of_work.work_hash.is_empty() {
+            anyhow::bail!("PoS token missing PoWork hash");
+        }
+        if token.proof_of_time.prev_hash.is_empty() {
+            anyhow::bail!("PoS token missing PoTime prev_hash");
+        }
+        if token.signature.is_empty() {
+            anyhow::bail!("PoS token missing signature — binary pass/fail");
+        }
+
         // Run fast structural validation
         match self.fast_validator.fast_validate(&token) {
             FastValidationResult::CachedValid => {

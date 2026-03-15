@@ -17,6 +17,9 @@ use tracing::{debug, info, warn};
 
 use super::types::StoqNodeCertificate;
 use crate::protocol::STOQ_ALPN;
+use crate::transport::falcon::{
+    self, FalconEngine, FalconSignature, FalconVariant, verify_certificate_signature,
+};
 
 /// TrustChain client for certificate operations
 #[derive(Clone)]
@@ -275,6 +278,11 @@ impl TrustChainClient {
     /// Generate a locally-signed certificate for P2P/local TrustChain mode.
     /// When the endpoint is `local://`, the node acts as its own CA
     /// (node-as-DNS-provider-first principle).
+    ///
+    /// The X.509 certificate itself uses rcgen (for QUIC TLS compatibility),
+    /// but the certificate DER is additionally signed with FALCON-1024 and
+    /// the signature is embedded in the metadata field. Peers verify the
+    /// FALCON signature to confirm post-quantum authenticity.
     fn generate_local_certificate(
         &self,
         common_name: &str,
@@ -282,7 +290,7 @@ impl TrustChainClient {
         metadata: Option<&[u8]>,
     ) -> Result<StoqNodeCertificate> {
         info!(
-            "Local TrustChain: generating self-signed certificate for {}",
+            "Local TrustChain: generating FALCON-1024 signed certificate for {}",
             common_name
         );
 
@@ -291,10 +299,27 @@ impl TrustChainClient {
             san_entries.push(format!("{addr}"));
         }
 
+        // Generate X.509 cert (rcgen) for QUIC TLS handshake compatibility
         let cert_key = generate_simple_self_signed(san_entries)?;
         let cert_der = cert_key.cert.der().clone();
         let private_key_der = PrivateKeyDer::try_from(cert_key.key_pair.serialize_der())
             .map_err(|e| anyhow!("Failed to serialize private key: {e}"))?;
+
+        // Sign the certificate DER with FALCON-1024 for post-quantum authenticity
+        let falcon_engine = FalconEngine::new(FalconVariant::Falcon1024);
+        let (falcon_sk, falcon_pk) = falcon_engine.generate_keypair()?;
+        let falcon_sig = falcon::sign_certificate_data(cert_der.as_ref(), &falcon_sk)?;
+
+        // Serialize FALCON signature + public key into metadata so peers can verify
+        let falcon_meta = FalconCertMetadata {
+            signature: falcon_sig.signature_data.clone(),
+            message_hash: falcon_sig.message_hash,
+            public_key: falcon_pk.key_data.clone(),
+            signed_at: falcon_sig.signed_at,
+            app_metadata: metadata.map(|m| m.to_vec()),
+        };
+        let meta_bytes = serde_json::to_vec(&falcon_meta)
+            .map_err(|e| anyhow!("Failed to serialize FALCON cert metadata: {e}"))?;
 
         let fingerprint = self.calculate_fingerprint(cert_der.as_ref());
         let now = SystemTime::now();
@@ -307,11 +332,11 @@ impl TrustChainClient {
             issued_at: now,
             expires_at,
             fingerprint_sha256: fingerprint,
-            metadata: metadata.map(|m| m.to_vec()),
+            metadata: Some(meta_bytes),
         };
 
         info!(
-            "Local TrustChain certificate generated: {}",
+            "Local TrustChain FALCON-1024 signed certificate generated: {}",
             stoq_cert.fingerprint()
         );
         Ok(stoq_cert)
@@ -448,6 +473,59 @@ impl TrustChainClient {
         }
     }
 
+    /// Validate FALCON-1024 signature embedded in certificate metadata.
+    ///
+    /// Authenticated certificates carry a FALCON-1024 signature over the
+    /// certificate DER in their metadata field. This method deserializes
+    /// the metadata, reconstructs the FALCON public key and signature,
+    /// and verifies the signature matches the certificate bytes.
+    ///
+    /// Returns `Ok(true)` if the signature is valid, `Ok(false)` if
+    /// metadata is missing or signature verification fails.
+    pub fn validate_falcon_certificate_signature(
+        &self,
+        cert_der: &[u8],
+        metadata: Option<&[u8]>,
+    ) -> Result<bool> {
+        let meta_bytes = match metadata {
+            Some(m) => m,
+            None => {
+                debug!("No metadata present — cannot verify FALCON signature");
+                return Ok(false);
+            }
+        };
+
+        let falcon_meta: FalconCertMetadata = match serde_json::from_slice(meta_bytes) {
+            Ok(m) => m,
+            Err(e) => {
+                debug!("Failed to parse FALCON cert metadata: {e}");
+                return Ok(false);
+            }
+        };
+
+        // Reconstruct the public key
+        let public_key =
+            falcon::FalconPublicKey::new(FalconVariant::Falcon1024, falcon_meta.public_key)?;
+
+        // Reconstruct the signature
+        let signature = FalconSignature::new(
+            FalconVariant::Falcon1024,
+            falcon_meta.signature,
+            falcon_meta.message_hash,
+        )?;
+
+        // Verify: FALCON signature over the certificate DER bytes
+        let valid = verify_certificate_signature(cert_der, &signature, &public_key)?;
+
+        if valid {
+            info!("FALCON-1024 certificate signature verified successfully");
+        } else {
+            warn!("FALCON-1024 certificate signature verification FAILED");
+        }
+
+        Ok(valid)
+    }
+
     /// SECURITY: Validate certificate cryptographic strength
     fn validate_certificate_crypto_strength(&self, cert_der: &[u8]) -> Result<bool> {
         match x509_parser::parse_x509_certificate(cert_der) {
@@ -479,4 +557,24 @@ impl TrustChainClient {
             }
         }
     }
+}
+
+/// Metadata embedded in certificate's `metadata` field carrying
+/// the FALCON-1024 signature over the certificate DER bytes.
+///
+/// Peers deserialize this from the `StoqNodeCertificate::metadata`
+/// field and call [`TrustChainClient::validate_falcon_certificate_signature`]
+/// to verify post-quantum authenticity.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FalconCertMetadata {
+    /// Raw FALCON-1024 signature bytes
+    pub signature: Vec<u8>,
+    /// SHA-256 hash of the signed data (certificate DER)
+    pub message_hash: [u8; 32],
+    /// FALCON-1024 public key bytes for verification
+    pub public_key: Vec<u8>,
+    /// Timestamp when the signature was created
+    pub signed_at: u64,
+    /// Optional application-specific metadata from the original request
+    pub app_metadata: Option<Vec<u8>>,
 }

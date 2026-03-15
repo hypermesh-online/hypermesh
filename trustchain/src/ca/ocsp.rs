@@ -70,6 +70,10 @@ pub struct OcspResponse {
 ///
 /// Checks certificate status against the in-memory store and returns
 /// FALCON-1024 signed responses for quantum-resistant verification.
+///
+/// Transport-agnostic: requests and responses are serde-serializable
+/// structs suitable for STOQ stream delivery. No HTTP-specific
+/// transport assumptions exist in this layer.
 pub struct OcspResponder {
     /// Certificate store to query status from.
     store: Arc<CertificateStore>,

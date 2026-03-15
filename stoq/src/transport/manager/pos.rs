@@ -6,9 +6,10 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::transport::certificate_strategy::NetworkType;
+use crate::transport::connection::PosValidationState;
 use crate::transport::falcon;
 
 use super::StoqTransport;
@@ -79,6 +80,63 @@ impl StoqTransport {
                 .set_pos_validation(content_hash, is_valid)
             {
                 warn!("Failed to feed PoS validation to eBPF: {}", e);
+            }
+        }
+
+        Ok(is_valid)
+    }
+
+    /// Perform bilateral PoS validation on a connection and update its state.
+    ///
+    /// This method MUST be called after the QUIC TLS handshake completes
+    /// but BEFORE any application data is exchanged. It validates the
+    /// peer's PoS token and marks the connection as authenticated or
+    /// rejected. For Anonymous networks, the connection is marked as
+    /// `NotRequired` (no PoS needed).
+    ///
+    /// Returns `true` if the connection passed PoS validation.
+    pub async fn validate_and_gate_connection(
+        &self,
+        connection_id: &str,
+        network_type: &NetworkType,
+        pos_token: Option<&crate::protocol::PosToken>,
+    ) -> Result<bool> {
+        // Check if Anonymous — skip PoS
+        if matches!(network_type, NetworkType::Anonymous) {
+            if let Some(conn) = self.connections.get(connection_id) {
+                conn.set_pos_state(PosValidationState::NotRequired);
+            }
+            debug!(
+                "Connection {} is Anonymous — PoS not required",
+                connection_id
+            );
+            return Ok(true);
+        }
+
+        // Perform PoS validation
+        let is_valid = self
+            .validate_connection_with_pos(
+                connection_id.to_string(),
+                network_type,
+                pos_token,
+            )
+            .await?;
+
+        // Update connection's PoS gate state
+        if let Some(conn) = self.connections.get(connection_id) {
+            if is_valid {
+                conn.set_pos_state(PosValidationState::Validated);
+                info!(
+                    "Connection {} passed bilateral PoS validation",
+                    connection_id
+                );
+            } else {
+                conn.set_pos_state(PosValidationState::Rejected);
+                warn!(
+                    "Connection {} REJECTED by PoS validation — closing",
+                    connection_id
+                );
+                conn.close();
             }
         }
 

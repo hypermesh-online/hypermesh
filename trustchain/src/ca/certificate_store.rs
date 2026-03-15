@@ -167,6 +167,17 @@ impl CertificateStore {
         self.certificates.iter().map(|entry| entry.value().clone())
     }
 
+    /// Return all certificates that are currently in Revoked status.
+    ///
+    /// Used by the CRL generator to build the revocation list.
+    pub fn get_revoked_certificates(&self) -> Vec<IssuedCertificate> {
+        self.certificates
+            .iter()
+            .filter(|entry| matches!(entry.value().status, CertificateStatus::Revoked { .. }))
+            .map(|entry| entry.value().clone())
+            .collect()
+    }
+
     /// Find the first certificate matching a given common name.
     /// Returns `None` if no certificate with that CN exists.
     pub async fn find_by_common_name(&self, common_name: &str) -> Option<IssuedCertificate> {

@@ -13,6 +13,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::{FourProofValidator, StateProof};
 
 /// Trust level assigned to a federated peer CA.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,6 +108,8 @@ pub struct FederationManager {
     peers: Arc<RwLock<HashMap<String, FederatedCA>>>,
     policy: FederationPolicy,
     events: Arc<RwLock<Vec<FederationEvent>>>,
+    /// Four-proof validator for bilateral PoS authentication of peers.
+    state_proof_validator: Arc<tokio::sync::Mutex<FourProofValidator>>,
 }
 
 impl FederationManager {
@@ -116,11 +119,35 @@ impl FederationManager {
             peers: Arc::new(RwLock::new(HashMap::new())),
             policy,
             events: Arc::new(RwLock::new(Vec::new())),
+            state_proof_validator: Arc::new(tokio::sync::Mutex::new(FourProofValidator::new())),
         }
     }
 
-    /// Add a peer CA. Fails if duplicate or at capacity.
+    /// Add a peer CA with bilateral Proof of State validation.
+    ///
+    /// The peer's state proof is validated through the four-proof system.
+    /// If the proof is invalid, the peer is still added but forced to
+    /// `Untrusted` trust level. Only peers with valid PoS may receive
+    /// `Full` or `Conditional` trust.
+    ///
+    /// Fails if duplicate or at capacity.
     pub async fn add_peer(&self, peer: FederatedCA) -> TrustChainResult<()> {
+        self.add_peer_with_proof(peer, None).await
+    }
+
+    /// Add a peer CA with an explicit state proof for bilateral PoS validation.
+    ///
+    /// When `state_proof` is `Some`, the proof is validated and the peer's
+    /// trust level is only honoured when PoS passes. Otherwise the peer is
+    /// demoted to `Untrusted`.
+    ///
+    /// When `state_proof` is `None`, the peer is accepted at `Untrusted`
+    /// trust level regardless of the requested trust level.
+    pub async fn add_peer_with_proof(
+        &self,
+        mut peer: FederatedCA,
+        state_proof: Option<&StateProof>,
+    ) -> TrustChainResult<()> {
         let mut peers = self.peers.write().await;
         if peers.contains_key(&peer.ca_id) {
             return Err(TrustChainError::InvalidRequest {
@@ -136,14 +163,55 @@ impl FederationManager {
                 ),
             });
         }
-        info!("Adding federated peer CA '{}' ({})", peer.ca_id, peer.name);
-        let (ca_id, name) = (peer.ca_id.clone(), peer.name.clone());
+
+        // Bilateral PoS gate: validate state proof before granting trust
+        let pos_valid = match state_proof {
+            Some(proof) => {
+                let mut validator = self.state_proof_validator.lock().await;
+                match validator.validate_state_proof(proof).await {
+                    Ok(result) => result.is_valid(),
+                    Err(e) => {
+                        warn!(
+                            "PoS validation error for peer '{}': {}, demoting to Untrusted",
+                            peer.ca_id, e
+                        );
+                        false
+                    }
+                }
+            }
+            None => {
+                debug!(
+                    "No state proof provided for peer '{}', assigning Untrusted",
+                    peer.ca_id
+                );
+                false
+            }
+        };
+
+        // Enforce trust level based on PoS result
+        if !pos_valid && peer.trust_level != FederationTrustLevel::Untrusted {
+            warn!(
+                "Peer '{}' requested {:?} trust but PoS validation failed, demoting to Untrusted",
+                peer.ca_id, peer.trust_level
+            );
+            peer.trust_level = FederationTrustLevel::Untrusted;
+        }
+
+        info!(
+            "Adding federated peer CA '{}' ({}) with trust level {:?} (PoS valid: {})",
+            peer.ca_id, peer.name, peer.trust_level, pos_valid
+        );
+        let (ca_id, name, trust) = (
+            peer.ca_id.clone(),
+            peer.name.clone(),
+            format!("{:?}", peer.trust_level),
+        );
         peers.insert(ca_id.clone(), peer);
         drop(peers);
         self.record_event(
             FederationEventType::PeerAdded,
             &ca_id,
-            format!("Peer '{name}' added"),
+            format!("Peer '{name}' added with trust {trust} (PoS valid: {pos_valid})"),
         )
         .await;
         Ok(())
@@ -397,9 +465,15 @@ mod tests {
         }
     }
 
+    /// Helper: create a test state proof that passes FourProofValidator.
+    fn test_state_proof() -> StateProof {
+        StateProof::default_for_testing()
+    }
+
     #[tokio::test]
     async fn test_add_and_list_peers() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
+        // Without PoS proof, all peers are demoted to Untrusted — still stored
         mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
             .await
             .expect("test: add alpha");
@@ -413,9 +487,41 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_remove_peer() {
+    async fn test_add_peer_without_proof_demotes_to_untrusted() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+            .await
+            .expect("test: add");
+        let peer = mgr.get_peer("alpha").await.expect("test: peer exists");
+        assert_eq!(
+            peer.trust_level,
+            FederationTrustLevel::Untrusted,
+            "Peer without PoS proof should be demoted to Untrusted"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_add_peer_with_valid_proof_keeps_trust() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let proof = test_state_proof();
+        mgr.add_peer_with_proof(
+            make_peer("alpha", FederationTrustLevel::Full),
+            Some(&proof),
+        )
+        .await
+        .expect("test: add with proof");
+        let peer = mgr.get_peer("alpha").await.expect("test: peer exists");
+        assert_eq!(
+            peer.trust_level,
+            FederationTrustLevel::Full,
+            "Peer with valid PoS proof should keep requested trust level"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_peer() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Untrusted))
             .await
             .expect("test: add");
         assert!(mgr.get_peer("alpha").await.is_some());
@@ -438,7 +544,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_trust_level() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Untrusted))
             .await
             .expect("test: add");
         mgr.update_trust_level("alpha", FederationTrustLevel::Conditional)
@@ -463,7 +569,11 @@ mod tests {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         let mut peer = make_peer("signer-ca", FederationTrustLevel::Full);
         peer.public_key = pk.as_bytes().to_vec();
-        mgr.add_peer(peer).await.expect("test: add peer");
+        // Use add_peer_with_proof to preserve Full trust level
+        let proof = test_state_proof();
+        mgr.add_peer_with_proof(peer, Some(&proof))
+            .await
+            .expect("test: add peer");
 
         let result = mgr
             .validate_federated_certificate(&blob, "signer-ca")
@@ -491,12 +601,12 @@ mod tests {
     async fn test_max_peers_enforced() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         for i in 0..5 {
-            mgr.add_peer(make_peer(&format!("p{i}"), FederationTrustLevel::Full))
+            mgr.add_peer(make_peer(&format!("p{i}"), FederationTrustLevel::Untrusted))
                 .await
                 .expect("test: add");
         }
         assert!(mgr
-            .add_peer(make_peer("overflow", FederationTrustLevel::Full))
+            .add_peer(make_peer("overflow", FederationTrustLevel::Untrusted))
             .await
             .is_err());
     }
@@ -504,15 +614,26 @@ mod tests {
     #[tokio::test]
     async fn test_federation_status() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("a", FederationTrustLevel::Full))
-            .await
-            .expect("test: add a");
-        mgr.add_peer(make_peer("b", FederationTrustLevel::Full))
-            .await
-            .expect("test: add b");
-        mgr.add_peer(make_peer("c", FederationTrustLevel::Conditional))
-            .await
-            .expect("test: add c");
+        let proof = test_state_proof();
+        // Use add_peer_with_proof to preserve requested trust levels
+        mgr.add_peer_with_proof(
+            make_peer("a", FederationTrustLevel::Full),
+            Some(&proof),
+        )
+        .await
+        .expect("test: add a");
+        mgr.add_peer_with_proof(
+            make_peer("b", FederationTrustLevel::Full),
+            Some(&proof),
+        )
+        .await
+        .expect("test: add b");
+        mgr.add_peer_with_proof(
+            make_peer("c", FederationTrustLevel::Conditional),
+            Some(&proof),
+        )
+        .await
+        .expect("test: add c");
         mgr.add_peer(make_peer("d", FederationTrustLevel::Untrusted))
             .await
             .expect("test: add d");
@@ -527,7 +648,7 @@ mod tests {
     #[tokio::test]
     async fn test_federation_events_logged() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
-        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Full))
+        mgr.add_peer(make_peer("alpha", FederationTrustLevel::Untrusted))
             .await
             .expect("test: add");
         mgr.update_trust_level("alpha", FederationTrustLevel::Conditional)

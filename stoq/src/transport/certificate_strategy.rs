@@ -268,18 +268,41 @@ impl CertificateStrategy for AuthenticatedCertificateStrategy {
     async fn validate_certificate(&self, cert: &StoqNodeCertificate) -> Result<bool> {
         debug!("Validating certificate via {} TrustChain CA", self.label);
 
+        // Step 1: Standard TrustChain validation (structure, expiration, CT)
         let is_valid = self
             .trustchain_client
             .validate_certificate(cert.certificate.as_ref())
             .await?;
 
-        if is_valid {
-            debug!("{} certificate validated", self.label);
-        } else {
-            warn!("{} certificate validation failed", self.label);
+        if !is_valid {
+            warn!("{} certificate failed TrustChain validation", self.label);
+            return Ok(false);
         }
 
-        Ok(is_valid)
+        // Step 2: Verify FALCON-1024 signature if metadata is present.
+        // Authenticated certificates MUST carry a FALCON signature.
+        // Missing metadata means the cert was not issued through the
+        // FALCON-aware path — reject it for authenticated strategies.
+        let falcon_valid = self
+            .trustchain_client
+            .validate_falcon_certificate_signature(
+                cert.certificate.as_ref(),
+                cert.metadata.as_deref(),
+            )?;
+
+        if !falcon_valid {
+            warn!(
+                "{} certificate missing or invalid FALCON-1024 signature",
+                self.label
+            );
+            return Ok(false);
+        }
+
+        debug!(
+            "{} certificate validated with FALCON-1024 signature",
+            self.label
+        );
+        Ok(true)
     }
 
     fn strategy_name(&self) -> &str {

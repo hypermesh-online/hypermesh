@@ -207,6 +207,13 @@ async fn run_scheduler_loop(
 }
 
 /// Run a single rotation cycle, updating metrics accordingly.
+///
+/// NOTE: The rotation manager marks expiring certificates as revoked.
+/// Re-issuance of renewed certificates MUST go through the PoS-gated
+/// `TrustChainCA::issue_certificate()` or `SecurityIntegratedCA::issue_certificate_secure()`
+/// to ensure the four-proof validation is enforced. The scheduler does NOT
+/// bypass PoS validation -- it only triggers revocation; the node must
+/// request a fresh certificate through the standard PoS-gated issuance flow.
 async fn execute_rotation_cycle(
     rotation_manager: &CertificateRotationManager,
     certificate_store: &CertificateStore,

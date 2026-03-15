@@ -219,6 +219,10 @@ impl CrlGenerator {
 ///
 /// Stores the most recently published CRL and provides query access
 /// for revocation checking without hitting the certificate store directly.
+///
+/// Transport-agnostic: CRL data is serializable via serde and can be
+/// distributed over STOQ streams, gossip protocol, or any other transport.
+/// No HTTP-specific assumptions exist in this layer.
 pub struct CrlDistributor {
     /// The latest published CRL.
     latest_crl: Arc<RwLock<Option<CertificateRevocationList>>>,

@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_build_cert_request() {
         let node_id = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let state_proof = StateProof::default();
+        let state_proof = StateProof::new_for_testing();
         let request = build_cert_request(node_id, state_proof)
             .expect("test: build cert request");
         assert_eq!(request.common_name, "node-abcdef1234567890.hypermesh");
@@ -205,7 +205,7 @@ mod tests {
     #[tokio::test]
     async fn test_full_enrollment_flow() {
         let node_id = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
-        let state_proof = StateProof::default();
+        let state_proof = StateProof::new_for_testing();
 
         // Create CA and issue cert
         let ca = create_local_ca(node_id).await.expect("test: create CA");
