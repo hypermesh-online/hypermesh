@@ -258,6 +258,66 @@ impl ReflectorPool {
         pruned
     }
 
+    /// Update a reflector's health score based on a sync outcome.
+    ///
+    /// On `success`, the score is incremented by 0.05 (clamped to 1.0).
+    /// On failure, it is decremented by 0.1 (clamped to 0.0).
+    /// The reflector is looked up by `node_id` within the given `network_id`.
+    pub fn update_reflector_health(
+        &mut self,
+        node_id: &str,
+        network_id: &str,
+        success: bool,
+    ) {
+        if let Some(pool) = self.reflectors.get_mut(network_id) {
+            if let Some(reflector) = pool.get_mut(node_id) {
+                if success {
+                    reflector.health_score = (reflector.health_score + 0.05).min(1.0);
+                } else {
+                    reflector.health_score = (reflector.health_score - 0.1).max(0.0);
+                }
+                debug!(
+                    network = %network_id,
+                    node = %node_id,
+                    success,
+                    new_health = reflector.health_score,
+                    "Updated reflector health from sync outcome"
+                );
+            }
+        }
+    }
+
+    /// Remove reflectors not seen since `stale_timeout_secs` seconds ago.
+    ///
+    /// Uses real wall-clock time (seconds since UNIX epoch) for the
+    /// comparison. Returns the number of reflectors pruned.
+    pub fn prune_stale_by_timeout(&mut self, stale_timeout_secs: u64) -> usize {
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let cutoff = now_secs.saturating_sub(stale_timeout_secs);
+        let mut pruned = 0;
+
+        for (network_id, pool) in &mut self.reflectors {
+            let before = pool.len();
+            pool.retain(|_, r| r.last_seen >= cutoff);
+            let removed = before - pool.len();
+            if removed > 0 {
+                warn!(
+                    network = %network_id,
+                    pruned = removed,
+                    timeout_secs = stale_timeout_secs,
+                    "Pruned stale reflectors by timeout"
+                );
+            }
+            pruned += removed;
+        }
+
+        pruned
+    }
+
     /// Get all tracked network IDs
     pub fn tracked_networks(&self) -> Vec<&str> {
         self.reflectors.keys().map(|s| s.as_str()).collect()
@@ -456,5 +516,59 @@ mod tests {
         assert_eq!(networks.len(), 2);
         assert!(networks.contains(&"alpha"));
         assert!(networks.contains(&"beta"));
+    }
+
+    #[test]
+    fn test_update_reflector_health_success() {
+        let mut pool = ReflectorPool::new(test_config());
+        pool.register_reflector("net", make_reflector("n1", 0.5, 10, 100));
+
+        pool.update_reflector_health("n1", "net", true);
+        let best = pool.get_best_reflectors("net", 1);
+        assert!((best[0].health_score - 0.55).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_update_reflector_health_failure() {
+        let mut pool = ReflectorPool::new(test_config());
+        pool.register_reflector("net", make_reflector("n1", 0.5, 10, 100));
+
+        pool.update_reflector_health("n1", "net", false);
+        let best = pool.get_best_reflectors("net", 1);
+        assert!((best[0].health_score - 0.4).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_update_reflector_health_clamped_bounds() {
+        let mut pool = ReflectorPool::new(test_config());
+        pool.register_reflector("net", make_reflector("n1", 0.98, 10, 100));
+
+        // Multiple successes should clamp at 1.0
+        pool.update_reflector_health("n1", "net", true);
+        pool.update_reflector_health("n1", "net", true);
+        let best = pool.get_best_reflectors("net", 1);
+        assert!((best[0].health_score - 1.0).abs() < f64::EPSILON);
+
+        // Now fail enough to reach 0.0
+        let mut pool2 = ReflectorPool::new(test_config());
+        pool2.register_reflector("net", make_reflector("n2", 0.05, 10, 100));
+        pool2.update_reflector_health("n2", "net", false);
+        // 0.05 - 0.1 = clamped to 0.0
+        let all: Vec<_> = pool2.get_best_reflectors("net", 10);
+        // Below health_threshold so won't appear in best
+        assert!(all.is_empty());
+    }
+
+    #[test]
+    fn test_update_reflector_health_unknown_noop() {
+        let mut pool = ReflectorPool::new(test_config());
+        pool.register_reflector("net", make_reflector("n1", 0.5, 10, 100));
+
+        // Unknown node_id or network_id should be a no-op
+        pool.update_reflector_health("nonexistent", "net", true);
+        pool.update_reflector_health("n1", "other-net", true);
+
+        let best = pool.get_best_reflectors("net", 1);
+        assert!((best[0].health_score - 0.5).abs() < f64::EPSILON);
     }
 }

@@ -201,15 +201,17 @@ impl<'a> SyncDispatcher<'a> {
     }
 }
 
+/// Maximum number of reflectors to try before giving up on a network.
+const MAX_REFLECTOR_RETRIES: usize = 3;
+
 /// Drives sync operations over real STOQ connections.
 ///
 /// For each network needing sync:
-/// 1. Opens a STOQ stream to the best reflector.
-/// 2. Sends a `SyncRequest`, reads the `SyncResponse`.
-/// 3. Identifies missing block hashes.
-/// 4. Opens a second stream with a `BlockFetchRequest` for those hashes.
-/// 5. Reads the `BlockFetchResponse` containing serialized blocks.
-/// 6. Returns fetched blocks for the caller to insert.
+/// 1. Selects the best reflectors from the pool.
+/// 2. Tries them in order (up to `MAX_REFLECTOR_RETRIES`).
+/// 3. On success, updates reflector health positively.
+/// 4. On failure, updates reflector health negatively and tries next.
+/// 5. Returns fetched blocks for the caller to insert.
 pub struct TransportSyncDriver;
 
 impl TransportSyncDriver {
@@ -217,9 +219,12 @@ impl TransportSyncDriver {
     ///
     /// Returns blocks fetched from peers. The caller is responsible for
     /// inserting them into the blockchain and extracting DNS entries.
+    ///
+    /// `reflector_pool` is taken as `&mut` so that health scores can be
+    /// updated based on sync outcomes.
     pub async fn run_sync_round(
         sync_manager: &mut SyncManager,
-        reflector_pool: &ReflectorPool,
+        reflector_pool: &mut ReflectorPool,
         blockchain: &NodeBlockchain,
         transport: &stoq::StoqTransport,
         node_map: &HashMap<String, (String, SocketAddr)>,
@@ -241,51 +246,95 @@ impl TransportSyncDriver {
                 None => continue,
             };
 
-            let reflectors = reflector_pool.get_best_reflectors(network_id, 1);
-            let reflector = match reflectors.first() {
-                Some(r) => r,
-                None => {
-                    debug!(network = %network_id, "No reflectors available for sync");
-                    continue;
-                }
-            };
+            // Get multiple reflectors for retry
+            let reflector_ids: Vec<(String, String)> = reflector_pool
+                .get_best_reflectors(network_id, MAX_REFLECTOR_RETRIES)
+                .iter()
+                .map(|r| (r.node_id.clone(), network_id.clone()))
+                .collect();
 
-            match Self::sync_from_reflector(
-                &request,
-                reflector,
-                blockchain,
-                transport,
-                node_map,
-                local_coordinate,
-            )
-            .await
-            {
-                Ok((blocks, peer_height)) => {
-                    let response = SyncMessage::Response {
-                        network_id: network_id.clone(),
-                        block_hashes: Vec::new(),
-                        peer_height,
-                    };
-                    sync_manager.process_sync_message(response);
+            if reflector_ids.is_empty() {
+                debug!(network = %network_id, "No reflectors available for sync");
+                continue;
+            }
 
-                    if !blocks.is_empty() {
-                        info!(
+            let mut synced = false;
+            for (ref_node_id, ref_net_id) in &reflector_ids {
+                // Re-fetch the reflector from the pool each iteration
+                // since health may have changed.
+                let reflector = {
+                    let candidates = reflector_pool.get_best_reflectors(ref_net_id, MAX_REFLECTOR_RETRIES);
+                    match candidates.iter().find(|r| r.node_id == *ref_node_id).cloned() {
+                        Some(r) => r,
+                        None => continue,
+                    }
+                };
+
+                let sync_result = Self::sync_from_reflector(
+                    &request,
+                    &reflector,
+                    blockchain,
+                    transport,
+                    node_map,
+                    local_coordinate,
+                )
+                .await;
+
+                let reflector_label = reflector.node_id
+                    [..8.min(reflector.node_id.len())]
+                    .to_string();
+
+                match sync_result {
+                    Ok((blocks, peer_height)) => {
+                        // Health feedback: success
+                        reflector_pool.update_reflector_health(
+                            ref_node_id,
+                            ref_net_id,
+                            true,
+                        );
+
+                        let response = SyncMessage::Response {
+                            network_id: network_id.clone(),
+                            block_hashes: Vec::new(),
+                            peer_height,
+                        };
+                        sync_manager.process_sync_message(response);
+
+                        if !blocks.is_empty() {
+                            info!(
+                                network = %network_id,
+                                count = blocks.len(),
+                                "Fetched blocks from reflector {reflector_label}",
+                            );
+                        }
+                        fetched_blocks.extend(blocks);
+                        synced = true;
+                        break;
+                    }
+                    Err(e) => {
+                        // Health feedback: failure
+                        reflector_pool.update_reflector_health(
+                            ref_node_id,
+                            ref_net_id,
+                            false,
+                        );
+
+                        debug!(
                             network = %network_id,
-                            count = blocks.len(),
-                            "Fetched blocks from reflector {}",
-                            &reflector.node_id[..8.min(reflector.node_id.len())],
+                            reflector = %ref_node_id,
+                            error = %e,
+                            "Sync failed, trying next reflector",
                         );
                     }
-                    fetched_blocks.extend(blocks);
                 }
-                Err(e) => {
-                    debug!(
-                        network = %network_id,
-                        reflector = %reflector.node_id,
-                        error = %e,
-                        "Sync round failed for network",
-                    );
-                }
+            }
+
+            if !synced {
+                warn!(
+                    network = %network_id,
+                    tried = reflector_ids.len(),
+                    "All reflectors failed for sync round",
+                );
             }
         }
 
@@ -983,7 +1032,7 @@ mod tests {
         sm.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
             .expect("test: join");
 
-        let rp = make_reflector_pool();
+        let mut rp = make_reflector_pool();
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let blockchain = NodeBlockchain::new(coord);
         let node_map = HashMap::new();
@@ -1002,7 +1051,7 @@ mod tests {
 
         let blocks = TransportSyncDriver::run_sync_round(
             &mut sm,
-            &rp,
+            &mut rp,
             &blockchain,
             &transport,
             &node_map,

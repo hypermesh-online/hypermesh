@@ -151,6 +151,58 @@ impl PathSelector {
         self.strategy = strategy;
     }
 
+    /// Apply an engauge routing recommendation by mapping lowercase
+    /// strategy names to `PathScheduler` variants.
+    ///
+    /// Accepted names: `"bandwidth"` → `BandwidthWeighted`,
+    /// `"latency"` → `LowestLatency`, `"redundant"` → `Redundant`,
+    /// anything else → `RoundRobin`.
+    ///
+    /// Returns `true` if the strategy actually changed.
+    pub fn apply_engauge_recommendation(&mut self, strategy_name: &str) -> bool {
+        let new_strategy = match strategy_name {
+            "bandwidth" => PathScheduler::BandwidthWeighted,
+            "latency" => PathScheduler::LowestLatency,
+            "redundant" => PathScheduler::Redundant,
+            _ => PathScheduler::RoundRobin,
+        };
+
+        if self.strategy == new_strategy {
+            return false;
+        }
+
+        tracing::info!(
+            "PathSelector engauge recommendation: {:?} -> {:?} (input={:?})",
+            self.strategy, new_strategy, strategy_name,
+        );
+        self.strategy = new_strategy;
+        true
+    }
+
+    /// Record observed path metrics for a specific path.
+    ///
+    /// This updates the `PathCandidate` fields in the provided slice
+    /// so that future selection decisions reflect real measurements.
+    /// If no candidate with the given `path_id` exists, the call is
+    /// silently ignored.
+    pub fn record_path_metrics(
+        candidates: &mut [PathCandidate],
+        path_id: u32,
+        bandwidth_mbps: f64,
+        latency_ms: f64,
+    ) {
+        if let Some(candidate) = candidates.iter_mut().find(|c| c.path_id == path_id) {
+            candidate.bandwidth_estimate_bps = bandwidth_mbps * 1_000_000.0;
+            candidate.rtt_ms = latency_ms;
+            tracing::debug!(
+                path_id,
+                bandwidth_mbps,
+                latency_ms,
+                "Recorded path metrics from engauge",
+            );
+        }
+    }
+
     /// Apply an external scheduling recommendation (e.g., from engauge
     /// routing intelligence). Maps the recommended strategy to the
     /// internal `PathScheduler` enum. The `enable_redundant` flag forces
@@ -351,5 +403,56 @@ mod tests {
         assert!(changed);
         // Unknown strategies fall back to RoundRobin.
         assert_eq!(*selector.strategy(), PathScheduler::RoundRobin);
+    }
+
+    #[test]
+    fn test_apply_engauge_recommendation() {
+        let mut selector = PathSelector::new(PathScheduler::RoundRobin);
+
+        let changed = selector.apply_engauge_recommendation("bandwidth");
+        assert!(changed);
+        assert_eq!(*selector.strategy(), PathScheduler::BandwidthWeighted);
+
+        let changed = selector.apply_engauge_recommendation("latency");
+        assert!(changed);
+        assert_eq!(*selector.strategy(), PathScheduler::LowestLatency);
+
+        let changed = selector.apply_engauge_recommendation("redundant");
+        assert!(changed);
+        assert_eq!(*selector.strategy(), PathScheduler::Redundant);
+
+        let changed = selector.apply_engauge_recommendation("unknown");
+        assert!(changed);
+        assert_eq!(*selector.strategy(), PathScheduler::RoundRobin);
+
+        // Same value should not change
+        let changed = selector.apply_engauge_recommendation("unknown");
+        assert!(!changed);
+    }
+
+    #[test]
+    fn test_record_path_metrics() {
+        let mut candidates = make_candidates(3);
+
+        PathSelector::record_path_metrics(&mut candidates, 1, 500.0, 25.0);
+
+        assert!((candidates[1].bandwidth_estimate_bps - 500_000_000.0).abs() < 1.0);
+        assert!((candidates[1].rtt_ms - 25.0).abs() < f64::EPSILON);
+
+        // Path 0 should be unchanged
+        assert!((candidates[0].bandwidth_estimate_bps - 1_000_000_000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_record_path_metrics_unknown_path() {
+        let mut candidates = make_candidates(2);
+
+        // Recording metrics for non-existent path_id should be a no-op
+        PathSelector::record_path_metrics(&mut candidates, 99, 100.0, 5.0);
+
+        // All candidates unchanged
+        for c in &candidates {
+            assert!((c.bandwidth_estimate_bps - 1_000_000_000.0).abs() < 1.0);
+        }
     }
 }

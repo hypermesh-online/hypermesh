@@ -100,10 +100,10 @@ pub(super) fn spawn_block_sync_loop(
 
             let fetched_blocks = {
                 let mut sm = sync_manager.lock().await;
-                let rp = reflector_pool.lock().await;
+                let mut rp = reflector_pool.lock().await;
                 TransportSyncDriver::run_sync_round(
                     &mut sm,
-                    &rp,
+                    &mut rp,
                     &blockchain,
                     &transport,
                     &addr_map_snapshot,

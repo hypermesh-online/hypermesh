@@ -414,6 +414,20 @@ impl SyncProtocol {
     pub fn config(&self) -> &SyncProtocolConfig {
         &self.config
     }
+
+    /// Check whether a specific peer is stale based on the given timeout.
+    ///
+    /// Returns `true` if the peer's last heartbeat is older than
+    /// `timeout_secs` seconds, or if the peer is not tracked at all.
+    pub fn is_reflector_stale(&self, node_id: &str, timeout_secs: u64) -> bool {
+        let timeout = Duration::from_secs(timeout_secs);
+        let now = Instant::now();
+
+        match self.health_tracker.get(node_id) {
+            Some(entry) => now.duration_since(entry.value().last_heartbeat) > timeout,
+            None => true, // Unknown peer is considered stale
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -682,5 +696,53 @@ mod tests {
         qs.record_confirmation(10, "node-a".to_string());
         qs.record_confirmation(10, "node-a".to_string());
         assert_eq!(qs.confirmations_for(10), 1);
+    }
+
+    #[test]
+    fn test_is_reflector_stale_unknown_peer() {
+        let t = make_transport();
+        let p = make_protocol(t);
+
+        // Unknown peer is always considered stale
+        assert!(p.is_reflector_stale("nonexistent", 60));
+    }
+
+    #[test]
+    fn test_is_reflector_stale_fresh_peer() {
+        let t = make_transport();
+        let p = make_protocol(t.clone());
+
+        t.connect_reflector("peer-1".into(), "[::1]:9001".into(), test_position(1.0))
+            .expect("test: connect");
+        p.process_heartbeat("peer-1", 10, 1.0, test_position(1.0));
+
+        // Just heartbeated — should not be stale with a 60s timeout
+        assert!(!p.is_reflector_stale("peer-1", 60));
+    }
+
+    #[test]
+    fn test_is_reflector_stale_expired_peer() {
+        let config = SyncProtocolConfig {
+            stale_reflector_timeout: Duration::from_millis(1),
+            ..SyncProtocolConfig::default()
+        };
+
+        let t = make_transport();
+        t.connect_reflector("old-peer".into(), "[::1]:9001".into(), test_position(1.0))
+            .expect("test: connect");
+
+        let p = SyncProtocol::new(
+            config,
+            t,
+            test_network(),
+            "local".to_string(),
+            test_position(0.0),
+        );
+
+        p.process_heartbeat("old-peer", 10, 0.5, test_position(1.0));
+        std::thread::sleep(Duration::from_millis(10));
+
+        // With a 0-second timeout, the peer is definitely stale
+        assert!(p.is_reflector_stale("old-peer", 0));
     }
 }

@@ -30,3 +30,13 @@ pub use block_transport::StoqBlockTransport;
 pub use bridge::{BridgedMatrixMessage, ReflectorBridge};
 pub use message::ReflectorMessage;
 pub use sync_protocol::{SyncProtocol, SyncProtocolConfig};
+
+/// Check whether a reflector should be considered stale based on how
+/// long ago it was last seen.
+///
+/// Returns `false` (unhealthy) when `last_seen_secs >= timeout_secs`,
+/// meaning the reflector has not been heard from within the timeout.
+#[inline]
+pub fn check_reflector_health(last_seen_secs: u64, timeout_secs: u64) -> bool {
+    last_seen_secs < timeout_secs
+}
