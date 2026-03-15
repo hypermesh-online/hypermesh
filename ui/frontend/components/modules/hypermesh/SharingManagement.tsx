@@ -7,17 +7,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAssets, useAllocations } from '@/lib/api';
+import { useNetworkPeers } from '@/lib/hooks/useBlockMatrix';
 import {
   Settings,
   Share,
   Shield,
   Zap,
-  Activity
+  Activity,
+  Users
 } from 'lucide-react';
 
 export function SharingManagement() {
   const { allocations, activeAllocations, isLoading } = useAllocations();
   const { assets } = useAssets();
+  const { data: peers, isLoading: peersLoading } = useNetworkPeers();
   const [selectedAllocation, setSelectedAllocation] = React.useState<string | null>(null);
 
   const sharingStats = React.useMemo(() => {
@@ -171,6 +174,61 @@ export function SharingManagement() {
               <h3 className="text-lg font-medium text-white mb-2">No Active Sharing</h3>
               <p className="text-gray-400">Your resources are available but not currently being used by others.</p>
               <p className="text-sm text-gray-500 mt-2">Configure resource limits in the Resources tab to start sharing.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Connected Peers */}
+      <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-cyan-400" />
+            Connected Peers
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Peers available for resource sharing ({peers?.length ?? 0} connected)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {peersLoading ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => (
+                <div key={i} className="animate-pulse h-14 bg-gray-700 rounded-lg"></div>
+              ))}
+            </div>
+          ) : peers && peers.length > 0 ? (
+            <div className="space-y-2">
+              {peers.map((peer) => (
+                <div
+                  key={peer.node_id}
+                  className="flex items-center justify-between p-3 border border-cyan-500/20 rounded-lg bg-cyan-500/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-400 rounded-full" />
+                    <div>
+                      <p className="text-sm font-mono text-white">{peer.node_id.slice(0, 16)}...</p>
+                      <p className="text-xs text-gray-400">{peer.address}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {peer.coordinate && (
+                      <Badge variant="outline" className="text-xs bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
+                        ({peer.coordinate.x},{peer.coordinate.y},{peer.coordinate.z})
+                      </Badge>
+                    )}
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                      Connected
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <Users className="h-10 w-10 text-gray-600 mx-auto mb-2" />
+              <p>No peers connected</p>
+              <p className="text-xs text-gray-500 mt-1">Peers will appear when other nodes join the network</p>
             </div>
           )}
         </CardContent>

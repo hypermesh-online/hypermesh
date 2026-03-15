@@ -128,6 +128,13 @@ items = [
     "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
     "Engauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
     "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered",
+    "Bilateral PoS verification on peer auth",
+    "Reflector health scoring and pruning",
+    "Cross-node metrics pipeline (MetricsReporter)",
+    "EngaugeBridge periodic feed + transmit",
+    "ReplicationTrigger wired to IntelligenceLayer",
+    "RoutingAdvisor weights in TransactionRouter",
+    "Privacy tier mapping fix",
 ]
 
 [features.in_development]

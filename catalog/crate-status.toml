@@ -22,18 +22,19 @@ items = [
     "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness)",
     "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)",
     "Catalog server binary stability (standalone STOQ API — LRU cache OOM bug fixed)",
+    "DHT store/query over STOQ transport",
+    "STOQ API handlers wired to CatalogRegistry",
+    "Real FALCON-1024 signature verification",
+    "X.509 certificate parsing for publisher info",
+    "TrustChain certificate validation (real expiry/revocation)",
+    "Policy rule evaluation (CertificateIssuer)",
 ]
 
 [features.in_development]
 items = [
-    # Network integration is all stub/local-only
-    "STOQ transport for real cross-node distribution — transport code exists but not tested between nodes",
-    "TrustChain security integration — FALCON-1024 cert lifecycle referenced but certs are rcgen X.509",
-    "Proof of State validation for packages — validation struct exists but proofs are self-generated fakes",
     "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
     "Peer-to-peer sharing — announce/discover code exists but local-only until DHT remote I/O is wired",
     "HyperMesh execution delegation — allocate/query/terminate lifecycle code exists but no real remote execution",
-    "DHT remote I/O — wire to real STOQ transport for cross-node package discovery",
     "Shared asset library — browse and install packages across nodes on the public network",
 ]
 

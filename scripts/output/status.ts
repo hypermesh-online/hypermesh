@@ -122,7 +122,14 @@ export const crateStatuses: CrateStatus[] = [
         "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
         "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
         "Engauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
-        "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered"
+        "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered",
+        "Bilateral PoS verification on peer auth",
+        "Reflector health scoring and pruning",
+        "Cross-node metrics pipeline (MetricsReporter)",
+        "EngaugeBridge periodic feed + transmit",
+        "ReplicationTrigger wired to IntelligenceLayer",
+        "RoutingAdvisor weights in TransactionRouter",
+        "Privacy tier mapping fix"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
@@ -228,21 +235,23 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard manifest types (DashboardManifest parse/validate, shared with blockmatrix)",
         "Asset validation pipeline (size limits, BLAKE3 hash verification, metadata completeness)",
         "catalog.hypermesh.online STOQ API endpoint (6 handlers over QUIC)",
-        "Catalog server binary stability (standalone STOQ API — LRU cache OOM bug fixed)"
+        "Catalog server binary stability (standalone STOQ API — LRU cache OOM bug fixed)",
+        "DHT store/query over STOQ transport",
+        "STOQ API handlers wired to CatalogRegistry",
+        "Real FALCON-1024 signature verification",
+        "X.509 certificate parsing for publisher info",
+        "TrustChain certificate validation (real expiry/revocation)",
+        "Policy rule evaluation (CertificateIssuer)"
       ],
       "inDevelopment": [
-        "STOQ transport for real cross-node distribution — transport code exists but not tested between nodes",
-        "TrustChain security integration — FALCON-1024 cert lifecycle referenced but certs are rcgen X.509",
-        "Proof of State validation for packages — validation struct exists but proofs are self-generated fakes",
         "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
         "Peer-to-peer sharing — announce/discover code exists but local-only until DHT remote I/O is wired",
         "HyperMesh execution delegation — allocate/query/terminate lifecycle code exists but no real remote execution",
-        "DHT remote I/O — wire to real STOQ transport for cross-node package discovery",
         "Shared asset library — browse and install packages across nodes on the public network"
       ],
       "planned": []
     },
-    "completion": 65
+    "completion": 84
   },
   {
     "id": "engauge",
@@ -271,18 +280,19 @@ export const crateStatuses: CrateStatus[] = [
         "Caesar in-transit/holding amount tracking (per-node economic state struct)",
         "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
         "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
-        "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()"
+        "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()",
+        "MetricsPublisher transport callbacks",
+        "MetricsSubscriber byte ingestion",
+        "RegionalAggregator periodic change detection"
       ],
       "inDevelopment": [
-        "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
-        "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
       ],
       "planned": [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 84
+    "completion": 92
   },
   {
     "id": "gateway",
@@ -540,11 +550,16 @@ export const crateStatuses: CrateStatus[] = [
         "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
         "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
         "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames",
-        "Path scheduling feedback — PathSelector.apply_recommendation() accepts engauge PathPolicyRecommendation, maps strategy to multi-path scheduler"
+        "Path scheduling feedback — PathSelector.apply_recommendation() accepts engauge PathPolicyRecommendation, maps strategy to multi-path scheduler",
+        "WAN transport (non-localhost bind, interface detection)",
+        "MTU clamping for internet paths",
+        "Connection migration scaffold",
+        "Engauge→path scheduler feedback",
+        "PosValidationState connection gate",
+        "PathSelector recommendation polling"
       ],
       "inDevelopment": [
         "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
-        "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
       ],
       "planned": [
@@ -553,7 +568,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 81
+    "completion": 86
   },
   {
     "id": "trustchain",
@@ -585,7 +600,11 @@ export const crateStatuses: CrateStatus[] = [
         "Canonical ProofType from hypermesh-lib",
         "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
         "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
-        "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)"
+        "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)",
+        "Real PoS bilateral verification on peer connections",
+        "PoS-gated CA certificate issuance",
+        "CA federation with PoS-validated peers",
+        "FALCON-1024 certificate signing in STOQ"
       ],
       "inDevelopment": [
         "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
@@ -614,7 +633,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 52
+    "completion": 56
   },
   {
     "id": "ui",
@@ -636,13 +655,15 @@ export const crateStatuses: CrateStatus[] = [
         "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
         "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
         "Sidebar shows real daemon status, chain height, peer count, privacy mode",
-        "No mock fallbacks — shows 'not connected' when daemon offline"
+        "No mock fallbacks — shows 'not connected' when daemon offline",
+        "TrustChain module wired to real API data",
+        "Engauge module TypeScript errors fixed",
+        "STOQ module wired to real topology data",
+        "Asset management wired to blockchain data",
+        "Engauge API hooks re-exported"
       ],
       "inDevelopment": [
         "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
-        "TrustChain management views — 21 components render with static data, no real cert operations",
-        "Asset management views — creation wizard renders but no real asset creation backend",
-        "Engauge analytics views — renders but metrics are mock data (15 pre-existing TS errors in engauge module)",
         "Catalog browser — renders but limited backend integration",
         "Global search — searches hardcoded static data only",
         "WebSocket real-time events — Web3Events system defined but not connected to components",
@@ -659,6 +680,6 @@ export const crateStatuses: CrateStatus[] = [
         "Native desktop dashboard (Tauri cross-platform)"
       ]
     },
-    "completion": 47
+    "completion": 59
   }
 ];

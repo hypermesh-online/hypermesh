@@ -33,12 +33,17 @@ items = [
     "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
     "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames",
     "Path scheduling feedback — PathSelector.apply_recommendation() accepts engauge PathPolicyRecommendation, maps strategy to multi-path scheduler",
+    "WAN transport (non-localhost bind, interface detection)",
+    "MTU clamping for internet paths",
+    "Connection migration scaffold",
+    "Engauge→path scheduler feedback",
+    "PosValidationState connection gate",
+    "PathSelector recommendation polling",
 ]
 
 [features.in_development]
 items = [
     "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
-    "Peer connection manager — maintain persistent QUIC connections to known peers, reconnect on failure",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
 ]
 

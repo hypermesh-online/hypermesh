@@ -34,6 +34,10 @@ items = [
     "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
     # Metrics
     "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)",
+    "Real PoS bilateral verification on peer connections",
+    "PoS-gated CA certificate issuance",
+    "CA federation with PoS-validated peers",
+    "FALCON-1024 certificate signing in STOQ",
 ]
 
 [features.in_development]

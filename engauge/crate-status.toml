@@ -28,13 +28,13 @@ items = [
     "STOQ-compatible API server (EngaugeStoqApi: 6 handlers, bind [::1]:9296)",
     "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
     "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()",
+    "MetricsPublisher transport callbacks",
+    "MetricsSubscriber byte ingestion",
+    "RegionalAggregator periodic change detection",
 ]
 
 [features.in_development]
 items = [
-    "Metrics publisher/subscriber network delivery — push model code exists, needs STOQ transport for real peer delivery",
-    # Post-B2
-    "Regional aggregator multi-node operation — aggregation logic works but only with local/mock data",
     "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
 ]
 

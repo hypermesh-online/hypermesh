@@ -22,15 +22,17 @@ items = [
     "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
     "Sidebar shows real daemon status, chain height, peer count, privacy mode",
     "No mock fallbacks — shows 'not connected' when daemon offline",
+    "TrustChain module wired to real API data",
+    "Engauge module TypeScript errors fixed",
+    "STOQ module wired to real topology data",
+    "Asset management wired to blockchain data",
+    "Engauge API hooks re-exported",
 ]
 
 [features.in_development]
 items = [
     # Service-specific pages still render with static/mock data
     "Caesar wallet views — has real endpoint calls but returns mock data when backend unavailable",
-    "TrustChain management views — 21 components render with static data, no real cert operations",
-    "Asset management views — creation wizard renders but no real asset creation backend",
-    "Engauge analytics views — renders but metrics are mock data (15 pre-existing TS errors in engauge module)",
     "Catalog browser — renders but limited backend integration",
     "Global search — searches hardcoded static data only",
     "WebSocket real-time events — Web3Events system defined but not connected to components",

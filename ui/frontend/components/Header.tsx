@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 import React from 'react';
-import { Activity, Settings, User, Globe, Zap } from 'lucide-react';
+import { Activity, Settings, User, Globe, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,10 +15,12 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { GlobalSearch } from './GlobalSearch';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useNodeStatus } from '@/lib/hooks/useBlockMatrix';
 
 export function Header() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { data: nodeStatus } = useNodeStatus();
 
   const getThemeFromPath = () => {
     const path = location.pathname;
@@ -41,9 +43,15 @@ export function Header() {
         </div>
         
         <div className="flex items-center gap-4">
+          {nodeStatus && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full">
+              <Shield className="h-3 w-3 text-purple-400" />
+              <span className="text-xs text-purple-300">{nodeStatus.privacy_mode}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-xs text-green-300">HyperMesh Active</span>
+            <span className="text-xs text-green-300">{nodeStatus ? 'HyperMesh Active' : 'Connecting...'}</span>
           </div>
           
           <Button variant="ghost" size="icon" className="relative text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/20">

@@ -157,6 +157,27 @@ export function useAssetList(pollInterval = 15_000) {
   });
 }
 
+// ---------- Config ----------
+
+/** Full node configuration */
+export function useConfigShow() {
+  return useQuery<Record<string, unknown>>({
+    queryKey: ['blockmatrix', 'config', 'show'],
+    queryFn: () => blockMatrixClient.getConfig() as Promise<Record<string, unknown>>,
+    staleTime: 30_000,
+  });
+}
+
+/** Get a specific config key */
+export function useConfigGet(key: string | undefined) {
+  return useQuery<unknown>({
+    queryKey: ['blockmatrix', 'config', 'get', key],
+    queryFn: () => blockMatrixClient.getConfigKey(key!),
+    enabled: !!key,
+    staleTime: 30_000,
+  });
+}
+
 // ---------- Domain ----------
 
 /** List registered domains */
