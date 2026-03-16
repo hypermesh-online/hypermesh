@@ -74,7 +74,7 @@ pub async fn extract_dns_from_blockchain(
 }
 
 /// Persist a single DNS record by updating the on-disk JSON file.
-fn persist_dns_record(
+pub(crate) fn persist_dns_record(
     data_dir: &std::path::Path,
     node_id: &str,
     name: &str,

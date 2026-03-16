@@ -12,7 +12,7 @@ items = [
     "Geospatial module (GPS conversion, clustering)",
     # Single-node blockchain (real persistence, real BLAKE3 hashing)
     "Every-node blockchain (independent Device chain, genesis on boot)",
-    "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager)",
+    "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager, versioned block format v1 with BLAKE3 integrity verification on every read)",
     "NodeBlockchain::from_blocks() chain reconstruction with integrity validation",
     "Node resume path (load persisted genesis/blocks/cert from disk)",
     "BLAKE3 content hashing for blocks",
@@ -48,9 +48,8 @@ items = [
     "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
     "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
     # Scope-aware block sync (HashMatrix)
-    "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication), Public (HashMatrix spatial filtering)",
+    "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication)",
     "SpatialBucketAssigner — adaptive neighborhood radius via sqrt(n) k-nearest peers, octree-like partitioning of 3D hash volume",
-    "Block re-propagation — Network/Public scope blocks re-propagated to connected peers after insertion",
     # Genesis and hardware (R1)
     "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
     # IPC daemon architecture (Phase 1 Sprints 1-2)
@@ -117,7 +116,7 @@ items = [
     "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
     "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
     "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
-    "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
+    "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync data messages, network-ID scoping, per-entry proof_hash validation (block announces are ungated)",
     "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
     "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
     "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
@@ -141,6 +140,13 @@ items = [
 items = [
     # Group C (deferred)
     "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
+    # Security review pending
+    "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
+    # Scope-aware sync (partially working)
+    "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
+    "Block re-propagation — Network/Public scope blocks re-propagated to connected peers (currently floods, needs torrent-model selective propagation)",
+    "Block propagation torrent model — blocks propagate to content-interested peers only (Private: full replication, Public: HashMatrix spatial filtering)",
+    "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
 ]
 
 [features.planned]
@@ -153,4 +159,6 @@ items = [
     "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
     "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
     "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
+    "Consumer-becomes-provider shard replication (R12 swarm scaling)",
+    "Engauge-driven demand-based block replication",
 ]

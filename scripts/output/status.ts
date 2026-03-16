@@ -26,7 +26,7 @@ export const crateStatuses: CrateStatus[] = [
         "Tensor math library (Vector3D, Matrix3x3, A*)",
         "Geospatial module (GPS conversion, clustering)",
         "Every-node blockchain (independent Device chain, genesis on boot)",
-        "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager)",
+        "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager, versioned block format v1 with BLAKE3 integrity verification on every read)",
         "NodeBlockchain::from_blocks() chain reconstruction with integrity validation",
         "Node resume path (load persisted genesis/blocks/cert from disk)",
         "BLAKE3 content hashing for blocks",
@@ -132,7 +132,8 @@ export const crateStatuses: CrateStatus[] = [
         "Privacy tier mapping fix"
       ],
       "inDevelopment": [
-        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end"
+        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
+        "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending"
       ],
       "planned": [
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",

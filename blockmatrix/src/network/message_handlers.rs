@@ -103,10 +103,12 @@ pub(crate) async fn run_peer_message_loop(
 
 /// Route a single message payload to the appropriate handler.
 ///
-/// All data-bearing messages (blocks, shards, sync, block-fetch) are
+/// Asset-level operations (shard send/fetch, sync, block-fetch) are
 /// gated on the sender being in the [`AuthenticatedPeers`] map AND
-/// belonging to the same network. Gossip and unknown tags are logged
-/// but not gated (they carry no state-changing data).
+/// belonging to the same network. Block announcements are NOT gated —
+/// they are validated by BLAKE3 content integrity, per-entry proof_hash,
+/// and state_proof.validate(). Gossip and unknown tags are logged
+/// but not gated.
 pub(crate) async fn dispatch_message(
     data: &[u8],
     stream: &mut stoq::Stream,
@@ -117,10 +119,13 @@ pub(crate) async fn dispatch_message(
     let tag = data[0];
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
-    // Gate all state-changing messages on peer authentication + network scope.
+    // Gate asset-level operations on peer authentication + network scope.
+    // Block announcements are NOT gated here — blocks are validated by
+    // BLAKE3 content integrity + per-entry proof_hash + state_proof.validate().
+    // Only shard access (asset-level) and sync operations need PoS gating.
     let needs_auth = matches!(
         tag,
-        TAG_SHARD_SEND | TAG_SHARD_FETCH | TAG_BLOCK_ANNOUNCE
+        TAG_SHARD_SEND | TAG_SHARD_FETCH
             | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
     );
     if needs_auth
@@ -632,6 +637,13 @@ fn spawn_acceptor_ca_enrollment(
 }
 
 /// Process a single peer-message connection (non-handshake).
+///
+/// This path handles standalone CONN_TYPE_PEER_MESSAGE connections.
+/// Block propagation uses the handshake connection's `run_peer_message_loop`
+/// instead, so this path is mainly for ad-hoc peer messages.
+///
+/// Uses the remote socket address as a placeholder peer identity since
+/// no node_id prefix is included in the wire format.
 async fn handle_peer_message_connection(
     stream: &mut stoq::Stream,
     connection: &Arc<stoq::Connection>,
@@ -646,11 +658,8 @@ async fn handle_peer_message_connection(
     };
 
     if let Some(ctx) = peer_ctx {
-        let remote = connection.endpoint().to_socket_addr();
-        let remote_str = remote.to_string();
-        let short_remote = &remote_str[..20.min(remote_str.len())];
-        let placeholder = MatrixCoordinate::new(0, 0, 0).unwrap_or(local_coord);
-        dispatch_message(&data, stream, short_remote, &placeholder, &ctx).await;
+        let peer_node_id = connection.endpoint().to_socket_addr().to_string();
+        dispatch_message(&data, stream, &peer_node_id, &local_coord, &ctx).await;
     } else {
         debug!("Peer message received but no PeerContext — dropping");
     }

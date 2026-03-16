@@ -75,6 +75,23 @@ pub enum PersistenceError {
     /// Invalid path
     #[error("Invalid path: {0}")]
     InvalidPath(String),
+
+    /// Block integrity violation detected — possible tampering
+    ///
+    /// SECURITY REVIEW REQUIRED: This error indicates the persisted block's
+    /// canonical hash does not match the stored/expected hash. This could mean:
+    /// 1. Data corruption (disk error)
+    /// 2. Format incompatibility (software bug)
+    /// 3. Intentional tampering (security breach)
+    ///
+    /// The node MUST NOT accept this block. Manual investigation required.
+    /// See papers/HYPERMESH.md §6.2 and §7.2 for the security model.
+    #[error("Block integrity violation at index {index}: stored hash {stored_hash}, computed hash {computed_hash} — possible tampering, SECURITY REVIEW REQUIRED")]
+    IntegrityViolation {
+        index: u64,
+        stored_hash: String,
+        computed_hash: String,
+    },
 }
 
 pub type PersistenceResult<T> = Result<T, PersistenceError>;

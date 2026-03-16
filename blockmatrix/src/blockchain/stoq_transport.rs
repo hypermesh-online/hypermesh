@@ -9,7 +9,6 @@
 //! coordinate and reused when still active.
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
@@ -21,47 +20,49 @@ use crate::matrix::coordinate::MatrixCoordinate;
 /// Tag byte identifying a BLOCK_ANNOUNCE message on the wire.
 const BLOCK_ANNOUNCE_TAG: u8 = 0x03;
 
-/// Adapter that implements [`BlockTransport`] using real STOQ connections.
+/// Adapter that implements [`BlockTransport`] over bilateral handshake connections.
 ///
-/// Connects to remote nodes via STOQ/QUIC and sends serialized blocks over
-/// bidirectional streams. Connections are cached per coordinate and reused
-/// when still active.
+/// Block propagation ONLY uses connections established via bilateral PoS
+/// handshake (R11). Connections are injected after handshake completes;
+/// `send_block` never creates new connections. If no handshake connection
+/// exists for a target coordinate, propagation to that peer is skipped —
+/// the peer must handshake first.
+///
+/// Streams opened on handshake connections are received by
+/// `run_peer_message_loop` on the remote side, which already knows our
+/// identity from the handshake. No discriminator or node-id prefix is
+/// needed — just the raw `[tag][body]` payload.
 pub struct StoqBlockTransportAdapter {
-    /// STOQ transport for establishing connections.
-    transport: Arc<stoq::StoqTransport>,
-    /// Cached connections keyed by coordinate string ("x,y,z").
+    /// Bilateral handshake connections keyed by coordinate string ("x,y,z").
+    /// Populated via [`inject_connection`] after successful PoS handshake.
     connections: Arc<RwLock<HashMap<String, Arc<stoq::Connection>>>>,
-    /// Coordinate -> (node_id_hex, socket_addr) mapping for address resolution.
-    node_map: Arc<RwLock<HashMap<String, (String, SocketAddr)>>>,
 }
 
 impl StoqBlockTransportAdapter {
-    /// Create a new adapter backed by the given STOQ transport.
+    /// Create a new adapter.
     ///
-    /// `node_map` maps coordinate keys ("x,y,z") to `(node_id_hex, SocketAddr)`.
-    pub fn new(
-        transport: Arc<stoq::StoqTransport>,
-        node_map: Arc<RwLock<HashMap<String, (String, SocketAddr)>>>,
-    ) -> Self {
+    /// Starts with no connections. Call [`inject_connection`] after each
+    /// successful bilateral PoS handshake to enable block propagation to
+    /// that peer.
+    pub fn new() -> Self {
         Self {
-            transport,
             connections: Arc::new(RwLock::new(HashMap::new())),
-            node_map,
         }
     }
 
-    /// Register a node's address for a coordinate.
-    pub async fn register_node(
+    /// Inject a bilateral handshake connection for a coordinate.
+    ///
+    /// After a successful PoS handshake, the authenticated connection is
+    /// registered here so that block propagation can reuse it. The remote
+    /// side's `run_peer_message_loop` is already accepting streams on this
+    /// connection and knows our identity from the handshake.
+    pub async fn inject_connection(
         &self,
         coord: &MatrixCoordinate,
-        node_id: &str,
-        addr: SocketAddr,
+        connection: Arc<stoq::Connection>,
     ) {
         let key = format!("{},{},{}", coord.x, coord.y, coord.z);
-        self.node_map
-            .write()
-            .await
-            .insert(key, (node_id.to_string(), addr));
+        self.connections.write().await.insert(key, connection);
     }
 
     /// Build the wire-format payload for a block announcement.
@@ -106,54 +107,25 @@ impl BlockTransport for StoqBlockTransportAdapter {
     ) -> bool {
         let key = format!("{},{},{}", target.x, target.y, target.z);
 
-        // 1. Resolve target coordinate to a socket address.
-        let addr = {
-            let map = self.node_map.read().await;
-            match map.get(&key) {
-                Some((_node_id, addr)) => *addr,
+        // Look up the handshake connection for this coordinate.
+        // If no connection exists, the peer hasn't completed bilateral PoS
+        // handshake — skip propagation to this peer.
+        let conn = {
+            let cache = self.connections.read().await;
+            match cache.get(&key) {
+                Some(c) if c.is_active() => c.clone(),
+                Some(_) => {
+                    debug!(coord = %key, "handshake connection inactive, skipping");
+                    return false;
+                }
                 None => {
-                    warn!(coord = %key, "no node registered for coordinate");
+                    debug!(coord = %key, "no handshake connection for coordinate, skipping");
                     return false;
                 }
             }
         };
 
-        // STOQ is IPv6-only — reject IPv4 addresses.
-        let ipv6_addr = match addr {
-            SocketAddr::V6(v6) => *v6.ip(),
-            SocketAddr::V4(_) => {
-                warn!(addr = %addr, "IPv4 address rejected — STOQ is IPv6-only");
-                return false;
-            }
-        };
-
-        // 2. Try to reuse a cached connection, or establish a new one.
-        let conn = {
-            let cache = self.connections.read().await;
-            cache.get(&key).filter(|c| c.is_active()).cloned()
-        };
-
-        let conn = match conn {
-            Some(c) => c,
-            None => {
-                let endpoint = stoq::Endpoint::new(ipv6_addr, addr.port());
-                match self.transport.connect(&endpoint).await {
-                    Ok(new_conn) => {
-                        self.connections
-                            .write()
-                            .await
-                            .insert(key.clone(), new_conn.clone());
-                        new_conn
-                    }
-                    Err(e) => {
-                        warn!(coord = %key, error = %e, "STOQ connect failed");
-                        return false;
-                    }
-                }
-            }
-        };
-
-        // 3. Build the wire payload.
+        // Build the wire payload: [tag][body].
         let payload = match Self::build_wire_payload(block) {
             Ok(p) => p,
             Err(e) => {
@@ -162,28 +134,21 @@ impl BlockTransport for StoqBlockTransportAdapter {
             }
         };
 
-        // 4. Open a stream, write the PEER_MESSAGE discriminator, then payload.
-        match conn.open_bi().await {
-            Ok((mut send, _recv)) => {
-                // Write the connection-type discriminator so the acceptor
-                // knows this is a peer message, not a handshake.
-                if let Err(e) = send.write_all(&[crate::network::CONN_TYPE_PEER_MESSAGE]).await {
-                    warn!(coord = %key, error = %e, "discriminator write failed");
-                    return false;
-                }
-                if let Err(e) = send.write_all(&payload).await {
-                    warn!(coord = %key, error = %e, "stream write failed");
-                    return false;
-                }
-                if let Err(e) = send.finish() {
-                    warn!(coord = %key, error = %e, "stream finish failed");
+        // Open a Stream on the handshake connection and send the payload.
+        // Uses `open_stream()` + `stream.send()` so the framing matches
+        // what the remote side's `run_peer_message_loop` expects from
+        // `stream.receive()`.
+        match conn.open_stream().await {
+            Ok(mut stream) => {
+                if let Err(e) = stream.send(&payload).await {
+                    warn!(coord = %key, error = %e, "stream send failed");
                     return false;
                 }
                 debug!(
                     coord = %key,
                     block_index = block.index,
                     payload_bytes = payload.len(),
-                    "block announced via STOQ"
+                    "block announced via STOQ handshake connection"
                 );
                 true
             }

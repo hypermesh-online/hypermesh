@@ -53,6 +53,10 @@ pub struct Cli {
     #[clap(long, default_value = "~/.blockmatrix")]
     pub data_dir: String,
 
+    /// DNS name to register for this node at boot (e.g., "trust", "persist")
+    #[clap(long, env = "HYPERMESH_NAME")]
+    pub name: Option<String>,
+
     /// Output in JSON format
     #[clap(long, global = true)]
     pub json: bool,

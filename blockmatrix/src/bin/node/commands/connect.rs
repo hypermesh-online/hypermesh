@@ -4,9 +4,10 @@
 
 //! Connect/disconnect subcommand handler -- starts the node daemon.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use tracing::{debug, info, warn};
 
+use blockmatrix::assets::core::{AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope};
 use blockmatrix::blockchain::propagation::{BlockPropagator, PropagationStrategy};
 use blockmatrix::blockchain::stoq_transport::StoqBlockTransportAdapter;
 use blockmatrix::blockchain::sync_manager::{SyncConfig, SyncManager};
@@ -165,6 +166,13 @@ pub async fn run_connect(
 
     register_default_dashboard(bootstrap, data_dir, nid, coord).await;
 
+    // --- DNS self-registration from --name flag ---
+    if let Some(ref name) = cli.name {
+        if let Err(e) = register_node_dns_name(name, bootstrap, data_dir, nid, coord).await {
+            warn!("DNS self-registration failed for '{}': {}", name, e);
+        }
+    }
+
     info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
     info!("Press Ctrl+C to stop");
 
@@ -295,10 +303,7 @@ async fn start_network(
         std::collections::HashMap::new(),
     ));
 
-    let block_transport = std::sync::Arc::new(StoqBlockTransportAdapter::new(
-        transport.clone(),
-        node_map.clone(),
-    ));
+    let block_transport = std::sync::Arc::new(StoqBlockTransportAdapter::new());
 
     let block_propagator = std::sync::Arc::new(tokio::sync::Mutex::new(
         BlockPropagator::with_transport(
@@ -389,6 +394,15 @@ async fn start_network(
     let addr_map = network_clone.get_node_address_map().await;
     *node_map.write().await = addr_map;
 
+    // Inject authenticated connections into the block transport adapter so
+    // that block propagation reuses the handshake connection instead of
+    // opening new (unauthenticated) STOQ connections.
+    for node in network_clone.get_connected_nodes().await {
+        if let Some(ref conn) = node.connection {
+            block_transport.inject_connection(&node.coordinate, conn.clone()).await;
+        }
+    }
+
     // Accept connections in background
     let network_accept = network_clone.clone();
     let ctx_accept = peer_ctx.clone();
@@ -455,4 +469,66 @@ async fn start_network(
     let _reflector_pool = reflector_pool.clone();
 
     Ok((network_clone, shard_store, shard_transport))
+}
+
+/// Register a DNS name for this node on the local blockchain.
+///
+/// This replicates the `dns register` command logic so that nodes can
+/// self-register their name at boot via `--name`.
+async fn register_node_dns_name(
+    name: &str,
+    bootstrap: &NodeBootstrap,
+    data_dir: &std::path::Path,
+    node_id: &str,
+    coord: MatrixCoordinate,
+) -> Result<()> {
+    // TODO: Use the node's peer-facing address once NAT detection is implemented.
+    // For now, register with ::1 -- peers discover the real address from the
+    // STOQ connection's remote address, not from the DNS record's stored IP.
+    let target_addr = std::net::IpAddr::from(std::net::Ipv6Addr::LOCALHOST);
+
+    // Register in the in-memory resolver
+    bootstrap.dns().register(name.to_string(), target_addr).await;
+
+    // Persist to disk so the record survives restarts
+    super::dns::persist_dns_record(data_dir, node_id, name, target_addr)?;
+
+    // Write a blockchain DNS asset so it propagates to peers
+    let bc = bootstrap.blockchain();
+    let ipv6_addr = match target_addr {
+        std::net::IpAddr::V6(v6) => v6,
+        std::net::IpAddr::V4(v4) => v4.to_ipv6_mapped(),
+    };
+    let dns_entry = blockmatrix::dns::DnsBlockEntry {
+        domain_name: name.to_string(),
+        record_type: blockmatrix::dns::DnsRecordType::AAAA,
+        record_data: blockmatrix::dns::DnsRecordData::AAAA(ipv6_addr),
+        ttl: 300,
+        owner: node_id.to_string(),
+    };
+    let dns_bytes = serde_json::to_vec(&dns_entry)
+        .context("failed to serialize DNS entry")?;
+
+    let asset_data = AssetData {
+        config: name.as_bytes().to_vec(),
+        definition: dns_bytes.clone(),
+        metadata: Vec::new(),
+    };
+    let registration = AssetRegistration::from_asset_data(
+        &asset_data,
+        NetworkScope::Global,
+        AssetCategory::BaseSystem(BaseSystemType::Dns),
+    );
+    let state_proof = crate::hardware::build_hardware_state_proof(node_id, coord);
+    let block = bc
+        .register_dns_asset(registration, &state_proof, dns_bytes)
+        .await
+        .map_err(|e| anyhow::anyhow!("blockchain write failed: {e}"))?;
+
+    info!(
+        "DNS self-registered '{}' -> {} (block #{})",
+        name, target_addr, block.index,
+    );
+
+    Ok(())
 }
