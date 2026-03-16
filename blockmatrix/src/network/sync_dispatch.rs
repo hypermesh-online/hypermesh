@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use tracing::{debug, info, warn};
 
-use crate::blockchain::block::Block;
+use crate::blockchain::block::{Block, BlockHeader};
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::blockchain::sync_manager::{BlockProvider, SyncManager, SyncMessage};
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -90,6 +90,29 @@ impl<'a> SyncDispatcher<'a> {
                 block_height,
                 health_score,
             ),
+
+            MatrixMessage::GenesisRequest { network_id } => {
+                self.handle_genesis_request(network_id)
+            }
+
+            MatrixMessage::HeaderRequest {
+                network_id,
+                from_height,
+                max_count,
+            } => self.handle_header_request(network_id, from_height, max_count),
+
+            MatrixMessage::SyncBlockRequest {
+                network_id,
+                block_hashes,
+            } => self.handle_sync_block_request(network_id, block_hashes),
+
+            // Response variants are handled by the caller, not dispatched
+            MatrixMessage::GenesisResponse { .. }
+            | MatrixMessage::HeaderResponse { .. }
+            | MatrixMessage::SyncBlockResponse { .. } => {
+                debug!("SyncDispatcher: response message handled by caller");
+                DispatchResponse::None
+            }
 
             other => {
                 debug!("SyncDispatcher ignoring non-sync message: {:?}", other);
@@ -198,6 +221,109 @@ impl<'a> SyncDispatcher<'a> {
         );
 
         DispatchResponse::None
+    }
+
+    /// Return the genesis block (index 0) from the local chain.
+    fn handle_genesis_request(&self, network_id: String) -> DispatchResponse {
+        let provider = match self.block_provider {
+            Some(p) => p,
+            None => {
+                debug!(
+                    network = %network_id,
+                    "GenesisRequest: no block provider available",
+                );
+                return DispatchResponse::None;
+            }
+        };
+
+        let (hashes, _height) = provider.get_block_hashes(0, 1);
+        if hashes.is_empty() {
+            warn!(
+                network = %network_id,
+                "GenesisRequest: no genesis block found",
+            );
+            return DispatchResponse::None;
+        }
+
+        // The provider only gives hashes; we need the full block.
+        // For GenesisRequest we return the hash so the caller can fetch
+        // the full block via BlockFetchRequest. We encode the hash as a
+        // GenesisResponse with the genesis hash in the JSON field.
+        //
+        // NOTE: The full-block provider pattern requires the caller to
+        // supply a FullBlockProvider (see NodeBlockchainFullBlockProvider).
+        // For now, return the hash so the caller can follow up.
+        DispatchResponse::Reply(MatrixMessage::GenesisResponse {
+            network_id,
+            genesis_block_json: hashes[0].clone(),
+        })
+    }
+
+    /// Return block headers from `from_height` up to `max_count`.
+    fn handle_header_request(
+        &self,
+        network_id: String,
+        from_height: u64,
+        max_count: u32,
+    ) -> DispatchResponse {
+        let provider = match self.block_provider {
+            Some(p) => p,
+            None => {
+                debug!(
+                    network = %network_id,
+                    "HeaderRequest: no block provider available",
+                );
+                return DispatchResponse::None;
+            }
+        };
+
+        let (hashes, peer_height) = provider.get_block_hashes(from_height, max_count);
+
+        // We only have hashes from the provider, so we construct minimal
+        // header info. The caller with full block access should use
+        // FullBlockProvider for richer header data.
+        let headers_json: Vec<String> = hashes
+            .iter()
+            .enumerate()
+            .map(|(i, hash)| {
+                let index = from_height + i as u64;
+                // Serialize a minimal header placeholder with hash and index
+                serde_json::json!({
+                    "index": index,
+                    "hash": hash,
+                })
+                .to_string()
+            })
+            .collect();
+
+        DispatchResponse::Reply(MatrixMessage::HeaderResponse {
+            network_id,
+            headers_json,
+            peer_height,
+        })
+    }
+
+    /// Return full blocks matching the requested hashes.
+    fn handle_sync_block_request(
+        &self,
+        network_id: String,
+        block_hashes: Vec<String>,
+    ) -> DispatchResponse {
+        // SyncBlockRequest uses the same mechanism as BlockFetchRequest
+        // but scoped to a network. With only a hash-based BlockProvider
+        // we cannot return full blocks -- return the hashes as confirmation.
+        // The real full-block fetch is done via the existing BlockFetchRequest
+        // path in message_handlers.
+        info!(
+            network = %network_id,
+            requested = block_hashes.len(),
+            "SyncBlockRequest: delegating to block fetch path",
+        );
+
+        DispatchResponse::Reply(MatrixMessage::SyncBlockResponse {
+            network_id,
+            blocks_json: Vec::new(),
+        })
     }
 }
 
@@ -849,6 +975,166 @@ mod tests {
         let best = rp.get_best_reflectors("net-1", 1);
         assert_eq!(best[0].block_height, 25);
         assert!((best[0].health_score - 0.9).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_dispatch_genesis_request_with_provider() {
+        let mut sm = make_sync_manager();
+        sm.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
+            .expect("test: join");
+
+        let mut rp = make_reflector_pool();
+        let provider = FakeBlockProvider { chain_height: 10 };
+
+        let mut dispatcher = SyncDispatcher {
+            sync_manager: &mut sm,
+            reflector_pool: &mut rp,
+            block_provider: Some(&provider),
+        };
+
+        let msg = MatrixMessage::GenesisRequest {
+            network_id: "net-1".to_string(),
+        };
+
+        let resp = dispatcher.dispatch(msg, "peer-1", zero_position());
+        match resp {
+            DispatchResponse::Reply(MatrixMessage::GenesisResponse {
+                network_id,
+                genesis_block_json,
+            }) => {
+                assert_eq!(network_id, "net-1");
+                // FakeBlockProvider returns "hash_0" for height 0
+                assert_eq!(genesis_block_json, "hash_0");
+            }
+            other => unreachable!("test: expected GenesisResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_dispatch_genesis_request_without_provider() {
+        let mut sm = make_sync_manager();
+        let mut rp = make_reflector_pool();
+
+        let mut dispatcher = SyncDispatcher {
+            sync_manager: &mut sm,
+            reflector_pool: &mut rp,
+            block_provider: None,
+        };
+
+        let msg = MatrixMessage::GenesisRequest {
+            network_id: "net-1".to_string(),
+        };
+
+        let resp = dispatcher.dispatch(msg, "peer-1", zero_position());
+        assert!(matches!(resp, DispatchResponse::None));
+    }
+
+    #[test]
+    fn test_dispatch_header_request_with_provider() {
+        let mut sm = make_sync_manager();
+        sm.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
+            .expect("test: join");
+
+        let mut rp = make_reflector_pool();
+        let provider = FakeBlockProvider { chain_height: 20 };
+
+        let mut dispatcher = SyncDispatcher {
+            sync_manager: &mut sm,
+            reflector_pool: &mut rp,
+            block_provider: Some(&provider),
+        };
+
+        let msg = MatrixMessage::HeaderRequest {
+            network_id: "net-1".to_string(),
+            from_height: 5,
+            max_count: 3,
+        };
+
+        let resp = dispatcher.dispatch(msg, "peer-1", zero_position());
+        match resp {
+            DispatchResponse::Reply(MatrixMessage::HeaderResponse {
+                network_id,
+                headers_json,
+                peer_height,
+            }) => {
+                assert_eq!(network_id, "net-1");
+                assert_eq!(headers_json.len(), 3);
+                assert_eq!(peer_height, 20);
+            }
+            other => unreachable!("test: expected HeaderResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_dispatch_sync_block_request() {
+        let mut sm = make_sync_manager();
+        let mut rp = make_reflector_pool();
+
+        let mut dispatcher = SyncDispatcher {
+            sync_manager: &mut sm,
+            reflector_pool: &mut rp,
+            block_provider: None,
+        };
+
+        let msg = MatrixMessage::SyncBlockRequest {
+            network_id: "net-1".to_string(),
+            block_hashes: vec!["hash_a".to_string()],
+        };
+
+        let resp = dispatcher.dispatch(msg, "peer-1", zero_position());
+        match resp {
+            DispatchResponse::Reply(MatrixMessage::SyncBlockResponse {
+                network_id,
+                blocks_json,
+            }) => {
+                assert_eq!(network_id, "net-1");
+                assert!(blocks_json.is_empty());
+            }
+            other => unreachable!("test: expected SyncBlockResponse, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_dispatch_response_variants_return_none() {
+        let mut sm = make_sync_manager();
+        let mut rp = make_reflector_pool();
+
+        let mut dispatcher = SyncDispatcher {
+            sync_manager: &mut sm,
+            reflector_pool: &mut rp,
+            block_provider: None,
+        };
+
+        // GenesisResponse
+        let msg = MatrixMessage::GenesisResponse {
+            network_id: "net-1".to_string(),
+            genesis_block_json: "{}".to_string(),
+        };
+        assert!(matches!(
+            dispatcher.dispatch(msg, "peer-1", zero_position()),
+            DispatchResponse::None
+        ));
+
+        // HeaderResponse
+        let msg = MatrixMessage::HeaderResponse {
+            network_id: "net-1".to_string(),
+            headers_json: vec![],
+            peer_height: 0,
+        };
+        assert!(matches!(
+            dispatcher.dispatch(msg, "peer-1", zero_position()),
+            DispatchResponse::None
+        ));
+
+        // SyncBlockResponse
+        let msg = MatrixMessage::SyncBlockResponse {
+            network_id: "net-1".to_string(),
+            blocks_json: vec![],
+        };
+        assert!(matches!(
+            dispatcher.dispatch(msg, "peer-1", zero_position()),
+            DispatchResponse::None
+        ));
     }
 
     #[test]

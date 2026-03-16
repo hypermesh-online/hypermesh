@@ -26,6 +26,7 @@ pub mod reflector_pool;
 pub mod shard_store;
 pub mod shard_transport;
 pub mod stoq_integration;
+pub mod swarm_provider;
 pub mod sync_dispatch;
 pub mod trust;
 pub mod validation;
@@ -179,6 +180,9 @@ pub struct PeerContext {
     /// Swarm demand tracker for recording shard fetch requests.
     /// Fed into engauge SwarmAnalytics when the `intelligence` feature is enabled.
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
+    /// Shard location index for consumer-becomes-provider (R12).
+    /// Tracks which peers provide which shards, populated from TAG_SHARD_ANNOUNCE.
+    pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,
 }
 
 /// Result of a bilateral handshake including both network node info

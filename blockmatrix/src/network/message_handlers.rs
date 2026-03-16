@@ -43,6 +43,8 @@ pub(crate) const TAG_BLOCK_ANNOUNCE: u8 = 0x03;
 pub(crate) const TAG_SYNC_MESSAGE: u8 = 0x10;
 /// Block fetch request (pull specific blocks by hash).
 pub(crate) const TAG_BLOCK_FETCH_REQUEST: u8 = 0x11;
+/// Shard availability announcement (consumer-becomes-provider, R12).
+pub(crate) const TAG_SHARD_ANNOUNCE: u8 = 0x04;
 /// Gossip protocol message.
 pub(crate) const TAG_GOSSIP: u8 = 0x20;
 
@@ -156,6 +158,9 @@ pub(crate) async fn dispatch_message(
         TAG_BLOCK_FETCH_REQUEST => {
             handle_block_fetch_request(&data[1..], stream, peer_node_id, ctx).await;
         }
+        TAG_SHARD_ANNOUNCE => {
+            handle_shard_announce(data, peer_node_id, ctx).await;
+        }
         TAG_GOSSIP => {
             debug!(
                 "Gossip message from peer {} ({} bytes)",
@@ -207,6 +212,49 @@ async fn record_shard_demand(data: &[u8], peer_node_id: &str, ctx: &PeerContext)
     ctx.swarm_demand_tracker
         .record_fetch(shard_id, peer_node_id)
         .await;
+}
+
+// ── Shard announce handler ───────────────────────────────────────────
+
+/// Handle a shard availability announcement (tag 0x04).
+///
+/// Wire format: tag(1) + count(4 bytes u32 LE) + [shard_hash(32)]...
+/// Updates the ShardLocationIndex with the announcing peer's available shards.
+async fn handle_shard_announce(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if data.len() < 5 {
+        return;
+    }
+    let count = u32::from_le_bytes([data[1], data[2], data[3], data[4]]) as usize;
+    let expected_len = 5 + count * 32;
+    if data.len() < expected_len {
+        let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+        warn!(
+            "Shard announce from {} truncated: expected {} bytes, got {}",
+            short_id, expected_len, data.len(),
+        );
+        return;
+    }
+
+    let mut shard_ids = Vec::with_capacity(count);
+    for i in 0..count {
+        let offset = 5 + i * 32;
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&data[offset..offset + 32]);
+        shard_ids.push(ContentHash(hash));
+    }
+
+    if let Some(ref index) = ctx.shard_location_index {
+        index.register_provider(peer_node_id, &shard_ids).await;
+        debug!(
+            "Shard announce from {}: {} shard(s) registered",
+            &peer_node_id[..8.min(peer_node_id.len())],
+            count,
+        );
+    }
 }
 
 // ── Block handlers ───────────────────────────────────────────────────

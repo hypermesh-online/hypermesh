@@ -291,6 +291,18 @@ impl SyncManager {
                 block_hashes,
                 peer_height,
             } => self.handle_sync_response(&network_id, block_hashes, peer_height),
+
+            // Genesis/Header/Block request-response variants are handled
+            // at the dispatch layer (SyncDispatcher), not SyncManager.
+            SyncMessage::GenesisRequest { .. }
+            | SyncMessage::GenesisResponse { .. }
+            | SyncMessage::HeaderRequest { .. }
+            | SyncMessage::HeaderResponse { .. }
+            | SyncMessage::BlockRequest { .. }
+            | SyncMessage::BlockResponse { .. } => {
+                debug!("SyncManager: genesis/header/block messages handled by dispatcher");
+                None
+            }
         }
     }
 

@@ -374,6 +374,9 @@ async fn start_network(
         swarm_demand_tracker: std::sync::Arc::new(
             blockmatrix::network::SwarmDemandTracker::new(),
         ),
+        shard_location_index: Some(std::sync::Arc::new(
+            blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
+        )),
     });
 
     let network_clone = std::sync::Arc::new(network_manager);

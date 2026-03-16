@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
-use super::block::Block;
+use super::block::{Block, BlockHeader};
 use super::genesis_auth::GenesisAuthManager;
 use super::validation::ChainValidator;
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -59,6 +59,10 @@ pub struct NodeBlockchain {
 
     /// Genesis authentication manager (optional MFA)
     pub(crate) genesis_auth: Arc<RwLock<Option<GenesisAuthManager>>>,
+
+    /// Block headers for lightweight chain verification.
+    /// Stores headers for blocks we don't have full data for.
+    pub(crate) headers: Arc<RwLock<HashMap<u64, BlockHeader>>>,
 }
 
 impl NodeBlockchain {
@@ -91,6 +95,7 @@ impl NodeBlockchain {
             state_proof_validator: Arc::new(ValidationService::new()),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
+            headers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -181,6 +186,7 @@ impl NodeBlockchain {
             state_proof_validator: Arc::new(ValidationService::new()),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
+            headers: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -276,6 +282,91 @@ impl NodeBlockchain {
     /// Calculate chain's total size in bytes.
     pub async fn get_total_size(&self) -> usize {
         self.blocks.read().await.values().map(|b| b.size()).sum()
+    }
+
+    /// Adopt a foreign network's genesis block, replacing the local chain.
+    /// This is used when joining a network -- the node discards its independent
+    /// chain and starts from the network's genesis.
+    ///
+    /// Returns error if the genesis block's index is not 0 or hash verification fails.
+    pub async fn adopt_genesis(&self, genesis: Block) -> Result<(), String> {
+        if genesis.index != 0 {
+            return Err(format!(
+                "Genesis block must have index 0, got {}",
+                genesis.index,
+            ));
+        }
+        if !genesis.verify_hash() {
+            return Err("Genesis block hash verification failed".to_string());
+        }
+
+        let mut blocks = self.blocks.write().await;
+        let mut hash_index = self.hash_index.write().await;
+        let mut head = self.head.write().await;
+        let mut stats = self.stats.write().await;
+
+        blocks.clear();
+        hash_index.clear();
+
+        blocks.insert(genesis.index, genesis.clone());
+        hash_index.insert(genesis.hash.clone(), genesis.index);
+        *head = Some(genesis.clone());
+
+        *stats = ChainStats {
+            total_blocks: 1,
+            chain_height: 0,
+            total_data_size: genesis.size(),
+        };
+
+        info!(
+            "Adopted foreign genesis block (hash: {}...)",
+            &genesis.hash[..8.min(genesis.hash.len())],
+        );
+
+        Ok(())
+    }
+
+    /// Insert block headers for lightweight chain verification.
+    /// Headers are stored separately from full blocks -- they prove chain
+    /// integrity without requiring full block data.
+    ///
+    /// Returns the number of new headers inserted.
+    pub async fn insert_received_headers(
+        &self,
+        headers: Vec<BlockHeader>,
+    ) -> Result<usize, String> {
+        let mut stored_headers = self.headers.write().await;
+        let mut count = 0;
+        for header in headers {
+            if !stored_headers.contains_key(&header.index) {
+                stored_headers.insert(header.index, header);
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    /// Get a block header by index. Returns from full blocks first, then stored headers.
+    pub async fn get_header(&self, index: u64) -> Option<BlockHeader> {
+        // Check full blocks first
+        let blocks = self.blocks.read().await;
+        if let Some(block) = blocks.get(&index) {
+            return Some(block.header());
+        }
+        drop(blocks);
+        // Then check stored headers
+        let headers = self.headers.read().await;
+        headers.get(&index).cloned()
+    }
+
+    /// Get the highest known height (full blocks or headers).
+    pub async fn get_known_height(&self) -> u64 {
+        let chain_height = self.get_height().await;
+        let header_height = {
+            let headers = self.headers.read().await;
+            headers.keys().max().copied().unwrap_or(0)
+        };
+        chain_height.max(header_height)
     }
 
     /// Insert a block into the chain (internal helper).
@@ -476,6 +567,185 @@ mod tests {
         let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
         let result = NodeBlockchain::from_blocks(coord, vec![]);
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_adopt_genesis_replaces_chain() {
+        let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Original chain has its own genesis
+        let original_height = chain.get_height().await;
+        assert_eq!(original_height, 0);
+
+        // Create a foreign genesis from a different coordinate
+        let foreign_coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
+        let foreign_genesis = Block::genesis(foreign_coord);
+
+        // Adopt the foreign genesis
+        chain
+            .adopt_genesis(foreign_genesis.clone())
+            .await
+            .expect("test: adopt genesis");
+
+        // Chain should now start from the foreign genesis
+        assert_eq!(chain.get_height().await, 0);
+        let head = chain.get_head().await.expect("test: head exists");
+        assert_eq!(head.hash, foreign_genesis.hash);
+        assert!(chain.has_block(&foreign_genesis.hash).await);
+
+        // Stats should reflect single block
+        let stats = chain.get_stats().await;
+        assert_eq!(stats.total_blocks, 1);
+    }
+
+    #[tokio::test]
+    async fn test_adopt_genesis_rejects_non_zero_index() {
+        let coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Create a block with index 1 (not genesis)
+        let entry = test_entry(coord);
+        let non_genesis = Block::new(1, vec![entry], "prev".to_string());
+
+        let result = chain.adopt_genesis(non_genesis).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .expect_err("test: should error")
+                .contains("index 0"),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_adopt_genesis_rejects_invalid_hash() {
+        let coord = MatrixCoordinate::new(3, 3, 3).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Create a genesis then tamper with its hash
+        let foreign_coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
+        let mut tampered = Block::genesis(foreign_coord);
+        tampered.hash = "tampered_hash_value".to_string();
+
+        let result = chain.adopt_genesis(tampered).await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .expect_err("test: should error")
+                .contains("hash verification"),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_insert_received_headers() {
+        let coord = MatrixCoordinate::new(4, 4, 4).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Create some headers
+        let headers = vec![
+            BlockHeader {
+                index: 5,
+                hash: "hash_5".to_string(),
+                previous_hash: "hash_4".to_string(),
+                entries_hash: [0u8; 32],
+                entry_count: 1,
+            },
+            BlockHeader {
+                index: 6,
+                hash: "hash_6".to_string(),
+                previous_hash: "hash_5".to_string(),
+                entries_hash: [0u8; 32],
+                entry_count: 2,
+            },
+        ];
+
+        let count = chain
+            .insert_received_headers(headers)
+            .await
+            .expect("test: insert headers");
+        assert_eq!(count, 2);
+
+        // Inserting the same headers again should not increase count
+        let headers_dup = vec![BlockHeader {
+            index: 5,
+            hash: "hash_5".to_string(),
+            previous_hash: "hash_4".to_string(),
+            entries_hash: [0u8; 32],
+            entry_count: 1,
+        }];
+        let count2 = chain
+            .insert_received_headers(headers_dup)
+            .await
+            .expect("test: insert dup headers");
+        assert_eq!(count2, 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_header_from_blocks_and_headers() {
+        let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Genesis block (index 0) should be retrievable as header
+        let genesis_header = chain.get_header(0).await;
+        assert!(genesis_header.is_some());
+        assert_eq!(genesis_header.expect("test: header").index, 0);
+
+        // Insert a stored header for index 10
+        let remote_header = BlockHeader {
+            index: 10,
+            hash: "remote_hash_10".to_string(),
+            previous_hash: "remote_hash_9".to_string(),
+            entries_hash: [0u8; 32],
+            entry_count: 3,
+        };
+        chain
+            .insert_received_headers(vec![remote_header.clone()])
+            .await
+            .expect("test: insert header");
+
+        // Should retrieve from stored headers
+        let retrieved = chain.get_header(10).await;
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.expect("test: header").hash, "remote_hash_10");
+
+        // Non-existent index returns None
+        assert!(chain.get_header(999).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_known_height() {
+        let coord = MatrixCoordinate::new(6, 6, 6).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Chain height is 0 (genesis only), no headers
+        assert_eq!(chain.get_known_height().await, 0);
+
+        // Insert headers at height 50
+        let header = BlockHeader {
+            index: 50,
+            hash: "hash_50".to_string(),
+            previous_hash: "hash_49".to_string(),
+            entries_hash: [0u8; 32],
+            entry_count: 1,
+        };
+        chain
+            .insert_received_headers(vec![header])
+            .await
+            .expect("test: insert header");
+
+        // Known height should be 50 (max of chain=0 and headers=50)
+        assert_eq!(chain.get_known_height().await, 50);
+
+        // Add blocks up to height 3
+        for i in 1..=3u64 {
+            let prev = chain.get_head().await.expect("test: head");
+            let entry = test_entry(coord);
+            let block = Block::new(i, vec![entry], prev.hash.clone());
+            chain.insert_block(block).await.expect("test: insert");
+        }
+
+        // Known height should still be 50 (headers > chain)
+        assert_eq!(chain.get_known_height().await, 50);
     }
 
     #[tokio::test]

@@ -42,6 +42,54 @@ pub enum ShardStoreResult {
     Deduplicated { ref_count: u32 },
 }
 
+/// Status of a shard after dedup check against the local store.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ShardStatus {
+    /// Shard needs to be distributed (new or Anonymous/None policy).
+    NeedsDistribution,
+    /// Shard already exists in store, reference acquired.
+    AlreadyStored { ref_count: u32 },
+}
+
+/// Dedup shards against the local store before distribution.
+///
+/// For each shard:
+/// - If `DedupPolicy::Full` and shard exists: `acquire()` a reference, mark `AlreadyStored`.
+/// - Otherwise: mark `NeedsDistribution`.
+///
+/// The content hash is computed from each shard's data using BLAKE3.
+pub async fn dedup_shards(
+    shards: &[crate::assets::pipeline::Shard],
+    store: &super::shard_store::ShardStore,
+    policy: DedupPolicy,
+) -> Vec<ShardStatus> {
+    let mut results = Vec::with_capacity(shards.len());
+
+    for shard in shards {
+        let hash_bytes: [u8; 32] = *blake3::hash(&shard.data).as_bytes();
+        let content_hash = hypermesh_lib::ContentHash(hash_bytes);
+
+        let status = match policy {
+            DedupPolicy::Full => {
+                if store.has(&content_hash).await {
+                    match store.acquire(&content_hash).await {
+                        Some(rc) => ShardStatus::AlreadyStored { ref_count: rc },
+                        // Race: shard was removed between has() and acquire()
+                        None => ShardStatus::NeedsDistribution,
+                    }
+                } else {
+                    ShardStatus::NeedsDistribution
+                }
+            }
+            DedupPolicy::None => ShardStatus::NeedsDistribution,
+        };
+
+        results.push(status);
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +131,98 @@ mod tests {
             deduped.clone(),
             ShardStoreResult::Deduplicated { ref_count: 3 }
         );
+    }
+
+    #[test]
+    fn shard_status_variants() {
+        let needs = ShardStatus::NeedsDistribution;
+        let stored = ShardStatus::AlreadyStored { ref_count: 2 };
+        assert_ne!(needs, stored);
+        assert_eq!(needs.clone(), ShardStatus::NeedsDistribution);
+        assert_eq!(stored.clone(), ShardStatus::AlreadyStored { ref_count: 2 });
+    }
+
+    fn make_test_shard(data: &[u8]) -> crate::assets::pipeline::Shard {
+        crate::assets::pipeline::Shard {
+            data: data.to_vec(),
+            metadata: crate::assets::pipeline::sharding::ShardMetadata {
+                index: 0,
+                is_parity: false,
+                size: data.len(),
+                original_size: data.len(),
+                hash: hex::encode(blake3::hash(data).as_bytes()),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_full_policy_new_shards() {
+        let store = super::super::shard_store::ShardStore::new();
+        let shard = make_test_shard(b"brand-new-data");
+
+        let results = dedup_shards(&[shard], &store, DedupPolicy::Full).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ShardStatus::NeedsDistribution);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_full_policy_existing_shard() {
+        let store = super::super::shard_store::ShardStore::new();
+        let data = b"existing-data-in-store";
+        let hash_bytes: [u8; 32] = *blake3::hash(data).as_bytes();
+        let content_hash = hypermesh_lib::ContentHash(hash_bytes);
+
+        // Pre-store the shard
+        store.store(content_hash, data.to_vec()).await;
+
+        let shard = make_test_shard(data);
+        let results = dedup_shards(&[shard], &store, DedupPolicy::Full).await;
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(results[0], ShardStatus::AlreadyStored { ref_count: 2 }),
+            "expected AlreadyStored with ref_count=2, got {:?}",
+            results[0],
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_none_policy_always_needs_distribution() {
+        let store = super::super::shard_store::ShardStore::new();
+        let data = b"data-for-anon";
+        let hash_bytes: [u8; 32] = *blake3::hash(data).as_bytes();
+        let content_hash = hypermesh_lib::ContentHash(hash_bytes);
+
+        // Pre-store the shard
+        store.store(content_hash, data.to_vec()).await;
+
+        let shard = make_test_shard(data);
+        let results = dedup_shards(&[shard], &store, DedupPolicy::None).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ShardStatus::NeedsDistribution);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_mixed_new_and_existing() {
+        let store = super::super::shard_store::ShardStore::new();
+
+        let existing_data = b"already-here";
+        let hash_bytes: [u8; 32] = *blake3::hash(existing_data as &[u8]).as_bytes();
+        store
+            .store(hypermesh_lib::ContentHash(hash_bytes), existing_data.to_vec())
+            .await;
+
+        let shard_existing = make_test_shard(existing_data);
+        let shard_new = make_test_shard(b"never-seen-before");
+
+        let results = dedup_shards(
+            &[shard_existing, shard_new],
+            &store,
+            DedupPolicy::Full,
+        )
+        .await;
+
+        assert_eq!(results.len(), 2);
+        assert!(matches!(results[0], ShardStatus::AlreadyStored { .. }));
+        assert_eq!(results[1], ShardStatus::NeedsDistribution);
     }
 }

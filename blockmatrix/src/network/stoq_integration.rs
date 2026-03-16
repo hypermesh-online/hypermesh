@@ -142,6 +142,52 @@ pub enum MatrixMessage {
         /// Serialized blocks (JSON strings)
         blocks: Vec<String>,
     },
+
+    // --- Genesis adoption and header-based sync ---
+    /// Request the genesis block for a network
+    GenesisRequest {
+        /// Network scope identifier
+        network_id: String,
+    },
+    /// Response with the network's genesis block (JSON-serialized)
+    GenesisResponse {
+        /// Network scope identifier
+        network_id: String,
+        /// JSON-serialized genesis block
+        genesis_block_json: String,
+    },
+    /// Request block headers for lightweight chain verification
+    HeaderRequest {
+        /// Network scope identifier
+        network_id: String,
+        /// Start from this block height
+        from_height: u64,
+        /// Maximum number of headers to return
+        max_count: u32,
+    },
+    /// Response with block headers
+    HeaderResponse {
+        /// Network scope identifier
+        network_id: String,
+        /// JSON-serialized block headers
+        headers_json: Vec<String>,
+        /// Peer's current chain height
+        peer_height: u64,
+    },
+    /// Request full blocks by hash for segments the node participates in
+    SyncBlockRequest {
+        /// Network scope identifier
+        network_id: String,
+        /// BLAKE3 hex hashes of blocks to fetch
+        block_hashes: Vec<String>,
+    },
+    /// Response with full blocks
+    SyncBlockResponse {
+        /// Network scope identifier
+        network_id: String,
+        /// JSON-serialized blocks
+        blocks_json: Vec<String>,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager
