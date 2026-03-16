@@ -76,6 +76,31 @@ pub struct BlockAssetEntry {
     pub registration: AssetRegistration,
 }
 
+/// Lightweight block header for chain integrity verification.
+///
+/// Nodes store headers for blocks they don't fully participate in,
+/// enabling selective chain reconstruction without full block data.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BlockHeader {
+    /// Block index in the chain
+    pub index: u64,
+    /// This block's hash (BLAKE3 hex)
+    pub hash: String,
+    /// Hash of the previous block (BLAKE3 hex)
+    pub previous_hash: String,
+    /// BLAKE3 hash of the serialized entries, proving header matches block content.
+    pub entries_hash: [u8; 32],
+    /// Number of asset entries in the block
+    pub entry_count: usize,
+}
+
+impl BlockHeader {
+    /// Verify that this header chains to the given previous header.
+    pub fn chains_to(&self, previous: &BlockHeader) -> bool {
+        self.previous_hash == previous.hash && self.index == previous.index + 1
+    }
+}
+
 /// A block in a node's independent blockchain.
 ///
 /// The block is purely: hash linkage + asset entries.
@@ -177,6 +202,39 @@ impl Block {
                 generate_genesis_proof(&hw)
             }
         }
+    }
+
+    /// Compute the BLAKE3 hash of all entries (deterministic commitment).
+    ///
+    /// Hashes the concatenation of `(asset_hash || proof_hash)` for each entry.
+    /// This is deterministic regardless of serialization format.
+    pub fn compute_entries_hash(&self) -> [u8; 32] {
+        let mut hasher = Hasher::new();
+        for entry in &self.entries {
+            hasher.update(&entry.asset_hash);
+            hasher.update(&entry.proof_hash);
+        }
+        *hasher.finalize().as_bytes()
+    }
+
+    /// Extract a lightweight header from this block.
+    pub fn header(&self) -> BlockHeader {
+        BlockHeader {
+            index: self.index,
+            hash: self.hash.clone(),
+            previous_hash: self.previous_hash.clone(),
+            entries_hash: self.compute_entries_hash(),
+            entry_count: self.entries.len(),
+        }
+    }
+
+    /// Verify that this block matches a given header.
+    pub fn verify_against_header(&self, header: &BlockHeader) -> bool {
+        self.index == header.index
+            && self.hash == header.hash
+            && self.previous_hash == header.previous_hash
+            && self.entries.len() == header.entry_count
+            && self.compute_entries_hash() == header.entries_hash
     }
 
     /// Calculate the hash of this block using BLAKE3.
@@ -408,6 +466,100 @@ mod tests {
 
         assert_eq!(block.asset_count(), 5);
         assert_eq!(block.get_assets().len(), 5);
+    }
+
+    // --- BlockHeader tests ---
+
+    #[test]
+    fn test_block_header_round_trip() {
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
+        let entry = test_genesis_entry(coord);
+        let block = Block::new(1, vec![entry], "prev".to_string());
+
+        let header = block.header();
+        assert!(block.verify_against_header(&header));
+    }
+
+    #[test]
+    fn test_block_header_verify_fails_different_entries() {
+        let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
+        let entry1 = test_genesis_entry(coord);
+        let block = Block::new(1, vec![entry1], "prev".to_string());
+        let header = block.header();
+
+        // Build a different block with same index/prev but different entry
+        let coord2 = MatrixCoordinate::new(4, 5, 6).expect("test: valid coord");
+        let entry2 = test_genesis_entry(coord2);
+        let block2 = Block::new(1, vec![entry2], "prev".to_string());
+
+        assert!(!block2.verify_against_header(&header));
+    }
+
+    #[test]
+    fn test_block_header_chains_to_sequential() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let entry = test_genesis_entry(coord);
+
+        let block0 = Block::new(0, vec![entry.clone()], "genesis".to_string());
+        let block1 = Block::new(1, vec![entry], block0.hash.clone());
+
+        let h0 = block0.header();
+        let h1 = block1.header();
+
+        assert!(h1.chains_to(&h0));
+    }
+
+    #[test]
+    fn test_block_header_chains_to_fails_non_sequential() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let entry = test_genesis_entry(coord);
+
+        let block0 = Block::new(0, vec![entry.clone()], "genesis".to_string());
+        let block2 = Block::new(2, vec![entry], block0.hash.clone());
+
+        let h0 = block0.header();
+        let h2 = block2.header();
+
+        // Index gap: 2 != 0 + 1
+        assert!(!h2.chains_to(&h0));
+    }
+
+    #[test]
+    fn test_block_header_chains_to_fails_wrong_hash() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let entry = test_genesis_entry(coord);
+
+        let block0 = Block::new(0, vec![entry.clone()], "genesis".to_string());
+        let block1 = Block::new(1, vec![entry], "wrong_prev_hash".to_string());
+
+        let h0 = block0.header();
+        let h1 = block1.header();
+
+        assert!(!h1.chains_to(&h0));
+    }
+
+    #[test]
+    fn test_block_header_entries_hash_deterministic() {
+        let coord = MatrixCoordinate::new(3, 3, 3).expect("test: valid coord");
+        let entry = test_genesis_entry(coord);
+
+        let block = Block::new(1, vec![entry], "prev".to_string());
+        let hash1 = block.compute_entries_hash();
+        let hash2 = block.compute_entries_hash();
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_block_header_genesis_block() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let genesis = Block::genesis(coord);
+        let header = genesis.header();
+
+        assert_eq!(header.index, 0);
+        assert_eq!(header.entry_count, 1);
+        assert_eq!(header.hash, genesis.hash);
+        assert!(genesis.verify_against_header(&header));
     }
 
     #[test]

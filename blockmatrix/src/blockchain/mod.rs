@@ -34,7 +34,7 @@ pub mod sync_manager;
 pub mod sync_protocol;
 pub mod validation;
 
-pub use block::Block;
+pub use block::{Block, BlockHeader};
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,

@@ -20,6 +20,7 @@ pub mod metrics_reporter;
 pub mod multi_network;
 pub mod peer_auth;
 mod peer_discovery;
+pub mod shard_dedup;
 pub mod shard_distribution;
 pub mod reflector_pool;
 pub mod shard_store;
