@@ -369,6 +369,55 @@ impl NodeBlockchain {
         chain_height.max(header_height)
     }
 
+    /// Check if a full block (not just a header) exists at the given index.
+    pub async fn has_full_block(&self, index: u64) -> bool {
+        self.blocks.read().await.contains_key(&index)
+    }
+
+    /// Return the contiguous range of block indices for which full blocks exist.
+    ///
+    /// Returns `(start, end)` inclusive. If there are gaps, this returns the
+    /// smallest and largest indices that have full blocks (the node's
+    /// participation span). Returns `(0, 0)` if only the genesis block exists.
+    pub async fn get_participation_range(&self) -> (u64, u64) {
+        let blocks = self.blocks.read().await;
+        if blocks.is_empty() {
+            return (0, 0);
+        }
+        let min = blocks.keys().min().copied().unwrap_or(0);
+        let max = blocks.keys().max().copied().unwrap_or(0);
+        (min, max)
+    }
+
+    /// Convert full blocks within a range to headers-only.
+    ///
+    /// For each block in the range that exists as a full block, its header
+    /// is extracted and stored in the `headers` map, then the full block is
+    /// removed from `blocks`. This allows nodes to stop participating in a
+    /// segment while retaining chain integrity verification capability.
+    ///
+    /// The genesis block (index 0) is never pruned.
+    pub async fn prune_to_headers(&self, range: std::ops::Range<u64>) {
+        let mut blocks = self.blocks.write().await;
+        let mut headers = self.headers.write().await;
+        let mut hash_index = self.hash_index.write().await;
+        let mut stats = self.stats.write().await;
+
+        for index in range {
+            // Never prune genesis
+            if index == 0 {
+                continue;
+            }
+            if let Some(block) = blocks.remove(&index) {
+                // Store header for integrity verification
+                headers.insert(index, block.header());
+                hash_index.remove(&block.hash);
+                stats.total_blocks = stats.total_blocks.saturating_sub(1);
+                stats.total_data_size = stats.total_data_size.saturating_sub(block.size());
+            }
+        }
+    }
+
     /// Insert a block into the chain (internal helper).
     pub(crate) async fn insert_block(&self, block: Block) -> Result<(), String> {
         let mut blocks = self.blocks.write().await;
@@ -759,5 +808,159 @@ mod tests {
 
         let result = NodeBlockchain::from_blocks(coord, vec![genesis, bad_block]);
         assert!(result.is_err());
+    }
+
+    // ── Selective chain reconstruction tests ───────────────────────
+
+    #[tokio::test]
+    async fn test_has_full_block() {
+        let coord = MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Genesis exists as full block
+        assert!(chain.has_full_block(0).await);
+
+        // Index 1 does not exist yet
+        assert!(!chain.has_full_block(1).await);
+
+        // Add a block and verify
+        let prev = chain.get_head().await.expect("test: head");
+        let entry = test_entry(coord);
+        let block = Block::new(1, vec![entry], prev.hash.clone());
+        chain.insert_block(block).await.expect("test: insert");
+
+        assert!(chain.has_full_block(1).await);
+
+        // Header-only blocks should NOT count as full blocks
+        let header = BlockHeader {
+            index: 5,
+            hash: "hdr5".to_string(),
+            previous_hash: "hdr4".to_string(),
+            entries_hash: [0u8; 32],
+            entry_count: 1,
+        };
+        chain
+            .insert_received_headers(vec![header])
+            .await
+            .expect("test: insert header");
+        assert!(!chain.has_full_block(5).await);
+    }
+
+    #[tokio::test]
+    async fn test_get_participation_range_genesis_only() {
+        let coord = MatrixCoordinate::new(2, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let (start, end) = chain.get_participation_range().await;
+        assert_eq!(start, 0);
+        assert_eq!(end, 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_participation_range_with_blocks() {
+        let coord = MatrixCoordinate::new(3, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        for i in 1..=5u64 {
+            let prev = chain.get_head().await.expect("test: head");
+            let entry = test_entry(coord);
+            let block = Block::new(i, vec![entry], prev.hash.clone());
+            chain.insert_block(block).await.expect("test: insert");
+        }
+
+        let (start, end) = chain.get_participation_range().await;
+        assert_eq!(start, 0);
+        assert_eq!(end, 5);
+    }
+
+    #[tokio::test]
+    async fn test_prune_to_headers_basic() {
+        let coord = MatrixCoordinate::new(4, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        // Build chain of 6 blocks (genesis + 5)
+        for i in 1..=5u64 {
+            let prev = chain.get_head().await.expect("test: head");
+            let entry = test_entry(coord);
+            let block = Block::new(i, vec![entry], prev.hash.clone());
+            chain.insert_block(block).await.expect("test: insert");
+        }
+
+        assert_eq!(chain.get_stats().await.total_blocks, 6);
+
+        // Prune blocks 1..4 (indices 1, 2, 3) to headers
+        chain.prune_to_headers(1..4).await;
+
+        // Full blocks 1, 2, 3 should be gone
+        assert!(!chain.has_full_block(1).await);
+        assert!(!chain.has_full_block(2).await);
+        assert!(!chain.has_full_block(3).await);
+
+        // Genesis and blocks 4, 5 should remain
+        assert!(chain.has_full_block(0).await);
+        assert!(chain.has_full_block(4).await);
+        assert!(chain.has_full_block(5).await);
+
+        // Headers should be available for pruned blocks
+        assert!(chain.get_header(1).await.is_some());
+        assert!(chain.get_header(2).await.is_some());
+        assert!(chain.get_header(3).await.is_some());
+
+        // Stats should reflect pruned blocks (6 - 3 = 3)
+        assert_eq!(chain.get_stats().await.total_blocks, 3);
+    }
+
+    #[tokio::test]
+    async fn test_prune_to_headers_preserves_genesis() {
+        let coord = MatrixCoordinate::new(5, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let prev = chain.get_head().await.expect("test: head");
+        let entry = test_entry(coord);
+        let block = Block::new(1, vec![entry], prev.hash.clone());
+        chain.insert_block(block).await.expect("test: insert");
+
+        // Try to prune range including genesis
+        chain.prune_to_headers(0..2).await;
+
+        // Genesis must survive
+        assert!(chain.has_full_block(0).await);
+
+        // Block 1 should be pruned
+        assert!(!chain.has_full_block(1).await);
+        assert!(chain.get_header(1).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_prune_to_headers_empty_range() {
+        let coord = MatrixCoordinate::new(6, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        let stats_before = chain.get_stats().await;
+        chain.prune_to_headers(10..10).await;
+        let stats_after = chain.get_stats().await;
+
+        assert_eq!(stats_before.total_blocks, stats_after.total_blocks);
+    }
+
+    #[tokio::test]
+    async fn test_participation_range_after_prune() {
+        let coord = MatrixCoordinate::new(7, 0, 0).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+
+        for i in 1..=5u64 {
+            let prev = chain.get_head().await.expect("test: head");
+            let entry = test_entry(coord);
+            let block = Block::new(i, vec![entry], prev.hash.clone());
+            chain.insert_block(block).await.expect("test: insert");
+        }
+
+        // Prune middle blocks
+        chain.prune_to_headers(2..4).await;
+
+        // Range spans genesis (0) to block 5, even though 2 and 3 are pruned
+        let (start, end) = chain.get_participation_range().await;
+        assert_eq!(start, 0);
+        assert_eq!(end, 5);
     }
 }

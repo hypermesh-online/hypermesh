@@ -12,8 +12,34 @@
 //! - [`CascadeMetrics`] measures cascade propagation performance.
 
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
+
+// ---------------------------------------------------------------------------
+// ReplicationRecommendation (windowed fetch-rate API)
+// ---------------------------------------------------------------------------
+
+/// Recommendation for a shard's replication based on windowed fetch rate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplicationRecommendation {
+    /// No action needed -- fetch rate is below the popularity threshold.
+    None,
+    /// Shard is popular -- recommend additional replicas.
+    Replicate {
+        shard_hash: [u8; 32],
+        suggested_replicas: u32,
+        /// Fetches within the current window.
+        fetch_rate: u32,
+    },
+    /// Shard is extremely popular -- urgent replication needed.
+    UrgentReplicate {
+        shard_hash: [u8; 32],
+        suggested_replicas: u32,
+        /// Fetches within the current window.
+        fetch_rate: u32,
+    },
+}
 
 // ---------------------------------------------------------------------------
 // ShardPopularity (Item 7.4)
@@ -44,22 +70,56 @@ impl ShardPopularity {
 }
 
 /// Swarm-level analytics for shard demand tracking.
+///
+/// Provides both cumulative request tracking (via [`record_request`]) and
+/// time-windowed fetch-rate tracking (via [`record_fetch`]).  The windowed
+/// API powers [`ReplicationRecommendation`] generation for R12 swarm scaling.
 pub struct SwarmAnalytics {
-    /// Per-shard popularity data.
+    /// Per-shard popularity data (cumulative).
     shard_data: HashMap<ContentHash, ShardPopularity>,
     /// Per-shard set of unique consumer node IDs.
     shard_consumers: HashMap<ContentHash, HashSet<NodeId>>,
     /// Per-shard replica count (set externally by BlockMatrix).
     replica_counts: HashMap<ContentHash, u32>,
+
+    // -- Windowed fetch-rate tracking --
+
+    /// shard_hash -> list of fetch timestamps (windowed).
+    fetch_history: HashMap<[u8; 32], Vec<Instant>>,
+    /// Sliding window for counting fetches.
+    window: Duration,
+    /// If fetches in window exceed this, shard is "popular".
+    popularity_threshold: u32,
+    /// Maximum history entries per shard (prevent unbounded growth).
+    max_history_per_shard: usize,
 }
 
 impl SwarmAnalytics {
     /// Create a new swarm analytics tracker.
+    ///
+    /// Uses default windowed-fetch settings (5 min window, threshold 10).
     pub fn new() -> Self {
         Self {
             shard_data: HashMap::new(),
             shard_consumers: HashMap::new(),
             replica_counts: HashMap::new(),
+            fetch_history: HashMap::new(),
+            window: Duration::from_secs(300),
+            popularity_threshold: 10,
+            max_history_per_shard: 1000,
+        }
+    }
+
+    /// Create a swarm analytics tracker with explicit windowed-fetch settings.
+    pub fn with_window(window: Duration, popularity_threshold: u32) -> Self {
+        Self {
+            shard_data: HashMap::new(),
+            shard_consumers: HashMap::new(),
+            replica_counts: HashMap::new(),
+            fetch_history: HashMap::new(),
+            window,
+            popularity_threshold,
+            max_history_per_shard: 1000,
         }
     }
 
@@ -113,6 +173,140 @@ impl SwarmAnalytics {
     /// Get the replica count for a shard.
     pub fn get_replica_count(&self, shard_id: &ContentHash) -> u32 {
         self.replica_counts.get(shard_id).copied().unwrap_or(0)
+    }
+
+    // -- Windowed fetch-rate API (R12 swarm scaling) --
+
+    /// Record a shard fetch event at a specific instant (test-friendly).
+    pub fn record_fetch_at(&mut self, shard_hash: [u8; 32], at: Instant) {
+        let history = self.fetch_history.entry(shard_hash).or_default();
+        history.push(at);
+
+        // Trim entries outside the window.
+        let cutoff = at.checked_sub(self.window).unwrap_or(at);
+        history.retain(|t| *t >= cutoff);
+
+        // Cap at max_history_per_shard (drop oldest).
+        while history.len() > self.max_history_per_shard {
+            history.remove(0);
+        }
+    }
+
+    /// Record a shard fetch event at the current time.
+    pub fn record_fetch(&mut self, shard_hash: [u8; 32]) {
+        self.record_fetch_at(shard_hash, Instant::now());
+    }
+
+    /// Count of fetches for a shard within the current window.
+    pub fn get_fetch_rate(&self, shard_hash: &[u8; 32]) -> u32 {
+        let now = Instant::now();
+        self.get_fetch_rate_at(shard_hash, now)
+    }
+
+    /// Count of fetches within the window relative to a given instant.
+    fn get_fetch_rate_at(&self, shard_hash: &[u8; 32], now: Instant) -> u32 {
+        let history = match self.fetch_history.get(shard_hash) {
+            Some(h) => h,
+            None => return 0,
+        };
+        let cutoff = now.checked_sub(self.window).unwrap_or(now);
+        history.iter().filter(|t| **t >= cutoff).count() as u32
+    }
+
+    /// Produce a replication recommendation for a single shard.
+    ///
+    /// - Below `popularity_threshold` -> `None`
+    /// - 1x-3x threshold -> `Replicate`
+    /// - >3x threshold -> `UrgentReplicate`
+    ///
+    /// `suggested_replicas` = `fetch_rate / popularity_threshold`, capped at 10.
+    pub fn get_recommendation(&self, shard_hash: &[u8; 32]) -> ReplicationRecommendation {
+        self.get_recommendation_at(shard_hash, Instant::now())
+    }
+
+    /// Recommendation relative to a given instant (test-friendly).
+    fn get_recommendation_at(
+        &self,
+        shard_hash: &[u8; 32],
+        now: Instant,
+    ) -> ReplicationRecommendation {
+        let rate = self.get_fetch_rate_at(shard_hash, now);
+        if self.popularity_threshold == 0 || rate < self.popularity_threshold {
+            return ReplicationRecommendation::None;
+        }
+        let suggested = (rate / self.popularity_threshold).min(10);
+        if rate > self.popularity_threshold.saturating_mul(3) {
+            ReplicationRecommendation::UrgentReplicate {
+                shard_hash: *shard_hash,
+                suggested_replicas: suggested,
+                fetch_rate: rate,
+            }
+        } else {
+            ReplicationRecommendation::Replicate {
+                shard_hash: *shard_hash,
+                suggested_replicas: suggested,
+                fetch_rate: rate,
+            }
+        }
+    }
+
+    /// Return recommendations for ALL shards above the popularity threshold,
+    /// sorted by fetch_rate descending.
+    pub fn get_popular_shard_recommendations(&self) -> Vec<ReplicationRecommendation> {
+        let now = Instant::now();
+        let mut recs: Vec<ReplicationRecommendation> = self
+            .fetch_history
+            .keys()
+            .filter_map(|hash| {
+                let rec = self.get_recommendation_at(hash, now);
+                if rec == ReplicationRecommendation::None {
+                    None
+                } else {
+                    Some(rec)
+                }
+            })
+            .collect();
+        recs.sort_by(|a, b| {
+            let rate_a = match a {
+                ReplicationRecommendation::Replicate { fetch_rate, .. }
+                | ReplicationRecommendation::UrgentReplicate { fetch_rate, .. } => *fetch_rate,
+                ReplicationRecommendation::None => 0,
+            };
+            let rate_b = match b {
+                ReplicationRecommendation::Replicate { fetch_rate, .. }
+                | ReplicationRecommendation::UrgentReplicate { fetch_rate, .. } => *fetch_rate,
+                ReplicationRecommendation::None => 0,
+            };
+            rate_b.cmp(&rate_a)
+        });
+        recs
+    }
+
+    /// Remove shards with zero fetches in the current window (GC for cold shards).
+    pub fn cleanup_cold_shards(&mut self) {
+        let now = Instant::now();
+        let window = self.window;
+        self.fetch_history.retain(|_, history| {
+            let cutoff = now.checked_sub(window).unwrap_or(now);
+            history.retain(|t| *t >= cutoff);
+            !history.is_empty()
+        });
+    }
+
+    /// Number of shards currently tracked in the windowed fetch history.
+    pub fn tracked_shard_count(&self) -> usize {
+        self.fetch_history.len()
+    }
+
+    /// Total fetch events across all shards currently within the window.
+    pub fn total_fetches_in_window(&self) -> usize {
+        let now = Instant::now();
+        let cutoff = now.checked_sub(self.window).unwrap_or(now);
+        self.fetch_history
+            .values()
+            .flat_map(|h| h.iter())
+            .filter(|t| **t >= cutoff)
+            .count()
     }
 }
 
@@ -717,5 +911,228 @@ mod tests {
 
         let loads = tracker.get_relay_loads();
         assert_eq!(loads.get(&hub).copied().unwrap_or(0), 2);
+    }
+
+    // -- Windowed fetch-rate tests (R12 swarm scaling) --
+
+    fn test_shard_bytes(val: u8) -> [u8; 32] {
+        [val; 32]
+    }
+
+    #[test]
+    fn windowed_new_analytics_has_zero_shards() {
+        let analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);
+        assert_eq!(analytics.tracked_shard_count(), 0);
+        assert_eq!(analytics.total_fetches_in_window(), 0);
+    }
+
+    #[test]
+    fn windowed_record_single_fetch_rate_is_one() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);
+        let hash = test_shard_bytes(0xAA);
+        let now = Instant::now();
+        analytics.record_fetch_at(hash, now);
+
+        assert_eq!(analytics.get_fetch_rate_at(&hash, now), 1);
+        assert_eq!(analytics.tracked_shard_count(), 1);
+    }
+
+    #[test]
+    fn windowed_record_multiple_fetches_rate_correct() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);
+        let hash = test_shard_bytes(0xBB);
+        let now = Instant::now();
+
+        for i in 0..7 {
+            analytics.record_fetch_at(hash, now + Duration::from_secs(i));
+        }
+        // All 7 within 60s window when queried at now + 6s.
+        assert_eq!(analytics.get_fetch_rate_at(&hash, now + Duration::from_secs(6)), 7);
+    }
+
+    #[test]
+    fn windowed_below_threshold_recommendation_none() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 10);
+        let hash = test_shard_bytes(0xCC);
+        let now = Instant::now();
+
+        // Only 5 fetches, threshold is 10.
+        for i in 0..5 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i * 100));
+        }
+
+        let rec = analytics.get_recommendation_at(&hash, now + Duration::from_secs(1));
+        assert_eq!(rec, ReplicationRecommendation::None);
+    }
+
+    #[test]
+    fn windowed_above_threshold_replicate() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 10);
+        let hash = test_shard_bytes(0xDD);
+        let now = Instant::now();
+
+        // 20 fetches, threshold is 10 => 2x threshold => Replicate.
+        for i in 0..20 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i * 50));
+        }
+
+        let rec = analytics.get_recommendation_at(&hash, now + Duration::from_secs(1));
+        match rec {
+            ReplicationRecommendation::Replicate {
+                shard_hash,
+                suggested_replicas,
+                fetch_rate,
+            } => {
+                assert_eq!(shard_hash, hash);
+                assert_eq!(fetch_rate, 20);
+                assert_eq!(suggested_replicas, 2); // 20 / 10 = 2
+            }
+            other => unreachable!("test: expected Replicate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn windowed_urgent_replicate_above_3x() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 10);
+        let hash = test_shard_bytes(0xEE);
+        let now = Instant::now();
+
+        // 40 fetches, threshold is 10 => 4x threshold => UrgentReplicate.
+        for i in 0..40 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i * 25));
+        }
+
+        let rec = analytics.get_recommendation_at(&hash, now + Duration::from_secs(1));
+        match rec {
+            ReplicationRecommendation::UrgentReplicate {
+                shard_hash,
+                suggested_replicas,
+                fetch_rate,
+            } => {
+                assert_eq!(shard_hash, hash);
+                assert_eq!(fetch_rate, 40);
+                assert_eq!(suggested_replicas, 4); // 40 / 10 = 4
+            }
+            other => unreachable!("test: expected UrgentReplicate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn windowed_popular_shard_recommendations_sorted() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);
+        let hash_hot = test_shard_bytes(0x01);
+        let hash_warm = test_shard_bytes(0x02);
+        let hash_cold = test_shard_bytes(0x03);
+        let now = Instant::now();
+
+        // Hot: 30 fetches.
+        for i in 0..30 {
+            analytics.record_fetch_at(hash_hot, now + Duration::from_millis(i * 10));
+        }
+        // Warm: 10 fetches.
+        for i in 0..10 {
+            analytics.record_fetch_at(hash_warm, now + Duration::from_millis(i * 10));
+        }
+        // Cold: 2 fetches (below threshold).
+        for i in 0..2 {
+            analytics.record_fetch_at(hash_cold, now + Duration::from_millis(i * 10));
+        }
+
+        let recs = analytics.get_popular_shard_recommendations();
+        // Cold should be excluded (below threshold of 5).
+        assert_eq!(recs.len(), 2, "only hot and warm should appear");
+
+        // First should be the hottest.
+        match &recs[0] {
+            ReplicationRecommendation::UrgentReplicate { fetch_rate, .. } => {
+                assert_eq!(*fetch_rate, 30);
+            }
+            other => unreachable!("test: expected UrgentReplicate for hot shard, got {:?}", other),
+        }
+        match &recs[1] {
+            ReplicationRecommendation::Replicate { fetch_rate, .. } => {
+                assert_eq!(*fetch_rate, 10);
+            }
+            other => unreachable!("test: expected Replicate for warm shard, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn windowed_cleanup_removes_cold_shards() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_millis(50), 5);
+        let hash = test_shard_bytes(0xFF);
+
+        // Record a fetch that will expire quickly.
+        let past = Instant::now() - Duration::from_millis(200);
+        analytics.fetch_history.entry(hash).or_default().push(past);
+
+        assert_eq!(analytics.tracked_shard_count(), 1);
+        analytics.cleanup_cold_shards();
+        assert_eq!(
+            analytics.tracked_shard_count(),
+            0,
+            "cold shard should be removed after cleanup"
+        );
+    }
+
+    #[test]
+    fn windowed_max_history_prevents_unbounded_growth() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(600), 5);
+        analytics.max_history_per_shard = 20;
+        let hash = test_shard_bytes(0xAB);
+        let now = Instant::now();
+
+        // Record 50 fetches; only 20 should be kept.
+        for i in 0..50 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i * 10));
+        }
+
+        let history = analytics
+            .fetch_history
+            .get(&hash)
+            .expect("test: history should exist");
+        assert_eq!(history.len(), 20, "history should be capped at max_history_per_shard");
+    }
+
+    #[test]
+    fn windowed_expiry_drops_old_fetches() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_millis(100), 3);
+        let hash = test_shard_bytes(0xCD);
+        let now = Instant::now();
+
+        // Record 5 fetches at `now`.
+        for i in 0..5 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i));
+        }
+
+        // At now + 200ms they should all be outside the 100ms window.
+        let later = now + Duration::from_millis(200);
+        assert_eq!(
+            analytics.get_fetch_rate_at(&hash, later),
+            0,
+            "old fetches should be outside the window"
+        );
+    }
+
+    #[test]
+    fn windowed_suggested_replicas_capped_at_10() {
+        let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 1);
+        let hash = test_shard_bytes(0xDE);
+        let now = Instant::now();
+
+        // 100 fetches with threshold 1 => suggested = 100, but capped at 10.
+        for i in 0..100 {
+            analytics.record_fetch_at(hash, now + Duration::from_millis(i));
+        }
+
+        let rec = analytics.get_recommendation_at(&hash, now + Duration::from_secs(1));
+        match rec {
+            ReplicationRecommendation::UrgentReplicate {
+                suggested_replicas, ..
+            } => {
+                assert_eq!(suggested_replicas, 10, "suggested_replicas should be capped at 10");
+            }
+            other => unreachable!("test: expected UrgentReplicate, got {:?}", other),
+        }
     }
 }

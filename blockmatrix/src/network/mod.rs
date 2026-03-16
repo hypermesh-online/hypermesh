@@ -10,6 +10,7 @@
 pub mod blockchain_integration;
 pub mod ca_enrollment;
 pub mod cluster;
+pub mod consumer_provider;
 pub mod config;
 pub mod discovery;
 pub mod gossip;
