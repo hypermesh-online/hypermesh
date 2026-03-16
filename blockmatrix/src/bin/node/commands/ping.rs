@@ -17,7 +17,7 @@ const DEFAULT_PORT: u16 = 9292;
 /// Run the ping subcommand: connect via STOQ, perform bilateral PoS
 /// handshake, measure RTT, print results.
 pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
-    let addr = parse_target(target)?;
+    let addr = parse_target(target).await?;
     let coord = (cli.coord_x, cli.coord_y, cli.coord_z);
 
     // Resolve identity directory for loading/creating FALCON keypair
@@ -173,40 +173,43 @@ async fn ping_once(
 
 /// Parse a target string into a `SocketAddr`.
 ///
-/// Supports:
-/// - `host:port`
-/// - `[ipv6]:port`
-/// - `host` (default port 9292)
-/// - IPv4 addresses (mapped to IPv6)
-fn parse_target(target: &str) -> Result<SocketAddr> {
+/// Resolution order:
+/// 1. Direct IP:port parse (`[::1]:9292`, `1.2.3.4:9292`)
+/// 2. HyperMesh DNS — well-known services (`trust`, `caesar`, `catalog`, etc.)
+///    and user-registered names from persisted DNS records
+/// 3. System DNS fallback — clearnet hostnames (`trust.hypermesh.online`)
+async fn parse_target(target: &str) -> Result<SocketAddr> {
     // Try direct parse first (handles `[::1]:9292`, `1.2.3.4:9292`, etc.)
     if let Ok(sa) = target.parse::<SocketAddr>() {
         return Ok(sa);
     }
 
-    // Try as `host:port` via DNS resolution
-    if target.contains(':') && !target.starts_with('[') {
-        // Could be ipv6 without brackets or host:port
-        // Try host:port resolution
-        if let Ok(mut addrs) = target.to_socket_addrs() {
-            if let Some(sa) = addrs.next() {
-                return Ok(sa);
-            }
-        }
-        // Maybe bare IPv6 address without port
-        let with_port = format!("[{}]:{}", target, DEFAULT_PORT);
-        if let Ok(sa) = with_port.parse::<SocketAddr>() {
-            return Ok(sa);
-        }
+    // Split target into (name, optional port)
+    let (name, port) = split_host_port(target);
+
+    // --- HyperMesh DNS: decentralized namespace first ---
+    if let Some(sa) = resolve_hypermesh_dns(name, port).await {
+        tracing::info!("Resolved '{}' via HyperMesh DNS → {}", name, sa);
+        return Ok(sa);
     }
 
-    // Try as bare host or IPv4 without port
-    let with_port = format!("{}:{}", target, DEFAULT_PORT);
+    // --- System DNS fallback ---
+    let with_port = format!("{}:{}", name, port.unwrap_or(DEFAULT_PORT));
+
+    // Try direct IP:port parse (bare IPv4/IPv6 without port handled here)
     if let Ok(sa) = with_port.parse::<SocketAddr>() {
         return Ok(sa);
     }
 
-    // DNS resolution with default port
+    // Try as `[ipv6]:port`
+    if name.contains(':') {
+        let bracketed = format!("[{}]:{}", name, port.unwrap_or(DEFAULT_PORT));
+        if let Ok(sa) = bracketed.parse::<SocketAddr>() {
+            return Ok(sa);
+        }
+    }
+
+    // System DNS resolution
     if let Ok(mut addrs) = with_port.to_socket_addrs() {
         if let Some(sa) = addrs.next() {
             return Ok(sa);
@@ -214,6 +217,80 @@ fn parse_target(target: &str) -> Result<SocketAddr> {
     }
 
     Err(anyhow!("cannot resolve target address: {}", target))
+}
+
+/// Split a target into (hostname, optional port).
+fn split_host_port(target: &str) -> (&str, Option<u16>) {
+    // `[ipv6]:port`
+    if target.starts_with('[') {
+        if let Some(bracket_end) = target.find(']') {
+            let host = &target[1..bracket_end];
+            let port = target[bracket_end + 1..]
+                .strip_prefix(':')
+                .and_then(|p| p.parse().ok());
+            return (host, port);
+        }
+    }
+
+    // `host:port` — but NOT bare IPv6 (which has multiple colons)
+    if let Some(colon_pos) = target.rfind(':') {
+        let before = &target[..colon_pos];
+        let after = &target[colon_pos + 1..];
+        // Only treat as host:port if the part after last colon is a valid port number
+        // (avoids misinterpreting `2600:1900::` as host=`2600:1900:` port=`:`)
+        if let Ok(port) = after.parse::<u16>() {
+            if !before.contains(':') || before.starts_with('[') {
+                return (before, Some(port));
+            }
+        }
+    }
+
+    (target, None)
+}
+
+/// Resolve a name via HyperMesh's decentralized DNS.
+///
+/// Resolution layers (in order):
+/// 1. If daemon is running: query IPC `dns.resolve` for full blockchain DNS
+///    (includes peer-synced records, user-registered names, network DNS)
+/// 2. Well-known local services (trust, caesar, catalog, engauge, blockmatrix)
+/// 3. Returns None → caller falls through to system DNS
+async fn resolve_hypermesh_dns(name: &str, explicit_port: Option<u16>) -> Option<SocketAddr> {
+    // Query running daemon for full DNS (blockchain + peer-synced + local services).
+    // The daemon's DNS resolver has the complete picture: local services point to
+    // ::1, but network-registered names point to their actual node addresses.
+    // If no daemon is running, HyperMesh DNS is unavailable — fall through to
+    // system DNS so that `trust.hypermesh.online` still resolves via clearnet.
+    resolve_via_ipc(name, explicit_port).await
+}
+
+/// Try to resolve a name via IPC to the running daemon.
+/// Returns None if daemon isn't running or resolution fails.
+async fn resolve_via_ipc(name: &str, explicit_port: Option<u16>) -> Option<SocketAddr> {
+    let client = blockmatrix::ipc::IpcClient::new();
+    if !client.is_daemon_running().await {
+        return None;
+    }
+    match client
+        .call_ok("dns.resolve", serde_json::json!({"name": name}))
+        .await
+    {
+        Ok(resp) => {
+            // Response format: {"name": "trust", "address": "::1"}
+            let addr_str = resp.get("address")?.as_str()?;
+            let ip: std::net::IpAddr = addr_str.parse().ok()?;
+            // Use explicit port, or well-known service port, or default STOQ port
+            let port = explicit_port.unwrap_or_else(|| {
+                blockmatrix::bootstrap::LOCAL_SERVICES
+                    .iter()
+                    .find(|s| s.name == name)
+                    .map(|s| s.port)
+                    .unwrap_or(DEFAULT_PORT)
+            });
+            Some(SocketAddr::new(ip, port))
+        }
+        Err(_) => None,
+    }
 }
 
 /// Expand `~` and resolve the data directory path.
