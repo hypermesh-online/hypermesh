@@ -183,6 +183,7 @@ tempfile = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 ctor = "0.2"  # Test initialization functions
+engauge = { path = "../engauge" }
 
 [features]
 default = ["proof-of-state", "assets"]

@@ -66,8 +66,8 @@ pub use streaming::{
     MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator,
 };
 pub use swarm_analytics::{
-    CascadeTracker, DispersionAdvisor, ReplicationRecommendation, ReplicationTrigger,
-    SwarmAnalytics,
+    CascadeTracker, DispersionAdvisor, ReplicationConfig, ReplicationRecommendation,
+    ReplicationSignal, ReplicationTrigger, SwarmAnalytics,
 };
 pub use throttle::{EngaugeThrottle, ThrottleSignal};
 pub use trending::{AggregatedCapacity, CapacityTrend, EpochRecord, EpochTracker, TrendDirection};

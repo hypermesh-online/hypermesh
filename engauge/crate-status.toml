@@ -31,11 +31,13 @@ items = [
     "MetricsPublisher transport callbacks",
     "MetricsSubscriber byte ingestion",
     "RegionalAggregator periodic change detection",
+    "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
 ]
 
 [features.in_development]
 items = [
     "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
+    "Engauge-driven shard replication triggers — popularity detection drives blockmatrix replication decisions",
 ]
 
 [features.planned]

@@ -55,9 +55,8 @@ export const crateStatuses: CrateStatus[] = [
         "Per-entry proof hash — hπ = BLAKE3(StateProof) in every BlockAssetEntry, validated independently",
         "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
         "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
-        "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication), Public (HashMatrix spatial filtering)",
+        "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication)",
         "SpatialBucketAssigner — adaptive neighborhood radius via sqrt(n) k-nearest peers, octree-like partitioning of 3D hash volume",
-        "Block re-propagation — Network/Public scope blocks re-propagated to connected peers after insertion",
         "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
         "JSON-RPC 2.0 IPC over Unix domain sockets (protocol, server, client, handler)",
         "Daemon lifecycle (connect/disconnect commands, PID file, graceful shutdown)",
@@ -112,7 +111,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
         "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
         "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
-        "PoS-gated peer access control — AuthenticatedPeer tracking, verify_peer_access() gates all data messages (blocks/shards/sync), network-ID scoping, per-entry proof_hash validation",
+        "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync data messages, network-ID scoping, per-entry proof_hash validation (block announces are ungated)",
         "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
         "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
         "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
@@ -129,11 +128,22 @@ export const crateStatuses: CrateStatus[] = [
         "EngaugeBridge periodic feed + transmit",
         "ReplicationTrigger wired to IntelligenceLayer",
         "RoutingAdvisor weights in TransactionRouter",
-        "Privacy tier mapping fix"
+        "Privacy tier mapping fix",
+        "BlockHeader — lightweight header for selective chain reconstruction without full block data",
+        "Shard refcount dedup — content-addressed dedup with DedupPolicy (Full/None), auto-GC at refcount 0 (R4)",
+        "Genesis adoption protocol — nodes join networks by adopting foreign genesis, then sync headers",
+        "SyncMessage extensions — GenesisRequest/Response, HeaderRequest/Response, BlockRequest/Response",
+        "ShardLocationIndex — shard-to-provider mapping for swarm discovery (R12)",
+        "TAG_SHARD_ANNOUNCE wire protocol — nodes announce shard availability to peers",
+        "Consumer-becomes-provider — post-fetch store + announce for swarm scaling (R12)",
+        "Selective chain reconstruction — header-only storage for non-participating segments, prune_to_headers()"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
-        "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending"
+        "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
+        "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
+        "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
+        "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units"
       ],
       "planned": [
         "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
@@ -143,10 +153,11 @@ export const crateStatuses: CrateStatus[] = [
         "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
         "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
         "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
-        "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
+        "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
+        "Engauge-driven demand-based shard replication"
       ]
     },
-    "completion": 92
+    "completion": 89
   },
   {
     "id": "caesar",
@@ -284,16 +295,18 @@ export const crateStatuses: CrateStatus[] = [
         "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()",
         "MetricsPublisher transport callbacks",
         "MetricsSubscriber byte ingestion",
-        "RegionalAggregator periodic change detection"
+        "RegionalAggregator periodic change detection",
+        "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)"
       ],
       "inDevelopment": [
-        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
+        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
+        "Engauge-driven shard replication triggers — popularity detection drives blockmatrix replication decisions"
       ],
       "planned": [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 92
+    "completion": 89
   },
   {
     "id": "gateway",
