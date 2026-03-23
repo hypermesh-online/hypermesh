@@ -39,6 +39,7 @@ items = [
     "Engauge→path scheduler feedback",
     "PosValidationState connection gate",
     "PathSelector recommendation polling",
+    "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch",
 ]
 
 [features.in_development]

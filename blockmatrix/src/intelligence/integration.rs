@@ -254,8 +254,10 @@ impl ComponentIntegration {
             pipeline.compression.level = 4;
         } else {
             // ANONYMOUS: minimal tracking, fast processing
+            // R7: quantum-resistant encryption is non-negotiable for all privacy modes
+            // R8: standard cipher suite is default; configurable by agreement only
             pipeline.encryption = EncryptionConfig {
-                quantum_resistant: false,
+                quantum_resistant: true,
                 nonce_size: 12,
             };
             pipeline.sharding = ShardingConfig {

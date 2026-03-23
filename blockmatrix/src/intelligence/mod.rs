@@ -633,7 +633,8 @@ impl IntelligenceLayer {
             config.sharding.parity_shards = 3;
         } else {
             // ANONYMOUS: minimal tracking, balanced security
-            config.encryption.quantum_resistant = false;
+            // R7: quantum-resistant encryption is non-negotiable for all privacy modes
+            config.encryption.quantum_resistant = true;
             config.compression.level = 2;
             config.sharding.parity_shards = 2;
         }

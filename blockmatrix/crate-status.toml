@@ -143,6 +143,9 @@ items = [
     "TAG_SHARD_ANNOUNCE wire protocol — nodes announce shard availability to peers",
     "Consumer-becomes-provider — post-fetch store + announce for swarm scaling (R12)",
     "Selective chain reconstruction — header-only storage for non-participating segments, prune_to_headers()",
+    # Bug fixes (post-Sprint D1)
+    "Post-handshake network_id metadata exchange — peers exchange network_id after STOQ handshake, backward-compatible with old nodes",
+    "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous",
 ]
 
 [features.in_development]

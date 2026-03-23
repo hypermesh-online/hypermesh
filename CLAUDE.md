@@ -452,7 +452,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 3. **Sharding Third**: Reed-Solomon erasure coding (10+4) splits the encrypted blob into matrix-aware shards
 4. **Distribution Fourth**: Tensor-based placement at calculated matrix positions
 
-**Current Implementation GAP**: Code currently does Compress→Shard→Encrypt (wrong order, per-shard AES-256-GCM). Needs reorder to Compress→Encrypt→Shard and replacement of AES-256-GCM with Kyber-1024. Brotli compression is correct. Reed-Solomon sharding is correct. FALCON-1024 is for STOQ protocol signing. Kyber-1024 is for asset encryption.
+**Implementation Status**: Pipeline order and encryption are correct. Kyber-1024 KEM generates shared secret, AES-256-GCM uses that secret as symmetric key (standard hybrid encryption). FALCON-1024 is for STOQ protocol signing. Kyber-1024 KEM is for asset encryption. **Remaining gap**: Large assets need segment-based encryption for R13 streaming reconstruction (AES-GCM requires full ciphertext for auth tag verification).
 
 **Bucket Deduplication**: Hash buckets mapped to matrix positions prevent duplicate storage while maintaining redundancy through matrix topology.
 
@@ -525,7 +525,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ **Node-as-DNS-Provider First**: Self-sufficient bootstrap, no upstream dependency
 - ✅ **DNS-as-Asset**: Requires full Proof of State, blockchain-registered
 - ✅ **STOQ Protocol Intelligence**: PoS validation, shard addressing at protocol layer
-- ⚡ **Compression→Encryption→Sharding→Distribution**: Whole-blob Kyber-1024 encryption before sharding (code currently wrong order + AES-256-GCM, needs fix)
+- ✅ **Compression→Encryption→Sharding→Distribution**: Whole-blob Kyber-1024 KEM + AES-256-GCM (standard hybrid encryption) before sharding — implemented and tested
 - ✅ **Instruction-Based Retrieval**: Send maps not files
 - ✅ **Matrix-Aware Coordination**: Tensor operations for resource allocation
 - ✅ Separate protocols (TrustChain, STOQ, Catalog) from BlockMatrix
