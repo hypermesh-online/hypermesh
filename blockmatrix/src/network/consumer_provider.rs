@@ -56,12 +56,27 @@ impl ConsumerProviderManager {
 
     /// Process fetched shards: store locally, register as provider, build announcement.
     ///
-    /// Each shard is stored with `DedupPolicy::Full` (content-addressed dedup).
-    /// The local node is registered as a provider in the shard location index.
-    /// Returns counts and an optional announcement payload for broadcast.
+    /// Uses the given `DedupPolicy` for storage. With `Full`, refcounts are
+    /// tracked and the node is announced as a provider. With `HashOnly`
+    /// (Anonymous R4), storage dedup is performed but provider registration
+    /// and shard announcements are skipped to preserve privacy.
     pub async fn process_fetched_shards(
         &self,
         shards: Vec<(ContentHash, Vec<u8>)>,
+    ) -> ConsumerProviderResult {
+        self.process_fetched_shards_with_policy(shards, DedupPolicy::Full)
+            .await
+    }
+
+    /// Process fetched shards with an explicit dedup policy.
+    ///
+    /// When `policy` is `HashOnly` (Anonymous scope), shards are stored
+    /// but the node is NOT registered as a provider and no announcement
+    /// payload is generated — preserving Anonymous privacy guarantees.
+    pub async fn process_fetched_shards_with_policy(
+        &self,
+        shards: Vec<(ContentHash, Vec<u8>)>,
+        policy: DedupPolicy,
     ) -> ConsumerProviderResult {
         if shards.is_empty() {
             return ConsumerProviderResult {
@@ -78,7 +93,7 @@ impl ConsumerProviderManager {
         for (hash, data) in &shards {
             let result = self
                 .shard_store
-                .store_with_dedup(*hash, data.clone(), DedupPolicy::Full)
+                .store_with_dedup(*hash, data.clone(), policy)
                 .await;
 
             match result {
@@ -98,22 +113,32 @@ impl ConsumerProviderManager {
             announced_hashes.push(*hash);
         }
 
-        // Register ourselves as a provider for all shards
-        self.shard_location_index
-            .register_provider(&self.local_node_id, &announced_hashes)
-            .await;
-
-        // Build announcement payload
-        let announcement_payload = if announced_hashes.is_empty() {
+        // For HashOnly (Anonymous R4): skip provider registration and
+        // announcement to avoid leaking identity/location information.
+        let announcement_payload = if policy == DedupPolicy::HashOnly {
+            debug!(
+                "HashOnly policy: skipping provider registration and announcement for {} shards",
+                announced_hashes.len()
+            );
             None
         } else {
-            info!(
-                "Consumer-becomes-provider: announcing {} shards (stored={}, deduped={})",
-                announced_hashes.len(),
-                stored,
-                deduped
-            );
-            Some(build_shard_announce_payload(&announced_hashes))
+            // Register ourselves as a provider for all shards
+            self.shard_location_index
+                .register_provider(&self.local_node_id, &announced_hashes)
+                .await;
+
+            // Build announcement payload
+            if announced_hashes.is_empty() {
+                None
+            } else {
+                info!(
+                    "Consumer-becomes-provider: announcing {} shards (stored={}, deduped={})",
+                    announced_hashes.len(),
+                    stored,
+                    deduped
+                );
+                Some(build_shard_announce_payload(&announced_hashes))
+            }
         };
 
         ConsumerProviderResult {
@@ -255,6 +280,70 @@ mod tests {
         assert_eq!(mgr.shard_location_index.provider_count().await, 1);
         // Shard count should be 2
         assert_eq!(mgr.shard_location_index.shard_count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_anonymous_skips_provider_registration() {
+        let mgr = make_manager();
+        let hash = test_hash(0xF1);
+        let data = vec![0xAA, 0xBB, 0xCC];
+
+        let result = mgr
+            .process_fetched_shards_with_policy(
+                vec![(hash, data.clone())],
+                DedupPolicy::HashOnly,
+            )
+            .await;
+
+        // Shard should be stored
+        assert_eq!(result.shards_stored, 1);
+        assert_eq!(result.shards_deduped, 0);
+        let fetched = mgr.shard_store.get(&hash).await;
+        assert_eq!(fetched, Some(data));
+
+        // But NOT registered as provider
+        let providers = mgr.shard_location_index.get_providers(&hash).await;
+        assert!(
+            providers.is_empty(),
+            "expected no providers for HashOnly, got {:?}",
+            providers
+        );
+    }
+
+    #[tokio::test]
+    async fn test_anonymous_skips_announcement() {
+        let mgr = make_manager();
+        let hash = test_hash(0xF2);
+
+        let result = mgr
+            .process_fetched_shards_with_policy(
+                vec![(hash, vec![1, 2, 3])],
+                DedupPolicy::HashOnly,
+            )
+            .await;
+
+        assert!(
+            result.announcement_payload.is_none(),
+            "expected no announcement for HashOnly policy"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_full_policy_still_registers_and_announces() {
+        let mgr = make_manager();
+        let hash = test_hash(0xF3);
+
+        let result = mgr
+            .process_fetched_shards_with_policy(
+                vec![(hash, vec![4, 5, 6])],
+                DedupPolicy::Full,
+            )
+            .await;
+
+        assert_eq!(result.shards_stored, 1);
+        assert!(result.announcement_payload.is_some());
+        let providers = mgr.shard_location_index.get_providers(&hash).await;
+        assert!(providers.contains(&"local-node-001".to_string()));
     }
 
     #[tokio::test]

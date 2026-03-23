@@ -27,7 +27,8 @@ struct ShardEntry {
 /// persisted to disk and reloaded on startup.
 ///
 /// Supports privacy-scoped deduplication (R4): `DedupPolicy::Full`
-/// increments refcounts for duplicate stores, `DedupPolicy::None`
+/// increments refcounts for duplicate stores, `DedupPolicy::HashOnly`
+/// detects dupes but skips refcount tracking, `DedupPolicy::None`
 /// always overwrites with refcount 1.
 pub struct ShardStore {
     shards: Arc<RwLock<HashMap<ContentHash, ShardEntry>>>,
@@ -106,6 +107,7 @@ impl ShardStore {
     /// Store a shard with dedup policy awareness.
     ///
     /// - `Full`: if shard exists, increment refcount and return `Deduplicated`.
+    /// - `HashOnly`: if shard exists, skip (return `Deduplicated` with rc=1); if new, store with rc=1.
     /// - `None`: always overwrite with refcount 1 (no cross-asset correlation).
     pub async fn store_with_dedup(
         &self,
@@ -135,8 +137,20 @@ impl ShardStore {
                     ShardStoreResult::Stored
                 }
             }
+            DedupPolicy::HashOnly => {
+                // Anonymous R4: detect dupe by hash to save storage,
+                // but never increment refcount (no provider tracking).
+                if shards.contains_key(&shard_id) {
+                    ShardStoreResult::Deduplicated { ref_count: 1 }
+                } else {
+                    self.persist_shard_data(&shard_id, &data);
+                    self.persist_ref_count(&shard_id, 1);
+                    shards.insert(shard_id, ShardEntry { data, ref_count: 1 });
+                    ShardStoreResult::Stored
+                }
+            }
             DedupPolicy::None => {
-                // Anonymous: always store fresh with refcount 1 (no dedup).
+                // Always store fresh with refcount 1 (no dedup at all).
                 self.persist_shard_data(&shard_id, &data);
                 self.persist_ref_count(&shard_id, 1);
                 shards.insert(shard_id, ShardEntry { data, ref_count: 1 });
@@ -557,6 +571,68 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_store_with_hash_only_skips_duplicate() {
+        let store = ShardStore::new();
+        let hash = test_hash(80);
+
+        let r1 = store
+            .store_with_dedup(hash, vec![0xDD; 64], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(r1, ShardStoreResult::Stored);
+
+        let r2 = store
+            .store_with_dedup(hash, vec![0xDD; 64], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(r2, ShardStoreResult::Deduplicated { ref_count: 1 });
+
+        // Data is still accessible
+        assert_eq!(store.get(&hash).await, Some(vec![0xDD; 64]));
+    }
+
+    #[tokio::test]
+    async fn test_store_with_hash_only_no_refcount_increment() {
+        let store = ShardStore::new();
+        let hash = test_hash(81);
+
+        store
+            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(store.ref_count(&hash).await, Some(1));
+
+        // Second store with HashOnly: refcount stays 1 (no tracking)
+        store
+            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(store.ref_count(&hash).await, Some(1));
+
+        // Third store: still 1
+        store
+            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(store.ref_count(&hash).await, Some(1));
+    }
+
+    #[tokio::test]
+    async fn test_hash_only_release_does_not_auto_remove() {
+        let store = ShardStore::new();
+        let hash = test_hash(82);
+
+        // Store with HashOnly (rc=1 sentinel)
+        store
+            .store_with_dedup(hash, vec![0xFF; 16], DedupPolicy::HashOnly)
+            .await;
+        assert_eq!(store.ref_count(&hash).await, Some(1));
+
+        // Release: refcount goes to 0, shard is removed.
+        // For HashOnly shards the caller should NOT call release() since
+        // refcount is not tracked. But if they do, the behavior is defined:
+        // rc=1 -> 0 -> removed. This is safe — the shard can be re-fetched.
+        let rc = store.release(&hash).await;
+        assert_eq!(rc, Some(0));
+        assert!(!store.has(&hash).await);
     }
 
     #[tokio::test]

@@ -4,8 +4,9 @@
 
 //! Privacy-scoped shard deduplication policy (R4).
 //!
-//! Full dedup in Device/Private scope (same BLAKE3 hash = one copy).
-//! No dedup in Anonymous scope (each asset gets independent copies).
+//! Full dedup in Device/Private scope (same BLAKE3 hash = one copy, refcount tracked).
+//! HashOnly dedup in Anonymous scope (detects dupes by hash to save storage, but
+//! no refcount tracking and no provider identity registration).
 
 use crate::bootstrap::PrivacyMode;
 
@@ -14,8 +15,11 @@ use crate::bootstrap::PrivacyMode;
 pub enum DedupPolicy {
     /// Device + Private: full dedup, shared shards with refcount.
     Full,
-    /// Anonymous: no dedup, each asset stores independent copies.
+    /// Anonymous (legacy): no dedup, each asset stores independent copies.
     None,
+    /// Anonymous (R4): detect dupes by hash to save storage, but no
+    /// refcount tracking and no provider identity registration.
+    HashOnly,
 }
 
 impl DedupPolicy {
@@ -26,7 +30,7 @@ impl DedupPolicy {
     /// content-addressed deduplication.
     pub fn from_privacy_mode(mode: &PrivacyMode) -> Self {
         if *mode == PrivacyMode::ANONYMOUS {
-            DedupPolicy::None
+            DedupPolicy::HashOnly
         } else {
             DedupPolicy::Full
         }
@@ -81,6 +85,15 @@ pub async fn dedup_shards(
                     ShardStatus::NeedsDistribution
                 }
             }
+            DedupPolicy::HashOnly => {
+                // Detect duplicate by hash (saves storage) but do NOT
+                // acquire a reference — no refcount tracking for Anonymous.
+                if store.has(&content_hash).await {
+                    ShardStatus::AlreadyStored { ref_count: 1 }
+                } else {
+                    ShardStatus::NeedsDistribution
+                }
+            }
             DedupPolicy::None => ShardStatus::NeedsDistribution,
         };
 
@@ -95,9 +108,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn anonymous_yields_no_dedup() {
+    fn anonymous_yields_hash_only_dedup() {
         let policy = DedupPolicy::from_privacy_mode(&PrivacyMode::ANONYMOUS);
-        assert_eq!(policy, DedupPolicy::None);
+        assert_eq!(policy, DedupPolicy::HashOnly);
     }
 
     #[test]
@@ -199,6 +212,73 @@ mod tests {
         let results = dedup_shards(&[shard], &store, DedupPolicy::None).await;
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], ShardStatus::NeedsDistribution);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_hash_only_detects_existing() {
+        let store = super::super::shard_store::ShardStore::new();
+        let data = b"hash-only-existing";
+        let hash_bytes: [u8; 32] = *blake3::hash(data).as_bytes();
+        let content_hash = hypermesh_lib::ContentHash(hash_bytes);
+
+        // Pre-store the shard
+        store.store(content_hash, data.to_vec()).await;
+
+        let shard = make_test_shard(data);
+        let results = dedup_shards(&[shard], &store, DedupPolicy::HashOnly).await;
+        assert_eq!(results.len(), 1);
+        assert!(
+            matches!(results[0], ShardStatus::AlreadyStored { ref_count: 1 }),
+            "expected AlreadyStored with ref_count=1 (no acquire), got {:?}",
+            results[0],
+        );
+
+        // Refcount should still be 1 — HashOnly does NOT call acquire()
+        assert_eq!(store.ref_count(&content_hash).await, Some(1));
+    }
+
+    #[tokio::test]
+    async fn test_dedup_shards_hash_only_new_shard() {
+        let store = super::super::shard_store::ShardStore::new();
+        let shard = make_test_shard(b"hash-only-brand-new");
+
+        let results = dedup_shards(&[shard], &store, DedupPolicy::HashOnly).await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ShardStatus::NeedsDistribution);
+    }
+
+    #[tokio::test]
+    async fn test_hash_only_and_full_policies_work_independently() {
+        let store = super::super::shard_store::ShardStore::new();
+        let data = b"shared-data-for-policy-test";
+        let hash_bytes: [u8; 32] = *blake3::hash(data).as_bytes();
+        let content_hash = hypermesh_lib::ContentHash(hash_bytes);
+
+        // Pre-store
+        store.store(content_hash, data.to_vec()).await;
+        assert_eq!(store.ref_count(&content_hash).await, Some(1));
+
+        let shard = make_test_shard(data);
+
+        // HashOnly: detects existing but does NOT bump refcount
+        let results_ho = dedup_shards(&[shard.clone()], &store, DedupPolicy::HashOnly).await;
+        assert!(matches!(
+            results_ho[0],
+            ShardStatus::AlreadyStored { ref_count: 1 }
+        ));
+        assert_eq!(store.ref_count(&content_hash).await, Some(1));
+
+        // Full: detects existing AND bumps refcount via acquire()
+        let results_full = dedup_shards(&[shard.clone()], &store, DedupPolicy::Full).await;
+        assert!(matches!(
+            results_full[0],
+            ShardStatus::AlreadyStored { ref_count: 2 }
+        ));
+        assert_eq!(store.ref_count(&content_hash).await, Some(2));
+
+        // None: always NeedsDistribution regardless of store contents
+        let results_none = dedup_shards(&[shard], &store, DedupPolicy::None).await;
+        assert_eq!(results_none[0], ShardStatus::NeedsDistribution);
     }
 
     #[tokio::test]
