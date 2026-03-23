@@ -46,7 +46,7 @@ pub struct Cli {
     pub reflector: bool,
 
     /// Network ID for multi-node sync (nodes with the same ID sync blocks)
-    #[arg(long, default_value = "public-hypermesh-alpha")]
+    #[arg(long, default_value = "trustnet-test")]
     pub network_id: String,
 
     /// Data directory for blockchain persistence

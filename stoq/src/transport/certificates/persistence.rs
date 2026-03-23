@@ -6,7 +6,7 @@
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use std::time::{Duration, SystemTime};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::types::StoqNodeCertificate;
 
@@ -78,6 +78,36 @@ pub fn try_load_cached_certificate(
         fingerprint_sha256: fingerprint,
         metadata: None,
     };
+
+    // Validate cert-key consistency before returning. A mismatch
+    // (e.g. one file regenerated but the other stale) causes rustls
+    // KeyMismatch errors downstream. Auto-recover by deleting stale files.
+    // Use an explicit CryptoProvider so this works even before the
+    // process-level default is installed.
+    let validation_result = rustls::ServerConfig::builder_with_provider(std::sync::Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .map_err(|e| e.to_string())
+    .and_then(|b| {
+        b.with_no_client_auth()
+            .with_single_cert(
+                vec![stoq_cert.certificate.clone()],
+                stoq_cert.private_key.clone_key(),
+            )
+            .map_err(|e| e.to_string())
+    });
+    if let Err(e) = validation_result {
+        warn!(
+            "Stale certificates detected ({}), removing cached files in {}",
+            e,
+            cache_dir.display()
+        );
+        let _ = std::fs::remove_file(&cert_path);
+        let _ = std::fs::remove_file(&key_path);
+        let _ = std::fs::remove_file(&meta_path);
+        return None;
+    }
 
     info!("Loaded cached certificate from {}", cert_path.display());
     Some(stoq_cert)

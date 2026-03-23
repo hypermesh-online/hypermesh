@@ -592,6 +592,43 @@ async fn handle_handshake_connection(
     )
     .await?;
 
+    // Post-handshake metadata exchange (blockmatrix layer).
+    // Acceptor reads initiator's metadata first, then sends its own.
+    let peer_network_id = match tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stream.read_msg(),
+    )
+    .await
+    {
+        Ok(Ok(peer_meta_bytes)) => {
+            let peer_meta: super::HandshakeMetadata =
+                serde_json::from_slice(&peer_meta_bytes).unwrap_or_default();
+            peer_meta.network_id
+        }
+        Ok(Err(e)) => {
+            debug!("Peer did not send handshake metadata: {e}");
+            String::new()
+        }
+        Err(_) => {
+            debug!("Timeout waiting for peer handshake metadata — assuming old node");
+            String::new()
+        }
+    };
+
+    // Send our metadata back to the initiator
+    let our_network_id = peer_ctx
+        .as_ref()
+        .map(|c| c.network_id.as_str())
+        .unwrap_or("");
+    let our_meta = super::HandshakeMetadata {
+        network_id: our_network_id.to_string(),
+    };
+    if let Ok(meta_bytes) = serde_json::to_vec(&our_meta) {
+        if let Err(e) = stream.write_msg(&meta_bytes).await {
+            debug!("Failed to send handshake metadata to peer: {e}");
+        }
+    }
+
     let coordinate = MatrixCoordinate::new(
         result.peer_coordinate.0,
         result.peer_coordinate.1,
@@ -614,17 +651,15 @@ async fn handle_handshake_connection(
     // Register the accepted peer as authenticated (PoS handshake passed).
     // register_authenticated_peer enforces that proof_bytes and pubkey are
     // non-empty (R11 bilateral verification).
-    let auth_network_id = peer_ctx
-        .as_ref()
-        .map(|c| c.network_id.clone())
-        .unwrap_or_default();
+    // Use the network_id received from the peer during metadata exchange,
+    // NOT our own network_id.
     let registered = peer_auth::register_authenticated_peer(
         &authenticated_peers,
         peer_auth::AuthenticatedPeer {
             node_id: peer_node_id.clone(),
             pubkey: result.peer_pubkey.clone(),
             coordinate: (coordinate.x as i32, coordinate.y as i32, coordinate.z as i32),
-            network_id: auth_network_id,
+            network_id: peer_network_id,
             authenticated_at: std::time::Instant::now(),
             proof_bytes: result.peer_proof.clone(),
         },

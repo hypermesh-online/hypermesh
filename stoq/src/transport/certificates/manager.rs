@@ -13,7 +13,7 @@ use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::certificate_strategy::CertificateStrategy;
 use super::trustchain_client::TrustChainClient;
@@ -638,6 +638,39 @@ impl CertificateManager {
             metadata: None,
         };
 
+        // Validate that cert and key are consistent before using them.
+        // A mismatch (e.g. one file was regenerated but the other wasn't)
+        // causes rustls to reject the pair with a KeyMismatch error later
+        // in server_crypto_config(). Catch it here and auto-recover.
+        // Use an explicit CryptoProvider so this works even before the
+        // process-level default is installed.
+        let validation_result = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .map_err(|e| e.to_string())
+        .and_then(|b| {
+            b.with_no_client_auth()
+                .with_single_cert(
+                    vec![stoq_cert.certificate.clone()],
+                    stoq_cert.private_key.clone_key(),
+                )
+                .map_err(|e| e.to_string())
+        });
+        if let Err(e) = validation_result {
+            warn!(
+                "Stale certificates detected ({}), regenerating. \
+                 Cached files in {} will be replaced.",
+                e,
+                cache_dir.display()
+            );
+            // Remove stale files so the next call generates fresh ones
+            let _ = std::fs::remove_file(&cert_path);
+            let _ = std::fs::remove_file(&key_path);
+            let _ = std::fs::remove_file(&meta_path);
+            return false;
+        }
+
         // Use try_write since this runs during async init before concurrent access
         match self.current_certificate.try_write() {
             Ok(mut guard) => {
@@ -980,5 +1013,62 @@ mod tests {
             .await
             .expect("test: permission check should not error");
         assert!(!allowed, "invalid DER should be denied");
+    }
+
+    // -- Stale certificate auto-recovery --------------------------------------
+
+    #[tokio::test]
+    async fn test_stale_cert_auto_recovery() {
+        // Create a manager that persists a valid cert
+        let node_id = format!("test-stale-{}", std::process::id());
+        let config = CertificateConfig::localhost_testing(
+            node_id.clone(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        let mgr = CertificateManager::new(config)
+            .await
+            .expect("test: create manager");
+
+        let fp1 = mgr
+            .get_certificate_fingerprint()
+            .await
+            .expect("test: get fingerprint");
+
+        // Corrupt the key file to simulate a stale/mismatched key
+        let cache_dir = CertificateManager::resolve_cache_dir(&node_id)
+            .expect("test: resolve cache dir");
+        let key_path = cache_dir.join("key.der");
+
+        // Write a valid but DIFFERENT key (from a different self-signed cert)
+        let other = rcgen::generate_simple_self_signed(vec!["other.local".to_string()])
+            .expect("test: generate other cert");
+        std::fs::write(&key_path, other.key_pair.serialize_der())
+            .expect("test: write mismatched key");
+
+        // Create a second manager -- should detect mismatch, delete stale
+        // files, and regenerate a fresh certificate
+        let config2 = CertificateConfig::localhost_testing(
+            node_id.clone(),
+            "localhost".to_string(),
+            vec![Ipv6Addr::LOCALHOST],
+        );
+        let mgr2 = CertificateManager::new(config2)
+            .await
+            .expect("test: second manager should recover from stale certs");
+
+        let fp2 = mgr2
+            .get_certificate_fingerprint()
+            .await
+            .expect("test: get fingerprint after recovery");
+
+        // The fingerprints must differ because the stale cert was replaced
+        assert_ne!(
+            fp1, fp2,
+            "recovered manager should have a new certificate"
+        );
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&cache_dir);
     }
 }

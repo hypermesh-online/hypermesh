@@ -194,6 +194,22 @@ struct HandshakeData {
     peer_pubkey: Vec<u8>,
     /// Validated state proof bytes from the peer
     peer_proof: Vec<u8>,
+    /// Network ID received from the peer during post-handshake metadata exchange.
+    /// Empty string if the peer is running an older version without this field.
+    peer_network_id: String,
+}
+
+/// Post-handshake metadata exchanged at the blockmatrix layer.
+///
+/// Sent after the STOQ bilateral PoS handshake completes, carrying
+/// application-level fields that don't belong in the crypto protocol.
+/// Uses `#[serde(default)]` on all fields for backward compatibility
+/// with older nodes that don't send this message.
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct HandshakeMetadata {
+    /// Network ID for multi-node sync (nodes with the same ID sync blocks).
+    #[serde(default)]
+    network_id: String,
 }
 
 /// Check whether an IPv6 address is valid for WAN (non-loopback) connections.
@@ -321,7 +337,11 @@ impl NetworkManager {
         let connection = self.transport.connect(&endpoint).await?;
 
         // Exchange node information via bilateral PoS handshake (R11)
-        let handshake = self.exchange_node_info(&connection).await?;
+        let our_network_id = peer_ctx
+            .as_ref()
+            .map(|c| c.network_id.as_str())
+            .unwrap_or("");
+        let handshake = self.exchange_node_info(&connection, our_network_id).await?;
         let node_info = handshake.node;
 
         // Store the connected node
@@ -342,10 +362,8 @@ impl NetworkManager {
         // Register as authenticated peer — proof_bytes and pubkey come from
         // the bilateral handshake result. register_authenticated_peer will
         // reject if either is empty (enforcing R11 bilateral verification).
-        let auth_network_id = peer_ctx
-            .as_ref()
-            .map(|c| c.network_id.clone())
-            .unwrap_or_default();
+        // Use the network_id received from the peer during metadata exchange,
+        // NOT our own network_id.
         let registered = peer_auth::register_authenticated_peer(
             &self.authenticated_peers,
             peer_auth::AuthenticatedPeer {
@@ -356,7 +374,7 @@ impl NetworkManager {
                     node_info.coordinate.y as i32,
                     node_info.coordinate.z as i32,
                 ),
-                network_id: auth_network_id,
+                network_id: handshake.peer_network_id,
                 authenticated_at: std::time::Instant::now(),
                 proof_bytes: handshake.peer_proof,
             },
@@ -399,9 +417,16 @@ impl NetworkManager {
     /// implements the 3-message challenge-response protocol (R11) using
     /// NodeSigner and StateProofProvider traits.
     ///
+    /// After the STOQ crypto handshake, exchanges a blockmatrix-level
+    /// metadata message carrying `network_id` (for multi-node sync).
+    ///
     /// Returns both the `NetworkNode` and the raw proof/pubkey data so
     /// the caller can register a fully-verified `AuthenticatedPeer`.
-    async fn exchange_node_info(&self, connection: &Arc<stoq::Connection>) -> Result<HandshakeData> {
+    async fn exchange_node_info(
+        &self,
+        connection: &Arc<stoq::Connection>,
+        our_network_id: &str,
+    ) -> Result<HandshakeData> {
         let coord = self.local_coordinate;
         let local_coord = (coord.x, coord.y, coord.z);
 
@@ -415,9 +440,40 @@ impl NetworkManager {
             self.proof_provider.as_ref(),
             local_coord,
         )
-        .await;
+        .await?;
+
+        // Post-handshake metadata exchange (blockmatrix layer).
+        // Initiator sends metadata first, then reads peer's metadata.
+        let our_meta = HandshakeMetadata {
+            network_id: our_network_id.to_string(),
+        };
+        let meta_bytes = serde_json::to_vec(&our_meta)
+            .map_err(|e| anyhow!("Failed to serialize handshake metadata: {e}"))?;
+        stream.write_msg(&meta_bytes).await?;
+
+        // Read peer's metadata (with timeout tolerance for old nodes).
+        let peer_network_id = match tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            stream.read_msg(),
+        )
+        .await
+        {
+            Ok(Ok(peer_meta_bytes)) => {
+                let peer_meta: HandshakeMetadata =
+                    serde_json::from_slice(&peer_meta_bytes).unwrap_or_default();
+                peer_meta.network_id
+            }
+            Ok(Err(e)) => {
+                debug!("Peer did not send handshake metadata: {e}");
+                String::new()
+            }
+            Err(_) => {
+                debug!("Timeout waiting for peer handshake metadata — assuming old node");
+                String::new()
+            }
+        };
+
         let _ = stream.finish_send();
-        let result = result?;
 
         let coordinate = MatrixCoordinate::new(
             result.peer_coordinate.0,
@@ -436,6 +492,7 @@ impl NetworkManager {
             },
             peer_pubkey: result.peer_pubkey,
             peer_proof: result.peer_proof,
+            peer_network_id,
         })
     }
 
