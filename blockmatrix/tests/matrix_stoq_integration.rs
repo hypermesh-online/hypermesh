@@ -282,6 +282,7 @@ async fn test_network_manager_with_stoq_integration() -> Result<()> {
         vec![], // No bootstrap nodes for test
         signer,
         proof_provider,
+        "test-network".to_string(),
     )
     .await?;
 

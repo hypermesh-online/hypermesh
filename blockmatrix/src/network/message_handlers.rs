@@ -603,14 +603,15 @@ async fn handle_handshake_connection(
         Ok(Ok(peer_meta_bytes)) => {
             let peer_meta: super::HandshakeMetadata =
                 serde_json::from_slice(&peer_meta_bytes).unwrap_or_default();
+            info!("Received peer network_id from metadata: '{}'", peer_meta.network_id);
             peer_meta.network_id
         }
         Ok(Err(e)) => {
-            debug!("Peer did not send handshake metadata: {e}");
+            warn!("Peer did not send handshake metadata: {e}");
             String::new()
         }
         Err(_) => {
-            debug!("Timeout waiting for peer handshake metadata — assuming old node");
+            warn!("Timeout waiting for peer handshake metadata — assuming old node");
             String::new()
         }
     };

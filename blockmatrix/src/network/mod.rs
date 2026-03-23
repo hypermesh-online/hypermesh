@@ -241,6 +241,8 @@ pub struct NetworkManager {
     pub(super) proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
     /// Authenticated peers map shared with PeerContext.
     pub(super) authenticated_peers: AuthenticatedPeers,
+    /// Network ID for multi-node sync (sent in handshake metadata).
+    pub(super) network_id: String,
 }
 
 impl NetworkManager {
@@ -255,6 +257,7 @@ impl NetworkManager {
         bootstrap_nodes: Vec<SocketAddr>,
         signer: Arc<dyn hypermesh_lib::NodeSigner>,
         proof_provider: Arc<dyn hypermesh_lib::StateProofProvider>,
+        network_id: String,
     ) -> Result<Self> {
         info!(
             "Initializing network manager at ({},{},{}) in {:?} mode",
@@ -289,6 +292,7 @@ impl NetworkManager {
             signer,
             proof_provider,
             authenticated_peers: peer_auth::new_authenticated_peers(),
+            network_id,
         })
     }
 
@@ -340,7 +344,7 @@ impl NetworkManager {
         let our_network_id = peer_ctx
             .as_ref()
             .map(|c| c.network_id.as_str())
-            .unwrap_or("");
+            .unwrap_or(self.network_id.as_str());
         let handshake = self.exchange_node_info(&connection, our_network_id).await?;
         let node_info = handshake.node;
 
@@ -461,14 +465,15 @@ impl NetworkManager {
             Ok(Ok(peer_meta_bytes)) => {
                 let peer_meta: HandshakeMetadata =
                     serde_json::from_slice(&peer_meta_bytes).unwrap_or_default();
+                info!("Received peer network_id from metadata: '{}'", peer_meta.network_id);
                 peer_meta.network_id
             }
             Ok(Err(e)) => {
-                debug!("Peer did not send handshake metadata: {e}");
+                warn!("Peer did not send handshake metadata: {e}");
                 String::new()
             }
             Err(_) => {
-                debug!("Timeout waiting for peer handshake metadata — assuming old node");
+                warn!("Timeout waiting for peer handshake metadata — assuming old node");
                 String::new()
             }
         };
@@ -759,6 +764,7 @@ mod tests {
             vec![],
             signer,
             proof_provider,
+            "test-network".to_string(),
         )
         .await
         .expect("test: manager creation");

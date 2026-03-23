@@ -154,6 +154,7 @@ async fn start_node(
             bootstrap_nodes,
             signer,
             proof_provider,
+            "demo-network".to_string(),
         )
         .await?;
 

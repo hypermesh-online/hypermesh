@@ -289,6 +289,7 @@ async fn start_network(
         bootstrap_nodes,
         signer,
         proof_provider,
+        cli.network_id.clone(),
     )
     .await?;
 
