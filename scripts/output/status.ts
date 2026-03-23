@@ -31,6 +31,11 @@ export const crateStatuses: CrateStatus[] = [
         "Node resume path (load persisted genesis/blocks/cert from disk)",
         "BLAKE3 content hashing for blocks",
         "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(Reed-Solomon 10+4)->store locally",
+        "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
+        "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
+        "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
+        "Random-access byte range reconstruction — reconstruct only segments covering requested range",
+        "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
         "Adaptive erasure coding (R14 — RS parameters scale with asset size)",
         "Store command: file -> pipeline -> local shard files + shard map",
         "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
@@ -136,28 +141,29 @@ export const crateStatuses: CrateStatus[] = [
         "ShardLocationIndex — shard-to-provider mapping for swarm discovery (R12)",
         "TAG_SHARD_ANNOUNCE wire protocol — nodes announce shard availability to peers",
         "Consumer-becomes-provider — post-fetch store + announce for swarm scaling (R12)",
-        "Selective chain reconstruction — header-only storage for non-participating segments, prune_to_headers()"
+        "Selective chain reconstruction — header-only storage for non-participating segments, prune_to_headers()",
+        "Post-handshake network_id metadata exchange — peers exchange network_id after STOQ handshake, backward-compatible with old nodes",
+        "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
-        "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units"
+        "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
+        "Privacy-scoped deduplication (R4 — PrivacyScopedDedup exists with Anonymous/Private/Public modes, needs HashOnly policy integration)",
+        "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
+        "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing"
       ],
       "planned": [
-        "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
-        "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
         "Cross-network asset transfers with dual PoS validation",
-        "Container runtime with real process isolation",
         "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
         "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
         "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
-        "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
-        "Engauge-driven demand-based shard replication"
+        "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 89
+    "completion": 90
   },
   {
     "id": "caesar",
@@ -296,7 +302,8 @@ export const crateStatuses: CrateStatus[] = [
         "MetricsPublisher transport callbacks",
         "MetricsSubscriber byte ingestion",
         "RegionalAggregator periodic change detection",
-        "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)"
+        "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
+        "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)"
       ],
       "inDevelopment": [
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
@@ -306,7 +313,7 @@ export const crateStatuses: CrateStatus[] = [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 89
+    "completion": 90
   },
   {
     "id": "gateway",
@@ -376,7 +383,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
-        "Network MVP — bilateral handshake + block sync verified E2E local (two-node QUIC), shared --network-id, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution. NOT tested on separate hosts.",
+        "Network MVP — bilateral handshake + block sync verified E2E local-to-GCP (trust.hypermesh.online), network_id metadata exchange, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution, stale cert auto-recovery.",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
@@ -499,7 +506,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "inDevelopment": [
         "State proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
-        "BlockchainScope::Network — enum variant exists but no crate implements Network scope sync"
+        "BlockchainScope::Network — blockmatrix implements Network scope sync MVP (block propagation, gossip, cross-genesis insertion, E2E two-node over QUIC)"
       ],
       "planned": []
     },
@@ -570,10 +577,11 @@ export const crateStatuses: CrateStatus[] = [
         "Connection migration scaffold",
         "Engauge→path scheduler feedback",
         "PosValidationState connection gate",
-        "PathSelector recommendation polling"
+        "PathSelector recommendation polling",
+        "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch"
       ],
       "inDevelopment": [
-        "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
+        "Bilateral handshake protocol — 3-message challenge-response, verified local two-node and local-to-GCP (trust.hypermesh.online), handshake metadata exchange for network_id",
         "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions"
       ],
       "planned": [
@@ -582,7 +590,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 86
+    "completion": 87
   },
   {
     "id": "trustchain",

@@ -32,6 +32,7 @@ items = [
     "MetricsSubscriber byte ingestion",
     "RegionalAggregator periodic change detection",
     "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
+    "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
 ]
 
 [features.in_development]

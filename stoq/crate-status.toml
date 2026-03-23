@@ -44,7 +44,7 @@ items = [
 
 [features.in_development]
 items = [
-    "Bilateral handshake protocol — 3-message challenge-response verified local-only, NOT tested on separate hosts",
+    "Bilateral handshake protocol — 3-message challenge-response, verified local two-node and local-to-GCP (trust.hypermesh.online), handshake metadata exchange for network_id",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
 ]
 

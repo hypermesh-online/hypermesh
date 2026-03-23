@@ -39,7 +39,7 @@ items = [
 items = [
     # Lib types are defined but some are not yet exercised by real implementations
     "State proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
-    "BlockchainScope::Network — enum variant exists but no crate implements Network scope sync",
+    "BlockchainScope::Network — blockmatrix implements Network scope sync MVP (block propagation, gossip, cross-genesis insertion, E2E two-node over QUIC)",
 ]
 
 [features.planned]

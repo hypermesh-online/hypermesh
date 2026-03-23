@@ -163,16 +163,16 @@ items = [
     "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
     "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
     "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
+    "Privacy-scoped deduplication (R4 — PrivacyScopedDedup exists with Anonymous/Private/Public modes, needs HashOnly policy integration)",
+    "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
+    "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing",
 ]
 
 [features.planned]
 items = [
-    "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
     "Cross-network asset transfers with dual PoS validation",
-    "Container runtime with real process isolation",
     "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
     "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
     "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
     "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
-    "Engauge-driven demand-based shard replication",
 ]
