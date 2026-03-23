@@ -30,8 +30,11 @@ use serde::{Deserialize, Serialize};
 pub mod compression;
 pub mod distribution;
 pub mod encryption;
+pub mod key_derivation;
 pub mod orchestrator;
+pub mod segment;
 pub mod sharding;
+pub mod streaming_pipeline;
 
 // Re-exports
 pub use compression::{CompressionAlgorithm, CompressionConfig, CompressionStats, Compressor};

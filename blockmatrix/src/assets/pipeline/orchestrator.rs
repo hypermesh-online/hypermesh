@@ -73,6 +73,20 @@ pub enum DecryptionKey {
     },
     /// Plain AES-256-GCM (non-quantum fallback)
     Aes(AesKey),
+    /// Segment-oriented encryption with HKDF key derivation.
+    /// One Kyber KEM per asset, BLAKE3-HKDF per segment.
+    KyberSegmented {
+        /// Kyber KEM ciphertext for decapsulation
+        #[serde(with = "serde_bytes")]
+        ciphertext_kem: Vec<u8>,
+        /// Kyber secret key
+        #[serde(with = "serde_bytes")]
+        secret_key: Vec<u8>,
+        /// Number of segments
+        segment_count: u32,
+        /// Original uncompressed asset size
+        original_size: u64,
+    },
 }
 
 /// Processed asset with all metadata
@@ -450,6 +464,11 @@ impl AssetPipeline {
                         original_size: 0,
                     };
                     self.encryptor.decrypt_aes(&encrypted, key)?
+                }
+                DecryptionKey::KyberSegmented { .. } => {
+                    return Err(crate::assets::pipeline::PipelineError::InvalidData(
+                        "KyberSegmented assets must use StreamingAssetPipeline for reconstruction".into(),
+                    ));
                 }
             }
         } else {

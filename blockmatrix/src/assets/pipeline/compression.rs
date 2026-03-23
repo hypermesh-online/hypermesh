@@ -2,9 +2,11 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Compression Stage - Brotli streaming compression
+//! Compression Stage - Brotli and Zstd streaming compression
 //!
-//! Provides configurable Brotli compression with streaming support for large assets.
+//! Provides configurable compression with streaming support for large assets.
+//! Supports Brotli (excellent ratio for text), Zstd (fast for large/binary data),
+//! and Auto mode (content-type-based algorithm selection).
 
 use crate::assets::pipeline::{PipelineError, PipelineResult};
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,10 @@ pub enum CompressionAlgorithm {
     Brotli,
     /// No compression
     None,
+    /// Zstd compression - fast with good ratio for large/binary data
+    Zstd,
+    /// Auto-select algorithm based on content type and size
+    Auto,
 }
 
 impl Default for CompressionAlgorithm {
@@ -118,6 +124,14 @@ impl Compressor {
         let compressed = match self.config.algorithm {
             CompressionAlgorithm::Brotli => self.compress_brotli(data)?,
             CompressionAlgorithm::None => data.to_vec(),
+            CompressionAlgorithm::Zstd => self.compress_zstd_raw(data)?,
+            CompressionAlgorithm::Auto => {
+                let algo = self.select_algorithm("application/octet-stream", data.len());
+                let mut temp_config = self.config.clone();
+                temp_config.algorithm = algo;
+                let temp = Compressor::new(temp_config);
+                return temp.compress(data);
+            }
         };
 
         let duration_ms = start.elapsed().as_millis() as u64;
@@ -131,6 +145,20 @@ impl Compressor {
         match self.config.algorithm {
             CompressionAlgorithm::Brotli => self.decompress_brotli(data),
             CompressionAlgorithm::None => Ok(data.to_vec()),
+            CompressionAlgorithm::Zstd => self.decompress_zstd(data),
+            CompressionAlgorithm::Auto => {
+                // Auto-detect: zstd magic bytes (0x28 0xB5 0x2F 0xFD), else try brotli
+                if data.len() >= 4
+                    && data[0] == 0x28
+                    && data[1] == 0xB5
+                    && data[2] == 0x2F
+                    && data[3] == 0xFD
+                {
+                    self.decompress_zstd(data)
+                } else {
+                    self.decompress_brotli(data)
+                }
+            }
         }
     }
 
@@ -166,6 +194,57 @@ impl Compressor {
         })?;
 
         Ok(output)
+    }
+
+    /// Compress using Zstd (raw bytes, stats calculated by caller)
+    fn compress_zstd_raw(&self, data: &[u8]) -> PipelineResult<Vec<u8>> {
+        let level = self.config.level.min(22) as i32; // zstd max level is 22
+        zstd::encode_all(std::io::Cursor::new(data), level)
+            .map_err(|e| PipelineError::CompressionFailed(format!("zstd compression failed: {e}")))
+    }
+
+    /// Decompress using Zstd
+    fn decompress_zstd(&self, data: &[u8]) -> PipelineResult<Vec<u8>> {
+        zstd::decode_all(std::io::Cursor::new(data))
+            .map_err(|e| PipelineError::CompressionFailed(format!("zstd decompression failed: {e}")))
+    }
+
+    /// Select the best compression algorithm based on content type and size.
+    ///
+    /// - Already-compressed formats (video, audio, jpeg, zip, etc.) → None
+    /// - Small text content (<10 MB) → Brotli (best ratio for text)
+    /// - Everything else → Zstd (fast, good for large/heterogeneous data)
+    pub fn select_algorithm(&self, content_type: &str, size: usize) -> CompressionAlgorithm {
+        let ct = content_type.to_lowercase();
+
+        // Already-compressed formats: skip compression
+        if ct.starts_with("video/")
+            || ct.starts_with("audio/")
+            || ct == "image/jpeg"
+            || ct == "image/png"
+            || ct == "image/webp"
+            || ct == "application/zip"
+            || ct == "application/gzip"
+            || ct == "application/x-xz"
+            || ct == "application/zstd"
+            || ct == "application/x-bzip2"
+        {
+            return CompressionAlgorithm::None;
+        }
+
+        // Small text content: Brotli (best ratio for text)
+        if size < 10 * 1024 * 1024
+            && (ct.starts_with("text/")
+                || ct == "application/json"
+                || ct == "application/javascript"
+                || ct == "application/xml"
+                || ct == "application/xhtml+xml")
+        {
+            return CompressionAlgorithm::Brotli;
+        }
+
+        // Everything else: zstd (fast, good for large heterogeneous data)
+        CompressionAlgorithm::Zstd
     }
 
     /// Compress with streaming for large files
@@ -228,6 +307,46 @@ impl Compressor {
                     PipelineError::CompressionFailed(format!("Direct copy failed: {e}"))
                 })? as usize;
                 total_read = total_written;
+            }
+            CompressionAlgorithm::Zstd => {
+                let level = self.config.level.min(22) as i32;
+                let mut input_buffer = Vec::new();
+                reader.read_to_end(&mut input_buffer).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Stream read failed: {e}"))
+                })?;
+                total_read = input_buffer.len();
+
+                let compressed =
+                    zstd::encode_all(std::io::Cursor::new(&input_buffer), level).map_err(|e| {
+                        PipelineError::CompressionFailed(format!(
+                            "zstd stream compression failed: {e}"
+                        ))
+                    })?;
+
+                total_written = compressed.len();
+                writer.write_all(&compressed).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Final write failed: {e}"))
+                })?;
+            }
+            CompressionAlgorithm::Auto => {
+                // For streaming, read all data first to detect, then compress in-memory
+                let mut input_buffer = Vec::new();
+                reader.read_to_end(&mut input_buffer).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Stream read failed: {e}"))
+                })?;
+                total_read = input_buffer.len();
+
+                let algo =
+                    self.select_algorithm("application/octet-stream", input_buffer.len());
+                let mut temp_config = self.config.clone();
+                temp_config.algorithm = algo;
+                let temp = Compressor::new(temp_config);
+
+                let (compressed, _) = temp.compress(&input_buffer)?;
+                total_written = compressed.len();
+                writer.write_all(&compressed).map_err(|e| {
+                    PipelineError::CompressionFailed(format!("Final write failed: {e}"))
+                })?;
             }
         }
 
@@ -360,5 +479,93 @@ mod tests {
         // Verify we can decompress
         let decompressed = compressor.decompress(&output).expect("test: compression operation");
         assert_eq!(decompressed, data);
+    }
+
+    // --- Zstd and Auto tests ---
+
+    #[test]
+    fn test_zstd_compression_roundtrip() {
+        let data = b"Hello, zstd compression! This is a test of the zstd algorithm.".repeat(100);
+        let compressor = Compressor::new(CompressionConfig {
+            algorithm: CompressionAlgorithm::Zstd,
+            level: 3,
+            ..CompressionConfig::default()
+        });
+        let (compressed, stats) = compressor.compress(&data).expect("test: compress");
+        assert!(compressed.len() < data.len(), "test: zstd should compress");
+        assert!(stats.ratio < 1.0);
+
+        let decompressed = compressor.decompress(&compressed).expect("test: decompress");
+        assert_eq!(decompressed, data);
+    }
+
+    #[test]
+    fn test_zstd_large_data() {
+        let data: Vec<u8> = (0..1_000_000).map(|i| (i % 256) as u8).collect();
+        let compressor = Compressor::new(CompressionConfig {
+            algorithm: CompressionAlgorithm::Zstd,
+            level: 3,
+            ..CompressionConfig::default()
+        });
+        let (compressed, _) = compressor.compress(&data).expect("test: compress 1MB");
+        let decompressed = compressor.decompress(&compressed).expect("test: decompress 1MB");
+        assert_eq!(decompressed, data);
+    }
+
+    #[test]
+    fn test_auto_detect_video_skips_compression() {
+        let compressor = Compressor::default();
+        assert!(matches!(
+            compressor.select_algorithm("video/mp4", 1000),
+            CompressionAlgorithm::None
+        ));
+        assert!(matches!(
+            compressor.select_algorithm("audio/mpeg", 1000),
+            CompressionAlgorithm::None
+        ));
+        assert!(matches!(
+            compressor.select_algorithm("image/jpeg", 1000),
+            CompressionAlgorithm::None
+        ));
+        assert!(matches!(
+            compressor.select_algorithm("application/zip", 1000),
+            CompressionAlgorithm::None
+        ));
+    }
+
+    #[test]
+    fn test_auto_detect_text_uses_brotli() {
+        let compressor = Compressor::default();
+        assert!(matches!(
+            compressor.select_algorithm("text/html", 5000),
+            CompressionAlgorithm::Brotli
+        ));
+        assert!(matches!(
+            compressor.select_algorithm("application/json", 1_000_000),
+            CompressionAlgorithm::Brotli
+        ));
+    }
+
+    #[test]
+    fn test_auto_detect_large_text_uses_zstd() {
+        let compressor = Compressor::default();
+        // Text > 10MB uses zstd
+        assert!(matches!(
+            compressor.select_algorithm("text/plain", 20_000_000),
+            CompressionAlgorithm::Zstd
+        ));
+    }
+
+    #[test]
+    fn test_auto_detect_binary_uses_zstd() {
+        let compressor = Compressor::default();
+        assert!(matches!(
+            compressor.select_algorithm("application/octet-stream", 1000),
+            CompressionAlgorithm::Zstd
+        ));
+        assert!(matches!(
+            compressor.select_algorithm("application/pdf", 1000),
+            CompressionAlgorithm::Zstd
+        ));
     }
 }

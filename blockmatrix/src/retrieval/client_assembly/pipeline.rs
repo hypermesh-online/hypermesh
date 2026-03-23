@@ -176,6 +176,11 @@ impl ClientAssembler {
                     .decrypt_aes(&encrypted, key)
                     .map_err(|e| anyhow::anyhow!("AES decryption failed: {e}"))
             }
+            DecryptionKey::KyberSegmented { .. } => {
+                Err(anyhow::anyhow!(
+                    "KyberSegmented assets must use StreamingAssetPipeline for reconstruction"
+                ))
+            }
         }
     }
 

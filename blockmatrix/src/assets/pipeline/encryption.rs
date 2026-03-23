@@ -10,6 +10,7 @@
 //!
 //! Pipeline order: Compress -> **Encrypt (whole blob)** -> Shard -> Distribute
 
+use crate::assets::pipeline::key_derivation::derive_segment_key;
 use crate::assets::pipeline::{PipelineError, PipelineResult};
 use serde::{Deserialize, Serialize};
 
@@ -323,6 +324,69 @@ impl Encryptor {
         Ok(plaintext)
     }
 
+    // ── Per-segment encryption (streaming pipeline) ─────────────────────
+
+    /// Encrypt a single segment with a derived key from the master key + segment index.
+    /// Uses AES-256-GCM with deterministic key+nonce derived via BLAKE3 HKDF.
+    pub fn encrypt_segment(
+        &self,
+        segment_data: &[u8],
+        master_key: &[u8; 32],
+        segment_index: u32,
+    ) -> PipelineResult<(Vec<u8>, EncryptionStats)> {
+        let start = std::time::Instant::now();
+        let (key_bytes, nonce_bytes) = derive_segment_key(master_key, segment_index);
+
+        let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
+        let cipher = Aes256Gcm::new(key);
+        let nonce = aes_gcm::Nonce::from_slice(&nonce_bytes);
+
+        let ciphertext = cipher
+            .encrypt(nonce, segment_data.as_ref())
+            .map_err(|_| PipelineError::EncryptionFailed(
+                format!("AES-GCM segment encryption failed for segment {}", segment_index)
+            ))?;
+
+        let encrypted_size = ciphertext.len();
+        let duration = start.elapsed();
+        let duration_ms = duration.as_millis() as u64;
+        let throughput = if duration_ms > 0 {
+            (segment_data.len() as f64 / (1024.0 * 1024.0)) / (duration_ms as f64 / 1000.0)
+        } else if segment_data.is_empty() {
+            0.0
+        } else {
+            (segment_data.len() as f64 / (1024.0 * 1024.0)) / 0.001
+        };
+
+        Ok((ciphertext, EncryptionStats {
+            original_size: segment_data.len(),
+            encrypted_size,
+            duration_ms,
+            throughput_mbps: throughput,
+            quantum_resistant: true, // Key derived from Kyber KEM shared secret
+        }))
+    }
+
+    /// Decrypt a single segment with a derived key from the master key + segment index.
+    pub fn decrypt_segment(
+        &self,
+        encrypted_segment: &[u8],
+        master_key: &[u8; 32],
+        segment_index: u32,
+    ) -> PipelineResult<Vec<u8>> {
+        let (key_bytes, nonce_bytes) = derive_segment_key(master_key, segment_index);
+
+        let key = aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes);
+        let cipher = Aes256Gcm::new(key);
+        let nonce = aes_gcm::Nonce::from_slice(&nonce_bytes);
+
+        cipher
+            .decrypt(nonce, encrypted_segment.as_ref())
+            .map_err(|_| PipelineError::EncryptionFailed(
+                format!("AES-GCM segment decryption failed for segment {}", segment_index)
+            ))
+    }
+
     /// Get encryption configuration
     pub fn config(&self) -> &EncryptionConfig {
         &self.config
@@ -476,5 +540,103 @@ mod tests {
         assert!(stats.encrypted_size > 100_000, "auth tag adds bytes");
         assert!(stats.throughput_mbps > 0.0);
         assert!(stats.quantum_resistant);
+    }
+
+    // ── Per-segment encryption tests ─────────────────────────────────────
+
+    #[test]
+    fn test_segment_encrypt_decrypt_roundtrip() {
+        let encryptor = Encryptor::default();
+        let master_key = [42u8; 32];
+        let data = b"Hello, segment encryption! This tests per-segment AES-GCM.";
+
+        let (encrypted, stats) = encryptor
+            .encrypt_segment(data, &master_key, 0)
+            .expect("test: encrypt segment");
+        assert_ne!(encrypted, data);
+        assert!(stats.quantum_resistant);
+
+        let decrypted = encryptor
+            .decrypt_segment(&encrypted, &master_key, 0)
+            .expect("test: decrypt segment");
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_segment_encrypt_different_indices_produce_different_ciphertext() {
+        let encryptor = Encryptor::default();
+        let master_key = [42u8; 32];
+        let data = b"Same data, different segment indices";
+
+        let (encrypted_0, _) = encryptor
+            .encrypt_segment(data, &master_key, 0)
+            .expect("test: encrypt seg 0");
+        let (encrypted_1, _) = encryptor
+            .encrypt_segment(data, &master_key, 1)
+            .expect("test: encrypt seg 1");
+
+        assert_ne!(encrypted_0, encrypted_1, "Different indices must produce different ciphertext");
+    }
+
+    #[test]
+    fn test_segment_decrypt_wrong_index_fails() {
+        let encryptor = Encryptor::default();
+        let master_key = [42u8; 32];
+        let data = b"Encrypted with index 0, decrypted with index 1";
+
+        let (encrypted, _) = encryptor
+            .encrypt_segment(data, &master_key, 0)
+            .expect("test: encrypt");
+
+        let result = encryptor.decrypt_segment(&encrypted, &master_key, 1);
+        assert!(result.is_err(), "Wrong index must fail decryption");
+    }
+
+    #[test]
+    fn test_segment_encrypt_deterministic() {
+        let encryptor = Encryptor::default();
+        let master_key = [42u8; 32];
+        let data = b"Deterministic encryption test";
+
+        let (encrypted_1, _) = encryptor
+            .encrypt_segment(data, &master_key, 5)
+            .expect("test: encrypt 1");
+        let (encrypted_2, _) = encryptor
+            .encrypt_segment(data, &master_key, 5)
+            .expect("test: encrypt 2");
+
+        assert_eq!(encrypted_1, encrypted_2, "Same input+key+index must produce same ciphertext");
+    }
+
+    #[test]
+    fn test_kyber_kem_to_segment_encryption_flow() {
+        use crate::assets::pipeline::key_derivation::derive_master_key;
+
+        let encryptor = Encryptor::default();
+
+        // Generate Kyber keypair
+        let _keypair = encryptor.generate_keypair().expect("test: keypair");
+
+        // Simulate KEM: use a fixed shared secret for deterministic test
+        let fake_shared_secret = [0xABu8; 32];
+        let master_key = derive_master_key(&fake_shared_secret);
+
+        // Encrypt 3 segments
+        let data_0 = b"Segment zero data content here";
+        let data_1 = b"Segment one has different data";
+        let data_2 = b"Final segment with more content";
+
+        let (enc_0, _) = encryptor.encrypt_segment(data_0, &master_key, 0).expect("test: seg 0");
+        let (enc_1, _) = encryptor.encrypt_segment(data_1, &master_key, 1).expect("test: seg 1");
+        let (enc_2, _) = encryptor.encrypt_segment(data_2, &master_key, 2).expect("test: seg 2");
+
+        // Decrypt in any order (random access)
+        let dec_2 = encryptor.decrypt_segment(&enc_2, &master_key, 2).expect("test: dec 2");
+        let dec_0 = encryptor.decrypt_segment(&enc_0, &master_key, 0).expect("test: dec 0");
+        let dec_1 = encryptor.decrypt_segment(&enc_1, &master_key, 1).expect("test: dec 1");
+
+        assert_eq!(dec_0, data_0);
+        assert_eq!(dec_1, data_1);
+        assert_eq!(dec_2, data_2);
     }
 }
