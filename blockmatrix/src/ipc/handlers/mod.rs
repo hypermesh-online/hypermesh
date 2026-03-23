@@ -11,6 +11,7 @@ pub mod blockchain;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
+pub mod gateway;
 pub mod domain;
 pub mod network;
 pub mod shard;
@@ -85,6 +86,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     dashboard::register(handler, &state);
     shard::register(handler, &state);
     store::register(handler, &state);
+    gateway::register(handler, &state);
     config::register(handler);
 }
 
@@ -185,6 +187,9 @@ pub(crate) mod tests {
             "dashboard.deploy",
             "dashboard.list",
             "dashboard.info",
+            "gateway.transfer",
+            "gateway.status",
+            "gateway.list",
             "config.show",
             "config.get",
             "config.set",

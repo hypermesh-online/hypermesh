@@ -22,7 +22,8 @@ pub mod asset_transfer;
 pub mod scope_bridge;
 
 pub use asset_transfer::{
-    AssetTransfer, DefaultTransferValidator, TransferStatus, TransferValidator,
+    AssetTransfer, DefaultTransferValidator, PosTransferValidator, TransferLockEntry,
+    TransferRegistrationEntry, TransferReleaseEntry, TransferStatus, TransferValidator,
 };
 pub use scope_bridge::{BridgeMessage, ScopeBridge, TransferShard};
 

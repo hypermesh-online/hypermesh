@@ -197,6 +197,12 @@ pub enum Commands {
         action: CatalogAction,
     },
 
+    /// Cross-scope asset transfer operations (Device <-> Network)
+    Gateway {
+        #[clap(subcommand)]
+        action: GatewayAction,
+    },
+
     /// Destroy all node data (blockchain, identity, shards, config)
     Destroy {
         /// Skip confirmation prompt
@@ -391,4 +397,26 @@ pub enum CatalogAction {
     },
     /// Show registry statistics
     Stats,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GatewayAction {
+    /// Transfer an asset between blockchain scopes (Device <-> Network)
+    Transfer {
+        /// Asset ID to transfer
+        asset_id: String,
+        /// Source scope (device or network)
+        #[arg(long, default_value = "device")]
+        from: String,
+        /// Target scope (device or network)
+        #[arg(long, default_value = "network")]
+        to: String,
+    },
+    /// Get the status of a transfer by ID
+    Status {
+        /// Transfer ID (e.g., "gw-tx-1")
+        transfer_id: String,
+    },
+    /// List all transfers
+    List,
 }

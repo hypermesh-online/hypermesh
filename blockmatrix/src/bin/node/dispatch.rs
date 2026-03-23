@@ -14,7 +14,7 @@ use blockmatrix::ipc;
 
 use crate::cli::{
     CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction,
-    EngaugeAction, TrustchainAction,
+    EngaugeAction, GatewayAction, TrustchainAction,
 };
 use crate::commands::connect::service_ipc_call;
 use crate::commands::domain::{run_domain, run_join};
@@ -139,6 +139,9 @@ pub(crate) async fn dispatch_command(
         }
         Some(Commands::Catalog { action }) => {
             dispatch_catalog(action, cli.json).await?;
+        }
+        Some(Commands::Gateway { action }) => {
+            dispatch_gateway(action, cli.json).await?;
         }
         Some(Commands::Destroy { .. }) => {
             unreachable!("destroy handled before bootstrap");
@@ -458,6 +461,35 @@ async fn dispatch_catalog(action: CatalogAction, json: bool) -> Result<()> {
         CatalogAction::Stats => {
             service_ipc_call("catalog.registry_stats", serde_json::json!({}), json)
                 .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn dispatch_gateway(action: GatewayAction, json: bool) -> Result<()> {
+    match action {
+        GatewayAction::Transfer { asset_id, from, to } => {
+            service_ipc_call(
+                "gateway.transfer",
+                serde_json::json!({
+                    "asset_id": asset_id,
+                    "source_scope": from,
+                    "target_scope": to,
+                }),
+                json,
+            )
+            .await?;
+        }
+        GatewayAction::Status { transfer_id } => {
+            service_ipc_call(
+                "gateway.status",
+                serde_json::json!({"transfer_id": transfer_id}),
+                json,
+            )
+            .await?;
+        }
+        GatewayAction::List => {
+            service_ipc_call("gateway.list", serde_json::json!({}), json).await?;
         }
     }
     Ok(())
