@@ -447,12 +447,12 @@ DNS names are blockchain assets earning CAESAR rewards.
 
 **Compression → Encryption → Sharding → Distribution**
 
-1. **Compression First**: Brotli streaming compression (levels 1-11) on raw data
-2. **Encryption Second**: Kyber-1024 quantum-resistant encryption of the compressed blob (NOT per-shard, NOT AES wrapping)
-3. **Sharding Third**: Reed-Solomon erasure coding (10+4) splits the encrypted blob into matrix-aware shards
+1. **Compression First**: Zstd/Brotli per-segment compression (auto-detected by content type)
+2. **Encryption Second**: Per-segment AES-256-GCM with BLAKE3-HKDF key derivation from one Kyber-1024 KEM shared secret
+3. **Sharding Third**: Per-segment Reed-Solomon erasure coding (configurable k+m, default 10+4)
 4. **Distribution Fourth**: Tensor-based placement at calculated matrix positions
 
-**Implementation Status**: Pipeline order and encryption are correct. Kyber-1024 KEM generates shared secret, AES-256-GCM uses that secret as symmetric key (standard hybrid encryption). FALCON-1024 is for STOQ protocol signing. Kyber-1024 KEM is for asset encryption. **Remaining gap**: Large assets need segment-based encryption for R13 streaming reconstruction (AES-GCM requires full ciphertext for auth tag verification).
+**Implementation Status**: Streaming-first segment-oriented pipeline is complete. Assets are split into fixed-size segments; each segment is independently compressed, encrypted (BLAKE3-HKDF per-segment key from one Kyber-1024 KEM shared secret), and Reed-Solomon sharded. Supports three consumption patterns: torrent (all segments), streaming (async reader/writer with bounded memory per R13), and random-access byte range (fetch only needed segments). Zstd compression with content-type auto-detection (video/audio skipped, text to Brotli, binary to Zstd). Old whole-blob AssetPipeline remains for backward compatibility.
 
 **Bucket Deduplication**: Hash buckets mapped to matrix positions prevent duplicate storage while maintaining redundancy through matrix topology.
 
@@ -525,7 +525,7 @@ DNS names are blockchain assets earning CAESAR rewards.
 - ✅ **Node-as-DNS-Provider First**: Self-sufficient bootstrap, no upstream dependency
 - ✅ **DNS-as-Asset**: Requires full Proof of State, blockchain-registered
 - ✅ **STOQ Protocol Intelligence**: PoS validation, shard addressing at protocol layer
-- ✅ **Compression→Encryption→Sharding→Distribution**: Whole-blob Kyber-1024 KEM + AES-256-GCM (standard hybrid encryption) before sharding — implemented and tested
+- ✅ **Streaming-first asset pipeline**: Segment-oriented Compress→Encrypt→Shard→Distribute with per-segment HKDF keys, async streaming I/O (process_stream/reconstruct_to_writer for R13 bounded memory), random-access byte range reconstruction, Zstd content-type auto-detection
 - ✅ **Instruction-Based Retrieval**: Send maps not files
 - ✅ **Matrix-Aware Coordination**: Tensor operations for resource allocation
 - ✅ Separate protocols (TrustChain, STOQ, Catalog) from BlockMatrix

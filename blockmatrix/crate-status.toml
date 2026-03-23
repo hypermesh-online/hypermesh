@@ -18,6 +18,11 @@ items = [
     "BLAKE3 content hashing for blocks",
     # Asset pipeline (real crypto, real erasure coding — LOCAL ONLY)
     "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(Reed-Solomon 10+4)->store locally",
+    "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
+    "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
+    "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
+    "Random-access byte range reconstruction — reconstruct only segments covering requested range",
+    "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
     "Adaptive erasure coding (R14 — RS parameters scale with asset size)",
     "Store command: file -> pipeline -> local shard files + shard map",
     "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
@@ -162,7 +167,6 @@ items = [
 
 [features.planned]
 items = [
-    "Streaming shard reconstruction (R13 — incremental decode for min-spec devices)",
     "Privacy-scoped deduplication (R4 — full tracking Device/Private, hash-only Anonymous)",
     "Cross-network asset transfers with dual PoS validation",
     "Container runtime with real process isolation",

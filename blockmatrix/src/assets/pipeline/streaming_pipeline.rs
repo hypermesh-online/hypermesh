@@ -25,6 +25,7 @@ use crate::assets::pipeline::{
 use pqcrypto_kyber::kyber1024;
 use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Configuration for the streaming pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,6 +275,184 @@ impl StreamingAssetPipeline {
         Ok(result)
     }
 
+    /// Process asset from an async reader -- never loads the full asset into memory.
+    /// Reads segment_size chunks, processes each independently.
+    pub async fn process_stream<R: tokio::io::AsyncRead + Unpin>(
+        &self,
+        mut reader: R,
+        total_size: u64,
+        metadata: &PipelineInputMetadata,
+    ) -> PipelineResult<(AssetManifest, DecryptionKey, Vec<SegmentShardSet>)> {
+        let seg_size = if self.config.segment_size == 0 {
+            segment_size_for_asset(total_size)
+        } else {
+            self.config.segment_size
+        };
+        let seg_count = segment_count(total_size, seg_size);
+
+        // Generate Kyber keypair, KEM -> shared secret -> master key
+        let keypair = self.encryptor.generate_keypair()?;
+        let pk = kyber1024::PublicKey::from_bytes(&keypair.public_key)
+            .map_err(|_| PipelineError::EncryptionFailed("Invalid Kyber public key".into()))?;
+        let (shared_secret, kem_ciphertext) = kyber1024::encapsulate(&pk);
+        let master_key = derive_master_key(shared_secret.as_bytes());
+        let kem_ct_bytes = kem_ciphertext.as_bytes().to_vec();
+        let kem_ct_hash = *blake3::hash(&kem_ct_bytes).as_bytes();
+
+        // Streaming BLAKE3 hasher (incremental -- never buffers full asset)
+        let mut hasher = blake3::Hasher::new();
+
+        // Determine effective compression algorithm
+        let effective_algo = match self.config.compression {
+            CompressionAlgorithm::Auto => {
+                self.compressor
+                    .select_algorithm(&self.config.content_type, total_size as usize)
+            }
+            algo => algo,
+        };
+
+        let mut segment_index_entries = Vec::with_capacity(seg_count as usize);
+        let mut shard_sets = Vec::with_capacity(seg_count as usize);
+
+        for i in 0..seg_count {
+            let expected_len = if i == seg_count - 1 {
+                let remaining = total_size - (i as u64 * seg_size as u64);
+                remaining as usize
+            } else {
+                seg_size as usize
+            };
+
+            let mut segment_buf = vec![0u8; expected_len];
+            reader
+                .read_exact(&mut segment_buf)
+                .await
+                .map_err(|e| {
+                    PipelineError::InvalidData(format!("Failed to read segment {}: {}", i, e))
+                })?;
+
+            // Update incremental hash
+            hasher.update(&segment_buf);
+
+            // Process this segment: compress -> encrypt -> shard
+            let (entry, shard_set) = self.process_segment_buf(
+                &segment_buf,
+                i,
+                effective_algo,
+                &master_key,
+            )?;
+            segment_index_entries.push(entry);
+            shard_sets.push(shard_set);
+            // segment_buf dropped here -- memory freed before next segment
+        }
+
+        let content_hash = *hasher.finalize().as_bytes();
+
+        let inline_index = if seg_count as usize <= MAX_INLINE_SEGMENTS {
+            Some(segment_index_entries)
+        } else {
+            None
+        };
+
+        let compression_algo_byte = match effective_algo {
+            CompressionAlgorithm::None => 0u8,
+            CompressionAlgorithm::Brotli => 1u8,
+            CompressionAlgorithm::Zstd | CompressionAlgorithm::Auto => 2u8,
+        };
+
+        let mut flags = FLAG_SEGMENTED;
+        if inline_index.is_some() {
+            flags |= FLAG_INDEX_INLINED;
+        }
+
+        let manifest = AssetManifest {
+            version: 1,
+            flags,
+            content_hash,
+            original_size: total_size,
+            segment_size: seg_size,
+            segment_count: seg_count,
+            compression_algo: compression_algo_byte,
+            compression_level: self.config.compression_level,
+            encryption_algo: 1,
+            rs_data_shards: self.config.rs_data_shards,
+            rs_parity_shards: self.config.rs_parity_shards,
+            content_type: metadata.content_type.clone(),
+            kem_ciphertext_hash: kem_ct_hash,
+            index_root_hash: [0u8; 32],
+            inline_index,
+        };
+
+        let decryption_key = DecryptionKey::KyberSegmented {
+            ciphertext_kem: kem_ct_bytes,
+            secret_key: keypair.secret_key,
+            segment_count: seg_count,
+            original_size: total_size,
+        };
+
+        Ok((manifest, decryption_key, shard_sets))
+    }
+
+    /// Reconstruct asset to an async writer -- bounded memory.
+    /// Processes one segment at a time, writes output incrementally.
+    pub async fn reconstruct_to_writer<W: tokio::io::AsyncWrite + Unpin>(
+        &self,
+        manifest: &AssetManifest,
+        decryption_key: &DecryptionKey,
+        segment_shards: &[Vec<Shard>],
+        mut writer: W,
+    ) -> PipelineResult<()> {
+        let master_key = self.extract_master_key(decryption_key)?;
+        let decompress_algo = algo_from_byte(manifest.compression_algo)?;
+
+        if segment_shards.len() != manifest.segment_count as usize {
+            return Err(PipelineError::InvalidData(format!(
+                "Expected {} segment shard sets, got {}",
+                manifest.segment_count,
+                segment_shards.len()
+            )));
+        }
+
+        let mut hasher = blake3::Hasher::new();
+        let mut bytes_written: u64 = 0;
+
+        for (i, shards) in segment_shards.iter().enumerate() {
+            let decompressed = self.reconstruct_single_segment(
+                shards,
+                &master_key,
+                i as u32,
+                manifest,
+                decompress_algo,
+            )?;
+
+            let remaining = manifest.original_size - bytes_written;
+            let write_len = std::cmp::min(decompressed.len() as u64, remaining) as usize;
+
+            hasher.update(&decompressed[..write_len]);
+            writer
+                .write_all(&decompressed[..write_len])
+                .await
+                .map_err(|e| {
+                    PipelineError::InvalidData(format!("Write failed at segment {}: {}", i, e))
+                })?;
+            bytes_written += write_len as u64;
+            // decompressed dropped here -- memory freed
+        }
+
+        writer.flush().await.map_err(|e| {
+            PipelineError::InvalidData(format!("Flush failed: {}", e))
+        })?;
+
+        // Verify content hash
+        let hash = *hasher.finalize().as_bytes();
+        if hash != manifest.content_hash {
+            return Err(PipelineError::InvalidData(
+                "Content hash mismatch after reconstruction".into(),
+            ));
+        }
+
+        Ok(())
+    }
+
     // ── Private helpers ─────────────────────────────────────────────────
 
     /// Process a single segment: compress, encrypt, shard.
@@ -300,6 +479,46 @@ impl StreamingAssetPipeline {
         let encrypted_hash = *blake3::hash(&encrypted).as_bytes();
 
         // Shard (RS per segment)
+        let shard_config = ShardingConfig {
+            data_shards: self.config.rs_data_shards as usize,
+            parity_shards: self.config.rs_parity_shards as usize,
+            target_shard_size: 1024 * 1024,
+        };
+        let sharder = Sharder::new(shard_config)?;
+        let (shards, _) = sharder.shard(&encrypted)?;
+
+        let entry = SegmentIndexEntry {
+            encrypted_segment_hash: encrypted_hash,
+            compressed_size,
+        };
+
+        let shard_set = SegmentShardSet {
+            segment_index,
+            encrypted_segment_hash: encrypted_hash,
+            compressed_size,
+            shards,
+        };
+
+        Ok((entry, shard_set))
+    }
+
+    /// Process a single segment from a pre-sliced buffer: compress, encrypt, shard.
+    /// Used by `process_stream` where segments are read from a reader one at a time.
+    fn process_segment_buf(
+        &self,
+        segment_data: &[u8],
+        segment_index: u32,
+        algo: CompressionAlgorithm,
+        master_key: &[u8; 32],
+    ) -> PipelineResult<(SegmentIndexEntry, SegmentShardSet)> {
+        let compressed = self.compress_segment(segment_data, algo)?;
+        let compressed_size = compressed.len() as u32;
+
+        let (encrypted, _) =
+            self.encryptor
+                .encrypt_segment(&compressed, master_key, segment_index)?;
+        let encrypted_hash = *blake3::hash(&encrypted).as_bytes();
+
         let shard_config = ShardingConfig {
             data_shards: self.config.rs_data_shards as usize,
             parity_shards: self.config.rs_parity_shards as usize,
@@ -622,5 +841,101 @@ mod tests {
             .expect("test: reconstruct segment 1");
 
         assert_eq!(seg1_data, &data[5000..10000]);
+    }
+
+    #[tokio::test]
+    async fn test_process_stream_matches_process_segmented() {
+        let data: Vec<u8> = (0..20_000).map(|i| (i % 256) as u8).collect();
+        let config = StreamingPipelineConfig {
+            segment_size: 5000,
+            compression: CompressionAlgorithm::None,
+            rs_data_shards: 4,
+            rs_parity_shards: 2,
+            ..Default::default()
+        };
+        let pipeline = StreamingAssetPipeline::new(config).expect("test: pipeline");
+        let meta = test_metadata();
+
+        // Process via streaming
+        let cursor = tokio::io::BufReader::new(&data[..]);
+        let (manifest_stream, key_stream, shards_stream) = pipeline
+            .process_stream(cursor, data.len() as u64, &meta)
+            .await
+            .expect("test: stream process");
+
+        // Reconstruct from streaming result
+        let all_shards: Vec<Vec<Shard>> =
+            shards_stream.into_iter().map(|s| s.shards).collect();
+        let reconstructed = pipeline
+            .reconstruct_segmented(&manifest_stream, &key_stream, &all_shards)
+            .expect("test: reconstruct");
+
+        assert_eq!(reconstructed, data);
+        assert_eq!(
+            manifest_stream.content_hash,
+            *blake3::hash(&data).as_bytes()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reconstruct_to_writer_matches_reconstruct_segmented() {
+        let data: Vec<u8> = (0..15_000).map(|i| (i % 256) as u8).collect();
+        let config = StreamingPipelineConfig {
+            segment_size: 5000,
+            compression: CompressionAlgorithm::None,
+            rs_data_shards: 4,
+            rs_parity_shards: 2,
+            ..Default::default()
+        };
+        let pipeline = StreamingAssetPipeline::new(config).expect("test: pipeline");
+        let (manifest, key, shard_sets) = pipeline
+            .process_segmented(&data, &test_metadata())
+            .expect("test: process");
+
+        let all_shards: Vec<Vec<Shard>> =
+            shard_sets.into_iter().map(|s| s.shards).collect();
+
+        // Reconstruct to writer
+        let mut output = Vec::new();
+        pipeline
+            .reconstruct_to_writer(&manifest, &key, &all_shards, &mut output)
+            .await
+            .expect("test: reconstruct to writer");
+
+        assert_eq!(output, data);
+    }
+
+    #[tokio::test]
+    async fn test_stream_large_asset() {
+        // 500KB through streaming (larger than segment size)
+        let data: Vec<u8> = (0..500_000).map(|i| (i % 256) as u8).collect();
+        let config = StreamingPipelineConfig {
+            segment_size: 50_000, // 10 segments
+            compression: CompressionAlgorithm::Zstd,
+            compression_level: 1,
+            rs_data_shards: 4,
+            rs_parity_shards: 2,
+            ..Default::default()
+        };
+        let pipeline = StreamingAssetPipeline::new(config).expect("test: pipeline");
+        let meta = test_metadata();
+
+        let cursor = tokio::io::BufReader::new(&data[..]);
+        let (manifest, key, shard_sets) = pipeline
+            .process_stream(cursor, data.len() as u64, &meta)
+            .await
+            .expect("test: stream process");
+
+        assert_eq!(manifest.segment_count, 10);
+
+        let all_shards: Vec<Vec<Shard>> =
+            shard_sets.into_iter().map(|s| s.shards).collect();
+        let mut output = Vec::new();
+        pipeline
+            .reconstruct_to_writer(&manifest, &key, &all_shards, &mut output)
+            .await
+            .expect("test: reconstruct");
+
+        assert_eq!(output, data);
     }
 }
