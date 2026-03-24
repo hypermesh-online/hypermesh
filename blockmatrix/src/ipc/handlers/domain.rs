@@ -203,14 +203,15 @@ mod tests {
     use crate::ipc::protocol::RpcRequest;
     use crate::matrix::coordinate::MatrixCoordinate;
     use crate::persistence::{PersistenceConfig, PersistenceManager};
-    use std::path::PathBuf;
     use std::time::Instant;
 
-    async fn test_state() -> Arc<DaemonState> {
+    async fn test_state() -> (Arc<DaemonState>, tempfile::TempDir) {
+        let tmp = tempfile::tempdir().expect("test: create tempdir");
+        let data_dir = tmp.path().to_path_buf();
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let bc = Arc::new(NodeBlockchain::new(coord));
         let config = PersistenceConfig {
-            storage_dir: PathBuf::from("/tmp"),
+            storage_dir: data_dir.clone(),
             ..PersistenceConfig::default()
         };
         let persistence = Arc::new(
@@ -221,7 +222,7 @@ mod tests {
         let (shutdown_tx, _rx) = tokio::sync::watch::channel(false);
         let dns = DnsResolver::default();
 
-        Arc::new(DaemonState {
+        let state = Arc::new(DaemonState {
             blockchain: bc,
             persistence,
             network: None,
@@ -229,17 +230,18 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "domain-test".into(),
-            data_dir: PathBuf::from("/tmp"),
+            data_dir,
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
-        })
+        });
+        (state, tmp)
     }
 
     #[tokio::test]
     async fn test_domain_register() {
-        let state = test_state().await;
+        let (state, _tmp) = test_state().await;
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
@@ -256,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_domain_list_empty() {
-        let state = test_state().await;
+        let (state, _tmp) = test_state().await;
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
@@ -269,7 +271,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_domain_join() {
-        let state = test_state().await;
+        let (state, _tmp) = test_state().await;
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
