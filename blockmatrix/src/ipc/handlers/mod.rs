@@ -12,6 +12,7 @@ pub mod config;
 pub mod dashboard;
 pub mod dns;
 pub mod gateway;
+pub mod intelligence;
 pub mod domain;
 pub mod network;
 pub mod shard;
@@ -87,6 +88,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     shard::register(handler, &state);
     store::register(handler, &state);
     gateway::register(handler, &state);
+    intelligence::register(handler, &state);
     config::register(handler);
 }
 
@@ -190,6 +192,7 @@ pub(crate) mod tests {
             "gateway.transfer",
             "gateway.status",
             "gateway.list",
+            "intelligence.stats",
             "config.show",
             "config.get",
             "config.set",
