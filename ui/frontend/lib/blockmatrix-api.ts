@@ -111,6 +111,22 @@ export interface ShareActionResponse {
   status: string;
 }
 
+export interface MessageItem {
+  message_id: string;
+  sender_node_id: string;
+  sender_name?: string;
+  recipient_node_id: string;
+  body: string;
+  content_type: string;
+  reply_to?: string;
+  created_at: number;
+}
+
+export interface MessageInboxResponse {
+  messages: MessageItem[];
+  count: number;
+}
+
 // --- Client ---
 
 class BlockMatrixClient {
@@ -282,6 +298,43 @@ class BlockMatrixClient {
     return this.fetchJson('/api/v1/share/reject', {
       method: 'POST',
       body: JSON.stringify({ invite_id: inviteId }),
+    });
+  }
+
+  // --- Messaging ---
+
+  async messageSend(
+    recipient: string,
+    body: string,
+    contentType?: string,
+    replyTo?: string,
+  ): Promise<{ message_id: string; status: string }> {
+    return this.fetchJson('/api/v1/message/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipient,
+        body,
+        content_type: contentType ?? 'text/plain',
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
+    });
+  }
+
+  async messageInbox(limit?: number): Promise<MessageInboxResponse> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.fetchJson(`/api/v1/message/inbox${params}`);
+  }
+
+  async messageHistory(peer: string, limit?: number): Promise<MessageInboxResponse> {
+    const params = new URLSearchParams({ peer });
+    if (limit) params.set('limit', String(limit));
+    return this.fetchJson(`/api/v1/message/history?${params.toString()}`);
+  }
+
+  async messageRead(messageId: string): Promise<{ message: MessageItem }> {
+    return this.fetchJson('/api/v1/message/read', {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
     });
   }
 }

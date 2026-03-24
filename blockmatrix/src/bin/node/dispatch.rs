@@ -14,7 +14,7 @@ use blockmatrix::ipc;
 
 use crate::cli::{
     CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction,
-    EngaugeAction, GatewayAction, ShareAction, TrustchainAction,
+    EngaugeAction, GatewayAction, MessageAction, ShareAction, TrustchainAction,
 };
 use crate::commands::connect::service_ipc_call;
 use crate::commands::domain::{run_domain, run_join};
@@ -145,6 +145,9 @@ pub(crate) async fn dispatch_command(
         }
         Some(Commands::Share { action }) => {
             dispatch_share(action, cli.json).await?;
+        }
+        Some(Commands::Message { action }) => {
+            dispatch_message(action, cli.json).await?;
         }
         Some(Commands::Destroy { .. }) => {
             unreachable!("destroy handled before bootstrap");
@@ -542,6 +545,52 @@ async fn dispatch_share(action: ShareAction, json: bool) -> Result<()> {
             service_ipc_call(
                 "peer.pubkey",
                 serde_json::json!({"node_id": node_id}),
+                json,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+async fn dispatch_message(action: MessageAction, json: bool) -> Result<()> {
+    match action {
+        MessageAction::Send {
+            to,
+            body,
+            content_type,
+            reply_to,
+        } => {
+            let mut params = serde_json::json!({
+                "recipient": to,
+                "body": body,
+                "content_type": content_type,
+            });
+            if let Some(ref rt) = reply_to {
+                params["reply_to"] = serde_json::Value::String(rt.clone());
+            }
+            service_ipc_call("message.send", params, json).await?;
+        }
+        MessageAction::Inbox { limit } => {
+            service_ipc_call(
+                "message.inbox",
+                serde_json::json!({"limit": limit}),
+                json,
+            )
+            .await?;
+        }
+        MessageAction::History { peer, limit } => {
+            service_ipc_call(
+                "message.history",
+                serde_json::json!({"peer": peer, "limit": limit}),
+                json,
+            )
+            .await?;
+        }
+        MessageAction::Read { message_id } => {
+            service_ipc_call(
+                "message.read",
+                serde_json::json!({"message_id": message_id}),
                 json,
             )
             .await?;

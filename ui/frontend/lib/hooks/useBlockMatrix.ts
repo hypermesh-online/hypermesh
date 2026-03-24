@@ -23,6 +23,8 @@ import {
   type DomainRecord,
   type ShareInboxResponse,
   type ShareActionResponse,
+  type MessageInboxResponse,
+  type MessageItem,
 } from '../blockmatrix-api';
 
 // ---------- Core ----------
@@ -260,6 +262,57 @@ export function useShareReject() {
     mutationFn: (inviteId) => blockMatrixClient.shareReject(inviteId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['blockmatrix', 'share', 'inbox'] });
+    },
+  });
+}
+
+// ---------- Messaging ----------
+
+/** Poll the message inbox */
+export function useMessageInbox(pollInterval = 10_000) {
+  return useQuery<MessageInboxResponse>({
+    queryKey: ['blockmatrix', 'message', 'inbox'],
+    queryFn: () => blockMatrixClient.messageInbox(),
+    refetchInterval: pollInterval,
+    staleTime: 5_000,
+    retry: 1,
+  });
+}
+
+/** Fetch message history with a specific peer */
+export function useMessageHistory(peer: string, limit = 50) {
+  return useQuery<MessageInboxResponse>({
+    queryKey: ['blockmatrix', 'message', 'history', peer],
+    queryFn: () => blockMatrixClient.messageHistory(peer, limit),
+    enabled: !!peer,
+    refetchInterval: 5_000,
+    staleTime: 3_000,
+  });
+}
+
+/** Send a message (mutation) */
+export function useMessageSend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ recipient, body, contentType, replyTo }: {
+      recipient: string;
+      body: string;
+      contentType?: string;
+      replyTo?: string;
+    }) => blockMatrixClient.messageSend(recipient, body, contentType, replyTo),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'message'] });
+    },
+  });
+}
+
+/** Mark a message as read (mutation) */
+export function useMessageRead() {
+  const qc = useQueryClient();
+  return useMutation<{ message: MessageItem }, Error, string>({
+    mutationFn: (messageId) => blockMatrixClient.messageRead(messageId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'message', 'inbox'] });
     },
   });
 }

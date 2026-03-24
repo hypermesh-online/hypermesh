@@ -209,6 +209,12 @@ pub enum Commands {
         action: ShareAction,
     },
 
+    /// Private messaging
+    Message {
+        #[clap(subcommand)]
+        action: MessageAction,
+    },
+
     /// Destroy all node data (blockchain, identity, shards, config)
     Destroy {
         /// Skip confirmation prompt
@@ -459,5 +465,42 @@ pub enum ShareAction {
     PeerPubkey {
         /// Peer node ID
         node_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum MessageAction {
+    /// Send a message to a peer
+    Send {
+        /// Recipient name or node ID
+        #[arg(long)]
+        to: String,
+        /// Message body
+        body: String,
+        /// Content type
+        #[arg(long, default_value = "text/plain")]
+        content_type: String,
+        /// Reply to message ID
+        #[arg(long)]
+        reply_to: Option<String>,
+    },
+    /// List received messages
+    Inbox {
+        /// Maximum number of messages to show
+        #[arg(long, default_value = "20")]
+        limit: usize,
+    },
+    /// Message history with a peer
+    History {
+        /// Peer name or node ID
+        peer: String,
+        /// Maximum number of messages to show
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
+    /// Read a specific message
+    Read {
+        /// Message ID
+        message_id: String,
     },
 }

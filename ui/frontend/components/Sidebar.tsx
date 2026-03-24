@@ -5,7 +5,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useNodeStatus, useShareInbox } from '@/lib/hooks/useBlockMatrix';
+import { useNodeStatus, useShareInbox, useMessageInbox } from '@/lib/hooks/useBlockMatrix';
 import {
   Home,
   Network,
@@ -14,6 +14,7 @@ import {
   Coins,
   Activity,
   Inbox,
+  MessageSquare,
 } from 'lucide-react';
 
 const navigation = [
@@ -59,13 +60,21 @@ const navigation = [
     icon: Inbox,
     description: 'Received file sharing invites'
   },
+  {
+    name: 'Messages',
+    href: '/messages',
+    icon: MessageSquare,
+    description: 'Private peer-to-peer messaging'
+  },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const { data: status } = useNodeStatus(10_000);
   const { data: inbox } = useShareInbox(15_000);
+  const { data: msgInbox } = useMessageInbox(15_000);
   const inboxCount = inbox?.invites?.length ?? 0;
+  const messageCount = msgInbox?.count ?? 0;
 
   return (
     <div className="w-72 bg-black/80 backdrop-blur-lg border-r border-cyan-500/20">
@@ -108,7 +117,12 @@ export function Sidebar() {
                     {inboxCount > 9 ? '9+' : inboxCount}
                   </span>
                 )}
-                {isActive && item.name !== 'Inbox' && <div className="ml-auto w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />}
+                {item.name === 'Messages' && messageCount > 0 && (
+                  <span className="ml-auto bg-cyan-500 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {messageCount > 9 ? '9+' : messageCount}
+                  </span>
+                )}
+                {isActive && item.name !== 'Inbox' && item.name !== 'Messages' && <div className="ml-auto w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />}
               </div>
               <p className={cn(
                 "text-xs ml-7",

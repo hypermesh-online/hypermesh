@@ -15,6 +15,7 @@ import { TrustChainModule } from './components/modules/TrustChainModule';
 import CaesarModule from './components/modules/CaesarModule';
 import { DashboardMonitor } from './components/api/DashboardMonitor';
 import { InboxPanel } from './components/sharing/InboxPanel';
+import { MessengerPanel } from './components/messaging/MessengerPanel';
 import { blockMatrixClient } from './lib/blockmatrix-api';
 
 // Configure React Query client
@@ -69,6 +70,7 @@ export default function App() {
                 <Route path="/trustchain/*" element={<TrustChainModule />} />
                 <Route path="/caesar/*" element={<CaesarModule />} />
                 <Route path="/inbox" element={<InboxPanel />} />
+                <Route path="/messages" element={<MessengerPanel />} />
               </Routes>
             </Layout>
             <Toaster />
