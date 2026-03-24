@@ -21,6 +21,8 @@ import {
   type PeerInfo,
   type AssetRecord,
   type DomainRecord,
+  type ShareInboxResponse,
+  type ShareActionResponse,
 } from '../blockmatrix-api';
 
 // ---------- Core ----------
@@ -210,6 +212,54 @@ export function useJoinDomain() {
       blockMatrixClient.joinDomain(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['blockmatrix', 'domain'] });
+    },
+  });
+}
+
+// ---------- Sharing ----------
+
+/** Poll the share inbox for received invites */
+export function useShareInbox(pollInterval = 10_000) {
+  return useQuery<ShareInboxResponse>({
+    queryKey: ['blockmatrix', 'share', 'inbox'],
+    queryFn: () => blockMatrixClient.shareInbox(),
+    refetchInterval: pollInterval,
+    staleTime: 5_000,
+    retry: 1,
+  });
+}
+
+/** Send a share invite to a recipient */
+export function useShareSend() {
+  const qc = useQueryClient();
+  return useMutation<ShareActionResponse, Error, { assetId: string; recipient: string }>({
+    mutationFn: ({ assetId, recipient }) =>
+      blockMatrixClient.shareSend(assetId, recipient),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'share'] });
+    },
+  });
+}
+
+/** Accept a share invite */
+export function useShareAccept() {
+  const qc = useQueryClient();
+  return useMutation<ShareActionResponse, Error, string>({
+    mutationFn: (inviteId) => blockMatrixClient.shareAccept(inviteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'share', 'inbox'] });
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'asset'] });
+    },
+  });
+}
+
+/** Reject a share invite */
+export function useShareReject() {
+  const qc = useQueryClient();
+  return useMutation<ShareActionResponse, Error, string>({
+    mutationFn: (inviteId) => blockMatrixClient.shareReject(inviteId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'share', 'inbox'] });
     },
   });
 }

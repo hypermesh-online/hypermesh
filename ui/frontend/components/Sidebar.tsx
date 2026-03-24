@@ -5,7 +5,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useNodeStatus } from '@/lib/hooks/useBlockMatrix';
+import { useNodeStatus, useShareInbox } from '@/lib/hooks/useBlockMatrix';
 import {
   Home,
   Network,
@@ -13,6 +13,7 @@ import {
   Shield,
   Coins,
   Activity,
+  Inbox,
 } from 'lucide-react';
 
 const navigation = [
@@ -52,11 +53,19 @@ const navigation = [
     icon: Coins,
     description: 'Token integration and economics'
   },
+  {
+    name: 'Inbox',
+    href: '/inbox',
+    icon: Inbox,
+    description: 'Received file sharing invites'
+  },
 ];
 
 export function Sidebar() {
   const location = useLocation();
   const { data: status } = useNodeStatus(10_000);
+  const { data: inbox } = useShareInbox(15_000);
+  const inboxCount = inbox?.invites?.length ?? 0;
 
   return (
     <div className="w-72 bg-black/80 backdrop-blur-lg border-r border-cyan-500/20">
@@ -94,7 +103,12 @@ export function Sidebar() {
               <div className="flex items-center gap-3">
                 <item.icon className={cn("h-4 w-4", isActive ? "text-cyan-400" : "")} />
                 <span>{item.name}</span>
-                {isActive && <div className="ml-auto w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />}
+                {item.name === 'Inbox' && inboxCount > 0 && (
+                  <span className="ml-auto bg-cyan-500 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    {inboxCount > 9 ? '9+' : inboxCount}
+                  </span>
+                )}
+                {isActive && item.name !== 'Inbox' && <div className="ml-auto w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />}
               </div>
               <p className={cn(
                 "text-xs ml-7",

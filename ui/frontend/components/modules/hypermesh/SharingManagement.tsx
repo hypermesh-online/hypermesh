@@ -7,21 +7,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAssets, useAllocations } from '@/lib/api';
-import { useNetworkPeers } from '@/lib/hooks/useBlockMatrix';
+import { useNetworkPeers, useAssetList } from '@/lib/hooks/useBlockMatrix';
+import { ShareDialog } from '@/components/sharing/ShareDialog';
 import {
   Settings,
   Share,
   Shield,
   Zap,
   Activity,
-  Users
+  Users,
+  Send
 } from 'lucide-react';
 
 export function SharingManagement() {
   const { allocations, activeAllocations, isLoading } = useAllocations();
   const { assets } = useAssets();
   const { data: peers, isLoading: peersLoading } = useNetworkPeers();
+  const { data: blockchainAssets } = useAssetList();
   const [selectedAllocation, setSelectedAllocation] = React.useState<string | null>(null);
+  const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
 
   const sharingStats = React.useMemo(() => {
     const total = allocations?.length || 0;
@@ -234,6 +238,50 @@ export function SharingManagement() {
         </CardContent>
       </Card>
 
+      {/* Share an Asset */}
+      <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Send className="h-5 w-5 text-cyan-400" />
+            Share an Asset
+          </CardTitle>
+          <CardDescription className="text-gray-400">
+            Send a file sharing invite to another node on the network
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {blockchainAssets && blockchainAssets.length > 0 ? (
+            <div className="space-y-2">
+              {blockchainAssets.slice(0, 10).map((asset) => (
+                <div
+                  key={asset.id}
+                  className="flex items-center justify-between p-3 border border-cyan-500/20 rounded-lg bg-cyan-500/5"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate font-mono">{asset.id.slice(0, 24)}...</p>
+                    <p className="text-xs text-gray-400">{asset.category} - block #{asset.block_index}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white shrink-0 ml-3"
+                    onClick={() => setShareTarget({ id: asset.id, name: asset.id.slice(0, 16) })}
+                  >
+                    <Share className="h-3 w-3 mr-1" />
+                    Share
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-400">
+              <Share className="h-10 w-10 text-gray-600 mx-auto mb-2" />
+              <p>No assets available to share</p>
+              <p className="text-xs text-gray-500 mt-1">Assets will appear after they are registered on the blockchain</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Resource Allocation History */}
       <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
         <CardHeader>
@@ -277,6 +325,16 @@ export function SharingManagement() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Share Dialog */}
+      {shareTarget && (
+        <ShareDialog
+          assetId={shareTarget.id}
+          assetName={shareTarget.name}
+          isOpen={true}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
     </div>
   );
 }

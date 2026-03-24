@@ -14,6 +14,7 @@ import { CatalogModule } from './components/modules/CatalogModule';
 import { TrustChainModule } from './components/modules/TrustChainModule';
 import CaesarModule from './components/modules/CaesarModule';
 import { DashboardMonitor } from './components/api/DashboardMonitor';
+import { InboxPanel } from './components/sharing/InboxPanel';
 import { blockMatrixClient } from './lib/blockmatrix-api';
 
 // Configure React Query client
@@ -67,6 +68,7 @@ export default function App() {
                 <Route path="/catalog/*" element={<CatalogModule />} />
                 <Route path="/trustchain/*" element={<TrustChainModule />} />
                 <Route path="/caesar/*" element={<CaesarModule />} />
+                <Route path="/inbox" element={<InboxPanel />} />
               </Routes>
             </Layout>
             <Toaster />

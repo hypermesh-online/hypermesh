@@ -90,6 +90,27 @@ export interface DomainRecord {
   [key: string]: unknown;
 }
 
+export interface ShareInvite {
+  invite_id: string;
+  asset_id: string;
+  sender_node_id: string;
+  sender_name?: string;
+  asset_name: string;
+  asset_size: number;
+  shard_count: number;
+  created_at: number;
+}
+
+export interface ShareInboxResponse {
+  invites: ShareInvite[];
+  count: number;
+}
+
+export interface ShareActionResponse {
+  invite_id: string;
+  status: string;
+}
+
 // --- Client ---
 
 class BlockMatrixClient {
@@ -233,6 +254,34 @@ class BlockMatrixClient {
     return this.fetchJson('/api/v1/domain/join', {
       method: 'POST',
       body: JSON.stringify(body),
+    });
+  }
+
+  // --- Sharing ---
+
+  async shareSend(assetId: string, recipient: string): Promise<ShareActionResponse> {
+    return this.fetchJson('/api/v1/share/send', {
+      method: 'POST',
+      body: JSON.stringify({ asset_id: assetId, recipient }),
+    });
+  }
+
+  async shareInbox(limit?: number): Promise<ShareInboxResponse> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.fetchJson(`/api/v1/share/inbox${params}`);
+  }
+
+  async shareAccept(inviteId: string): Promise<ShareActionResponse> {
+    return this.fetchJson('/api/v1/share/accept', {
+      method: 'POST',
+      body: JSON.stringify({ invite_id: inviteId }),
+    });
+  }
+
+  async shareReject(inviteId: string): Promise<ShareActionResponse> {
+    return this.fetchJson('/api/v1/share/reject', {
+      method: 'POST',
+      body: JSON.stringify({ invite_id: inviteId }),
     });
   }
 }
