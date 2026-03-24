@@ -278,6 +278,9 @@ pub mod ipc;
 // Dashboard asset manifest and lifecycle
 pub mod dashboard;
 
+// P2P file sharing: invite types, key wrapping, inbox storage
+pub mod sharing;
+
 // Module stubs - some enabled for Gate 2
 pub mod catalog;
 pub mod container;

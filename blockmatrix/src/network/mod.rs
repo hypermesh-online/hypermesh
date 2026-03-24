@@ -184,6 +184,8 @@ pub struct PeerContext {
     /// Shard location index for consumer-becomes-provider (R12).
     /// Tracks which peers provide which shards, populated from TAG_SHARD_ANNOUNCE.
     pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,
+    /// Inbox for received share invitations (P2P file sharing).
+    pub inbox_store: Option<Arc<crate::sharing::inbox::InboxStore>>,
     /// engauge SwarmAnalytics for processing received metrics and demand data.
     /// When `Some`, `handle_metrics_connection` feeds frames into this pipeline
     /// and the EngaugeBridge reads analytics for propagation weight computation.

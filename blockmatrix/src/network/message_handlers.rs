@@ -45,6 +45,8 @@ pub(crate) const TAG_SYNC_MESSAGE: u8 = 0x10;
 pub(crate) const TAG_BLOCK_FETCH_REQUEST: u8 = 0x11;
 /// Shard availability announcement (consumer-becomes-provider, R12).
 pub(crate) const TAG_SHARD_ANNOUNCE: u8 = 0x04;
+/// Share invite (P2P file sharing).
+pub(crate) const TAG_SHARE_INVITE: u8 = 0x05;
 /// Gossip protocol message.
 pub(crate) const TAG_GOSSIP: u8 = 0x20;
 
@@ -160,6 +162,9 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SHARD_ANNOUNCE => {
             handle_shard_announce(data, peer_node_id, ctx).await;
+        }
+        TAG_SHARE_INVITE => {
+            handle_share_invite(data, peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(
@@ -1034,6 +1039,54 @@ async fn register_peer_as_reflector(
         &peer_node_id[..8.min(peer_node_id.len())],
         &network_id,
     );
+}
+
+// ── Share invite handler ────────────────────────────────────────────
+
+/// Handle a received share invite (tag 0x05).
+///
+/// Deserializes the invite from JSON (after the tag byte) and stores
+/// it in the peer context's inbox. Signature verification is deferred
+/// to the recipient's accept flow (requires looking up the sender's
+/// FALCON pubkey from the blockchain).
+async fn handle_share_invite(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if data.len() < 2 {
+        return;
+    }
+    let invite_json = &data[1..]; // skip tag byte
+    match serde_json::from_slice::<crate::sharing::invite::ShareInvite>(invite_json) {
+        Ok(invite) => {
+            let sender_display = invite
+                .sender_name
+                .as_deref()
+                .unwrap_or_else(|| {
+                    &invite.sender_node_id[..8.min(invite.sender_node_id.len())]
+                });
+            info!(
+                "Received share invite {} from {} for asset {} ({})",
+                &invite.invite_id,
+                sender_display,
+                &invite.asset_id[..8.min(invite.asset_id.len())],
+                invite.asset_name,
+            );
+            if let Some(ref inbox) = ctx.inbox_store {
+                if let Err(e) = inbox.add(invite).await {
+                    warn!("Failed to store share invite: {e}");
+                }
+            }
+        }
+        Err(e) => {
+            debug!(
+                "Invalid share invite from {}: {}",
+                &peer_node_id[..8.min(peer_node_id.len())],
+                e,
+            );
+        }
+    }
 }
 
 /// Serialize and send a sync reply on the given stream.

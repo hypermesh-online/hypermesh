@@ -203,6 +203,12 @@ pub enum Commands {
         action: GatewayAction,
     },
 
+    /// Share an asset with a peer
+    Share {
+        #[clap(subcommand)]
+        action: ShareAction,
+    },
+
     /// Destroy all node data (blockchain, identity, shards, config)
     Destroy {
         /// Skip confirmation prompt
@@ -419,4 +425,39 @@ pub enum GatewayAction {
     },
     /// List all transfers
     List,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ShareAction {
+    /// Send a share invite for an asset to a peer
+    Send {
+        /// Asset ID to share
+        asset_id: String,
+        /// Recipient node ID or DNS name
+        #[arg(long)]
+        with: String,
+    },
+    /// List received share invites
+    Inbox {
+        /// Maximum number of invites to show
+        #[arg(long, default_value = "50")]
+        limit: u64,
+    },
+    /// Accept a received share invite
+    Accept {
+        /// Invite ID to accept
+        invite_id: String,
+    },
+    /// Reject a received share invite
+    Reject {
+        /// Invite ID to reject
+        invite_id: String,
+    },
+    /// Show this node's public keys (FALCON + Kyber)
+    Pubkey,
+    /// Look up a peer's public key by node ID
+    PeerPubkey {
+        /// Peer node ID
+        node_id: String,
+    },
 }

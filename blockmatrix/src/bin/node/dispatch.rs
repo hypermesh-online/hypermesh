@@ -14,7 +14,7 @@ use blockmatrix::ipc;
 
 use crate::cli::{
     CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction,
-    EngaugeAction, GatewayAction, TrustchainAction,
+    EngaugeAction, GatewayAction, ShareAction, TrustchainAction,
 };
 use crate::commands::connect::service_ipc_call;
 use crate::commands::domain::{run_domain, run_join};
@@ -142,6 +142,9 @@ pub(crate) async fn dispatch_command(
         }
         Some(Commands::Gateway { action }) => {
             dispatch_gateway(action, cli.json).await?;
+        }
+        Some(Commands::Share { action }) => {
+            dispatch_share(action, cli.json).await?;
         }
         Some(Commands::Destroy { .. }) => {
             unreachable!("destroy handled before bootstrap");
@@ -490,6 +493,58 @@ async fn dispatch_gateway(action: GatewayAction, json: bool) -> Result<()> {
         }
         GatewayAction::List => {
             service_ipc_call("gateway.list", serde_json::json!({}), json).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn dispatch_share(action: ShareAction, json: bool) -> Result<()> {
+    match action {
+        ShareAction::Send { asset_id, with } => {
+            service_ipc_call(
+                "share.send",
+                serde_json::json!({
+                    "asset_id": asset_id,
+                    "recipient": with,
+                }),
+                json,
+            )
+            .await?;
+        }
+        ShareAction::Inbox { limit } => {
+            service_ipc_call(
+                "share.inbox",
+                serde_json::json!({"limit": limit}),
+                json,
+            )
+            .await?;
+        }
+        ShareAction::Accept { invite_id } => {
+            service_ipc_call(
+                "share.accept",
+                serde_json::json!({"invite_id": invite_id}),
+                json,
+            )
+            .await?;
+        }
+        ShareAction::Reject { invite_id } => {
+            service_ipc_call(
+                "share.reject",
+                serde_json::json!({"invite_id": invite_id}),
+                json,
+            )
+            .await?;
+        }
+        ShareAction::Pubkey => {
+            service_ipc_call("identity.pubkey", serde_json::json!({}), json).await?;
+        }
+        ShareAction::PeerPubkey { node_id } => {
+            service_ipc_call(
+                "peer.pubkey",
+                serde_json::json!({"node_id": node_id}),
+                json,
+            )
+            .await?;
         }
     }
     Ok(())

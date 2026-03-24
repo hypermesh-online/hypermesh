@@ -390,6 +390,11 @@ async fn start_network(
         shard_location_index: Some(std::sync::Arc::new(
             blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
         )),
+        inbox_store: Some(std::sync::Arc::new(
+            blockmatrix::sharing::inbox::InboxStore::new(
+                Some(data_dir.join(nid).join("inbox")),
+            ),
+        )),
         #[cfg(feature = "intelligence")]
         engauge_analytics: Some(engauge_analytics.clone()),
         #[cfg(feature = "intelligence")]
