@@ -146,16 +146,21 @@ export const crateStatuses: CrateStatus[] = [
         "Post-handshake network_id metadata exchange — peers exchange network_id after STOQ handshake, backward-compatible with old nodes",
         "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous",
         "Block propagation torrent model — ContentInterested strategy: Device=none, Private=full replication, Public=reflectors+spatial+consumers, Anonymous=consumers only",
-        "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers"
+        "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers",
+        "Intelligence feature enabled by default — engauge bridge compiles and runs in production",
+        "Metrics ingestion wired — handle_metrics_connection feeds frames into engauge MetricsIngestionPipeline (no longer discarded)",
+        "EngaugeBridge periodic feed — SwarmDemandTracker → SwarmAnalytics every 10s via tokio task",
+        "Propagation weight feed — RoutingIntelligence → TensorWeightModifier → PropagationWeight every 15s",
+        "Replication trigger — ReplicationTrigger.check() against live SwarmAnalytics, signals logged with urgency > 0.5",
+        "intelligence.stats IPC endpoint — queryable metrics (shard_count, peer_count, uptime)",
+        "10-50 node simulation harness — 9 integration tests (asset lifecycle, engauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
-        "Scope-aware Public spatial send-side filtering — SpatialBucketAssigner.block_relevant_to_peer() used in propagation target selection",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
-        "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
-        "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing"
+        "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)"
       ],
       "planned": [
         "Cross-network asset transfers with dual PoS validation",
@@ -165,7 +170,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 91
+    "completion": 93
   },
   {
     "id": "caesar",
