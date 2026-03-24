@@ -22,7 +22,7 @@ pub use asset_type::{
 
 pub use catalog_registry::{
     CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics, SearchQuery, SearchResult,
-    SearchResults, SortCriteria, TrustPolicy,
+    SearchResults, SortCriteria, TrustPolicy, TypeRegistration,
 };
 
 // Legacy compatibility exports (DEPRECATED - use new types above)

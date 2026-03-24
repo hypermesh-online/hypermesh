@@ -19,6 +19,29 @@ use hypermesh_lib::PrivacyMode;
 
 use super::asset_type::AssetTypeDefinition;
 
+/// Content-addressed type registration record.
+///
+/// Created when a type definition is registered. The `type_hash` is the
+/// BLAKE3 hash of the canonical JSON-serialized schema, providing a
+/// stable, content-addressed identifier for deduplication and lookup.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeRegistration {
+    /// Human-readable type name (e.g. "Message", "Document")
+    pub type_name: String,
+
+    /// BLAKE3 hash of the canonical schema JSON (hex-encoded)
+    pub type_hash: String,
+
+    /// The JSON schema defining the type structure
+    pub schema: serde_json::Value,
+
+    /// Semantic version at registration time
+    pub version: String,
+
+    /// Unix timestamp (seconds) when the type was registered
+    pub registered_at: i64,
+}
+
 /// Catalog Registry - provides indexing/discovery for asset types
 ///
 /// The registry itself is stored as a BlockMatrix Asset
@@ -35,6 +58,9 @@ pub struct CatalogRegistry {
 
     /// Full type definitions (for scoring metadata)
     type_definitions: Arc<RwLock<HashMap<String, AssetTypeDefinition>>>,
+
+    /// Content-addressed type registrations (type_hash → TypeRegistration)
+    type_registrations: Arc<RwLock<HashMap<String, TypeRegistration>>>,
 
     /// Trust policy
     trust_policy: TrustPolicy,
@@ -120,10 +146,119 @@ impl CatalogRegistry {
             registry_id,
             index: Arc::new(RwLock::new(HashMap::new())),
             type_definitions: Arc::new(RwLock::new(HashMap::new())),
+            type_registrations: Arc::new(RwLock::new(HashMap::new())),
             privacy,
             trust_policy,
             config,
         }
+    }
+
+    /// Create a registry pre-populated with built-in HyperMesh types.
+    ///
+    /// Built-in types (Message, Invitation, Document) are registered with
+    /// a permissive trust policy so they do not require Proof of State.
+    pub async fn with_builtin_types(
+        privacy: PrivacyMode,
+        trust_policy: TrustPolicy,
+        config: RegistryConfig,
+    ) -> Self {
+        // Use a relaxed trust policy for built-in registration
+        let builtin_policy = TrustPolicy {
+            require_state_proof: false,
+            minimum_stake: 0,
+            allowed_publishers: Vec::new(),
+            require_certificate: false,
+        };
+        let registry = Self::new(privacy.clone(), builtin_policy, config.clone());
+
+        let builtins: Vec<(&str, serde_json::Value)> = vec![
+            (
+                "Message",
+                serde_json::json!({
+                    "type": "object",
+                    "required": ["sender_node_id", "recipient_node_id", "encrypted_body"],
+                    "properties": {
+                        "sender_node_id": { "type": "string" },
+                        "recipient_node_id": { "type": "string" },
+                        "encrypted_body": { "type": "string", "format": "hex" },
+                        "content_type": { "type": "string", "default": "text/plain" },
+                        "reply_to": { "type": "string" }
+                    }
+                }),
+            ),
+            (
+                "Invitation",
+                serde_json::json!({
+                    "type": "object",
+                    "required": ["sender_node_id", "recipient_node_id", "asset_id", "encrypted_key"],
+                    "properties": {
+                        "sender_node_id": { "type": "string" },
+                        "recipient_node_id": { "type": "string" },
+                        "asset_id": { "type": "string" },
+                        "encrypted_key": { "type": "string", "format": "hex" }
+                    }
+                }),
+            ),
+            (
+                "Document",
+                serde_json::json!({
+                    "type": "object",
+                    "required": ["name", "content_hash"],
+                    "properties": {
+                        "name": { "type": "string" },
+                        "content_hash": { "type": "string" },
+                        "content_type": { "type": "string" },
+                        "size": { "type": "integer" }
+                    }
+                }),
+            ),
+        ];
+
+        for (name, schema) in builtins {
+            let state_proof = Self::builtin_state_proof();
+            let type_def = AssetTypeDefinition::new(name.to_string(), schema, state_proof);
+            // Ignore errors for built-in types (should never fail)
+            if let Err(e) = registry.register_type(type_def).await {
+                tracing::warn!("Failed to register built-in type '{}': {}", name, e);
+            }
+        }
+
+        // Now swap in the caller's real trust policy
+        // We do this by reconstructing with the correct policy. Since the
+        // type data lives in Arcs, we can just swap the policy field.
+        Self {
+            registry_id: registry.registry_id,
+            index: registry.index,
+            type_definitions: registry.type_definitions,
+            type_registrations: registry.type_registrations,
+            privacy,
+            trust_policy,
+            config,
+        }
+    }
+
+    /// Construct a minimal state proof for built-in type registration.
+    ///
+    /// This is public so STOQ API handlers can create type definitions
+    /// without requiring callers to construct full proofs during alpha.
+    pub fn builtin_state_proof() -> StateProof {
+        use blockmatrix::proof_of_state::proof_of_state_integration::{
+            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        };
+        use std::time::Duration;
+
+        let stake = StakeProof::new("builtin".to_string(), "builtin".to_string(), 0);
+        let space = SpaceProof::new("builtin".to_string(), "/builtin".to_string(), 0);
+        let work = WorkProof::new(
+            "builtin".to_string(),
+            "builtin".to_string(),
+            0,
+            0,
+            WorkloadType::Compute,
+            WorkState::Completed,
+        );
+        let time = TimeProof::new(Duration::from_secs(0));
+        StateProof::new(stake, time, space, work)
     }
 
     /// Register a new asset type definition
@@ -151,6 +286,23 @@ impl CatalogRegistry {
         let asset_id = type_def.asset_id.clone();
         let type_name = type_def.type_name.clone();
         index.insert(type_name.clone(), asset_id.clone());
+
+        // Compute content-addressed type hash (BLAKE3 of canonical schema JSON)
+        let schema_json = serde_json::to_string(&type_def.schema)
+            .map_err(|e| anyhow::anyhow!("failed to serialize schema: {e}"))?;
+        let type_hash = hex::encode(blake3::hash(schema_json.as_bytes()).as_bytes());
+
+        let registration = TypeRegistration {
+            type_name: type_name.clone(),
+            type_hash: type_hash.clone(),
+            schema: type_def.schema.clone(),
+            version: type_def.metadata.version.clone(),
+            registered_at: chrono::Utc::now().timestamp(),
+        };
+
+        // Store content-addressed registration
+        let mut regs = self.type_registrations.write().await;
+        regs.insert(type_hash, registration);
 
         // Store full definition for scoring
         let mut defs = self.type_definitions.write().await;
@@ -315,6 +467,26 @@ impl CatalogRegistry {
         }
 
         Ok(())
+    }
+
+    /// Look up a type registration by name.
+    ///
+    /// Scans all registrations for a matching `type_name`.
+    pub async fn lookup_type(&self, name: &str) -> Option<TypeRegistration> {
+        let regs = self.type_registrations.read().await;
+        regs.values().find(|r| r.type_name == name).cloned()
+    }
+
+    /// Look up a type registration by its content-addressed hash.
+    pub async fn lookup_type_by_hash(&self, hash: &str) -> Option<TypeRegistration> {
+        let regs = self.type_registrations.read().await;
+        regs.get(hash).cloned()
+    }
+
+    /// List all type registrations.
+    pub async fn list_type_registrations(&self) -> Vec<TypeRegistration> {
+        let regs = self.type_registrations.read().await;
+        regs.values().cloned().collect()
     }
 
     /// Get a type definition by name
@@ -532,5 +704,142 @@ mod tests {
 
         let stats = registry.get_statistics().await;
         assert_eq!(stats.total_types, 0);
+    }
+
+    #[tokio::test]
+    async fn test_register_type_creates_hash() {
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        let schema = json!({
+            "type": "object",
+            "properties": { "name": { "type": "string" } }
+        });
+
+        let state_proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("TestType".to_string(), schema.clone(), state_proof);
+        registry.register_type(type_def).await.expect("test: register");
+
+        let reg = registry.lookup_type("TestType").await.expect("test: lookup");
+
+        // Verify hash matches BLAKE3 of canonical schema JSON
+        let expected_hash = hex::encode(
+            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+        );
+        assert_eq!(reg.type_hash, expected_hash);
+        assert_eq!(reg.type_name, "TestType");
+        assert_eq!(reg.version, "1.0.0");
+    }
+
+    #[tokio::test]
+    async fn test_register_duplicate_type_fails() {
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        let schema = json!({ "type": "object" });
+        let proof1 = create_test_state_proof();
+        let type_def1 = AssetTypeDefinition::new("DupType".to_string(), schema.clone(), proof1);
+        registry.register_type(type_def1).await.expect("test: first register");
+
+        let proof2 = create_test_state_proof();
+        let type_def2 = AssetTypeDefinition::new("DupType".to_string(), schema, proof2);
+        let result = registry.register_type(type_def2).await;
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("already registered"),
+            "Error should mention already registered"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_lookup_type_by_name() {
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        let schema = json!({ "type": "object", "description": "test" });
+        let proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("ByNameType".to_string(), schema, proof);
+        registry.register_type(type_def).await.expect("test: register");
+
+        assert!(registry.lookup_type("ByNameType").await.is_some());
+        assert!(registry.lookup_type("NonExistent").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_lookup_type_by_hash() {
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        let schema = json!({ "type": "object", "id": "hash-test" });
+        let proof = create_test_state_proof();
+        let type_def = AssetTypeDefinition::new("HashLookup".to_string(), schema.clone(), proof);
+        registry.register_type(type_def).await.expect("test: register");
+
+        let expected_hash = hex::encode(
+            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+        );
+
+        let reg = registry
+            .lookup_type_by_hash(&expected_hash)
+            .await
+            .expect("test: lookup by hash");
+        assert_eq!(reg.type_name, "HashLookup");
+
+        assert!(registry.lookup_type_by_hash("badhash").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_list_type_registrations() {
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        );
+
+        for name in &["Alpha", "Beta", "Gamma"] {
+            let schema = json!({ "type": "object", "name": name });
+            let proof = create_test_state_proof();
+            let type_def = AssetTypeDefinition::new(name.to_string(), schema, proof);
+            registry.register_type(type_def).await.expect("test: register");
+        }
+
+        let all = registry.list_type_registrations().await;
+        assert_eq!(all.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_builtin_types_preregistered() {
+        let registry = CatalogRegistry::with_builtin_types(
+            PrivacyMode::PUBLIC,
+            TrustPolicy::default(),
+            RegistryConfig::default(),
+        )
+        .await;
+
+        // Verify all three built-in types exist
+        assert!(registry.lookup_type("Message").await.is_some());
+        assert!(registry.lookup_type("Invitation").await.is_some());
+        assert!(registry.lookup_type("Document").await.is_some());
+
+        // Verify they appear in list
+        let all = registry.list_type_registrations().await;
+        assert_eq!(all.len(), 3);
+
+        // Verify schemas have expected required fields
+        let msg = registry.lookup_type("Message").await.expect("test: Message");
+        let required = msg.schema.get("required").expect("test: required field");
+        assert!(required.as_array().expect("test: array").iter().any(|v| v == "sender_node_id"));
     }
 }

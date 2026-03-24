@@ -272,6 +272,66 @@ pub struct HealthResponse {
     pub uptime_secs: u64,
 }
 
+/// Publish a new type definition request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypePublishRequest {
+    /// Type name (e.g. "Message", "Invoice")
+    pub type_name: String,
+    /// JSON Schema defining the type structure
+    pub schema: serde_json::Value,
+    /// Semantic version (defaults to "1.0.0")
+    #[serde(default = "default_version")]
+    pub version: String,
+    /// Optional author identifier
+    pub author: Option<String>,
+    /// Optional description
+    pub description: Option<String>,
+    /// Optional tags
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+fn default_version() -> String {
+    "1.0.0".to_string()
+}
+
+/// Type publish response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypePublishResponse {
+    /// Human-readable type name
+    pub type_name: String,
+    /// Content-addressed BLAKE3 hash of the schema
+    pub type_hash: String,
+    /// Version that was registered
+    pub version: String,
+    /// Registration status
+    pub status: String,
+}
+
+/// Look up a type definition request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeLookupRequest {
+    /// Look up by name (optional)
+    pub name: Option<String>,
+    /// Look up by content hash (optional)
+    pub hash: Option<String>,
+}
+
+/// Type lookup response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypeLookupResponse {
+    /// Whether the type was found
+    pub status: String,
+    /// Type name (if found)
+    pub type_name: Option<String>,
+    /// Content-addressed hash (if found)
+    pub type_hash: Option<String>,
+    /// Schema (if found)
+    pub schema: Option<serde_json::Value>,
+    /// Version (if found)
+    pub version: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Helpers — map registry types to API response types
 // ---------------------------------------------------------------------------
@@ -723,6 +783,137 @@ impl ApiHandler for CatalogHealthHandler {
     }
 }
 
+/// Publish (register) a type definition handler
+pub struct TypePublishHandler {
+    pub state: Arc<CatalogAppState>,
+}
+
+#[async_trait]
+impl ApiHandler for TypePublishHandler {
+    async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
+        debug!("Handling catalog/type.publish: {}", request.id);
+
+        let req: TypePublishRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid type publish request: {e}")))?;
+
+        let registry = self
+            .state
+            .registry
+            .as_ref()
+            .ok_or_else(|| ApiError::HandlerError("Registry not configured".to_string()))?;
+
+        // Build a type definition from the request
+        let state_proof = crate::registry::CatalogRegistry::builtin_state_proof();
+        let mut type_def =
+            crate::registry::asset_type::AssetTypeDefinition::new(
+                req.type_name.clone(),
+                req.schema.clone(),
+                state_proof,
+            );
+
+        // Apply optional metadata
+        type_def.metadata.version = req.version.clone();
+        type_def.metadata.author = req.author;
+        type_def.metadata.description = req.description;
+        type_def.metadata.tags = req.tags;
+
+        // Register via the registry
+        registry
+            .register_type(type_def)
+            .await
+            .map_err(|e| ApiError::HandlerError(format!("Registration failed: {e}")))?;
+
+        // Compute the type hash for the response (same algorithm as registry)
+        let schema_json = serde_json::to_string(&req.schema)
+            .map_err(|e| ApiError::SerializationError(format!("Schema serialization: {e}")))?;
+        let type_hash = hex::encode(blake3::hash(schema_json.as_bytes()).as_bytes());
+
+        let response = TypePublishResponse {
+            type_name: req.type_name,
+            type_hash,
+            version: req.version,
+            status: "published".to_string(),
+        };
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+        Ok(ApiResponse {
+            request_id: request.id,
+            success: true,
+            payload: payload.into(),
+            error: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    fn path(&self) -> &str {
+        "catalog/type.publish"
+    }
+}
+
+/// Look up a type definition by name or content hash
+pub struct TypeLookupHandler {
+    pub state: Arc<CatalogAppState>,
+}
+
+#[async_trait]
+impl ApiHandler for TypeLookupHandler {
+    async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
+        debug!("Handling catalog/type.lookup: {}", request.id);
+
+        let req: TypeLookupRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid type lookup request: {e}")))?;
+
+        let registry = self
+            .state
+            .registry
+            .as_ref()
+            .ok_or_else(|| ApiError::HandlerError("Registry not configured".to_string()))?;
+
+        // Try lookup by hash first (exact), then by name
+        let registration = if let Some(ref hash) = req.hash {
+            registry.lookup_type_by_hash(hash).await
+        } else if let Some(ref name) = req.name {
+            registry.lookup_type(name).await
+        } else {
+            None
+        };
+
+        let response = match registration {
+            Some(reg) => TypeLookupResponse {
+                status: "found".to_string(),
+                type_name: Some(reg.type_name),
+                type_hash: Some(reg.type_hash),
+                schema: Some(reg.schema),
+                version: Some(reg.version),
+            },
+            None => TypeLookupResponse {
+                status: "not_found".to_string(),
+                type_name: None,
+                type_hash: None,
+                schema: None,
+                version: None,
+            },
+        };
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+        Ok(ApiResponse {
+            request_id: request.id,
+            success: true,
+            payload: payload.into(),
+            error: None,
+            metadata: HashMap::new(),
+        })
+    }
+
+    fn path(&self) -> &str {
+        "catalog/type.lookup"
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Server
 // ---------------------------------------------------------------------------
@@ -796,11 +987,17 @@ impl CatalogStoqApi {
             state: app_state.clone(),
         }));
         server.register_handler(Arc::new(CatalogHealthHandler {
-            state: app_state,
+            state: app_state.clone(),
             start_time,
         }));
+        server.register_handler(Arc::new(TypePublishHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(TypeLookupHandler {
+            state: app_state,
+        }));
 
-        info!("Catalog STOQ API handlers registered (6 endpoints)");
+        info!("Catalog STOQ API handlers registered (8 endpoints)");
 
         Ok(Self {
             server,
@@ -1269,10 +1466,18 @@ mod tests {
         assert_eq!(stats.path(), "catalog/stats");
 
         let health = CatalogHealthHandler {
-            state,
+            state: state.clone(),
             start_time: std::time::Instant::now(),
         };
         assert_eq!(health.path(), "catalog/health");
+
+        let type_publish = TypePublishHandler {
+            state: state.clone(),
+        };
+        assert_eq!(type_publish.path(), "catalog/type.publish");
+
+        let type_lookup = TypeLookupHandler { state };
+        assert_eq!(type_lookup.path(), "catalog/type.lookup");
     }
 
     #[test]
@@ -1288,5 +1493,177 @@ mod tests {
         let state = CatalogAppState::with_registry(registry);
         assert!(state.registry.is_some());
         assert_eq!(state.service_name, "catalog");
+    }
+
+    fn make_registry_with_no_pos() -> crate::registry::CatalogRegistry {
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use hypermesh_lib::PrivacyMode;
+
+        CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            TrustPolicy {
+                require_state_proof: false,
+                minimum_stake: 0,
+                allowed_publishers: Vec::new(),
+                require_certificate: false,
+            },
+            RegistryConfig::default(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_type_publish_handler() {
+        let registry = make_registry_with_no_pos();
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+        let handler = TypePublishHandler { state };
+
+        let req_body = TypePublishRequest {
+            type_name: "Invoice".to_string(),
+            schema: serde_json::json!({
+                "type": "object",
+                "required": ["amount"],
+                "properties": { "amount": { "type": "number" } }
+            }),
+            version: "1.0.0".to_string(),
+            author: Some("test-author".to_string()),
+            description: Some("An invoice type".to_string()),
+            tags: vec!["finance".to_string()],
+        };
+
+        let api_req = ApiRequest {
+            id: "test-type-pub-1".to_string(),
+            service: "catalog".to_string(),
+            method: "type.publish".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+
+        let resp = handler
+            .handle(api_req)
+            .await
+            .expect("test: type publish should succeed");
+        assert!(resp.success);
+
+        let body: TypePublishResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        assert_eq!(body.type_name, "Invoice");
+        assert_eq!(body.status, "published");
+        assert!(!body.type_hash.is_empty());
+
+        // Verify BLAKE3 hash matches
+        let schema_json = serde_json::to_string(&req_body.schema).expect("test: json");
+        let expected_hash = hex::encode(blake3::hash(schema_json.as_bytes()).as_bytes());
+        assert_eq!(body.type_hash, expected_hash);
+    }
+
+    #[tokio::test]
+    async fn test_type_publish_duplicate_fails() {
+        let registry = make_registry_with_no_pos();
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+        let handler = TypePublishHandler { state };
+
+        let req_body = TypePublishRequest {
+            type_name: "DupApi".to_string(),
+            schema: serde_json::json!({ "type": "object" }),
+            version: "1.0.0".to_string(),
+            author: None,
+            description: None,
+            tags: vec![],
+        };
+
+        let api_req1 = ApiRequest {
+            id: "dup-1".to_string(),
+            service: "catalog".to_string(),
+            method: "type.publish".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        handler.handle(api_req1).await.expect("test: first publish");
+
+        let api_req2 = ApiRequest {
+            id: "dup-2".to_string(),
+            service: "catalog".to_string(),
+            method: "type.publish".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        let result = handler.handle(api_req2).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_type_lookup_handler_by_name() {
+        let registry = make_registry_with_no_pos();
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+
+        // First publish a type
+        let pub_handler = TypePublishHandler {
+            state: state.clone(),
+        };
+        let pub_req = TypePublishRequest {
+            type_name: "LookupTest".to_string(),
+            schema: serde_json::json!({ "type": "object", "id": "lookup-test" }),
+            version: "2.0.0".to_string(),
+            author: None,
+            description: None,
+            tags: vec![],
+        };
+        let api_req = ApiRequest {
+            id: "pub-for-lookup".to_string(),
+            service: "catalog".to_string(),
+            method: "type.publish".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&pub_req).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        pub_handler.handle(api_req).await.expect("test: publish");
+
+        // Look up by name
+        let lookup_handler = TypeLookupHandler { state };
+        let lookup_req = TypeLookupRequest {
+            name: Some("LookupTest".to_string()),
+            hash: None,
+        };
+        let api_req = ApiRequest {
+            id: "lookup-by-name".to_string(),
+            service: "catalog".to_string(),
+            method: "type.lookup".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&lookup_req).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        let resp = lookup_handler.handle(api_req).await.expect("test: lookup");
+        assert!(resp.success);
+
+        let body: TypeLookupResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        assert_eq!(body.status, "found");
+        assert_eq!(body.type_name.as_deref(), Some("LookupTest"));
+        assert!(body.type_hash.is_some());
+        assert!(body.schema.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_type_lookup_handler_not_found() {
+        let registry = make_registry_with_no_pos();
+        let state = Arc::new(CatalogAppState::with_registry(registry));
+        let handler = TypeLookupHandler { state };
+
+        let lookup_req = TypeLookupRequest {
+            name: Some("DoesNotExist".to_string()),
+            hash: None,
+        };
+        let api_req = ApiRequest {
+            id: "lookup-miss".to_string(),
+            service: "catalog".to_string(),
+            method: "type.lookup".to_string(),
+            payload: Bytes::from(serde_json::to_vec(&lookup_req).expect("test: serialize")),
+            metadata: HashMap::new(),
+        };
+        let resp = handler.handle(api_req).await.expect("test: lookup");
+        assert!(resp.success);
+
+        let body: TypeLookupResponse =
+            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        assert_eq!(body.status, "not_found");
+        assert!(body.type_name.is_none());
     }
 }

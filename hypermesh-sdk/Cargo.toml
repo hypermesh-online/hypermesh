@@ -6,6 +6,7 @@ description = "Rust SDK for HyperMesh daemon"
 license = "BSL-1.1"
 
 [dependencies]
+hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

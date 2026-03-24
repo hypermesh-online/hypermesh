@@ -1,13 +1,18 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! Asset IPC handlers: info, list.
+//! Asset IPC handlers: info, list, register.
 
 use std::sync::Arc;
 
+use crate::assets::core::asset_id::{
+    ApplicationDomain, AssetCategory, AssetData, BaseSystemType, NetworkScope,
+};
+use crate::assets::core::AssetRegistration;
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::{RpcError, INVALID_PARAMS};
+use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
+use trustchain::proof_of_state::StateProof;
 
 /// Register asset-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
@@ -99,6 +104,161 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             }),
         );
     }
+
+    // asset.register — register a new asset on the blockchain
+    {
+        let s = state.clone();
+        handler.register(
+            "asset.register",
+            Arc::new(move |params| {
+                let s = s.clone();
+                Box::pin(async move { handle_asset_register(params, &s).await })
+            }),
+        );
+    }
+}
+
+/// Parse a system type name (case-insensitive) into a `BaseSystemType`.
+fn parse_system_type(name: &str) -> Result<BaseSystemType, RpcError> {
+    match name.to_lowercase().as_str() {
+        "cpu" => Ok(BaseSystemType::Cpu),
+        "gpu" => Ok(BaseSystemType::Gpu),
+        "memory" => Ok(BaseSystemType::Memory),
+        "storage" => Ok(BaseSystemType::Storage),
+        "network" => Ok(BaseSystemType::Network),
+        "container" => Ok(BaseSystemType::Container),
+        "economic" => Ok(BaseSystemType::Economic),
+        "blockchain" => Ok(BaseSystemType::Blockchain),
+        "dns" => Ok(BaseSystemType::Dns),
+        "transmission" => Ok(BaseSystemType::Transmission),
+        "dashboard" => Ok(BaseSystemType::Dashboard),
+        "identity" => Ok(BaseSystemType::Identity),
+        "keyrotation" | "key_rotation" => Ok(BaseSystemType::KeyRotation),
+        "invitation" => Ok(BaseSystemType::Invitation),
+        other => Err(RpcError {
+            code: INVALID_PARAMS,
+            message: format!(
+                "unknown system type '{other}', use 'application' category for custom types"
+            ),
+            data: None,
+        }),
+    }
+}
+
+/// Handle the `asset.register` IPC call.
+///
+/// Required params: `category` ("system"|"application"), `content` (hex-encoded bytes).
+/// Optional params: `type_name`, `type_hash` (hex), `metadata` (JSON object).
+async fn handle_asset_register(
+    params: serde_json::Value,
+    state: &DaemonState,
+) -> Result<serde_json::Value, RpcError> {
+    let category = params
+        .get("category")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "category required (system|application)".into(),
+            data: None,
+        })?;
+
+    let content = params
+        .get("content")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "content required (hex-encoded asset data)".into(),
+            data: None,
+        })?;
+
+    let type_name = params
+        .get("type_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown");
+    let type_hash = params
+        .get("type_hash")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let metadata_val = params
+        .get("metadata")
+        .cloned()
+        .unwrap_or_else(|| serde_json::json!({}));
+
+    let content_bytes = hex::decode(content).map_err(|e| RpcError {
+        code: INVALID_PARAMS,
+        message: format!("invalid hex content: {e}"),
+        data: None,
+    })?;
+
+    let asset_data = AssetData {
+        config: type_name.as_bytes().to_vec(),
+        definition: content_bytes.clone(),
+        metadata: serde_json::to_vec(&metadata_val).unwrap_or_default(),
+    };
+
+    let asset_category = match category {
+        "system" => {
+            let base_type = parse_system_type(type_name)?;
+            AssetCategory::BaseSystem(base_type)
+        }
+        "application" => {
+            let domain_hash = if type_hash.is_empty() {
+                *blake3::hash(type_name.as_bytes()).as_bytes()
+            } else {
+                let bytes = hex::decode(type_hash).map_err(|e| RpcError {
+                    code: INVALID_PARAMS,
+                    message: format!("invalid type_hash hex: {e}"),
+                    data: None,
+                })?;
+                let mut h = [0u8; 32];
+                let len = bytes.len().min(32);
+                h[..len].copy_from_slice(&bytes[..len]);
+                h
+            };
+            AssetCategory::Application(ApplicationDomain {
+                domain_name: type_name.to_string(),
+                domain_hash,
+            })
+        }
+        other => {
+            return Err(RpcError {
+                code: INVALID_PARAMS,
+                message: format!(
+                    "unknown category '{other}', expected 'system' or 'application'"
+                ),
+                data: None,
+            });
+        }
+    };
+
+    let registration = AssetRegistration::from_asset_data(
+        &asset_data,
+        NetworkScope::Global,
+        asset_category,
+    );
+
+    let content_hash_hex = hex::encode(registration.content_hash);
+
+    // Use a minimal testing-grade state proof for alpha.
+    // Production will require real PoS from the caller.
+    let state_proof = StateProof::new_for_testing();
+
+    match state
+        .blockchain
+        .register_asset_record(registration, &state_proof)
+        .await
+    {
+        Ok(block) => Ok(serde_json::json!({
+            "asset_id": content_hash_hex,
+            "block_index": block.index,
+            "status": "registered",
+        })),
+        Err(e) => Err(RpcError {
+            code: INTERNAL_ERROR,
+            message: format!("blockchain registration failed: {e}"),
+            data: None,
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -182,5 +342,131 @@ mod tests {
         assert!(resp.error.is_some());
         let err = resp.error.expect("test: error present");
         assert_eq!(err.code, INVALID_PARAMS);
+    }
+
+    #[tokio::test]
+    async fn test_asset_register_application_type() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "asset.register",
+            serde_json::json!({
+                "category": "application",
+                "type_name": "Message",
+                "content": hex::encode(b"hello world"),
+                "metadata": {"version": "1.0"},
+            }),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result");
+        assert_eq!(result["status"], "registered");
+        assert!(result["asset_id"].is_string());
+        assert_eq!(result["block_index"], 1);
+    }
+
+    #[tokio::test]
+    async fn test_asset_register_system_type() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "asset.register",
+            serde_json::json!({
+                "category": "system",
+                "type_name": "Dns",
+                "content": hex::encode(b"dns-record-data"),
+            }),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result");
+        assert_eq!(result["status"], "registered");
+        assert!(result["block_index"].is_number());
+    }
+
+    #[tokio::test]
+    async fn test_asset_register_missing_category() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "asset.register",
+            serde_json::json!({"content": "aabb"}),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_some());
+        let err = resp.error.expect("test: error present");
+        assert_eq!(err.code, INVALID_PARAMS);
+        assert!(err.message.contains("category"));
+    }
+
+    #[tokio::test]
+    async fn test_asset_register_missing_content() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "asset.register",
+            serde_json::json!({"category": "application"}),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_some());
+        let err = resp.error.expect("test: error present");
+        assert_eq!(err.code, INVALID_PARAMS);
+        assert!(err.message.contains("content"));
+    }
+
+    #[tokio::test]
+    async fn test_asset_register_invalid_category() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "asset.register",
+            serde_json::json!({
+                "category": "bogus",
+                "content": "aabb",
+            }),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_some());
+        let err = resp.error.expect("test: error present");
+        assert_eq!(err.code, INVALID_PARAMS);
+        assert!(err.message.contains("bogus"));
+    }
+
+    #[test]
+    fn test_parse_system_type() {
+        assert!(matches!(parse_system_type("dns"), Ok(BaseSystemType::Dns)));
+        assert!(matches!(parse_system_type("Cpu"), Ok(BaseSystemType::Cpu)));
+        assert!(matches!(parse_system_type("GPU"), Ok(BaseSystemType::Gpu)));
+        assert!(matches!(
+            parse_system_type("Dashboard"),
+            Ok(BaseSystemType::Dashboard)
+        ));
+        assert!(matches!(
+            parse_system_type("identity"),
+            Ok(BaseSystemType::Identity)
+        ));
+        assert!(matches!(
+            parse_system_type("key_rotation"),
+            Ok(BaseSystemType::KeyRotation)
+        ));
+        assert!(matches!(
+            parse_system_type("invitation"),
+            Ok(BaseSystemType::Invitation)
+        ));
+        assert!(matches!(
+            parse_system_type("transmission"),
+            Ok(BaseSystemType::Transmission)
+        ));
+        assert!(parse_system_type("nonexistent").is_err());
     }
 }

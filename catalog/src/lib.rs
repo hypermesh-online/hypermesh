@@ -88,7 +88,7 @@ pub use documentation::DocumentationGenerator;
 pub use registry::{
     AssetTypeDefinition, CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics,
     SearchQuery, SearchResult, SearchResults, SortCriteria, TrustPolicy, TypeMetadata,
-    TypeValidationResult, ValidationRule, ValidationRuleType,
+    TypeRegistration, TypeValidationResult, ValidationRule, ValidationRuleType,
 };
 pub use security::VerificationResult;
 pub use settlement::{
