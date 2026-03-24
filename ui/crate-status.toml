@@ -42,6 +42,11 @@ items = [
     "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
     "Sidebar Inbox nav item with live badge count from polling",
     "Per-asset Share button in SharingManagement component",
+    "MessengerPanel — two-column messaging view (conversation list + message thread)",
+    "ConversationList — peer list with last message preview, new conversation input",
+    "MessageThread — bubble layout (sent/received), auto-scroll, compose input, send mutation",
+    "Messaging API client + React Query hooks (useMessageInbox, useMessageHistory, useMessageSend, useMessageRead)",
+    "Sidebar Messages nav item with unread badge count from polling",
 ]
 
 [features.in_development]

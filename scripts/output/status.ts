@@ -159,7 +159,16 @@ export const crateStatuses: CrateStatus[] = [
         "InboxStore — async inbox with JSON persistence for received share invitations",
         "Share IPC handlers — share.send, share.inbox, share.accept, share.reject + identity.pubkey, peer.pubkey",
         "Share CLI — hypermesh share send/inbox/accept/reject/pubkey/peer-pubkey subcommands",
-        "Sharing integration tests — 10 scenarios (full lifecycle, wrong key, invalid signature, multi-node fetch, persistence, KyberSegmented)"
+        "Sharing integration tests — 10 scenarios (full lifecycle, wrong key, invalid signature, multi-node fetch, persistence, KyberSegmented)",
+        "Unified asset.register IPC — single handler for all asset types (system + application), replaces ad-hoc mutation paths",
+        "Catalog type publishing — register_type() with BLAKE3 content-addressed schemas, type.publish + type.lookup STOQ API",
+        "Built-in type definitions — Message, Invitation, Document pre-registered in Catalog with JSON Schema validation",
+        "DirectMessage — Kyber-1024 encrypted body, FALCON-1024 signed, threading via reply_to, Application('Message') asset category",
+        "MessageStore — blockchain-backed + YAML persistence, list_for_recipient, history_with_peer, Application asset registration",
+        "TAG_DIRECT_MESSAGE (0x06) wire protocol + handler for peer-to-peer message delivery",
+        "Message IPC handlers — message.send, message.inbox, message.history, message.read",
+        "Message CLI — hypermesh message send/inbox/history/read subcommands",
+        "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
@@ -176,7 +185,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 93
+    "completion": 94
   },
   {
     "id": "caesar",
@@ -712,7 +721,12 @@ export const crateStatuses: CrateStatus[] = [
         "InboxPanel — received share invitations with Accept/Reject buttons and badge count",
         "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
         "Sidebar Inbox nav item with live badge count from polling",
-        "Per-asset Share button in SharingManagement component"
+        "Per-asset Share button in SharingManagement component",
+        "MessengerPanel — two-column messaging view (conversation list + message thread)",
+        "ConversationList — peer list with last message preview, new conversation input",
+        "MessageThread — bubble layout (sent/received), auto-scroll, compose input, send mutation",
+        "Messaging API client + React Query hooks (useMessageInbox, useMessageHistory, useMessageSend, useMessageRead)",
+        "Sidebar Messages nav item with unread badge count from polling"
       ],
       "inDevelopment": [
         "Global search — searches hardcoded static data only",
@@ -728,6 +742,6 @@ export const crateStatuses: CrateStatus[] = [
         "Native desktop dashboard (Tauri cross-platform)"
       ]
     },
-    "completion": 79
+    "completion": 81
   }
 ];

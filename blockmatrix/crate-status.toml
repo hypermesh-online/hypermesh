@@ -169,6 +169,17 @@ items = [
     "Share IPC handlers — share.send, share.inbox, share.accept, share.reject + identity.pubkey, peer.pubkey",
     "Share CLI — hypermesh share send/inbox/accept/reject/pubkey/peer-pubkey subcommands",
     "Sharing integration tests — 10 scenarios (full lifecycle, wrong key, invalid signature, multi-node fetch, persistence, KyberSegmented)",
+    # Unified Asset Registration + Catalog Types (K1+K2)
+    "Unified asset.register IPC — single handler for all asset types (system + application), replaces ad-hoc mutation paths",
+    "Catalog type publishing — register_type() with BLAKE3 content-addressed schemas, type.publish + type.lookup STOQ API",
+    "Built-in type definitions — Message, Invitation, Document pre-registered in Catalog with JSON Schema validation",
+    # Private Messaging (K3-K6)
+    "DirectMessage — Kyber-1024 encrypted body, FALCON-1024 signed, threading via reply_to, Application('Message') asset category",
+    "MessageStore — blockchain-backed + YAML persistence, list_for_recipient, history_with_peer, Application asset registration",
+    "TAG_DIRECT_MESSAGE (0x06) wire protocol + handler for peer-to-peer message delivery",
+    "Message IPC handlers — message.send, message.inbox, message.history, message.read",
+    "Message CLI — hypermesh message send/inbox/history/read subcommands",
+    "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
 ]
 
 [features.in_development]
