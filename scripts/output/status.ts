@@ -153,7 +153,13 @@ export const crateStatuses: CrateStatus[] = [
         "Propagation weight feed — RoutingIntelligence → TensorWeightModifier → PropagationWeight every 15s",
         "Replication trigger — ReplicationTrigger.check() against live SwarmAnalytics, signals logged with urgency > 0.5",
         "intelligence.stats IPC endpoint — queryable metrics (shard_count, peer_count, uptime)",
-        "10-50 node simulation harness — 9 integration tests (asset lifecycle, engauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)"
+        "10-50 node simulation harness — 9 integration tests (asset lifecycle, engauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)",
+        "ShareInvite protocol — signed envelope with shard map + Kyber-wrapped DecryptionKey, FALCON-1024 signature, TAG_SHARE_INVITE wire protocol",
+        "Key wrapping — encrypt/decrypt DecryptionKey with recipient's Kyber-1024 public key (KEM + BLAKE3-derived AES-256-GCM)",
+        "InboxStore — async inbox with JSON persistence for received share invitations",
+        "Share IPC handlers — share.send, share.inbox, share.accept, share.reject + identity.pubkey, peer.pubkey",
+        "Share CLI — hypermesh share send/inbox/accept/reject/pubkey/peer-pubkey subcommands",
+        "Sharing integration tests — 10 scenarios (full lifecycle, wrong key, invalid signature, multi-node fetch, persistence, KyberSegmented)"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
@@ -701,7 +707,12 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge Routing wired to real throttle status and advisory",
         "Engauge Marketplace wired to real pools/leases/pricing",
         "Engauge Overview wired to real overview data",
-        "Config key filter search and lookup UI"
+        "Config key filter search and lookup UI",
+        "ShareDialog — modal for sharing assets with peers by name/node ID",
+        "InboxPanel — received share invitations with Accept/Reject buttons and badge count",
+        "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
+        "Sidebar Inbox nav item with live badge count from polling",
+        "Per-asset Share button in SharingManagement component"
       ],
       "inDevelopment": [
         "Global search — searches hardcoded static data only",
@@ -717,6 +728,6 @@ export const crateStatuses: CrateStatus[] = [
         "Native desktop dashboard (Tauri cross-platform)"
       ]
     },
-    "completion": 76
+    "completion": 79
   }
 ];

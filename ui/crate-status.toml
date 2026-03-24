@@ -37,6 +37,11 @@ items = [
     "Engauge Marketplace wired to real pools/leases/pricing",
     "Engauge Overview wired to real overview data",
     "Config key filter search and lookup UI",
+    "ShareDialog — modal for sharing assets with peers by name/node ID",
+    "InboxPanel — received share invitations with Accept/Reject buttons and badge count",
+    "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
+    "Sidebar Inbox nav item with live badge count from polling",
+    "Per-asset Share button in SharingManagement component",
 ]
 
 [features.in_development]

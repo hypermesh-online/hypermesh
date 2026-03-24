@@ -162,6 +162,13 @@ items = [
     "Replication trigger — ReplicationTrigger.check() against live SwarmAnalytics, signals logged with urgency > 0.5",
     "intelligence.stats IPC endpoint — queryable metrics (shard_count, peer_count, uptime)",
     "10-50 node simulation harness — 9 integration tests (asset lifecycle, engauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)",
+    # P2P File Sharing (J1-J7)
+    "ShareInvite protocol — signed envelope with shard map + Kyber-wrapped DecryptionKey, FALCON-1024 signature, TAG_SHARE_INVITE wire protocol",
+    "Key wrapping — encrypt/decrypt DecryptionKey with recipient's Kyber-1024 public key (KEM + BLAKE3-derived AES-256-GCM)",
+    "InboxStore — async inbox with JSON persistence for received share invitations",
+    "Share IPC handlers — share.send, share.inbox, share.accept, share.reject + identity.pubkey, peer.pubkey",
+    "Share CLI — hypermesh share send/inbox/accept/reject/pubkey/peer-pubkey subcommands",
+    "Sharing integration tests — 10 scenarios (full lifecycle, wrong key, invalid signature, multi-node fetch, persistence, KyberSegmented)",
 ]
 
 [features.in_development]
