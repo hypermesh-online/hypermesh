@@ -152,6 +152,8 @@ items = [
     # Bug fixes (post-Sprint D1)
     "Post-handshake network_id metadata exchange — peers exchange network_id after STOQ handshake, backward-compatible with old nodes",
     "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous",
+    "Block propagation torrent model — ContentInterested strategy: Device=none, Private=full replication, Public=reflectors+spatial+consumers, Anonymous=consumers only",
+    "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers",
 ]
 
 [features.in_development]
@@ -162,7 +164,7 @@ items = [
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)
     "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
-    "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
+    "Scope-aware Public spatial send-side filtering — SpatialBucketAssigner.block_relevant_to_peer() used in propagation target selection",
     "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
     "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
     "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing",

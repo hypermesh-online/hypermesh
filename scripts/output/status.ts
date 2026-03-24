@@ -144,13 +144,15 @@ export const crateStatuses: CrateStatus[] = [
         "Consumer-becomes-provider — post-fetch store + announce for swarm scaling (R12)",
         "Selective chain reconstruction — header-only storage for non-participating segments, prune_to_headers()",
         "Post-handshake network_id metadata exchange — peers exchange network_id after STOQ handshake, backward-compatible with old nodes",
-        "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous"
+        "R7/R8 cipher compliance — quantum-resistant encryption (Kyber-1024 KEM) is default for ALL privacy modes including Anonymous",
+        "Block propagation torrent model — ContentInterested strategy: Device=none, Private=full replication, Public=reflectors+spatial+consumers, Anonymous=consumers only",
+        "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers"
       ],
       "inDevelopment": [
         "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
-        "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
+        "Scope-aware Public spatial send-side filtering — SpatialBucketAssigner.block_relevant_to_peer() used in propagation target selection",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
         "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
         "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing"
@@ -195,7 +197,8 @@ export const crateStatuses: CrateStatus[] = [
         "Node status tracking in storage (settled count, fee earnings)",
         "STOQ API handlers wired to real CaesarProtocol (5 handlers over QUIC)",
         "Caesar binary CLI (--bind, --service-name, STOQ API server launcher)",
-        "Cross-chain bridge trait (InternalBridge with conservation checks)"
+        "Cross-chain bridge trait (InternalBridge with conservation checks)",
+        "UI-facing API handlers — /wallet, /balance, /transactions, /rewards, /staking, /exchange/rates, /analytics/overview, /analytics/earnings (8 handlers matching UI TypeScript interfaces)"
       ],
       "inDevelopment": [
         "Multi-node packet routing — routing logic exists but packets don't actually traverse QUIC connections between nodes",
@@ -209,7 +212,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real gold oracle data feed (blocked by: external API subscription)"
       ]
     },
-    "completion": 77
+    "completion": 78
   },
   {
     "id": "caesar-sdk",
@@ -303,7 +306,8 @@ export const crateStatuses: CrateStatus[] = [
         "MetricsSubscriber byte ingestion",
         "RegionalAggregator periodic change detection",
         "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
-        "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)"
+        "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
+        "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)"
       ],
       "inDevelopment": [
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",

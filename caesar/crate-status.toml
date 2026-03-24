@@ -31,6 +31,7 @@ items = [
     "STOQ API handlers wired to real CaesarProtocol (5 handlers over QUIC)",
     "Caesar binary CLI (--bind, --service-name, STOQ API server launcher)",
     "Cross-chain bridge trait (InternalBridge with conservation checks)",
+    "UI-facing API handlers — /wallet, /balance, /transactions, /rewards, /staking, /exchange/rates, /analytics/overview, /analytics/earnings (8 handlers matching UI TypeScript interfaces)",
 ]
 
 [features.in_development]
