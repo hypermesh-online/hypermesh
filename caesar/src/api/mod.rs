@@ -3,5 +3,6 @@
 // See the LICENSE file in the repository root for full license text.
 
 pub mod stoq_api;
+pub mod ui_handlers;
 
 pub use stoq_api::{CaesarAppState, CaesarStoqApi, CaesarStoqConfig};

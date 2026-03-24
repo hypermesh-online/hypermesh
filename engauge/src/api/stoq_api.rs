@@ -160,14 +160,22 @@ pub struct MetricsResponse {
     pub version: String,
 }
 
+/// Capacity metrics response aligned with UI `CapacityMetrics` interface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapacityResponse {
     pub bytes_served: u64,
     pub compute_delivered: u64,
+    /// Serialized as `storage_committed` for UI compatibility.
+    #[serde(rename = "storage_committed")]
     pub storage_maintained_bytes: u64,
+    /// Serialized as `network_utilized` for UI compatibility.
+    #[serde(rename = "network_utilized")]
     pub bandwidth_available_bps: u64,
+    /// Serialized as `utilization_percent` for UI compatibility.
+    #[serde(rename = "utilization_percent")]
     pub uptime_ratio: f64,
-    pub active_nodes: u64,
+    /// Unix timestamp of last update.
+    pub last_updated: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -184,11 +192,17 @@ fn default_duration() -> u64 {
     60
 }
 
+/// Traffic analysis response aligned with UI `TrafficAnalysis` interface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrafficResponse {
-    pub classification: String,
-    pub confidence: f64,
+    pub organic_count: u64,
+    pub speculative_count: u64,
+    /// Serialized as `organic_rate` for UI compatibility.
+    #[serde(rename = "organic_rate")]
     pub organic_ratio: f64,
+    pub confidence: f64,
+    pub analysis_window_seconds: u64,
+    pub last_updated: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,11 +212,85 @@ pub struct SwarmResponse {
     pub total_receipts: u64,
 }
 
+/// A single trending metric entry aligned with UI `TrendingMetric` interface.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrendingResponse {
-    pub tracked_nodes: u64,
-    pub active_nodes: u64,
-    pub version: String,
+pub struct TrendingMetricEntry {
+    pub metric_name: String,
+    pub current_value: f64,
+    pub previous_value: f64,
+    pub trend_direction: String,
+    pub change_percent: f64,
+}
+
+/// Throttle status response aligned with UI `ThrottleStatus` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThrottleStatusResponse {
+    pub governor_signal: f64,
+    pub is_throttled: bool,
+    pub reason: Option<String>,
+}
+
+/// Routing advisory response aligned with UI `RoutingAdvisory` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingAdvisoryResponse {
+    pub tensor_weight_modifier: f64,
+    pub path_policy: String,
+    pub congestion_forecast: f64,
+    pub recommended_tier: String,
+    pub alternate_paths: u64,
+    pub last_updated: u64,
+}
+
+/// Resource pool entry aligned with UI `ResourcePool` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourcePoolEntry {
+    pub pool_id: String,
+    pub resource_type: String,
+    pub sovereign_allocation_pct: f64,
+    pub available_units: u64,
+    pub total_units: u64,
+    pub price_per_unit: f64,
+    pub tier: String,
+}
+
+/// Lease contract entry aligned with UI `LeaseContract` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaseContractEntry {
+    pub lease_id: String,
+    pub pool_id: String,
+    pub state: String,
+    pub units: u64,
+    pub cost_gg: f64,
+    pub lessee: String,
+    pub created_at: u64,
+    pub expires_at: u64,
+}
+
+/// Pricing info entry aligned with UI `PricingInfo` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PricingInfoEntry {
+    pub tier: String,
+    pub multiplier: f64,
+    pub base_price: f64,
+    pub effective_price: f64,
+}
+
+/// Metrics frame entry aligned with UI `MetricsFrame` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricsFrameEntry {
+    pub frame_type: String,
+    pub timestamp: u64,
+    pub payload: HashMap<String, serde_json::Value>,
+    pub privacy_filtered: bool,
+}
+
+/// Create lease request aligned with UI `CreateLeaseRequest` interface.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateLeaseRequest {
+    pub pool_id: String,
+    pub units: u64,
+    pub tier: String,
+    pub duration_seconds: Option<u64>,
 }
 
 // ---------------------------------------------------------------------------
@@ -296,16 +384,18 @@ impl ApiHandler for CapacityHandler {
     async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
         debug!("Handling engauge/capacity: {}", request.id);
 
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
         let response = CapacityResponse {
             bytes_served: 0,
             compute_delivered: 0,
             storage_maintained_bytes: 0,
             bandwidth_available_bps: 0,
             uptime_ratio: 0.0,
-            active_nodes: self
-                .state
-                .active_nodes
-                .load(std::sync::atomic::Ordering::Relaxed),
+            last_updated: now,
         };
 
         let payload = serde_json::to_vec(&response)
@@ -348,23 +438,36 @@ impl ApiHandler for TrafficHandler {
         };
 
         let classification = classifier.classify(&pattern);
-        let (class_name, confidence, organic_ratio) = match &classification {
+        let (confidence, organic_ratio) = match &classification {
             crate::organic_detection::TrafficClassification::Organic { confidence } => {
-                ("organic".to_string(), *confidence, 1.0)
+                (*confidence, 1.0)
             }
             crate::organic_detection::TrafficClassification::Speculative { confidence } => {
-                ("speculative".to_string(), *confidence, 0.0)
+                (*confidence, 0.0)
             }
             crate::organic_detection::TrafficClassification::Mixed {
                 confidence,
                 organic_ratio,
-            } => ("mixed".to_string(), *confidence, *organic_ratio),
+            } => (*confidence, *organic_ratio),
         };
 
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Approximate counts based on ratio (actual counting requires event storage)
+        let total_estimate: u64 = 100;
+        let organic_count = (total_estimate as f64 * organic_ratio) as u64;
+        let speculative_count = total_estimate.saturating_sub(organic_count);
+
         let response = TrafficResponse {
-            classification: class_name,
-            confidence,
+            organic_count,
+            speculative_count,
             organic_ratio,
+            confidence,
+            analysis_window_seconds: req.duration_secs,
+            last_updated: now,
         };
 
         let payload = serde_json::to_vec(&response)
@@ -422,40 +525,7 @@ impl ApiHandler for SwarmHandler {
     }
 }
 
-pub struct TrendingHandler {
-    pub state: Arc<EngaugeAppState>,
-}
-
-#[async_trait]
-impl ApiHandler for TrendingHandler {
-    async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
-        debug!("Handling engauge/trending: {}", request.id);
-
-        let response = TrendingResponse {
-            tracked_nodes: 0,
-            active_nodes: self
-                .state
-                .active_nodes
-                .load(std::sync::atomic::Ordering::Relaxed),
-            version: self.state.version.clone(),
-        };
-
-        let payload = serde_json::to_vec(&response)
-            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
-
-        Ok(ApiResponse {
-            request_id: request.id,
-            success: true,
-            payload: payload.into(),
-            error: None,
-            metadata: HashMap::new(),
-        })
-    }
-
-    fn path(&self) -> &str {
-        "engauge/trending"
-    }
-}
+// UI-facing handlers are in ui_handlers.rs module
 
 // ---------------------------------------------------------------------------
 // Server (uses quinn directly to avoid stoq cycle)
@@ -498,10 +568,48 @@ impl EngaugeStoqApi {
         });
         handlers.insert(swarm.path().to_string(), swarm);
 
-        let trending: Arc<dyn ApiHandler> = Arc::new(TrendingHandler {
-            state: app_state,
+        // UI-facing handlers (from ui_handlers module)
+        use super::ui_handlers;
+
+        let trending: Arc<dyn ApiHandler> = Arc::new(ui_handlers::TrendingHandler {
+            state: app_state.clone(),
         });
         handlers.insert(trending.path().to_string(), trending);
+
+        let throttle: Arc<dyn ApiHandler> = Arc::new(ui_handlers::ThrottleHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(throttle.path().to_string(), throttle);
+
+        let routing_advisory: Arc<dyn ApiHandler> = Arc::new(ui_handlers::RoutingAdvisoryHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(routing_advisory.path().to_string(), routing_advisory);
+
+        let marketplace_pools: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplacePoolsHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(marketplace_pools.path().to_string(), marketplace_pools);
+
+        let marketplace_leases: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplaceLeasesHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(marketplace_leases.path().to_string(), marketplace_leases);
+
+        let marketplace_pricing: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplacePricingHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(marketplace_pricing.path().to_string(), marketplace_pricing);
+
+        let metrics_stream: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MetricsStreamHandler {
+            state: app_state.clone(),
+        });
+        handlers.insert(metrics_stream.path().to_string(), metrics_stream);
+
+        let create_lease: Arc<dyn ApiHandler> = Arc::new(ui_handlers::CreateLeaseHandler {
+            state: app_state,
+        });
+        handlers.insert(create_lease.path().to_string(), create_lease);
 
         info!("Engauge STOQ API handlers registered ({} endpoints)", handlers.len());
 
@@ -792,7 +900,46 @@ mod tests {
         };
         assert_eq!(swarm.path(), "engauge/swarm");
 
-        let trending = TrendingHandler { state };
-        assert_eq!(trending.path(), "engauge/trending");
     }
+
+    #[test]
+    fn test_capacity_response_ui_field_names() {
+        let resp = CapacityResponse {
+            bytes_served: 1000,
+            compute_delivered: 50,
+            storage_maintained_bytes: 500_000,
+            bandwidth_available_bps: 1_000_000,
+            uptime_ratio: 85.5,
+            last_updated: 1700000000,
+        };
+        let json = serde_json::to_string(&resp).expect("test: serialization");
+        // Verify serde renames match UI expectations
+        assert!(json.contains("\"storage_committed\""));
+        assert!(json.contains("\"network_utilized\""));
+        assert!(json.contains("\"utilization_percent\""));
+        assert!(json.contains("\"last_updated\""));
+        assert!(!json.contains("\"storage_maintained_bytes\""));
+        assert!(!json.contains("\"bandwidth_available_bps\""));
+        assert!(!json.contains("\"uptime_ratio\""));
+    }
+
+    #[test]
+    fn test_traffic_response_ui_field_names() {
+        let resp = TrafficResponse {
+            organic_count: 80,
+            speculative_count: 20,
+            organic_ratio: 0.8,
+            confidence: 0.95,
+            analysis_window_seconds: 60,
+            last_updated: 1700000000,
+        };
+        let json = serde_json::to_string(&resp).expect("test: serialization");
+        assert!(json.contains("\"organic_rate\""));
+        assert!(json.contains("\"organic_count\""));
+        assert!(json.contains("\"speculative_count\""));
+        assert!(json.contains("\"analysis_window_seconds\""));
+        assert!(!json.contains("\"organic_ratio\""));
+    }
+
+    // UI-facing handler tests are in ui_handlers::tests
 }
