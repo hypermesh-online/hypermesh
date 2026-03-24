@@ -29,6 +29,7 @@ pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
             SystemAssetKind::Dashboard => AssetType::Dashboard,
             SystemAssetKind::Identity => AssetType::Identity,
             SystemAssetKind::KeyRotation => AssetType::KeyRotation,
+            SystemAssetKind::Invitation => AssetType::Invitation,
         },
         AssetKind::UserDefined(_) => AssetType::Container,
     }
@@ -50,6 +51,7 @@ pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
         AssetType::Dashboard => SystemAssetKind::Dashboard,
         AssetType::Identity => SystemAssetKind::Identity,
         AssetType::KeyRotation => SystemAssetKind::KeyRotation,
+        AssetType::Invitation => SystemAssetKind::Invitation,
     })
 }
 
@@ -84,6 +86,7 @@ pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
         BaseSystemType::Dashboard => SystemAssetKind::Dashboard,
         BaseSystemType::Identity => SystemAssetKind::Identity,
         BaseSystemType::KeyRotation => SystemAssetKind::KeyRotation,
+        BaseSystemType::Invitation => SystemAssetKind::Invitation,
     }
 }
 

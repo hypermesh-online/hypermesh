@@ -78,6 +78,7 @@ impl AdapterRegistry {
             AssetType::Dashboard => None,
             AssetType::Identity => None,
             AssetType::KeyRotation => None,
+            AssetType::Invitation => None,
         }
     }
 

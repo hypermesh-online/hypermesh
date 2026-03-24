@@ -30,6 +30,7 @@ pub fn test_asset_id(asset_type: AssetType) -> AssetRegistration {
         AssetType::Dashboard => AssetCategory::BaseSystem(BaseSystemType::Dashboard),
         AssetType::Identity => AssetCategory::BaseSystem(BaseSystemType::Identity),
         AssetType::KeyRotation => AssetCategory::BaseSystem(BaseSystemType::KeyRotation),
+        AssetType::Invitation => AssetCategory::BaseSystem(BaseSystemType::Invitation),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }
@@ -63,6 +64,7 @@ pub fn test_asset_id_with_content(asset_type: AssetType, content: Vec<u8>) -> As
         AssetType::Dashboard => AssetCategory::BaseSystem(BaseSystemType::Dashboard),
         AssetType::Identity => AssetCategory::BaseSystem(BaseSystemType::Identity),
         AssetType::KeyRotation => AssetCategory::BaseSystem(BaseSystemType::KeyRotation),
+        AssetType::Invitation => AssetCategory::BaseSystem(BaseSystemType::Invitation),
     };
     AssetRegistration::from_asset_data(&data, NetworkScope::Global, category)
 }
