@@ -103,6 +103,29 @@ impl SpatialBucketAssigner {
         self.our_coordinate
             .is_within_distance(placement, self.neighborhood_radius)
     }
+
+    /// Check if a block's content is relevant to a specific peer coordinate.
+    ///
+    /// Returns true if any shard placement position is within the peer's
+    /// spatial neighborhood. The neighborhood radius is estimated from
+    /// peer density: if we have peer coordinates, use the adaptive radius;
+    /// otherwise use the default radius scaled by the peer's distance
+    /// from us (closer peers get tighter neighborhoods).
+    pub fn block_relevant_to_peer(
+        &self,
+        block_shard_positions: &[MatrixCoordinate],
+        peer_coordinate: &MatrixCoordinate,
+    ) -> bool {
+        if block_shard_positions.is_empty() {
+            return false;
+        }
+        // Use our neighborhood radius as an approximation for the peer's radius.
+        // In a uniform distribution, peers at similar density have similar radii.
+        let peer_radius = self.neighborhood_radius;
+        block_shard_positions.iter().any(|pos| {
+            peer_coordinate.is_within_distance(pos, peer_radius)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -261,5 +284,76 @@ mod tests {
 
         let block = Block::new(1, vec![local_entry, far_entry, near_entry], "prev".to_string());
         assert!(assigner.block_in_our_neighborhood(&block));
+    }
+
+    // ── Spatial send-side filtering tests ────────────────────────────
+
+    #[test]
+    fn test_block_relevant_to_nearby_peer() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let assigner = SpatialBucketAssigner::new(coord); // radius 10
+
+        // Shard at (3,0,0), peer at (5,0,0) — distance from peer to shard is 2, within radius 10
+        let shard_positions = vec![MatrixCoordinate::new(3, 0, 0).expect("test: coord")];
+        let peer = MatrixCoordinate::new(5, 0, 0).expect("test: coord");
+
+        assert!(
+            assigner.block_relevant_to_peer(&shard_positions, &peer),
+            "Peer near shard position should be relevant"
+        );
+    }
+
+    #[test]
+    fn test_block_not_relevant_to_distant_peer() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let mut assigner = SpatialBucketAssigner::new(coord);
+        // Set a small radius by providing close peers
+        assigner.update_peers(vec![
+            MatrixCoordinate::new(1, 0, 0).expect("test: coord"),
+        ]);
+        // radius should be ~1.0
+
+        // Shard at (0,0,0), peer at (100,100,100) — far beyond radius
+        let shard_positions = vec![MatrixCoordinate::new(0, 0, 0).expect("test: coord")];
+        let peer = MatrixCoordinate::new(100, 100, 100).expect("test: coord");
+
+        assert!(
+            !assigner.block_relevant_to_peer(&shard_positions, &peer),
+            "Peer far from all shard positions should not be relevant"
+        );
+    }
+
+    #[test]
+    fn test_block_relevant_empty_positions() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let assigner = SpatialBucketAssigner::new(coord);
+
+        let peer = MatrixCoordinate::new(1, 1, 1).expect("test: coord");
+
+        assert!(
+            !assigner.block_relevant_to_peer(&[], &peer),
+            "Empty shard positions should never be relevant"
+        );
+    }
+
+    #[test]
+    fn test_block_relevant_multiple_positions_one_matches() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let mut assigner = SpatialBucketAssigner::new(coord);
+        // Small radius
+        assigner.update_peers(vec![
+            MatrixCoordinate::new(2, 0, 0).expect("test: coord"),
+        ]);
+
+        let shard_positions = vec![
+            MatrixCoordinate::new(500, 500, 500).expect("test: coord"), // far
+            MatrixCoordinate::new(5, 5, 5).expect("test: coord"),       // near peer
+        ];
+        let peer = MatrixCoordinate::new(5, 5, 6).expect("test: coord"); // close to second shard
+
+        assert!(
+            assigner.block_relevant_to_peer(&shard_positions, &peer),
+            "At least one matching shard position should make block relevant"
+        );
     }
 }

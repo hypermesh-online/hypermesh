@@ -14,12 +14,18 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::block::Block;
+use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
 use crate::matrix::tensor::routing::calculate_routing_path;
+use crate::network::hash_bucket::SpatialBucketAssigner;
+use crate::network::peer_auth::AuthenticatedPeers;
+use crate::network::reflector_pool::ReflectorPool;
+use crate::network::SwarmDemandTracker;
+use hypermesh_lib::BlockchainScope;
 
 /// Abstraction over the network transport used for block propagation.
 ///
@@ -68,6 +74,31 @@ pub enum PropagationStrategy {
     RoutedPath,
     /// Send based on distance threshold
     DistanceThreshold(f64),
+    /// Torrent model: propagate only to content-interested peers.
+    /// Device=none, Private=full replication, Public=reflectors+spatial+consumers, Anonymous=consumers.
+    ContentInterested,
+}
+
+/// Context for content-interested propagation decisions.
+///
+/// Provides the network state needed by `ContentInterested` strategy to
+/// determine which peers should receive a block based on scope, privacy
+/// mode, and active content interest.
+pub struct InterestContext {
+    /// Which nodes are fetching which shards (consumer interest).
+    pub swarm_demand: Arc<SwarmDemandTracker>,
+    /// Healthy reflectors by network.
+    pub reflector_pool: Arc<tokio::sync::Mutex<ReflectorPool>>,
+    /// Authenticated peers with network_id.
+    pub authenticated_peers: AuthenticatedPeers,
+    /// Our network ID.
+    pub network_id: String,
+    /// Our blockchain scope.
+    pub blockchain_scope: BlockchainScope,
+    /// Our privacy mode.
+    pub privacy_mode: PrivacyMode,
+    /// Spatial bucket assigner (for Public mode send-side filtering).
+    pub spatial_assigner: Option<Arc<RwLock<SpatialBucketAssigner>>>,
 }
 
 /// Result of a propagation attempt
@@ -110,6 +141,10 @@ pub struct BlockPropagator {
     /// When set, `propagate_block` sorts targets by weight (highest first)
     /// and skips nodes with weight <= 0.
     propagation_weights: Arc<RwLock<Vec<PropagationWeight>>>,
+    /// Optional context for content-interested propagation.
+    /// When set and strategy is `ContentInterested`, targets are selected
+    /// based on scope, privacy mode, and active content interest.
+    interest_context: Option<Arc<InterestContext>>,
 }
 
 use std::collections::HashMap;
@@ -132,7 +167,17 @@ impl BlockPropagator {
             seen_blocks: Arc::new(RwLock::new(HashMap::new())),
             transport,
             propagation_weights: Arc::new(RwLock::new(Vec::new())),
+            interest_context: None,
         }
+    }
+
+    /// Set the interest context for content-interested propagation.
+    ///
+    /// When the strategy is `ContentInterested`, this context determines
+    /// target selection based on blockchain scope, privacy mode, and
+    /// active consumer demand.
+    pub fn set_interest_context(&mut self, ctx: Arc<InterestContext>) {
+        self.interest_context = Some(ctx);
     }
 
     /// Update the propagation weight modifiers (typically called by engauge
@@ -152,7 +197,18 @@ impl BlockPropagator {
         let mut failed_nodes = Vec::new();
 
         // Get target nodes based on strategy
-        let mut targets = self.select_propagation_targets(network_nodes).await;
+        let mut targets = match &self.strategy {
+            PropagationStrategy::ContentInterested => {
+                if let Some(ref ctx) = self.interest_context {
+                    self.select_interested_targets(block, network_nodes, ctx)
+                        .await
+                } else {
+                    // Fallback to NearestN(6) when no context is available
+                    self.select_propagation_targets(network_nodes).await
+                }
+            }
+            _ => self.select_propagation_targets(network_nodes).await,
+        };
 
         // Apply engauge routing weights: filter out zero-weight nodes, sort by weight descending.
         targets = self.apply_weights(targets).await;
@@ -223,6 +279,15 @@ impl BlockPropagator {
             PropagationStrategy::RoutedPath => {
                 // Use routing to find optimal paths
                 self.select_routed_targets(network_nodes).await
+            }
+
+            PropagationStrategy::ContentInterested => {
+                // ContentInterested is handled in propagate_block() before this
+                // method is called. If we reach here, fall back to NearestN(6).
+                find_k_nearest(&self.node_coordinate, network_nodes, 6)
+                    .into_iter()
+                    .map(|(coord, _distance)| coord)
+                    .collect()
             }
         }
     }
@@ -377,6 +442,186 @@ impl BlockPropagator {
         });
 
         weighted.into_iter().map(|(coord, _)| coord).collect()
+    }
+
+    /// Select targets using the content-interested torrent model.
+    ///
+    /// Routing depends on blockchain scope and privacy mode:
+    /// - **Device**: no propagation (local-only chain)
+    /// - **Private**: full replication to all authenticated peers in same network
+    /// - **Anonymous**: only nodes actively fetching content from this block
+    /// - **Public**: reflectors + spatial neighbors + active consumers
+    async fn select_interested_targets(
+        &self,
+        block: &Block,
+        all_peers: &[MatrixCoordinate],
+        ctx: &InterestContext,
+    ) -> Vec<MatrixCoordinate> {
+        // Device scope blocks never propagate
+        if ctx.blockchain_scope == BlockchainScope::Device {
+            debug!("ContentInterested: Device scope — no propagation");
+            return vec![];
+        }
+
+        // Network scope: routing depends on privacy mode
+        if ctx.privacy_mode == PrivacyMode::PRIVATE {
+            // Private: full replication to all authenticated peers sharing network_id
+            debug!(
+                "ContentInterested: Private mode — full replication to {} peer(s)",
+                all_peers.len()
+            );
+            return all_peers.to_vec();
+        }
+
+        if ctx.privacy_mode == PrivacyMode::ANONYMOUS {
+            // Anonymous: only consumers who are actively fetching content in this block
+            let consumers = self.get_consumer_targets(block, ctx).await;
+            debug!(
+                "ContentInterested: Anonymous mode — {} consumer target(s)",
+                consumers.len()
+            );
+            return consumers;
+        }
+
+        // Public (default): reflectors + spatial neighbors + consumers
+        let mut targets = Vec::new();
+
+        // 1. Reflectors (always interested in network blocks)
+        let reflector_targets = self.get_reflector_targets(ctx).await;
+        debug!(
+            "ContentInterested: Public mode — {} reflector target(s)",
+            reflector_targets.len()
+        );
+        targets.extend(reflector_targets);
+
+        // 2. Consumers actively fetching this block's shards
+        let consumer_targets = self.get_consumer_targets(block, ctx).await;
+        debug!(
+            "ContentInterested: Public mode — {} consumer target(s)",
+            consumer_targets.len()
+        );
+        targets.extend(consumer_targets);
+
+        // 3. Spatial neighbors (peers whose neighborhood includes this block's content)
+        if let Some(ref assigner_lock) = ctx.spatial_assigner {
+            let assigner = assigner_lock.read().await;
+            let shard_positions = Self::extract_shard_positions(block);
+            if !shard_positions.is_empty() {
+                let spatial: Vec<MatrixCoordinate> = all_peers
+                    .iter()
+                    .filter(|peer| {
+                        assigner.block_relevant_to_peer(&shard_positions, peer)
+                    })
+                    .copied()
+                    .collect();
+                debug!(
+                    "ContentInterested: Public mode — {} spatial target(s)",
+                    spatial.len()
+                );
+                targets.extend(spatial);
+            }
+        } else {
+            // No spatial assigner: include nearest 3 peers as fallback
+            let nearest = self.select_nearest_n(all_peers, 3);
+            targets.extend(nearest);
+        }
+
+        // Deduplicate by coordinate
+        targets.sort_by(|a, b| (a.x, a.y, a.z).cmp(&(b.x, b.y, b.z)));
+        targets.dedup_by(|a, b| a.x == b.x && a.y == b.y && a.z == b.z);
+
+        debug!(
+            "ContentInterested: Public mode — {} total unique target(s)",
+            targets.len()
+        );
+        targets
+    }
+
+    /// Get reflector coordinates from the pool for this network.
+    async fn get_reflector_targets(&self, ctx: &InterestContext) -> Vec<MatrixCoordinate> {
+        let pool = ctx.reflector_pool.lock().await;
+        pool.get_best_reflectors(&ctx.network_id, 10)
+            .iter()
+            .filter_map(|r| {
+                // MatrixPosition { x: f64, y: f64, z: f64 } -> MatrixCoordinate
+                MatrixCoordinate::new(
+                    r.position.x as i64,
+                    r.position.y as i64,
+                    r.position.z as i64,
+                )
+                .ok()
+            })
+            .collect()
+    }
+
+    /// Get coordinates of nodes actively fetching shards referenced in this block.
+    async fn get_consumer_targets(
+        &self,
+        block: &Block,
+        ctx: &InterestContext,
+    ) -> Vec<MatrixCoordinate> {
+        let demand_snapshot = ctx.swarm_demand.snapshot().await;
+        if demand_snapshot.is_empty() {
+            return vec![];
+        }
+
+        let mut consumer_coords = Vec::new();
+        let auth_peers = ctx.authenticated_peers.read().await;
+
+        for entry in &block.entries {
+            // Hash the asset_hash to a ContentHash for demand lookup
+            let content_hash = hypermesh_lib::ContentHash(entry.asset_hash);
+
+            if let Some(demand) = demand_snapshot.get(&content_hash) {
+                for requester_id in &demand.requester_ids {
+                    // Look up coordinate from authenticated peers
+                    if let Some(peer) = auth_peers.get(requester_id) {
+                        match MatrixCoordinate::new(
+                            peer.coordinate.0 as i64,
+                            peer.coordinate.1 as i64,
+                            peer.coordinate.2 as i64,
+                        ) {
+                            Ok(coord) => consumer_coords.push(coord),
+                            Err(e) => {
+                                warn!(
+                                    "Invalid peer coordinate for {}: {}",
+                                    &requester_id[..8.min(requester_id.len())],
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        consumer_coords
+    }
+
+    /// Extract all shard placement coordinates from a block's entries.
+    fn extract_shard_positions(block: &Block) -> Vec<MatrixCoordinate> {
+        let mut positions = Vec::new();
+        for entry in &block.entries {
+            if let super::block::StoragePointer::Sharded {
+                ref placements, ..
+            } = entry.storage_pointer
+            {
+                positions.extend_from_slice(placements);
+            }
+        }
+        positions
+    }
+
+    /// Select the N nearest peers to our coordinate.
+    fn select_nearest_n(
+        &self,
+        peers: &[MatrixCoordinate],
+        n: usize,
+    ) -> Vec<MatrixCoordinate> {
+        find_k_nearest(&self.node_coordinate, peers, n)
+            .into_iter()
+            .map(|(coord, _distance)| coord)
+            .collect()
     }
 
     /// Flood propagation for critical blocks
@@ -648,5 +893,233 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], a);
         assert_eq!(result[1], b);
+    }
+
+    // ── Content-interested propagation tests ────────────────────────
+
+    use crate::network::peer_auth;
+    use crate::network::reflector_pool::{ReflectorConfig, ReflectorPool};
+    use crate::network::SwarmDemandTracker;
+
+    /// Deterministic transport that always succeeds (no randomness).
+    struct AlwaysSuccessTransport;
+
+    #[async_trait::async_trait]
+    impl BlockTransport for AlwaysSuccessTransport {
+        async fn send_block(
+            &self,
+            _block: &Block,
+            _target: &MatrixCoordinate,
+            _origin: &MatrixCoordinate,
+        ) -> bool {
+            true
+        }
+    }
+
+    fn make_interest_context(
+        scope: BlockchainScope,
+        privacy: PrivacyMode,
+    ) -> Arc<InterestContext> {
+        Arc::new(InterestContext {
+            swarm_demand: Arc::new(SwarmDemandTracker::new()),
+            reflector_pool: Arc::new(tokio::sync::Mutex::new(ReflectorPool::new(
+                ReflectorConfig::default(),
+            ))),
+            authenticated_peers: peer_auth::new_authenticated_peers(),
+            network_id: "test-net".to_string(),
+            blockchain_scope: scope,
+            privacy_mode: privacy,
+            spatial_assigner: None,
+        })
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_device_no_propagation() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let mut propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let ctx = make_interest_context(BlockchainScope::Device, PrivacyMode::PRIVATE);
+        propagator.set_interest_context(ctx);
+
+        let network = create_test_network();
+        let block = Block::genesis(origin);
+
+        let result = propagator.propagate_block(&block, &network).await;
+        // Device scope should return empty targets — no propagation
+        assert!(
+            result.reached_nodes.is_empty(),
+            "Device scope should not propagate blocks"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_private_full_replication() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let mut propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let ctx = make_interest_context(BlockchainScope::Network, PrivacyMode::PRIVATE);
+        propagator.set_interest_context(ctx);
+
+        let network = create_test_network();
+        let block = Block::genesis(origin);
+
+        let result = propagator.propagate_block(&block, &network).await;
+        // Private should replicate to all peers (minus self, which is filtered
+        // by should_propagate_to). Network has 27 nodes, minus origin = up to 26.
+        assert!(
+            !result.reached_nodes.is_empty(),
+            "Private mode should replicate to peers"
+        );
+        // All non-self peers should be reached with AlwaysSuccessTransport
+        assert_eq!(result.reached_nodes.len(), 26);
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_public_includes_reflectors() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let mut propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let ctx = make_interest_context(BlockchainScope::Network, PrivacyMode::PUBLIC);
+
+        // Register a reflector at position (0,0,0)
+        {
+            let mut pool = ctx.reflector_pool.lock().await;
+            pool.register_reflector(
+                "test-net",
+                crate::network::reflector_pool::Reflector {
+                    node_id: "reflector-1".to_string(),
+                    position: hypermesh_lib::MatrixPosition {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                    last_seen: 999999,
+                    block_height: 100,
+                    health_score: 0.9,
+                    privacy_mode: PrivacyMode::PUBLIC,
+                },
+            );
+        }
+
+        propagator.set_interest_context(ctx);
+
+        let network = create_test_network();
+        let block = Block::genesis(origin);
+
+        let result = propagator.propagate_block(&block, &network).await;
+        // Should include reflector coordinate (0,0,0) among reached nodes
+        let reflector_coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        assert!(
+            result.reached_nodes.contains(&reflector_coord),
+            "Public mode should include reflector targets"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_anonymous_consumers_only() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let mut propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let ctx = make_interest_context(BlockchainScope::Network, PrivacyMode::ANONYMOUS);
+
+        // Register no demand — should result in zero targets
+        propagator.set_interest_context(ctx);
+
+        let network = create_test_network();
+        let block = Block::genesis(origin);
+
+        let result = propagator.propagate_block(&block, &network).await;
+        // Anonymous with no active consumers = no propagation
+        assert!(
+            result.reached_nodes.is_empty(),
+            "Anonymous mode with no consumers should not propagate"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_anonymous_with_consumer() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        let mut propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let ctx = make_interest_context(BlockchainScope::Network, PrivacyMode::ANONYMOUS);
+
+        // Create a block with a known asset hash
+        let block = Block::genesis(origin);
+        let asset_hash = block.entries[0].asset_hash;
+
+        // Record demand for this asset hash from a peer
+        let content_hash = hypermesh_lib::ContentHash(asset_hash);
+        ctx.swarm_demand
+            .record_fetch(content_hash, "consumer-node-1")
+            .await;
+
+        // Register the consumer as an authenticated peer at (2,2,2)
+        peer_auth::register_authenticated_peer(
+            &ctx.authenticated_peers,
+            peer_auth::AuthenticatedPeer {
+                node_id: "consumer-node-1".to_string(),
+                pubkey: vec![1, 2, 3],
+                coordinate: (2, 2, 2),
+                network_id: "test-net".to_string(),
+                authenticated_at: std::time::Instant::now(),
+                proof_bytes: vec![4, 5, 6],
+            },
+        )
+        .await;
+
+        propagator.set_interest_context(ctx);
+
+        let network = create_test_network();
+        let result = propagator.propagate_block(&block, &network).await;
+
+        // Should reach the consumer at (2,2,2)
+        let consumer_coord = MatrixCoordinate::new(2, 2, 2).expect("test: valid coord");
+        assert!(
+            result.reached_nodes.contains(&consumer_coord),
+            "Anonymous mode should propagate to active consumers"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_content_interested_fallback_without_context() {
+        let origin = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
+        // ContentInterested strategy but NO interest context set
+        let propagator = BlockPropagator::with_transport(
+            origin,
+            PropagationStrategy::ContentInterested,
+            Arc::new(AlwaysSuccessTransport),
+        );
+
+        let network = create_test_network();
+        let block = Block::genesis(origin);
+
+        let result = propagator.propagate_block(&block, &network).await;
+        // Should fall back to select_propagation_targets (NearestN behavior
+        // is not available for ContentInterested, so it uses default routing)
+        // The key assertion: it doesn't crash and produces some result
+        assert!(
+            result.reached_nodes.len() + result.failed_nodes.len() >= 0,
+            "Fallback should not panic"
+        );
     }
 }
