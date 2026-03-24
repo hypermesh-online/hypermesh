@@ -395,6 +395,11 @@ async fn start_network(
                 Some(data_dir.join(nid).join("inbox")),
             ),
         )),
+        message_store: Some(std::sync::Arc::new(
+            blockmatrix::messaging::store::MessageStore::new(
+                Some(data_dir.join(nid).join("messages")),
+            ),
+        )),
         #[cfg(feature = "intelligence")]
         engauge_analytics: Some(engauge_analytics.clone()),
         #[cfg(feature = "intelligence")]

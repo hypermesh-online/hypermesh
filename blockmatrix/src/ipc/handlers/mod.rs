@@ -14,6 +14,7 @@ pub mod dns;
 pub mod gateway;
 pub mod intelligence;
 pub mod domain;
+pub mod message;
 pub mod network;
 pub mod share;
 pub mod shard;
@@ -90,6 +91,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     store::register(handler, &state);
     gateway::register(handler, &state);
     share::register(handler, &state);
+    message::register(handler, &state);
     intelligence::register(handler, &state);
     config::register(handler);
 }
@@ -198,6 +200,10 @@ pub(crate) mod tests {
             "share.inbox",
             "share.accept",
             "share.reject",
+            "message.send",
+            "message.inbox",
+            "message.history",
+            "message.read",
             "identity.pubkey",
             "peer.pubkey",
             "intelligence.stats",

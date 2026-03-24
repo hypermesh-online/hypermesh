@@ -36,6 +36,8 @@ pub enum TrustAssetKind {
     KeyRotation,
     /// Share invitation registered on-chain
     Invitation,
+    /// Direct message registered on-chain
+    Message,
 }
 
 impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
@@ -56,6 +58,7 @@ impl From<hypermesh_lib::asset::SystemAssetKind> for TrustAssetKind {
             SystemAssetKind::Identity => Self::Identity,
             SystemAssetKind::KeyRotation => Self::KeyRotation,
             SystemAssetKind::Invitation => Self::Invitation,
+            SystemAssetKind::Message => Self::Message,
         }
     }
 }
@@ -77,6 +80,7 @@ impl From<TrustAssetKind> for hypermesh_lib::asset::SystemAssetKind {
             TrustAssetKind::Identity => Self::Identity,
             TrustAssetKind::KeyRotation => Self::KeyRotation,
             TrustAssetKind::Invitation => Self::Invitation,
+            TrustAssetKind::Message => Self::Message,
         }
     }
 }

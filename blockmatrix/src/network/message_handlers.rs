@@ -47,6 +47,8 @@ pub(crate) const TAG_BLOCK_FETCH_REQUEST: u8 = 0x11;
 pub(crate) const TAG_SHARD_ANNOUNCE: u8 = 0x04;
 /// Share invite (P2P file sharing).
 pub(crate) const TAG_SHARE_INVITE: u8 = 0x05;
+/// Direct message (P2P encrypted messaging).
+pub(crate) const TAG_DIRECT_MESSAGE: u8 = 0x06;
 /// Gossip protocol message.
 pub(crate) const TAG_GOSSIP: u8 = 0x20;
 
@@ -165,6 +167,9 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SHARE_INVITE => {
             handle_share_invite(data, peer_node_id, ctx).await;
+        }
+        TAG_DIRECT_MESSAGE => {
+            handle_direct_message(data, peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(
@@ -1082,6 +1087,46 @@ async fn handle_share_invite(
         Err(e) => {
             debug!(
                 "Invalid share invite from {}: {}",
+                &peer_node_id[..8.min(peer_node_id.len())],
+                e,
+            );
+        }
+    }
+}
+
+/// Handle an incoming direct message from a peer.
+async fn handle_direct_message(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if data.len() < 2 {
+        return;
+    }
+    let msg_json = &data[1..]; // skip tag byte
+    match serde_json::from_slice::<crate::messaging::message::DirectMessage>(msg_json) {
+        Ok(msg) => {
+            let sender_display = msg
+                .sender_name
+                .as_deref()
+                .unwrap_or_else(|| {
+                    &msg.sender_node_id[..8.min(msg.sender_node_id.len())]
+                });
+            info!(
+                "Received message {} from {} to {}",
+                &msg.message_id[..8.min(msg.message_id.len())],
+                sender_display,
+                &msg.recipient_node_id[..8.min(msg.recipient_node_id.len())],
+            );
+            if let Some(ref store) = ctx.message_store {
+                if let Err(e) = store.add(msg).await {
+                    warn!("Failed to store direct message: {e}");
+                }
+            }
+        }
+        Err(e) => {
+            debug!(
+                "Invalid direct message from {}: {}",
                 &peer_node_id[..8.min(peer_node_id.len())],
                 e,
             );

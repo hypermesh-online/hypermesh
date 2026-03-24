@@ -75,6 +75,8 @@ pub enum SystemAssetKind {
     KeyRotation,
     /// Share invitation registered on-chain
     Invitation,
+    /// Direct message registered on-chain
+    Message,
 }
 
 impl SystemAssetKind {
@@ -95,6 +97,7 @@ impl SystemAssetKind {
             Self::Identity => 11,
             Self::KeyRotation => 12,
             Self::Invitation => 13,
+            Self::Message => 14,
         }
     }
 
@@ -115,6 +118,7 @@ impl SystemAssetKind {
             Self::Identity => "Identity",
             Self::KeyRotation => "KeyRotation",
             Self::Invitation => "Invitation",
+            Self::Message => "Message",
         }
     }
 }

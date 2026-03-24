@@ -229,6 +229,7 @@ impl AssetManager {
                 BaseSystemType::Identity => AssetType::Identity,
                 BaseSystemType::KeyRotation => AssetType::KeyRotation,
                 BaseSystemType::Invitation => AssetType::Invitation,
+                BaseSystemType::Message => AssetType::Message,
             }),
             AssetCategory::Application(_) => Err(AssetError::AdapterError {
                 message: "Cannot determine asset type for application asset".to_string(),
@@ -508,6 +509,7 @@ impl AssetManager {
                     BaseSystemType::Identity => stats.identity_assets += 1,
                     BaseSystemType::KeyRotation => { /* counted in identity_assets */ },
                     BaseSystemType::Invitation => { /* share invitations */ },
+                    BaseSystemType::Message => { /* direct messages */ },
                 },
                 AssetCategory::Application(_) => {
                     // Application assets not tracked separately yet

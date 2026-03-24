@@ -30,6 +30,7 @@ pub fn _asset_kind_to_bm_asset_type(kind: &AssetKind) -> AssetType {
             SystemAssetKind::Identity => AssetType::Identity,
             SystemAssetKind::KeyRotation => AssetType::KeyRotation,
             SystemAssetKind::Invitation => AssetType::Invitation,
+            SystemAssetKind::Message => AssetType::Message,
         },
         AssetKind::UserDefined(_) => AssetType::Container,
     }
@@ -52,6 +53,7 @@ pub fn _bm_asset_type_to_asset_kind(bm_type: &AssetType) -> AssetKind {
         AssetType::Identity => SystemAssetKind::Identity,
         AssetType::KeyRotation => SystemAssetKind::KeyRotation,
         AssetType::Invitation => SystemAssetKind::Invitation,
+        AssetType::Message => SystemAssetKind::Message,
     })
 }
 
@@ -87,6 +89,7 @@ pub fn _bm_base_to_system_kind(base: &BaseSystemType) -> SystemAssetKind {
         BaseSystemType::Identity => SystemAssetKind::Identity,
         BaseSystemType::KeyRotation => SystemAssetKind::KeyRotation,
         BaseSystemType::Invitation => SystemAssetKind::Invitation,
+        BaseSystemType::Message => SystemAssetKind::Message,
     }
 }
 

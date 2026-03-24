@@ -186,6 +186,8 @@ pub struct PeerContext {
     pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,
     /// Inbox for received share invitations (P2P file sharing).
     pub inbox_store: Option<Arc<crate::sharing::inbox::InboxStore>>,
+    /// Store for received direct messages (P2P encrypted messaging).
+    pub message_store: Option<Arc<crate::messaging::store::MessageStore>>,
     /// engauge SwarmAnalytics for processing received metrics and demand data.
     /// When `Some`, `handle_metrics_connection` feeds frames into this pipeline
     /// and the EngaugeBridge reads analytics for propagation weight computation.

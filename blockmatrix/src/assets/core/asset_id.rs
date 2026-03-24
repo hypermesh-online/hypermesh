@@ -93,6 +93,8 @@ pub enum BaseSystemType {
     KeyRotation,
     /// Share invitation registered on-chain
     Invitation,
+    /// Direct message registered on-chain
+    Message,
 }
 
 /// Application domain for user assets
@@ -170,6 +172,8 @@ pub enum AssetType {
     KeyRotation,
     /// Share invitation registered on-chain
     Invitation,
+    /// Direct message registered on-chain
+    Message,
 }
 
 impl AssetType {
@@ -190,6 +194,7 @@ impl AssetType {
             AssetType::Identity => 11,
             AssetType::KeyRotation => 12,
             AssetType::Invitation => 13,
+            AssetType::Message => 14,
         }
     }
 
@@ -210,6 +215,7 @@ impl AssetType {
             AssetType::Identity => "Identity",
             AssetType::KeyRotation => "KeyRotation",
             AssetType::Invitation => "Invitation",
+            AssetType::Message => "Message",
         }
     }
 }
@@ -239,6 +245,7 @@ impl From<AssetType> for hypermesh_lib::SystemAssetKind {
             AssetType::Identity => Self::Identity,
             AssetType::KeyRotation => Self::KeyRotation,
             AssetType::Invitation => Self::Invitation,
+            AssetType::Message => Self::Message,
         }
     }
 }
@@ -260,6 +267,7 @@ impl From<hypermesh_lib::SystemAssetKind> for AssetType {
             hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
             hypermesh_lib::SystemAssetKind::KeyRotation => Self::KeyRotation,
             hypermesh_lib::SystemAssetKind::Invitation => Self::Invitation,
+            hypermesh_lib::SystemAssetKind::Message => Self::Message,
         }
     }
 }
@@ -281,6 +289,7 @@ impl From<BaseSystemType> for hypermesh_lib::SystemAssetKind {
             BaseSystemType::Identity => Self::Identity,
             BaseSystemType::KeyRotation => Self::KeyRotation,
             BaseSystemType::Invitation => Self::Invitation,
+            BaseSystemType::Message => Self::Message,
         }
     }
 }
@@ -302,6 +311,7 @@ impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
             hypermesh_lib::SystemAssetKind::Identity => Self::Identity,
             hypermesh_lib::SystemAssetKind::KeyRotation => Self::KeyRotation,
             hypermesh_lib::SystemAssetKind::Invitation => Self::Invitation,
+            hypermesh_lib::SystemAssetKind::Message => Self::Message,
         }
     }
 }
@@ -367,6 +377,7 @@ impl AssetRegistration {
             AssetType::Identity => BaseSystemType::Identity,
             AssetType::KeyRotation => BaseSystemType::KeyRotation,
             AssetType::Invitation => BaseSystemType::Invitation,
+            AssetType::Message => BaseSystemType::Message,
         };
 
         Self {
@@ -450,6 +461,7 @@ impl AssetRegistration {
                     BaseSystemType::Identity => 11,
                     BaseSystemType::KeyRotation => 12,
                     BaseSystemType::Invitation => 13,
+                    BaseSystemType::Message => 14,
                 }]);
             }
             AssetCategory::Application(domain) => {
@@ -637,6 +649,7 @@ impl AssetRegistration {
                 BaseSystemType::Identity => AssetType::Identity,
                 BaseSystemType::KeyRotation => AssetType::KeyRotation,
                 BaseSystemType::Invitation => AssetType::Invitation,
+                BaseSystemType::Message => AssetType::Message,
             }),
             AssetCategory::Application(_) => None,
         }

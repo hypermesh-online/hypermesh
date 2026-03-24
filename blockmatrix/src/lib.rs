@@ -281,6 +281,9 @@ pub mod dashboard;
 // P2P file sharing: invite types, key wrapping, inbox storage
 pub mod sharing;
 
+// Direct messaging between nodes: encrypted messages, store, wire protocol
+pub mod messaging;
+
 // Module stubs - some enabled for Gate 2
 pub mod catalog;
 pub mod container;
