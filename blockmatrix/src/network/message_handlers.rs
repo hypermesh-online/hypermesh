@@ -755,8 +755,9 @@ async fn handle_peer_message_connection(
 
 /// Handle an incoming metrics stream (discriminator 0x02).
 ///
-/// Reads the frame payload and logs it. In the future this should
-/// feed into engauge's `MetricsIngestionPipeline` if available.
+/// Reads the frame payload, logs it, and when the `intelligence` feature is
+/// enabled feeds it into the engauge `MetricsIngestionPipeline` attached to
+/// the `PeerContext`.
 async fn handle_metrics_connection(
     stream: &mut stoq::Stream,
     peer_ctx: Option<Arc<PeerContext>>,
@@ -768,7 +769,7 @@ async fn handle_metrics_connection(
     };
 
     // Validate it's parseable JSON (MetricsFrame format)
-    match serde_json::from_slice::<serde_json::Value>(&data) {
+    let frame_json = match serde_json::from_slice::<serde_json::Value>(&data) {
         Ok(frame) => {
             let source = frame.get("source_node")
                 .and_then(|v| v.as_str())
@@ -778,13 +779,42 @@ async fn handle_metrics_connection(
                 &source[..8.min(source.len())],
                 data.len(),
             );
+            Some(frame)
         }
         Err(e) => {
             debug!("Invalid metrics frame ({} bytes): {}", data.len(), e);
+            None
+        }
+    };
+
+    // Feed into engauge ingestion pipeline when available (H2).
+    #[cfg(feature = "intelligence")]
+    if let (Some(ctx), Some(_json)) = (&peer_ctx, &frame_json) {
+        if let Some(ref ingestion) = ctx.engauge_ingestion {
+            // Try to deserialize the JSON into an engauge MetricsFrame.
+            // MetricsReporter builds JSON manually, so this may fail for
+            // older formats — log and continue rather than crashing.
+            match serde_json::from_value::<engauge::MetricsFrame>(_json.clone()) {
+                Ok(metrics_frame) => {
+                    match ingestion.lock() {
+                        Ok(mut pipeline) => {
+                            pipeline.ingest(metrics_frame);
+                            debug!("Ingested metrics frame into engauge pipeline");
+                        }
+                        Err(e) => {
+                            debug!("Failed to lock ingestion pipeline: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Metrics frame not engauge-compatible (ok for alpha): {e}");
+                }
+            }
         }
     }
 
-    let _ = peer_ctx; // Reserved for future engauge pipeline integration
+    // Suppress unused warnings when intelligence feature is off.
+    let _ = (&peer_ctx, &frame_json);
     Ok(())
 }
 

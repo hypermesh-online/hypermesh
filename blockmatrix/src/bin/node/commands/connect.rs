@@ -353,6 +353,20 @@ async fn start_network(
     let connected_peer_coords = std::sync::Arc::new(
         tokio::sync::RwLock::new(Vec::<MatrixCoordinate>::new()),
     );
+    let swarm_demand_tracker = std::sync::Arc::new(
+        blockmatrix::network::SwarmDemandTracker::new(),
+    );
+
+    // --- engauge intelligence wiring (H2-H5) ---
+    #[cfg(feature = "intelligence")]
+    let engauge_analytics = std::sync::Arc::new(
+        std::sync::Mutex::new(engauge::SwarmAnalytics::new()),
+    );
+    #[cfg(feature = "intelligence")]
+    let engauge_ingestion = std::sync::Arc::new(
+        std::sync::Mutex::new(engauge::MetricsIngestionPipeline::with_defaults()),
+    );
+
     let peer_ctx = std::sync::Arc::new(blockmatrix::network::PeerContext {
         blockchain: bootstrap.blockchain().clone(),
         shard_store: shard_store.clone(),
@@ -372,12 +386,14 @@ async fn start_network(
         dns_resolver: Some(bootstrap.dns().clone()),
         authenticated_peers: network_manager.authenticated_peers(),
         gossip_protocol: Some(gossip_proto.clone()),
-        swarm_demand_tracker: std::sync::Arc::new(
-            blockmatrix::network::SwarmDemandTracker::new(),
-        ),
+        swarm_demand_tracker: swarm_demand_tracker.clone(),
         shard_location_index: Some(std::sync::Arc::new(
             blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
         )),
+        #[cfg(feature = "intelligence")]
+        engauge_analytics: Some(engauge_analytics.clone()),
+        #[cfg(feature = "intelligence")]
+        engauge_ingestion: Some(engauge_ingestion.clone()),
     });
 
     let network_clone = std::sync::Arc::new(network_manager);
@@ -451,6 +467,133 @@ async fn start_network(
         coord,
     )
     .await;
+
+    // --- H3: Spawn EngaugeBridge periodic feed loop ---
+    #[cfg(feature = "intelligence")]
+    {
+        let bridge_position = hypermesh_lib::MatrixPosition {
+            x: coord.x as f64,
+            y: coord.y as f64,
+            z: coord.z as f64,
+        };
+        // Spawn periodic feed: every 10 seconds, feed demand data into SwarmAnalytics.
+        // We implement the loop here instead of calling run_periodic_feed() because
+        // the std::sync::MutexGuard held by that method is not Send-safe across await.
+        let feed_tracker = swarm_demand_tracker.clone();
+        let feed_analytics = engauge_analytics.clone();
+        let feed_position = bridge_position;
+        tokio::spawn(async move {
+            let interval = std::time::Duration::from_secs(10);
+            loop {
+                tokio::time::sleep(interval).await;
+                // Snapshot demand data (async lock).
+                let snapshot = feed_tracker.snapshot().await;
+                // Feed into analytics (sync lock, no await while held).
+                match feed_analytics.lock() {
+                    Ok(mut analytics) => {
+                        for (shard_id, entry) in &snapshot {
+                            for requester_id in &entry.requester_ids {
+                                let consumer_id = hypermesh_lib::NodeId::from_public_key(
+                                    requester_id.as_bytes(),
+                                );
+                                analytics.record_request(
+                                    *shard_id,
+                                    consumer_id,
+                                    feed_position,
+                                    entry.last_request_us,
+                                );
+                            }
+                        }
+                        if !snapshot.is_empty() {
+                            debug!(
+                                "Fed {} shard demand entries into SwarmAnalytics",
+                                snapshot.len(),
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to lock analytics for feed: {e}");
+                    }
+                }
+            }
+        });
+        info!("engauge intelligence bridge started (periodic_feed=10s)");
+
+        // --- H4: Spawn propagation weight feed loop ---
+        let h4_analytics = engauge_analytics.clone();
+        let h4_propagator = block_propagator.clone();
+        let h4_network = network_clone.clone();
+        let h4_coord = coord;
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(15));
+            loop {
+                interval.tick().await;
+                // Build a node_id -> coordinate map from connected peers.
+                let nodes = h4_network.get_connected_nodes().await;
+                if nodes.is_empty() {
+                    continue;
+                }
+                let mut node_coords: std::collections::HashMap<
+                    hypermesh_lib::NodeId,
+                    blockmatrix::matrix::coordinate::MatrixCoordinate,
+                > = std::collections::HashMap::new();
+                let mut candidate_ids: Vec<hypermesh_lib::NodeId> = Vec::new();
+                for node in &nodes {
+                    let nid = hypermesh_lib::NodeId::from_public_key(node.node_id.as_bytes());
+                    node_coords.insert(nid, node.coordinate);
+                    candidate_ids.push(nid);
+                }
+                // Use RoutingIntelligence to compute weight adjustments.
+                // In alpha, we create a fresh instance per cycle (no subscriber data
+                // accumulated yet, so weights will be neutral=1.0). When the
+                // MetricsIngestionPipeline starts feeding RoutingIntelligence
+                // in a later sprint, these weights become meaningful.
+                let ri = engauge::RoutingIntelligence::new(30);
+                let source_pos = hypermesh_lib::MatrixPosition {
+                    x: h4_coord.x as f64,
+                    y: h4_coord.y as f64,
+                    z: h4_coord.z as f64,
+                };
+                let modifiers = engauge::RoutingAdvisor::compute_weight_adjustments(
+                    &ri, &source_pos, &source_pos, &candidate_ids,
+                );
+                if !modifiers.is_empty() {
+                    let weights = blockmatrix::intelligence::engauge_bridge::compute_propagation_weights(
+                        &modifiers, &node_coords,
+                    );
+                    if !weights.is_empty() {
+                        h4_propagator.lock().await.set_propagation_weights(weights).await;
+                        debug!("Updated propagation weights from engauge ({} modifiers)", modifiers.len());
+                    }
+                }
+
+                // --- H5: Check replication triggers ---
+                match h4_analytics.lock() {
+                    Ok(analytics) => {
+                        let trigger = engauge::ReplicationTrigger::new(
+                            engauge::ReplicationConfig::default(),
+                        );
+                        let signals = trigger.check(&analytics);
+                        for signal in &signals {
+                            if signal.urgency > 0.5 {
+                                info!(
+                                    "Replication signal: shard {} needs {} more replicas (urgency: {:.2}, rate: {})",
+                                    hex::encode(&signal.shard_id.0[..4]),
+                                    signal.suggested_count,
+                                    signal.urgency,
+                                    signal.current_request_rate,
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        debug!("Failed to lock analytics for replication check: {e}");
+                    }
+                }
+            }
+        });
+        info!("engauge propagation weight + replication loop started (interval=15s)");
+    }
 
     // Propagate bootstrap blocks
     {

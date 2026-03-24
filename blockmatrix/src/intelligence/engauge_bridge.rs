@@ -250,4 +250,104 @@ mod tests {
         // 2 unique requester IDs recorded
         assert_eq!(pop.unique_consumers, 2);
     }
+
+    /// H2-H3 test: EngaugeBridge feeds demand data into analytics via shared Mutex.
+    #[tokio::test]
+    async fn test_bridge_feeds_analytics() {
+        let tracker = Arc::new(SwarmDemandTracker::new());
+        let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
+        let pos = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
+
+        // Record some demand data.
+        let hash = ContentHash([0xDD; 32]);
+        tracker.record_fetch(hash, "consumer-a").await;
+        tracker.record_fetch(hash, "consumer-b").await;
+        tracker.record_fetch(hash, "consumer-c").await;
+
+        // Feed into analytics via the free function (same logic EngaugeBridge uses).
+        {
+            let snapshot = tracker.snapshot().await;
+            let mut analytics_guard = analytics.lock().expect("test: analytics lock");
+            for (shard_id, entry) in &snapshot {
+                for requester_id in &entry.requester_ids {
+                    let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
+                    analytics_guard.record_request(*shard_id, consumer_id, pos, entry.last_request_us);
+                }
+            }
+        }
+
+        // Verify analytics received the demand data.
+        let guard = analytics.lock().expect("test: analytics lock");
+        let pop = guard.get_popularity(&hash).expect("test: should have data");
+        assert_eq!(pop.unique_consumers, 3);
+        assert!(pop.request_count >= 3);
+    }
+
+    /// H4 test: compute_propagation_weights produces non-empty weights when
+    /// demand data exists and RoutingIntelligence computes modifiers.
+    #[test]
+    fn test_propagation_weights_from_routing_intelligence() {
+        use engauge::RoutingAdvisor;
+
+        let node_a = NodeId::from_public_key(b"node-alpha");
+        let node_b = NodeId::from_public_key(b"node-beta");
+        let coord_a = MatrixCoordinate::new(1, 2, 3).expect("test: coord");
+        let coord_b = MatrixCoordinate::new(4, 5, 6).expect("test: coord");
+
+        let mut node_coords = std::collections::HashMap::new();
+        node_coords.insert(node_a, coord_a);
+        node_coords.insert(node_b, coord_b);
+
+        let candidates = vec![node_a, node_b];
+        let ri = engauge::RoutingIntelligence::new(30);
+        let source_pos = MatrixPosition { x: 0.0, y: 0.0, z: 0.0 };
+
+        let modifiers = ri.compute_weight_adjustments(&source_pos, &source_pos, &candidates);
+        assert_eq!(modifiers.len(), 2, "should get modifiers for both candidates");
+
+        let weights = compute_propagation_weights(&modifiers, &node_coords);
+        assert_eq!(weights.len(), 2, "both candidates have known coordinates");
+        // Default weight factor is 1.0 (neutral) when no metrics ingested.
+        for w in &weights {
+            assert!((w.weight - 1.0).abs() < 1e-6, "neutral weight expected");
+        }
+    }
+
+    /// H5 test: ReplicationTrigger detects shards needing replication when
+    /// demand data is present in SwarmAnalytics.
+    #[tokio::test]
+    async fn test_replication_trigger_fires_on_demand() {
+        let tracker = Arc::new(SwarmDemandTracker::new());
+        let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
+        let pos = MatrixPosition { x: 0.0, y: 0.0, z: 0.0 };
+
+        // Record high demand for a shard (exceeds default threshold of 100 per replica).
+        let hash = ContentHash([0xEE; 32]);
+        for i in 0..150 {
+            tracker.record_fetch(hash, &format!("peer-{i}")).await;
+        }
+
+        // Feed into analytics.
+        {
+            let snapshot = tracker.snapshot().await;
+            let mut guard = analytics.lock().expect("test: analytics lock");
+            for (shard_id, entry) in &snapshot {
+                for requester_id in &entry.requester_ids {
+                    let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
+                    guard.record_request(*shard_id, consumer_id, pos, entry.last_request_us);
+                }
+            }
+        }
+
+        // Check replication triggers.
+        let guard = analytics.lock().expect("test: analytics lock");
+        let trigger = engauge::ReplicationTrigger::new(engauge::ReplicationConfig::default());
+        let signals = trigger.check(&guard);
+        assert!(!signals.is_empty(), "should detect replication need for high-demand shard");
+
+        let signal = &signals[0];
+        assert_eq!(signal.shard_id, hash);
+        assert!(signal.urgency > 0.0, "urgency should be positive");
+        assert!(signal.suggested_count >= 1, "should suggest at least 1 replica");
+    }
 }

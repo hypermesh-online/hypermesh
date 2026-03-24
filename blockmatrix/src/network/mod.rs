@@ -184,6 +184,16 @@ pub struct PeerContext {
     /// Shard location index for consumer-becomes-provider (R12).
     /// Tracks which peers provide which shards, populated from TAG_SHARD_ANNOUNCE.
     pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,
+    /// engauge SwarmAnalytics for processing received metrics and demand data.
+    /// When `Some`, `handle_metrics_connection` feeds frames into this pipeline
+    /// and the EngaugeBridge reads analytics for propagation weight computation.
+    #[cfg(feature = "intelligence")]
+    pub engauge_analytics: Option<Arc<std::sync::Mutex<engauge::SwarmAnalytics>>>,
+    /// engauge MetricsIngestionPipeline for processing received MetricsFrame payloads.
+    /// When `Some`, incoming metrics frames are routed through differential privacy
+    /// filtering and stored for trending analysis.
+    #[cfg(feature = "intelligence")]
+    pub engauge_ingestion: Option<Arc<std::sync::Mutex<engauge::MetricsIngestionPipeline>>>,
 }
 
 /// Result of a bilateral handshake including both network node info
