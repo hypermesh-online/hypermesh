@@ -186,7 +186,7 @@ ctor = "0.2"  # Test initialization functions
 engauge = { path = "../engauge" }
 
 [features]
-default = ["proof-of-state", "assets"]
+default = ["proof-of-state", "assets", "intelligence"]
 proof-of-state = []
 assets = []
 multi-node = []
