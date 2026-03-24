@@ -135,7 +135,8 @@ export const crateStatuses: CrateStatus[] = [
         "RoutingAdvisor weights in TransactionRouter",
         "Privacy tier mapping fix",
         "BlockHeader — lightweight header for selective chain reconstruction without full block data",
-        "Shard refcount dedup — content-addressed dedup with DedupPolicy (Full/None), auto-GC at refcount 0 (R4)",
+        "Shard refcount dedup — content-addressed dedup with DedupPolicy (Full/HashOnly/None), auto-GC at refcount 0 (R4)",
+        "Privacy-scoped deduplication (R4 — DedupPolicy::HashOnly for Anonymous: detects dupes, saves storage, no refcount/provider tracking)",
         "Genesis adoption protocol — nodes join networks by adopting foreign genesis, then sync headers",
         "SyncMessage extensions — GenesisRequest/Response, HeaderRequest/Response, BlockRequest/Response",
         "ShardLocationIndex — shard-to-provider mapping for swarm discovery (R12)",
@@ -151,7 +152,6 @@ export const crateStatuses: CrateStatus[] = [
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Block propagation torrent model — content-interested peers only, not flooded (Private: full replication, Public: HashMatrix spatial filtering)",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
-        "Privacy-scoped deduplication (R4 — PrivacyScopedDedup exists with Anonymous/Private/Public modes, needs HashOnly policy integration)",
         "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)",
         "Engauge-driven demand-based shard replication — intelligence bridge wired (feature-gated), needs e2e trigger testing"
       ],
@@ -163,7 +163,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 90
+    "completion": 91
   },
   {
     "id": "caesar",
