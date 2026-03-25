@@ -21,9 +21,15 @@ use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, NodeId};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use super::asset_transfer::{AssetTransfer, TransferStatus, TransferValidator};
+use super::asset_transfer::{
+    AssetTransfer, TransferLockEntry, TransferRegistrationEntry, TransferReleaseEntry,
+    TransferStatus, TransferValidator,
+};
 use super::GatewayError;
+use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
+use crate::blockchain::NodeBlockchain;
 use crate::network::shard_transport::ShardTransport;
+use trustchain::proof_of_state::StateProof;
 
 // ---------------------------------------------------------------------------
 // Bridge message types
@@ -77,6 +83,9 @@ pub struct ScopeBridge {
     target_node: Option<NodeId>,
     /// Shards staged for transfer, keyed by transfer_id.
     shard_staging: Arc<RwLock<HashMap<String, Vec<TransferShard>>>>,
+    /// Optional blockchain reference for writing transfer entries.
+    /// When `None`, transfers proceed in-memory only (backward compatible).
+    blockchain: Option<Arc<NodeBlockchain>>,
 }
 
 impl ScopeBridge {
@@ -88,6 +97,7 @@ impl ScopeBridge {
             transport: None,
             target_node: None,
             shard_staging: Arc::new(RwLock::new(HashMap::new())),
+            blockchain: None,
         }
     }
 
@@ -103,7 +113,28 @@ impl ScopeBridge {
             transport: Some(transport),
             target_node: Some(target_node),
             shard_staging: Arc::new(RwLock::new(HashMap::new())),
+            blockchain: None,
         }
+    }
+
+    /// Create a bridge wired to a blockchain for persistent transfer entries.
+    pub fn with_blockchain(
+        validator: Arc<dyn TransferValidator>,
+        blockchain: Arc<NodeBlockchain>,
+    ) -> Self {
+        Self {
+            transfers: Arc::new(RwLock::new(HashMap::new())),
+            validator,
+            transport: None,
+            target_node: None,
+            shard_staging: Arc::new(RwLock::new(HashMap::new())),
+            blockchain: Some(blockchain),
+        }
+    }
+
+    /// Set or replace the blockchain reference on this bridge.
+    pub fn set_blockchain(&mut self, blockchain: Arc<NodeBlockchain>) {
+        self.blockchain = Some(blockchain);
     }
 
     /// Register a transfer for tracking.
@@ -222,19 +253,102 @@ impl ScopeBridge {
 
     // --- internal helpers ---
 
-    async fn lock_on_source(&self, transfer_id: &str) -> Result<(), GatewayError> {
-        let mut transfers = self.transfers.write().await;
-        let transfer =
-            transfers
-                .get_mut(transfer_id)
-                .ok_or_else(|| GatewayError::TransferNotFound {
-                    transfer_id: transfer_id.to_string(),
-                })?;
-        transfer.lock()?;
-        info!(
-            "Locked asset {} on {} scope for transfer {}",
-            transfer.asset_id, transfer.source_scope, transfer_id
+    /// Write a serialized transfer entry to the blockchain as a new block.
+    ///
+    /// Returns `Ok(())` if no blockchain is wired (in-memory only mode).
+    async fn write_transfer_entry(
+        &self,
+        entry_bytes: &[u8],
+        label: &str,
+        transfer_id: &str,
+    ) -> Result<(), GatewayError> {
+        let bc = match self.blockchain.as_ref() {
+            Some(bc) => bc,
+            None => return Ok(()),
+        };
+
+        let asset_hash = *blake3::hash(entry_bytes).as_bytes();
+        let proof_hash = *blake3::hash(
+            format!("transfer-{}-proof-{}", label, transfer_id).as_bytes(),
+        )
+        .as_bytes();
+
+        let state_proof = StateProof::new_for_testing();
+        let registration = crate::assets::core::AssetRegistration::from_asset_data(
+            &crate::assets::core::asset_id::AssetData {
+                config: Vec::new(),
+                definition: entry_bytes.to_vec(),
+                metadata: format!("transfer-{}", label).into_bytes(),
+            },
+            crate::assets::core::asset_id::NetworkScope::Global,
+            crate::assets::core::asset_id::AssetCategory::BaseSystem(
+                crate::assets::core::asset_id::BaseSystemType::Blockchain,
+            ),
         );
+
+        let block_entry = BlockAssetEntry {
+            asset_hash,
+            proof_hash,
+            state_proof,
+            storage_pointer: StoragePointer::Local {
+                path: String::from_utf8_lossy(entry_bytes).to_string(),
+            },
+            registration,
+        };
+
+        bc.add_block(vec![block_entry]).await.map_err(|e| {
+            GatewayError::ProofValidationFailed {
+                scope: "blockchain".to_string(),
+                reason: format!("failed to write {} entry: {}", label, e),
+            }
+        })?;
+
+        info!(
+            "Transfer {} entry written to blockchain for {}",
+            label, transfer_id
+        );
+        Ok(())
+    }
+
+    async fn lock_on_source(&self, transfer_id: &str) -> Result<(), GatewayError> {
+        let (asset_id, source_scope, target_scope) = {
+            let mut transfers = self.transfers.write().await;
+            let transfer =
+                transfers
+                    .get_mut(transfer_id)
+                    .ok_or_else(|| GatewayError::TransferNotFound {
+                        transfer_id: transfer_id.to_string(),
+                    })?;
+            transfer.lock()?;
+            info!(
+                "Locked asset {} on {} scope for transfer {}",
+                transfer.asset_id, transfer.source_scope, transfer_id
+            );
+            (
+                transfer.asset_id.to_string(),
+                transfer.source_scope,
+                transfer.target_scope,
+            )
+        };
+
+        // Write TransferLockEntry to blockchain (no-op if blockchain is None)
+        let lock_entry = TransferLockEntry {
+            transfer_id: transfer_id.to_string(),
+            asset_id,
+            source_scope,
+            target_scope,
+            locked_at: chrono::Utc::now().timestamp(),
+            proof_hash: *blake3::hash(b"transfer-lock-proof").as_bytes(),
+        };
+        let entry_bytes = serde_json::to_vec(&lock_entry).map_err(|e| {
+            GatewayError::ProofValidationFailed {
+                scope: "serialization".to_string(),
+                reason: format!("serialize lock: {e}"),
+            }
+        })?;
+        self.write_transfer_entry(&entry_bytes, "lock", transfer_id)
+            .await?;
+
         Ok(())
     }
 
@@ -312,32 +426,79 @@ impl ScopeBridge {
     }
 
     async fn confirm_transfer(&self, transfer_id: &str) -> Result<(), GatewayError> {
-        let mut transfers = self.transfers.write().await;
-        let transfer =
-            transfers
-                .get_mut(transfer_id)
-                .ok_or_else(|| GatewayError::TransferNotFound {
-                    transfer_id: transfer_id.to_string(),
-                })?;
-        transfer.confirm()?;
-        info!(
-            "Transfer {} confirmed on {} scope",
-            transfer_id, transfer.target_scope
-        );
+        let (asset_id, source_scope, target_scope) = {
+            let mut transfers = self.transfers.write().await;
+            let transfer =
+                transfers
+                    .get_mut(transfer_id)
+                    .ok_or_else(|| GatewayError::TransferNotFound {
+                        transfer_id: transfer_id.to_string(),
+                    })?;
+            transfer.confirm()?;
+            info!(
+                "Transfer {} confirmed on {} scope",
+                transfer_id, transfer.target_scope
+            );
+            (
+                transfer.asset_id.to_string(),
+                transfer.source_scope,
+                transfer.target_scope,
+            )
+        };
+
+        // Write TransferRegistrationEntry to blockchain
+        let reg_entry = TransferRegistrationEntry {
+            transfer_id: transfer_id.to_string(),
+            asset_id,
+            source_scope,
+            target_scope,
+            registered_at: chrono::Utc::now().timestamp(),
+            proof_hash: *blake3::hash(b"transfer-registration-proof").as_bytes(),
+        };
+        let entry_bytes = serde_json::to_vec(&reg_entry).map_err(|e| {
+            GatewayError::ProofValidationFailed {
+                scope: "serialization".to_string(),
+                reason: format!("serialize registration: {e}"),
+            }
+        })?;
+        self.write_transfer_entry(&entry_bytes, "registration", transfer_id)
+            .await?;
+
         Ok(())
     }
 
     async fn fail_transfer(&self, transfer_id: &str, reason: String) -> Result<(), GatewayError> {
-        let mut transfers = self.transfers.write().await;
-        let transfer =
-            transfers
-                .get_mut(transfer_id)
-                .ok_or_else(|| GatewayError::TransferNotFound {
-                    transfer_id: transfer_id.to_string(),
-                })?;
-        transfer.fail(reason)?;
-        transfer.rollback()?;
-        warn!("Transfer {} rolled back", transfer_id);
+        let asset_id = {
+            let mut transfers = self.transfers.write().await;
+            let transfer =
+                transfers
+                    .get_mut(transfer_id)
+                    .ok_or_else(|| GatewayError::TransferNotFound {
+                        transfer_id: transfer_id.to_string(),
+                    })?;
+            let aid = transfer.asset_id.to_string();
+            transfer.fail(reason.clone())?;
+            transfer.rollback()?;
+            warn!("Transfer {} rolled back", transfer_id);
+            aid
+        };
+
+        // Write TransferReleaseEntry to blockchain
+        let release_entry = TransferReleaseEntry {
+            transfer_id: transfer_id.to_string(),
+            asset_id,
+            released_at: chrono::Utc::now().timestamp(),
+            reason,
+        };
+        let entry_bytes = serde_json::to_vec(&release_entry).map_err(|e| {
+            GatewayError::ProofValidationFailed {
+                scope: "serialization".to_string(),
+                reason: format!("serialize release: {e}"),
+            }
+        })?;
+        self.write_transfer_entry(&entry_bytes, "release", transfer_id)
+            .await?;
+
         Ok(())
     }
 }
@@ -532,5 +693,161 @@ mod tests {
 
         // No shards should have been stored
         assert_eq!(mock_transport.shard_count().await, 0);
+    }
+
+    // --- Blockchain-write tests ---
+
+    fn make_blockchain() -> Arc<crate::blockchain::NodeBlockchain> {
+        use crate::matrix::coordinate::MatrixCoordinate;
+        let coord = MatrixCoordinate::new(7, 7, 7).expect("test: valid coord");
+        Arc::new(crate::blockchain::NodeBlockchain::new(coord))
+    }
+
+    fn make_bridge_with_blockchain(bc: Arc<crate::blockchain::NodeBlockchain>) -> ScopeBridge {
+        ScopeBridge::with_blockchain(Arc::new(DefaultTransferValidator), bc)
+    }
+
+    #[tokio::test]
+    async fn test_scope_bridge_writes_lock_to_blockchain() {
+        let bc = make_blockchain();
+        let initial_height = bc.get_height().await;
+
+        let bridge = make_bridge_with_blockchain(bc.clone());
+        let transfer = make_transfer("tx-bc-lock");
+        bridge.register_transfer(transfer).await;
+
+        // Execute lock
+        bridge
+            .lock_on_source("tx-bc-lock")
+            .await
+            .expect("test: lock");
+
+        // Verify blockchain grew by one block (the TransferLockEntry)
+        let new_height = bc.get_height().await;
+        assert_eq!(
+            new_height,
+            initial_height + 1,
+            "Lock should write one block to blockchain"
+        );
+
+        // Verify the block contains a Local storage pointer with the lock JSON
+        let block = bc
+            .get_block(new_height)
+            .await
+            .expect("test: get lock block");
+        assert_eq!(block.entries.len(), 1);
+        if let StoragePointer::Local { ref path } = block.entries[0].storage_pointer {
+            assert!(
+                path.contains("tx-bc-lock"),
+                "Lock entry should reference the transfer ID"
+            );
+            assert!(
+                path.contains("transfer_id"),
+                "Lock entry should be serialized JSON"
+            );
+        } else {
+            unreachable!("Expected StoragePointer::Local for lock entry");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scope_bridge_writes_registration_on_confirm() {
+        let bc = make_blockchain();
+        let bridge = make_bridge_with_blockchain(bc.clone());
+        let transfer = make_transfer("tx-bc-confirm");
+        bridge.register_transfer(transfer).await;
+
+        // Drive through full lifecycle
+        let status = bridge
+            .bridge_transfer("tx-bc-confirm")
+            .await
+            .expect("test: bridge transfer");
+        assert_eq!(status, TransferStatus::Confirmed);
+
+        // Lock writes 1 block, confirm writes 1 block = 2 new blocks
+        // (begin_transit does not write a block)
+        let height = bc.get_height().await;
+        assert!(
+            height >= 2,
+            "Expected at least 2 blocks (lock + registration), got {}",
+            height
+        );
+
+        // Last block should be the registration entry
+        let last_block = bc
+            .get_block(height)
+            .await
+            .expect("test: get registration block");
+        if let StoragePointer::Local { ref path } = last_block.entries[0].storage_pointer {
+            assert!(
+                path.contains("tx-bc-confirm"),
+                "Registration entry should reference the transfer ID"
+            );
+            assert!(
+                path.contains("registered_at"),
+                "Registration entry should contain registered_at field"
+            );
+        } else {
+            unreachable!("Expected StoragePointer::Local for registration entry");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scope_bridge_writes_release_on_failure() {
+        let bc = make_blockchain();
+        let bridge = make_bridge_with_blockchain(bc.clone());
+        let transfer = make_transfer("tx-bc-fail");
+        bridge.register_transfer(transfer).await;
+
+        // Lock, then fail
+        bridge
+            .lock_on_source("tx-bc-fail")
+            .await
+            .expect("test: lock");
+        let height_after_lock = bc.get_height().await;
+
+        bridge
+            .fail_transfer("tx-bc-fail", "test failure".to_string())
+            .await
+            .expect("test: fail");
+
+        // Fail should write 1 more block (release entry)
+        let height_after_fail = bc.get_height().await;
+        assert_eq!(
+            height_after_fail,
+            height_after_lock + 1,
+            "Fail should write one release block"
+        );
+
+        let release_block = bc
+            .get_block(height_after_fail)
+            .await
+            .expect("test: get release block");
+        if let StoragePointer::Local { ref path } = release_block.entries[0].storage_pointer {
+            assert!(
+                path.contains("tx-bc-fail"),
+                "Release entry should reference the transfer ID"
+            );
+            assert!(
+                path.contains("test failure"),
+                "Release entry should contain the failure reason"
+            );
+        } else {
+            unreachable!("Expected StoragePointer::Local for release entry");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_scope_bridge_no_blockchain_still_works() {
+        // Verify that the original behavior (no blockchain) is unchanged.
+        let bridge = make_bridge();
+        let transfer = make_transfer("tx-no-bc");
+        bridge.register_transfer(transfer).await;
+
+        let status = bridge
+            .bridge_transfer("tx-no-bc")
+            .await
+            .expect("test: bridge transfer without blockchain");
+        assert_eq!(status, TransferStatus::Confirmed);
     }
 }

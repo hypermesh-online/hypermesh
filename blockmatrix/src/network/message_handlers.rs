@@ -49,6 +49,8 @@ pub(crate) const TAG_SHARD_ANNOUNCE: u8 = 0x04;
 pub(crate) const TAG_SHARE_INVITE: u8 = 0x05;
 /// Direct message (P2P encrypted messaging).
 pub(crate) const TAG_DIRECT_MESSAGE: u8 = 0x06;
+/// Cross-network asset transfer request/response.
+pub(crate) const TAG_TRANSFER: u8 = 0x07;
 /// Gossip protocol message.
 pub(crate) const TAG_GOSSIP: u8 = 0x20;
 
@@ -170,6 +172,9 @@ pub(crate) async fn dispatch_message(
         }
         TAG_DIRECT_MESSAGE => {
             handle_direct_message(data, peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER => {
+            handle_transfer_message(&data[1..], stream, peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(
@@ -1090,6 +1095,79 @@ async fn handle_share_invite(
                 &peer_node_id[..8.min(peer_node_id.len())],
                 e,
             );
+        }
+    }
+}
+
+// ── Transfer handler ────────────────────────────────────────────────
+
+/// Handle a cross-network asset transfer message (tag 0x07).
+///
+/// Wire format: tag(1) + JSON-serialized MatrixMessage (TransferRequest or TransferResponse).
+/// For alpha: logs the request and responds with acceptance. Full cross-node
+/// coordination will be wired when bilateral PoS validation is production-ready.
+async fn handle_transfer_message(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    _ctx: &PeerContext,
+) {
+    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+
+    let msg: MatrixMessage = match serde_json::from_slice(data) {
+        Ok(m) => m,
+        Err(e) => {
+            warn!("Invalid transfer message from {}: {}", short_id, e);
+            return;
+        }
+    };
+
+    match msg {
+        MatrixMessage::TransferRequest {
+            transfer_id,
+            asset_id,
+            source_scope,
+            target_scope,
+            ..
+        } => {
+            info!(
+                "Transfer request {} from {}: asset={} ({} -> {})",
+                transfer_id, short_id, asset_id, source_scope, target_scope,
+            );
+
+            // Alpha: accept all transfer requests. Full PoS bilateral
+            // validation will gate acceptance in production.
+            let response = MatrixMessage::TransferResponse {
+                transfer_id,
+                accepted: true,
+                target_proof_bytes: Vec::new(),
+            };
+            let reply = match serde_json::to_vec(&response) {
+                Ok(d) => d,
+                Err(e) => {
+                    warn!("Failed to serialize transfer response: {}", e);
+                    return;
+                }
+            };
+            let mut tagged = Vec::with_capacity(1 + reply.len());
+            tagged.push(TAG_TRANSFER);
+            tagged.extend_from_slice(&reply);
+            if let Err(e) = stream.send(&tagged).await {
+                warn!("Failed to send transfer response to {}: {}", short_id, e);
+            }
+        }
+        MatrixMessage::TransferResponse {
+            transfer_id,
+            accepted,
+            ..
+        } => {
+            info!(
+                "Transfer response {} from {}: accepted={}",
+                transfer_id, short_id, accepted,
+            );
+        }
+        _ => {
+            debug!("Non-transfer message on TAG_TRANSFER from {}", short_id);
         }
     }
 }

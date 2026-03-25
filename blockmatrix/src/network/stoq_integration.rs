@@ -188,6 +188,32 @@ pub enum MatrixMessage {
         /// JSON-serialized blocks
         blocks_json: Vec<String>,
     },
+
+    // --- Cross-network asset transfer messages ---
+    /// Request to transfer an asset across network scopes.
+    TransferRequest {
+        /// Unique transfer identifier.
+        transfer_id: String,
+        /// Asset being transferred.
+        asset_id: String,
+        /// Scope the asset is leaving (e.g. "Device").
+        source_scope: String,
+        /// Scope the asset is entering (e.g. "Network").
+        target_scope: String,
+        /// PoS proof bytes from the source scope.
+        #[serde(with = "serde_bytes")]
+        proof_bytes: Vec<u8>,
+    },
+    /// Response to a cross-scope transfer request.
+    TransferResponse {
+        /// Transfer identifier this response corresponds to.
+        transfer_id: String,
+        /// Whether the target scope accepted the transfer.
+        accepted: bool,
+        /// PoS proof bytes from the target scope (empty if rejected).
+        #[serde(with = "serde_bytes")]
+        target_proof_bytes: Vec<u8>,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager

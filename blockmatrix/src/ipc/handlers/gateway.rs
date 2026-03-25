@@ -31,19 +31,17 @@ fn parse_scope(s: &str) -> Result<BlockchainScope, RpcError> {
 }
 
 /// Register gateway-related IPC methods.
-pub fn register(handler: &mut RequestHandler, _state: &Arc<DaemonState>) {
-    // Each handler creates a lightweight GatewayManager on the fly.
-    // GatewayManager::new() is cheap (no I/O, no network) and avoids
-    // adding a field to DaemonState which is used across many files.
-    //
-    // For production persistence of in-flight transfers, the manager
-    // should eventually live in DaemonState, but for alpha this is fine.
+pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
+    // GatewayManager is now wired to the node's blockchain so that
+    // transfer lock/confirm/release entries are written as blocks.
 
     // gateway.transfer -- initiate a cross-scope asset transfer
     {
+        let blockchain = state.blockchain.clone();
         handler.register(
             "gateway.transfer",
             Arc::new(move |params| {
+                let bc = blockchain.clone();
                 Box::pin(async move {
                     let asset_id_str = params
                         .get("asset_id")
@@ -76,7 +74,7 @@ pub fn register(handler: &mut RequestHandler, _state: &Arc<DaemonState>) {
                     let to = parse_scope(target_scope)?;
                     let asset_id = hypermesh_lib::AssetId::from(asset_id_str);
 
-                    let gw = GatewayManager::new();
+                    let gw = GatewayManager::with_blockchain(bc);
                     match gw.transfer_asset(asset_id, from, to).await {
                         Ok(transfer_id) => Ok(serde_json::json!({
                             "transfer_id": transfer_id,

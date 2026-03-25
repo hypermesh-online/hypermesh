@@ -32,6 +32,7 @@ use std::sync::Arc;
 use hypermesh_lib::{AssetId, BlockchainScope, NodeId};
 use tracing::info;
 
+use crate::blockchain::NodeBlockchain;
 use crate::network::shard_transport::ShardTransport;
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,20 @@ impl GatewayManager {
     ) -> Self {
         Self {
             bridge: ScopeBridge::with_transport(validator, transport, target_node),
+            next_id: Arc::new(tokio::sync::Mutex::new(1)),
+        }
+    }
+
+    /// Create a gateway wired to a blockchain for persistent transfer entries.
+    ///
+    /// Transfer lock/confirm/release entries are written as blocks on the
+    /// node's chain, providing an auditable record of cross-scope transfers.
+    pub fn with_blockchain(blockchain: Arc<NodeBlockchain>) -> Self {
+        Self {
+            bridge: ScopeBridge::with_blockchain(
+                Arc::new(DefaultTransferValidator),
+                blockchain,
+            ),
             next_id: Arc::new(tokio::sync::Mutex::new(1)),
         }
     }
