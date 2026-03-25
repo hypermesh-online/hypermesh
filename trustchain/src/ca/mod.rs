@@ -45,6 +45,8 @@ pub use stoq_ca_client::*;
 pub use certificate_authority::{TrustChainCA as TrustChainCAImpl, *};
 // Re-export security integration
 pub use security_integration::*;
+// Re-export threshold cryptography types for distributed CA signing
+pub use crate::crypto::threshold::{KeyShare, ThresholdConfig, ThresholdSigner};
 // Re-export federation types
 pub use federation::{
     FederatedCA, FederatedValidationResult, FederationManager, FederationPolicy, FederationStatus,
@@ -70,6 +72,12 @@ pub struct TrustChainCA {
     pub state_proof_validator: Arc<tokio::sync::Mutex<crate::proof_of_state::FourProofValidator>>,
     /// CA configuration
     config: Arc<CAConfig>,
+    /// Optional threshold configuration for distributed CA signing.
+    /// When set, the CA's FALCON-1024 key can be split into shares and signing
+    /// requires t-of-n shares to be collected.
+    threshold_config: Option<crate::crypto::threshold::ThresholdConfig>,
+    /// Cached key shares after splitting (only available on the node that performed the split).
+    ca_key_shares: Option<Vec<crate::crypto::threshold::KeyShare>>,
 }
 
 /// Certificate Authority Configuration
@@ -416,6 +424,8 @@ impl TrustChainCA {
             hypermesh_client,
             state_proof_validator,
             config: Arc::new(config),
+            threshold_config: None,
+            ca_key_shares: None,
         };
 
         info!("TrustChain CA initialized successfully");
@@ -910,6 +920,91 @@ impl TrustChainCA {
         Ok(result)
     }
 
+    // -----------------------------------------------------------------------
+    // Threshold CA signing (Shamir SSS over FALCON-1024)
+    // -----------------------------------------------------------------------
+
+    /// Split a FALCON-1024 signing key into threshold shares using Shamir SSS.
+    ///
+    /// Returns N [`KeyShare`]s; any T can reconstruct the key and sign.
+    /// The original key is NOT erased (backward compat / single-node mode).
+    ///
+    /// The CA itself uses rcgen (ECDSA) for X.509 issuance, so the FALCON key
+    /// bytes must be provided explicitly (typically from [`FalconIdentity`]).
+    pub fn split_ca_key(
+        &mut self,
+        falcon_secret_key: &[u8],
+        falcon_public_key: &[u8],
+        config: crate::crypto::threshold::ThresholdConfig,
+    ) -> Result<Vec<crate::crypto::threshold::KeyShare>> {
+        use sha2::{Digest, Sha256};
+
+        let signer = crate::crypto::threshold::ThresholdSigner::new(config.clone())?;
+
+        // Compute SHA-256 fingerprint of the public key (matches ThresholdSigner convention)
+        let fingerprint: [u8; 32] = {
+            let mut h = Sha256::new();
+            h.update(b"FALCON-1024-KEY:");
+            h.update(falcon_public_key);
+            h.finalize().into()
+        };
+
+        let shares = signer.split_signing_key(falcon_secret_key, fingerprint)?;
+
+        self.threshold_config = Some(config);
+        self.ca_key_shares = Some(shares.clone());
+
+        info!(
+            "Split FALCON-1024 CA key into {} threshold shares (threshold={})",
+            shares.len(),
+            self.threshold_config.as_ref().map_or(0, |c| c.threshold),
+        );
+
+        Ok(shares)
+    }
+
+    /// Sign a message using threshold shares (requires t shares).
+    ///
+    /// Instead of using the local CA key, this reconstructs the FALCON-1024
+    /// private key from the provided shares and signs. The reconstructed key
+    /// exists only for the duration of this call.
+    pub fn sign_with_threshold(
+        &self,
+        message: &[u8],
+        shares: &[crate::crypto::threshold::KeyShare],
+    ) -> Result<Vec<u8>> {
+        let config = self
+            .threshold_config
+            .as_ref()
+            .ok_or_else(|| anyhow!("Threshold not configured — call split_ca_key() first"))?;
+
+        let signer = crate::crypto::threshold::ThresholdSigner::new(config.clone())?;
+        let signature = signer.reconstruct_and_sign(shares, message)?;
+
+        debug!(
+            "Threshold-signed message ({} bytes) with {} shares",
+            message.len(),
+            shares.len(),
+        );
+
+        Ok(signature)
+    }
+
+    /// Check if threshold signing is configured.
+    pub fn is_threshold_configured(&self) -> bool {
+        self.threshold_config.is_some()
+    }
+
+    /// Get the threshold configuration, if set.
+    pub fn threshold_config(&self) -> Option<&crate::crypto::threshold::ThresholdConfig> {
+        self.threshold_config.as_ref()
+    }
+
+    /// Get the cached key shares (only available on the node that performed the split).
+    pub fn ca_key_shares(&self) -> Option<&[crate::crypto::threshold::KeyShare]> {
+        self.ca_key_shares.as_deref()
+    }
+
     /// Internal: Calculate certificate fingerprint
     fn calculate_fingerprint(&self, cert_der: &[u8]) -> [u8; 32] {
         use sha2::{Digest, Sha256};
@@ -963,6 +1058,141 @@ mod tests {
         assert_eq!(issued_cert.common_name, "test.localhost");
         assert!(matches!(issued_cert.status, CertificateStatus::Valid));
         Ok(())
+    }
+
+    // -- Threshold CA signing tests -----------------------------------------
+
+    #[tokio::test]
+    async fn test_split_ca_key_produces_shares() {
+        let config = CAConfig::testing();
+        let mut ca = TrustChainCA::new(config)
+            .await
+            .expect("test: Failed to create CA");
+
+        // Generate a FALCON-1024 keypair for threshold splitting
+        let identity = crate::identity::FalconIdentity::generate();
+
+        let threshold_cfg = ThresholdConfig {
+            threshold: 3,
+            total_shares: 5,
+        };
+        let shares = ca
+            .split_ca_key(
+                identity.secret_key_bytes(),
+                &identity.public_key,
+                threshold_cfg,
+            )
+            .expect("test: split_ca_key");
+
+        assert_eq!(shares.len(), 5);
+        assert!(ca.is_threshold_configured());
+        assert_eq!(ca.threshold_config().expect("test: config").threshold, 3);
+        assert_eq!(ca.threshold_config().expect("test: config").total_shares, 5);
+
+        // All shares must have the same fingerprint
+        let fp = shares[0].key_fingerprint;
+        for share in &shares {
+            assert_eq!(share.key_fingerprint, fp);
+        }
+
+        // Cached shares should match
+        let cached = ca.ca_key_shares().expect("test: cached shares");
+        assert_eq!(cached.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn test_sign_with_threshold_succeeds() {
+        let config = CAConfig::testing();
+        let mut ca = TrustChainCA::new(config)
+            .await
+            .expect("test: Failed to create CA");
+
+        let identity = crate::identity::FalconIdentity::generate();
+
+        let threshold_cfg = ThresholdConfig {
+            threshold: 3,
+            total_shares: 5,
+        };
+        let shares = ca
+            .split_ca_key(
+                identity.secret_key_bytes(),
+                &identity.public_key,
+                threshold_cfg,
+            )
+            .expect("test: split_ca_key");
+
+        // Sign with exactly 3 shares (the threshold)
+        let message = b"threshold CA signing test message";
+        let signature = ca
+            .sign_with_threshold(message, &shares[0..3])
+            .expect("test: sign_with_threshold");
+
+        // Verify with the original public key.
+        // ThresholdSigner::reconstruct_and_sign hashes the message with SHA-256
+        // before signing (matching FalconCrypto::sign convention), so we must
+        // verify against the hashed message.
+        let message_hash: [u8; 32] = {
+            use sha2::{Digest, Sha256};
+            let mut h = Sha256::new();
+            h.update(message);
+            h.finalize().into()
+        };
+        // verify_signature is on the NodeSigner trait
+        use hypermesh_lib::NodeSigner;
+        let valid = crate::identity::FalconIdentity::verify_signature(
+            &identity.public_key,
+            &message_hash,
+            &signature,
+        )
+        .expect("test: verify_signature");
+        assert!(valid, "Threshold signature should verify with original public key");
+    }
+
+    #[tokio::test]
+    async fn test_sign_with_insufficient_shares_fails() {
+        let config = CAConfig::testing();
+        let mut ca = TrustChainCA::new(config)
+            .await
+            .expect("test: Failed to create CA");
+
+        let identity = crate::identity::FalconIdentity::generate();
+
+        let threshold_cfg = ThresholdConfig {
+            threshold: 3,
+            total_shares: 5,
+        };
+        let shares = ca
+            .split_ca_key(
+                identity.secret_key_bytes(),
+                &identity.public_key,
+                threshold_cfg,
+            )
+            .expect("test: split_ca_key");
+
+        // Only 2 shares — below the threshold of 3
+        let result = ca.sign_with_threshold(b"msg", &shares[0..2]);
+        assert!(result.is_err(), "2-of-3 threshold should fail");
+    }
+
+    #[tokio::test]
+    async fn test_threshold_not_configured_error() {
+        let config = CAConfig::testing();
+        let ca = TrustChainCA::new(config)
+            .await
+            .expect("test: Failed to create CA");
+
+        // No split_ca_key() called — threshold not configured
+        assert!(!ca.is_threshold_configured());
+        assert!(ca.threshold_config().is_none());
+        assert!(ca.ca_key_shares().is_none());
+
+        let result = ca.sign_with_threshold(b"msg", &[]);
+        assert!(result.is_err(), "sign_with_threshold without config should fail");
+        let err_msg = result.err().expect("test: expected error").to_string();
+        assert!(
+            err_msg.contains("Threshold not configured"),
+            "Error should mention threshold not configured, got: {err_msg}"
+        );
     }
 
     #[tokio::test]
