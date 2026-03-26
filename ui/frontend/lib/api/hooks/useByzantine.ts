@@ -12,20 +12,15 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import {
   hyperMeshAPI,
   ByzantineDetection,
 } from '../services/HyperMeshAPI';
-import { web3Events } from '../index';
 
 /**
  * Get Byzantine detection results
  */
 export function useByzantineDetections(nodeId?: string) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['byzantine', 'detections', nodeId],
     queryFn: () => hyperMeshAPI.getByzantineDetections(nodeId),
@@ -33,33 +28,6 @@ export function useByzantineDetections(nodeId?: string) {
     refetchInterval: 60000,
     retry: 2
   });
-
-  // Set up real-time Byzantine detection updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        const subscriptionId = await web3Events.subscribe('hypermesh', 'hypermesh.byzantine', (event) => {
-          if (event.type === 'byzantine_detected' || event.type === 'byzantine_resolved') {
-            queryClient.invalidateQueries({ queryKey: ['byzantine', 'detections'] });
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time Byzantine detection updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient]);
 
   return {
     ...query,

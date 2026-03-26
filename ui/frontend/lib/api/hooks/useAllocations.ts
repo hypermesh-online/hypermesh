@@ -11,12 +11,10 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import {
   hyperMeshAPI,
   AssetAllocation,
 } from '../services/HyperMeshAPI';
-import { web3Events } from '../index';
 
 /**
  * Request asset allocation
@@ -48,9 +46,6 @@ export function useRequestAllocation() {
  * Get asset allocations
  */
 export function useAllocations(assetId?: string) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['allocations', assetId],
     queryFn: () => hyperMeshAPI.getAllocations(assetId),
@@ -58,50 +53,6 @@ export function useAllocations(assetId?: string) {
     refetchInterval: 60000,
     retry: 2
   });
-
-  // Set up real-time allocation updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        const subscriptionId = await web3Events.subscribe('hypermesh', 'hypermesh.assets', (event) => {
-          if (event.type === 'allocation_updated' || event.type === 'allocation_created') {
-            const allocation = event.data.allocation;
-
-            // Update allocations cache
-            queryClient.setQueryData(['allocations', assetId], (oldData: AssetAllocation[] | undefined) => {
-              if (!oldData) return oldData;
-
-              const existingIndex = oldData.findIndex(alloc => alloc.id === allocation.id);
-              if (existingIndex >= 0) {
-                const newData = [...oldData];
-                newData[existingIndex] = allocation;
-                return newData;
-              } else {
-                return [...oldData, allocation];
-              }
-            });
-
-            // Update general allocations cache
-            queryClient.invalidateQueries({ queryKey: ['allocations'] });
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time allocation updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient, assetId]);
 
   return {
     ...query,

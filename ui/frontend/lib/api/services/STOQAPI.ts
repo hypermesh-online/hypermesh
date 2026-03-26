@@ -12,8 +12,7 @@
  * - Network quality analysis
  */
 
-import { web3ApiClient } from '../index';
-import type { ServiceType } from '../Web3APIClient';
+import { get, post, put } from '../../api';
 
 export interface QUICConnection {
   id: string;
@@ -179,20 +178,18 @@ export interface STOQSystemHealth {
 }
 
 export class STOQAPI {
-  private readonly service: ServiceType = 'stoq';
-
   /**
    * Get all QUIC connections
    */
   async getConnections(): Promise<QUICConnection[]> {
-    return web3ApiClient.request<QUICConnection[]>(this.service, '/api/v1/stoq/connections');
+    return get<QUICConnection[]>('/api/v1/stoq/connections');
   }
 
   /**
    * Get specific connection details
    */
   async getConnection(connectionId: string): Promise<QUICConnection> {
-    return web3ApiClient.request<QUICConnection>(this.service, `/api/v1/stoq/connections/${connectionId}`);
+    return get<QUICConnection>(`/api/v1/stoq/connections/${connectionId}`);
   }
 
   /**
@@ -205,20 +202,14 @@ export class STOQAPI {
     alpn?: string[];
     initialMaxStreams?: number;
   }): Promise<QUICConnection> {
-    return web3ApiClient.request<QUICConnection>(this.service, '/api/v1/stoq/connections', {
-      method: 'POST',
-      body: config
-    });
+    return post<QUICConnection>('/api/v1/stoq/connections', config);
   }
 
   /**
    * Close connection
    */
   async closeConnection(connectionId: string, reason?: string): Promise<void> {
-    await web3ApiClient.request(this.service, `/api/v1/stoq/connections/${connectionId}/close`, {
-      method: 'POST',
-      body: { reason }
-    });
+    await post(`/api/v1/stoq/connections/${connectionId}/close`, { reason });
   }
 
   /**
@@ -234,26 +225,26 @@ export class STOQAPI {
       params.append('start', timeRange.start);
       params.append('end', timeRange.end);
     }
-    
+
     const endpoint = params.toString() ? `/api/v1/stoq/metrics/performance?${params}` : '/api/v1/stoq/metrics/performance';
-    return web3ApiClient.request<PerformanceMetrics[]>(this.service, endpoint);
+    return get<PerformanceMetrics[]>(endpoint);
   }
 
   /**
    * Get network quality assessment
    */
   async getNetworkQuality(connectionId?: string): Promise<NetworkQuality> {
-    const endpoint = connectionId 
+    const endpoint = connectionId
       ? `/api/v1/stoq/analysis/quality?connectionId=${connectionId}`
       : '/api/v1/stoq/analysis/quality';
-    return web3ApiClient.request<NetworkQuality>(this.service, endpoint);
+    return get<NetworkQuality>(endpoint);
   }
 
   /**
    * Get transport optimization suggestions
    */
   async getOptimizations(connectionId: string): Promise<TransportOptimization> {
-    return web3ApiClient.request<TransportOptimization>(this.service, `/api/v1/stoq/optimization/${connectionId}`);
+    return get<TransportOptimization>(`/api/v1/stoq/optimization/${connectionId}`);
   }
 
   /**
@@ -263,17 +254,14 @@ export class STOQAPI {
     type: string;
     settings: Record<string, any>;
   }): Promise<{ applied: boolean; impact?: number; error?: string }> {
-    return web3ApiClient.request(this.service, `/api/v1/stoq/optimization/${connectionId}/apply`, {
-      method: 'POST',
-      body: optimization
-    });
+    return post(`/api/v1/stoq/optimization/${connectionId}/apply`, optimization);
   }
 
   /**
    * Get connection pools
    */
   async getConnectionPools(): Promise<ConnectionPool[]> {
-    return web3ApiClient.request<ConnectionPool[]>(this.service, '/api/v1/stoq/pools');
+    return get<ConnectionPool[]>('/api/v1/stoq/pools');
   }
 
   /**
@@ -289,20 +277,14 @@ export class STOQAPI {
       weight?: number;
     }>;
   }): Promise<ConnectionPool> {
-    return web3ApiClient.request<ConnectionPool>(this.service, '/api/v1/stoq/pools', {
-      method: 'POST',
-      body: config
-    });
+    return post<ConnectionPool>('/api/v1/stoq/pools', config);
   }
 
   /**
    * Update connection pool
    */
   async updateConnectionPool(poolId: string, updates: Partial<ConnectionPool>): Promise<ConnectionPool> {
-    return web3ApiClient.request<ConnectionPool>(this.service, `/api/v1/stoq/pools/${poolId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<ConnectionPool>(`/api/v1/stoq/pools/${poolId}`, updates);
   }
 
   /**
@@ -312,9 +294,9 @@ export class STOQAPI {
     const params = new URLSearchParams();
     if (connectionId) params.append('connectionId', connectionId);
     if (streamId) params.append('streamId', streamId);
-    
+
     const endpoint = params.toString() ? `/api/v1/stoq/analytics/streams?${params}` : '/api/v1/stoq/analytics/streams';
-    return web3ApiClient.request<StreamAnalytics[]>(this.service, endpoint);
+    return get<StreamAnalytics[]>(endpoint);
   }
 
   /**
@@ -331,10 +313,7 @@ export class STOQAPI {
     connections: number;
     errors: number;
   }>> {
-    return web3ApiClient.request(this.service, '/api/v1/stoq/metrics/historical', {
-      method: 'POST',
-      body: timeRange
-    });
+    return post('/api/v1/stoq/metrics/historical', timeRange);
   }
 
   /**
@@ -351,16 +330,14 @@ export class STOQAPI {
     overall: 'healthy' | 'issues' | 'critical';
     executedAt: string;
   }> {
-    return web3ApiClient.request(this.service, `/api/v1/stoq/diagnostics/${connectionId}`, {
-      method: 'POST'
-    });
+    return post(`/api/v1/stoq/diagnostics/${connectionId}`);
   }
 
   /**
    * Get STOQ system health
    */
   async getSystemHealth(): Promise<STOQSystemHealth> {
-    return web3ApiClient.request<STOQSystemHealth>(this.service, '/api/v1/stoq/system/health');
+    return get<STOQSystemHealth>('/api/v1/stoq/system/health');
   }
 
   /**
@@ -368,7 +345,7 @@ export class STOQAPI {
    */
   async runBenchmark(test: {
     type: 'throughput' | 'latency' | 'stream_multiplexing' | 'connection_establishment';
-    duration: number; // seconds
+    duration: number;
     targets?: string[];
     parameters?: Record<string, any>;
   }): Promise<{
@@ -385,10 +362,7 @@ export class STOQAPI {
     startTime: string;
     endTime?: string;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/stoq/benchmark', {
-      method: 'POST',
-      body: test
-    });
+    return post('/api/v1/stoq/benchmark', test);
   }
 
   /**
@@ -401,7 +375,7 @@ export class STOQAPI {
     report: string;
     completedAt: string;
   }> {
-    return web3ApiClient.request(this.service, `/api/v1/stoq/benchmark/${testId}`);
+    return get(`/api/v1/stoq/benchmark/${testId}`);
   }
 
   /**
@@ -415,10 +389,7 @@ export class STOQAPI {
     keepAlive?: boolean;
     congestionControl?: 'bbr' | 'cubic' | 'reno';
   }): Promise<{ applied: boolean; errors?: string[] }> {
-    return web3ApiClient.request(this.service, '/api/v1/stoq/config/transport', {
-      method: 'PUT',
-      body: settings
-    });
+    return put('/api/v1/stoq/config/transport', settings);
   }
 
   /**
@@ -434,7 +405,7 @@ export class STOQAPI {
       impact: string;
     }>;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/stoq/config/transport');
+    return get('/api/v1/stoq/config/transport');
   }
 }
 

@@ -2,320 +2,356 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-import { useEffect, useState } from 'react';
-import { stoqDataProvider, SystemStatus, PerformanceMetrics, Asset, AssetAllocation, ByzantineDetection, QUICConnection } from '../StoqDataProvider';
+import { useEffect, useState, useCallback } from 'react';
+import { hyperMeshAPI } from '../services/HyperMeshAPI';
+import { stoqAPI } from '../services/STOQAPI';
+import type { PerformanceMetrics as StoqPerformanceMetrics } from '../services/STOQAPI';
+
+// Local type definitions (previously from StoqDataProvider)
+export interface SystemStatus {
+  services: {
+    [key: string]: {
+      status: 'healthy' | 'degraded' | 'offline';
+      uptime: number;
+      lastHealthCheck: string;
+    };
+  };
+  overall: 'healthy' | 'degraded' | 'critical';
+}
+
+export interface PerformanceMetrics {
+  throughput: {
+    download: number;
+    upload: number;
+    efficiency: number;
+  };
+  latency: {
+    rtt: number;
+    packetLoss: number;
+  };
+  timestamp: string;
+}
+
+export interface Asset {
+  id: string;
+  type: 'CPU' | 'GPU' | 'Memory' | 'Storage';
+  status: 'available' | 'allocated' | 'maintenance';
+  proxyAddress: string;
+  stateProof?: string;
+}
+
+export interface AssetAllocation {
+  id: string;
+  assetId: string;
+  status: 'active' | 'pending' | 'completed';
+  allocatedAt: string;
+}
+
+export interface ByzantineDetection {
+  nodeId: string;
+  behaviour: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'detected' | 'investigating' | 'resolved';
+  detectedAt: string;
+}
+
+export interface QUICConnection {
+  id: string;
+  status: 'active' | 'idle' | 'closed';
+  throughput: number;
+  latency: number;
+  createdAt: string;
+}
 
 /**
- * Hook for real-time system status via STOQ protocol
+ * Hook for system status via API polling
  */
 export function useSystemStatus(autoRefresh = false) {
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.systemStatus$.subscribe({
-      next: (status) => {
-        setSystemStatus(status);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get system status');
-        setIsLoading(false);
+  const fetchStatus = useCallback(async () => {
+    try {
+      const [hypermeshHealth, stoqHealth] = await Promise.allSettled([
+        hyperMeshAPI.getSystemStatus(),
+        stoqAPI.getSystemHealth()
+      ]);
+
+      const services: SystemStatus['services'] = {};
+
+      if (hypermeshHealth.status === 'fulfilled') {
+        services['hypermesh'] = {
+          status: hypermeshHealth.value.status === 'healthy' ? 'healthy' : 'degraded',
+          uptime: hypermeshHealth.value.uptime,
+          lastHealthCheck: new Date().toISOString()
+        };
       }
-    });
 
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestSystemStatus();
+      if (stoqHealth.status === 'fulfilled') {
+        services['stoq'] = {
+          status: stoqHealth.value.status === 'optimal' ? 'healthy' : stoqHealth.value.status === 'good' ? 'healthy' : 'degraded',
+          uptime: stoqHealth.value.uptime,
+          lastHealthCheck: new Date().toISOString()
+        };
+      }
+
+      const statuses = Object.values(services).map(s => s.status);
+      const overall = statuses.includes('offline') ? 'critical' as const
+        : statuses.includes('degraded') ? 'degraded' as const
+        : 'healthy' as const;
+
+      setSystemStatus({ services, overall });
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get system status');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const isHealthy = systemStatus?.overall === 'healthy';
-  const hasWarnings = systemStatus?.overall === 'degraded';
-  const isCritical = systemStatus?.overall === 'critical';
+  useEffect(() => {
+    fetchStatus();
+    if (autoRefresh) {
+      const interval = setInterval(fetchStatus, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchStatus, autoRefresh]);
 
   return {
     systemStatus,
     isLoading,
     error,
-    isHealthy,
-    hasWarnings,
-    isCritical,
-    refetch: () => stoqDataProvider.requestSystemStatus()
+    isHealthy: systemStatus?.overall === 'healthy',
+    hasWarnings: systemStatus?.overall === 'degraded',
+    isCritical: systemStatus?.overall === 'critical',
+    refetch: fetchStatus
   };
 }
 
 /**
- * Hook for real-time performance metrics via STOQ protocol
+ * Hook for performance metrics via API polling
  */
 export function usePerformanceMetrics(serviceType?: string, timeRange?: string, autoRefresh = false) {
   const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.performanceMetrics$.subscribe({
-      next: (performanceMetrics) => {
-        setMetrics(performanceMetrics);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get performance metrics');
-        setIsLoading(false);
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const results = await stoqAPI.getPerformanceMetrics();
+      if (results.length > 0) {
+        const latest = results[results.length - 1];
+        setMetrics({
+          throughput: {
+            download: latest.throughput.download,
+            upload: latest.throughput.upload,
+            efficiency: latest.throughput.efficiency
+          },
+          latency: {
+            rtt: latest.latency.rtt,
+            packetLoss: latest.latency.packetLoss
+          },
+          timestamp: latest.timestamp
+        });
       }
-    });
-
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestPerformanceMetrics();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get performance metrics');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, [serviceType, timeRange]);
 
-  // Calculate derived metrics
-  const latestMetrics = metrics;
+  useEffect(() => {
+    fetchMetrics();
+    if (autoRefresh) {
+      const interval = setInterval(fetchMetrics, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchMetrics, autoRefresh]);
+
   const throughputAchievement = metrics ? (metrics.throughput.download / 40000) * 100 : 0;
   const performanceGrade = throughputAchievement >= 90 ? 'A+' :
                           throughputAchievement >= 80 ? 'A' :
                           throughputAchievement >= 70 ? 'B' :
                           throughputAchievement >= 60 ? 'C' : 'D';
-  
+
   const bottlenecks = metrics && metrics.latency.rtt > 100 ? ['High Latency'] : [];
 
   return {
-    latestMetrics,
+    latestMetrics: metrics,
     throughputAchievement,
     performanceGrade,
     bottlenecks,
     isLoading,
     error,
-    refetch: () => stoqDataProvider.requestPerformanceMetrics()
+    refetch: fetchMetrics
   };
 }
 
 /**
- * Hook for real-time assets via STOQ protocol
+ * Hook for assets via API polling
  */
 export function useAssets() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.assets$.subscribe({
-      next: (assetsData) => {
-        setAssets(assetsData);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get assets');
-        setIsLoading(false);
-      }
-    });
-
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestAssets();
+  const fetchAssets = useCallback(async () => {
+    try {
+      const result = await hyperMeshAPI.getAssets();
+      const mapped: Asset[] = result.map(a => ({
+        id: a.id,
+        type: (a.type as Asset['type']) || 'CPU',
+        status: (a.status as Asset['status']) || 'available',
+        proxyAddress: a.location?.address || '',
+        stateProof: undefined
+      }));
+      setAssets(mapped);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get assets');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const availableAssets = assets.filter(asset => asset.status === 'available');
-  const allocatedAssets = assets.filter(asset => asset.status === 'allocated');
+  useEffect(() => { fetchAssets(); }, [fetchAssets]);
 
   return {
     assets,
-    availableAssets,
-    allocatedAssets,
+    availableAssets: assets.filter(a => a.status === 'available'),
+    allocatedAssets: assets.filter(a => a.status === 'allocated'),
     isLoading,
     error,
-    refetch: () => stoqDataProvider.requestAssets()
+    refetch: fetchAssets
   };
 }
 
 /**
- * Hook for real-time allocations via STOQ protocol
+ * Hook for allocations via API polling
  */
 export function useAllocations() {
   const [allocations, setAllocations] = useState<AssetAllocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.allocations$.subscribe({
-      next: (allocationsData) => {
-        setAllocations(allocationsData);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get allocations');
-        setIsLoading(false);
-      }
-    });
-
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestAllocations();
+  const fetchAllocations = useCallback(async () => {
+    try {
+      const result = await hyperMeshAPI.getAllocations();
+      const mapped: AssetAllocation[] = result.map(a => ({
+        id: a.id,
+        assetId: a.assetId,
+        status: (a.status as AssetAllocation['status']) || 'active',
+        allocatedAt: a.startTime || new Date().toISOString()
+      }));
+      setAllocations(mapped);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get allocations');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const activeAllocations = allocations.filter(allocation => allocation.status === 'active');
+  useEffect(() => { fetchAllocations(); }, [fetchAllocations]);
 
   return {
     allocations,
-    activeAllocations,
+    activeAllocations: allocations.filter(a => a.status === 'active'),
     isLoading,
     error,
-    refetch: () => stoqDataProvider.requestAllocations()
+    refetch: fetchAllocations
   };
 }
 
 /**
- * Hook for real-time Byzantine detections via STOQ protocol
+ * Hook for Byzantine detections via API polling
  */
 export function useByzantineDetections() {
   const [detections, setDetections] = useState<ByzantineDetection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.byzantineDetections$.subscribe({
-      next: (detectionsData) => {
-        setDetections(detectionsData);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get Byzantine detections');
-        setIsLoading(false);
-      }
-    });
-
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestByzantineDetections();
+  const fetchDetections = useCallback(async () => {
+    try {
+      const result = await hyperMeshAPI.getByzantineDetections();
+      const mapped: ByzantineDetection[] = result.map(d => ({
+        nodeId: d.nodeId,
+        behaviour: d.behaviour,
+        severity: (d.severity as ByzantineDetection['severity']) || 'low',
+        status: (d.status as ByzantineDetection['status']) || 'detected',
+        detectedAt: d.detectedAt
+      }));
+      setDetections(mapped);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get Byzantine detections');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const criticalDetections = detections.filter(detection => detection.severity === 'critical');
-  const unresolved = detections.filter(detection => detection.status !== 'resolved');
+  useEffect(() => { fetchDetections(); }, [fetchDetections]);
 
   return {
     detections,
-    criticalDetections,
-    unresolved,
+    criticalDetections: detections.filter(d => d.severity === 'critical'),
+    unresolved: detections.filter(d => d.status !== 'resolved'),
     isLoading,
     error,
-    refetch: () => stoqDataProvider.requestByzantineDetections()
+    refetch: fetchDetections
   };
 }
 
 /**
- * Hook for real-time QUIC connections via STOQ protocol
+ * Hook for QUIC connections via API polling
  */
 export function useQUICConnections() {
   const [connections, setConnections] = useState<QUICConnection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const subscription = stoqDataProvider.quicConnections$.subscribe({
-      next: (connectionsData) => {
-        setConnections(connectionsData);
-        setIsLoading(false);
-        setError(null);
-      },
-      error: (err) => {
-        setError(err.message || 'Failed to get QUIC connections');
-        setIsLoading(false);
-      }
-    });
-
-    // Get initial data
-    if (stoqDataProvider.isConnected()) {
-      stoqDataProvider.requestQUICConnections();
+  const fetchConnections = useCallback(async () => {
+    try {
+      const result = await stoqAPI.getConnections();
+      const mapped: QUICConnection[] = result.map(c => ({
+        id: c.id,
+        status: c.status === 'connected' ? 'active' as const : c.status === 'disconnected' ? 'closed' as const : 'idle' as const,
+        throughput: 0,
+        latency: 0,
+        createdAt: c.establishedAt || new Date().toISOString()
+      }));
+      setConnections(mapped);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get QUIC connections');
+    } finally {
+      setIsLoading(false);
     }
-
-    return () => subscription.unsubscribe();
   }, []);
 
-  const activeConnections = connections.filter(connection => connection.status === 'active');
+  useEffect(() => { fetchConnections(); }, [fetchConnections]);
 
   return {
     connections,
-    activeConnections,
+    activeConnections: connections.filter(c => c.status === 'active'),
     isLoading,
     error,
-    refetch: () => stoqDataProvider.requestQUICConnections()
+    refetch: fetchConnections
   };
 }
 
 /**
- * Hook to initialize STOQ data provider with certificate
+ * No-op hook (STOQ Data Provider removed)
  */
 export function useStoqDataProvider() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const initialize = async (certificatePem: string) => {
-    if (isInitializing) return;
-    
-    setIsInitializing(true);
-    setError(null);
-
-    try {
-      await stoqDataProvider.initialize(certificatePem);
-      setIsConnected(true);
-      console.log('✅ STOQ Data Provider ready for dashboard streaming');
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize STOQ data provider';
-      setError(errorMessage);
-      console.error('❌ STOQ Data Provider initialization failed:', errorMessage);
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-
-  const disconnect = async () => {
-    try {
-      await stoqDataProvider.disconnect();
-      setIsConnected(false);
-    } catch (err) {
-      console.error('Error disconnecting STOQ data provider:', err);
-    }
-  };
-
-  // Check connection status periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const connected = stoqDataProvider.isConnected();
-      if (connected !== isConnected) {
-        setIsConnected(connected);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isConnected]);
-
   return {
-    isConnected,
-    isInitializing,
-    error,
-    initialize,
-    disconnect
+    isConnected: false,
+    isInitializing: false,
+    error: 'STOQ Data Provider removed - use HTTP API hooks instead',
+    initialize: async (_cert: string) => {},
+    disconnect: async () => {}
   };
 }

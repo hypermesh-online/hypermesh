@@ -13,98 +13,27 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { 
-  stoqAPI, 
-  QUICConnection, 
-  PerformanceMetrics, 
+import {
+  stoqAPI,
+  QUICConnection,
+  PerformanceMetrics,
   NetworkQuality,
   TransportOptimization,
   ConnectionPool,
   StreamAnalytics
 } from '../services/STOQAPI';
-import { web3Events } from '../index';
 
 /**
  * Get QUIC connections with real-time updates
  */
 export function useQUICConnections() {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['stoq', 'connections'],
     queryFn: () => stoqAPI.getConnections(),
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // 1 minute
+    staleTime: 30000,
+    refetchInterval: 60000,
     retry: 2
   });
-
-  // Set up real-time connection updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        await web3Events.connect('stoq');
-        
-        const subscriptionId = await web3Events.subscribe('stoq', 'stoq.connections', (event) => {
-          switch (event.type) {
-            case 'connection_established':
-            case 'connection_updated':
-              queryClient.setQueryData(['stoq', 'connections'], (oldData: QUICConnection[] | undefined) => {
-                if (!Array.isArray(oldData)) return [];
-                
-                const updatedConnection = event.data.connection;
-                const existingIndex = oldData.findIndex(conn => conn.id === updatedConnection.id);
-                
-                if (existingIndex >= 0) {
-                  const newData = [...oldData];
-                  newData[existingIndex] = updatedConnection;
-                  return newData;
-                } else {
-                  return [...oldData, updatedConnection];
-                }
-              });
-              break;
-              
-            case 'connection_closed':
-              queryClient.setQueryData(['stoq', 'connections'], (oldData: QUICConnection[] | undefined) => {
-                return Array.isArray(oldData) ? oldData.filter(conn => conn.id !== event.data.connectionId) : [];
-              });
-              break;
-              
-            case 'connection_status_changed':
-              queryClient.setQueryData(['stoq', 'connections'], (oldData: QUICConnection[] | undefined) => {
-                return Array.isArray(oldData) ? oldData.map(conn => 
-                  conn.id === event.data.connectionId 
-                    ? { ...conn, status: event.data.newStatus, lastActivity: event.timestamp }
-                    : conn
-                ) : [];
-              });
-              break;
-          }
-          
-          // Invalidate specific connection queries
-          if (event.data.connectionId) {
-            queryClient.invalidateQueries({ queryKey: ['stoq', 'connection', event.data.connectionId] });
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time connection updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient]);
 
   return {
     ...query,
@@ -177,58 +106,17 @@ export function useCloseConnection() {
  * Get real-time performance metrics with high-frequency updates
  */
 export function usePerformanceMetrics(
-  connectionId?: string, 
+  connectionId?: string,
   timeRange?: { start: string; end: string },
   enableRealtime: boolean = true
 ) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['stoq', 'performance', connectionId, timeRange],
     queryFn: () => stoqAPI.getPerformanceMetrics(connectionId, timeRange),
-    staleTime: enableRealtime ? 5000 : 30000, // 5 seconds for real-time, 30 seconds otherwise
-    refetchInterval: enableRealtime ? 10000 : 60000, // 10 seconds for real-time, 1 minute otherwise
+    staleTime: enableRealtime ? 5000 : 30000,
+    refetchInterval: enableRealtime ? 10000 : 60000,
     retry: 2
   });
-
-  // Set up real-time performance updates (high frequency for performance monitoring)
-  useEffect(() => {
-    if (!enableRealtime) return;
-
-    const setupRealtimeUpdates = async () => {
-      try {
-        const subscriptionId = await web3Events.subscribe('stoq', 'stoq.performance', (event) => {
-          if (event.type === 'performance_update') {
-            const metrics = event.data.metrics;
-            
-            // Update performance metrics cache
-            queryClient.setQueryData(['stoq', 'performance', connectionId, timeRange], (oldData: PerformanceMetrics[] | undefined) => {
-              if (!Array.isArray(oldData)) return [metrics];
-              
-              // Add new metrics and keep last 1000 entries for real-time view
-              const newData = [...oldData, metrics].slice(-1000);
-              return newData.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-            });
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time performance updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient, connectionId, timeRange, enableRealtime]);
 
   const metricsArray = Array.isArray(query.data) ? query.data : [];
   const latestMetrics = metricsArray.length > 0 ? metricsArray[metricsArray.length - 1] : undefined;

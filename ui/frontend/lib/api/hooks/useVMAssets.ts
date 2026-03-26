@@ -13,7 +13,6 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import {
   hyperMeshAPI,
   Asset,
@@ -23,7 +22,6 @@ import {
   VMExecution,
   CatalogApplication,
 } from '../services/HyperMeshAPI';
-import { web3Events } from '../index';
 import { useAssets } from './useAssetCrud';
 
 /**
@@ -161,9 +159,6 @@ export function useExecuteVMAsset() {
  * Get VM executions with real-time updates
  */
 export function useVMExecutions(vmAssetId?: string) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['vm', 'executions', vmAssetId],
     queryFn: () => hyperMeshAPI.getVMExecutions(vmAssetId),
@@ -171,49 +166,6 @@ export function useVMExecutions(vmAssetId?: string) {
     refetchInterval: 60000,
     retry: 2
   });
-
-  // Set up real-time VM execution updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        const subscriptionId = await web3Events.subscribe('hypermesh', 'hypermesh.vm', (event) => {
-          if (event.type === 'vm_execution_updated' || event.type === 'vm_execution_started') {
-            const execution = event.data.execution;
-
-            queryClient.setQueryData(['vm', 'executions', vmAssetId], (oldData: VMExecution[] | undefined) => {
-              if (!oldData) return oldData;
-
-              const existingIndex = oldData.findIndex(exec => exec.id === execution.id);
-              if (existingIndex >= 0) {
-                const newData = [...oldData];
-                newData[existingIndex] = execution;
-                return newData;
-              } else {
-                return [...oldData, execution];
-              }
-            });
-
-            // Also update individual execution cache
-            queryClient.setQueryData(['vm', 'execution', execution.id], execution);
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time VM execution updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient, vmAssetId]);
 
   return {
     ...query,

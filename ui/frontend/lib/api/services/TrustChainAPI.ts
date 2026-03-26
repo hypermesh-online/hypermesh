@@ -12,8 +12,7 @@
  * - Trust hierarchy validation
  */
 
-import { web3ApiClient } from '../index';
-import type { ServiceType } from '../Web3APIClient';
+import { get, post, put, del } from '../../api';
 
 export interface Certificate {
   id: string;
@@ -75,20 +74,18 @@ export interface ValidationResult {
 }
 
 export class TrustChainAPI {
-  private readonly service: ServiceType = 'trustchain';
-
   /**
    * Get all certificates in the trust store
    */
   async getCertificates(): Promise<Certificate[]> {
-    return web3ApiClient.request<Certificate[]>(this.service, '/api/v1/trustchain/certificates');
+    return get<Certificate[]>('/api/v1/trustchain/certificates');
   }
 
   /**
    * Get specific certificate by ID
    */
   async getCertificate(certificateId: string): Promise<Certificate> {
-    return web3ApiClient.request<Certificate>(this.service, `/api/v1/trustchain/certificates/${certificateId}`);
+    return get<Certificate>(`/api/v1/trustchain/certificates/${certificateId}`);
   }
 
   /**
@@ -100,34 +97,28 @@ export class TrustChainAPI {
     keySize: number;
     usage: string[];
   }): Promise<Certificate> {
-    return web3ApiClient.request<Certificate>(this.service, '/api/v1/trustchain/certificates', {
-      method: 'POST',
-      body: certificateData
-    });
+    return post<Certificate>('/api/v1/trustchain/certificates', certificateData);
   }
 
   /**
    * Revoke certificate
    */
   async revokeCertificate(certificateId: string, reason: string): Promise<void> {
-    await web3ApiClient.request(this.service, `/api/v1/trustchain/certificates/${certificateId}/revoke`, {
-      method: 'POST',
-      body: { reason }
-    });
+    await post(`/api/v1/trustchain/certificates/${certificateId}/revoke`, { reason });
   }
 
   /**
    * Validate certificate chain
    */
   async validateCertificate(certificateId: string): Promise<ValidationResult> {
-    return web3ApiClient.request<ValidationResult>(this.service, `/api/v1/trustchain/certificates/${certificateId}/validate`);
+    return get<ValidationResult>(`/api/v1/trustchain/certificates/${certificateId}/validate`);
   }
 
   /**
    * Get trust hierarchy
    */
   async getTrustHierarchy(): Promise<TrustHierarchy> {
-    return web3ApiClient.request<TrustHierarchy>(this.service, '/api/v1/trustchain/trust/hierarchy');
+    return get<TrustHierarchy>('/api/v1/trustchain/trust/hierarchy');
   }
 
   /**
@@ -135,73 +126,56 @@ export class TrustChainAPI {
    */
   async getDNSRecords(domain?: string): Promise<DNSRecord[]> {
     const endpoint = domain ? `/api/v1/trustchain/dns/records?domain=${encodeURIComponent(domain)}` : '/api/v1/trustchain/dns/records';
-    return web3ApiClient.request<DNSRecord[]>(this.service, endpoint);
+    return get<DNSRecord[]>(endpoint);
   }
 
   /**
    * Create DNS record
    */
   async createDNSRecord(record: Omit<DNSRecord, 'id' | 'lastUpdated' | 'status'>): Promise<DNSRecord> {
-    return web3ApiClient.request<DNSRecord>(this.service, '/api/v1/trustchain/dns/records', {
-      method: 'POST',
-      body: record
-    });
+    return post<DNSRecord>('/api/v1/trustchain/dns/records', record);
   }
 
   /**
    * Update DNS record
    */
   async updateDNSRecord(recordId: string, updates: Partial<DNSRecord>): Promise<DNSRecord> {
-    return web3ApiClient.request<DNSRecord>(this.service, `/api/v1/trustchain/dns/records/${recordId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<DNSRecord>(`/api/v1/trustchain/dns/records/${recordId}`, updates);
   }
 
   /**
    * Delete DNS record
    */
   async deleteDNSRecord(recordId: string): Promise<void> {
-    await web3ApiClient.request(this.service, `/api/v1/trustchain/dns/records/${recordId}`, {
-      method: 'DELETE'
-    });
+    await del(`/api/v1/trustchain/dns/records/${recordId}`);
   }
 
   /**
    * Resolve domain
    */
   async resolveDomain(domain: string, recordType: string = 'A'): Promise<DNSRecord[]> {
-    return web3ApiClient.request<DNSRecord[]>(this.service, `/api/v1/trustchain/dns/resolve`, {
-      method: 'POST',
-      body: { domain, type: recordType }
-    });
+    return post<DNSRecord[]>('/api/v1/trustchain/dns/resolve', { domain, type: recordType });
   }
 
   /**
    * Get rotation policies
    */
   async getRotationPolicies(): Promise<RotationPolicy[]> {
-    return web3ApiClient.request<RotationPolicy[]>(this.service, '/api/v1/trustchain/rotation/policies');
+    return get<RotationPolicy[]>('/api/v1/trustchain/rotation/policies');
   }
 
   /**
    * Create rotation policy
    */
   async createRotationPolicy(policy: Omit<RotationPolicy, 'id'>): Promise<RotationPolicy> {
-    return web3ApiClient.request<RotationPolicy>(this.service, '/api/v1/trustchain/rotation/policies', {
-      method: 'POST',
-      body: policy
-    });
+    return post<RotationPolicy>('/api/v1/trustchain/rotation/policies', policy);
   }
 
   /**
    * Update rotation policy
    */
   async updateRotationPolicy(policyId: string, updates: Partial<RotationPolicy>): Promise<RotationPolicy> {
-    return web3ApiClient.request<RotationPolicy>(this.service, `/api/v1/trustchain/rotation/policies/${policyId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<RotationPolicy>(`/api/v1/trustchain/rotation/policies/${policyId}`, updates);
   }
 
   /**
@@ -212,10 +186,7 @@ export class TrustChainAPI {
     newCertificate: Certificate;
     rotationId: string;
   }> {
-    return web3ApiClient.request(this.service, `/api/v1/trustchain/rotation/execute`, {
-      method: 'POST',
-      body: { certificateId }
-    });
+    return post('/api/v1/trustchain/rotation/execute', { certificateId });
   }
 
   /**
@@ -230,10 +201,10 @@ export class TrustChainAPI {
     newFingerprint: string;
     status: 'success' | 'failed' | 'partial';
   }>> {
-    const endpoint = certificateId 
+    const endpoint = certificateId
       ? `/api/v1/trustchain/rotation/history?certificateId=${certificateId}`
       : '/api/v1/trustchain/rotation/history';
-    return web3ApiClient.request(this.service, endpoint);
+    return get(endpoint);
   }
 
   /**
@@ -251,7 +222,7 @@ export class TrustChainAPI {
   }> {
     try {
       // Call real TrustChain health endpoint
-      const healthResponse = await web3ApiClient.request<{
+      const healthResponse = await get<{
         status: string;
         timestamp: string;
         version: string;
@@ -261,10 +232,10 @@ export class TrustChainAPI {
           dns: boolean;
           stateProof: boolean;
         };
-      }>(this.service, '/api/v1/trustchain/health');
+      }>('/api/v1/trustchain/health');
 
       // Get additional stats from the /stats endpoint
-      const statsResponse = await web3ApiClient.request<{
+      const statsResponse = await get<{
         requests_total: number;
         requests_successful: number;
         requests_failed: number;
@@ -275,10 +246,10 @@ export class TrustChainAPI {
         active_connections: number;
         rate_limited_requests: number;
         last_update: string;
-      }>(this.service, '/api/v1/trustchain/stats');
+      }>('/api/v1/trustchain/stats');
 
       // Calculate uptime percentage from success rate
-      const uptime = statsResponse.requests_total > 0 
+      const uptime = statsResponse.requests_total > 0
         ? (statsResponse.requests_successful / statsResponse.requests_total) * 100
         : 100;
 
@@ -293,25 +264,25 @@ export class TrustChainAPI {
 
       try {
         // Get expiring certificates count
-        const expiringResponse = await web3ApiClient.request<{
+        const expiringResponse = await get<{
           certificates: Certificate[],
           count: number,
           days_threshold: number
-        }>(this.service, '/api/v1/trustchain/certificates/expiring?days=30');
+        }>('/api/v1/trustchain/certificates/expiring?days=30');
         expiringSoon = expiringResponse.count;
 
         // Get revoked certificates count
-        const revokedResponse = await web3ApiClient.request<{
+        const revokedResponse = await get<{
           count: number,
           revocations: Array<any>
-        }>(this.service, '/api/v1/trustchain/certificates/revoked');
+        }>('/api/v1/trustchain/certificates/revoked');
         revokedCount = revokedResponse.count;
 
         // Get rotation policies count
-        const policiesResponse = await web3ApiClient.request<{
+        const policiesResponse = await get<{
           policies: Array<any>,
           count: number
-        }>(this.service, '/api/v1/trustchain/policies/rotation');
+        }>('/api/v1/trustchain/policies/rotation');
         rotationPolicyCount = policiesResponse.count;
       } catch (error) {
         console.warn('Failed to fetch additional TrustChain metrics:', error);
@@ -319,7 +290,7 @@ export class TrustChainAPI {
 
       return {
         status: overallStatus,
-        certificateCount: statsResponse.ca_requests, // Use CA requests as proxy for cert count
+        certificateCount: statsResponse.ca_requests,
         expiringSoon: expiringSoon,
         revokedCount: revokedCount,
         dnsRecordCount: statsResponse.dns_requests,
@@ -329,7 +300,6 @@ export class TrustChainAPI {
       };
     } catch (error) {
       console.error('Failed to get TrustChain health status:', error);
-      // Return offline status if backend is not available
       return {
         status: 'critical',
         certificateCount: 0,
@@ -352,18 +322,18 @@ export class TrustChainAPI {
     fingerprint: string;
     status?: string;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/trustchain/certificates/root');
+    return get('/api/v1/trustchain/certificates/root');
   }
 
   /**
    * Export certificate in various formats
    */
   async exportCertificate(certificateId: string, format: 'pem' | 'der' | 'p12'): Promise<Blob> {
-    const response = await web3ApiClient.request<ArrayBuffer>(this.service, 
-      `/api/v1/trustchain/certificates/${certificateId}/export?format=${format}`, {
-      headers: { 'Accept': 'application/octet-stream' }
-    });
-    
+    const response = await get<ArrayBuffer>(
+      `/api/v1/trustchain/certificates/${certificateId}/export?format=${format}`,
+      { headers: { 'Accept': 'application/octet-stream' } }
+    );
+
     return new Blob([response], { type: 'application/octet-stream' });
   }
 
@@ -371,14 +341,11 @@ export class TrustChainAPI {
    * Import certificate
    */
   async importCertificate(certificateData: string | ArrayBuffer, format: 'pem' | 'der' | 'p12'): Promise<Certificate> {
-    const body = typeof certificateData === 'string' 
+    const body = typeof certificateData === 'string'
       ? { certificate: certificateData, format }
       : { certificate: Array.from(new Uint8Array(certificateData)), format };
 
-    return web3ApiClient.request<Certificate>(this.service, '/api/v1/trustchain/certificates/import', {
-      method: 'POST',
-      body
-    });
+    return post<Certificate>('/api/v1/trustchain/certificates/import', body);
   }
 }
 

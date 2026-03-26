@@ -12,13 +12,10 @@
  * - WebSocket-based live updates
  */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { trustChainAPI } from '../services/TrustChainAPI';
 import { hyperMeshAPI } from '../services/HyperMeshAPI';
 import { stoqAPI } from '../services/STOQAPI';
-import { web3Events } from '../index';
-import type { EventChannel } from '../Web3Events';
 
 export interface SystemStatus {
   overall: 'healthy' | 'degraded' | 'critical' | 'offline';
@@ -52,9 +49,6 @@ export interface ServiceStatus {
  * Get comprehensive system status with real-time updates
  */
 export function useSystemStatus(enableRealtime: boolean = true) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['system', 'status'],
     queryFn: async (): Promise<SystemStatus> => {
@@ -101,52 +95,6 @@ export function useSystemStatus(enableRealtime: boolean = true) {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
-
-  // Set up real-time updates via WebSocket
-  useEffect(() => {
-    if (!enableRealtime) return;
-
-    const setupRealtimeUpdates = async () => {
-      try {
-        // Connect to system status events
-        await web3Events.connect('integration');
-        
-        const subscriptionId = await web3Events.subscribe('integration', 'system.status', (event) => {
-          // Update the query cache with real-time data
-          queryClient.setQueryData(['system', 'status'], (oldData: SystemStatus | undefined) => {
-            if (!oldData) return oldData;
-            
-            return {
-              ...oldData,
-              services: {
-                ...oldData.services,
-                [event.data.service]: {
-                  ...oldData.services[event.data.service as keyof typeof oldData.services],
-                  ...event.data.status,
-                  lastCheck: event.timestamp
-                }
-              },
-              lastUpdated: event.timestamp
-            };
-          });
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time system status updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [enableRealtime, queryClient]);
 
   return {
     ...query,

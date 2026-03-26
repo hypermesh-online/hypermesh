@@ -13,9 +13,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
 import { trustChainAPI, Certificate, RotationPolicy, ValidationResult, TrustHierarchy } from '../services/TrustChainAPI';
-import { web3Events } from '../index';
 
 /**
  * Get all certificates with optional filtering
@@ -25,9 +23,6 @@ export function useCertificates(filters?: {
   trustLevel?: Certificate['trustLevel'];
   expiringWithinDays?: number;
 }) {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
   const query = useQuery({
     queryKey: ['certificates', filters],
     queryFn: async (): Promise<Certificate[]> => {
@@ -60,72 +55,6 @@ export function useCertificates(filters?: {
     refetchInterval: 300000, // 5 minutes
     retry: 2
   });
-
-  // Set up real-time certificate updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        await web3Events.connect('trustchain');
-        
-        const subscriptionId = await web3Events.subscribe('trustchain', 'trustchain.certificates', (event) => {
-          // Update certificates in cache based on event type
-          switch (event.type) {
-            case 'certificate_created':
-            case 'certificate_updated':
-              queryClient.setQueryData(['certificates', filters], (oldData: Certificate[] | undefined) => {
-                if (!oldData) return oldData;
-                
-                const updatedCert = event.data.certificate;
-                const existingIndex = oldData.findIndex(cert => cert.id === updatedCert.id);
-                
-                if (existingIndex >= 0) {
-                  // Update existing certificate
-                  const newData = [...oldData];
-                  newData[existingIndex] = updatedCert;
-                  return newData;
-                } else {
-                  // Add new certificate
-                  return [...oldData, updatedCert];
-                }
-              });
-              break;
-              
-            case 'certificate_revoked':
-            case 'certificate_expired':
-              queryClient.setQueryData(['certificates', filters], (oldData: Certificate[] | undefined) => {
-                if (!oldData) return oldData;
-                
-                return oldData.map(cert => 
-                  cert.id === event.data.certificateId 
-                    ? { ...cert, status: event.type === 'certificate_revoked' ? 'revoked' : 'expired' }
-                    : cert
-                );
-              });
-              break;
-          }
-          
-          // Invalidate specific certificate queries
-          if (event.data.certificateId) {
-            queryClient.invalidateQueries({ queryKey: ['certificate', event.data.certificateId] });
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time certificate updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient, filters]);
 
   return {
     ...query,
@@ -238,59 +167,13 @@ export function useTrustHierarchy() {
  * Get rotation policies
  */
 export function useRotationPolicies() {
-  const queryClient = useQueryClient();
-  const subscriptionRef = useRef<string | null>(null);
-
-  const query = useQuery({
+  return useQuery({
     queryKey: ['rotation', 'policies'],
     queryFn: () => trustChainAPI.getRotationPolicies(),
     staleTime: 60000,
+    refetchInterval: 300000,
     retry: 2
   });
-
-  // Set up real-time rotation updates
-  useEffect(() => {
-    const setupRealtimeUpdates = async () => {
-      try {
-        const subscriptionId = await web3Events.subscribe('trustchain', 'trustchain.rotation', (event) => {
-          switch (event.type) {
-            case 'rotation_executed':
-              // Invalidate certificates and policies when rotation occurs
-              queryClient.invalidateQueries({ queryKey: ['certificates'] });
-              queryClient.invalidateQueries({ queryKey: ['rotation', 'policies'] });
-              break;
-              
-            case 'policy_updated':
-              queryClient.setQueryData(['rotation', 'policies'], (oldData: RotationPolicy[] | undefined) => {
-                if (!oldData) return oldData;
-                
-                const updatedPolicy = event.data.policy;
-                return oldData.map(policy => 
-                  policy.id === updatedPolicy.id ? updatedPolicy : policy
-                );
-              });
-              break;
-          }
-        });
-
-        subscriptionRef.current = subscriptionId;
-
-      } catch (error) {
-        console.error('Failed to setup real-time rotation updates:', error);
-      }
-    };
-
-    setupRealtimeUpdates();
-
-    return () => {
-      if (subscriptionRef.current) {
-        web3Events.unsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [queryClient]);
-
-  return query;
 }
 
 /**

@@ -12,8 +12,7 @@
  * - Remote proxy/NAT addressing system
  */
 
-import { web3ApiClient } from '../index';
-import type { ServiceType } from '../Web3APIClient';
+import { get, post, put, del } from '../../api';
 
 // Re-export all types from the types file for backward compatibility
 export type {
@@ -48,8 +47,6 @@ import type {
 } from './HyperMeshTypes';
 
 export class HyperMeshAPI {
-  private readonly service: ServiceType = 'hypermesh';
-
   /**
    * Get all assets with optional filtering
    */
@@ -67,31 +64,23 @@ export class HyperMeshAPI {
     }
 
     const endpoint = params.toString() ? `/api/v1/hypermesh/assets?${params}` : '/api/v1/hypermesh/assets';
-    return web3ApiClient.request<Asset[]>(this.service, endpoint);
+    return get<Asset[]>(endpoint);
   }
 
   async getAsset(assetId: string): Promise<Asset> {
-    return web3ApiClient.request<Asset>(this.service, `/api/v1/hypermesh/assets/${assetId}`);
+    return get<Asset>(`/api/v1/hypermesh/assets/${assetId}`);
   }
 
   async createAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>): Promise<Asset> {
-    return web3ApiClient.request<Asset>(this.service, '/api/v1/hypermesh/assets', {
-      method: 'POST',
-      body: assetData
-    });
+    return post<Asset>('/api/v1/hypermesh/assets', assetData);
   }
 
   async updateAsset(assetId: string, updates: Partial<Asset>): Promise<Asset> {
-    return web3ApiClient.request<Asset>(this.service, `/api/v1/hypermesh/assets/${assetId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<Asset>(`/api/v1/hypermesh/assets/${assetId}`, updates);
   }
 
   async deleteAsset(assetId: string): Promise<void> {
-    await web3ApiClient.request(this.service, `/api/v1/hypermesh/assets/${assetId}`, {
-      method: 'DELETE'
-    });
+    await del(`/api/v1/hypermesh/assets/${assetId}`);
   }
 
   async requestAllocation(request: {
@@ -100,33 +89,24 @@ export class HyperMeshAPI {
     duration: number;
     requirements?: Record<string, any>;
   }): Promise<AssetAllocation> {
-    return web3ApiClient.request<AssetAllocation>(this.service, '/api/v1/hypermesh/allocations', {
-      method: 'POST',
-      body: request
-    });
+    return post<AssetAllocation>('/api/v1/hypermesh/allocations', request);
   }
 
   async getAllocations(assetId?: string): Promise<AssetAllocation[]> {
     const endpoint = assetId ? `/api/v1/hypermesh/allocations?assetId=${assetId}` : '/api/v1/hypermesh/allocations';
-    return web3ApiClient.request<AssetAllocation[]>(this.service, endpoint);
+    return get<AssetAllocation[]>(endpoint);
   }
 
   async releaseAllocation(allocationId: string): Promise<void> {
-    await web3ApiClient.request(this.service, `/api/v1/hypermesh/allocations/${allocationId}/release`, {
-      method: 'POST'
-    });
+    await post(`/api/v1/hypermesh/allocations/${allocationId}/release`);
   }
 
   async validateStateProof(assetId: string, blockId: string): Promise<FourProofStateVerification> {
-    return web3ApiClient.request<FourProofStateVerification>(this.service, `/api/v1/hypermesh/state-proof/validate`, {
-      method: 'POST',
-      body: { assetId, blockId }
-    });
+    return post<FourProofStateVerification>('/api/v1/hypermesh/state-proof/validate', { assetId, blockId });
   }
 
   async getStateProofHistory(assetId: string, limit: number = 100): Promise<FourProofStateVerification[]> {
-    return web3ApiClient.request<FourProofStateVerification[]>(this.service,
-      `/api/v1/hypermesh/state-proof/history/${assetId}?limit=${limit}`);
+    return get<FourProofStateVerification[]>(`/api/v1/hypermesh/state-proof/history/${assetId}?limit=${limit}`);
   }
 
   async submitProof(proof: {
@@ -136,15 +116,12 @@ export class HyperMeshAPI {
     data: any;
     signature: string;
   }): Promise<{ accepted: boolean; reason?: string }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/state-proof/submit', {
-      method: 'POST',
-      body: proof
-    });
+    return post('/api/v1/hypermesh/state-proof/submit', proof);
   }
 
   async getByzantineDetections(nodeId?: string): Promise<ByzantineDetection[]> {
     const endpoint = nodeId ? `/api/v1/hypermesh/byzantine/detections?nodeId=${nodeId}` : '/api/v1/hypermesh/byzantine/detections';
-    return web3ApiClient.request<ByzantineDetection[]>(this.service, endpoint);
+    return get<ByzantineDetection[]>(endpoint);
   }
 
   async reportByzantineBehavior(report: {
@@ -153,15 +130,12 @@ export class HyperMeshAPI {
     evidence: any;
     description: string;
   }): Promise<ByzantineDetection> {
-    return web3ApiClient.request<ByzantineDetection>(this.service, '/api/v1/hypermesh/byzantine/report', {
-      method: 'POST',
-      body: report
-    });
+    return post<ByzantineDetection>('/api/v1/hypermesh/byzantine/report', report);
   }
 
   async getRemoteProxies(assetId?: string): Promise<RemoteProxy[]> {
     const endpoint = assetId ? `/api/v1/hypermesh/proxy/list?assetId=${assetId}` : '/api/v1/hypermesh/proxy/list';
-    return web3ApiClient.request<RemoteProxy[]>(this.service, endpoint);
+    return get<RemoteProxy[]>(endpoint);
   }
 
   async createRemoteProxy(config: {
@@ -172,17 +146,11 @@ export class HyperMeshAPI {
     port?: number;
     virtualAddress?: string;
   }): Promise<RemoteProxy> {
-    return web3ApiClient.request<RemoteProxy>(this.service, '/api/v1/hypermesh/proxy/create', {
-      method: 'POST',
-      body: config
-    });
+    return post<RemoteProxy>('/api/v1/hypermesh/proxy/create', config);
   }
 
   async updateRemoteProxy(proxyId: string, updates: Partial<RemoteProxy>): Promise<RemoteProxy> {
-    return web3ApiClient.request<RemoteProxy>(this.service, `/api/v1/hypermesh/proxy/${proxyId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<RemoteProxy>(`/api/v1/hypermesh/proxy/${proxyId}`, updates);
   }
 
   async validateProxyTrust(proxyId: string): Promise<{
@@ -194,12 +162,12 @@ export class HyperMeshAPI {
       reason?: string;
     }>;
   }> {
-    return web3ApiClient.request(this.service, `/api/v1/hypermesh/proxy/${proxyId}/validate-trust`);
+    return get(`/api/v1/hypermesh/proxy/${proxyId}/validate-trust`);
   }
 
   async getNodeHealth(nodeId?: string): Promise<NodeHealth | NodeHealth[]> {
     const endpoint = nodeId ? `/api/v1/hypermesh/nodes/${nodeId}/health` : '/api/v1/hypermesh/nodes/health';
-    return web3ApiClient.request(this.service, endpoint);
+    return get(endpoint);
   }
 
   async getNetworkTopology(): Promise<{
@@ -223,7 +191,7 @@ export class HyperMeshAPI {
       region: string;
     }>;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/network/topology');
+    return get('/api/v1/hypermesh/network/topology');
   }
 
   async executeRemoteOperation(operation: {
@@ -238,10 +206,7 @@ export class HyperMeshAPI {
     error?: string;
     executionTime: number;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/proxy/execute', {
-      method: 'POST',
-      body: operation
-    });
+    return post('/api/v1/hypermesh/proxy/execute', operation);
   }
 
   async getSystemStatus(): Promise<{
@@ -255,7 +220,7 @@ export class HyperMeshAPI {
     lastStateProof: string;
     uptime: number;
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/system/status');
+    return get('/api/v1/hypermesh/system/status');
   }
 
   async createVMAsset(request: {
@@ -275,7 +240,7 @@ export class HyperMeshAPI {
       type: 'vm',
       name: `VM: ${catalogApp.name}`,
       description: catalogApp.description,
-      owner: '', // Will be set by backend from auth context
+      owner: '',
       status: 'available',
       privacyLevel: config.privacyLevel,
       location: { nodeId: '', address: '', region: 'local' },
@@ -321,10 +286,7 @@ export class HyperMeshAPI {
       }
     };
 
-    return web3ApiClient.request<VMAsset>(this.service, '/api/v1/hypermesh/assets/vm', {
-      method: 'POST',
-      body: vmAssetData
-    });
+    return post<VMAsset>('/api/v1/hypermesh/assets/vm', vmAssetData);
   }
 
   async executeVMAsset(request: {
@@ -335,43 +297,35 @@ export class HyperMeshAPI {
     requiresStateProof?: boolean;
     allocationDuration?: number;
   }): Promise<VMExecution> {
-    return web3ApiClient.request<VMExecution>(this.service, '/api/v1/hypermesh/vm/execute', {
-      method: 'POST',
-      body: {
-        vmAssetId: request.vmAssetId,
-        operation: request.operation,
-        parameters: request.parameters,
-        timeout: request.timeout || 300,
-        requiresStateProof: request.requiresStateProof || true,
-        allocationDuration: request.allocationDuration || 3600
-      }
+    return post<VMExecution>('/api/v1/hypermesh/vm/execute', {
+      vmAssetId: request.vmAssetId,
+      operation: request.operation,
+      parameters: request.parameters,
+      timeout: request.timeout || 300,
+      requiresStateProof: request.requiresStateProof || true,
+      allocationDuration: request.allocationDuration || 3600
     });
   }
 
   async getVMExecution(executionId: string): Promise<VMExecution> {
-    return web3ApiClient.request<VMExecution>(this.service, `/api/v1/hypermesh/vm/executions/${executionId}`);
+    return get<VMExecution>(`/api/v1/hypermesh/vm/executions/${executionId}`);
   }
 
   async getVMExecutions(vmAssetId?: string): Promise<VMExecution[]> {
     const endpoint = vmAssetId ? `/api/v1/hypermesh/vm/executions?vmAssetId=${vmAssetId}` : '/api/v1/hypermesh/vm/executions';
-    return web3ApiClient.request<VMExecution[]>(this.service, endpoint);
+    return get<VMExecution[]>(endpoint);
   }
 
   async cancelVMExecution(executionId: string): Promise<{ cancelled: boolean; reason?: string }> {
-    return web3ApiClient.request(this.service, `/api/v1/hypermesh/vm/executions/${executionId}/cancel`, {
-      method: 'POST'
-    });
+    return post(`/api/v1/hypermesh/vm/executions/${executionId}/cancel`);
   }
 
   async getVMAsset(assetId: string): Promise<VMAsset> {
-    return web3ApiClient.request<VMAsset>(this.service, `/api/v1/hypermesh/assets/${assetId}`);
+    return get<VMAsset>(`/api/v1/hypermesh/assets/${assetId}`);
   }
 
   async updateVMAsset(assetId: string, updates: Partial<VMAsset>): Promise<VMAsset> {
-    return web3ApiClient.request<VMAsset>(this.service, `/api/v1/hypermesh/assets/${assetId}`, {
-      method: 'PUT',
-      body: updates
-    });
+    return put<VMAsset>(`/api/v1/hypermesh/assets/${assetId}`, updates);
   }
 
   async getCatalogApplications(filters?: {
@@ -387,7 +341,7 @@ export class HyperMeshAPI {
     }
 
     const endpoint = params.toString() ? `/api/v1/hypermesh/catalog/applications?${params}` : '/api/v1/hypermesh/catalog/applications';
-    return web3ApiClient.request<CatalogApplication[]>(this.service, endpoint);
+    return get<CatalogApplication[]>(endpoint);
   }
 
   async installCatalogApplication(catalogId: string, config: {
@@ -402,14 +356,11 @@ export class HyperMeshAPI {
       logs: string[];
     };
   }> {
-    return web3ApiClient.request(this.service, '/api/v1/hypermesh/catalog/install', {
-      method: 'POST',
-      body: {
-        catalogId,
-        privacyLevel: config.privacyLevel,
-        autoStart: config.autoStart || false,
-        resourceLimits: config.resourceLimits
-      }
+    return post('/api/v1/hypermesh/catalog/install', {
+      catalogId,
+      privacyLevel: config.privacyLevel,
+      autoStart: config.autoStart || false,
+      resourceLimits: config.resourceLimits
     });
   }
 

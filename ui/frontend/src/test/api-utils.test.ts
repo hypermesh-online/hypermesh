@@ -156,14 +156,12 @@ describe('API Utility Functions', () => {
 
     it('has valid timeout configuration', () => {
       expect(WEB3_CONFIG.TIMEOUTS.API_REQUEST).toBe(5000);
-      expect(WEB3_CONFIG.TIMEOUTS.WEBSOCKET_CONNECT).toBe(10000);
       expect(WEB3_CONFIG.TIMEOUTS.PING_INTERVAL).toBe(30000);
       expect(WEB3_CONFIG.TIMEOUTS.RECONNECT_INTERVAL).toBe(5000);
     });
 
     it('has valid retry configuration', () => {
       expect(WEB3_CONFIG.RETRIES.API_REQUESTS).toBe(3);
-      expect(WEB3_CONFIG.RETRIES.WEBSOCKET_CONNECT).toBe(5);
       expect(WEB3_CONFIG.RETRIES.MAX_BACKOFF).toBe(30000);
     });
   });
