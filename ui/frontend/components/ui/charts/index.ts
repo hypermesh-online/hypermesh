@@ -6,30 +6,9 @@ export { AreaChart } from './AreaChart';
 export { BarChart } from './BarChart';
 export { LineChart } from './LineChart';
 export { PieChart } from './PieChart';
-export { NetworkGraph } from './NetworkGraph';
 export { SparklineChart } from './SparklineChart';
 export { GaugeChart } from './GaugeChart';
-export { MetricDisplay } from './MetricDisplay';
 export { ChartContainer } from './ChartContainer';
-export { TopologyChart } from './TopologyChart';
-export { PerformanceChart } from './PerformanceChart';
-export { SystemMetrics } from './SystemMetrics';
-
-// Re-export types for convenience
-export type { 
-  TopologyNode, 
-  TopologyLink 
-} from './TopologyChart';
-
-export type { 
-  PerformanceDataPoint, 
-  PerformanceMetric 
-} from './PerformanceChart';
-
-export type { 
-  SystemMetric, 
-  MetricValue 
-} from './SystemMetrics';
 
 // Chart themes
 export const CHART_THEMES = ['cyan', 'green', 'purple', 'red', 'yellow'] as const;
