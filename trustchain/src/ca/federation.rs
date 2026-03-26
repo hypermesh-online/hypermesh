@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+use crate::crypto::threshold::KeyShare;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::proof_of_state::{FourProofValidator, StateProof};
 
@@ -110,6 +111,9 @@ pub struct FederationManager {
     events: Arc<RwLock<Vec<FederationEvent>>>,
     /// Four-proof validator for bilateral PoS authentication of peers.
     state_proof_validator: Arc<tokio::sync::Mutex<FourProofValidator>>,
+    /// Key shares held by this node from federated CA key splits.
+    /// Keyed by CA fingerprint (SHA-256 of CA public key).
+    held_key_shares: RwLock<HashMap<[u8; 32], KeyShare>>,
 }
 
 impl FederationManager {
@@ -120,6 +124,7 @@ impl FederationManager {
             policy,
             events: Arc::new(RwLock::new(Vec::new())),
             state_proof_validator: Arc::new(tokio::sync::Mutex::new(FourProofValidator::new())),
+            held_key_shares: RwLock::new(HashMap::new()),
         }
     }
 
@@ -384,6 +389,76 @@ impl FederationManager {
 
     pub async fn get_events(&self) -> Vec<FederationEvent> {
         self.events.read().await.clone()
+    }
+
+    // -- Key share management ------------------------------------------------
+
+    /// Store a key share received from a federated CA.
+    /// The share is validated against the CA's fingerprint before storage.
+    pub async fn store_key_share(
+        &self,
+        ca_fingerprint: [u8; 32],
+        share: KeyShare,
+    ) -> TrustChainResult<()> {
+        if share.key_fingerprint != ca_fingerprint {
+            return Err(TrustChainError::InvalidRequest {
+                reason: format!(
+                    "Key share fingerprint mismatch: share fingerprint does not match CA fingerprint"
+                ),
+            });
+        }
+        self.held_key_shares.write().await.insert(ca_fingerprint, share);
+        info!(
+            "Stored key share for CA fingerprint {:02x}{:02x}..{:02x}{:02x}",
+            ca_fingerprint[0], ca_fingerprint[1],
+            ca_fingerprint[30], ca_fingerprint[31]
+        );
+        Ok(())
+    }
+
+    /// Retrieve our key share for a specific CA.
+    pub async fn get_key_share(&self, ca_fingerprint: &[u8; 32]) -> Option<KeyShare> {
+        self.held_key_shares.read().await.get(ca_fingerprint).cloned()
+    }
+
+    /// List all CA fingerprints for which we hold shares.
+    pub async fn held_share_fingerprints(&self) -> Vec<[u8; 32]> {
+        self.held_key_shares.read().await.keys().cloned().collect()
+    }
+
+    /// Remove a key share (e.g., on key refresh or CA decommission).
+    pub async fn remove_key_share(&self, ca_fingerprint: &[u8; 32]) -> Option<KeyShare> {
+        self.held_key_shares.write().await.remove(ca_fingerprint)
+    }
+
+    /// Collect key shares from federation peers for threshold signing.
+    ///
+    /// In alpha: this is LOCAL-ONLY (collects from held_key_shares).
+    /// In production: would send TAG_CA_SIGN_REQUEST to peers via STOQ.
+    pub async fn collect_shares_for_signing(
+        &self,
+        ca_fingerprint: &[u8; 32],
+        threshold: u8,
+    ) -> TrustChainResult<Vec<KeyShare>> {
+        let mut shares = Vec::new();
+        if let Some(share) = self.held_key_shares.read().await.get(ca_fingerprint) {
+            shares.push(share.clone());
+        }
+
+        // In production: would query peers for their shares via STOQ.
+        // For alpha: we can only collect locally held shares.
+
+        if shares.len() < threshold as usize {
+            return Err(TrustChainError::InvalidRequest {
+                reason: format!(
+                    "Insufficient shares: have {}, need {}. Remote collection not yet implemented.",
+                    shares.len(),
+                    threshold
+                ),
+            });
+        }
+
+        Ok(shares)
     }
 
     // -- Private helpers -----------------------------------------------------
@@ -673,5 +748,103 @@ mod tests {
             events[2].event_type,
             FederationEventType::PeerRemoved
         ));
+    }
+
+    // -- Key share management tests ------------------------------------------
+
+    fn make_key_share(fingerprint: [u8; 32], index: u8) -> KeyShare {
+        use crate::crypto::threshold::SecretShare;
+        KeyShare {
+            share: SecretShare {
+                index,
+                data: vec![1, 2, 3, 4],
+            },
+            key_fingerprint: fingerprint,
+            created_at: SystemTime::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_store_key_share() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fingerprint = [0xAA; 32];
+        let share = make_key_share(fingerprint, 1);
+        mgr.store_key_share(fingerprint, share)
+            .await
+            .expect("test: store should succeed");
+        assert!(mgr.get_key_share(&fingerprint).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_store_key_share_fingerprint_mismatch() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fingerprint = [0xAA; 32];
+        let wrong_fp = [0xBB; 32];
+        let share = make_key_share(wrong_fp, 1);
+        let result = mgr.store_key_share(fingerprint, share).await;
+        assert!(result.is_err(), "mismatched fingerprint should be rejected");
+    }
+
+    #[tokio::test]
+    async fn test_held_share_fingerprints() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fp1 = [0x01; 32];
+        let fp2 = [0x02; 32];
+        let fp3 = [0x03; 32];
+        mgr.store_key_share(fp1, make_key_share(fp1, 1))
+            .await
+            .expect("test: store fp1");
+        mgr.store_key_share(fp2, make_key_share(fp2, 2))
+            .await
+            .expect("test: store fp2");
+        mgr.store_key_share(fp3, make_key_share(fp3, 3))
+            .await
+            .expect("test: store fp3");
+        let fps = mgr.held_share_fingerprints().await;
+        assert_eq!(fps.len(), 3, "should hold 3 distinct shares");
+    }
+
+    #[tokio::test]
+    async fn test_remove_key_share() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fingerprint = [0xDD; 32];
+        mgr.store_key_share(fingerprint, make_key_share(fingerprint, 1))
+            .await
+            .expect("test: store");
+        assert!(mgr.get_key_share(&fingerprint).await.is_some());
+        let removed = mgr.remove_key_share(&fingerprint).await;
+        assert!(removed.is_some(), "should return removed share");
+        assert!(
+            mgr.get_key_share(&fingerprint).await.is_none(),
+            "share should be gone after removal"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_collect_shares_insufficient() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fingerprint = [0xEE; 32];
+        mgr.store_key_share(fingerprint, make_key_share(fingerprint, 1))
+            .await
+            .expect("test: store one share");
+        let result = mgr.collect_shares_for_signing(&fingerprint, 3).await;
+        assert!(
+            result.is_err(),
+            "should fail: have 1 share but need 3"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_collect_shares_sufficient() {
+        let mgr = FederationManager::new("local-ca".into(), test_policy());
+        let fingerprint = [0xFF; 32];
+        mgr.store_key_share(fingerprint, make_key_share(fingerprint, 1))
+            .await
+            .expect("test: store");
+        let shares = mgr
+            .collect_shares_for_signing(&fingerprint, 1)
+            .await
+            .expect("test: collect with threshold=1 should succeed");
+        assert_eq!(shares.len(), 1);
     }
 }

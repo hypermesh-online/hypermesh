@@ -214,6 +214,43 @@ pub enum MatrixMessage {
         #[serde(with = "serde_bytes")]
         target_proof_bytes: Vec<u8>,
     },
+
+    // --- Distributed CA messages ---
+
+    /// A CA key share being distributed to a reflector node.
+    KeyShareDistribute {
+        /// Share index (1-based).
+        share_index: u8,
+        /// Serialized share data.
+        #[serde(with = "serde_bytes")]
+        share_data: Vec<u8>,
+        /// CA key fingerprint (BLAKE3 of public key).
+        fingerprint: [u8; 32],
+    },
+
+    /// Request for a threshold signature from a peer holding a key share.
+    ThresholdSignRequest {
+        /// Unique request ID.
+        request_id: String,
+        /// BLAKE3 hash of message to sign.
+        message_hash: [u8; 32],
+        /// The actual message bytes to sign.
+        #[serde(with = "serde_bytes")]
+        message: Vec<u8>,
+        /// CA fingerprint (which CA's shares).
+        ca_fingerprint: [u8; 32],
+    },
+
+    /// Response to a threshold signing request (peer's contribution).
+    ThresholdSignResponse {
+        /// Matches the request_id.
+        request_id: String,
+        /// The peer's partial signature data (serialized).
+        #[serde(with = "serde_bytes")]
+        share_data: Vec<u8>,
+        /// Whether the peer accepts the request.
+        accepted: bool,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager
@@ -786,5 +823,100 @@ mod tests {
 
         assert_eq!(integration.local_coordinate, coord);
         assert_eq!(integration.node_id, "test_node");
+    }
+
+    #[test]
+    fn test_key_share_distribute_serialization() {
+        let msg = MatrixMessage::KeyShareDistribute {
+            share_index: 3,
+            share_data: vec![1, 2, 3, 4],
+            fingerprint: [0xAA; 32],
+        };
+        let bytes = serde_json::to_vec(&msg).expect("test: serialize");
+        let decoded: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
+        match decoded {
+            MatrixMessage::KeyShareDistribute {
+                share_index,
+                share_data,
+                fingerprint,
+            } => {
+                assert_eq!(share_index, 3);
+                assert_eq!(share_data, vec![1, 2, 3, 4]);
+                assert_eq!(fingerprint, [0xAA; 32]);
+            }
+            _ => unreachable!("Expected KeyShareDistribute variant"),
+        }
+    }
+
+    #[test]
+    fn test_threshold_sign_request_serialization() {
+        let msg = MatrixMessage::ThresholdSignRequest {
+            request_id: "req-001".to_string(),
+            message_hash: [0xBB; 32],
+            message: vec![10, 20, 30],
+            ca_fingerprint: [0xCC; 32],
+        };
+        let bytes = serde_json::to_vec(&msg).expect("test: serialize");
+        let decoded: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
+        match decoded {
+            MatrixMessage::ThresholdSignRequest {
+                request_id,
+                message_hash,
+                message,
+                ca_fingerprint,
+            } => {
+                assert_eq!(request_id, "req-001");
+                assert_eq!(message_hash, [0xBB; 32]);
+                assert_eq!(message, vec![10, 20, 30]);
+                assert_eq!(ca_fingerprint, [0xCC; 32]);
+            }
+            _ => unreachable!("Expected ThresholdSignRequest variant"),
+        }
+    }
+
+    #[test]
+    fn test_threshold_sign_response_serialization() {
+        let msg = MatrixMessage::ThresholdSignResponse {
+            request_id: "req-001".to_string(),
+            share_data: vec![99, 100, 101],
+            accepted: true,
+        };
+        let bytes = serde_json::to_vec(&msg).expect("test: serialize");
+        let decoded: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
+        match decoded {
+            MatrixMessage::ThresholdSignResponse {
+                request_id,
+                share_data,
+                accepted,
+            } => {
+                assert_eq!(request_id, "req-001");
+                assert_eq!(share_data, vec![99, 100, 101]);
+                assert!(accepted);
+            }
+            _ => unreachable!("Expected ThresholdSignResponse variant"),
+        }
+    }
+
+    #[test]
+    fn test_threshold_sign_response_rejected() {
+        let msg = MatrixMessage::ThresholdSignResponse {
+            request_id: "req-002".to_string(),
+            share_data: Vec::new(),
+            accepted: false,
+        };
+        let bytes = serde_json::to_vec(&msg).expect("test: serialize");
+        let decoded: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
+        match decoded {
+            MatrixMessage::ThresholdSignResponse {
+                request_id,
+                accepted,
+                share_data,
+            } => {
+                assert_eq!(request_id, "req-002");
+                assert!(!accepted);
+                assert!(share_data.is_empty());
+            }
+            _ => unreachable!("Expected ThresholdSignResponse variant"),
+        }
     }
 }

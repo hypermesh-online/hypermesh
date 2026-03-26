@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use super::certificate_store::CertificateStore;
+use super::federation::FederationManager;
 use super::stoq_ca_client::RevocationReason;
 use super::CertificateStatus;
 use crate::crypto::falcon::FalconCrypto;
@@ -172,6 +173,45 @@ impl OcspResponder {
             signature,
             produced_at: now,
         })
+    }
+
+    /// Check certificate revocation status across the federation.
+    ///
+    /// First checks the local certificate store. If the certificate is not
+    /// found locally, federation peers would be queried in production.
+    /// For alpha: returns Good if not locally revoked, Unknown if not found.
+    pub async fn federated_check(
+        &self,
+        serial_number: &str,
+        _federation: &FederationManager,
+    ) -> OcspCertStatus {
+        // 1. Check local store first
+        match self.store.get_certificate_by_serial(serial_number).await {
+            Ok(Some(cert)) => {
+                let status = self.map_certificate_status(&cert.status);
+                debug!(
+                    "OCSP federated check for serial={}: local status={:?}",
+                    serial_number, status
+                );
+                return status;
+            }
+            Ok(None) => {
+                debug!(
+                    "OCSP federated check: serial={} not found locally, would query federation",
+                    serial_number
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "OCSP federated check: local store error for serial={}: {}",
+                    serial_number, e
+                );
+            }
+        }
+
+        // 2. In production: query federation peers via STOQ for their OCSP status.
+        // For alpha: return Unknown for certificates not found locally.
+        OcspCertStatus::Unknown
     }
 
     /// Map internal `CertificateStatus` to `OcspCertStatus`.
@@ -413,5 +453,78 @@ mod tests {
             status,
             metadata: super::super::CertificateMetadata::default(),
         }
+    }
+
+    #[tokio::test]
+    async fn test_ocsp_federated_check_revoked_locally() {
+        use super::super::federation::{FederationManager, FederationPolicy};
+
+        let (store, responder) = setup_responder().await;
+        let fm = FederationManager::new(
+            "local-ca".into(),
+            FederationPolicy::default(),
+        );
+
+        // Store a revoked certificate locally
+        let revoked_at = SystemTime::now();
+        let cert = create_test_certificate(
+            "serial-fed-rev",
+            CertificateStatus::Revoked {
+                reason: "KeyCompromise".to_string(),
+                revoked_at,
+            },
+        );
+        store
+            .store_certificate(&cert)
+            .await
+            .expect("test: store_certificate failed");
+
+        let status = responder.federated_check("serial-fed-rev", &fm).await;
+        assert!(
+            matches!(status, OcspCertStatus::Revoked { .. }),
+            "locally revoked cert should return Revoked from federated check"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_ocsp_federated_check_good_locally() {
+        use super::super::federation::{FederationManager, FederationPolicy};
+
+        let (store, responder) = setup_responder().await;
+        let fm = FederationManager::new(
+            "local-ca".into(),
+            FederationPolicy::default(),
+        );
+
+        let cert = create_test_certificate("serial-fed-good", CertificateStatus::Valid);
+        store
+            .store_certificate(&cert)
+            .await
+            .expect("test: store_certificate failed");
+
+        let status = responder.federated_check("serial-fed-good", &fm).await;
+        assert!(
+            matches!(status, OcspCertStatus::Good),
+            "locally valid cert should return Good from federated check"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_ocsp_federated_check_unknown_locally() {
+        use super::super::federation::{FederationManager, FederationPolicy};
+
+        let (_store, responder) = setup_responder().await;
+        let fm = FederationManager::new(
+            "local-ca".into(),
+            FederationPolicy::default(),
+        );
+
+        let status = responder
+            .federated_check("serial-nonexistent", &fm)
+            .await;
+        assert!(
+            matches!(status, OcspCertStatus::Unknown),
+            "unknown cert should return Unknown in alpha (no remote query)"
+        );
     }
 }

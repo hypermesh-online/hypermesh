@@ -27,9 +27,11 @@ use crate::proof_of_state::{
 pub mod certificate_authority;
 pub mod certificate_manager;
 pub mod certificate_store;
+pub mod crl;
 pub mod federation;
 pub mod field_bootstrap;
 pub mod grace_period;
+pub mod ocsp;
 pub mod policy;
 pub mod security_integration; // Security integration module
 pub mod stoq_ca_client;

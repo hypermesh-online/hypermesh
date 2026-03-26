@@ -17,6 +17,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::certificate_store::CertificateStore;
+use super::federation::{FederationManager, FederationTrustLevel};
 use super::stoq_ca_client::RevocationReason;
 use super::CertificateStatus;
 use crate::crypto::falcon::FalconCrypto;
@@ -267,6 +268,38 @@ impl CrlDistributor {
             }
         }
     }
+
+    /// Propagate a CRL update to federation peers.
+    ///
+    /// Each peer with Full or Conditional trust receives a notification.
+    /// In alpha: this logs the propagation. In production: would send via STOQ.
+    /// Returns the list of CA IDs that were targeted for propagation.
+    pub async fn propagate_to_federation(
+        &self,
+        revoked_serial: &str,
+        reason: &str,
+        federation: &FederationManager,
+    ) -> Vec<String> {
+        let mut propagated_to = Vec::new();
+
+        for peer in federation.list_peers().await {
+            if peer.trust_level == FederationTrustLevel::Full
+                || peer.trust_level == FederationTrustLevel::Conditional
+            {
+                // In production: send CRL update via STOQ stream
+                // For alpha: log the propagation target
+                info!(
+                    "CRL propagated to federation peer {} (serial: {}, reason: {})",
+                    &peer.ca_id[..8.min(peer.ca_id.len())],
+                    revoked_serial,
+                    reason
+                );
+                propagated_to.push(peer.ca_id.clone());
+            }
+        }
+
+        propagated_to
+    }
 }
 
 impl Default for CrlDistributor {
@@ -482,5 +515,78 @@ mod tests {
 
         assert!(!crl.signature.signature_bytes.is_empty());
         assert_eq!(crl.signature.algorithm, "FALCON-1024");
+    }
+
+    #[tokio::test]
+    async fn test_crl_propagation_to_federation() {
+        use super::super::federation::{
+            FederatedCA, FederationManager, FederationPolicy, FederationTrustLevel,
+        };
+        use crate::proof_of_state::StateProof;
+
+        let policy = FederationPolicy {
+            max_peers: 10,
+            require_ct_proof: false,
+            auto_demote_on_failure: false,
+            max_sync_age: Duration::from_secs(3600),
+        };
+        let fm = FederationManager::new("local-ca".into(), policy);
+        let proof = StateProof::default_for_testing();
+
+        // Add two peers with Full/Conditional trust (via PoS proof to preserve trust)
+        let peer_full = FederatedCA {
+            ca_id: "peer-full".to_string(),
+            name: "Full Peer".to_string(),
+            public_key: vec![0u8; 32],
+            root_certificate: vec![1u8; 64],
+            trust_level: FederationTrustLevel::Full,
+            joined_at: SystemTime::now(),
+            last_sync: None,
+            endpoint: "[::1]:8443".to_string(),
+        };
+        let peer_cond = FederatedCA {
+            ca_id: "peer-cond".to_string(),
+            name: "Conditional Peer".to_string(),
+            public_key: vec![0u8; 32],
+            root_certificate: vec![1u8; 64],
+            trust_level: FederationTrustLevel::Conditional,
+            joined_at: SystemTime::now(),
+            last_sync: None,
+            endpoint: "[::1]:8444".to_string(),
+        };
+        // Untrusted peer should NOT receive propagation
+        let peer_untrusted = FederatedCA {
+            ca_id: "peer-untrusted".to_string(),
+            name: "Untrusted Peer".to_string(),
+            public_key: vec![0u8; 32],
+            root_certificate: vec![1u8; 64],
+            trust_level: FederationTrustLevel::Untrusted,
+            joined_at: SystemTime::now(),
+            last_sync: None,
+            endpoint: "[::1]:8445".to_string(),
+        };
+
+        fm.add_peer_with_proof(peer_full, Some(&proof))
+            .await
+            .expect("test: add full peer");
+        fm.add_peer_with_proof(peer_cond, Some(&proof))
+            .await
+            .expect("test: add conditional peer");
+        fm.add_peer(peer_untrusted)
+            .await
+            .expect("test: add untrusted peer");
+
+        let distributor = CrlDistributor::new();
+        let targets = distributor
+            .propagate_to_federation("serial-123", "KeyCompromise", &fm)
+            .await;
+
+        assert_eq!(targets.len(), 2, "should propagate to Full + Conditional only");
+        assert!(targets.contains(&"peer-full".to_string()));
+        assert!(targets.contains(&"peer-cond".to_string()));
+        assert!(
+            !targets.contains(&"peer-untrusted".to_string()),
+            "untrusted peer should NOT receive CRL propagation"
+        );
     }
 }
