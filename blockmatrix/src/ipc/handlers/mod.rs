@@ -205,6 +205,7 @@ pub(crate) mod tests {
             "message.history",
             "message.read",
             "identity.pubkey",
+            "identity.rotate",
             "peer.pubkey",
             "intelligence.stats",
             "config.show",

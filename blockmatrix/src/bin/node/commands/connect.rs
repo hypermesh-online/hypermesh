@@ -400,6 +400,9 @@ async fn start_network(
                 Some(data_dir.join(nid).join("messages")),
             ),
         )),
+        rotation_chains: Some(std::sync::Arc::new(
+            tokio::sync::RwLock::new(std::collections::HashMap::new()),
+        )),
         #[cfg(feature = "intelligence")]
         engauge_analytics: Some(engauge_analytics.clone()),
         #[cfg(feature = "intelligence")]

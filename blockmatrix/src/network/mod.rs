@@ -188,6 +188,9 @@ pub struct PeerContext {
     pub inbox_store: Option<Arc<crate::sharing::inbox::InboxStore>>,
     /// Store for received direct messages (P2P encrypted messaging).
     pub message_store: Option<Arc<crate::messaging::store::MessageStore>>,
+    /// Key rotation chains per node (node_id -> list of rotation entries).
+    /// Used for key continuity verification and split-brain detection.
+    pub rotation_chains: Option<Arc<RwLock<HashMap<String, Vec<serde_json::Value>>>>>,
     /// engauge SwarmAnalytics for processing received metrics and demand data.
     /// When `Some`, `handle_metrics_connection` feeds frames into this pipeline
     /// and the EngaugeBridge reads analytics for propagation weight computation.

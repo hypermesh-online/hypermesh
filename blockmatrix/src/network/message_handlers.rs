@@ -59,6 +59,8 @@ pub(crate) const TAG_CA_KEY_SHARE: u8 = 0x30;
 pub(crate) const TAG_CA_SIGN_REQUEST: u8 = 0x31;
 /// Threshold signing response (distributed CA).
 pub(crate) const TAG_CA_SIGN_RESPONSE: u8 = 0x32;
+/// Key rotation announcement (informational, not auth-gated).
+pub(crate) const TAG_KEY_ROTATION: u8 = 0x08;
 
 // ── Peer message loop ────────────────────────────────────────────────
 
@@ -198,6 +200,11 @@ pub(crate) async fn dispatch_message(
                 warn!("Failed to handle CA sign response: {e}");
             }
         }
+        TAG_KEY_ROTATION => {
+            if let Err(e) = handle_key_rotation(data, peer_node_id, ctx).await {
+                warn!("Failed to handle key rotation: {e}");
+            }
+        }
         TAG_GOSSIP => {
             debug!(
                 "Gossip message from peer {} ({} bytes)",
@@ -292,6 +299,80 @@ async fn handle_shard_announce(
             count,
         );
     }
+}
+
+// ── Key rotation handler ────────────────────────────────────────────
+
+/// Handle a key rotation announcement (tag 0x08).
+///
+/// Informational only — not auth-gated. Records the rotation in the
+/// peer's rotation chain for continuity verification and split-brain
+/// detection. Does NOT reject the peer on discontinuity (bilateral,
+/// no consensus — warn only).
+async fn handle_key_rotation(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) -> Result<()> {
+    if data.len() < 2 {
+        return Err(anyhow!("Key rotation message too short"));
+    }
+    let msg_data = &data[1..];
+    let rotation: serde_json::Value = serde_json::from_slice(msg_data)
+        .map_err(|e| anyhow!("Invalid key rotation JSON: {e}"))?;
+
+    let old_fp = rotation
+        .get("old_key_fingerprint")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let new_fp = rotation
+        .get("new_key_fingerprint")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let reason = rotation
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let short_peer = &peer_node_id[..8.min(peer_node_id.len())];
+    let short_old = &old_fp[..8.min(old_fp.len())];
+    let short_new = &new_fp[..8.min(new_fp.len())];
+    info!(
+        peer = %short_peer,
+        reason = reason,
+        "Received key rotation: {} -> {}",
+        short_old,
+        short_new,
+    );
+
+    // Store in peer's rotation chain
+    if let Some(ref chains) = ctx.rotation_chains {
+        let mut chains = chains.write().await;
+        let chain = chains
+            .entry(peer_node_id.to_string())
+            .or_insert_with(Vec::new);
+        chain.push(rotation.clone());
+
+        // Split-brain detection: previous rotation's new_key should match
+        // this rotation's old_key.
+        if chain.len() > 1 {
+            let prev = &chain[chain.len() - 2];
+            let prev_new = prev
+                .get("new_key_fingerprint")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if prev_new != old_fp && !prev_new.is_empty() {
+                warn!(
+                    peer = peer_node_id,
+                    "SPLIT-BRAIN DETECTED: rotation chain discontinuity. Expected old_fp={}, got {}",
+                    prev_new,
+                    old_fp,
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 // ── Block handlers ───────────────────────────────────────────────────

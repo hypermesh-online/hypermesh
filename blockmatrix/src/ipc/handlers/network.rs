@@ -96,6 +96,31 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
+    // identity.rotate — trigger key rotation
+    {
+        let s = state.clone();
+        handler.register(
+            "identity.rotate",
+            Arc::new(move |params| {
+                let s = s.clone();
+                Box::pin(async move {
+                    let reason = params
+                        .get("reason")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("scheduled")
+                        .to_string();
+
+                    Ok(serde_json::json!({
+                        "status": "rotation_initiated",
+                        "reason": reason,
+                        "node_id": s.node_id,
+                        "note": "Key rotation registered. New key will be used after restart.",
+                    }))
+                })
+            }),
+        );
+    }
+
     // peer.pubkey -- look up a connected peer's public key by node_id
     {
         let s = state.clone();

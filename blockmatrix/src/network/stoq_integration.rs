@@ -251,6 +251,23 @@ pub enum MatrixMessage {
         /// Whether the peer accepts the request.
         accepted: bool,
     },
+
+    /// Key rotation announcement (§6.2.2 identity distribution).
+    KeyRotation {
+        /// Hex fingerprint (BLAKE3 hash) of the outgoing FALCON public key.
+        old_key_fingerprint: String,
+        /// Hex fingerprint (BLAKE3 hash) of the incoming FALCON public key.
+        new_key_fingerprint: String,
+        /// Reason for the rotation (Scheduled, Compromise, Upgrade, Recovery).
+        reason: String,
+        /// FALCON-1024 signature proving old key authorized the transition.
+        #[serde(with = "serde_bytes")]
+        rotation_proof: Vec<u8>,
+        /// Block index at which this rotation was recorded.
+        block_index: u64,
+        /// Unix timestamp (seconds) of the rotation event.
+        timestamp: i64,
+    },
 }
 
 /// STOQ-integrated Matrix communication manager
@@ -894,6 +911,39 @@ mod tests {
                 assert!(accepted);
             }
             _ => unreachable!("Expected ThresholdSignResponse variant"),
+        }
+    }
+
+    #[test]
+    fn test_key_rotation_message_serialization() {
+        let msg = MatrixMessage::KeyRotation {
+            old_key_fingerprint: "abcd1234".to_string(),
+            new_key_fingerprint: "efgh5678".to_string(),
+            reason: "Scheduled".to_string(),
+            rotation_proof: vec![1, 2, 3, 4, 5],
+            block_index: 42,
+            timestamp: 1700000000,
+        };
+        let bytes = serde_json::to_vec(&msg).expect("test: serialize");
+        let decoded: MatrixMessage =
+            serde_json::from_slice(&bytes).expect("test: deserialize");
+        match decoded {
+            MatrixMessage::KeyRotation {
+                old_key_fingerprint,
+                new_key_fingerprint,
+                reason,
+                rotation_proof,
+                block_index,
+                timestamp,
+            } => {
+                assert_eq!(old_key_fingerprint, "abcd1234");
+                assert_eq!(new_key_fingerprint, "efgh5678");
+                assert_eq!(reason, "Scheduled");
+                assert_eq!(rotation_proof, vec![1, 2, 3, 4, 5]);
+                assert_eq!(block_index, 42);
+                assert_eq!(timestamp, 1700000000);
+            }
+            _ => unreachable!("Expected KeyRotation variant"),
         }
     }
 

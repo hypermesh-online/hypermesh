@@ -163,6 +163,43 @@ pub async fn verify_peer_access(
     true
 }
 
+/// Validate that a peer's claimed public key is consistent with their
+/// known rotation chain. Returns `true` if the key is either:
+/// 1. The original key (no rotations recorded), or
+/// 2. The latest `new_key_fingerprint` in the rotation chain.
+pub async fn validate_key_continuity(
+    rotation_chains: &tokio::sync::RwLock<HashMap<String, Vec<serde_json::Value>>>,
+    node_id: &str,
+    claimed_key_fingerprint: &str,
+) -> bool {
+    let chains = rotation_chains.read().await;
+    match chains.get(node_id) {
+        None => true, // No rotation history = first contact, accept any key
+        Some(chain) if chain.is_empty() => true,
+        Some(chain) => {
+            // Latest rotation's new_key should match claimed key
+            if let Some(latest) = chain.last() {
+                let latest_new = latest
+                    .get("new_key_fingerprint")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if latest_new == claimed_key_fingerprint {
+                    return true;
+                }
+                warn!(
+                    node = node_id,
+                    expected = latest_new,
+                    claimed = claimed_key_fingerprint,
+                    "Key continuity check FAILED — claimed key doesn't match rotation chain",
+                );
+                false
+            } else {
+                true
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,5 +312,78 @@ mod tests {
 
         assert!(!verify_peer_access(&peers, "expiredAA", "net-1").await);
         assert!(!peers.read().await.contains_key("expiredAA"));
+    }
+
+    // ── Key continuity tests ────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_validate_key_continuity_no_history() {
+        let chains = tokio::sync::RwLock::new(HashMap::new());
+        // No rotation chain at all → accept any key
+        assert!(validate_key_continuity(&chains, "node-aaa", "fp-xyz").await);
+    }
+
+    #[tokio::test]
+    async fn test_validate_key_continuity_empty_chain() {
+        let chains = tokio::sync::RwLock::new(HashMap::new());
+        chains
+            .write()
+            .await
+            .insert("node-bbb".to_string(), Vec::new());
+        // Empty chain → accept any key
+        assert!(validate_key_continuity(&chains, "node-bbb", "fp-xyz").await);
+    }
+
+    #[tokio::test]
+    async fn test_validate_key_continuity_matches_latest() {
+        let chains = tokio::sync::RwLock::new(HashMap::new());
+        let entry = serde_json::json!({
+            "old_key_fingerprint": "fp-A",
+            "new_key_fingerprint": "fp-B",
+            "reason": "Scheduled",
+        });
+        chains
+            .write()
+            .await
+            .insert("node-ccc".to_string(), vec![entry]);
+        // Claimed key matches latest rotation's new_key → true
+        assert!(validate_key_continuity(&chains, "node-ccc", "fp-B").await);
+    }
+
+    #[tokio::test]
+    async fn test_validate_key_continuity_stale_key() {
+        let chains = tokio::sync::RwLock::new(HashMap::new());
+        let entry = serde_json::json!({
+            "old_key_fingerprint": "fp-A",
+            "new_key_fingerprint": "fp-B",
+            "reason": "Scheduled",
+        });
+        chains
+            .write()
+            .await
+            .insert("node-ddd".to_string(), vec![entry]);
+        // Claimed key is the old key, not the new one → false
+        assert!(!validate_key_continuity(&chains, "node-ddd", "fp-A").await);
+    }
+
+    #[tokio::test]
+    async fn test_validate_key_continuity_multi_rotation() {
+        let chains = tokio::sync::RwLock::new(HashMap::new());
+        let entry1 = serde_json::json!({
+            "old_key_fingerprint": "fp-A",
+            "new_key_fingerprint": "fp-B",
+        });
+        let entry2 = serde_json::json!({
+            "old_key_fingerprint": "fp-B",
+            "new_key_fingerprint": "fp-C",
+        });
+        chains
+            .write()
+            .await
+            .insert("node-eee".to_string(), vec![entry1, entry2]);
+        // Only the latest new_key (fp-C) should pass
+        assert!(validate_key_continuity(&chains, "node-eee", "fp-C").await);
+        assert!(!validate_key_continuity(&chains, "node-eee", "fp-B").await);
+        assert!(!validate_key_continuity(&chains, "node-eee", "fp-A").await);
     }
 }

@@ -225,6 +225,34 @@ impl NodeBlockchain {
         self.add_block(vec![entry]).await
     }
 
+    /// Write a key rotation entry to the blockchain.
+    ///
+    /// Records old->new key transition with FALCON-signed proof (§6.2.2).
+    /// The rotation entry is stored as a `StoragePointer::Local` payload
+    /// so peers receiving the block can extract and verify the chain.
+    pub async fn add_key_rotation_block(
+        &self,
+        entry: &trustchain::identity::KeyRotationEntry,
+    ) -> Result<Block, String> {
+        let entry_bytes = serde_json::to_vec(entry).map_err(|e| {
+            format!("Failed to serialize key rotation entry: {e}")
+        })?;
+        let asset_hash = *blake3::hash(&entry_bytes).as_bytes();
+        let proof_hash = *blake3::hash(&entry.rotation_signature).as_bytes();
+
+        let block_entry = BlockAssetEntry {
+            asset_hash,
+            proof_hash,
+            state_proof: StateProof::new_for_testing(), // alpha: bootstrap phase
+            storage_pointer: StoragePointer::Local {
+                path: String::from_utf8_lossy(&entry_bytes).to_string(),
+            },
+            registration: AssetRegistration::genesis(self.node_coordinate),
+        };
+
+        self.add_block(vec![block_entry]).await
+    }
+
     /// Register multiple asset records in a single block.
     ///
     /// Useful during genesis to batch all hardware assets into one block.
