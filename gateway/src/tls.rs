@@ -183,6 +183,35 @@ impl TlsProvider {
     }
 }
 
+/// Generate an ephemeral self-signed certificate for a specific domain name.
+///
+/// Used for dynamic per-domain certificate provisioning (e.g. when a new
+/// subdomain is resolved via blockchain DNS). Delegates to the same ECDSA
+/// P-256 key generation used by [`TlsProvider::generate_self_signed`].
+///
+/// Returns `(cert_der, key_der)` -- the DER-encoded certificate and private
+/// key bytes.
+pub fn generate_domain_cert(domain: &str) -> Result<(Vec<u8>, Vec<u8>)> {
+    let key_pair = KeyPair::generate()
+        .map_err(|e| GatewayError::Tls(format!("failed to generate domain key pair: {e}")))?;
+
+    let mut params = CertificateParams::new(vec![domain.to_string()])
+        .map_err(|e| GatewayError::Tls(format!("failed to create domain cert params: {e}")))?;
+    params.distinguished_name.push(
+        rcgen::DnType::CommonName,
+        rcgen::DnValue::Utf8String(domain.to_string()),
+    );
+
+    let cert = params.self_signed(&key_pair).map_err(|e| {
+        GatewayError::Tls(format!(
+            "failed to generate self-signed cert for '{}': {}",
+            domain, e
+        ))
+    })?;
+
+    Ok((cert.der().to_vec(), key_pair.serialize_der()))
+}
+
 /// Check whether a file path has a PEM-like extension.
 fn is_pem_extension(path: &Path) -> bool {
     path.extension()
@@ -276,5 +305,37 @@ mod tests {
         assert!(is_pem_extension(Path::new("server.key")));
         assert!(!is_pem_extension(Path::new("server.der")));
         assert!(!is_pem_extension(Path::new("server")));
+    }
+
+    // ===== generate_domain_cert (3 tests) =================================
+
+    #[test]
+    fn generate_domain_cert_produces_nonempty_output() {
+        let (cert_der, key_der) =
+            generate_domain_cert("test.hypermesh.online").expect("test: generate domain cert");
+        assert!(!cert_der.is_empty(), "cert DER should not be empty");
+        assert!(!key_der.is_empty(), "key DER should not be empty");
+    }
+
+    #[test]
+    fn generate_domain_cert_different_domains_produce_different_keys() {
+        let (_, key1) =
+            generate_domain_cert("a.hypermesh.online").expect("test: generate cert a");
+        let (_, key2) =
+            generate_domain_cert("b.hypermesh.online").expect("test: generate cert b");
+        // Different key pairs should produce different DER encodings.
+        assert_ne!(key1, key2);
+    }
+
+    #[test]
+    fn generate_domain_cert_usable_with_rustls() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
+        let (cert_der, key_der) =
+            generate_domain_cert("rustls-test.hypermesh.online").expect("test: generate cert");
+        let cert = CertificateDer::from(cert_der);
+        let key = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(key_der));
+        let config = TlsProvider::build_server_config(vec![cert], key);
+        assert!(config.is_ok(), "domain cert should build a valid server config");
     }
 }

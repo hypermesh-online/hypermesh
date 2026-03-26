@@ -181,6 +181,9 @@ pub struct PeerContext {
     /// Swarm demand tracker for recording shard fetch requests.
     /// Fed into engauge SwarmAnalytics when the `intelligence` feature is enabled.
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
+    /// DNS popularity tracker for engauge-driven replication of popular names.
+    /// When `Some`, DNS resolution requests are recorded for analytics.
+    pub dns_popularity_tracker: Option<Arc<crate::dns::DnsPopularityTracker>>,
     /// Shard location index for consumer-becomes-provider (R12).
     /// Tracks which peers provide which shards, populated from TAG_SHARD_ANNOUNCE.
     pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,

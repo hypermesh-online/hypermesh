@@ -243,6 +243,7 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
+            dns_popularity_tracker: None,
         })
     }
 

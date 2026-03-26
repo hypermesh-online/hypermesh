@@ -61,6 +61,10 @@ pub(crate) const TAG_CA_SIGN_REQUEST: u8 = 0x31;
 pub(crate) const TAG_CA_SIGN_RESPONSE: u8 = 0x32;
 /// Key rotation announcement (informational, not auth-gated).
 pub(crate) const TAG_KEY_ROTATION: u8 = 0x08;
+/// DNS resolution request (network fallback when local DNS misses).
+pub(crate) const TAG_DNS_RESOLVE: u8 = 0x09;
+/// DNS resolution response (reply with address or empty).
+pub(crate) const TAG_DNS_RESOLVE_RESPONSE: u8 = 0x0A;
 
 // ── Peer message loop ────────────────────────────────────────────────
 
@@ -204,6 +208,9 @@ pub(crate) async fn dispatch_message(
             if let Err(e) = handle_key_rotation(data, peer_node_id, ctx).await {
                 warn!("Failed to handle key rotation: {e}");
             }
+        }
+        TAG_DNS_RESOLVE => {
+            handle_dns_resolve_request(data, stream, peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(
@@ -373,6 +380,120 @@ async fn handle_key_rotation(
     }
 
     Ok(())
+}
+
+// ── DNS network resolution handler ──────────────────────────────────
+
+/// Handle a DNS resolve request from a peer (tag 0x09).
+///
+/// Checks local DNS for the requested name and responds with the address
+/// (tag 0x0A + address bytes) or an empty response if not found.
+async fn handle_dns_resolve_request(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    if data.len() < 2 {
+        debug!("DNS resolve request too short from {}", peer_node_id);
+        return;
+    }
+    let name = match std::str::from_utf8(&data[1..]) {
+        Ok(n) => n,
+        Err(_) => {
+            debug!("DNS resolve request invalid UTF-8 from {}", peer_node_id);
+            return;
+        }
+    };
+
+    debug!(name = name, peer = peer_node_id, "DNS network resolve request");
+
+    // Record in popularity tracker if available.
+    if let Some(ref tracker) = ctx.dns_popularity_tracker {
+        tracker.record_resolution(name).await;
+    }
+
+    // Check local DNS resolver.
+    let response = if let Some(ref dns) = ctx.dns_resolver {
+        match dns.resolve(name).await {
+            Some(addr) => {
+                let addr_str = addr.to_string();
+                let mut resp = vec![TAG_DNS_RESOLVE_RESPONSE];
+                resp.extend_from_slice(addr_str.as_bytes());
+                resp
+            }
+            None => vec![TAG_DNS_RESOLVE_RESPONSE],
+        }
+    } else {
+        vec![TAG_DNS_RESOLVE_RESPONSE]
+    };
+
+    if let Err(e) = stream.send(&response).await {
+        debug!("Failed to send DNS resolve response to {}: {}", peer_node_id, e);
+    }
+}
+
+/// Resolve a DNS name by querying connected peers (network fallback).
+///
+/// Used when local DNS resolution fails. Queries up to 6 peers and
+/// returns the first successful response. Similar to shard fetch fallback.
+pub async fn resolve_from_network(
+    name: &str,
+    peers: &[Arc<stoq::Connection>],
+) -> Option<std::net::IpAddr> {
+    let max_peers = 6.min(peers.len());
+    if max_peers == 0 {
+        return None;
+    }
+
+    tracing::debug!(
+        name = name,
+        peers = max_peers,
+        "DNS network resolution attempt",
+    );
+
+    for peer_conn in &peers[..max_peers] {
+        match try_resolve_from_peer(name, peer_conn).await {
+            Some(addr) => return Some(addr),
+            None => continue,
+        }
+    }
+
+    None
+}
+
+/// Try resolving a DNS name from a single peer.
+///
+/// Opens a new stream, sends TAG_DNS_RESOLVE + name, reads response.
+async fn try_resolve_from_peer(
+    name: &str,
+    conn: &stoq::Connection,
+) -> Option<std::net::IpAddr> {
+    let mut stream = conn.open_stream().await.ok()?;
+
+    let mut request = vec![TAG_DNS_RESOLVE];
+    request.extend_from_slice(name.as_bytes());
+    stream.send(&request).await.ok()?;
+
+    let response = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        stream.receive(),
+    )
+    .await
+    .ok()?
+    .ok()?;
+
+    // Response format: [TAG_DNS_RESOLVE_RESPONSE][addr_string_bytes]
+    if response.len() <= 1 {
+        return None; // Empty response = name not found on peer
+    }
+
+    if response[0] != TAG_DNS_RESOLVE_RESPONSE {
+        return None;
+    }
+
+    let addr_str = std::str::from_utf8(&response[1..]).ok()?;
+    addr_str.parse::<std::net::IpAddr>().ok()
 }
 
 // ── Block handlers ───────────────────────────────────────────────────

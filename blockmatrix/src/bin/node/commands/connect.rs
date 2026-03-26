@@ -137,6 +137,9 @@ pub async fn run_connect(
         started_at: std::time::Instant::now(),
         shutdown_tx: shutdown_tx.clone(),
         dns_resolver: bootstrap.dns().clone(),
+        dns_popularity_tracker: Some(std::sync::Arc::new(
+            blockmatrix::dns::DnsPopularityTracker::new(),
+        )),
     });
 
     let mut handler = ipc::RequestHandler::new();
@@ -387,6 +390,9 @@ async fn start_network(
         authenticated_peers: network_manager.authenticated_peers(),
         gossip_protocol: Some(gossip_proto.clone()),
         swarm_demand_tracker: swarm_demand_tracker.clone(),
+        dns_popularity_tracker: Some(std::sync::Arc::new(
+            blockmatrix::dns::DnsPopularityTracker::new(),
+        )),
         shard_location_index: Some(std::sync::Arc::new(
             blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
         )),

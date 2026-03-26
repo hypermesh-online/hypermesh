@@ -235,6 +235,7 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
+            dns_popularity_tracker: None,
         });
         (state, tmp)
     }

@@ -295,6 +295,7 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
+            dns_popularity_tracker: None,
         })
     }
 
@@ -382,6 +383,7 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
+            dns_popularity_tracker: None,
         });
 
         let mut handler = RequestHandler::new();

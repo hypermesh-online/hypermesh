@@ -135,6 +135,7 @@ fn parse_system_type(name: &str) -> Result<BaseSystemType, RpcError> {
         "identity" => Ok(BaseSystemType::Identity),
         "keyrotation" | "key_rotation" => Ok(BaseSystemType::KeyRotation),
         "invitation" => Ok(BaseSystemType::Invitation),
+        "message" => Ok(BaseSystemType::Message),
         other => Err(RpcError {
             code: INVALID_PARAMS,
             message: format!(
@@ -299,6 +300,7 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
+            dns_popularity_tracker: None,
         })
     }
 

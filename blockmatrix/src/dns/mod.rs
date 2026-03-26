@@ -21,6 +21,7 @@
 pub mod cache;
 pub mod domain;
 pub mod invitation;
+pub mod popularity;
 pub mod pools;
 pub mod records;
 pub mod registration;
@@ -39,6 +40,7 @@ pub use records::{DnsRecord, DnsRecordData, DnsRecordType};
 pub use registration::{DnsBlockEntry, DnsRegistrar, DnsRegistration, RegistrationStatus};
 pub use resolver::{DnsQuery, DnsResolutionTier, DnsResolver, DnsResponse};
 pub use trustchain::{TrustChainDnsClient, TrustChainDnsService};
+pub use popularity::DnsPopularityTracker;
 pub use validation::{DnsValidator, ValidationResult};
 
 use anyhow::Result;

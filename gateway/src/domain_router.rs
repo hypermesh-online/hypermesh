@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -138,6 +139,48 @@ impl DomainRouter {
     /// Number of wildcard patterns registered.
     pub fn wildcard_count(&self) -> usize {
         self.wildcard_routes.len()
+    }
+
+    /// Resolve a hostname via blockchain DNS records and return a route decision.
+    ///
+    /// Extracts the subdomain from the Host header (e.g., `"persist"` from
+    /// `"persist.hypermesh.online"`) and looks it up in the provided DNS records.
+    /// Returns `None` if the host has no subdomain or no matching record exists.
+    pub fn resolve_from_dns(
+        &self,
+        host: &str,
+        dns_records: &HashMap<String, SocketAddr>,
+    ) -> Option<DomainRoute> {
+        let subdomain = extract_subdomain(host)?;
+        let addr = dns_records.get(&subdomain)?;
+        Some(DomainRoute {
+            domain: subdomain.clone(),
+            backend_addr: *addr,
+            backend_name: subdomain,
+        })
+    }
+}
+
+/// Extract the first subdomain label from a full hostname.
+///
+/// Strips any trailing port (`host:port`) before splitting. Returns the first
+/// label when the hostname has three or more dot-separated parts, otherwise
+/// returns `None` (bare domain like `"hypermesh.online"` has no subdomain).
+///
+/// # Examples
+///
+/// - `"persist.hypermesh.online"` -> `Some("persist")`
+/// - `"persist.hypermesh.online:8443"` -> `Some("persist")`
+/// - `"a.b.hypermesh.online"` -> `Some("a")`
+/// - `"hypermesh.online"` -> `None`
+/// - `"localhost"` -> `None`
+pub fn extract_subdomain(host: &str) -> Option<String> {
+    let hostname = host.split(':').next().unwrap_or(host);
+    let parts: Vec<&str> = hostname.split('.').collect();
+    if parts.len() >= 3 {
+        Some(parts[0].to_string())
+    } else {
+        None
     }
 }
 
@@ -346,5 +389,84 @@ mod tests {
         // Wildcard single label only.
         assert!(matches_wildcard("*.example.com", "sub.example.com"));
         assert!(!matches_wildcard("*.example.com", "a.b.example.com"));
+    }
+
+    // ===== extract_subdomain (5 tests) ====================================
+
+    #[test]
+    fn extract_subdomain_from_three_part_host() {
+        assert_eq!(
+            extract_subdomain("persist.hypermesh.online"),
+            Some("persist".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_subdomain_strips_port() {
+        assert_eq!(
+            extract_subdomain("persist.hypermesh.online:8443"),
+            Some("persist".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_subdomain_multi_level_returns_first() {
+        assert_eq!(
+            extract_subdomain("a.b.hypermesh.online"),
+            Some("a".to_string()),
+        );
+    }
+
+    #[test]
+    fn extract_subdomain_bare_domain_returns_none() {
+        assert_eq!(extract_subdomain("hypermesh.online"), None);
+    }
+
+    #[test]
+    fn extract_subdomain_single_label_returns_none() {
+        assert_eq!(extract_subdomain("localhost"), None);
+    }
+
+    // ===== resolve_from_dns (3 tests) =====================================
+
+    #[test]
+    fn resolve_from_dns_known_subdomain() {
+        let router = DomainRouter::new();
+        let mut records = HashMap::new();
+        records.insert(
+            "persist".to_string(),
+            "[::1]:8080".parse().expect("test: valid addr"),
+        );
+
+        let route = router.resolve_from_dns("persist.hypermesh.online", &records);
+        assert!(route.is_some());
+        let route = route.expect("test: checked above");
+        assert_eq!(route.domain, "persist");
+        assert_eq!(route.backend_name, "persist");
+        assert_eq!(
+            route.backend_addr,
+            "[::1]:8080".parse::<SocketAddr>().expect("test: valid addr"),
+        );
+    }
+
+    #[test]
+    fn resolve_from_dns_unknown_subdomain_returns_none() {
+        let router = DomainRouter::new();
+        let records = HashMap::new();
+        let route = router.resolve_from_dns("unknown.hypermesh.online", &records);
+        assert!(route.is_none());
+    }
+
+    #[test]
+    fn resolve_from_dns_bare_domain_returns_none() {
+        let router = DomainRouter::new();
+        let mut records = HashMap::new();
+        records.insert(
+            "persist".to_string(),
+            "[::1]:8080".parse().expect("test: valid addr"),
+        );
+
+        let route = router.resolve_from_dns("hypermesh.online", &records);
+        assert!(route.is_none());
     }
 }
