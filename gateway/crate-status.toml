@@ -33,6 +33,11 @@ items = [
     "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
     "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
     "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides",
+    # Browser namespace (L5)
+    "DNS-over-HTTPS (DoH) endpoint — JSON-based DNS query/response for browser-compatible resolution",
+    "Host→DNS resolution — extract_subdomain() maps Host header to blockchain DNS entries",
+    "Dynamic per-domain TLS certificates — generate_domain_cert() creates ECDSA P-256 self-signed certs on demand",
+    "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing",
 ]
 
 [features.in_development]

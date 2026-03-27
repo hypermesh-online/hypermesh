@@ -180,12 +180,16 @@ items = [
     "Message IPC handlers — message.send, message.inbox, message.history, message.read",
     "Message CLI — hypermesh message send/inbox/history/read subcommands",
     "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
+    # Core Protocol Completion (L1-L5)
+    "Cross-network asset transfers — ScopeBridge writes TransferLock/Registration/Release blockchain entries, TAG_TRANSFER wire protocol, GatewayManager with_blockchain()",
+    "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
+    "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
+    "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
+    "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
 ]
 
 [features.in_development]
 items = [
-    # Group C (deferred)
-    "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
     # Security review pending
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)
@@ -196,9 +200,6 @@ items = [
 
 [features.planned]
 items = [
-    "Cross-network asset transfers with dual PoS validation",
     "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
-    "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
-    "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
     "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
 ]

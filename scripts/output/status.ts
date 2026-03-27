@@ -168,24 +168,25 @@ export const crateStatuses: CrateStatus[] = [
         "TAG_DIRECT_MESSAGE (0x06) wire protocol + handler for peer-to-peer message delivery",
         "Message IPC handlers — message.send, message.inbox, message.history, message.read",
         "Message CLI — hypermesh message send/inbox/history/read subcommands",
-        "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)"
+        "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
+        "Cross-network asset transfers — ScopeBridge writes TransferLock/Registration/Release blockchain entries, TAG_TRANSFER wire protocol, GatewayManager with_blockchain()",
+        "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
+        "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
+        "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
+        "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)"
       ],
       "inDevelopment": [
-        "Gateway cross-scope transfers — Lock/Transfer/Unlock lifecycle code exists, not integrated end-to-end",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
         "Container runtime — ProcessIsolation with real spawn, cluster management, health+heartbeat (not integration-tested)"
       ],
       "planned": [
-        "Cross-network asset transfers with dual PoS validation",
         "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
-        "Identity distribution — key rotation entries propagated via block sync, rotation alerts for split-brain theft detection (§6.2.4)",
-        "Threshold CA — Shamir SSS splits FALCON-1024 CA key 3-of-5 across reflector nodes (§6 Phase 5)",
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 94
+    "completion": 96
   },
   {
     "id": "caesar",
@@ -369,7 +370,11 @@ export const crateStatuses: CrateStatus[] = [
         "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
         "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
         "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
-        "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides"
+        "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides",
+        "DNS-over-HTTPS (DoH) endpoint — JSON-based DNS query/response for browser-compatible resolution",
+        "Host→DNS resolution — extract_subdomain() maps Host header to blockchain DNS entries",
+        "Dynamic per-domain TLS certificates — generate_domain_cert() creates ECDSA P-256 self-signed certs on demand",
+        "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing"
       ],
       "inDevelopment": [
         "Bootstrap token flow — HTTP/3 side complete (token gen + response), STOQ-side validation missing (no token-to-PoS correlation)",
@@ -382,7 +387,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 77
+    "completion": 80
   },
   {
     "id": "hypermesh",
@@ -650,7 +655,11 @@ export const crateStatuses: CrateStatus[] = [
         "Real PoS bilateral verification on peer connections",
         "PoS-gated CA certificate issuance",
         "CA federation with PoS-validated peers",
-        "FALCON-1024 certificate signing in STOQ"
+        "FALCON-1024 certificate signing in STOQ",
+        "Threshold CA activation — split_ca_key() + sign_with_threshold() wire Shamir SSS into TrustChainCA",
+        "FederationManager key share storage — store/get/remove/list KeyShares with fingerprint validation",
+        "CRL propagation to federation — propagate_to_federation() pushes revocations to Full+Conditional peers",
+        "OCSP federated check — federated_check() queries local store first, fallback to peers"
       ],
       "inDevelopment": [
         "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
@@ -660,16 +669,10 @@ export const crateStatuses: CrateStatus[] = [
         "Peer discovery (mDNS) — PeerAnnouncement struct exists, not tested multi-node",
         "STOQ-based API server — binds [::1]:8444, handler-to-cert-store wiring not fully verified",
         "HTTP/3 handlers — exist but real cert operation flow not tested end-to-end",
-        "Decentralized CA — single-node only, no peer CA discovery or certificate exchange",
-        "CT log federation sync — message types exist but no real cross-node sync",
-        "Cross-network CA federation — FederatedCA/FederationManager structs exist but no real peer exchange",
         "Byzantine detection — ByzantineDetector monitors local node only",
-        "Threshold crypto activation — Shamir SSS code exists but not wired to actual CA key distribution",
         "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS"
       ],
       "planned": [
-        "Multi-node CA coordination (distributed certificate issuance across reflector pool)",
-        "Distributed revocation propagation (federation broadcast to peer CAs)",
         "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
         "Cascading revocation across federated CAs",
         "Offline device grace period renewal",
@@ -679,7 +682,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 56
+    "completion": 67
   },
   {
     "id": "ui",
@@ -688,60 +691,69 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
-        "React 19 + TypeScript + Vite + Tailwind 4 build system",
-        "Module pages with sub-routing (HyperMesh, TrustChain, Catalog, Caesar, Engauge)",
-        "Component library (45+ Radix UI primitives: buttons, cards, tabs, alerts, badges, etc.)",
-        "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
-        "Accessibility wrappers (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly)",
-        "React Router page routing with sidebar navigation and dark theme",
-        "React Query state management (variable staleTime per data type, retry logic)",
-        "Storybook component documentation (5 stories)",
-        "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
-        "Singleton blockmatrix-api.ts client targeting Gateway (localhost:8443) with typed responses",
-        "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
-        "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
-        "Sidebar shows real daemon status, chain height, peer count, privacy mode",
-        "No mock fallbacks — shows 'not connected' when daemon offline",
-        "TrustChain module wired to real API data",
-        "Engauge module TypeScript errors fixed",
-        "STOQ module wired to real topology data",
-        "Asset management wired to blockchain data",
-        "Engauge API hooks re-exported",
-        "Caesar wallet/rewards/ngauge pages wired to real Caesar API",
-        "HyperMesh ResourceConfiguration wired to useConfigShow with full config table",
-        "HyperMesh SharingManagement wired to real peer data",
-        "Privacy mode badge in header from useNodeStatus",
-        "useConfigShow and useConfigGet hooks for config management",
-        "Engauge Analytics wired to real capacity/trending metrics",
-        "Engauge Routing wired to real throttle status and advisory",
-        "Engauge Marketplace wired to real pools/leases/pricing",
-        "Engauge Overview wired to real overview data",
-        "Config key filter search and lookup UI",
-        "ShareDialog — modal for sharing assets with peers by name/node ID",
-        "InboxPanel — received share invitations with Accept/Reject buttons and badge count",
-        "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
-        "Sidebar Inbox nav item with live badge count from polling",
-        "Per-asset Share button in SharingManagement component",
-        "MessengerPanel — two-column messaging view (conversation list + message thread)",
-        "ConversationList — peer list with last message preview, new conversation input",
-        "MessageThread — bubble layout (sent/received), auto-scroll, compose input, send mutation",
-        "Messaging API client + React Query hooks (useMessageInbox, useMessageHistory, useMessageSend, useMessageRead)",
-        "Sidebar Messages nav item with unread badge count from polling"
+        "React 19 + TypeScript 5.9 + Vite 6 + TailwindCSS 4 + Radix UI",
+        "React Query state management (per-hook polling intervals, retry logic, cache invalidation)",
+        "React Router v6 module routing with sub-navigation per module",
+        "Accessibility (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly, LiveRegion)",
+        "E2E tests (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
+        "Design tokens (lib/tokens.ts): moduleColors, statusColors, polling intervals",
+        "Barrel exports (components/ui/index.ts): 40+ primitives, charts, composites, accessibility",
+        "CSS custom properties (--hm-hypermesh through --hm-catalog) in oklch",
+        "Custom SVG charts (LineChart, BarChart, PieChart, AreaChart, SparklineChart, GaugeChart — zero deps)",
+        "ErrorBoundary: class component, module-aware error display + retry button",
+        "ModuleLoading: skeleton-based loading placeholder",
+        "blockmatrix-api.ts: 43 typed methods covering ALL IPC handlers (core, blockchain, dns, network, topology, asset, domain, dashboard, config, share, message, caesar, engauge, trustchain, stoq, gateway, intelligence)",
+        "useBlockMatrix.ts: 43 React Query hooks with per-hook polling intervals",
+        "Zero mock data — errors shown as errors, not fake data",
+        "HyperMeshOverview: node status, chain height, peers, assets, uptime",
+        "BlockchainExplorer: block search, navigation, chain validation",
+        "DnsManagement: record table, resolve lookup, register form",
+        "TopologyView: node coordinate display, neighbor list with distances",
+        "DomainManagement: domain list, register form, join with BLAKE3-HMAC token",
+        "AssetManagement: asset list with content hashes, category badges",
+        "StorePipeline: pipeline stages diagram (Compress→Encrypt→Shard→Distribute) + CLI reference",
+        "NodeSettings: identity info (FALCON + Kyber), config viewer/filter, rotation",
+        "ResourceConfiguration: config key search, full config table",
+        "SharingManagement: share inbox, per-asset share button, connected peers",
+        "StateProofDashboard: chain validation, four proof type reference, identity keys",
+        "AdvancedAssetManagement: asset inventory from blockchain",
+        "CaesarOverview: balance cards, staking, rewards, recent transactions (useCaesar* hooks)",
+        "CaesarModule: Overview/Wallet/Rewards tabs",
+        "EngaugeOverview: capacity metrics, traffic analysis, throttle status",
+        "EngaugeAnalytics: capacity breakdown, traffic details, privacy sharing matrix",
+        "EngaugeMarketplace: tier pricing with real capacity stats",
+        "EngaugeRouting: routing advisory, congestion level, governor throttle",
+        "IntelligenceStats: H1-H7 loop status, utilization, network flow",
+        "SecurityMonitoringDashboard: CA status, cert health, federation peers, identity",
+        "TrustChainRouting: node status, network management",
+        "NetworkManagement: peers, domains, topology",
+        "TransportDashboard: connection count, bytes transferred, per-connection details",
+        "PerformanceView: throughput/latency/packet loss with grades",
+        "DashboardMonitor: unified system monitor (Overview/Performance/Network tabs)",
+        "PerformanceMonitor: STOQ transport metrics, active connections",
+        "SystemStatusWidget: compact node health widget",
+        "ShareDialog: share assets with peers by name/node ID",
+        "InboxPanel: received share invitations with Accept/Reject + badge",
+        "MessengerPanel: two-column messaging (conversation list + thread)",
+        "ConversationList: peer list with last message preview",
+        "MessageThread: bubble layout, auto-scroll, compose input",
+        "Sidebar badges: live inbox + message unread counts from polling",
+        "CatalogBrowse: asset search/filter from blockchain",
+        "CatalogInstalled: registered assets with category badges",
+        "CatalogCreate: asset creation form"
       ],
       "inDevelopment": [
-        "Global search — searches hardcoded static data only",
-        "WebSocket real-time events — Web3Events system defined but not connected to components",
-        "Node join flow — no UI for connecting to public network",
-        "Component unit tests (Vitest, 3 test files — limited coverage)"
+        "GlobalSearch — searches local assets/DNS, no full-text backend yet",
+        "Storybook stories — 3 existing, ~25 needed for full coverage",
+        "Unit test coverage — trustchain has tests, other modules need Vitest tests"
       ],
       "planned": [
-        "Live STOQ WebSocket data connections",
-        "Multi-node cluster topology visualization",
-        "Security monitoring with live alerts",
+        "Multi-node cluster topology 3D visualization",
         "First-run onboarding flow (sovereign node setup, network join)",
-        "Native desktop dashboard (Tauri cross-platform)"
+        "Native desktop dashboard (Tauri cross-platform)",
+        "Real-time SSE/WebSocket event stream (block announcements, message notifications)"
       ]
     },
-    "completion": 81
+    "completion": 88
   }
 ];

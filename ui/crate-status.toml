@@ -6,62 +6,80 @@ phase = "alpha"
 
 [features.working]
 items = [
-    # UI framework and components (real React, renders in browser)
-    "React 19 + TypeScript + Vite + Tailwind 4 build system",
-    "Module pages with sub-routing (HyperMesh, TrustChain, Catalog, Caesar, Engauge)",
-    "Component library (45+ Radix UI primitives: buttons, cards, tabs, alerts, badges, etc.)",
-    "Chart system (Line, Bar, Pie, Area, Gauge, Sparkline, Topology, Network)",
-    "Accessibility wrappers (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly)",
-    "React Router page routing with sidebar navigation and dark theme",
-    "React Query state management (variable staleTime per data type, retry logic)",
-    "Storybook component documentation (5 stories)",
-    "E2E test suite (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
-    # Real backend connectivity (Gateway API on localhost:8443)
-    "Singleton blockmatrix-api.ts client targeting Gateway (localhost:8443) with typed responses",
-    "React Query hooks for all 20 REST endpoints (useNodeStatus, useBlockchainHeight, usePeers, etc.)",
-    "Dashboard home connected to real /api/v1/status, blockchain/height, peers, assets",
-    "Sidebar shows real daemon status, chain height, peer count, privacy mode",
-    "No mock fallbacks — shows 'not connected' when daemon offline",
-    "TrustChain module wired to real API data",
-    "Engauge module TypeScript errors fixed",
-    "STOQ module wired to real topology data",
-    "Asset management wired to blockchain data",
-    "Engauge API hooks re-exported",
-    "Caesar wallet/rewards/ngauge pages wired to real Caesar API",
-    "HyperMesh ResourceConfiguration wired to useConfigShow with full config table",
-    "HyperMesh SharingManagement wired to real peer data",
-    "Privacy mode badge in header from useNodeStatus",
-    "useConfigShow and useConfigGet hooks for config management",
-    "Engauge Analytics wired to real capacity/trending metrics",
-    "Engauge Routing wired to real throttle status and advisory",
-    "Engauge Marketplace wired to real pools/leases/pricing",
-    "Engauge Overview wired to real overview data",
-    "Config key filter search and lookup UI",
-    "ShareDialog — modal for sharing assets with peers by name/node ID",
-    "InboxPanel — received share invitations with Accept/Reject buttons and badge count",
-    "Sharing API client + React Query hooks (useShareInbox, useShareSend, useShareAccept, useShareReject)",
-    "Sidebar Inbox nav item with live badge count from polling",
-    "Per-asset Share button in SharingManagement component",
-    "MessengerPanel — two-column messaging view (conversation list + message thread)",
-    "ConversationList — peer list with last message preview, new conversation input",
-    "MessageThread — bubble layout (sent/received), auto-scroll, compose input, send mutation",
-    "Messaging API client + React Query hooks (useMessageInbox, useMessageHistory, useMessageSend, useMessageRead)",
-    "Sidebar Messages nav item with unread badge count from polling",
+    # Framework + build (production-quality stack)
+    "React 19 + TypeScript 5.9 + Vite 6 + TailwindCSS 4 + Radix UI",
+    "React Query state management (per-hook polling intervals, retry logic, cache invalidation)",
+    "React Router v6 module routing with sub-navigation per module",
+    "Accessibility (KeyboardNavigationProvider, ARIA labels, ScreenReaderOnly, LiveRegion)",
+    "E2E tests (Playwright, 5 specs: accessibility, dashboard, modules, navigation, trustchain)",
+    # Design system
+    "Design tokens (lib/tokens.ts): moduleColors, statusColors, polling intervals",
+    "Barrel exports (components/ui/index.ts): 40+ primitives, charts, composites, accessibility",
+    "CSS custom properties (--hm-hypermesh through --hm-catalog) in oklch",
+    "Custom SVG charts (LineChart, BarChart, PieChart, AreaChart, SparklineChart, GaugeChart — zero deps)",
+    "ErrorBoundary: class component, module-aware error display + retry button",
+    "ModuleLoading: skeleton-based loading placeholder",
+    # Single data path: useBlockMatrix → blockmatrix-api.ts → Gateway → IPC
+    "blockmatrix-api.ts: 43 typed methods covering ALL IPC handlers (core, blockchain, dns, network, topology, asset, domain, dashboard, config, share, message, caesar, engauge, trustchain, stoq, gateway, intelligence)",
+    "useBlockMatrix.ts: 43 React Query hooks with per-hook polling intervals",
+    "Zero mock data — errors shown as errors, not fake data",
+    # HyperMesh module (12 sub-routes, all connected)
+    "HyperMeshOverview: node status, chain height, peers, assets, uptime",
+    "BlockchainExplorer: block search, navigation, chain validation",
+    "DnsManagement: record table, resolve lookup, register form",
+    "TopologyView: node coordinate display, neighbor list with distances",
+    "DomainManagement: domain list, register form, join with BLAKE3-HMAC token",
+    "AssetManagement: asset list with content hashes, category badges",
+    "StorePipeline: pipeline stages diagram (Compress→Encrypt→Shard→Distribute) + CLI reference",
+    "NodeSettings: identity info (FALCON + Kyber), config viewer/filter, rotation",
+    "ResourceConfiguration: config key search, full config table",
+    "SharingManagement: share inbox, per-asset share button, connected peers",
+    "StateProofDashboard: chain validation, four proof type reference, identity keys",
+    "AdvancedAssetManagement: asset inventory from blockchain",
+    # Caesar module (real hooks)
+    "CaesarOverview: balance cards, staking, rewards, recent transactions (useCaesar* hooks)",
+    "CaesarModule: Overview/Wallet/Rewards tabs",
+    # Engauge module (real hooks, routed + sidebar)
+    "EngaugeOverview: capacity metrics, traffic analysis, throttle status",
+    "EngaugeAnalytics: capacity breakdown, traffic details, privacy sharing matrix",
+    "EngaugeMarketplace: tier pricing with real capacity stats",
+    "EngaugeRouting: routing advisory, congestion level, governor throttle",
+    "IntelligenceStats: H1-H7 loop status, utilization, network flow",
+    # TrustChain module (real hooks)
+    "SecurityMonitoringDashboard: CA status, cert health, federation peers, identity",
+    "TrustChainRouting: node status, network management",
+    "NetworkManagement: peers, domains, topology",
+    # STOQ module (real hooks, routed + sidebar)
+    "TransportDashboard: connection count, bytes transferred, per-connection details",
+    "PerformanceView: throughput/latency/packet loss with grades",
+    # System monitoring (real hooks)
+    "DashboardMonitor: unified system monitor (Overview/Performance/Network tabs)",
+    "PerformanceMonitor: STOQ transport metrics, active connections",
+    "SystemStatusWidget: compact node health widget",
+    # P2P features (real data, fully functional)
+    "ShareDialog: share assets with peers by name/node ID",
+    "InboxPanel: received share invitations with Accept/Reject + badge",
+    "MessengerPanel: two-column messaging (conversation list + thread)",
+    "ConversationList: peer list with last message preview",
+    "MessageThread: bubble layout, auto-scroll, compose input",
+    "Sidebar badges: live inbox + message unread counts from polling",
+    # Catalog module
+    "CatalogBrowse: asset search/filter from blockchain",
+    "CatalogInstalled: registered assets with category badges",
+    "CatalogCreate: asset creation form",
 ]
 
 [features.in_development]
 items = [
-    "Global search — searches hardcoded static data only",
-    "WebSocket real-time events — Web3Events system defined but not connected to components",
-    "Node join flow — no UI for connecting to public network",
-    "Component unit tests (Vitest, 3 test files — limited coverage)",
+    "GlobalSearch — searches local assets/DNS, no full-text backend yet",
+    "Storybook stories — 3 existing, ~25 needed for full coverage",
+    "Unit test coverage — trustchain has tests, other modules need Vitest tests",
 ]
 
 [features.planned]
 items = [
-    "Live STOQ WebSocket data connections",
-    "Multi-node cluster topology visualization",
-    "Security monitoring with live alerts",
+    "Multi-node cluster topology 3D visualization",
     "First-run onboarding flow (sovereign node setup, network join)",
     "Native desktop dashboard (Tauri cross-platform)",
+    "Real-time SSE/WebSocket event stream (block announcements, message notifications)",
 ]
