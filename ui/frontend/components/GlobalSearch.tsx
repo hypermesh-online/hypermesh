@@ -32,9 +32,8 @@ import {
   useSearchSuggestions,
   useRecentSearches,
   useTrendingSearches,
-  SearchResult,
-  SearchFilter
-} from '@/lib/api/hooks/useSearch';
+} from '@/lib/api';
+import type { SearchResult, SearchFilter } from '@/lib/api';
 
 interface GlobalSearchProps {
   onResultSelect?: (result: SearchResult) => void;

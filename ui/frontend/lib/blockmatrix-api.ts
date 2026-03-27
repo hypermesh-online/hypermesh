@@ -127,6 +127,184 @@ export interface MessageInboxResponse {
   count: number;
 }
 
+// --- Caesar response types ---
+
+export interface CaesarOverview {
+  balance: number;
+  locked: number;
+  pending_rewards: number;
+  total_staked: number;
+  recent_transactions: number;
+  [key: string]: unknown;
+}
+
+export interface CaesarBalance {
+  total: number;
+  available: number;
+  locked: number;
+  pending: number;
+  staked: number;
+  [key: string]: unknown;
+}
+
+export interface TransactionItem {
+  id: string;
+  type: string;
+  from_wallet: string;
+  to_wallet: string;
+  amount: number;
+  fee: number;
+  status: string;
+  timestamp: number;
+  [key: string]: unknown;
+}
+
+export interface TransactionList {
+  transactions: TransactionItem[];
+  total: number;
+  [key: string]: unknown;
+}
+
+export interface RewardsInfo {
+  total_earned: number;
+  pending_rewards: number;
+  claimed_rewards: number;
+  daily_rate: number;
+  multiplier: number;
+  [key: string]: unknown;
+}
+
+export interface StakingInfo {
+  total_staked: number;
+  available_to_stake: number;
+  total_rewards: number;
+  apy: number;
+  active_stakes: Array<{
+    id: string;
+    amount: number;
+    apy: number;
+    status: string;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+}
+
+// --- Engauge response types ---
+
+export interface CapacityMetrics {
+  cpu_usage: number;
+  memory_usage: number;
+  storage_usage: number;
+  network_usage: number;
+  total_capacity: number;
+  [key: string]: unknown;
+}
+
+export interface TrafficAnalysis {
+  bytes_in: number;
+  bytes_out: number;
+  packets_in: number;
+  packets_out: number;
+  active_flows: number;
+  [key: string]: unknown;
+}
+
+export interface ThrottleStatus {
+  is_throttled: boolean;
+  current_rate: number;
+  max_rate: number;
+  reason?: string;
+  [key: string]: unknown;
+}
+
+export interface RoutingAdvisory {
+  recommended_paths: Array<{
+    destination: string;
+    metric: number;
+    [key: string]: unknown;
+  }>;
+  congestion_level: number;
+  [key: string]: unknown;
+}
+
+// --- TrustChain response types ---
+
+export interface TrustChainStatus {
+  ca_status: string;
+  total_certs: number;
+  active_certs: number;
+  revoked_certs: number;
+  [key: string]: unknown;
+}
+
+export interface CertRecord {
+  id: string;
+  subject: string;
+  issuer: string;
+  valid_from: string;
+  valid_to: string;
+  status: string;
+  [key: string]: unknown;
+}
+
+export interface CertList {
+  certificates: CertRecord[];
+  total: number;
+  [key: string]: unknown;
+}
+
+export interface IdentityInfo {
+  node_id: string;
+  public_key: string;
+  key_algorithm: string;
+  created_at: number;
+  [key: string]: unknown;
+}
+
+export interface FederationInfo {
+  peers: Array<{
+    node_id: string;
+    trust_level: string;
+    [key: string]: unknown;
+  }>;
+  total_peers: number;
+  [key: string]: unknown;
+}
+
+// --- STOQ response types ---
+
+export interface StoqStats {
+  connections_active: number;
+  bytes_sent: number;
+  bytes_received: number;
+  packets_sent: number;
+  packets_received: number;
+  [key: string]: unknown;
+}
+
+export interface ConnectionRecord {
+  id: string;
+  remote_addr: string;
+  state: string;
+  bytes_sent: number;
+  bytes_received: number;
+  [key: string]: unknown;
+}
+
+export interface ConnectionList {
+  connections: ConnectionRecord[];
+  total: number;
+  [key: string]: unknown;
+}
+
+export interface PerformanceMetrics {
+  throughput_mbps: number;
+  latency_ms: number;
+  packet_loss_pct: number;
+  jitter_ms: number;
+  [key: string]: unknown;
+}
+
 // --- Client ---
 
 class BlockMatrixClient {
@@ -336,6 +514,79 @@ class BlockMatrixClient {
       method: 'POST',
       body: JSON.stringify({ message_id: messageId }),
     });
+  }
+
+  // --- Caesar ---
+
+  async caesarOverview(): Promise<CaesarOverview> {
+    return this.fetchJson('/api/v1/caesar/overview');
+  }
+
+  async caesarBalance(): Promise<CaesarBalance> {
+    return this.fetchJson('/api/v1/caesar/balance');
+  }
+
+  async caesarTransactions(limit?: number): Promise<TransactionList> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.fetchJson(`/api/v1/caesar/transactions${params}`);
+  }
+
+  async caesarRewards(): Promise<RewardsInfo> {
+    return this.fetchJson('/api/v1/caesar/rewards');
+  }
+
+  async caesarStaking(): Promise<StakingInfo> {
+    return this.fetchJson('/api/v1/caesar/staking');
+  }
+
+  // --- Engauge ---
+
+  async engaugeCapacity(): Promise<CapacityMetrics> {
+    return this.fetchJson('/api/v1/engauge/capacity');
+  }
+
+  async engaugeTraffic(): Promise<TrafficAnalysis> {
+    return this.fetchJson('/api/v1/engauge/traffic');
+  }
+
+  async engaugeThrottle(): Promise<ThrottleStatus> {
+    return this.fetchJson('/api/v1/engauge/throttle');
+  }
+
+  async engaugeRouting(): Promise<RoutingAdvisory> {
+    return this.fetchJson('/api/v1/engauge/routing');
+  }
+
+  // --- TrustChain ---
+
+  async trustchainStatus(): Promise<TrustChainStatus> {
+    return this.fetchJson('/api/v1/trustchain/status');
+  }
+
+  async trustchainCerts(): Promise<CertList> {
+    return this.fetchJson('/api/v1/trustchain/certs');
+  }
+
+  async trustchainIdentity(): Promise<IdentityInfo> {
+    return this.fetchJson('/api/v1/trustchain/identity');
+  }
+
+  async trustchainFederation(): Promise<FederationInfo> {
+    return this.fetchJson('/api/v1/trustchain/federation');
+  }
+
+  // --- STOQ ---
+
+  async stoqStats(): Promise<StoqStats> {
+    return this.fetchJson('/api/v1/stoq/stats');
+  }
+
+  async stoqConnections(): Promise<ConnectionList> {
+    return this.fetchJson('/api/v1/stoq/connections');
+  }
+
+  async stoqPerformance(): Promise<PerformanceMetrics> {
+    return this.fetchJson('/api/v1/stoq/performance');
   }
 }
 

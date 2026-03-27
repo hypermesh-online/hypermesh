@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { Asset, VMAsset, VMExecution } from '@/lib/api/services/HyperMeshTypes';
+import type { Asset, VMAsset, VMExecution } from '@/lib/api';
 import type { SystemStatus } from '@/lib/api';
 import {
   HardDrive, Cpu, MemoryStick, Network, Server, Globe,

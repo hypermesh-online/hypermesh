@@ -25,6 +25,22 @@ import {
   type ShareActionResponse,
   type MessageInboxResponse,
   type MessageItem,
+  type CaesarOverview,
+  type CaesarBalance,
+  type TransactionList,
+  type RewardsInfo,
+  type StakingInfo,
+  type CapacityMetrics,
+  type TrafficAnalysis,
+  type ThrottleStatus,
+  type RoutingAdvisory,
+  type TrustChainStatus,
+  type CertList,
+  type IdentityInfo,
+  type FederationInfo,
+  type StoqStats,
+  type ConnectionList,
+  type PerformanceMetrics,
 } from '../blockmatrix-api';
 
 // ---------- Core ----------
@@ -314,5 +330,172 @@ export function useMessageRead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['blockmatrix', 'message', 'inbox'] });
     },
+  });
+}
+
+// ---------- Caesar ----------
+
+/** Caesar overview (balance, staking, recent tx count) */
+export function useCaesarOverview(pollInterval = 30_000) {
+  return useQuery<CaesarOverview>({
+    queryKey: ['caesar', 'overview'],
+    queryFn: () => blockMatrixClient.caesarOverview(),
+    refetchInterval: pollInterval,
+    staleTime: 15_000,
+    retry: 2,
+  });
+}
+
+/** Caesar balance */
+export function useCaesarBalance(pollInterval = 10_000) {
+  return useQuery<CaesarBalance>({
+    queryKey: ['caesar', 'balance'],
+    queryFn: () => blockMatrixClient.caesarBalance(),
+    refetchInterval: pollInterval,
+    staleTime: 5_000,
+  });
+}
+
+/** Caesar transaction list */
+export function useCaesarTransactions(limit?: number) {
+  return useQuery<TransactionList>({
+    queryKey: ['caesar', 'transactions', limit],
+    queryFn: () => blockMatrixClient.caesarTransactions(limit),
+    staleTime: 10_000,
+  });
+}
+
+/** Caesar rewards info */
+export function useCaesarRewards(pollInterval = 30_000) {
+  return useQuery<RewardsInfo>({
+    queryKey: ['caesar', 'rewards'],
+    queryFn: () => blockMatrixClient.caesarRewards(),
+    refetchInterval: pollInterval,
+    staleTime: 15_000,
+  });
+}
+
+/** Caesar staking info */
+export function useCaesarStaking(pollInterval = 60_000) {
+  return useQuery<StakingInfo>({
+    queryKey: ['caesar', 'staking'],
+    queryFn: () => blockMatrixClient.caesarStaking(),
+    refetchInterval: pollInterval,
+    staleTime: 30_000,
+  });
+}
+
+// ---------- Engauge ----------
+
+/** Engauge capacity metrics */
+export function useEngaugeCapacity(pollInterval = 5_000) {
+  return useQuery<CapacityMetrics>({
+    queryKey: ['engauge', 'capacity'],
+    queryFn: () => blockMatrixClient.engaugeCapacity(),
+    refetchInterval: pollInterval,
+    staleTime: 3_000,
+  });
+}
+
+/** Engauge traffic analysis */
+export function useEngaugeTraffic(pollInterval = 10_000) {
+  return useQuery<TrafficAnalysis>({
+    queryKey: ['engauge', 'traffic'],
+    queryFn: () => blockMatrixClient.engaugeTraffic(),
+    refetchInterval: pollInterval,
+    staleTime: 5_000,
+  });
+}
+
+/** Engauge throttle status */
+export function useEngaugeThrottle(pollInterval = 5_000) {
+  return useQuery<ThrottleStatus>({
+    queryKey: ['engauge', 'throttle'],
+    queryFn: () => blockMatrixClient.engaugeThrottle(),
+    refetchInterval: pollInterval,
+    staleTime: 3_000,
+  });
+}
+
+/** Engauge routing advisory */
+export function useEngaugeRouting(pollInterval = 15_000) {
+  return useQuery<RoutingAdvisory>({
+    queryKey: ['engauge', 'routing'],
+    queryFn: () => blockMatrixClient.engaugeRouting(),
+    refetchInterval: pollInterval,
+    staleTime: 10_000,
+  });
+}
+
+// ---------- TrustChain ----------
+
+/** TrustChain CA status */
+export function useTrustchainStatus(pollInterval = 30_000) {
+  return useQuery<TrustChainStatus>({
+    queryKey: ['trustchain', 'status'],
+    queryFn: () => blockMatrixClient.trustchainStatus(),
+    refetchInterval: pollInterval,
+    staleTime: 15_000,
+  });
+}
+
+/** TrustChain certificate list */
+export function useTrustchainCerts(pollInterval = 60_000) {
+  return useQuery<CertList>({
+    queryKey: ['trustchain', 'certs'],
+    queryFn: () => blockMatrixClient.trustchainCerts(),
+    refetchInterval: pollInterval,
+    staleTime: 30_000,
+  });
+}
+
+/** TrustChain identity info (static, no polling) */
+export function useTrustchainIdentity() {
+  return useQuery<IdentityInfo>({
+    queryKey: ['trustchain', 'identity'],
+    queryFn: () => blockMatrixClient.trustchainIdentity(),
+    staleTime: 300_000,
+  });
+}
+
+/** TrustChain federation info */
+export function useTrustchainFederation(pollInterval = 30_000) {
+  return useQuery<FederationInfo>({
+    queryKey: ['trustchain', 'federation'],
+    queryFn: () => blockMatrixClient.trustchainFederation(),
+    refetchInterval: pollInterval,
+    staleTime: 15_000,
+  });
+}
+
+// ---------- STOQ ----------
+
+/** STOQ transport stats */
+export function useStoqStats(pollInterval = 5_000) {
+  return useQuery<StoqStats>({
+    queryKey: ['stoq', 'stats'],
+    queryFn: () => blockMatrixClient.stoqStats(),
+    refetchInterval: pollInterval,
+    staleTime: 3_000,
+  });
+}
+
+/** STOQ active connections */
+export function useStoqConnections(pollInterval = 10_000) {
+  return useQuery<ConnectionList>({
+    queryKey: ['stoq', 'connections'],
+    queryFn: () => blockMatrixClient.stoqConnections(),
+    refetchInterval: pollInterval,
+    staleTime: 5_000,
+  });
+}
+
+/** STOQ performance metrics */
+export function useStoqPerformance(pollInterval = 5_000) {
+  return useQuery<PerformanceMetrics>({
+    queryKey: ['stoq', 'performance'],
+    queryFn: () => blockMatrixClient.stoqPerformance(),
+    refetchInterval: pollInterval,
+    staleTime: 3_000,
   });
 }

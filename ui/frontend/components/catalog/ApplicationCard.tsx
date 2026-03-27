@@ -22,7 +22,7 @@ import {
   Activity,
   Zap
 } from 'lucide-react';
-import { CatalogApplication } from '@/lib/api/services/HyperMeshAPI';
+import type { CatalogApplication } from '@/lib/api';
 
 interface ApplicationCardProps {
   app: CatalogApplication;

@@ -6,7 +6,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PrivacyLevel } from '@/lib/api/services/HyperMeshAPI';
+import { type PrivacyLevel } from '@/lib/api';
 
 // Import modular components
 import { CatalogBrowse } from '../catalog/CatalogBrowse';

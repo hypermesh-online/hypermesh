@@ -14,9 +14,9 @@ import {
   Code,
   FileText
 } from 'lucide-react';
-import { useCreateVMAsset } from '@/lib/api/hooks/useAssets';
-import { PrivacyLevel } from '@/lib/api/services/HyperMeshAPI';
-import type { CatalogApplication } from '@/lib/api/services/HyperMeshAPI';
+import { useCreateVMAsset } from '@/lib/api';
+import { type PrivacyLevel } from '@/lib/api';
+import type { CatalogApplication } from '@/lib/api';
 
 export function CatalogCreate() {
   const createVMAsset = useCreateVMAsset();

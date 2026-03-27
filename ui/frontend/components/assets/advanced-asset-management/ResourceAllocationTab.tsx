@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Share } from 'lucide-react';
-import type { AssetAllocation } from '@/lib/api/services/HyperMeshTypes';
+import type { AssetAllocation } from '@/lib/api';
 
 interface ResourceAllocationTabProps {
   activeAllocations: AssetAllocation[] | undefined;

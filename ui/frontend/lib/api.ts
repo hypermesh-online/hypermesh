@@ -130,7 +130,3 @@ export function createWebSocket(path: string): WebSocket {
 
 // Export all API modules
 export * from './api/index';
-export type {
-  TransactionType,
-  TransactionStatus
-} from './api/index';
