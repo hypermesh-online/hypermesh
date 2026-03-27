@@ -8,9 +8,11 @@
 
 pub mod asset;
 pub mod blockchain;
+pub mod caesar;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
+pub mod engauge;
 pub mod gateway;
 pub mod intelligence;
 pub mod domain;
@@ -18,8 +20,10 @@ pub mod message;
 pub mod network;
 pub mod share;
 pub mod shard;
+pub mod stoq;
 pub mod store;
 pub mod topology;
+pub mod trustchain;
 
 use std::sync::Arc;
 
@@ -93,6 +97,10 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     share::register(handler, &state);
     message::register(handler, &state);
     intelligence::register(handler, &state);
+    caesar::register(handler, &state);
+    engauge::register(handler, &state);
+    trustchain::register(handler, &state);
+    stoq::register(handler, &state);
     config::register(handler);
 }
 
@@ -209,6 +217,22 @@ pub(crate) mod tests {
             "identity.rotate",
             "peer.pubkey",
             "intelligence.stats",
+            "caesar.overview",
+            "caesar.balance",
+            "caesar.transactions",
+            "caesar.rewards",
+            "caesar.staking",
+            "engauge.capacity",
+            "engauge.traffic",
+            "engauge.throttle",
+            "engauge.routing",
+            "trustchain.status",
+            "trustchain.certs",
+            "trustchain.identity",
+            "trustchain.federation",
+            "stoq.stats",
+            "stoq.connections",
+            "stoq.performance",
             "config.show",
             "config.get",
             "config.set",
