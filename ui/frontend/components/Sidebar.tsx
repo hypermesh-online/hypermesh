@@ -15,6 +15,8 @@ import {
   Activity,
   Inbox,
   MessageSquare,
+  BarChart2,
+  Zap,
 } from 'lucide-react';
 
 const navigation = [
@@ -53,6 +55,18 @@ const navigation = [
     href: '/caesar',
     icon: Coins,
     description: 'Token integration and economics'
+  },
+  {
+    name: 'Engauge',
+    href: '/engauge',
+    icon: BarChart2,
+    description: 'Analytics and resource marketplace'
+  },
+  {
+    name: 'STOQ',
+    href: '/stoq',
+    icon: Zap,
+    description: 'QUIC transport protocol'
   },
   {
     name: 'Inbox',

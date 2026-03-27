@@ -22,7 +22,6 @@ import {
   Clock,
   ArrowDownLeft,
   ArrowUpRight,
-  BarChart3,
 } from 'lucide-react';
 import {
   useBalance,
@@ -31,7 +30,6 @@ import {
   useStakingInfo,
   useEarnings,
   useClaimRewards,
-  useAnalytics,
 } from '@/lib/api';
 import { TransactionType, TransactionStatus } from '@/lib/api';
 import type { Transaction } from '@/lib/api';
@@ -41,7 +39,6 @@ const subNavigation = [
   { name: 'Overview', href: '/caesar' },
   { name: 'Wallet', href: '/caesar/wallet' },
   { name: 'Rewards', href: '/caesar/rewards' },
-  { name: 'NGauge', href: '/caesar/ngauge' },
 ];
 
 function CaesarWallet() {
@@ -346,118 +343,6 @@ function CaesarRewards() {
   );
 }
 
-function CaesarNGauge() {
-  const { data: analytics, isLoading, error } = useAnalytics();
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white">NGauge Integration</h2>
-        <Alert className="bg-red-500/10 border-red-500/30">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Caesar analytics service offline. Unable to load NGauge data.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">NGauge Integration</h2>
-      <p className="text-gray-400">Network analytics and engagement metrics from the Caesar economic system.</p>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-black/40 border-yellow-500/30 backdrop-blur-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Active Nodes</CardTitle>
-            <BarChart3 className="h-4 w-4 text-yellow-400" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-bold text-yellow-400">
-                {analytics?.network_activity.active_nodes ?? 0}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-black/40 border-green-500/30 backdrop-blur-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">24h Transactions</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-400" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-bold text-green-400">
-                {analytics?.transactions_24h ?? 0}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-black/40 border-blue-500/30 backdrop-blur-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Resources Shared</CardTitle>
-            <BarChart3 className="h-4 w-4 text-blue-400" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-bold text-blue-400">
-                {analytics?.network_activity.total_resources_shared ?? 0}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-black/40 border-purple-500/30 backdrop-blur-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">24h Rewards</CardTitle>
-            <Gift className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-20" /> : (
-              <div className="text-2xl font-bold text-purple-400">
-                {analytics?.network_activity.rewards_distributed_24h.toFixed(2) ?? '0.00'}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Staking Metrics */}
-      {analytics?.staking_metrics && (
-        <Card className="bg-black/40 border-gray-800 backdrop-blur-lg">
-          <CardHeader>
-            <CardTitle className="text-white">Staking Metrics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="bg-black/20 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Total Staked</p>
-                <p className="text-lg font-bold text-white">{analytics.staking_metrics.total_staked.toFixed(2)} CSR</p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Staking Ratio</p>
-                <p className="text-lg font-bold text-white">{(analytics.staking_metrics.staking_ratio * 100).toFixed(1)}%</p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Avg Lock Period</p>
-                <p className="text-lg font-bold text-white">{analytics.staking_metrics.average_lock_period}d</p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-3">
-                <p className="text-xs text-gray-400">Total Stakers</p>
-                <p className="text-lg font-bold text-white">{analytics.staking_metrics.total_stakers}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
 export default function CaesarModule() {
   const location = useLocation();
 
@@ -486,7 +371,6 @@ export default function CaesarModule() {
         <Route path="/" element={<CaesarOverview />} />
         <Route path="/wallet" element={<CaesarWallet />} />
         <Route path="/rewards" element={<CaesarRewards />} />
-        <Route path="/ngauge" element={<CaesarNGauge />} />
       </Routes>
     </div>
   );

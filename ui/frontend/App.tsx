@@ -7,12 +7,15 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { KeyboardNavigationProvider } from '@/components/ui/KeyboardNavigationProvider';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { DashboardHome } from './components/DashboardHome';
 import { HyperMeshModule } from './components/modules/HyperMeshModule';
 import { CatalogModule } from './components/modules/CatalogModule';
 import { TrustChainModule } from './components/modules/TrustChainModule';
 import CaesarModule from './components/modules/CaesarModule';
+import EngaugeModule from './components/modules/EngaugeModule';
+import { StoqModule } from './components/modules/StoqModule';
 import { DashboardMonitor } from './components/api/DashboardMonitor';
 import { InboxPanel } from './components/sharing/InboxPanel';
 import { MessengerPanel } from './components/messaging/MessengerPanel';
@@ -64,13 +67,15 @@ export default function App() {
             <Layout>
               <Routes>
                 <Route path="/" element={<DashboardHome />} />
-                <Route path="/monitor" element={<DashboardMonitor />} />
-                <Route path="/hypermesh/*" element={<HyperMeshModule />} />
-                <Route path="/catalog/*" element={<CatalogModule />} />
-                <Route path="/trustchain/*" element={<TrustChainModule />} />
-                <Route path="/caesar/*" element={<CaesarModule />} />
-                <Route path="/inbox" element={<InboxPanel />} />
-                <Route path="/messages" element={<MessengerPanel />} />
+                <Route path="/monitor" element={<ErrorBoundary module="Monitor"><DashboardMonitor /></ErrorBoundary>} />
+                <Route path="/hypermesh/*" element={<ErrorBoundary module="HyperMesh"><HyperMeshModule /></ErrorBoundary>} />
+                <Route path="/catalog/*" element={<ErrorBoundary module="Catalog"><CatalogModule /></ErrorBoundary>} />
+                <Route path="/trustchain/*" element={<ErrorBoundary module="TrustChain"><TrustChainModule /></ErrorBoundary>} />
+                <Route path="/caesar/*" element={<ErrorBoundary module="Caesar"><CaesarModule /></ErrorBoundary>} />
+                <Route path="/engauge/*" element={<ErrorBoundary module="Engauge"><EngaugeModule /></ErrorBoundary>} />
+                <Route path="/stoq/*" element={<ErrorBoundary module="STOQ"><StoqModule /></ErrorBoundary>} />
+                <Route path="/inbox" element={<ErrorBoundary module="Inbox"><InboxPanel /></ErrorBoundary>} />
+                <Route path="/messages" element={<ErrorBoundary module="Messages"><MessengerPanel /></ErrorBoundary>} />
               </Routes>
             </Layout>
             <Toaster />

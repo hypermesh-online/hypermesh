@@ -109,13 +109,13 @@ export function ModuleConnections({
         provides: ['Asset registry', 'Resource creation', 'Service deployment']
       },
       {
-        name: 'Ngauge',
+        name: 'Engauge',
         icon: Gauge,
-        status: 'locked',
-        description: 'Analytics and user engagement',
-        href: '/ngauge',
-        dependencies: ['Multi-network access'],
-        provides: ['Privacy analytics', 'User onboarding', 'Ad network']
+        status: 'enabled',
+        description: 'Analytics and resource marketplace',
+        href: '/engauge',
+        dependencies: ['STOQ transport', 'BlockMatrix metrics'],
+        provides: ['Capacity metrics', 'Routing intelligence', 'Marketplace']
       }
     ];
 

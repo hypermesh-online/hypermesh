@@ -27,7 +27,8 @@ export function Header() {
     if (path.includes('/trustchain')) return 'green';
     if (path.includes('/caesar')) return 'yellow';
     if (path.includes('/catalog')) return 'red';
-    if (path.includes('/ngauge')) return 'purple';
+    if (path.includes('/engauge')) return 'orange';
+    if (path.includes('/stoq')) return 'purple';
     return 'cyan';
   };
 
