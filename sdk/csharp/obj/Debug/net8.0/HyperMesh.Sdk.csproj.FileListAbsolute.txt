@@ -1,0 +1,12 @@
+/home/persist/hypermesh/core/sdk/csharp/bin/Debug/net8.0/HyperMesh.Sdk.deps.json
+/home/persist/hypermesh/core/sdk/csharp/bin/Debug/net8.0/HyperMesh.Sdk.dll
+/home/persist/hypermesh/core/sdk/csharp/bin/Debug/net8.0/HyperMesh.Sdk.pdb
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.GeneratedMSBuildEditorConfig.editorconfig
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.AssemblyInfoInputs.cache
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.AssemblyInfo.cs
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.csproj.CoreCompileInputs.cache
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.sourcelink.json
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.dll
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/refint/HyperMesh.Sdk.dll
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/HyperMesh.Sdk.pdb
+/home/persist/hypermesh/core/sdk/csharp/obj/Debug/net8.0/ref/HyperMesh.Sdk.dll

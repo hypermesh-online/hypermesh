@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "04c53j/gsU8=",
+  "success": true,
+  "projectFilePath": "/home/persist/hypermesh/core/sdk/csharp/HyperMesh.Sdk.csproj",
+  "expectedPackageFiles": [
+    "/home/persist/.nuget/packages/microsoft.netcore.app.ref/8.0.22/microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
+    "/home/persist/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512"
+  ],
+  "logs": []
+}
