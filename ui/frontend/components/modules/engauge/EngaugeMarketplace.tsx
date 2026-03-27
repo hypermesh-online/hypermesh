@@ -1,147 +1,137 @@
-// @ts-nocheck — Phase 8 will rewrite with useBlockMatrix hooks
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Store, FileText, DollarSign, AlertTriangle } from 'lucide-react';
-import { useResourcePools, useLeases, usePricingInfo, useCreateLease } from '@/lib/api';
-import { cn } from '@/lib/utils';
-
-const leaseStateColors: Record<string, string> = {
-  Proposed: 'text-blue-400 bg-blue-500/20',
-  Active: 'text-green-400 bg-green-500/20',
-  Completed: 'text-gray-400 bg-gray-500/20',
-  Cancelled: 'text-red-400 bg-red-500/20',
-};
+import { ModuleLoading } from '@/components/ui/ModuleLoading';
+import { useEngaugeCapacity } from '@/lib/hooks/useBlockMatrix';
+import { Store, Info, AlertTriangle } from 'lucide-react';
 
 export default function EngaugeMarketplace() {
-  const pools = useResourcePools();
-  const leases = useLeases();
-  const pricing = usePricingInfo();
-  const createLease = useCreateLease();
+  const capacity = useEngaugeCapacity();
 
-  const allErrored = pools.error && leases.error && pricing.error;
-
-  if (allErrored) {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white">Resource Marketplace</h2>
-        <Card className="bg-black/40 border-red-500/30 backdrop-blur-lg">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertTriangle className="h-10 w-10 text-red-400 mb-3" />
-            <p className="text-red-400 font-medium">Engauge service offline</p>
-            <p className="text-gray-500 text-sm mt-1">Unable to reach the marketplace backend.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (capacity.isLoading) {
+    return <ModuleLoading />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <h2 className="text-2xl font-bold text-white">Resource Marketplace</h2>
 
-      {/* Pricing Engine */}
+      {/* Alpha Notice */}
       <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-orange-400" />
-            Tier Pricing
+            <Info className="h-5 w-5 text-orange-400" />
+            Alpha Status
           </CardTitle>
-          <CardDescription className="text-gray-400">Market tier multipliers for resource pricing</CardDescription>
         </CardHeader>
         <CardContent>
-          {pricing.isLoading ? <Skeleton className="h-24 w-full" /> : pricing.error ? (
-            <p className="text-gray-500 text-center py-4">Pricing data unavailable</p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-4">
-              {pricing.data?.map(p => (
-                <div key={p.tier} className="p-3 rounded-lg bg-black/20 border border-gray-800 text-center">
-                  <Badge className="mb-2">{p.tier}</Badge>
-                  <div className="text-xl font-bold text-orange-400">{p.multiplier}x</div>
-                  <div className="text-xs text-gray-400">{p.effective_price.toFixed(4)} GG/unit</div>
-                </div>
-              )) || <p className="text-gray-500">No pricing data</p>}
-            </div>
-          )}
+          <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+            <p className="text-gray-300 text-sm">
+              The Resource Marketplace is in alpha. Lease contracts, pricing engine, and
+              resource pools are being built. Current capacity metrics from engauge are shown below.
+            </p>
+            <Badge className="mt-3 bg-orange-500/20 text-orange-400 border-orange-500/30">
+              Alpha Preview
+            </Badge>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Resource Pools */}
+      {/* Current Capacity Stats */}
       <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Store className="h-5 w-5 text-orange-400" />
-            Resource Pools
+            Available Resources
           </CardTitle>
+          <CardDescription className="text-gray-400">
+            Real-time resource availability from engauge capacity metrics
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {pools.isLoading ? <Skeleton className="h-40 w-full" /> : pools.error ? (
-            <p className="text-gray-500 text-center py-4">Resource pool data unavailable</p>
+          {capacity.error ? (
+            <div className="flex items-center gap-3 py-4">
+              <AlertTriangle className="h-5 w-5 text-red-400" />
+              <p className="text-gray-500">Capacity data unavailable</p>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {pools.data?.map(pool => (
-                <div key={pool.pool_id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">
-                  <div>
-                    <div className="text-sm text-white font-medium">{pool.resource_type}</div>
-                    <div className="text-xs text-gray-400">
-                      {pool.available_units}/{pool.total_units} available - Sovereign: {pool.sovereign_allocation_pct}%
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-orange-400">{pool.price_per_unit.toFixed(4)} GG/unit</span>
-                    <Button
-                      size="sm"
-                      className="bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"
-                      onClick={() => createLease.mutate({ pool_id: pool.pool_id, units: 1, tier: pool.tier })}
-                      disabled={createLease.isPending}
-                    >
-                      Lease
-                    </Button>
-                  </div>
-                </div>
-              )) || <p className="text-gray-500 text-center py-4">No pools available</p>}
+            <div className="grid gap-3 md:grid-cols-2">
+              <ResourceRow
+                label="CPU"
+                value={capacity.data?.cpu_usage}
+                format={(v) => `${((1 - v) * 100).toFixed(1)}% available`}
+              />
+              <ResourceRow
+                label="Memory"
+                value={capacity.data?.memory_usage}
+                format={(v) => `${((1 - v) * 100).toFixed(1)}% available`}
+              />
+              <ResourceRow
+                label="Storage"
+                value={capacity.data?.storage_usage}
+                format={(v) => `${((1 - v) * 100).toFixed(1)}% available`}
+              />
+              <ResourceRow
+                label="Network"
+                value={capacity.data?.network_usage}
+                format={(v) => `${((1 - v) * 100).toFixed(1)}% available`}
+              />
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Active Leases */}
+      {/* Tier Pricing (Static) */}
       <Card className="bg-black/40 border-orange-500/30 backdrop-blur-lg">
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <FileText className="h-5 w-5 text-orange-400" />
-            Lease Contracts
-          </CardTitle>
+          <CardTitle className="text-white">Tier Pricing</CardTitle>
+          <CardDescription className="text-gray-400">
+            Market tier multipliers for resource pricing
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {leases.isLoading ? <Skeleton className="h-32 w-full" /> : leases.error ? (
-            <p className="text-gray-500 text-center py-4">Lease data unavailable</p>
-          ) : (
-            <div className="space-y-2">
-              {leases.data?.map(lease => (
-                <div key={lease.lease_id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Badge className={leaseStateColors[lease.state] || ''}>{lease.state}</Badge>
-                    <div>
-                      <div className="text-sm text-white font-mono">{lease.lease_id.slice(0, 12)}...</div>
-                      <div className="text-xs text-gray-400">{lease.units} units - {lease.cost_gg.toFixed(4)} GG</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(lease.expires_at).toLocaleDateString()}
-                  </div>
-                </div>
-              )) || <p className="text-gray-500 text-center py-4">No leases</p>}
-            </div>
-          )}
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              { tier: 'L0 (Hot)', multiplier: '1.0x' },
+              { tier: 'L1 (Warm)', multiplier: '0.8x' },
+              { tier: 'L2 (Cool)', multiplier: '0.5x' },
+              { tier: 'L3 (Cold)', multiplier: '0.2x' },
+            ].map((p) => (
+              <div
+                key={p.tier}
+                className="p-3 rounded-lg bg-black/20 border border-gray-800 text-center"
+              >
+                <Badge className="mb-2">{p.tier}</Badge>
+                <div className="text-xl font-bold text-orange-400">{p.multiplier}</div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ResourceRow({
+  label,
+  value,
+  format,
+}: {
+  label: string;
+  value: number | undefined;
+  format: (v: number) => string;
+}) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800">
+      <span className="text-sm text-white font-medium">{label}</span>
+      <span className="text-sm text-orange-400">
+        {value != null ? format(value) : '--'}
+      </span>
     </div>
   );
 }

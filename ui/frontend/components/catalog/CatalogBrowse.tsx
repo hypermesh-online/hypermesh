@@ -1,136 +1,64 @@
-// @ts-nocheck — Phase 8 will rewrite with useBlockMatrix hooks
 // Copyright © 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Package, 
-  Download,
-  Play,
-  CheckCircle,
-  AlertTriangle,
-  Clock,
-  Eye,
-  Cpu,
-  Database,
-  Globe,
-  Shield,
-  Activity,
-  Zap
-} from 'lucide-react';
-import {
-  useCatalogApplications,
-  useInstallCatalogApplication,
-  useExecuteVMAsset,
-} from '@/lib/api';
-import type {
-  CatalogApplication,
-} from '@/lib/api';
-import { type PrivacyLevel } from '@/lib/api';
-import { CatalogSearchHeader } from './CatalogSearchHeader';
-import { ApplicationCard } from './ApplicationCard';
+import { Package, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { useAssetList } from '@/lib/hooks/useBlockMatrix';
+import { ModuleLoading } from '@/components/ui/ModuleLoading';
 
-interface CatalogBrowseProps {
-  selectedPrivacyLevel: PrivacyLevel;
-  onPrivacyLevelChange: (level: PrivacyLevel) => void;
-}
+export function CatalogBrowse() {
+  const { data: assets, isLoading, error } = useAssetList();
+  const [filter, setFilter] = React.useState('');
 
-export function CatalogBrowse({ selectedPrivacyLevel, onPrivacyLevelChange }: CatalogBrowseProps) {
-  const { applications, isLoading, availableApps, installedApps, vmAssets } = useCatalogApplications();
-  const installApp = useInstallCatalogApplication();
-  const executeVM = useExecuteVMAsset();
+  if (isLoading) return <ModuleLoading />;
 
-  const handleInstallApplication = async (app: CatalogApplication) => {
-    try {
-      await installApp.mutateAsync({
-        catalogId: app.id,
-        config: {
-          privacyLevel: selectedPrivacyLevel,
-          autoStart: false,
-          resourceLimits: {
-            maxCpu: app.requirements.cpu || 1,
-            maxMemory: `${app.requirements.memory || 1}GB`,
-            maxStorage: `${app.requirements.storage || 1}GB`,
-            maxExecutionTime: 300
-          }
-        }
-      });
-      alert(`Successfully installed ${app.name} as HyperMesh VM asset!`);
-    } catch (error) {
-      console.error('Installation failed:', error);
-      alert(`Failed to install ${app.name}. Check console for details.`);
-    }
-  };
-
-  const handleRunApplication = async (app: CatalogApplication) => {
-    if (!app.assetId) {
-      alert('Application must be installed as VM asset first');
-      return;
-    }
-
-    try {
-      await executeVM.mutateAsync({
-        vmAssetId: app.assetId,
-        operation: 'start',
-        parameters: {},
-        timeout: 300,
-        requiresStateProof: true,
-        allocationDuration: 3600
-      });
-      alert(`Starting ${app.name} execution through HyperMesh...`);
-    } catch (error) {
-      console.error('Execution failed:', error);
-      alert(`Failed to run ${app.name}. Check console for details.`);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <CatalogSearchHeader 
-          selectedPrivacyLevel={selectedPrivacyLevel}
-          onPrivacyLevelChange={onPrivacyLevelChange}
-        />
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto"></div>
-          <p className="text-gray-400 mt-4">Loading HyperMesh assets...</p>
-        </div>
-      </div>
-    );
-  }
+  const filteredAssets = (assets || []).filter((a: { content_hash?: string; category?: string }) =>
+    !filter || (a.content_hash || '').includes(filter) || (a.category || '').toLowerCase().includes(filter.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6">
-      <CatalogSearchHeader 
-        selectedPrivacyLevel={selectedPrivacyLevel}
-        onPrivacyLevelChange={onPrivacyLevelChange}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Search className="h-4 w-4 text-gray-400" />
+        <Input
+          placeholder="Search assets by hash or category..."
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
 
-      {/* Browse Section */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {availableApps.map((app) => (
-          <ApplicationCard
-            key={app.id}
-            app={app}
-            onInstall={handleInstallApplication}
-            onRun={handleRunApplication}
-            isInstalling={installApp.isPending}
-            isRunning={executeVM.isPending}
-          />
+      {error && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="p-4 text-red-400 text-sm">{error.message}</CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredAssets.map((asset: { content_hash?: string; category?: string; block_index?: number }, i: number) => (
+          <Card key={asset.content_hash || i} className="border-pink-500/20 bg-pink-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package className="h-4 w-4 text-pink-400" />
+                <span className="truncate font-mono text-xs">{(asset.content_hash || '').slice(0, 16)}...</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="outline" className="text-xs">{asset.category || 'unknown'}</Badge>
+              {asset.block_index !== undefined && (
+                <p className="text-xs text-gray-500 mt-2">Block #{asset.block_index}</p>
+              )}
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {availableApps.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-300 mb-2">No Applications Available</h3>
-          <p className="text-gray-400">No applications match your current search criteria.</p>
-        </div>
+      {filteredAssets.length === 0 && !isLoading && (
+        <p className="text-center text-gray-500 py-8">No assets found</p>
       )}
     </div>
   );

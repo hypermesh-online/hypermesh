@@ -1,5 +1,4 @@
-// @ts-nocheck — Phase 8 will rewrite with useBlockMatrix hooks
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
@@ -7,178 +6,155 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAssets, useAllocations } from '@/lib/api';
-import { useNetworkPeers, useAssetList } from '@/lib/hooks/useBlockMatrix';
+import { ModuleLoading } from '@/components/ui/ModuleLoading';
+import {
+  useNetworkPeers,
+  useAssetList,
+  useShareInbox,
+  useShareAccept,
+  useShareReject,
+} from '@/lib/hooks/useBlockMatrix';
 import { ShareDialog } from '@/components/sharing/ShareDialog';
 import {
-  Settings,
   Share,
-  Shield,
-  Zap,
-  Activity,
   Users,
-  Send
+  Send,
+  Inbox,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 
 export function SharingManagement() {
-  const { allocations, activeAllocations, isLoading } = useAllocations();
-  const { assets } = useAssets();
-  const { data: peers, isLoading: peersLoading } = useNetworkPeers();
-  const { data: blockchainAssets } = useAssetList();
-  const [selectedAllocation, setSelectedAllocation] = React.useState<string | null>(null);
+  const { data: peers, isLoading: peersLoading, error: peersError } = useNetworkPeers();
+  const { data: blockchainAssets, isLoading: assetsLoading } = useAssetList();
+  const { data: inbox, isLoading: inboxLoading } = useShareInbox();
+  const shareAccept = useShareAccept();
+  const shareReject = useShareReject();
+
   const [shareTarget, setShareTarget] = React.useState<{ id: string; name: string } | null>(null);
 
-  const sharingStats = React.useMemo(() => {
-    const total = allocations?.length || 0;
-    const active = activeAllocations?.length || 0;
-    const pending = allocations?.filter(a => a.status === 'pending').length || 0;
-    const completed = allocations?.filter(a => a.status === 'completed').length || 0;
+  const isLoading = peersLoading && assetsLoading && inboxLoading;
+  if (isLoading) return <ModuleLoading />;
 
-    return { total, active, pending, completed };
-  }, [allocations, activeAllocations]);
+  if (peersError) {
+    return (
+      <Card className="m-4 border-red-500/30">
+        <CardContent className="p-6 text-center">
+          <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+          <p className="text-red-400">{peersError.message}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const invites = inbox?.invites ?? [];
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-white">Sharing Management</h2>
 
-      {/* Sharing Statistics */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Summary cards */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Total Allocations</CardTitle>
-            <Activity className="h-4 w-4 text-cyan-400" />
+            <CardTitle className="text-sm font-medium text-white">Connected Peers</CardTitle>
+            <Users className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-cyan-400">{sharingStats.total}</div>
-            <p className="text-xs text-gray-400">All time</p>
+            <div className="text-2xl font-bold text-cyan-400">{peers?.length ?? 0}</div>
+            <p className="text-xs text-gray-400">Available for sharing</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-black/40 border-green-500/30 backdrop-blur-lg">
+        <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Active</CardTitle>
-            <Zap className="h-4 w-4 text-green-400" />
+            <CardTitle className="text-sm font-medium text-white">Shareable Assets</CardTitle>
+            <Share className="h-4 w-4 text-cyan-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-400">{sharingStats.active}</div>
-            <p className="text-xs text-gray-400">Currently sharing</p>
+            <div className="text-2xl font-bold text-cyan-400">{blockchainAssets?.length ?? 0}</div>
+            <p className="text-xs text-gray-400">Registered on-chain</p>
           </CardContent>
         </Card>
 
         <Card className="bg-black/40 border-yellow-500/30 backdrop-blur-lg">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Pending</CardTitle>
-            <Settings className="h-4 w-4 text-yellow-400" />
+            <CardTitle className="text-sm font-medium text-white">Pending Invites</CardTitle>
+            <Inbox className="h-4 w-4 text-yellow-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-400">{sharingStats.pending}</div>
-            <p className="text-xs text-gray-400">Awaiting approval</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-black/40 border-purple-500/30 backdrop-blur-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Completed</CardTitle>
-            <Shield className="h-4 w-4 text-purple-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-400">{sharingStats.completed}</div>
-            <p className="text-xs text-gray-400">Successfully shared</p>
+            <div className="text-2xl font-bold text-yellow-400">{invites.length}</div>
+            <p className="text-xs text-gray-400">Awaiting your response</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Active Allocations Management */}
+      {/* Share Inbox */}
       <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Share className="h-5 w-5 text-cyan-400" />
-            Active Resource Sharing
+            <Inbox className="h-5 w-5 text-cyan-400" />
+            Share Inbox
           </CardTitle>
-          <CardDescription className="text-gray-400">Manage ongoing resource allocations and sharing sessions</CardDescription>
+          <CardDescription className="text-gray-400">
+            Incoming file sharing invitations from other nodes
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {inboxLoading ? (
             <div className="space-y-3">
-              {[1,2,3].map(i => (
-                <div key={i} className="animate-pulse h-20 bg-gray-700 rounded-lg"></div>
+              {[1, 2].map((i) => (
+                <div key={i} className="animate-pulse h-16 bg-gray-700 rounded-lg" />
               ))}
             </div>
-          ) : activeAllocations && activeAllocations.length > 0 ? (
-            <div className="space-y-4">
-              {activeAllocations.map((allocation) => (
+          ) : invites.length > 0 ? (
+            <div className="space-y-3">
+              {invites.map((invite) => (
                 <div
-                  key={allocation.id}
-                  className="border border-cyan-500/20 rounded-lg p-4 bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors cursor-pointer"
-                  onClick={() => setSelectedAllocation(allocation.id)}
+                  key={invite.invite_id}
+                  className="flex items-center justify-between p-4 border border-cyan-500/20 rounded-lg bg-cyan-500/5"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-medium text-white">Allocation {allocation.id.slice(0, 8)}...</h4>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          allocation.status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                          allocation.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                          'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                        }`}
-                      >
-                        {allocation.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="text-cyan-400 hover:bg-cyan-500/20">
-                        <Settings className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:bg-red-500/20"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // In production, this would call releaseAllocation API
-                          alert(`Terminating allocation ${allocation.id}`);
-                        }}
-                      >
-                        Terminate
-                      </Button>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">
+                      {invite.asset_name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      From: {invite.sender_node_id.slice(0, 16)}... | {invite.shard_count} shards |{' '}
+                      {(invite.asset_size / 1024).toFixed(1)} KB
+                    </p>
                   </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-400">Resource:</span>
-                      <div className="text-white font-mono">{allocation.amount} {allocation.unit}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Duration:</span>
-                      <div className="text-white font-mono">{Math.floor(allocation.duration / 3600)}h</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Requester:</span>
-                      <div className="text-white font-mono">{allocation.requesterId.slice(0, 8)}...</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Started:</span>
-                      <div className="text-white font-mono">{new Date(allocation.startTime).toLocaleTimeString()}</div>
-                    </div>
+                  <div className="flex items-center gap-2 ml-3">
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-500 text-white"
+                      onClick={() => shareAccept.mutate(invite.invite_id)}
+                      disabled={shareAccept.isPending}
+                    >
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      onClick={() => shareReject.mutate(invite.invite_id)}
+                      disabled={shareReject.isPending}
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Reject
+                    </Button>
                   </div>
-
-                  {allocation.proxyAddress && (
-                    <div className="mt-3 pt-3 border-t border-cyan-500/20">
-                      <span className="text-gray-400 text-sm">Proxy Address:</span>
-                      <div className="text-cyan-400 font-mono text-sm">{allocation.proxyAddress}</div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <Share className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-white mb-2">No Active Sharing</h3>
-              <p className="text-gray-400">Your resources are available but not currently being used by others.</p>
-              <p className="text-sm text-gray-500 mt-2">Configure resource limits in the Resources tab to start sharing.</p>
+            <div className="text-center py-6 text-gray-400">
+              <Inbox className="h-10 w-10 text-gray-600 mx-auto mb-2" />
+              <p>No pending invitations</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Invites from other nodes will appear here
+              </p>
             </div>
           )}
         </CardContent>
@@ -196,13 +172,7 @@ export function SharingManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {peersLoading ? (
-            <div className="space-y-3">
-              {[1,2,3].map(i => (
-                <div key={i} className="animate-pulse h-14 bg-gray-700 rounded-lg"></div>
-              ))}
-            </div>
-          ) : peers && peers.length > 0 ? (
+          {peers && peers.length > 0 ? (
             <div className="space-y-2">
               {peers.map((peer) => (
                 <div
@@ -233,7 +203,9 @@ export function SharingManagement() {
             <div className="text-center py-6 text-gray-400">
               <Users className="h-10 w-10 text-gray-600 mx-auto mb-2" />
               <p>No peers connected</p>
-              <p className="text-xs text-gray-500 mt-1">Peers will appear when other nodes join the network</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Peers will appear when other nodes join the network
+              </p>
             </div>
           )}
         </CardContent>
@@ -277,53 +249,11 @@ export function SharingManagement() {
             <div className="text-center py-6 text-gray-400">
               <Share className="h-10 w-10 text-gray-600 mx-auto mb-2" />
               <p>No assets available to share</p>
-              <p className="text-xs text-gray-500 mt-1">Assets will appear after they are registered on the blockchain</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Assets will appear after they are registered on the blockchain
+              </p>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Resource Allocation History */}
-      <Card className="bg-black/40 border-cyan-500/30 backdrop-blur-lg">
-        <CardHeader>
-          <CardTitle className="text-white">Allocation History</CardTitle>
-          <CardDescription className="text-gray-400">Recent resource sharing activity and completed allocations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {allocations && allocations.length > 0 ? (
-              allocations.slice(0, 5).map((allocation) => (
-                <div key={allocation.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-white font-mono text-sm">{allocation.id.slice(0, 12)}...</span>
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          allocation.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                          allocation.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
-                          allocation.status === 'failed' ? 'bg-red-500/20 text-red-400' :
-                          'bg-gray-500/20 text-gray-400'
-                        }`}
-                      >
-                        {allocation.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      {allocation.amount} {allocation.unit} - {Math.floor(allocation.duration / 3600)}h duration
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(allocation.startTime).toLocaleDateString()}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-6 text-gray-400">
-                No allocation history available
-              </div>
-            )}
-          </div>
         </CardContent>
       </Card>
 

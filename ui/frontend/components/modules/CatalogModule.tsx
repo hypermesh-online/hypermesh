@@ -70,10 +70,7 @@ export function CatalogModule() {
         <Route 
           path="/" 
           element={
-            <CatalogBrowse 
-              selectedPrivacyLevel={selectedPrivacyLevel}
-              onPrivacyLevelChange={setSelectedPrivacyLevel}
-            />
+            <CatalogBrowse />
           } 
         />
         <Route path="/installed" element={<CatalogInstalled />} />

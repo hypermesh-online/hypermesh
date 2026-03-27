@@ -1,4 +1,4 @@
-// Copyright © 2026 Hypermesh Foundation. All rights reserved.
+// Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
@@ -11,21 +11,35 @@ import { ResourceConfiguration } from './hypermesh/ResourceConfiguration';
 import { SharingManagement } from './hypermesh/SharingManagement';
 import { StateProofDashboard } from '../proof-of-state/StateProofDashboard';
 import { AdvancedAssetManagement } from '../assets/AdvancedAssetManagement';
+import { BlockchainExplorer } from './hypermesh/BlockchainExplorer';
+import { DnsManagement } from './hypermesh/DnsManagement';
+import { TopologyView } from './hypermesh/TopologyView';
+import { DomainManagement } from './hypermesh/DomainManagement';
+import { AssetManagement } from './hypermesh/AssetManagement';
+import { StorePipeline } from './hypermesh/StorePipeline';
+import { NodeSettings } from './hypermesh/NodeSettings';
 
 const subNavigation = [
   { name: 'Overview', href: '/hypermesh' },
-  { name: 'Resources', href: '/hypermesh/resources' },
-  { name: 'Advanced Assets', href: '/hypermesh/advanced' },
+  { name: 'Blockchain', href: '/hypermesh/blockchain' },
+  { name: 'Assets', href: '/hypermesh/assets' },
+  { name: 'DNS', href: '/hypermesh/dns' },
+  { name: 'Domains', href: '/hypermesh/domains' },
+  { name: 'Topology', href: '/hypermesh/topology' },
   { name: 'Sharing', href: '/hypermesh/sharing' },
+  { name: 'Pipeline', href: '/hypermesh/pipeline' },
+  { name: 'Resources', href: '/hypermesh/resources' },
   { name: 'Proof of State', href: '/hypermesh/proof-of-state' },
+  { name: 'Settings', href: '/hypermesh/settings' },
+  { name: 'Advanced', href: '/hypermesh/advanced' },
 ];
 
 function SubNavigation() {
   const location = useLocation();
 
   return (
-    <div className="border-b border-cyan-500/20 mb-6">
-      <nav className="-mb-px flex space-x-8">
+    <div className="border-b border-cyan-500/20 mb-6 overflow-x-auto">
+      <nav className="-mb-px flex space-x-6">
         {subNavigation.map((item) => {
           const isActive = location.pathname === item.href;
           return (
@@ -33,10 +47,10 @@ function SubNavigation() {
               key={item.name}
               to={item.href}
               className={cn(
-                'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                'py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap',
                 isActive
                   ? 'border-cyan-400 text-cyan-400'
-                  : 'border-transparent text-gray-400 hover:text-white hover:border-cyan-500/50'
+                  : 'border-transparent text-gray-400 hover:text-white hover:border-cyan-500/50',
               )}
             >
               {item.name}
@@ -67,10 +81,17 @@ export function HyperMeshModule() {
 
       <Routes>
         <Route path="/" element={<HyperMeshOverview />} />
-        <Route path="/resources" element={<ResourceConfiguration />} />
-        <Route path="/advanced" element={<AdvancedAssetManagement />} />
+        <Route path="/blockchain" element={<BlockchainExplorer />} />
+        <Route path="/assets" element={<AssetManagement />} />
+        <Route path="/dns" element={<DnsManagement />} />
+        <Route path="/domains" element={<DomainManagement />} />
+        <Route path="/topology" element={<TopologyView />} />
         <Route path="/sharing" element={<SharingManagement />} />
+        <Route path="/pipeline" element={<StorePipeline />} />
+        <Route path="/resources" element={<ResourceConfiguration />} />
         <Route path="/proof-of-state" element={<StateProofDashboard />} />
+        <Route path="/settings" element={<NodeSettings />} />
+        <Route path="/advanced" element={<AdvancedAssetManagement />} />
       </Routes>
     </div>
   );
