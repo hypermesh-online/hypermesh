@@ -2,26 +2,65 @@
 
 A sovereign distributed computing platform with post-quantum cryptography, Block-MATRIX topology, and bilateral Proof of State authentication.
 
-**11 crates** | **999 files** | **289,405 lines** | **1,885 tests** | **0 compiler errors**
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design.
+**14 crates** | **1,071 files** | **338,666 lines** | **4,575 tests** | **0 compiler errors**
 
 ---
 
-## Quick Start
+## Run a Node
 
 ```bash
-# Clone
-git clone https://github.com/hypermesh-online/core.git
-cd core
+# Build (requires Rust + clang + lld)
+git clone https://github.com/hypermesh-online/hypermesh.git
+cd hypermesh/core
+cargo build --release --target x86_64-unknown-linux-musl -p blockmatrix --bin hypermesh
 
-# Install dependencies (Ubuntu)
-sudo apt install clang lld pkg-config
+# Run — joins the public test network via trust.hypermesh.online
+./target/x86_64-unknown-linux-musl/release/hypermesh \
+  --name yourname \
+  --privacy public \
+  --network-id trustnet-test \
+  --stoq-port 9292 \
+  --bootstrap "[::ffff:35.208.78.211]:9292" \
+  connect public --foreground
+```
 
-# Build
-cargo check --workspace
-cargo test --workspace
-cargo build --workspace --release
+Your node creates its own blockchain, assesses hardware, generates a FALCON-1024 identity, connects via STOQ/QUIC, and completes a bilateral Proof of State handshake — no external dependencies required.
+
+## What You Can Do
+
+```bash
+# Store a file (Compress → Encrypt → Shard → Distribute)
+hypermesh store myfile.pdf
+
+# Share with a peer by name
+hypermesh share send abc123 --with alice
+
+# Check your inbox for shared files
+hypermesh share inbox
+
+# Accept a shared file
+hypermesh share accept inv-001
+
+# Fetch a shared file
+hypermesh fetch abc123 -o downloaded.pdf
+
+# Send an encrypted message
+hypermesh message send --to alice "Hey, check out the file I shared"
+
+# Read your messages
+hypermesh message inbox
+
+# Register a DNS name
+hypermesh dns register myname ::1
+
+# Resolve a peer
+hypermesh dns resolve alice
+
+# Ping a peer (bilateral PoS handshake RTT)
+hypermesh ping alice
+
+# View node status
+hypermesh status
 ```
 
 ## Build Prerequisites
@@ -30,16 +69,10 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 | Required | Purpose |
 |----------|---------|
-| Rust (stable) | `rustup` -- compiler toolchain |
+| Rust (stable) | `rustup` — compiler toolchain |
 | clang | C compiler + linker |
 | lld | LLVM linker (`-fuse-ld=lld`) |
 | pkg-config | Native dependency discovery |
-
-| Optional (eBPF) | Purpose |
-|------------------|---------|
-| libbpf-dev | eBPF program loading (feature-gated) |
-| linux-headers | Kernel headers for eBPF |
-| llvm | eBPF bytecode compilation |
 
 **Not required**: gcc, openssl/libssl (all crypto is pure Rust), cmake, Docker.
 
@@ -54,130 +87,143 @@ Requires **clang + lld** (not gcc). Configured in `.cargo/config.toml`.
 
 **macOS**: `xcode-select --install && brew install llvm pkg-config`
 
+For musl static builds (deployment): `rustup target add x86_64-unknown-linux-musl`
+
 </details>
 
 ---
 
-## Crate Overview
+## Architecture
 
-| Crate | Lines | Tests | Completion | Description |
-|-------|------:|------:|-----------:|-------------|
-| [hypermesh-lib](lib/) | 3,198 | 97 | 68% | Shared canonical types -- single source of truth |
-| [stoq](stoq/) | 17,897 | 145 | 100% | QUIC/IPv6 transport with eBPF and FALCON-1024 |
-| [hypermesh-ebpf](hypermesh-ebpf/) | 8,203 | 152 | 100% | Kernel-level eBPF packet processing (XDP + AF_XDP) |
-| [trustchain](trustchain/) | 33,923 | 95 | 100% | FALCON-1024 Certificate Authority, identity, CT logs |
-| [blockmatrix](blockmatrix/) | 128,404 | 821 | 97% | Block-MATRIX node -- topology, assets, pipeline, blockchain |
-| [catalog](catalog/) | 27,932 | 52 | 100% | Asset package registry with DHT distribution |
-| [caesar](caesar/) | 12,753 | 220 | 94% | Gold-denominated Ephemeral Value Protocol |
-| [caesar-sdk](caesar-sdk/) | 1,039 | 2 | 83% | UPI adapter traits for Caesar payment rails |
-| [gateway](gateway/) | 7,028 | 155 | 100% | HTTP/3 + STOQ gateway (4 roles, *.hypermesh.online) |
-| [engauge](engauge/) | 5,758 | 135 | 100% | Analytics, capacity metrics, and streaming |
-| [ui](ui/) | 43,270 | 11 | 44% | TypeScript/React dashboard UI |
+### Crate Overview
 
----
+| Crate | Description |
+|-------|-------------|
+| [hypermesh-lib](lib/) | Shared canonical types — single source of truth for all crates |
+| [stoq](stoq/) | QUIC/IPv6 transport with eBPF acceleration, post-quantum key exchange |
+| [hypermesh-ebpf](hypermesh-ebpf/) | Kernel-level XDP + AF_XDP zero-copy packet processing |
+| [trustchain](trustchain/) | FALCON-1024 CA, threshold Shamir SSS, federation, OCSP/CRL |
+| [blockmatrix](blockmatrix/) | Block-MATRIX node — topology, assets, pipeline, blockchain, IPC daemon |
+| [catalog](catalog/) | Asset type registry with DHT, type publishing, STOQ API |
+| [caesar](caesar/) | Gold-denominated Ephemeral Value Protocol |
+| [caesar-sdk](caesar-sdk/) | UPI adapter traits for Caesar payment rails |
+| [gateway](gateway/) | HTTP/3 + STOQ gateway, DNS-over-HTTPS, domain routing |
+| [engauge](engauge/) | Analytics, capacity metrics, routing intelligence, marketplace |
+| [hypermesh-sdk](hypermesh-sdk/) | Typed Rust SDK for daemon IPC API |
+| [hypermesh-ffi](hypermesh-ffi/) | C FFI bindings for cross-language integration |
+| [ui](ui/) | React 19 dashboard — 55 connected components, zero mock data |
 
-## Join the Network
+Language SDKs: [TypeScript](sdk/typescript/) | [Python](sdk/python/) | [Go](sdk/go/) | [C#](sdk/csharp/) | [C++](sdk/cpp/)
 
-Join the public HyperMesh mesh in one command:
+### Key Concepts
 
-```bash
-hypermesh --privacy public --bootstrap "[2600:1900:4001:cf7::]:9292" start
-```
+**Proof of State** — Every asset requires four proofs: PoSpace (WHERE), PoStake (WHO), PoWork (WHAT), PoTime (WHEN). Bilateral verification — no voting, no quorum, no leader election. Something's either authentic or it isn't.
 
-Your node creates its own blockchain, assesses hardware, generates a self-signed certificate, connects via STOQ, and completes a bilateral Proof of State handshake -- no external dependencies required.
+**Block-MATRIX Topology** — Each node is a cell in a 3D geospatial matrix (x,y,z). Tensor operations drive routing, shard placement, and resource allocation.
 
-See [Onboarding Guide](docs/guides/ONBOARDING.md) for the full walkthrough.
+**Every Node = Own Blockchain** — Starts on boot with a unique genesis block. No network required. Network participation is optional (Device scope = local, Network scope = synced).
 
-## Installation
+**Privacy Model** — Two independent dimensions:
+- **PrivacyMode** (transport): Anonymous | Private | Public
+- **BlockchainScope** (state): Device | Network
+- Any combination is valid. Device + Anonymous = fully isolated. Network + Public = open ledger.
 
-HyperMesh runs as system-level daemons. See `systemd/` for service units and [docs/guides/INSTALL.md](docs/guides/INSTALL.md) for the full server deployment guide.
+**Asset Pipeline** — Compress → Encrypt → Shard → Distribute:
+- Compression: Zstd (large/binary), Brotli (small text), auto-skip (video/audio)
+- Encryption: Kyber-1024 KEM → BLAKE3-HKDF per-segment → AES-256-GCM
+- Sharding: Reed-Solomon adaptive erasure coding
+- Segment-oriented: supports torrent, streaming, and random-access byte range
 
----
+**Torrent-Model Propagation** — Blocks propagate to content-interested peers only:
+- Device scope: no propagation
+- Private: full replication to all peers
+- Public: reflectors + spatial neighbors + active consumers
+- Anonymous: consumers only
 
-## Key Concepts
-
-### Proof of State
-
-Every asset requires four proofs -- PoSpace (WHERE), PoStake (WHO), PoWork (WHAT/HOW), PoTime (WHEN). Bilateral verification -- no voting, no quorum, no leader election.
-
-### Block-MATRIX Topology
-
-Each node is a cell in a 3D geospatial matrix (x, y, z coordinates). Tensor operations drive routing, resource allocation, and shard placement. Nodes discover neighbors through matrix adjacency.
-
-### Every Node = Own Blockchain
-
-Starts on boot with a unique genesis block. No network connectivity required. Network participation is optional.
-
-### Privacy Model (Two Independent Dimensions)
-
-**PrivacyMode** (transport layer via STOQ) -- a struct with three presets:
-- **Anonymous**: Unbounded, untracked
-- **Private**: Bounded, tracked
-- **Public**: Unbounded, tracked
-
-**BlockchainScope** (state proof layer) -- binary:
-- **Device**: Local-only chain, always running from boot
-- **Network**: Synchronized across nodes via reflector pooling
-
-These are independent dimensions. Any combination is valid: Device + Anonymous, Network + Private, etc.
-
-### Asset Pipeline
-
-**Compress -> Encrypt -> Shard -> Distribute** (exact order):
-1. **Brotli** streaming compression (levels 1-11)
-2. **Kyber-1024** quantum-resistant encryption (KEM + AES-GCM, whole-blob)
-3. **Reed-Solomon** erasure coding (10+4 shards)
-4. **Tensor-based** placement at calculated matrix positions
-
-### Instruction-Based Retrieval
-
-Nodes send shard map instructions (under 1 KB), not raw data. The receiver queries matrix positions, fetches shards from nearest nodes, and reconstructs locally.
-
-### IPv6 Asset Addressing
-
-Every asset gets a unique IPv6 address (`fd48:4d00` prefix) encoding matrix coordinates, content fingerprint, and shard sub-addressing. The TransferEngine handles PoS-authenticated transfers with blockchain receipts.
-
-### Cryptography
-
+**Post-Quantum Cryptography**:
 | Algorithm | Purpose |
 |-----------|---------|
-| FALCON-1024 | Protocol signing (TrustChain CA, STOQ handshake) |
-| Kyber-1024 | Asset encryption (KEM + AES-GCM) |
-| X25519MLKEM768 | QUIC tunnel key exchange (post-quantum hybrid via aws-lc-rs) |
+| FALCON-1024 | Signing (identity, handshake, share invites, messages) |
+| Kyber-1024 | Encryption (assets, messages, key wrapping) |
+| X25519MLKEM768 | QUIC key exchange (hybrid post-quantum) |
 | BLAKE3 | All content hashing |
 
-SHA-256 is used only for X.509 certificate fingerprints (standard requirement) and OCI image digests.
+### P2P File Sharing
 
-### Three-Pillar Asset System
+Files are encrypted with Kyber-1024, sharded with Reed-Solomon, and distributed across the mesh. Share invitations are FALCON-1024 signed envelopes containing the shard map + a Kyber-wrapped decryption key — only the intended recipient can decrypt.
 
-Every asset has a **Kind** (two-level classification: system or user-defined), a **Status** (programmable state machine where domain states map to BaseState), and an **Adapter** (runtime interface with lifecycle hooks, command/query dispatch, and self-describing capabilities). Defined canonically in hypermesh-lib, used by all crates.
+### Private Messaging
+
+Messages are Kyber-1024 encrypted for the recipient, FALCON-1024 signed by the sender, and registered as blockchain assets. Threading via `reply_to`. All through CLI (`hypermesh message`) or the web dashboard.
+
+### Distributed CA
+
+TrustChain CA with Shamir Secret Sharing (3-of-5 threshold) for FALCON-1024 key splitting. Federation peers hold key shares. CRL/OCSP propagation across federated CAs.
+
+### Intelligence Loop
+
+engauge monitors network health and feeds back into routing:
+- MetricsReporter → engauge ingestion (every 30s)
+- SwarmDemandTracker → SwarmAnalytics (every 10s)
+- RoutingIntelligence → PropagationWeights (every 15s)
+- ReplicationTrigger checks against live analytics
+- 9-test simulation harness (10-50 nodes)
+
+---
+
+## Deployment
+
+### Static Binary (musl)
+
+```bash
+cargo build --release --target x86_64-unknown-linux-musl -p blockmatrix --bin hypermesh
+# Produces ~11MB static-pie ELF with zero runtime dependencies
+```
+
+### Deploy to Server
+
+```bash
+scp target/x86_64-unknown-linux-musl/release/hypermesh user@server:/usr/local/bin/
+# Copy systemd unit
+scp systemd/blockmatrix.service user@server:/etc/systemd/system/
+sudo systemctl enable --now blockmatrix
+```
+
+### trust.hypermesh.online
+
+The public bootstrap node at `35.208.78.211:9292` (GCP, Debian 12). Runs as a reflector with `--network-id trustnet-test`.
 
 ---
 
 ## Project Status
 
-> Source of truth: each crate's `crate-status.toml` file.
-> Auto-synced to `scripts/output/status.ts` via `scripts/sync-status.sh`.
+> Source of truth: each crate's `crate-status.toml`. Auto-synced via `./scripts/sync-status.sh`.
 
 ### What Works
 
-- **STOQ**: QUIC transport, FALCON-1024 signing, adaptive tiers, multi-path QUIC, reflector pools
-- **TrustChain**: Full CA with issuance/revocation, CT logs, OCSP, CRL, threshold crypto, federation
-- **BlockMatrix**: Asset adapters (6 types), asset pipeline, instruction-based retrieval, IPv6 addressing, network sync, gateway architecture, cross-scope routing, shard rebalancing, CLI, container runtime, cross-platform OS abstraction
-- **Catalog**: Full package registry with DHT, P2P sharing, TrustChain security, Caesar rewards, STOQ API
-- **Caesar**: EVP protocol with state machine, Governor PID controller, settlement, conservation law, gold oracle, STOQ API
-- **Gateway**: 4 roles (bootstrap, inbound proxy, outbound proxy, inter-network), rate limiting, load balancing, federation bridge
-- **engauge**: Receipts, capacity metrics, streaming protocol, differential privacy, routing intelligence, marketplace
-- **eBPF**: XDP packet processing, AF_XDP zero-copy, BPF map policy sync, multi-queue load balancing, hardware offload detection
+- **P2P file sharing** with post-quantum encrypted invitations
+- **Private messaging** (Kyber encrypted, FALCON signed, threaded)
+- **Streaming asset pipeline** (segment-oriented, torrent/streaming/random-access)
+- **Torrent-model block propagation** (content-interested peers only)
+- **Intelligence loop** (engauge → routing weights → replication triggers)
+- **Cross-network asset transfers** (blockchain lock/register/release entries)
+- **Threshold CA** (Shamir SSS for FALCON-1024 key splitting)
+- **Distributed CA** (federation key shares, CRL/OCSP propagation)
+- **Identity distribution** (key rotation via blockchain, split-brain detection)
+- **Browser namespace** (DNS-over-HTTPS, Host→DNS resolution, dynamic certs)
+- **Catalog type publishing** (Message, Invitation, Document types with JSON Schema)
+- **Web dashboard** (55 connected components, zero mock data, all real IPC hooks)
+- **Network sync** (block propagation, gossip, cross-genesis, E2E verified on trust.hypermesh.online)
+- **5 language SDKs** (TypeScript, Python, Go, C#, C++) + C FFI bindings
 
 ### Remaining Work
 
-- Network scope blockchain sync (reflector/swarm mode for multi-node state proof verification)
-- Cross-network asset transfers with dual proof of state
-- Live multi-chain Caesar bridges (BTC/ETH/SOL)
-- CI/CD pipelines and production deployment
-- End-to-end integration testing across all crates
-- UI completion (live data connections, native desktop via Tauri)
+- CI/CD pipelines
+- ARM cross-compilation (aarch64-unknown-linux-musl)
+- Docker image + install script
+- Storybook stories + Vitest unit tests for UI
+- Multi-node E2E integration test suite
+- Production security audit
 
 ---
 
@@ -185,11 +231,13 @@ Every asset has a **Kind** (two-level classification: system or user-defined), a
 
 - Files < 500 lines, functions < 50 lines, nesting < 3 levels
 - No `.unwrap()` or `panic!()` in production code (enforced by pre-commit hook)
-- All shared types go in `hypermesh-lib` -- no duplicate type definitions
+- All shared types go in `hypermesh-lib` — no duplicate type definitions
 - IPv6-only networking throughout
 - BLAKE3 for all hashing (no SHA-256 except X.509 fingerprints)
 - Update `crate-status.toml` when feature status changes, then run `./scripts/sync-status.sh`
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
+
 ## License
 
-MIT -- See [LICENSE](LICENSE)
+Business Source License 1.1 — See [LICENSE](LICENSE)
