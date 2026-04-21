@@ -240,48 +240,37 @@ impl MonitoringSystem {
         }
     }
 
+    /// Build a [`MonitoringAlert`] with the common boilerplate fields
+    /// (id, timestamp) populated and the caller's metric/value/threshold/level
+    /// details filled in. Pure helper — no side effects.
+    fn build_alert(
+        level: AlertLevel,
+        component: &str,
+        message: String,
+        metric: &str,
+        value: f64,
+        threshold: f64,
+    ) -> MonitoringAlert {
+        MonitoringAlert {
+            id: uuid::Uuid::new_v4().to_string(),
+            level,
+            component: component.to_string(),
+            message,
+            timestamp: SystemTime::now(),
+            metric: Some(metric.to_string()),
+            value: Some(value),
+            threshold: Some(threshold),
+        }
+    }
+
     /// Check for alerts based on thresholds
     async fn check_alerts(&self) {
         let metrics = self.get_metrics().await;
         let mut alerts = Vec::new();
 
-        // Check certificate issuance time
         if let Some(ca_metrics) = metrics.components.get("ca") {
-            if let Some(avg_time) = ca_metrics.additional_metrics.get("avg_issuance_time_ms") {
-                if *avg_time > self.config.alert_thresholds.max_cert_issuance_ms as f64 {
-                    alerts.push(MonitoringAlert {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        level: AlertLevel::Warning,
-                        component: "ca".to_string(),
-                        message: format!(
-                            "Certificate issuance time exceeds threshold: {}ms > {}ms",
-                            avg_time, self.config.alert_thresholds.max_cert_issuance_ms
-                        ),
-                        timestamp: SystemTime::now(),
-                        metric: Some("avg_issuance_time_ms".to_string()),
-                        value: Some(*avg_time),
-                        threshold: Some(self.config.alert_thresholds.max_cert_issuance_ms as f64),
-                    });
-                }
-            }
-
-            // Check success rate
-            if ca_metrics.success_rate < self.config.alert_thresholds.min_success_rate {
-                alerts.push(MonitoringAlert {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    level: AlertLevel::Error,
-                    component: "ca".to_string(),
-                    message: format!(
-                        "CA success rate below threshold: {:.2}% < {:.2}%",
-                        ca_metrics.success_rate * 100.0,
-                        self.config.alert_thresholds.min_success_rate * 100.0
-                    ),
-                    timestamp: SystemTime::now(),
-                    metric: Some("success_rate".to_string()),
-                    value: Some(ca_metrics.success_rate),
-                    threshold: Some(self.config.alert_thresholds.min_success_rate),
-                });
-            }
+            self.check_ca_issuance_time(ca_metrics, &mut alerts);
+            self.check_ca_success_rate(ca_metrics, &mut alerts);
         }
 
         // Process alerts
@@ -293,6 +282,56 @@ impl MonitoringSystem {
                 AlertLevel::Critical => error!("CRITICAL: {}", alert.message),
             }
         }
+    }
+
+    /// Check certificate-issuance-time threshold for the CA component.
+    fn check_ca_issuance_time(
+        &self,
+        ca_metrics: &ComponentMetrics,
+        alerts: &mut Vec<MonitoringAlert>,
+    ) {
+        let Some(avg_time) = ca_metrics.additional_metrics.get("avg_issuance_time_ms") else {
+            return;
+        };
+        let threshold = self.config.alert_thresholds.max_cert_issuance_ms as f64;
+        if *avg_time <= threshold {
+            return;
+        }
+        alerts.push(Self::build_alert(
+            AlertLevel::Warning,
+            "ca",
+            format!(
+                "Certificate issuance time exceeds threshold: {}ms > {}ms",
+                avg_time, self.config.alert_thresholds.max_cert_issuance_ms
+            ),
+            "avg_issuance_time_ms",
+            *avg_time,
+            threshold,
+        ));
+    }
+
+    /// Check success-rate threshold for the CA component.
+    fn check_ca_success_rate(
+        &self,
+        ca_metrics: &ComponentMetrics,
+        alerts: &mut Vec<MonitoringAlert>,
+    ) {
+        let threshold = self.config.alert_thresholds.min_success_rate;
+        if ca_metrics.success_rate >= threshold {
+            return;
+        }
+        alerts.push(Self::build_alert(
+            AlertLevel::Error,
+            "ca",
+            format!(
+                "CA success rate below threshold: {:.2}% < {:.2}%",
+                ca_metrics.success_rate * 100.0,
+                threshold * 100.0
+            ),
+            "success_rate",
+            ca_metrics.success_rate,
+            threshold,
+        ));
     }
 
     /// Add metrics exporter
