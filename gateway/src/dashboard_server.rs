@@ -18,8 +18,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
-use crate::auth::AuthResult;
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -375,20 +373,18 @@ impl DashboardServer {
 // Scope determination
 // ---------------------------------------------------------------------------
 
-/// Determine the dashboard scope from an [`AuthResult`] and the node owner's
-/// identity string.
-pub fn determine_scope(auth: &AuthResult, owner_identity: &str) -> DashboardScope {
-    match auth {
-        AuthResult::Anonymous
-        | AuthResult::BootstrapRequired
-        | AuthResult::Rejected { .. } => DashboardScope::Public,
-        AuthResult::Authenticated { identity, .. } => {
-            if identity == owner_identity {
-                DashboardScope::Admin
-            } else {
-                DashboardScope::Private
-            }
-        }
+/// Determine the dashboard scope from an optional authenticated identity and
+/// the node owner's identity string.
+///
+/// Phase 0 bootstrap pass-through: no authentication subsystem is wired into
+/// the gateway request pipeline. Requests without an identity fall back to
+/// the Public scope. When a PoS-validated identity is eventually plumbed
+/// through (Phase 2), pass `Some(identity)` to unlock Private/Admin.
+pub fn determine_scope(identity: Option<&str>, owner_identity: &str) -> DashboardScope {
+    match identity {
+        None => DashboardScope::Public,
+        Some(id) if id == owner_identity => DashboardScope::Admin,
+        Some(_) => DashboardScope::Private,
     }
 }
 
@@ -420,7 +416,6 @@ pub fn detect_content_type(path: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hypermesh_lib::PrivacyMode;
 
     // -- helpers -----------------------------------------------------------
 
@@ -450,46 +445,23 @@ mod tests {
         }
     }
 
-    // ===== Scope determination (5 tests) ==================================
+    // ===== Scope determination (3 tests) ==================================
 
     #[test]
-    fn scope_anonymous_is_public() {
-        let scope = determine_scope(&AuthResult::Anonymous, "owner");
+    fn scope_none_identity_is_public() {
+        let scope = determine_scope(None, "owner");
         assert_eq!(scope, DashboardScope::Public);
     }
 
     #[test]
-    fn scope_bootstrap_required_is_public() {
-        let scope = determine_scope(&AuthResult::BootstrapRequired, "owner");
-        assert_eq!(scope, DashboardScope::Public);
-    }
-
-    #[test]
-    fn scope_rejected_is_public() {
-        let auth = AuthResult::Rejected {
-            reason: "bad token".into(),
-        };
-        let scope = determine_scope(&auth, "owner");
-        assert_eq!(scope, DashboardScope::Public);
-    }
-
-    #[test]
-    fn scope_authenticated_non_owner_is_private() {
-        let auth = AuthResult::Authenticated {
-            identity: "alice".into(),
-            privacy_mode: PrivacyMode::PRIVATE,
-        };
-        let scope = determine_scope(&auth, "bob");
+    fn scope_non_owner_identity_is_private() {
+        let scope = determine_scope(Some("alice"), "bob");
         assert_eq!(scope, DashboardScope::Private);
     }
 
     #[test]
-    fn scope_authenticated_owner_is_admin() {
-        let auth = AuthResult::Authenticated {
-            identity: "owner-node".into(),
-            privacy_mode: PrivacyMode::PUBLIC,
-        };
-        let scope = determine_scope(&auth, "owner-node");
+    fn scope_owner_identity_is_admin() {
+        let scope = determine_scope(Some("owner-node"), "owner-node");
         assert_eq!(scope, DashboardScope::Admin);
     }
 

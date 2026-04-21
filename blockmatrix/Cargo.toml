@@ -83,6 +83,9 @@ hypermesh-ebpf = { path = "../hypermesh-ebpf" }
 # Engauge Intelligence Layer (optional — routing + swarm analytics)
 engauge = { path = "../engauge", optional = true }
 
+# Caesar EVP (optional — economic layer)
+caesar = { path = "../caesar", optional = true }
+
 # Async runtime
 async-trait = { workspace = true }
 futures = { workspace = true }
@@ -186,12 +189,13 @@ ctor = "0.2"  # Test initialization functions
 engauge = { path = "../engauge" }
 
 [features]
-default = ["proof-of-state", "assets", "intelligence"]
+default = ["proof-of-state", "assets", "intelligence", "caesar"]
 proof-of-state = []
 assets = []
 multi-node = []
 future-tests = []
 intelligence = ["dep:engauge"]
+caesar = ["dep:caesar"]
 
 # Explicit example entries for gated examples (require future-tests feature)
 [[example]]

@@ -2,7 +2,6 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-mod auth;
 mod bootstrap;
 mod config;
 mod dashboard_server;

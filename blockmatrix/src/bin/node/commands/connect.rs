@@ -101,18 +101,27 @@ pub async fn run_connect(
     let mut network_ref: Option<std::sync::Arc<NetworkManager>> = None;
     let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
     let mut shard_transport_ref: Option<std::sync::Arc<StoqShardTransport>> = None;
+    #[cfg(feature = "intelligence")]
+    let mut engauge_bits: Option<EngaugeBits> = None;
 
     let privacy_mode = bootstrap.privacy_mode().await;
     let has_bootstrap_peers = !cli.bootstrap.is_empty();
 
     if privacy_mode != PrivacyMode::PRIVATE || has_bootstrap_peers {
-        let (net_ref, ss_ref, st_ref) = start_network(
+        let result = start_network(
             cli, coord, nid, data_dir, bootstrap, privacy_mode, has_bootstrap_peers,
         )
         .await?;
-        network_ref = Some(net_ref);
-        shard_store_ref = Some(ss_ref);
-        shard_transport_ref = Some(st_ref);
+        network_ref = Some(result.network);
+        shard_store_ref = Some(result.shard_store);
+        shard_transport_ref = Some(result.shard_transport);
+        #[cfg(feature = "intelligence")]
+        {
+            engauge_bits = Some(EngaugeBits {
+                demand_tracker: result.swarm_demand_tracker,
+                analytics: result.engauge_analytics,
+            });
+        }
     }
 
     // --- IPC Server Setup ---
@@ -123,6 +132,20 @@ pub async fn run_connect(
             data_dir.join(nid).join("shards"),
         ))
     });
+
+    #[cfg(feature = "caesar")]
+    let caesar_instance = {
+        match caesar::CaesarProtocol::new(caesar::CaesarConfig::default()).await {
+            Ok(protocol) => {
+                info!("Caesar EVP protocol initialized");
+                Some(std::sync::Arc::new(tokio::sync::RwLock::new(protocol)))
+            }
+            Err(e) => {
+                warn!("Caesar init failed, caesar.* IPC will report unavailable: {e}");
+                None
+            }
+        }
+    };
 
     let daemon_state = std::sync::Arc::new(ipc::DaemonState {
         blockchain: bootstrap.blockchain().clone(),
@@ -140,6 +163,20 @@ pub async fn run_connect(
         dns_popularity_tracker: Some(std::sync::Arc::new(
             blockmatrix::dns::DnsPopularityTracker::new(),
         )),
+        #[cfg(feature = "caesar")]
+        caesar: caesar_instance,
+        #[cfg(feature = "intelligence")]
+        engauge_bridge: engauge_bits.map(|eb| {
+            std::sync::Arc::new(blockmatrix::intelligence::engauge_bridge::EngaugeBridge::new(
+                eb.demand_tracker,
+                eb.analytics,
+                hypermesh_lib::MatrixPosition {
+                    x: coord.x as f64,
+                    y: coord.y as f64,
+                    z: coord.z as f64,
+                },
+            ))
+        }),
     });
 
     let mut handler = ipc::RequestHandler::new();
@@ -179,6 +216,39 @@ pub async fn run_connect(
     info!("Node running in {:?} mode", bootstrap.privacy_mode().await);
     info!("Press Ctrl+C to stop");
 
+    #[cfg(unix)]
+    let mut sigterm = match tokio::signal::unix::signal(
+        tokio::signal::unix::SignalKind::terminate(),
+    ) {
+        Ok(sig) => Some(sig),
+        Err(e) => {
+            warn!("Failed to install SIGTERM handler: {}", e);
+            None
+        }
+    };
+
+    #[cfg(unix)]
+    tokio::select! {
+        result = tokio::signal::ctrl_c() => {
+            if let Err(e) = result {
+                warn!("Failed to listen for Ctrl+C: {}", e);
+            }
+            info!("SIGINT received, shutting down...");
+        }
+        _ = async {
+            match sigterm.as_mut() {
+                Some(sig) => { sig.recv().await; }
+                None => std::future::pending::<()>().await,
+            }
+        } => {
+            info!("SIGTERM received, shutting down...");
+        }
+        _ = shutdown_rx.changed() => {
+            info!("Shutdown requested via IPC");
+        }
+    }
+
+    #[cfg(not(unix))]
     tokio::select! {
         result = tokio::signal::ctrl_c() => {
             if let Err(e) = result {
@@ -207,9 +277,26 @@ pub async fn run_connect(
     Ok(())
 }
 
+/// Engauge handles carried back from `start_network` when the `intelligence`
+/// feature is enabled.
+#[cfg(feature = "intelligence")]
+struct EngaugeBits {
+    demand_tracker: std::sync::Arc<blockmatrix::network::SwarmDemandTracker>,
+    analytics: std::sync::Arc<std::sync::Mutex<engauge::SwarmAnalytics>>,
+}
+
+/// Result bundle returned from `start_network`.
+struct NetworkStartResult {
+    network: std::sync::Arc<NetworkManager>,
+    shard_store: std::sync::Arc<ShardStore>,
+    shard_transport: std::sync::Arc<StoqShardTransport>,
+    #[cfg(feature = "intelligence")]
+    swarm_demand_tracker: std::sync::Arc<blockmatrix::network::SwarmDemandTracker>,
+    #[cfg(feature = "intelligence")]
+    engauge_analytics: std::sync::Arc<std::sync::Mutex<engauge::SwarmAnalytics>>,
+}
+
 /// Initialize STOQ transport, network manager, and all background loops.
-///
-/// Returns (NetworkManager, ShardStore, StoqShardTransport) Arc references.
 #[allow(clippy::too_many_arguments)]
 async fn start_network(
     cli: &Cli,
@@ -219,11 +306,7 @@ async fn start_network(
     bootstrap: &NodeBootstrap,
     privacy_mode: PrivacyMode,
     has_bootstrap_peers: bool,
-) -> Result<(
-    std::sync::Arc<NetworkManager>,
-    std::sync::Arc<ShardStore>,
-    std::sync::Arc<StoqShardTransport>,
-)> {
+) -> Result<NetworkStartResult> {
     info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
     let mut stoq_config = stoq::TransportConfig {
@@ -634,7 +717,15 @@ async fn start_network(
     let _sync_manager = sync_manager.clone();
     let _reflector_pool = reflector_pool.clone();
 
-    Ok((network_clone, shard_store, shard_transport))
+    Ok(NetworkStartResult {
+        network: network_clone,
+        shard_store,
+        shard_transport,
+        #[cfg(feature = "intelligence")]
+        swarm_demand_tracker,
+        #[cfg(feature = "intelligence")]
+        engauge_analytics,
+    })
 }
 
 /// Register a DNS name for this node on the local blockchain.

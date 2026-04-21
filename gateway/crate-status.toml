@@ -31,7 +31,6 @@ items = [
     "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
     "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
     "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
-    "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
     "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides",
     # Browser namespace (L5)
     "DNS-over-HTTPS (DoH) endpoint — JSON-based DNS query/response for browser-compatible resolution",
@@ -42,7 +41,6 @@ items = [
 
 [features.in_development]
 items = [
-    "Bootstrap token flow — HTTP/3 side complete (token gen + response), STOQ-side validation missing (no token-to-PoS correlation)",
     "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
     "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
     "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
@@ -52,4 +50,7 @@ items = [
 ]
 
 [features.planned]
-items = []
+items = [
+    "PoS authentication subsystem — Phase 2, beyond Phase 0 bootstrap (self-signed + PoS handshake at STOQ layer is sufficient). Former AuthManager/BootstrapHandler/authenticate_stoq_with_proof was never wired into the request pipeline and has been removed. Can be resurrected from git history when multi-tenant HTTP/3 auth is needed.",
+    "Bootstrap token flow — HTTP/3 side issues tokens but validation path beyond self-serve PoS handshake not implemented",
+]

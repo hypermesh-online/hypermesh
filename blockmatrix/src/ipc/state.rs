@@ -44,4 +44,10 @@ pub struct DaemonState {
     /// DNS popularity tracker for engauge-driven replication.
     /// Records resolution frequency so popular names get replicated to more nodes.
     pub dns_popularity_tracker: Option<Arc<DnsPopularityTracker>>,
+    /// Caesar EVP protocol instance (None if feature disabled or init failed).
+    #[cfg(feature = "caesar")]
+    pub caesar: Option<Arc<tokio::sync::RwLock<caesar::CaesarProtocol>>>,
+    /// Engauge swarm analytics bridge (None if feature disabled or not wired).
+    #[cfg(feature = "intelligence")]
+    pub engauge_bridge: Option<Arc<crate::intelligence::engauge_bridge::EngaugeBridge>>,
 }

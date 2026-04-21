@@ -119,6 +119,10 @@ mod tests {
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
             dns_popularity_tracker: None,
+            #[cfg(feature = "caesar")]
+            caesar: None,
+            #[cfg(feature = "intelligence")]
+            engauge_bridge: None,
         })
     }
 

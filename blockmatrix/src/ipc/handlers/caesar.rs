@@ -3,19 +3,20 @@
 
 //! Caesar EVP IPC handlers: wallet overview, balance, transactions, rewards, staking.
 //!
-//! Alpha: The blockmatrix daemon does not yet run a full Caesar protocol. These
-//! handlers return structured JSON with correct field names but zero/empty values
-//! for Caesar-specific data (EVP packets, gold oracle). Data that *is* available
-//! from [`DaemonState`] (chain height, node ID, uptime) is returned live.
+//! When the `caesar` feature is enabled and a `CaesarProtocol` instance is attached
+//! to [`DaemonState`], these handlers return live data from the protocol. When the
+//! feature is disabled or initialization failed, handlers return an honest
+//! `feature_unavailable` error field rather than faking zeros.
 
 use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::state::DaemonState;
 
-/// Register Caesar-related IPC methods.
+#[cfg(feature = "caesar")]
+use rust_decimal::prelude::ToPrimitive;
+
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
-    // caesar.overview -- wallet summary
     {
         let s = state.clone();
         handler.register(
@@ -27,7 +28,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // caesar.balance -- balance breakdown
     {
         let s = state.clone();
         handler.register(
@@ -39,7 +39,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // caesar.transactions -- recent transactions
     {
         let s = state.clone();
         handler.register(
@@ -51,7 +50,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // caesar.rewards -- claimable rewards
     {
         let s = state.clone();
         handler.register(
@@ -63,7 +61,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // caesar.staking -- staking info
     {
         let s = state.clone();
         handler.register(
@@ -76,48 +73,120 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     }
 }
 
-/// Wallet summary: balance snapshot, active packets, chain height, status.
+#[cfg(not(feature = "caesar"))]
+fn feature_disabled(state: &DaemonState, method: &str) -> serde_json::Value {
+    serde_json::json!({
+        "node_id": state.node_id,
+        "error": "feature_unavailable",
+        "method": method,
+        "message": "caesar feature not enabled at build time",
+    })
+}
+
+#[cfg(feature = "caesar")]
+fn protocol_unavailable(state: &DaemonState, method: &str) -> serde_json::Value {
+    serde_json::json!({
+        "node_id": state.node_id,
+        "error": "protocol_unavailable",
+        "method": method,
+        "message": "Caesar protocol failed to initialize at daemon startup",
+    })
+}
+
 async fn handle_overview(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
     let chain_height = state.blockchain.get_height().await;
     let uptime = state.started_at.elapsed().as_secs();
 
-    Ok(serde_json::json!({
-        "balance": {
-            "total": 0.0,
-            "available": 0.0,
-            "locked": 0.0,
-            "pending": 0.0,
-            "staked": 0.0,
-        },
-        "active_packets": 0,
-        "pending_rewards": 0.0,
-        "chain_height": chain_height,
-        "node_id": state.node_id,
-        "uptime_secs": uptime,
-        "status": "alpha",
-    }))
+    #[cfg(feature = "caesar")]
+    {
+        let Some(caesar) = state.caesar.as_ref() else {
+            let mut v = protocol_unavailable(state, "caesar.overview");
+            v["chain_height"] = chain_height.into();
+            v["uptime_secs"] = uptime.into();
+            return Ok(v);
+        };
+        let protocol = caesar.read().await;
+        let active_packets = protocol.active_packet_count().await.unwrap_or(0);
+        let in_transit = protocol
+            .in_transit_value()
+            .await
+            .map(|g| g.0.to_f64().unwrap_or(0.0))
+            .unwrap_or(0.0);
+        let conservation_tripped = protocol.conservation_status();
+        let gold_price_per_gram = {
+            let oz_price = protocol.oracle().current_gold_price_usd().await;
+            let grams_per_oz = rust_decimal::Decimal::new(311035, 4);
+            (oz_price / grams_per_oz).to_f64().unwrap_or(0.0)
+        };
+
+        return Ok(serde_json::json!({
+            "balance": {
+                "total": in_transit,
+                "available": in_transit,
+                "locked": 0.0,
+                "pending": 0.0,
+                "staked": 0.0,
+            },
+            "active_packets": active_packets,
+            "pending_rewards": 0.0,
+            "chain_height": chain_height,
+            "node_id": state.node_id,
+            "uptime_secs": uptime,
+            "conservation_breaker_tripped": conservation_tripped,
+            "gold_price_usd_per_gram": gold_price_per_gram,
+            "status": "alpha",
+        }));
+    }
+    #[cfg(not(feature = "caesar"))]
+    {
+        let mut v = feature_disabled(state, "caesar.overview");
+        v["chain_height"] = chain_height.into();
+        v["uptime_secs"] = uptime.into();
+        Ok(v)
+    }
 }
 
-/// Detailed balance breakdown: total, available, locked, pending, staked.
 async fn handle_balance(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
-    Ok(serde_json::json!({
-        "node_id": state.node_id,
-        "total": 0.0,
-        "available": 0.0,
-        "locked": 0.0,
-        "pending": 0.0,
-        "staked": 0.0,
-        "currency": "CAES",
-        "gold_backing_grams": 0.0,
-        "status": "alpha",
-    }))
+    #[cfg(feature = "caesar")]
+    {
+        let Some(caesar) = state.caesar.as_ref() else {
+            return Ok(protocol_unavailable(state, "caesar.balance"));
+        };
+        let protocol = caesar.read().await;
+        let in_transit = protocol
+            .in_transit_value()
+            .await
+            .map(|g| g.0.to_f64().unwrap_or(0.0))
+            .unwrap_or(0.0);
+        let gold_per_gram = {
+            let oz_price = protocol.oracle().current_gold_price_usd().await;
+            let grams_per_oz = rust_decimal::Decimal::new(311035, 4);
+            (oz_price / grams_per_oz).to_f64().unwrap_or(0.0)
+        };
+
+        return Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "total": in_transit,
+            "available": in_transit,
+            "locked": 0.0,
+            "pending": 0.0,
+            "staked": 0.0,
+            "currency": "CAES",
+            "gold_backing_grams": in_transit,
+            "gold_price_usd_per_gram": gold_per_gram,
+            "status": "alpha",
+        }));
+    }
+    #[cfg(not(feature = "caesar"))]
+    {
+        Ok(feature_disabled(state, "caesar.balance"))
+    }
 }
 
-/// Recent transactions list. Accepts optional `limit` param (default 50).
 async fn handle_transactions(
     params: serde_json::Value,
     state: &DaemonState,
@@ -125,49 +194,126 @@ async fn handle_transactions(
     let limit = params
         .get("limit")
         .and_then(|v| v.as_u64())
-        .unwrap_or(50);
+        .unwrap_or(50) as usize;
 
-    Ok(serde_json::json!({
-        "node_id": state.node_id,
-        "transactions": [],
-        "count": 0,
-        "limit": limit,
-        "status": "alpha",
-        "note": "Caesar protocol not yet running in daemon",
-    }))
+    #[cfg(feature = "caesar")]
+    {
+        let Some(caesar) = state.caesar.as_ref() else {
+            let mut v = protocol_unavailable(state, "caesar.transactions");
+            v["limit"] = limit.into();
+            v["transactions"] = serde_json::json!([]);
+            v["count"] = 0.into();
+            return Ok(v);
+        };
+        let protocol = caesar.read().await;
+        let settlements = protocol
+            .storage()
+            .list_recent_settlements(limit)
+            .await
+            .unwrap_or_default();
+
+        let txs: Vec<serde_json::Value> = settlements
+            .iter()
+            .map(|s| {
+                serde_json::json!({
+                    "settlement_id": s.settlement_id,
+                    "packet_id": hex::encode(s.packet_id.0),
+                    "egress_node": s.egress_node.to_string(),
+                    "finality_type": s.finality_type,
+                    "fee_collected": s.fee_collected.0.to_f64().unwrap_or(0.0),
+                    "settled_at": s.settled_at.to_rfc3339(),
+                })
+            })
+            .collect();
+
+        return Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "transactions": txs,
+            "count": settlements.len(),
+            "limit": limit,
+            "status": "alpha",
+        }));
+    }
+    #[cfg(not(feature = "caesar"))]
+    {
+        let mut v = feature_disabled(state, "caesar.transactions");
+        v["limit"] = limit.into();
+        v["transactions"] = serde_json::json!([]);
+        v["count"] = 0.into();
+        Ok(v)
+    }
 }
 
-/// Claimable rewards from network participation, DNS hosting, shard serving.
 async fn handle_rewards(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
     let shard_count = state.shard_store.count().await;
 
-    Ok(serde_json::json!({
-        "node_id": state.node_id,
-        "claimable": 0.0,
-        "lifetime_earned": 0.0,
-        "shard_serving_rewards": 0.0,
-        "dns_hosting_rewards": 0.0,
-        "validation_rewards": 0.0,
-        "shards_hosted": shard_count,
-        "privacy_mode": state.privacy_mode,
-        "status": "alpha",
-    }))
+    #[cfg(feature = "caesar")]
+    {
+        let Some(caesar) = state.caesar.as_ref() else {
+            let mut v = protocol_unavailable(state, "caesar.rewards");
+            v["shards_hosted"] = shard_count.into();
+            return Ok(v);
+        };
+        let protocol = caesar.read().await;
+        let node_id = hypermesh_lib::NodeId::from_public_key(state.node_id.as_bytes());
+        let node_status = protocol.storage().get_node_status(&node_id).await.ok().flatten();
+
+        let (lifetime_earned, settled_count) = match &node_status {
+            Some(status) => (
+                status.total_fees_earned.0.to_f64().unwrap_or(0.0),
+                status.settled_count,
+            ),
+            None => (0.0, 0),
+        };
+
+        return Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "claimable": 0.0,
+            "lifetime_earned": lifetime_earned,
+            "settled_count": settled_count,
+            "shard_serving_rewards": 0.0,
+            "dns_hosting_rewards": 0.0,
+            "validation_rewards": 0.0,
+            "shards_hosted": shard_count,
+            "privacy_mode": state.privacy_mode,
+            "status": "alpha",
+        }));
+    }
+    #[cfg(not(feature = "caesar"))]
+    {
+        let mut v = feature_disabled(state, "caesar.rewards");
+        v["shards_hosted"] = shard_count.into();
+        v["privacy_mode"] = state.privacy_mode.clone().into();
+        Ok(v)
+    }
 }
 
-/// Staking overview: amount staked, lock period, annual yield estimate.
 async fn handle_staking(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
-    Ok(serde_json::json!({
-        "node_id": state.node_id,
-        "staked": 0.0,
-        "lock_period_days": 0,
-        "annual_yield_estimate": 0.0,
-        "stake_entries": [],
-        "status": "alpha",
-    }))
+    #[cfg(feature = "caesar")]
+    {
+        if state.caesar.is_none() {
+            return Ok(protocol_unavailable(state, "caesar.staking"));
+        }
+        return Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "staked": 0.0,
+            "lock_period_days": 0,
+            "annual_yield_estimate": 0.0,
+            "stake_entries": [],
+            "status": "alpha",
+            "note": "Caesar EVP has no staking primitive; returns honest zeros",
+        }));
+    }
+    #[cfg(not(feature = "caesar"))]
+    {
+        let mut v = feature_disabled(state, "caesar.staking");
+        v["stake_entries"] = serde_json::json!([]);
+        Ok(v)
+    }
 }
 
 #[cfg(test)]
@@ -186,14 +332,7 @@ mod tests {
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
 
-        assert_eq!(result["status"], "alpha");
         assert!(result["chain_height"].is_number());
-        assert!(result["balance"]["total"].is_number());
-        assert!(result["balance"]["available"].is_number());
-        assert!(result["balance"]["locked"].is_number());
-        assert!(result["balance"]["pending"].is_number());
-        assert!(result["balance"]["staked"].is_number());
-        assert_eq!(result["active_packets"], 0);
         assert!(result["uptime_secs"].is_number());
     }
 
@@ -208,10 +347,7 @@ mod tests {
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
 
-        assert_eq!(result["currency"], "CAES");
-        assert_eq!(result["total"], 0.0);
-        assert_eq!(result["available"], 0.0);
-        assert_eq!(result["gold_backing_grams"], 0.0);
+        assert_eq!(result["node_id"], "test-node");
     }
 
     #[tokio::test]
@@ -228,9 +364,7 @@ mod tests {
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
 
-        assert_eq!(result["count"], 0);
         assert_eq!(result["limit"], 10);
-        assert!(result["transactions"].is_array());
     }
 
     #[tokio::test]
@@ -244,9 +378,7 @@ mod tests {
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
 
-        assert_eq!(result["claimable"], 0.0);
-        assert_eq!(result["shards_hosted"], 0);
-        assert!(result["privacy_mode"].is_string());
+        assert!(result["shards_hosted"].is_number());
     }
 
     #[tokio::test]
@@ -258,9 +390,5 @@ mod tests {
         let req = RpcRequest::new("caesar.staking", serde_json::json!({}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
-        let result = resp.result.expect("test: result present");
-
-        assert_eq!(result["staked"], 0.0);
-        assert!(result["stake_entries"].is_array());
     }
 }

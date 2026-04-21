@@ -66,7 +66,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 
 /// CA status: bootstrap phase, cert type, key algorithm info.
 fn handle_status(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
-    let identity_dir = state.data_dir.join("identity");
+    let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let has_falcon = identity_dir.join("falcon_pubkey.der").exists();
     let has_kyber = identity_dir.join("kyber_pubkey.der").exists();
 
@@ -92,7 +92,7 @@ fn handle_status(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
 
 /// List issued certificates. Alpha: only the node's own self-signed cert.
 fn handle_certs(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
-    let identity_dir = state.data_dir.join("identity");
+    let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let cert_path = identity_dir.join("node_cert.der");
     let has_cert = cert_path.exists();
 
@@ -116,7 +116,7 @@ fn handle_certs(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
 
 /// Identity key summary: public key sizes, fingerprints (hex-encoded).
 fn handle_identity(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
-    let identity_dir = state.data_dir.join("identity");
+    let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let falcon_pk_path = identity_dir.join("falcon_pubkey.der");
     let kyber_pk_path = identity_dir.join("kyber_pubkey.der");
 
@@ -236,7 +236,7 @@ mod tests {
     #[tokio::test]
     async fn test_trustchain_identity_with_keys() {
         let dir = tempfile::tempdir().expect("test: tempdir");
-        let identity_dir = dir.path().join("identity");
+        let identity_dir = dir.path().join("tc-test").join("identity");
         std::fs::create_dir_all(&identity_dir).expect("test: mkdir");
 
         std::fs::write(identity_dir.join("falcon_pubkey.der"), vec![0xAA; 64])
@@ -271,6 +271,10 @@ mod tests {
             shutdown_tx,
             dns_resolver: crate::bootstrap::DnsResolver::default(),
             dns_popularity_tracker: None,
+            #[cfg(feature = "caesar")]
+            caesar: None,
+            #[cfg(feature = "intelligence")]
+            engauge_bridge: None,
         });
 
         let mut handler = RequestHandler::new();

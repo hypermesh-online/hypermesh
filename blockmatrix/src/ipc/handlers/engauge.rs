@@ -3,19 +3,18 @@
 
 //! Engauge IPC handlers: capacity, traffic, throttle, routing.
 //!
-//! Exposes engauge analytics through the daemon IPC. Real data is returned from
-//! [`DaemonState`] where available (shard count, peer count, uptime). Engauge-
-//! specific metrics (streaming frames, differential privacy, marketplace) return
-//! structured zeros until the full ingestion pipeline is wired to IPC.
+//! When the `intelligence` feature is enabled and an [`EngaugeBridge`] is wired
+//! into [`DaemonState`], these handlers return real analytics from engauge's
+//! [`SwarmAnalytics`] plus live daemon metrics (shard store count, peer count).
+//! When the feature is disabled, handlers return an honest `feature_unavailable`
+//! error field rather than fabricating zeros.
 
 use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::state::DaemonState;
 
-/// Register engauge-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
-    // engauge.capacity -- node capacity metrics
     {
         let s = state.clone();
         handler.register(
@@ -27,7 +26,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // engauge.traffic -- traffic and throughput metrics
     {
         let s = state.clone();
         handler.register(
@@ -39,7 +37,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // engauge.throttle -- throttle and rate-limit status
     {
         let s = state.clone();
         handler.register(
@@ -51,7 +48,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
         );
     }
 
-    // engauge.routing -- routing intelligence summary
     {
         let s = state.clone();
         handler.register(
@@ -64,7 +60,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
     }
 }
 
-/// Node capacity: shard count, peer count, storage utilization.
 async fn handle_capacity(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
@@ -85,10 +80,10 @@ async fn handle_capacity(
         "memory_utilization": 0.0,
         "uptime_secs": uptime,
         "intelligence_enabled": cfg!(feature = "intelligence"),
+        "bridge_attached": bridge_attached(state),
     }))
 }
 
-/// Traffic metrics: bytes in/out, request counts, throughput.
 async fn handle_traffic(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
@@ -96,6 +91,18 @@ async fn handle_traffic(
         Some(net) => net.get_connected_nodes().await.len(),
         None => 0,
     };
+
+    #[cfg(feature = "intelligence")]
+    let (tracked_shards, transmit_summaries) = match &state.engauge_bridge {
+        Some(bridge) => {
+            let summaries = bridge.metrics_to_transmit().await;
+            (summaries.len(), summaries.len())
+        }
+        None => (0, 0),
+    };
+
+    #[cfg(not(feature = "intelligence"))]
+    let (tracked_shards, transmit_summaries) = (0usize, 0usize);
 
     Ok(serde_json::json!({
         "node_id": state.node_id,
@@ -106,10 +113,13 @@ async fn handle_traffic(
         "active_connections": peer_count,
         "throughput_bps": 0.0,
         "privacy_mode": state.privacy_mode,
+        "tracked_shards": tracked_shards,
+        "transmit_summaries": transmit_summaries,
+        "intelligence_enabled": cfg!(feature = "intelligence"),
+        "bridge_attached": bridge_attached(state),
     }))
 }
 
-/// Throttle status: current rate limits, backpressure signals.
 async fn handle_throttle(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
@@ -121,10 +131,12 @@ async fn handle_throttle(
         "queue_depth": 0,
         "dropped_requests": 0,
         "privacy_mode": state.privacy_mode,
+        "intelligence_enabled": cfg!(feature = "intelligence"),
+        "bridge_attached": bridge_attached(state),
+        "note": "throttle signal plumbing pending — engauge MetricsIngestionPipeline→IPC",
     }))
 }
 
-/// Routing intelligence: path recommendations, weight modifiers.
 async fn handle_routing(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
@@ -145,7 +157,18 @@ async fn handle_routing(
         "preferred_paths": [],
         "weight_modifiers": {},
         "intelligence_enabled": cfg!(feature = "intelligence"),
+        "bridge_attached": bridge_attached(state),
     }))
+}
+
+#[cfg(feature = "intelligence")]
+fn bridge_attached(state: &DaemonState) -> bool {
+    state.engauge_bridge.is_some()
+}
+
+#[cfg(not(feature = "intelligence"))]
+fn bridge_attached(_state: &DaemonState) -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -168,6 +191,7 @@ mod tests {
         assert_eq!(result["peers_connected"], 0);
         assert!(result["uptime_secs"].is_number());
         assert!(result["intelligence_enabled"].is_boolean());
+        assert!(result["bridge_attached"].is_boolean());
     }
 
     #[tokio::test]
