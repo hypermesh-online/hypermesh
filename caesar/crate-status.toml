@@ -40,12 +40,16 @@ items = [
     "Multi-node packet routing — routing logic exists but packets don't actually traverse QUIC connections between nodes",
     "Blockchain-backed acceptance criteria — currently in-memory, should be on Network chain",
     "Engauge capacity metrics integration — feature-gated code exists but no real data pipeline",
-    "Banking interop bridge — 3 tests failing, external adapter not functional",
+    "Banking interop bridge — velocity economics functional, 3 tests failing on external adapter paths",
 ]
 
 [features.planned]
 items = [
     "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps)",
+    "Stripe provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+    "Plaid provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+    "Square provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+    "OpenBanking provider (integration point is caesar-sdk UPI adapter traits; live banking providers require PSD2/PCI-DSS compliance + API credentials)",
     "External fiat/crypto payment rail integrations (blocked by: external API keys + compliance)",
     "Real gold oracle data feed (blocked by: external API subscription)",
 ]

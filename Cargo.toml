@@ -36,18 +36,10 @@ bytes = { version = "1.6", features = ["serde"] }
 webpki-roots = "0.26"
 
 # HTTP and web
-# http = ... # REMOVED: STOQ-only transport (no HTTP)
-# http-body-util = ... # REMOVED: STOQ-only transport
-# axum = ... # REMOVED: STOQ-only transport
-# warp = ... # REMOVED: STOQ-only transport
-# tower = ... # REMOVED: STOQ-only transport
-# tower-http = ... # REMOVED: STOQ-only transport
-# hyper = ... # REMOVED: STOQ-only transport
-# reqwest = ... # REMOVED: STOQ-only transport
-
-# HTTP/3 Bridge
-# h3 = ... # REMOVED: Never used, STOQ-only transport
-# h3-quinn = ... # REMOVED: Never used, STOQ-only transport
+# REMOVED: Legacy HTTP/REST frameworks (axum, tower, hyper, warp, reqwest, http, http-body-util)
+# HTTP/3 (QUIC) is still used by the Gateway crate for bootstrap + clearnet proxy.
+# Everything else is STOQ-only.
+# h3 / h3-quinn are not workspace deps — Gateway uses quinn directly for HTTP/3 framing.
 
 # Cryptography
 ring = "0.17"

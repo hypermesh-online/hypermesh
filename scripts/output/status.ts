@@ -169,13 +169,13 @@ export const crateStatuses: CrateStatus[] = [
         "Message IPC handlers — message.send, message.inbox, message.history, message.read",
         "Message CLI — hypermesh message send/inbox/history/read subcommands",
         "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
-        "Cross-network asset transfers — ScopeBridge writes TransferLock/Registration/Release blockchain entries, TAG_TRANSFER wire protocol, GatewayManager with_blockchain()",
         "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
         "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
         "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
         "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)"
       ],
       "inDevelopment": [
+        "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
@@ -225,15 +225,19 @@ export const crateStatuses: CrateStatus[] = [
         "Multi-node packet routing — routing logic exists but packets don't actually traverse QUIC connections between nodes",
         "Blockchain-backed acceptance criteria — currently in-memory, should be on Network chain",
         "Engauge capacity metrics integration — feature-gated code exists but no real data pipeline",
-        "Banking interop bridge — 3 tests failing, external adapter not functional"
+        "Banking interop bridge — velocity economics functional, 3 tests failing on external adapter paths"
       ],
       "planned": [
         "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps)",
+        "Stripe provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+        "Plaid provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+        "Square provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
+        "OpenBanking provider (integration point is caesar-sdk UPI adapter traits; live banking providers require PSD2/PCI-DSS compliance + API credentials)",
         "External fiat/crypto payment rail integrations (blocked by: external API keys + compliance)",
         "Real gold oracle data feed (blocked by: external API subscription)"
       ]
     },
-    "completion": 78
+    "completion": 69
   },
   {
     "id": "caesar-sdk",
@@ -369,7 +373,6 @@ export const crateStatuses: CrateStatus[] = [
         "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",
         "trust.hypermesh.online onboarding dashboard (public landing, private topology, admin controls)",
         "STOQ protocol bridge — stoq_bridge.rs and stoq_listener.rs wired into main.rs, runs alongside HTTP/3 on port 8444 (configurable), graceful degradation if port unavailable",
-        "PoS authentication — authenticate_stoq_with_proof validates FALCON-1024 signed WireSignedProof envelopes (BLAKE3 digest + signature verification)",
         "Production config loader — GatewayConfig::load() cascades GATEWAY_CONFIG env → ~/.hypermesh/gateway.toml → defaults, with per-field env overrides",
         "DNS-over-HTTPS (DoH) endpoint — JSON-based DNS query/response for browser-compatible resolution",
         "Host→DNS resolution — extract_subdomain() maps Host header to blockchain DNS entries",
@@ -377,7 +380,6 @@ export const crateStatuses: CrateStatus[] = [
         "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing"
       ],
       "inDevelopment": [
-        "Bootstrap token flow — HTTP/3 side complete (token gen + response), STOQ-side validation missing (no token-to-PoS correlation)",
         "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
@@ -385,9 +387,12 @@ export const crateStatuses: CrateStatus[] = [
         "Outbound proxy with allowlist filtering — code exists, not tested",
         "Backend service discovery (resolve by address or service registry)"
       ],
-      "planned": []
+      "planned": [
+        "PoS authentication subsystem — Phase 2, beyond Phase 0 bootstrap (self-signed + PoS handshake at STOQ layer is sufficient). Former AuthManager/BootstrapHandler/authenticate_stoq_with_proof was never wired into the request pipeline and has been removed. Can be resurrected from git history when multi-tenant HTTP/3 auth is needed.",
+        "Bootstrap token flow — HTTP/3 side issues tokens but validation path beyond self-serve PoS handshake not implemented"
+      ]
     },
-    "completion": 80
+    "completion": 77
   },
   {
     "id": "hypermesh",

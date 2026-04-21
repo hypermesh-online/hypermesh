@@ -76,7 +76,7 @@ scripts/deploy/deploy-all.sh              # One-command deployment
 ### **1. Network Scope Blockchain Implementation**
 - ⚡ Network scope sync (reflector/swarm mode) — MVP working (block propagation 5s poll, gossip 15s fanout=3, cross-genesis insertion)
 - ✅ Gateway architecture for Device-to-Network bridging (implemented in `/gateway/`)
-- ❌ Cross-network asset transfers
+- ⚡ Cross-network asset transfers — infrastructure present (ScopeBridge, TAG_TRANSFER, Lock/Registration/Release block entries), Lock→Transfer→Unlock lifecycle not e2e integrated
 - ⚡ Reflector pooling for Network chain synchronization — SyncManager + ReflectorPool + SyncDispatcher implemented
 
 ### **2. Integration and Testing**
@@ -200,7 +200,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 - ✅ Asset system with blockchain registration
 - ⚡ Network scope sync MVP — block propagation (5s poll), gossip (15s, fanout=3), cross-genesis insertion, E2E two-node over QUIC
 - ✅ Gateway crate implemented (HTTP/3 + STOQ bridge, scope routing, federation, 20/20 features)
-- ❌ Cross-network asset transfers (NOT implemented)
+- ⚡ Cross-network asset transfers — infrastructure present (ScopeBridge, TAG_TRANSFER, Lock/Registration/Release block entries), Lock→Transfer→Unlock lifecycle not e2e integrated
 - ✅ IPC daemon (JSON-RPC 2.0, Unix socket), DNS-as-asset, domain naming, dashboard SDK
 
 **Key File Status**:

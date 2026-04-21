@@ -181,7 +181,6 @@ items = [
     "Message CLI — hypermesh message send/inbox/history/read subcommands",
     "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
     # Core Protocol Completion (L1-L5)
-    "Cross-network asset transfers — ScopeBridge writes TransferLock/Registration/Release blockchain entries, TAG_TRANSFER wire protocol, GatewayManager with_blockchain()",
     "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
     "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
     "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
@@ -190,6 +189,8 @@ items = [
 
 [features.in_development]
 items = [
+    # Cross-network asset transfer lifecycle
+    "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
     # Security review pending
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)

@@ -2,7 +2,7 @@
 
 A sovereign distributed computing platform with post-quantum cryptography, Block-MATRIX topology, and bilateral Proof of State authentication.
 
-**14 crates** | **1,071 files** | **338,666 lines** | **4,575 tests** | **0 compiler errors**
+**12 workspace crates** (+ UI) | **1,035 Rust files** | **361,784 lines** | **4,553 tests** | **0 compiler errors**
 
 ---
 
@@ -107,6 +107,8 @@ For musl static builds (deployment): `rustup target add x86_64-unknown-linux-mus
 | [catalog](catalog/) | Asset type registry with DHT, type publishing, STOQ API |
 | [caesar](caesar/) | Gold-denominated Ephemeral Value Protocol |
 | [caesar-sdk](caesar-sdk/) | UPI adapter traits for Caesar payment rails |
+
+> Banking provider integrations (Stripe/Plaid/Square) are not yet live; the caesar-sdk UPI adapter trait is the integration point.
 | [gateway](gateway/) | HTTP/3 + STOQ gateway, DNS-over-HTTPS, domain routing |
 | [engauge](engauge/) | Analytics, capacity metrics, routing intelligence, marketplace |
 | [hypermesh-sdk](hypermesh-sdk/) | Typed Rust SDK for daemon IPC API |
