@@ -7,10 +7,10 @@
 //! Handles quantum-resistant encryption operations
 
 /// Create Kyber encryption key for quantum-resistant security
-pub async fn create_kyber_encryption_key() -> String {
-    // TODO: Implement actual Kyber key generation
-    // For now, return placeholder key ID
-    format!("kyber_key_{}", uuid::Uuid::new_v4())
+pub async fn create_kyber_encryption_key() -> anyhow::Result<String> {
+    let kyber = trustchain::crypto::KyberCrypto::new()?;
+    let kp = kyber.generate_keypair().await?;
+    Ok(hex::encode(&kp.public_key.key_bytes))
 }
 
 #[cfg(test)]
@@ -19,7 +19,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_encryption_key() {
-        let key_id = create_kyber_encryption_key().await;
-        assert!(key_id.starts_with("kyber_key_"));
+        let key_id = create_kyber_encryption_key()
+            .await
+            .expect("test: kyber keygen");
+        assert!(!key_id.is_empty());
+        assert!(key_id.chars().all(|c| c.is_ascii_hexdigit()));
     }
 }

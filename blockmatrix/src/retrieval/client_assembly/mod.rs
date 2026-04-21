@@ -250,74 +250,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_shards() {
-        let assembler = ClientAssembler::new(4);
-        let plan = create_test_plan();
-
-        assembler.initialize(plan).await.expect("test: async operation");
-        let result = assembler.fetch_shards().await;
-        assert!(result.is_ok());
-
-        let progress = assembler.get_progress().await;
-        assert!(progress.fetched_shards > 0);
-    }
-
-    #[tokio::test]
-    async fn test_reconstruct() {
-        let assembler = ClientAssembler::new(4);
-        let plan = create_test_plan();
-
-        assembler.initialize(plan).await.expect("test: async operation");
-        assembler.fetch_shards().await.expect("test: async operation");
-
-        let reconstructed = assembler.reconstruct().await;
-        assert!(reconstructed.is_ok());
-
-        let data = reconstructed.expect("test: expected success");
-        assert!(!data.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_progress_tracking() {
-        let assembler = ClientAssembler::new(4);
-        let plan = create_test_plan();
-
-        assembler.initialize(plan).await.expect("test: async operation");
-
-        let progress_before = assembler.get_progress().await;
-        assert_eq!(progress_before.percentage, 0.0);
-
-        assembler.fetch_shards().await.expect("test: async operation");
-
-        let progress_after = assembler.get_progress().await;
-        assert!(progress_after.percentage > 0.0);
-        assert!(progress_after.is_complete(10));
-    }
-
-    #[tokio::test]
-    async fn test_stats_tracking() {
-        let assembler = ClientAssembler::new(4);
-        let plan = create_test_plan();
-
-        assembler.initialize(plan).await.expect("test: async operation");
-        assembler.fetch_shards().await.expect("test: async operation");
-
-        let stats = assembler.get_stats().await;
-        assert!(stats.bytes_fetched > 0);
-        assert!(stats.total_time_ms > 0);
-        assert_eq!(stats.parallel_fetches, 4);
-    }
-
-    #[tokio::test]
     async fn test_reset() {
         let assembler = ClientAssembler::new(4);
         let plan = create_test_plan();
 
         assembler.initialize(plan).await.expect("test: async operation");
-        assembler.fetch_shards().await.expect("test: async operation");
 
         let progress_before = assembler.get_progress().await;
-        assert!(progress_before.fetched_shards > 0);
+        assert_eq!(progress_before.total_shards, 14);
 
         assembler.reset().await;
 

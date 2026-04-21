@@ -61,14 +61,18 @@ pub struct WasmStoqMessage {
 
 // Separate wasm_bindgen impl for message creation and access
 #[wasm_bindgen]
-pub fn create_stoq_message(message_type: &str, payload: &str, correlation_id: &str) -> JsValue {
+pub fn create_stoq_message(
+    message_type: &str,
+    payload: &str,
+    correlation_id: &str,
+) -> Result<JsValue, JsValue> {
     let message = WasmStoqMessage {
         message_type: message_type.to_string(),
         payload: payload.to_string(),
         correlation_id: correlation_id.to_string(),
         timestamp: chrono::Utc::now().to_rfc3339(),
     };
-    serde_wasm_bindgen::to_value(&message).unwrap()
+    serde_wasm_bindgen::to_value(&message).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Certificate handling for WebAssembly

@@ -117,17 +117,52 @@ impl NodeAuthenticator {
         hex::encode(hash.as_bytes())
     }
 
-    /// Validate a certificate (placeholder for future implementation)
+    /// Validate an X.509 certificate: parse subject CN, check expiry, compute fingerprint
     pub async fn validate_certificate(&self, cert_data: &[u8]) -> Result<CertificateValidation> {
-        // For MVP, generate a mock validation result
+        let (_, cert) = x509_parser::parse_x509_certificate(cert_data).map_err(|e| {
+            super::error::TransportError::CertificateValidation(format!("Invalid X.509: {e}"))
+        })?;
+
+        let node_id = cert
+            .tbs_certificate
+            .subject
+            .iter_common_name()
+            .next()
+            .and_then(|cn| cn.as_str().ok())
+            .unwrap_or("unknown-node")
+            .to_string();
+
+        let now = chrono::Utc::now();
+        let not_after = chrono::DateTime::from_timestamp(
+            cert.tbs_certificate.validity.not_after.timestamp(),
+            0,
+        )
+        .ok_or_else(|| {
+            super::error::TransportError::CertificateValidation(
+                "Invalid not_after timestamp".to_string(),
+            )
+        })?;
+
+        let node_id_valid = self.validate_node_id(&node_id);
+        let not_expired = now < not_after;
+        let is_valid = not_expired && node_id_valid;
+
+        let mut validation_errors = Vec::new();
+        if !not_expired {
+            validation_errors.push("certificate expired".to_string());
+        }
+        if !node_id_valid {
+            validation_errors.push(format!("invalid node_id format: {node_id}"));
+        }
+
         let fingerprint = hex::encode(blake3::hash(cert_data).as_bytes());
 
         Ok(CertificateValidation {
-            is_valid: true,
-            node_id: "node-mvp".to_string(),
-            expires_at: chrono::Utc::now() + chrono::Duration::days(365),
+            is_valid,
+            node_id,
+            expires_at: not_after,
             fingerprint,
-            validation_errors: vec![],
+            validation_errors,
         })
     }
 

@@ -189,7 +189,13 @@ impl AssetAdapter for StorageAssetAdapter {
 
         // Create encryption key for quantum security
         let encryption_key_id = if request.privacy_level == PrivacyMode::PRIVATE {
-            Some(create_kyber_encryption_key().await)
+            Some(
+                create_kyber_encryption_key()
+                    .await
+                    .map_err(|e| AssetError::AdapterError {
+                        message: format!("Kyber key generation failed: {e}"),
+                    })?,
+            )
         } else {
             None
         };
@@ -410,7 +416,13 @@ impl AssetAdapter for StorageAssetAdapter {
 
         // Update encryption based on privacy level
         if privacy == PrivacyMode::PRIVATE && allocation.encryption_key_id.is_none() {
-            allocation.encryption_key_id = Some(create_kyber_encryption_key().await);
+            allocation.encryption_key_id = Some(
+                create_kyber_encryption_key()
+                    .await
+                    .map_err(|e| AssetError::AdapterError {
+                        message: format!("Kyber key generation failed: {e}"),
+                    })?,
+            );
             allocation.encryption_enabled = true;
         }
 
