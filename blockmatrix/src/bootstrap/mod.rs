@@ -266,8 +266,16 @@ impl NodeBootstrap {
         let genesis_block = Block::genesis(node_coordinate);
         info!("Created genesis block: {}", genesis_block.hash);
 
-        // 2. Initialize blockchain with genesis
-        let blockchain = Arc::new(NodeBlockchain::new(node_coordinate));
+        // 2. Initialize blockchain with the SAME genesis we just built.
+        //    NodeBlockchain::new would call Block::genesis again — and
+        //    Block::genesis is non-deterministic (TimeProof embeds
+        //    SystemTime + nonce), so the two genesis blocks would have
+        //    different hashes. Block 1 would chain off the in-memory genesis
+        //    while disk holds the persisted one, breaking restart replay.
+        let blockchain = Arc::new(NodeBlockchain::from_genesis(
+            node_coordinate,
+            genesis_block.clone(),
+        ));
 
         // 3. Self-sign certificate for localhost
         let localhost_cert = Self::generate_fresh_certificate()?;
@@ -484,6 +492,34 @@ mod tests {
 
         // Verify privacy mode
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
+    }
+
+    /// Regression test for the double-genesis chain integrity bug:
+    /// `bootstrap.genesis_block` is persisted to disk while
+    /// `bootstrap.blockchain.head` is used to compute block 1's
+    /// `previous_hash`. If the two diverge (because `Block::genesis` is
+    /// non-deterministic via TimeProof's SystemTime+nonce), reload after
+    /// restart fails with "Chain integrity violation at block 1".
+    #[tokio::test]
+    async fn genesis_in_bootstrap_matches_blockchain_head() {
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
+        let bootstrap = NodeBootstrap::initialize(coord)
+            .await
+            .expect("test: initialize");
+
+        let head = bootstrap
+            .blockchain()
+            .get_head()
+            .await
+            .expect("test: head must exist immediately after initialize");
+
+        assert_eq!(
+            bootstrap.genesis_block().hash,
+            head.hash,
+            "bootstrap.genesis_block.hash must equal blockchain.head.hash; \
+             otherwise block 1 will be persisted with previous_hash that \
+             disagrees with the on-disk genesis, breaking restart replay"
+        );
     }
 
     #[tokio::test]

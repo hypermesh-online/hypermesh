@@ -68,7 +68,23 @@ pub struct NodeBlockchain {
 impl NodeBlockchain {
     /// Create a new blockchain for a node.
     pub fn new(node_coordinate: MatrixCoordinate) -> Self {
-        let genesis = Block::genesis(node_coordinate);
+        Self::from_genesis(node_coordinate, Block::genesis(node_coordinate))
+    }
+
+    /// Create a new blockchain seeded with an externally-constructed genesis.
+    ///
+    /// `Block::genesis` is non-deterministic (TimeProof embeds SystemTime + a
+    /// random nonce), so two independent calls produce different hashes. When
+    /// a caller persists the genesis to disk AND uses a blockchain in memory,
+    /// both must reference the *same* block — otherwise block 1's
+    /// `previous_hash` (taken from the in-memory head) won't match the on-disk
+    /// genesis on restart.
+    pub fn from_genesis(node_coordinate: MatrixCoordinate, genesis: Block) -> Self {
+        assert!(
+            genesis.is_genesis(),
+            "from_genesis requires a genesis block (index 0, zero previous_hash)"
+        );
+
         let mut blocks = HashMap::new();
         let mut hash_index = HashMap::new();
 
