@@ -30,6 +30,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, instrument, warn};
 
 // Sub-modules for integration layer
+#[cfg(feature = "intelligence")]
+pub mod ebpf_feedback;
 pub mod engauge_bridge;
 pub mod integration;
 pub mod metrics_bridge;
@@ -37,6 +39,9 @@ pub mod performance;
 pub mod types;
 pub mod validation;
 pub mod workflows;
+
+#[cfg(feature = "intelligence")]
+pub use ebpf_feedback::EbpfFeedbackAdapter;
 
 // Re-exports from types module
 use types::inline_trustchain_stub;

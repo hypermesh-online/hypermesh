@@ -621,12 +621,37 @@ async fn start_network(
         });
         info!("engauge intelligence bridge started (periodic_feed=10s)");
 
+        // --- Phase E.1: Construct eBPF feedback adapter for the routing
+        // intelligence feed. The adapter pushes congestion-derived privacy
+        // actions and routing rules from engauge into HyperMeshEbpf.
+        let ebpf_for_feedback: Option<std::sync::Arc<hypermesh_ebpf::HyperMeshEbpf>> =
+            match hypermesh_ebpf::HyperMeshEbpf::new(hypermesh_ebpf::EbpfConfig::default()) {
+                Ok(e) => Some(std::sync::Arc::new(e)),
+                Err(err) => {
+                    warn!("eBPF orchestrator unavailable, feedback loop disabled: {err}");
+                    None
+                }
+            };
+        if ebpf_for_feedback.is_some() {
+            info!("eBPF feedback adapter ready for engauge routing intelligence");
+        }
+
         // --- H4: Spawn propagation weight feed loop ---
         let h4_analytics = engauge_analytics.clone();
         let h4_propagator = block_propagator.clone();
         let h4_network = network_clone.clone();
         let h4_coord = coord;
+        let h4_ebpf = ebpf_for_feedback.clone();
         tokio::spawn(async move {
+            // Construct a RoutingIntelFeed once and reuse it across iterations
+            // so the eBPF feedback adapter remains attached.
+            let mut feed = engauge::routing_intel::RoutingIntelFeed::new(30);
+            if let Some(ebpf) = h4_ebpf.clone() {
+                let adapter: Box<dyn engauge::routing_intel::EbpfPolicyFeedback> =
+                    Box::new(blockmatrix::intelligence::EbpfFeedbackAdapter::new(ebpf));
+                feed.set_ebpf_feedback(adapter);
+            }
+
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(15));
             loop {
                 interval.tick().await;
@@ -656,6 +681,11 @@ async fn start_network(
                     y: h4_coord.y as f64,
                     z: h4_coord.z as f64,
                 };
+                // Drive the feed's eBPF feedback hook by publishing an update.
+                // When the adapter is attached, this propagates congestion-
+                // derived privacy actions to HyperMeshEbpf.
+                let _ = feed.publish_update(&source_pos, &source_pos, &candidate_ids);
+
                 let modifiers = engauge::RoutingAdvisor::compute_weight_adjustments(
                     &ri, &source_pos, &source_pos, &candidate_ids,
                 );

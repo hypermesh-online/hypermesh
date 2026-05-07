@@ -24,14 +24,13 @@ items = [
     "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
     "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
     "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format",
+    "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
 ]
 
 [features.in_development]
 items = [
     "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
     "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
-    # Sprint B2: engauge intelligence must feed back into eBPF routing rules (trait exists, impl needed)
-    "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
 ]
 
 [features.planned]

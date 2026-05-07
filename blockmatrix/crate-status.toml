@@ -185,6 +185,7 @@ items = [
     "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
     "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
     "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
+    "EbpfFeedbackAdapter wires engauge routing intelligence into kernel-level BPF maps",
 ]
 
 [features.in_development]
