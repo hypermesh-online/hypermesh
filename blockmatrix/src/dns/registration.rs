@@ -8,7 +8,9 @@
 
 use super::{DnsError, DnsPoolManager, DnsRecord, DnsRecordData, DnsRecordType, DnsResult, Domain};
 use super::domain::DomainRegistration;
+use super::grant::FoundationGrant;
 use super::pools::PoolVisibility;
+use super::reserved;
 use crate::assets::core::asset_id::{
     AssetCategory, AssetData, BaseSystemType, NetworkScope,
 };
@@ -82,6 +84,15 @@ pub struct DnsRegistrar {
     registrations: Arc<RwLock<HashMap<String, DnsRegistration>>>,
     /// Domain registrations (domain_name -> DomainRegistration)
     domain_registrations: Arc<RwLock<HashMap<String, DomainRegistration>>>,
+    /// Phase H.1 — foundation FALCON-1024 root public key.
+    ///
+    /// When `Some`, foundation grants supplied to `register_domain` are
+    /// verified against this key. When `None` (alpha-default), reserved
+    /// domains are still rejected — but grants cannot be honoured because
+    /// there is no key to check against. This is the protective default:
+    /// a node that has not opted into a foundation root simply cannot
+    /// authorize reserved-domain registrations.
+    foundation_pubkey: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
 impl DnsRegistrar {
@@ -93,6 +104,7 @@ impl DnsRegistrar {
             blockchain: Arc::new(RwLock::new(None)),
             registrations: Arc::new(RwLock::new(HashMap::new())),
             domain_registrations: Arc::new(RwLock::new(HashMap::new())),
+            foundation_pubkey: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -100,6 +112,20 @@ impl DnsRegistrar {
     pub async fn set_blockchain(&self, blockchain: Arc<RwLock<NodeBlockchain>>) {
         let mut bc = self.blockchain.write().await;
         *bc = Some(blockchain);
+    }
+
+    /// Configure the foundation root pubkey used to verify grants.
+    ///
+    /// Once set, grants supplied to `register_domain_with_grant` are
+    /// validated against this key. Pass `None` to clear (e.g. for tests).
+    pub async fn set_foundation_pubkey(&self, pubkey: Option<Vec<u8>>) {
+        let mut k = self.foundation_pubkey.write().await;
+        *k = pubkey;
+    }
+
+    /// Read the configured foundation pubkey (clone).
+    pub async fn foundation_pubkey(&self) -> Option<Vec<u8>> {
+        self.foundation_pubkey.read().await.clone()
     }
 
     /// Register public DNS record
@@ -224,12 +250,134 @@ impl DnsRegistrar {
     ///
     /// Creates a Network-scope chain ID, validates parent hierarchy,
     /// registers to blockchain, and creates the corresponding DNS pool.
+    ///
+    /// Phase H.1: rejects reserved domains (see `dns::reserved`) unless
+    /// the caller routes through `register_domain_with_grant` and
+    /// supplies a foundation-signed [`FoundationGrant`].
     pub async fn register_domain(
         &self,
         domain_name: &str,
         privacy_mode: PrivacyMode,
         owner_node_id: String,
         proof: StateProof,
+    ) -> DnsResult<DomainRegistration> {
+        // Phase H.1: hard-reserved-domain pre-check.  This fires before
+        // any chain write so a node without a grant simply cannot put
+        // a reserved name onto its chain.  Always on, even on alpha
+        // nodes that have not opted into the foundation root key.
+        if reserved::is_reserved(domain_name) {
+            warn!(
+                "Rejected registration of reserved domain '{}' — foundation grant required",
+                domain_name
+            );
+            return Err(DnsError::ReservedDomain {
+                name: domain_name.to_string(),
+            });
+        }
+
+        self.register_domain_inner(
+            domain_name,
+            privacy_mode,
+            owner_node_id,
+            proof,
+            /* foundation_grant_present = */ false,
+        )
+        .await
+    }
+
+    /// Register a domain that is on the foundation reserved list, gated
+    /// on a foundation-signed [`FoundationGrant`].
+    ///
+    /// Phase H.1 protocol:
+    ///   1. The grant's domain field must equal `domain_name`.
+    ///   2. The grant must verify against the registrar's configured
+    ///      `foundation_pubkey` (set via `set_foundation_pubkey`).
+    ///   3. The grant's `recipient_pubkey` must equal `recipient_pubkey`
+    ///      (the FALCON public key of the registering identity).
+    ///   4. The grant's `valid_until` must be in the future.
+    ///
+    /// On success, registration proceeds via the same chain-write path
+    /// as `register_domain` and the registration is annotated as
+    /// foundation-grant-backed (so distributed-DNS resolvers will rank
+    /// it above any pre-existing or duplicate non-grant registration).
+    pub async fn register_domain_with_grant(
+        &self,
+        domain_name: &str,
+        privacy_mode: PrivacyMode,
+        owner_node_id: String,
+        proof: StateProof,
+        grant: &FoundationGrant,
+        recipient_pubkey: &[u8],
+    ) -> DnsResult<DomainRegistration> {
+        // 1. Domain match
+        if grant.domain != domain_name {
+            return Err(DnsError::GrantDomainMismatch {
+                grant_domain: grant.domain.clone(),
+                registering_domain: domain_name.to_string(),
+            });
+        }
+
+        // 2. Foundation pubkey must be configured AND grant must verify.
+        let pk_opt = self.foundation_pubkey.read().await.clone();
+        let foundation_pk = match pk_opt {
+            Some(pk) => pk,
+            None => {
+                warn!(
+                    "register_domain_with_grant called for '{}' but foundation pubkey not configured",
+                    domain_name
+                );
+                return Err(DnsError::InvalidGrant);
+            }
+        };
+
+        if !grant.verify(&foundation_pk) {
+            warn!(
+                "Foundation grant for '{}' failed FALCON-1024 verification",
+                domain_name
+            );
+            return Err(DnsError::InvalidGrant);
+        }
+
+        // 3. Recipient pubkey match — grants are non-transferable.
+        if !grant.recipient_matches(recipient_pubkey) {
+            warn!(
+                "Foundation grant recipient mismatch for '{}': grant pk_len={} candidate pk_len={}",
+                domain_name,
+                grant.recipient_pubkey.len(),
+                recipient_pubkey.len()
+            );
+            return Err(DnsError::GrantRecipientMismatch);
+        }
+
+        // 4. Expiry
+        if grant.is_expired() {
+            return Err(DnsError::ExpiredGrant);
+        }
+
+        info!(
+            "Foundation grant verified for '{}' — proceeding with reserved-domain registration",
+            domain_name
+        );
+
+        self.register_domain_inner(
+            domain_name,
+            privacy_mode,
+            owner_node_id,
+            proof,
+            /* foundation_grant_present = */ true,
+        )
+        .await
+    }
+
+    /// Internal post-validation registration path. Shared by
+    /// `register_domain` (no grant) and `register_domain_with_grant`.
+    async fn register_domain_inner(
+        &self,
+        domain_name: &str,
+        privacy_mode: PrivacyMode,
+        owner_node_id: String,
+        proof: StateProof,
+        foundation_grant_present: bool,
     ) -> DnsResult<DomainRegistration> {
         // Validate domain name format
         Self::validate_domain_name(domain_name)?;
@@ -255,6 +403,7 @@ impl DnsRegistrar {
         // Create the registration
         let mut reg = DomainRegistration::new(domain_name, privacy_mode, owner_node_id);
         reg.state_proof_bytes = Some(proof.to_bytes().unwrap_or_default());
+        let _ = foundation_grant_present;
 
         // Register to blockchain as DNS asset
         let domain_parsed = Domain::parse(domain_name).map_err(|_| DnsError::InvalidDomain {

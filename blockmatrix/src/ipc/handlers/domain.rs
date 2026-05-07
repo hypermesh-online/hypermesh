@@ -248,6 +248,8 @@ mod tests {
             threshold_coordinator: None,
 
             transfer_coordinator: None,
+            foundation_signing_key: None,
+            dns_registrar: None,
         });
         (state, tmp)
     }

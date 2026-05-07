@@ -25,19 +25,20 @@ use super::distributed_ca::{handle_ca_key_share, handle_ca_sign_request, handle_
 use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
-    TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_RESOLVE, TAG_GOSSIP, TAG_KEY_ROTATION,
-    TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
-    TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ,
-    TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
+    TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_GOSSIP,
+    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE,
+    TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK,
+    TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
 };
 use super::transfer_handlers::{
     handle_transfer_lock, handle_transfer_register_ack, handle_transfer_register_req,
     handle_transfer_release, handle_transfer_rollback,
 };
 use super::sync_and_reflection::{
-    handle_block_fetch_request, handle_direct_message, handle_dns_resolve_request,
-    handle_key_rotation, handle_shard_announce, handle_shard_dispatch, handle_share_invite,
-    handle_sync_message, handle_transfer_message, record_shard_demand, register_peer_as_reflector,
+    handle_block_fetch_request, handle_direct_message, handle_dns_query,
+    handle_dns_resolve_request, handle_key_rotation, handle_shard_announce,
+    handle_shard_dispatch, handle_share_invite, handle_sync_message, handle_transfer_message,
+    record_shard_demand, register_peer_as_reflector,
 };
 
 // ── Peer message loop ────────────────────────────────────────────────
@@ -187,6 +188,11 @@ pub(crate) async fn dispatch_message(
         }
         TAG_DNS_RESOLVE => {
             handle_dns_resolve_request(data, stream, peer_node_id, ctx).await;
+        }
+        TAG_DNS_QUERY => {
+            // Phase H.1: rich DNS query — wire format `[tag][JSON]`.
+            // Strip the tag byte; handler parses the rest as JSON.
+            handle_dns_query(&data[1..], stream, peer_node_id, ctx).await;
         }
         TAG_TRANSFER_LOCK => {
             handle_transfer_lock(&data[1..], peer_node_id, ctx).await;

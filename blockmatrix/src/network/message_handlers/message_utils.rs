@@ -6,12 +6,19 @@
 
 use anyhow::{anyhow, Result};
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::debug;
+use uuid::Uuid;
 
 use crate::network::stoq_integration::MatrixMessage;
 
 use super::super::PeerContext;
-use super::protocol::{TAG_DNS_RESOLVE, TAG_DNS_RESOLVE_RESPONSE, TAG_SYNC_MESSAGE};
+use super::dns_protocol::{
+    select_canonical, DistributedDnsQuery, DistributedDnsResponse,
+};
+use super::protocol::{
+    TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE, TAG_SYNC_MESSAGE,
+};
 
 /// Resolve a DNS name by querying connected peers (network fallback).
 ///
@@ -40,6 +47,116 @@ pub async fn resolve_from_network(
     }
 
     None
+}
+
+/// Phase H.1 — distributed DNS resolution with conflict resolution.
+///
+/// Broadcasts a [`DistributedDnsQuery`] to up to `max_peers` connected
+/// peers, collects [`DistributedDnsResponse`]s within `deadline`, and
+/// returns the canonical winner per the H.1 ordering tuple
+/// `(foundation_grant_present DESC, registration_timestamp ASC,
+/// chain_height DESC)`.
+///
+/// Returns `None` when no peer responded with non-empty records
+/// (i.e., no peer holds the name) — callers fall back to a `not found`
+/// response. Empty-records responses are still collected because they
+/// participate in tiebreak (in practice they only "win" when no peer
+/// has any record, and `None` is returned in that case).
+pub async fn distributed_dns_resolve(
+    name: &str,
+    peers: &[Arc<stoq::Connection>],
+    deadline: Duration,
+) -> Option<DistributedDnsResponse> {
+    let max_peers = 8.min(peers.len());
+    if max_peers == 0 {
+        return None;
+    }
+
+    let query = DistributedDnsQuery {
+        query_id: Uuid::new_v4(),
+        domain_name: name.to_string(),
+    };
+    let query_bytes = match serde_json::to_vec(&query) {
+        Ok(b) => b,
+        Err(e) => {
+            debug!("Failed to serialize H.1 DNS query: {}", e);
+            return None;
+        }
+    };
+
+    debug!(
+        name = name,
+        peers = max_peers,
+        "H.1 distributed DNS query starting"
+    );
+
+    // Issue queries in parallel and gather responses up to deadline.
+    let mut handles = Vec::with_capacity(max_peers);
+    for peer_conn in &peers[..max_peers] {
+        let conn = peer_conn.clone();
+        let query_bytes = query_bytes.clone();
+        let expected_id = query.query_id;
+        handles.push(tokio::spawn(async move {
+            try_query_peer_h1(&conn, &query_bytes, expected_id).await
+        }));
+    }
+
+    let mut responses: Vec<DistributedDnsResponse> = Vec::new();
+    let collection = async {
+        for h in handles {
+            if let Ok(Some(r)) = h.await {
+                responses.push(r);
+            }
+        }
+    };
+    let _ = tokio::time::timeout(deadline, collection).await;
+
+    if responses.is_empty() {
+        return None;
+    }
+
+    // Drop empty-records responses unless every response is empty.
+    // Empty-records means "I don't have this name" — keep the chain
+    // metadata for diagnostics but prefer a peer with actual records.
+    let any_with_records = responses.iter().any(|r| !r.records.is_empty());
+    if any_with_records {
+        responses.retain(|r| !r.records.is_empty());
+    }
+
+    select_canonical(&responses).cloned()
+}
+
+/// H.1 — query a single peer with `DistributedDnsQuery`, return the
+/// matching `DistributedDnsResponse` if `query_id` lines up.
+async fn try_query_peer_h1(
+    conn: &stoq::Connection,
+    query_bytes: &[u8],
+    expected_query_id: Uuid,
+) -> Option<DistributedDnsResponse> {
+    let mut stream = conn.open_stream().await.ok()?;
+
+    let mut frame = Vec::with_capacity(1 + query_bytes.len());
+    frame.push(TAG_DNS_QUERY);
+    frame.extend_from_slice(query_bytes);
+    stream.send(&frame).await.ok()?;
+
+    let raw = tokio::time::timeout(Duration::from_secs(4), stream.receive())
+        .await
+        .ok()?
+        .ok()?;
+
+    if raw.len() < 2 || raw[0] != TAG_DNS_RESPONSE {
+        return None;
+    }
+    let resp: DistributedDnsResponse = serde_json::from_slice(&raw[1..]).ok()?;
+    if resp.query_id != expected_query_id {
+        debug!(
+            "H.1 DNS response query_id mismatch: expected {}, got {}",
+            expected_query_id, resp.query_id
+        );
+        return None;
+    }
+    Some(resp)
 }
 
 /// Try resolving a DNS name from a single peer.

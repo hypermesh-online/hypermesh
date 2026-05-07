@@ -14,8 +14,9 @@ use crate::network::sync_dispatch;
 use hypermesh_lib::ContentHash;
 
 use super::super::PeerContext;
+use super::dns_protocol::{DistributedDnsQuery, DistributedDnsResponse};
 use super::message_utils::send_sync_reply;
-use super::protocol::TAG_DNS_RESOLVE_RESPONSE;
+use super::protocol::{TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE};
 
 // ── Shard handler ────────────────────────────────────────────────────
 
@@ -222,6 +223,150 @@ pub(super) async fn handle_dns_resolve_request(
 
     if let Err(e) = stream.send(&response).await {
         debug!("Failed to send DNS resolve response to {}: {}", peer_node_id, e);
+    }
+}
+
+// ── Phase H.1: distributed DNS query handler ─────────────────────────
+
+/// Handle TAG_DNS_QUERY (0x50): rich query with conflict-resolution metadata.
+///
+/// Wire format: `[TAG_DNS_QUERY][JSON DistributedDnsQuery]`.
+///
+/// We scan the local blockchain for DNS asset entries matching the
+/// requested name, build a [`DistributedDnsResponse`] populated with
+/// chain_id / chain_height / registration_timestamp /
+/// foundation_grant_present, and write it back as
+/// `[TAG_DNS_RESPONSE][JSON]`.
+///
+/// Empty-records responses are still meaningful — they tell the asker
+/// that this peer is alive and has no entry.  Callers fold all peer
+/// responses through `select_canonical` to pick the winner.
+pub(super) async fn handle_dns_query(
+    payload: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    let short = &peer_node_id[..8.min(peer_node_id.len())];
+
+    let query: DistributedDnsQuery = match serde_json::from_slice(payload) {
+        Ok(q) => q,
+        Err(e) => {
+            debug!("Invalid DNS query JSON from {}: {}", short, e);
+            return;
+        }
+    };
+
+    // Record popularity if available.
+    if let Some(ref tracker) = ctx.dns_popularity_tracker {
+        tracker.record_resolution(&query.domain_name).await;
+    }
+
+    let response = build_dns_response_for_query(&query, ctx).await;
+
+    let json = match serde_json::to_vec(&response) {
+        Ok(b) => b,
+        Err(e) => {
+            debug!("Failed to serialize DNS response: {}", e);
+            return;
+        }
+    };
+
+    let mut frame = Vec::with_capacity(1 + json.len());
+    frame.push(TAG_DNS_RESPONSE);
+    frame.extend_from_slice(&json);
+
+    if let Err(e) = stream.send(&frame).await {
+        debug!("Failed to send DNS response to {}: {}", short, e);
+    }
+}
+
+/// Walk the local chain looking for DNS entries matching the queried
+/// name and build the response struct used by H.1 conflict resolution.
+async fn build_dns_response_for_query(
+    query: &DistributedDnsQuery,
+    ctx: &PeerContext,
+) -> DistributedDnsResponse {
+    use crate::assets::core::{AssetCategory, BaseSystemType};
+    use crate::blockchain::block::StoragePointer;
+
+    let chain = ctx.blockchain.get_chain().await;
+    let mut records: Vec<crate::dns::DnsRecord> = Vec::new();
+    let mut earliest_ts: Option<u64> = None;
+    let mut earliest_height: u64 = 0;
+    let foundation_grant_present = false; // H.1 alpha — grant attestation flag wired in next sub-phase
+
+    for block in chain.iter() {
+        for entry in &block.entries {
+            let is_dns = matches!(
+                entry.registration.category,
+                AssetCategory::BaseSystem(BaseSystemType::Dns)
+            );
+            if !is_dns {
+                continue;
+            }
+            let dns_json = match &entry.storage_pointer {
+                StoragePointer::Local { path } => path.as_str(),
+                _ => continue,
+            };
+            let dns_entry: crate::dns::DnsBlockEntry =
+                match serde_json::from_str(dns_json) {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+            if dns_entry.domain_name != query.domain_name {
+                continue;
+            }
+
+            let rec = crate::dns::DnsRecord {
+                domain: dns_entry.domain_name.clone(),
+                record_type: dns_entry.record_type.clone(),
+                data: dns_entry.record_data.clone(),
+                ttl: dns_entry.ttl,
+                created_at: entry.state_proof.time_proof.time_verification_timestamp,
+                expires_at: entry.state_proof.time_proof.time_verification_timestamp,
+                owner: dns_entry.owner.clone(),
+                tx_hash: Some(block.hash.clone()),
+            };
+            records.push(rec);
+
+            // Track the *earliest* registration's metadata — older wins
+            // in the canonical-cmp ordering.
+            let ts = entry
+                .state_proof
+                .time_proof
+                .time_verification_timestamp
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            match earliest_ts {
+                None => {
+                    earliest_ts = Some(ts);
+                    earliest_height = block.index;
+                }
+                Some(prev) if ts < prev => {
+                    earliest_ts = Some(ts);
+                    earliest_height = block.index;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Use BLAKE3 of network_id as our advertised chain_id.  This is the
+    // canonical identifier other peers will see for our chain on the
+    // wire; it does not need to match `our_coordinate` because chain
+    // identity is independent of node coordinate.
+    let chain_id = blake3::hash(ctx.network_id.as_bytes()).to_hex().to_string();
+
+    DistributedDnsResponse {
+        query_id: query.query_id,
+        domain_name: query.domain_name.clone(),
+        records,
+        chain_id,
+        chain_height: earliest_height,
+        registration_timestamp: earliest_ts.unwrap_or(0),
+        foundation_grant_present,
     }
 }
 

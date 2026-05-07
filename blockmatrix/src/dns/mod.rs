@@ -20,11 +20,13 @@
 
 pub mod cache;
 pub mod domain;
+pub mod grant;
 pub mod invitation;
 pub mod popularity;
 pub mod pools;
 pub mod records;
 pub mod registration;
+pub mod reserved;
 pub mod resolver;
 pub mod trustchain;
 pub mod validation;
@@ -32,12 +34,14 @@ pub mod validation;
 // Re-export public API
 pub use cache::{CacheEntry, DnsCache};
 pub use domain::{derive_chain_id, derive_network_id, DomainNetworkManager, DomainRegistration};
+pub use grant::FoundationGrant;
 pub use invitation::{
     create_invitation, decode_invitation, encode_invitation, verify_invitation, DomainInvitation,
 };
 pub use pools::{DnsPool, DnsPoolManager, DnsPoolType, PoolVisibility};
 pub use records::{DnsRecord, DnsRecordData, DnsRecordType};
 pub use registration::{DnsBlockEntry, DnsRegistrar, DnsRegistration, RegistrationStatus};
+pub use reserved::{is_reserved, reserved_count, reserved_list};
 pub use resolver::{DnsQuery, DnsResolutionTier, DnsResolver, DnsResponse};
 pub use trustchain::{TrustChainDnsClient, TrustChainDnsService};
 pub use popularity::DnsPopularityTracker;
@@ -124,6 +128,34 @@ pub enum DnsError {
 
     #[error("Domain already registered: {domain}")]
     DomainAlreadyRegistered { domain: String },
+
+    /// Phase H.1 — domain is on the foundation reserved list and the
+    /// caller did not provide a foundation grant.
+    #[error("Reserved domain: {name} requires a foundation grant")]
+    ReservedDomain { name: String },
+
+    /// Phase H.1 — caller supplied a foundation grant, but its
+    /// FALCON-1024 signature does not verify against the configured
+    /// foundation root pubkey.
+    #[error("Invalid foundation grant: signature did not verify")]
+    InvalidGrant,
+
+    /// Phase H.1 — grant signature is valid but the recipient_pubkey
+    /// in the grant does not match the registering identity's pubkey.
+    #[error("Foundation grant recipient mismatch")]
+    GrantRecipientMismatch,
+
+    /// Phase H.1 — grant has expired (`valid_until` in the past).
+    #[error("Foundation grant has expired")]
+    ExpiredGrant,
+
+    /// Phase H.1 — grant authorizes a different domain than the one
+    /// being registered.
+    #[error("Foundation grant domain mismatch: grant authorizes '{grant_domain}', registration is for '{registering_domain}'")]
+    GrantDomainMismatch {
+        grant_domain: String,
+        registering_domain: String,
+    },
 }
 
 pub type DnsResult<T> = Result<T, DnsError>;

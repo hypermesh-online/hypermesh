@@ -28,6 +28,7 @@ items = [
     "X.509 certificate parsing for publisher info",
     "TrustChain certificate validation (real expiry/revocation)",
     "Policy rule evaluation (CertificateIssuer)",
+    "foundation.dns_grant/v1 typedef hosted",
 ]
 
 [features.in_development]

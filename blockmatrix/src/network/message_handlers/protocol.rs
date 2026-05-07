@@ -66,3 +66,23 @@ pub(crate) const TAG_TRANSFER_RELEASE: u8 = 0x43;
 /// Cross-network transfer: rollback notification (timeout or rejection)
 /// — both sides should restore pre-transfer state.
 pub(crate) const TAG_TRANSFER_ROLLBACK: u8 = 0x44;
+
+// ── Phase H.1: distributed DNS query/response ─────────────────────────
+//
+// The legacy `TAG_DNS_RESOLVE` (0x09) / `TAG_DNS_RESOLVE_RESPONSE`
+// (0x0A) carry only `name → IPv6 string`, which is enough for the
+// flat bootstrap resolver but NOT enough for cross-node conflict
+// resolution. Phase H.1 adds richer query/response types in the
+// 0x50/0x51 slot — slots 0x45-0x4F are reserved for any further
+// transfer-protocol extensions, keeping H.1 cleanly separated.
+//
+// Wire payloads are JSON-serialized [`DistributedDnsQuery`] and
+// [`DistributedDnsResponse`] from `dns_protocol.rs`.
+
+/// DNS query (rich): correlation ID + domain name. Carries enough
+/// metadata in the matching response for canonical-winner selection
+/// across multiple peers.
+pub(crate) const TAG_DNS_QUERY: u8 = 0x50;
+/// DNS response (rich): records + chain metadata + foundation-grant
+/// flag for cross-node conflict resolution.
+pub(crate) const TAG_DNS_RESPONSE: u8 = 0x51;

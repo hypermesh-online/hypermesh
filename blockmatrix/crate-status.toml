@@ -198,6 +198,10 @@ items = [
     "Cross-network transfer chain-scan recovery — TransferCoordinator::resume_in_flight scans NodeBlockchain for TransferLockEntry without matching TransferReleaseEntry, reconstructs CoordinatedTransfer state, repopulates in-memory map (chain is the durable state machine; no separate snapshot file needed)",
     "Transfer wire dispatch via PeerContext.transfer_coordinator — handle_transfer_register_req routes through TransferCoordinator::handle_register_request and writes ack back over the same stream; handle_transfer_register_ack delivers oneshot acks to awaiting initiate() futures via deliver_register_ack/register_ack_waiter; alpha-default inert when transfer_coordinator is None",
     "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer",
+    # Phase H.1 — distributed DNS + reserved domains + foundation grant
+    "Reserved-domain enforcement — top 1000 + Fortune 1000 brands + hypermesh-internal services hard-reserved; foundation CA-signed grant required for registration",
+    "Foundation DNS grant flow — dns.foundation_grant IPC, FoundationGrant struct with FALCON-1024 sig, recorded as foundation.dns_grant/v1 catalog asset",
+    "Network-wide DNS resolution with conflict resolution — TAG_DNS_QUERY/RESPONSE over STOQ; canonical entry by (foundation_grant_present, registration_timestamp, chain_height)",
 ]
 
 [features.in_development]

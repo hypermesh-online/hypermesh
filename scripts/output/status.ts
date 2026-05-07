@@ -183,7 +183,10 @@ export const crateStatuses: CrateStatus[] = [
         "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side",
         "Cross-network transfer chain-scan recovery — TransferCoordinator::resume_in_flight scans NodeBlockchain for TransferLockEntry without matching TransferReleaseEntry, reconstructs CoordinatedTransfer state, repopulates in-memory map (chain is the durable state machine; no separate snapshot file needed)",
         "Transfer wire dispatch via PeerContext.transfer_coordinator — handle_transfer_register_req routes through TransferCoordinator::handle_register_request and writes ack back over the same stream; handle_transfer_register_ack delivers oneshot acks to awaiting initiate() futures via deliver_register_ack/register_ack_waiter; alpha-default inert when transfer_coordinator is None",
-        "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer"
+        "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer",
+        "Reserved-domain enforcement — top 1000 + Fortune 1000 brands + hypermesh-internal services hard-reserved; foundation CA-signed grant required for registration",
+        "Foundation DNS grant flow — dns.foundation_grant IPC, FoundationGrant struct with FALCON-1024 sig, recorded as foundation.dns_grant/v1 catalog asset",
+        "Network-wide DNS resolution with conflict resolution — TAG_DNS_QUERY/RESPONSE over STOQ; canonical entry by (foundation_grant_present, registration_timestamp, chain_height)"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — daemon STOQ TransferTransport plumbing (production wrapper that registers oneshot acks before broadcasting TAG_TRANSFER_REGISTER_REQ) still pending in bin/node, scoped to Phase I",
@@ -298,7 +301,8 @@ export const crateStatuses: CrateStatus[] = [
         "Real FALCON-1024 signature verification",
         "X.509 certificate parsing for publisher info",
         "TrustChain certificate validation (real expiry/revocation)",
-        "Policy rule evaluation (CertificateIssuer)"
+        "Policy rule evaluation (CertificateIssuer)",
+        "foundation.dns_grant/v1 typedef hosted"
       ],
       "inDevelopment": [
         "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
@@ -308,7 +312,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 84
+    "completion": 85
   },
   {
     "id": "engauge",

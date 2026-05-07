@@ -1,13 +1,16 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! DNS IPC handlers: resolve, list, register.
+//! DNS IPC handlers: resolve, list, register, foundation_grant (H.1).
 
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::dns::FoundationGrant;
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::INVALID_PARAMS;
+use crate::ipc::protocol::{INTERNAL_ERROR, INVALID_PARAMS, RpcError};
 use crate::ipc::state::DaemonState;
+use hypermesh_lib::NodeSigner;
 
 /// Register DNS-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
@@ -69,6 +72,155 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             }),
         );
     }
+
+    // dns.reserved — diagnostic: list foundation-reserved domains
+    {
+        handler.register(
+            "dns.reserved",
+            Arc::new(move |_params| {
+                Box::pin(async move {
+                    let list = crate::dns::reserved_list();
+                    let count = list.len();
+                    Ok(serde_json::json!({
+                        "domains": list,
+                        "count": count,
+                    }))
+                })
+            }),
+        );
+    }
+
+    // dns.foundation_grant — admin-only: sign a reserved-domain grant
+    //
+    // Args:
+    //   domain: string                  — reserved domain to authorize
+    //   recipient_pubkey: string (hex)  — recipient FALCON-1024 pubkey
+    //   valid_until_secs: u64           — Unix timestamp grant expires
+    //   dues_paid_until_secs: u64       — Unix timestamp dues lapse
+    //
+    // Alpha-default inert: when `state.foundation_signing_key` is None
+    // returns "foundation root key not configured". Operators opt-in by
+    // populating that field at daemon startup with the foundation root
+    // identity.
+    {
+        let s = state.clone();
+        handler.register(
+            "dns.foundation_grant",
+            Arc::new(move |params| {
+                let s = s.clone();
+                Box::pin(async move {
+                    let signing_key = match s.foundation_signing_key.clone() {
+                        Some(k) => k,
+                        None => {
+                            return Err(RpcError {
+                                code: INTERNAL_ERROR,
+                                message:
+                                    "foundation root key not configured (alpha-default inert)"
+                                        .into(),
+                                data: None,
+                            });
+                        }
+                    };
+
+                    let domain = params
+                        .get("domain")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing 'domain' parameter".into(),
+                            data: None,
+                        })?
+                        .to_string();
+
+                    if !crate::dns::reserved::is_reserved(&domain) {
+                        return Err(RpcError {
+                            code: INVALID_PARAMS,
+                            message: format!(
+                                "domain '{}' is not on the foundation reserved list",
+                                domain
+                            ),
+                            data: None,
+                        });
+                    }
+
+                    let recipient_hex = params
+                        .get("recipient_pubkey")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing 'recipient_pubkey' parameter".into(),
+                            data: None,
+                        })?;
+                    let recipient_pubkey = hex::decode(recipient_hex).map_err(|e| RpcError {
+                        code: INVALID_PARAMS,
+                        message: format!("recipient_pubkey hex decode failed: {e}"),
+                        data: None,
+                    })?;
+
+                    let valid_until_secs = params
+                        .get("valid_until_secs")
+                        .and_then(|v| v.as_u64())
+                        .ok_or_else(|| RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing 'valid_until_secs' parameter".into(),
+                            data: None,
+                        })?;
+                    let valid_until = UNIX_EPOCH + Duration::from_secs(valid_until_secs);
+
+                    let dues_paid_until_secs = params
+                        .get("dues_paid_until_secs")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(valid_until_secs);
+                    let dues_paid_until =
+                        UNIX_EPOCH + Duration::from_secs(dues_paid_until_secs);
+
+                    // Build unsigned grant, sign canonical payload.
+                    let mut grant = FoundationGrant::new_unsigned(
+                        domain.clone(),
+                        recipient_pubkey,
+                        valid_until,
+                        dues_paid_until,
+                    );
+                    let payload = grant.signing_payload();
+                    let sig = signing_key.sign(&payload).map_err(|e| RpcError {
+                        code: INTERNAL_ERROR,
+                        message: format!("FALCON sign failed: {e}"),
+                        data: None,
+                    })?;
+                    grant.foundation_signature = sig;
+
+                    // Note: H.1 records the grant as a Catalog asset
+                    // (`foundation.dns_grant/v1`). The full Catalog wire
+                    // path is gated behind the `caesar` build of the
+                    // catalog crate; for alpha we return the serialized
+                    // grant + verifier metadata so the operator can
+                    // distribute the grant out-of-band and audit later.
+                    let grant_json =
+                        serde_json::to_value(&grant).map_err(|e| RpcError {
+                            code: INTERNAL_ERROR,
+                            message: format!("serialize grant: {e}"),
+                            data: None,
+                        })?;
+                    let issued_at_secs = grant
+                        .issued_at
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+
+                    Ok(serde_json::json!({
+                        "grant": grant_json,
+                        "domain": domain,
+                        "issued_at_secs": issued_at_secs,
+                        "foundation_pubkey": hex::encode(&signing_key.public_key),
+                        "typedef": "foundation.dns_grant/v1",
+                    }))
+                })
+            }),
+        );
+    }
+    // Suppress unused-import warning when the only use of `SystemTime`
+    // is in tests below.
+    let _ = SystemTime::now;
 }
 
 #[cfg(test)]
@@ -123,6 +275,8 @@ mod tests {
             threshold_coordinator: None,
 
             transfer_coordinator: None,
+            foundation_signing_key: None,
+            dns_registrar: None,
         })
     }
 

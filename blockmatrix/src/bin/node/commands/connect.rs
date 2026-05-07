@@ -196,6 +196,8 @@ pub async fn run_connect(
         threshold_coordinator: None,
 
         transfer_coordinator: None,
+            foundation_signing_key: None,
+            dns_registrar: None,
     });
 
     let mut handler = ipc::RequestHandler::new();

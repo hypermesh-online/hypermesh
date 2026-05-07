@@ -73,4 +73,27 @@ pub struct DaemonState {
     /// daemon at startup once federation gating + STOQ wire transport
     /// are opted-in.
     pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
+
+    /// Phase H.1: foundation FALCON-1024 signing identity for issuing
+    /// DNS reservation grants.
+    ///
+    /// Alpha-default inert: when `None`, `dns.foundation_grant` IPC
+    /// returns "foundation root key not configured". Operators who
+    /// run a foundation node opt-in via daemon config by populating
+    /// this field at startup with the foundation root identity.
+    ///
+    /// The corresponding public key is `key.public_key` and is what
+    /// `DnsRegistrar::set_foundation_pubkey` is configured with so
+    /// that grants can be verified at registration time.
+    pub foundation_signing_key: Option<Arc<trustchain::FalconIdentity>>,
+
+    /// Phase H.1: DNS registrar holding the reserved-domain enforcement
+    /// + foundation grant verification logic.
+    ///
+    /// When `None`, the unified `dns.*` handlers fall back to the legacy
+    /// flat-resolver behaviour (no reserved-domain checks beyond what is
+    /// in `dns/reserved.rs`). Wired by the daemon at startup so that
+    /// `dns.register` and `dns.register_with_grant` route through this
+    /// registrar.
+    pub dns_registrar: Option<Arc<crate::dns::DnsRegistrar>>,
 }

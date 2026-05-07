@@ -1,0 +1,62 @@
+{
+  "name": "foundation.dns_grant",
+  "version": 1,
+  "description": "Foundation-issued, FALCON-1024 signed DNS reservation grant. Authorizes a specific recipient (identified by FALCON-1024 public key) to register a foundation-reserved domain name. Bound to recipient by inclusion of `recipient_pubkey` in the signed payload — non-transferable.",
+  "schema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "domain": {
+        "type": "string",
+        "description": "The reserved domain name this grant authorizes (e.g., 'nike', 'apple').",
+        "minLength": 1,
+        "maxLength": 253
+      },
+      "recipient_pubkey": {
+        "type": "string",
+        "format": "hex",
+        "description": "FALCON-1024 public key bytes of the recipient, hex-encoded. Must equal the registering identity's pubkey at chain-write time (otherwise registration is rejected with GrantRecipientMismatch)."
+      },
+      "valid_until": {
+        "oneOf": [
+          {"type": "string", "format": "date-time"},
+          {"type": "object", "description": "RFC 3339 timestamp or SystemTime serialization"}
+        ],
+        "description": "Grant expiry. Registrations after this point are rejected with ExpiredGrant."
+      },
+      "dues_paid_until": {
+        "oneOf": [
+          {"type": "string", "format": "date-time"},
+          {"type": "object", "description": "RFC 3339 timestamp or SystemTime serialization"}
+        ],
+        "description": "Last paid dues date — used by Phase F.2 CRL revocation when dues lapse. Not enforced by H.1 verification."
+      },
+      "issued_at": {
+        "oneOf": [
+          {"type": "string", "format": "date-time"},
+          {"type": "object", "description": "RFC 3339 timestamp or SystemTime serialization"}
+        ],
+        "description": "When the foundation signed this grant."
+      },
+      "foundation_signature": {
+        "type": "string",
+        "format": "hex",
+        "description": "FALCON-1024 detached signature over the canonical signing_payload (domain || 0x00 || recipient_pubkey || 0x00 || valid_until_le || dues_paid_until_le || issued_at_le)."
+      }
+    },
+    "required": [
+      "domain",
+      "recipient_pubkey",
+      "valid_until",
+      "dues_paid_until",
+      "issued_at",
+      "foundation_signature"
+    ]
+  },
+  "verification": {
+    "signing_payload_format": "[domain UTF-8] || 0x00 || [recipient_pubkey raw bytes] || 0x00 || [valid_until u64 LE seconds] || [dues_paid_until u64 LE seconds] || [issued_at u64 LE seconds]",
+    "signature_algorithm": "FALCON-1024 detached",
+    "verification_key": "Foundation root pubkey (configured per-node in DaemonState.foundation_signing_key.public_key)"
+  }
+}
