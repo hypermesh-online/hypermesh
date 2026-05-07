@@ -541,6 +541,10 @@ async fn start_network(
         engauge_analytics: Some(engauge_analytics.clone()),
         #[cfg(feature = "intelligence")]
         engauge_ingestion: Some(engauge_ingestion.clone()),
+        // Phase G.2 — alpha-default inert. Daemon opt-in plumbs a real
+        // TransferCoordinator here once a STOQ-backed TransferTransport
+        // is configured (Phase G.2 deliverable on the daemon side).
+        transfer_coordinator: None,
     });
 
     let network_clone = std::sync::Arc::new(network_manager);

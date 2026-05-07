@@ -338,15 +338,17 @@ async fn test_register_timeout_rolls_back() {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Restart-recovery contract — Phase G.2 implements scan; G.1 stub returns empty.
+// 4. Restart-recovery contract — Phase G.2 turns this from a stub into
+//    a real chain scan. With an empty chain, the result is still empty.
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn test_lock_state_persists_on_restart_g1_stub() {
-    // G.1 contract: resume_in_flight returns Ok(empty) without scanning.
-    // Phase G.2 will replace the stub with a real chain scan + state
-    // restore. The test guards the contract: callers can rely on the
-    // method existing and not panicking even before G.2.
+    // resume_in_flight on a fresh chain (genesis only, no transfer
+    // entries) must return Ok(empty). Phase G.2 hardens this: the
+    // method now performs a real chain scan that reconstructs
+    // CoordinatedTransfer for any lock without a matching release.
+    // Empty chain → empty result.
     let chain = make_chain(0, 0, 0);
     let transport: Arc<dyn TransferTransport> = Arc::new(ProgrammableTransport::new());
     let coord = TransferCoordinator::new(
@@ -355,8 +357,11 @@ async fn test_lock_state_persists_on_restart_g1_stub() {
         Arc::new(AllowAllFederation),
         "any".into(),
     );
-    let resumed = coord.resume_in_flight().await.expect("test: stub ok");
-    assert!(resumed.is_empty(), "G.1 stub returns empty list");
+    let resumed = coord.resume_in_flight().await.expect("test: scan ok");
+    assert!(
+        resumed.is_empty(),
+        "fresh chain has no in-flight transfers"
+    );
 }
 
 // ---------------------------------------------------------------------------

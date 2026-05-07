@@ -204,6 +204,17 @@ pub struct PeerContext {
     /// filtering and stored for trending analysis.
     #[cfg(feature = "intelligence")]
     pub engauge_ingestion: Option<Arc<std::sync::Mutex<engauge::MetricsIngestionPipeline>>>,
+    /// Phase G.2 — cross-network transfer coordinator.
+    ///
+    /// When `Some`, incoming `TAG_TRANSFER_REGISTER_REQ` messages are
+    /// routed to [`TransferCoordinator::handle_register_request`] and
+    /// the resulting `TAG_TRANSFER_REGISTER_ACK` is written back over
+    /// the same stream. Incoming acks are delivered to awaiting
+    /// `initiate` futures via `deliver_register_ack`.
+    ///
+    /// Alpha-default inert: when `None`, handlers fall back to the
+    /// G.1 log-only behaviour and drop the messages.
+    pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
 }
 
 /// Result of a bilateral handshake including both network node info

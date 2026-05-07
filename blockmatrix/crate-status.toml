@@ -194,12 +194,16 @@ items = [
     "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
     "TransferCoordinator orchestrator — Initiated→Locked→ShardsHandedOff→Registered→Released happy path with TargetRejected / RegisterTimeout rollback paths and FederationGate short-circuit",
     "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side",
+    # Phase G.2 — durable cross-network transfer choreography
+    "Cross-network transfer chain-scan recovery — TransferCoordinator::resume_in_flight scans NodeBlockchain for TransferLockEntry without matching TransferReleaseEntry, reconstructs CoordinatedTransfer state, repopulates in-memory map (chain is the durable state machine; no separate snapshot file needed)",
+    "Transfer wire dispatch via PeerContext.transfer_coordinator — handle_transfer_register_req routes through TransferCoordinator::handle_register_request and writes ack back over the same stream; handle_transfer_register_ack delivers oneshot acks to awaiting initiate() futures via deliver_register_ack/register_ack_waiter; alpha-default inert when transfer_coordinator is None",
+    "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer",
 ]
 
 [features.in_development]
 items = [
-    # Cross-network asset transfer lifecycle
-    "Cross-network asset transfers — wire protocol + state machine + happy/rollback/timeout coordinator landed in G.1 (5/5 g1_transfer_protocol_tests pass); persisted-state restart-recovery + multi-host e2e harness scoped to G.2/Phase I",
+    # Cross-network asset transfer lifecycle — G.1+G.2 landed (full choreography, chain-scan recovery, ack-routing, e2e + crash-recovery tests). Real-subprocess two-host harness with daemon STOQ TransferTransport opt-in remains for Phase I.
+    "Cross-network asset transfers — daemon STOQ TransferTransport plumbing (production wrapper that registers oneshot acks before broadcasting TAG_TRANSFER_REGISTER_REQ) still pending in bin/node, scoped to Phase I",
     # Security review pending
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)

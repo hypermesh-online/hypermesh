@@ -31,7 +31,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use hypermesh_lib::{AssetId, BlockchainScope};
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, Mutex as TokioMutex, RwLock};
 use tracing::{debug, info, warn};
 use trustchain::proof_of_state::StateProof;
 
@@ -159,6 +159,14 @@ pub struct TransferCoordinator {
     local_chain_id: String,
     /// Register-ack deadline.
     register_timeout: RwLock<Duration>,
+    /// Pending register-ack waiters keyed by transfer_id.
+    ///
+    /// Production transports (STOQ-backed) register a oneshot sender
+    /// here before broadcasting `TAG_TRANSFER_REGISTER_REQ`. When a
+    /// matching `TAG_TRANSFER_REGISTER_ACK` arrives, the wire handler
+    /// fires the sender to wake the awaiting `initiate()` future.
+    /// Mock transports that respond synchronously do not use this map.
+    pending_acks: Arc<TokioMutex<HashMap<String, oneshot::Sender<TransferRegisterAck>>>>,
 }
 
 impl TransferCoordinator {
@@ -179,6 +187,40 @@ impl TransferCoordinator {
             transfers: Arc::new(RwLock::new(HashMap::new())),
             local_chain_id,
             register_timeout: RwLock::new(DEFAULT_REGISTER_TIMEOUT),
+            pending_acks: Arc::new(TokioMutex::new(HashMap::new())),
+        }
+    }
+
+    /// Register a oneshot sender that will be fired when an ack with a
+    /// matching `transfer_id` arrives via
+    /// [`Self::deliver_register_ack`].
+    ///
+    /// Production STOQ transports call this before broadcasting
+    /// `TAG_TRANSFER_REGISTER_REQ` so the in-flight `initiate` future
+    /// can be woken when the wire-side handler receives the ack.
+    pub async fn register_ack_waiter(
+        &self,
+        transfer_id: String,
+        tx: oneshot::Sender<TransferRegisterAck>,
+    ) {
+        self.pending_acks.lock().await.insert(transfer_id, tx);
+    }
+
+    /// Deliver a received `TAG_TRANSFER_REGISTER_ACK` to the awaiting
+    /// `initiate` future. Called by the wire handler when the ack
+    /// arrives over a different stream than the one that sent the
+    /// request.
+    ///
+    /// Returns `true` when a waiter was present and the ack was
+    /// delivered, `false` otherwise (unknown transfer_id, late ack).
+    pub async fn deliver_register_ack(&self, ack: TransferRegisterAck) -> bool {
+        let waiter = {
+            let mut guard = self.pending_acks.lock().await;
+            guard.remove(&ack.transfer_id)
+        };
+        match waiter {
+            Some(tx) => tx.send(ack).is_ok(),
+            None => false,
         }
     }
 
@@ -518,16 +560,166 @@ impl TransferCoordinator {
         }
     }
 
-    /// Phase G.2 placeholder — scan the blockchain for in-flight
-    /// transfers (lock entries with no matching release) and rebuild
-    /// in-memory state. Currently returns an empty list; full
-    /// implementation lands in G.2 alongside persisted state machine
-    /// snapshots.
+    /// Phase G.2 — scan the local blockchain for in-flight transfers
+    /// (lock entries with no matching release) and rebuild in-memory
+    /// state.
+    ///
+    /// Implementation: walks `NodeBlockchain::get_chain()` once,
+    /// extracting every transfer-related entry from each block's
+    /// [`StoragePointer::Local`] payload (the lock/register/release/
+    /// receipt entries are JSON-serialized into the storage path during
+    /// `append_block`). For each transfer ID:
+    ///
+    /// * a `lock` without a `release` → in-flight, restored as
+    ///   [`CoordinatorState::Locked`]
+    /// * a `lock` with a `release` (rollback or completion) → terminal,
+    ///   skipped
+    ///
+    /// The restored transfers are inserted into the in-memory map and
+    /// returned. Callers (typically daemon boot) can then decide whether
+    /// to re-drive the state machine (re-send register-request) or
+    /// surface them to operators.
+    ///
+    /// Safe to call when no transfers are in flight (returns empty).
     pub async fn resume_in_flight(&self) -> Result<Vec<CoordinatedTransfer>, GatewayError> {
-        debug!(
-            "TransferCoordinator::resume_in_flight is a Phase G.2 stub — no scan performed"
-        );
-        Ok(Vec::new())
+        let chain = self.blockchain.get_chain().await;
+
+        // Collect everything keyed by transfer_id. Locks need to land
+        // first because a single block may carry multiple entries.
+        let mut locks: HashMap<String, (TransferLockEntry, String, StateProof)> = HashMap::new();
+        let mut releases: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        // Optional registration / receipt hashes — recorded so resumed
+        // transfers carry the same target_register_block_hash and
+        // source_release_block_hash they had pre-restart.
+        let mut registrations: HashMap<String, (TransferRegistrationEntry, String)> =
+            HashMap::new();
+        let mut receipts: HashMap<String, TransferReceipt> = HashMap::new();
+
+        for block in chain.into_iter() {
+            let block_hash = block.hash.clone();
+            for entry in block.entries.iter() {
+                let payload_str = match &entry.storage_pointer {
+                    StoragePointer::Local { path } => path,
+                    _ => continue,
+                };
+                let payload_bytes = payload_str.as_bytes();
+
+                // Each transfer-related block carries exactly one entry
+                // type. Try lock first, then register, then release,
+                // then receipt — first match wins.
+                if let Ok(lock) = serde_json::from_slice::<TransferLockEntry>(payload_bytes) {
+                    // TransferLockEntry has a `proof_hash` field unique
+                    // to it; without that field a deserialize-from-arbitrary
+                    // JSON could collide. Distinguish from
+                    // TransferRegistrationEntry by the presence of
+                    // `locked_at` vs `registered_at`. serde silently
+                    // accepts missing fields when types overlap, so we
+                    // disambiguate by trying the more specific shapes
+                    // first below and re-checking on the parsed value.
+                    if !lock.transfer_id.is_empty()
+                        && lock.locked_at != 0
+                        && payload_str.contains("\"locked_at\"")
+                    {
+                        locks.insert(
+                            lock.transfer_id.clone(),
+                            (lock, block_hash.clone(), entry.state_proof.clone()),
+                        );
+                        continue;
+                    }
+                }
+                if let Ok(reg) =
+                    serde_json::from_slice::<TransferRegistrationEntry>(payload_bytes)
+                {
+                    if !reg.transfer_id.is_empty()
+                        && reg.registered_at != 0
+                        && payload_str.contains("\"registered_at\"")
+                    {
+                        registrations
+                            .insert(reg.transfer_id.clone(), (reg, block_hash.clone()));
+                        continue;
+                    }
+                }
+                if let Ok(rel) = serde_json::from_slice::<TransferReleaseEntry>(payload_bytes) {
+                    if !rel.transfer_id.is_empty()
+                        && rel.released_at != 0
+                        && payload_str.contains("\"released_at\"")
+                    {
+                        releases.insert(rel.transfer_id);
+                        continue;
+                    }
+                }
+                if let Ok(rcpt) = serde_json::from_slice::<TransferReceipt>(payload_bytes) {
+                    if !rcpt.transfer_id.is_empty()
+                        && rcpt.completed_at != 0
+                        && payload_str.contains("\"completed_at\"")
+                    {
+                        receipts.insert(rcpt.transfer_id.clone(), rcpt);
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // For every lock without a release, reconstruct CoordinatedTransfer.
+        let mut resumed: Vec<CoordinatedTransfer> = Vec::new();
+        for (transfer_id, (lock, lock_block_hash, state_proof)) in locks.into_iter() {
+            if releases.contains(&transfer_id) {
+                // Terminal (either completed-with-release or rollback) — skip.
+                continue;
+            }
+            let (target_register_block_hash, state) =
+                match registrations.get(&transfer_id) {
+                    Some((_, hash)) => {
+                        // Registration present but no release → ack was
+                        // received, release write was interrupted.
+                        (Some(hash.clone()), CoordinatorState::Registered)
+                    }
+                    None => (None, CoordinatorState::Locked),
+                };
+
+            // Target chain id is best-effort: receipt has it explicitly,
+            // otherwise we fall back to local_chain_id (single-chain
+            // alpha) so the caller can repopulate from peer state.
+            let target_chain_id = receipts
+                .get(&transfer_id)
+                .map(|r| r.target_chain_id.clone())
+                .unwrap_or_else(|| self.local_chain_id.clone());
+
+            let coord = CoordinatedTransfer {
+                transfer_id: transfer_id.clone(),
+                asset_id: AssetId::from(lock.asset_id.as_str()),
+                source_chain_id: self.local_chain_id.clone(),
+                target_chain_id,
+                source_scope: lock.source_scope,
+                target_scope: lock.target_scope,
+                target_peer: PeerCertFingerprint::new(),
+                state,
+                source_lock_block_hash: Some(lock_block_hash),
+                target_register_block_hash,
+                source_release_block_hash: None,
+                manifest: Vec::new(), // not preserved on chain (carried by req)
+                last_error: None,
+                state_proof,
+            };
+
+            self.transfers
+                .write()
+                .await
+                .insert(transfer_id.clone(), coord.clone());
+            resumed.push(coord);
+        }
+
+        if !resumed.is_empty() {
+            info!(
+                "TransferCoordinator::resume_in_flight restored {} in-flight transfer(s)",
+                resumed.len()
+            );
+        } else {
+            debug!("TransferCoordinator::resume_in_flight found no in-flight transfers");
+        }
+
+        Ok(resumed)
     }
 
     // -----------------------------------------------------------------
@@ -1034,7 +1226,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_resume_in_flight_is_g2_stub() {
+    async fn test_resume_in_flight_empty_chain_returns_empty() {
         let bc = make_blockchain();
         let transport = Arc::new(MockTransport::new());
         let coord = TransferCoordinator::new(
@@ -1043,7 +1235,111 @@ mod tests {
             Arc::new(AllowAllFederation),
             "any".into(),
         );
-        let resumed = coord.resume_in_flight().await.expect("test: stub returns ok");
+        let resumed = coord
+            .resume_in_flight()
+            .await
+            .expect("test: empty chain returns ok");
         assert!(resumed.is_empty());
+    }
+
+    /// Phase G.2: chain-scan recovery picks up locks without matching
+    /// release entries, ignores fully-completed transfers, and ignores
+    /// rollbacks (which are themselves release entries).
+    #[tokio::test]
+    async fn test_resume_in_flight_chain_scan_g2() {
+        let bc = make_blockchain();
+        let transport = Arc::new(MockTransport::new());
+        let coord = TransferCoordinator::new(
+            bc.clone(),
+            transport,
+            Arc::new(AllowAllFederation),
+            "src-chain".into(),
+        );
+        let proof = StateProof::new_for_testing();
+
+        // Seed three transfers:
+        //   tx-complete: lock + release (should NOT be in resume list)
+        //   tx-inflight: lock only      (SHOULD be in resume list)
+        //   tx-rolled-back: lock + rollback-release (NOT in resume list)
+        coord
+            .write_lock_entry(
+                "tx-complete",
+                &AssetId::from("asset-complete"),
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &proof,
+            )
+            .await
+            .expect("test: lock complete");
+        coord
+            .write_release_entry(
+                "tx-complete",
+                &AssetId::from("asset-complete"),
+                "completed cross-network transfer",
+                proof.clone(),
+            )
+            .await
+            .expect("test: release complete");
+
+        coord
+            .write_lock_entry(
+                "tx-inflight",
+                &AssetId::from("asset-inflight"),
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &proof,
+            )
+            .await
+            .expect("test: lock inflight");
+
+        coord
+            .write_lock_entry(
+                "tx-rolled-back",
+                &AssetId::from("asset-rolled"),
+                BlockchainScope::Device,
+                BlockchainScope::Network,
+                &proof,
+            )
+            .await
+            .expect("test: lock rolled");
+        coord
+            .write_release_entry(
+                "tx-rolled-back",
+                &AssetId::from("asset-rolled"),
+                "TargetRejected: hash mismatch",
+                proof.clone(),
+            )
+            .await
+            .expect("test: release rolled");
+
+        // Build a NEW coordinator on the same chain — simulates daemon
+        // restart with persisted on-chain state but empty in-memory map.
+        let transport2 = Arc::new(MockTransport::new());
+        let coord2 = TransferCoordinator::new(
+            bc,
+            transport2,
+            Arc::new(AllowAllFederation),
+            "src-chain".into(),
+        );
+
+        let resumed = coord2
+            .resume_in_flight()
+            .await
+            .expect("test: resume_in_flight scan");
+
+        assert_eq!(
+            resumed.len(),
+            1,
+            "expected exactly 1 in-flight transfer, got {:?}",
+            resumed.iter().map(|t| &t.transfer_id).collect::<Vec<_>>()
+        );
+        assert_eq!(resumed[0].transfer_id, "tx-inflight");
+        assert_eq!(resumed[0].state, CoordinatorState::Locked);
+        assert!(resumed[0].source_lock_block_hash.is_some());
+        assert!(resumed[0].source_release_block_hash.is_none());
+
+        // The in-memory map was repopulated.
+        let stored = coord2.get_transfer("tx-inflight").await;
+        assert!(stored.is_some(), "in-memory map updated by resume scan");
     }
 }

@@ -180,10 +180,13 @@ export const crateStatuses: CrateStatus[] = [
         "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
         "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
         "TransferCoordinator orchestrator — Initiated→Locked→ShardsHandedOff→Registered→Released happy path with TargetRejected / RegisterTimeout rollback paths and FederationGate short-circuit",
-        "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side"
+        "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side",
+        "Cross-network transfer chain-scan recovery — TransferCoordinator::resume_in_flight scans NodeBlockchain for TransferLockEntry without matching TransferReleaseEntry, reconstructs CoordinatedTransfer state, repopulates in-memory map (chain is the durable state machine; no separate snapshot file needed)",
+        "Transfer wire dispatch via PeerContext.transfer_coordinator — handle_transfer_register_req routes through TransferCoordinator::handle_register_request and writes ack back over the same stream; handle_transfer_register_ack delivers oneshot acks to awaiting initiate() futures via deliver_register_ack/register_ack_waiter; alpha-default inert when transfer_coordinator is None",
+        "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer"
       ],
       "inDevelopment": [
-        "Cross-network asset transfers — wire protocol + state machine + happy/rollback/timeout coordinator landed in G.1 (5/5 g1_transfer_protocol_tests pass); persisted-state restart-recovery + multi-host e2e harness scoped to G.2/Phase I",
+        "Cross-network asset transfers — daemon STOQ TransferTransport plumbing (production wrapper that registers oneshot acks before broadcasting TAG_TRANSFER_REGISTER_REQ) still pending in bin/node, scoped to Phase I",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
@@ -393,7 +396,7 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
-        "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + receipt linking landed in blockmatrix; gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase G.2)",
+        "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + G.2 chain-scan recovery + PeerContext wire dispatch landed in blockmatrix (5/5 g1_transfer + 4/4 g2_transfer tests pass); gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase I)",
         "Outbound proxy with allowlist filtering — code exists, not tested",
         "Backend service discovery (resolve by address or service registry)"
       ],

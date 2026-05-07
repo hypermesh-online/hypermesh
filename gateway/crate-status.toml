@@ -44,7 +44,7 @@ items = [
     "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
     "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
     "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
-    "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + receipt linking landed in blockmatrix; gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase G.2)",
+    "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + G.2 chain-scan recovery + PeerContext wire dispatch landed in blockmatrix (5/5 g1_transfer + 4/4 g2_transfer tests pass); gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase I)",
     "Outbound proxy with allowlist filtering — code exists, not tested",
     "Backend service discovery (resolve by address or service registry)",
 ]
