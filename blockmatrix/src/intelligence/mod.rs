@@ -33,6 +33,8 @@ use tracing::{debug, info, instrument, warn};
 #[cfg(feature = "intelligence")]
 pub mod ebpf_feedback;
 pub mod engauge_bridge;
+#[cfg(feature = "intelligence")]
+pub mod engauge_trust_adapter;
 pub mod integration;
 pub mod metrics_bridge;
 pub mod performance;
@@ -42,6 +44,8 @@ pub mod workflows;
 
 #[cfg(feature = "intelligence")]
 pub use ebpf_feedback::EbpfFeedbackAdapter;
+#[cfg(feature = "intelligence")]
+pub use engauge_trust_adapter::EngaugeTrustAdapter;
 
 // Re-exports from types module
 use types::inline_trustchain_stub;

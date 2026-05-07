@@ -43,6 +43,11 @@ items = [
     "FederationManager key share storage — store/get/remove/list KeyShares with fingerprint validation",
     "CRL propagation to federation — propagate_to_federation() pushes revocations to Full+Conditional peers",
     "OCSP federated check — federated_check() queries local store first, fallback to peers",
+    # Phase F.1 — CA Federation Activation (2026-05-07)
+    "ThresholdSignCoordinator — broadcasts share-request via FederationTransport, awaits t-of-n responses with deadline, calls reconstruct_and_sign for FALCON-1024 signature",
+    "TrustSignalProvider trait — pluggable engauge-driven trust gating in FederationManager.add_peer_with_proof",
+    "engauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
+    "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback",
 ]
 
 [features.in_development]

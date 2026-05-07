@@ -24,6 +24,7 @@ pub mod ocsp;
 pub mod policy;
 pub mod security_integration;
 pub mod stoq_ca_client;
+pub mod trust_provider;
 pub mod trustchain_ca;
 pub mod types;
 
@@ -52,3 +53,5 @@ pub use federation::{
     FederatedCA, FederatedValidationResult, FederationManager, FederationPolicy, FederationStatus,
     FederationTrustLevel,
 };
+// Re-export the engauge-facing trust provider abstraction (Phase F.1).
+pub use trust_provider::{PeerCertFingerprint, PeerTrustBand, TrustSignalProvider};

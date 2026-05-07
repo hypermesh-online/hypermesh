@@ -235,6 +235,10 @@ mod tests {
             caesar: None,
             #[cfg(feature = "intelligence")]
             engauge_bridge: None,
+            #[cfg(feature = "intelligence")]
+            federation_manager: None,
+            #[cfg(feature = "intelligence")]
+            threshold_coordinator: None,
         })
     }
 

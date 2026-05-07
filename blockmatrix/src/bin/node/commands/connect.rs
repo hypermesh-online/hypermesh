@@ -187,6 +187,13 @@ pub async fn run_connect(
                 },
             ))
         }),
+        // Phase F.1: not yet wired — these become Some(...) when the
+        // node actually joins a federation.  Until then,
+        // `trustchain.request_cert` falls through to local self-signing.
+        #[cfg(feature = "intelligence")]
+        federation_manager: None,
+        #[cfg(feature = "intelligence")]
+        threshold_coordinator: None,
     });
 
     let mut handler = ipc::RequestHandler::new();

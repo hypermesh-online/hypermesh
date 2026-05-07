@@ -10,11 +10,40 @@
 use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::RpcError;
+use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
+
+fn invalid_params(msg: impl Into<String>) -> RpcError {
+    RpcError {
+        code: INVALID_PARAMS,
+        message: msg.into(),
+        data: None,
+    }
+}
+
+fn internal_error(msg: impl Into<String>) -> RpcError {
+    RpcError {
+        code: INTERNAL_ERROR,
+        message: msg.into(),
+        data: None,
+    }
+}
 
 /// Register TrustChain-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
+    // trustchain.request_cert -- request certificate signing
+    // (local CA in Phase 0, threshold-mode coordinator when wired)
+    {
+        let s = state.clone();
+        handler.register(
+            "trustchain.request_cert",
+            Arc::new(move |params| {
+                let s = s.clone();
+                Box::pin(async move { handle_request_cert(&s, params).await })
+            }),
+        );
+    }
+
     // trustchain.status -- CA status
     {
         let s = state.clone();
@@ -154,6 +183,111 @@ fn handle_identity(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     }))
 }
 
+/// Request a certificate.
+///
+/// Phase F.1: in alpha, this is a local self-signing call backed by the
+/// node's FALCON-1024 identity key.  When `state.federation_manager` is
+/// `Some` and `threshold_mode_enabled()` returns true, the call is
+/// instead dispatched through the threshold-signing coordinator over
+/// federated peers.  The caller submits a CSR (raw bytes) and an
+/// optional scope; the response is a signed certificate envelope plus
+/// the path used (`local` vs `threshold`).
+///
+/// Params: `{ "csr": "<base64>", "scope"?: "<string>" }`.
+async fn handle_request_cert(
+    state: &DaemonState,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, RpcError> {
+    use base64::Engine;
+
+    let csr_b64 = params
+        .get("csr")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| invalid_params("missing 'csr' parameter (base64-encoded)"))?;
+    let csr_bytes = base64::engine::general_purpose::STANDARD
+        .decode(csr_b64)
+        .map_err(|e| invalid_params(format!("csr base64 decode failed: {e}")))?;
+    let scope = params
+        .get("scope")
+        .and_then(|v| v.as_str())
+        .unwrap_or("local")
+        .to_string();
+
+    // Phase F.1: federation manager + threshold coordinator wiring.
+    // When attached, route through threshold sign coordinator if mode
+    // is enabled.  Otherwise we fall back to local self-signing using
+    // the node's identity key.
+    #[cfg(feature = "intelligence")]
+    {
+        if let Some(coord) = state.threshold_coordinator.as_ref() {
+            if let Some(fed) = state.federation_manager.as_ref() {
+                if fed.threshold_mode_enabled().await {
+                    // Reconstruct CA fingerprint from local identity.
+                    let identity_dir = state.data_dir.join(&state.node_id).join("identity");
+                    let ca_fp = match std::fs::read(identity_dir.join("falcon_pubkey.der")) {
+                        Ok(pk) if pk.len() >= 32 => {
+                            use sha2::{Digest, Sha256};
+                            let d: [u8; 32] = Sha256::digest(&pk).into();
+                            d
+                        }
+                        _ => {
+                            return Err(internal_error(
+                                "threshold mode requires local FALCON public key",
+                            ));
+                        }
+                    };
+
+                    match coord
+                        .sign(
+                            ca_fp,
+                            &csr_bytes,
+                            2, // threshold of 2 for alpha
+                            std::time::Duration::from_secs(30),
+                        )
+                        .await
+                    {
+                        Ok(sig) => {
+                            return Ok(serde_json::json!({
+                                "node_id": state.node_id,
+                                "scope": scope,
+                                "path": "threshold",
+                                "signature": base64::engine::general_purpose::STANDARD.encode(&sig),
+                                "csr_len": csr_bytes.len(),
+                                "status": "signed",
+                            }));
+                        }
+                        Err(e) => {
+                            return Err(internal_error(format!(
+                                "threshold sign failed: {e}"
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Local fallback: sign the CSR with the node's FALCON-1024 identity
+    // key.  This is the Phase 0 bootstrap path.
+    let identity_dir = state.data_dir.join(&state.node_id).join("identity");
+    let identity = crate::identity::FalconIdentity::load_or_create(&identity_dir)
+        .map_err(|e| internal_error(format!("identity load failed: {e}")))?;
+    let signature = <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::sign(
+        &identity,
+        &csr_bytes,
+    )
+    .map_err(|e| internal_error(format!("local sign failed: {e}")))?;
+
+    Ok(serde_json::json!({
+        "node_id": state.node_id,
+        "scope": scope,
+        "path": "local",
+        "signature": base64::engine::general_purpose::STANDARD.encode(&signature),
+        "csr_len": csr_bytes.len(),
+        "status": "signed",
+    }))
+}
+
 /// Federation peers: connected CAs and trust levels.
 async fn handle_federation(
     state: &DaemonState,
@@ -277,6 +411,10 @@ mod tests {
             caesar: None,
             #[cfg(feature = "intelligence")]
             engauge_bridge: None,
+            #[cfg(feature = "intelligence")]
+            federation_manager: None,
+            #[cfg(feature = "intelligence")]
+            threshold_coordinator: None,
         });
 
         let mut handler = RequestHandler::new();

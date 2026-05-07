@@ -188,6 +188,8 @@ items = [
     "EbpfFeedbackAdapter wires engauge routing intelligence into kernel-level BPF maps",
     "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
     "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals",
+    "EngaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer engauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
+    "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
 ]
 
 [features.in_development]

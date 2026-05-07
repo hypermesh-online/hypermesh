@@ -60,4 +60,10 @@ pub struct DaemonState {
     /// Engauge swarm analytics bridge (None if feature disabled or not wired).
     #[cfg(feature = "intelligence")]
     pub engauge_bridge: Option<Arc<crate::intelligence::engauge_bridge::EngaugeBridge>>,
+    /// Phase F.1: federation manager (CA-side trust + key shares).
+    #[cfg(feature = "intelligence")]
+    pub federation_manager: Option<Arc<trustchain::ca::FederationManager>>,
+    /// Phase F.1: threshold-sign coordinator (drives federated CAs).
+    #[cfg(feature = "intelligence")]
+    pub threshold_coordinator: Option<Arc<trustchain::crypto::ThresholdSignCoordinator>>,
 }

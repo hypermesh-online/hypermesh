@@ -94,6 +94,7 @@ futures = { workspace = true }
 ring = { workspace = true }
 x509-parser = { workspace = true }
 blake3 = { workspace = true }
+sha2 = { workspace = true }
 hex = { workspace = true }
 ed25519-dalek = { workspace = true }
 aes-gcm = { workspace = true }

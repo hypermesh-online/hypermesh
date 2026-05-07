@@ -320,3 +320,74 @@ async fn send_gossip_to_peer(
         }
     }
 }
+
+/// Phase F.1: periodic peer-CA discovery.
+///
+/// Every 60 seconds, iterates the currently connected peers via
+/// [`NetworkManager::get_connected_nodes`] and calls
+/// [`trustchain::ca::FederationManager::add_peer`] for any peer not
+/// already in the federation.  PoS gating, byzantine override, and
+/// engauge trust-band capping are all enforced inside `add_peer`, so
+/// the discovery loop only needs to surface candidates.
+///
+/// This is a no-op when `federation` is `None`, which is the alpha
+/// default until the daemon explicitly opts into federation.
+#[cfg(feature = "intelligence")]
+pub(super) fn spawn_ca_discovery_loop(
+    network: std::sync::Arc<NetworkManager>,
+    federation: std::sync::Arc<trustchain::ca::FederationManager>,
+) {
+    use std::time::SystemTime;
+    use trustchain::ca::{FederatedCA, FederationTrustLevel};
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        // Skip the immediate tick — let the network warm up.
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            let nodes = network.get_connected_nodes().await;
+            if nodes.is_empty() {
+                continue;
+            }
+            // Snapshot existing peers to avoid duplicate add_peer calls.
+            let known: std::collections::HashSet<String> = federation
+                .list_peers()
+                .await
+                .into_iter()
+                .map(|p| p.ca_id)
+                .collect();
+
+            for node in &nodes {
+                if known.contains(&node.node_id) {
+                    continue;
+                }
+                let peer = FederatedCA {
+                    ca_id: node.node_id.clone(),
+                    name: format!("peer-{}", &node.node_id[..8.min(node.node_id.len())]),
+                    public_key: Vec::new(), // populated when handshake exposes the peer's key
+                    root_certificate: Vec::new(),
+                    trust_level: FederationTrustLevel::Conditional,
+                    joined_at: SystemTime::now(),
+                    last_sync: None,
+                    endpoint: node.address.to_string(),
+                };
+                match federation.add_peer(peer).await {
+                    Ok(()) => {
+                        debug!(
+                            "CA discovery: added peer '{}' to federation",
+                            &node.node_id[..8.min(node.node_id.len())]
+                        );
+                    }
+                    Err(e) => {
+                        debug!(
+                            "CA discovery: add_peer for '{}' failed: {}",
+                            &node.node_id[..8.min(node.node_id.len())],
+                            e
+                        );
+                    }
+                }
+            }
+        }
+    });
+}

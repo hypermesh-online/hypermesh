@@ -37,6 +37,7 @@ pub mod streaming;
 pub mod swarm_analytics;
 pub mod throttle;
 pub mod trending;
+pub mod trust_signals;
 pub mod udp_ingest;
 
 // Re-export primary types at crate root for convenience.
@@ -71,3 +72,4 @@ pub use swarm_analytics::{
 };
 pub use throttle::{EngaugeThrottle, ThrottleSignal};
 pub use trending::{AggregatedCapacity, CapacityTrend, EpochRecord, EpochTracker, TrendDirection};
+pub use trust_signals::{PeerTrustSignals, TrustBand};

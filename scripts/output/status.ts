@@ -175,7 +175,9 @@ export const crateStatuses: CrateStatus[] = [
         "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
         "EbpfFeedbackAdapter wires engauge routing intelligence into kernel-level BPF maps",
         "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
-        "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals"
+        "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals",
+        "EngaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer engauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
+        "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
@@ -337,7 +339,8 @@ export const crateStatuses: CrateStatus[] = [
         "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
         "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
         "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
-        "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex"
+        "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
+        "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full"
       ],
       "inDevelopment": [
         "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
@@ -668,7 +671,11 @@ export const crateStatuses: CrateStatus[] = [
         "Threshold CA activation — split_ca_key() + sign_with_threshold() wire Shamir SSS into TrustChainCA",
         "FederationManager key share storage — store/get/remove/list KeyShares with fingerprint validation",
         "CRL propagation to federation — propagate_to_federation() pushes revocations to Full+Conditional peers",
-        "OCSP federated check — federated_check() queries local store first, fallback to peers"
+        "OCSP federated check — federated_check() queries local store first, fallback to peers",
+        "ThresholdSignCoordinator — broadcasts share-request via FederationTransport, awaits t-of-n responses with deadline, calls reconstruct_and_sign for FALCON-1024 signature",
+        "TrustSignalProvider trait — pluggable engauge-driven trust gating in FederationManager.add_peer_with_proof",
+        "engauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
+        "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback"
       ],
       "inDevelopment": [
         "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
@@ -691,7 +698,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 67
+    "completion": 69
   },
   {
     "id": "ui",

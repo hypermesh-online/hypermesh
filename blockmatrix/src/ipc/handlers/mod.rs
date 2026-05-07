@@ -152,6 +152,10 @@ pub(crate) mod tests {
             caesar: None,
             #[cfg(feature = "intelligence")]
             engauge_bridge: None,
+            #[cfg(feature = "intelligence")]
+            federation_manager: None,
+            #[cfg(feature = "intelligence")]
+            threshold_coordinator: None,
         })
     }
 
@@ -236,6 +240,7 @@ pub(crate) mod tests {
             "trustchain.certs",
             "trustchain.identity",
             "trustchain.federation",
+            "trustchain.request_cert",
             "stoq.stats",
             "stoq.connections",
             "stoq.performance",

@@ -12,9 +12,11 @@ use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+use crate::ca::trust_provider::{PeerCertFingerprint, PeerTrustBand, TrustSignalProvider};
 use crate::crypto::threshold::KeyShare;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::proof_of_state::{FourProofValidator, StateProof};
+use crate::security::ByzantineDetector;
 
 /// Trust level assigned to a federated peer CA.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +116,17 @@ pub struct FederationManager {
     /// Key shares held by this node from federated CA key splits.
     /// Keyed by CA fingerprint (SHA-256 of CA public key).
     held_key_shares: RwLock<HashMap<[u8; 32], KeyShare>>,
+    /// Optional engauge-driven trust-band provider (Phase F.1). When
+    /// set, `add_peer` consults this after the PoS gate to cap the
+    /// peer's trust level at the engauge-derived band.
+    engauge_signals: RwLock<Option<Arc<dyn TrustSignalProvider>>>,
+    /// Optional byzantine detector (Phase F.1). When set and the peer
+    /// has any byzantine confidence above the detector's threshold,
+    /// `add_peer` forces `Untrusted` regardless of PoS or engauge state.
+    byzantine_detector: RwLock<Option<Arc<ByzantineDetector>>>,
+    /// Whether threshold-mode signing is enabled (Phase F.1). Set by
+    /// the caller after key shares have been distributed.
+    threshold_mode: RwLock<bool>,
 }
 
 impl FederationManager {
@@ -125,7 +138,37 @@ impl FederationManager {
             events: Arc::new(RwLock::new(Vec::new())),
             state_proof_validator: Arc::new(tokio::sync::Mutex::new(FourProofValidator::new())),
             held_key_shares: RwLock::new(HashMap::new()),
+            engauge_signals: RwLock::new(None),
+            byzantine_detector: RwLock::new(None),
+            threshold_mode: RwLock::new(false),
         }
+    }
+
+    /// Attach (or replace) the engauge trust-signal provider used by
+    /// `add_peer` to cap the peer's trust level.  See
+    /// [`crate::ca::trust_provider::TrustSignalProvider`].
+    pub async fn set_trust_signal_provider(&self, provider: Arc<dyn TrustSignalProvider>) {
+        *self.engauge_signals.write().await = Some(provider);
+    }
+
+    /// Attach (or replace) the byzantine detector consulted by
+    /// `add_peer`.  Peers flagged by the detector are forced to
+    /// `Untrusted` regardless of PoS or engauge state.
+    pub async fn set_byzantine_detector(&self, detector: Arc<ByzantineDetector>) {
+        *self.byzantine_detector.write().await = Some(detector);
+    }
+
+    /// Toggle threshold-signing mode.  When enabled, callers issuing
+    /// new certificates should route through
+    /// `crate::crypto::threshold_coordinator::ThresholdSignCoordinator`
+    /// rather than calling `TrustChainCA::issue_certificate` locally.
+    pub async fn set_threshold_mode(&self, enabled: bool) {
+        *self.threshold_mode.write().await = enabled;
+    }
+
+    /// Whether threshold-mode signing has been enabled.
+    pub async fn threshold_mode_enabled(&self) -> bool {
+        *self.threshold_mode.read().await
     }
 
     /// Add a peer CA with bilateral Proof of State validation.
@@ -200,6 +243,53 @@ impl FederationManager {
                 peer.ca_id, peer.trust_level
             );
             peer.trust_level = FederationTrustLevel::Untrusted;
+        }
+
+        // --- Phase F.1: byzantine override ---
+        // If the byzantine detector has any record of this peer with
+        // confidence above its threshold, force Untrusted regardless of
+        // PoS or engauge signals.  Engauge gating only applies when the
+        // peer is *not* byzantine.
+        let mut byzantine = false;
+        if peer.trust_level != FederationTrustLevel::Untrusted {
+            if let Some(detector) = self.byzantine_detector.read().await.as_ref().cloned() {
+                if detector_flags_peer(&detector, &peer.ca_id).await {
+                    warn!(
+                        "Peer '{}' flagged by ByzantineDetector — forcing Untrusted",
+                        peer.ca_id
+                    );
+                    peer.trust_level = FederationTrustLevel::Untrusted;
+                    byzantine = true;
+                }
+            }
+        }
+
+        // --- Phase F.1: engauge trust-band gating ---
+        // Cap the peer's trust at the engauge-derived band.  The band
+        // is `Full` or `Conditional`; `Untrusted` is already settled
+        // above by PoS / byzantine checks.
+        if !byzantine && peer.trust_level != FederationTrustLevel::Untrusted {
+            if let Some(provider) = self.engauge_signals.read().await.as_ref().cloned() {
+                if let Some(fp) = derive_peer_fingerprint(&peer.public_key) {
+                    match provider.trust_band_for(&fp).await {
+                        Some(PeerTrustBand::Full) => {
+                            // No demotion; peer keeps requested level.
+                        }
+                        Some(PeerTrustBand::Conditional) => {
+                            if peer.trust_level == FederationTrustLevel::Full {
+                                debug!(
+                                    "Engauge signals cap peer '{}' at Conditional",
+                                    peer.ca_id
+                                );
+                                peer.trust_level = FederationTrustLevel::Conditional;
+                            }
+                        }
+                        None => {
+                            // No signals yet — leave PoS-derived level alone.
+                        }
+                    }
+                }
+            }
         }
 
         info!(
@@ -511,6 +601,37 @@ impl FederationManager {
             timestamp: SystemTime::now(),
             details,
         });
+    }
+}
+
+/// SHA-256 fingerprint of a peer's public key.  Returns `None` for
+/// empty keys (e.g. the placeholder keys used in unit tests).
+fn derive_peer_fingerprint(public_key: &[u8]) -> Option<PeerCertFingerprint> {
+    if public_key.is_empty() {
+        return None;
+    }
+    let digest: [u8; 32] = Sha256::digest(public_key).into();
+    Some(digest)
+}
+
+/// Whether the byzantine detector has any record of this `ca_id`
+/// indicating Byzantine behaviour.
+///
+/// We use the detection summary instead of forcing a state-proof
+/// revalidation, because the federation manager doesn't always have a
+/// fresh state proof at hand.  Any peer appearing in the suspicious-
+/// nodes list with at least one failed verification is treated as
+/// flagged.
+async fn detector_flags_peer(detector: &ByzantineDetector, ca_id: &str) -> bool {
+    match detector.get_detection_summary().await {
+        Ok(summary) => summary
+            .top_suspicious_nodes
+            .iter()
+            .any(|n| n.node_id == ca_id && n.failed_verifications > 0),
+        Err(e) => {
+            debug!("ByzantineDetector summary error: {e}");
+            false
+        }
     }
 }
 

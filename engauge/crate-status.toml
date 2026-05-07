@@ -36,6 +36,7 @@ items = [
     "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
     "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
     "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
+    "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full",
 ]
 
 [features.in_development]
