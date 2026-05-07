@@ -27,7 +27,12 @@ use super::protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_RESOLVE, TAG_GOSSIP, TAG_KEY_ROTATION,
     TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
-    TAG_TRANSFER,
+    TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ,
+    TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
+};
+use super::transfer_handlers::{
+    handle_transfer_lock, handle_transfer_register_ack, handle_transfer_register_req,
+    handle_transfer_release, handle_transfer_rollback,
 };
 use super::sync_and_reflection::{
     handle_block_fetch_request, handle_direct_message, handle_dns_resolve_request,
@@ -117,6 +122,8 @@ pub(crate) async fn dispatch_message(
         TAG_SHARD_SEND | TAG_SHARD_FETCH
             | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
             | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
+            | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
+            | TAG_TRANSFER_RELEASE | TAG_TRANSFER_ROLLBACK
     );
     if needs_auth
         && !peer_auth::verify_peer_access(
@@ -180,6 +187,21 @@ pub(crate) async fn dispatch_message(
         }
         TAG_DNS_RESOLVE => {
             handle_dns_resolve_request(data, stream, peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER_LOCK => {
+            handle_transfer_lock(&data[1..], peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER_REGISTER_REQ => {
+            handle_transfer_register_req(&data[1..], stream, peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER_REGISTER_ACK => {
+            handle_transfer_register_ack(&data[1..], peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER_RELEASE => {
+            handle_transfer_release(&data[1..], peer_node_id, ctx).await;
+        }
+        TAG_TRANSFER_ROLLBACK => {
+            handle_transfer_rollback(&data[1..], peer_node_id, ctx).await;
         }
         TAG_GOSSIP => {
             debug!(

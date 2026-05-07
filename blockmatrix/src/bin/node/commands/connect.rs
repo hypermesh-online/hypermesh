@@ -194,6 +194,8 @@ pub async fn run_connect(
         federation_manager: None,
         #[cfg(feature = "intelligence")]
         threshold_coordinator: None,
+
+        transfer_coordinator: None,
     });
 
     let mut handler = ipc::RequestHandler::new();

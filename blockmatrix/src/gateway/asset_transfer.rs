@@ -364,6 +364,73 @@ pub struct TransferReleaseEntry {
     pub reason: String,
 }
 
+/// Cross-chain transfer receipt — written to BOTH the source and target
+/// chains so an auditor can trace transfer atomicity from either side.
+///
+/// Each chain's receipt references the OTHER chain's block hash, which is
+/// the cross-chain link. After both receipts are present, the transfer is
+/// fully reconcilable from either node's blockchain alone.
+///
+/// Phase G.1 introduces the type and writes it on both sides; full
+/// cross-chain validation (`CrossChainValidator::validate_cross_chain`)
+/// lands in Phase I.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TransferReceipt {
+    /// Unique transfer ID linking source and target receipts.
+    pub transfer_id: String,
+    /// Identifier of the source chain (network ID).
+    pub source_chain_id: String,
+    /// Identifier of the target chain (network ID).
+    pub target_chain_id: String,
+    /// BLAKE3 hex hash of the source-chain release block.
+    pub source_block_hash: String,
+    /// BLAKE3 hex hash of the target-chain registration block.
+    pub target_block_hash: String,
+    /// Unix timestamp when the receipt was finalized.
+    pub completed_at: i64,
+    /// Asset being transferred (for indexing/auditing).
+    pub asset_id: String,
+    /// Source scope (Device or Network).
+    pub source_scope: BlockchainScope,
+    /// Target scope (Device or Network).
+    pub target_scope: BlockchainScope,
+}
+
+/// Reason a transfer was rolled back. Carried in `TAG_TRANSFER_ROLLBACK`
+/// wire payloads and persisted in `TransferReleaseEntry::reason`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RollbackReason {
+    /// Target peer explicitly rejected the registration request.
+    TargetRejected { detail: String },
+    /// Source did not receive a register-ack within the deadline.
+    RegisterTimeout { elapsed_ms: u64 },
+    /// Federation gating denied the target peer (Phase F.2).
+    FederationRejected { detail: String },
+    /// Local validator failed (e.g., proof bytes invalid).
+    LocalValidationFailed { detail: String },
+    /// User-initiated cancel.
+    UserCancelled,
+    /// Internal error (transport failure, serialization, etc.).
+    Internal { detail: String },
+}
+
+impl fmt::Display for RollbackReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TargetRejected { detail } => write!(f, "target rejected: {detail}"),
+            Self::RegisterTimeout { elapsed_ms } => {
+                write!(f, "register timeout after {elapsed_ms}ms")
+            }
+            Self::FederationRejected { detail } => write!(f, "federation rejected: {detail}"),
+            Self::LocalValidationFailed { detail } => {
+                write!(f, "local validation failed: {detail}")
+            }
+            Self::UserCancelled => write!(f, "user cancelled"),
+            Self::Internal { detail } => write!(f, "internal error: {detail}"),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

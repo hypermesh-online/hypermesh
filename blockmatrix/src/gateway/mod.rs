@@ -20,12 +20,20 @@
 
 pub mod asset_transfer;
 pub mod scope_bridge;
+pub mod transfer_coordinator;
+pub mod transfer_protocol;
 
 pub use asset_transfer::{
-    AssetTransfer, DefaultTransferValidator, PosTransferValidator, TransferLockEntry,
-    TransferRegistrationEntry, TransferReleaseEntry, TransferStatus, TransferValidator,
+    AssetTransfer, DefaultTransferValidator, PosTransferValidator, RollbackReason,
+    TransferLockEntry, TransferReceipt, TransferRegistrationEntry, TransferReleaseEntry,
+    TransferStatus, TransferValidator,
 };
 pub use scope_bridge::{BridgeMessage, ScopeBridge, TransferShard};
+pub use transfer_coordinator::{TransferCoordinator, TransferTransport};
+pub use transfer_protocol::{
+    CoordinatorState, PeerCertFingerprint, ShardManifestEntry, TransferLockMessage,
+    TransferRegisterAck, TransferRegisterRequest, TransferRelease, TransferRollback,
+};
 
 use std::sync::Arc;
 
@@ -64,6 +72,37 @@ pub enum GatewayError {
         asset_id: String,
         transfer_id: String,
     },
+
+    /// Phase G.1: target peer is not in the federation (or marked Untrusted).
+    /// Returned by `TransferCoordinator::initiate` before any wire traffic.
+    #[error("Federation rejected target peer {peer}: {detail}")]
+    FederationRejected { peer: String, detail: String },
+
+    /// Phase G.1: register-ack deadline elapsed without a response.
+    #[error("Transfer {transfer_id} register-ack timed out after {elapsed_ms}ms")]
+    RegisterTimeout {
+        transfer_id: String,
+        elapsed_ms: u64,
+    },
+
+    /// Phase G.1: transfer transport (broadcast/send) failed.
+    #[error("Transfer transport failed for {transfer_id}: {detail}")]
+    TransportFailure {
+        transfer_id: String,
+        detail: String,
+    },
+
+    /// Phase G.1: target peer rejected the registration request.
+    #[error("Target rejected transfer {transfer_id}: {reason}")]
+    TargetRejected {
+        transfer_id: String,
+        reason: String,
+    },
+
+    /// Phase G.1: coordinator not configured on this daemon (alpha-default
+    /// inert behaviour preserved from Phase F).
+    #[error("Transfer coordinator not configured on this daemon")]
+    CoordinatorNotConfigured,
 }
 
 // ---------------------------------------------------------------------------

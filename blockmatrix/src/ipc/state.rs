@@ -66,4 +66,11 @@ pub struct DaemonState {
     /// Phase F.1: threshold-sign coordinator (drives federated CAs).
     #[cfg(feature = "intelligence")]
     pub threshold_coordinator: Option<Arc<trustchain::crypto::ThresholdSignCoordinator>>,
+    /// Phase G.1: cross-network transfer coordinator.
+    ///
+    /// Alpha-default inert: when `None`, `gateway.initiate_transfer` IPC
+    /// returns [`GatewayError::CoordinatorNotConfigured`]. Wired by the
+    /// daemon at startup once federation gating + STOQ wire transport
+    /// are opted-in.
+    pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
 }

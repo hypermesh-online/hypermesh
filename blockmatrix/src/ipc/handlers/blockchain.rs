@@ -129,6 +129,8 @@ mod tests {
             federation_manager: None,
             #[cfg(feature = "intelligence")]
             threshold_coordinator: None,
+
+            transfer_coordinator: None,
         })
     }
 

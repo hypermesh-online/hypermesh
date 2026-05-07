@@ -42,3 +42,27 @@ pub(crate) const TAG_KEY_ROTATION: u8 = 0x08;
 pub(crate) const TAG_DNS_RESOLVE: u8 = 0x09;
 /// DNS resolution response (reply with address or empty).
 pub(crate) const TAG_DNS_RESOLVE_RESPONSE: u8 = 0x0A;
+
+// ── Phase G.1: cross-network transfer choreography ───────────────────
+//
+// The plan reserved 0x10-0x14, but 0x10 (TAG_SYNC_MESSAGE) and 0x11
+// (TAG_BLOCK_FETCH_REQUEST) are already in use. Phase G.1 instead uses
+// the next free contiguous range, 0x40-0x44, for the five transfer
+// wire tags. Slots 0x40-0x44 are documented in
+// `gateway::transfer_protocol` and routed in `peer_connection.rs`.
+
+/// Cross-network transfer: source-side broadcast that an asset has been
+/// locked and is being prepared for migration to the target chain.
+pub(crate) const TAG_TRANSFER_LOCK: u8 = 0x40;
+/// Cross-network transfer: source-side request to register the asset on
+/// the target chain (carries shard manifest + lock proof).
+pub(crate) const TAG_TRANSFER_REGISTER_REQ: u8 = 0x41;
+/// Cross-network transfer: target-side acknowledgement that the asset
+/// has been registered on the target chain (carries target block hash).
+pub(crate) const TAG_TRANSFER_REGISTER_ACK: u8 = 0x42;
+/// Cross-network transfer: source-side broadcast that the lock has been
+/// released and the transfer is complete (carries target block hash).
+pub(crate) const TAG_TRANSFER_RELEASE: u8 = 0x43;
+/// Cross-network transfer: rollback notification (timeout or rejection)
+/// — both sides should restore pre-transfer state.
+pub(crate) const TAG_TRANSFER_ROLLBACK: u8 = 0x44;

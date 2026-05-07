@@ -18,13 +18,16 @@ mod message_utils;
 mod peer_connection;
 mod protocol;
 mod sync_and_reflection;
+mod transfer_handlers;
 
 // Wire-protocol tags — re-exported for other crate modules that drive sends.
 pub(crate) use protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_RESOLVE, TAG_DNS_RESOLVE_RESPONSE,
     TAG_GOSSIP, TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND,
-    TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER,
+    TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
+    TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE,
+    TAG_TRANSFER_ROLLBACK,
 };
 
 // Public entry points used by the network module.

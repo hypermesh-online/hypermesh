@@ -156,6 +156,7 @@ pub(crate) mod tests {
             federation_manager: None,
             #[cfg(feature = "intelligence")]
             threshold_coordinator: None,
+            transfer_coordinator: None,
         })
     }
 
@@ -215,6 +216,7 @@ pub(crate) mod tests {
             "gateway.transfer",
             "gateway.status",
             "gateway.list",
+            "gateway.initiate_transfer",
             "share.send",
             "share.inbox",
             "share.accept",

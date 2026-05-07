@@ -190,12 +190,16 @@ items = [
     "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals",
     "EngaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer engauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
     "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
+    # Phase G.1 — cross-network transfer choreography
+    "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
+    "TransferCoordinator orchestrator — Initiated→Locked→ShardsHandedOff→Registered→Released happy path with TargetRejected / RegisterTimeout rollback paths and FederationGate short-circuit",
+    "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side",
 ]
 
 [features.in_development]
 items = [
     # Cross-network asset transfer lifecycle
-    "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
+    "Cross-network asset transfers — wire protocol + state machine + happy/rollback/timeout coordinator landed in G.1 (5/5 g1_transfer_protocol_tests pass); persisted-state restart-recovery + multi-host e2e harness scoped to G.2/Phase I",
     # Security review pending
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)

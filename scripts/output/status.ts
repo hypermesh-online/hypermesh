@@ -177,10 +177,13 @@ export const crateStatuses: CrateStatus[] = [
         "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
         "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals",
         "EngaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer engauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
-        "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in"
+        "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
+        "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
+        "TransferCoordinator orchestrator — Initiated→Locked→ShardsHandedOff→Registered→Released happy path with TargetRejected / RegisterTimeout rollback paths and FederationGate short-circuit",
+        "TransferReceipt cross-chain block entry — written to BOTH chains linking source_block_hash and target_block_hash so an auditor can trace transfer atomicity from either side"
       ],
       "inDevelopment": [
-        "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
+        "Cross-network asset transfers — wire protocol + state machine + happy/rollback/timeout coordinator landed in G.1 (5/5 g1_transfer_protocol_tests pass); persisted-state restart-recovery + multi-host e2e harness scoped to G.2/Phase I",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",
@@ -390,7 +393,7 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
-        "Cross-scope transfer proxy — lock/transfer/unlock lifecycle not integrated",
+        "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + receipt linking landed in blockmatrix; gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase G.2)",
         "Outbound proxy with allowlist filtering — code exists, not tested",
         "Backend service discovery (resolve by address or service registry)"
       ],
