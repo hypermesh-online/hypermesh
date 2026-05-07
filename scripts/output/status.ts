@@ -172,7 +172,10 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
         "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
         "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
-        "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)"
+        "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
+        "EbpfFeedbackAdapter wires engauge routing intelligence into kernel-level BPF maps",
+        "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
+        "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — ScopeBridge + TAG_TRANSFER + TransferLock/Registration/Release block entries present; full Lock→Transfer→Unlock lifecycle e2e not integrated (gateway/crate-status.toml:49 corroborates)",
@@ -332,17 +335,18 @@ export const crateStatuses: CrateStatus[] = [
         "RegionalAggregator periodic change detection",
         "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
         "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
-        "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)"
+        "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
+        "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
+        "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex"
       ],
       "inDevelopment": [
-        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
-        "Engauge-driven shard replication triggers — popularity detection drives blockmatrix replication decisions"
+        "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources"
       ],
       "planned": [
         "Cross-node metrics federation via reflector pool"
       ]
     },
-    "completion": 90
+    "completion": 94
   },
   {
     "id": "gateway",
@@ -454,18 +458,18 @@ export const crateStatuses: CrateStatus[] = [
         "Hardware offload detection and opportunistic NIC offload",
         "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
         "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
-        "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format"
+        "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format",
+        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf"
       ],
       "inDevelopment": [
         "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
-        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
-        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf"
+        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)"
       ],
       "planned": [
         "Production multi-node eBPF policy distribution"
       ]
     },
-    "completion": 81
+    "completion": 86
   },
   {
     "id": "hypermesh-ffi",

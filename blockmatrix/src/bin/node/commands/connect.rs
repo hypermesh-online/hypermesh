@@ -101,6 +101,12 @@ pub async fn run_connect(
     let mut network_ref: Option<std::sync::Arc<NetworkManager>> = None;
     let mut shard_store_ref: Option<std::sync::Arc<ShardStore>> = None;
     let mut shard_transport_ref: Option<std::sync::Arc<StoqShardTransport>> = None;
+    let mut shard_location_index_ref: Option<
+        std::sync::Arc<blockmatrix::network::swarm_provider::ShardLocationIndex>,
+    > = None;
+    let mut consumer_provider_manager_ref: Option<
+        std::sync::Arc<blockmatrix::network::consumer_provider::ConsumerProviderManager>,
+    > = None;
     #[cfg(feature = "intelligence")]
     let mut engauge_bits: Option<EngaugeBits> = None;
 
@@ -115,6 +121,8 @@ pub async fn run_connect(
         network_ref = Some(result.network);
         shard_store_ref = Some(result.shard_store);
         shard_transport_ref = Some(result.shard_transport);
+        shard_location_index_ref = Some(result.shard_location_index);
+        consumer_provider_manager_ref = Some(result.consumer_provider_manager);
         #[cfg(feature = "intelligence")]
         {
             engauge_bits = Some(EngaugeBits {
@@ -163,6 +171,8 @@ pub async fn run_connect(
         dns_popularity_tracker: Some(std::sync::Arc::new(
             blockmatrix::dns::DnsPopularityTracker::new(),
         )),
+        shard_location_index: shard_location_index_ref,
+        consumer_provider_manager: consumer_provider_manager_ref,
         #[cfg(feature = "caesar")]
         caesar: caesar_instance,
         #[cfg(feature = "intelligence")]
@@ -290,6 +300,19 @@ struct NetworkStartResult {
     network: std::sync::Arc<NetworkManager>,
     shard_store: std::sync::Arc<ShardStore>,
     shard_transport: std::sync::Arc<StoqShardTransport>,
+    /// Shared shard location index — same instance used by PeerContext and
+    /// the IPC daemon, so TAG_SHARD_ANNOUNCE updates and local provider
+    /// registrations converge.
+    shard_location_index: std::sync::Arc<
+        blockmatrix::network::swarm_provider::ShardLocationIndex,
+    >,
+    /// Consumer-becomes-provider manager (R12) wired to the shared
+    /// `shard_location_index`. Used by IPC fetch handlers to register the
+    /// local node as a provider after a network fetch and to broadcast
+    /// TAG_SHARD_ANNOUNCE to peers.
+    consumer_provider_manager: std::sync::Arc<
+        blockmatrix::network::consumer_provider::ConsumerProviderManager,
+    >,
     #[cfg(feature = "intelligence")]
     swarm_demand_tracker: std::sync::Arc<blockmatrix::network::SwarmDemandTracker>,
     #[cfg(feature = "intelligence")]
@@ -443,6 +466,21 @@ async fn start_network(
         blockmatrix::network::SwarmDemandTracker::new(),
     );
 
+    // R12 consumer-becomes-provider: shared shard location index. The same
+    // Arc is passed to PeerContext (so TAG_SHARD_ANNOUNCE handlers update it)
+    // and returned to the daemon (so IPC fetch handlers can register the
+    // local node and discover providers for replication requests).
+    let shard_location_index = std::sync::Arc::new(
+        blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
+    );
+    let consumer_provider_manager = std::sync::Arc::new(
+        blockmatrix::network::consumer_provider::ConsumerProviderManager::new(
+            shard_store.clone(),
+            shard_location_index.clone(),
+            nid.to_string(),
+        ),
+    );
+
     // --- engauge intelligence wiring (H2-H5) ---
     #[cfg(feature = "intelligence")]
     let engauge_analytics = std::sync::Arc::new(
@@ -476,9 +514,7 @@ async fn start_network(
         dns_popularity_tracker: Some(std::sync::Arc::new(
             blockmatrix::dns::DnsPopularityTracker::new(),
         )),
-        shard_location_index: Some(std::sync::Arc::new(
-            blockmatrix::network::swarm_provider::ShardLocationIndex::new(),
-        )),
+        shard_location_index: Some(shard_location_index.clone()),
         inbox_store: Some(std::sync::Arc::new(
             blockmatrix::sharing::inbox::InboxStore::new(
                 Some(data_dir.join(nid).join("inbox")),
@@ -725,6 +761,89 @@ async fn start_network(
             }
         });
         info!("engauge propagation weight + replication loop started (interval=15s)");
+
+        // --- Phase E.2: Replication-poll task. Every 30s, ask engauge which
+        // shards need more replicas and proactively fetch additional copies
+        // from known providers via TAG_SHARD_FETCH. Closes the consumer-
+        // becomes-provider loop: hot shards get pulled by additional nodes,
+        // and each successful fetch announces the new node as a provider,
+        // so future requests fan out across the swarm.
+        {
+            let rp_analytics = engauge_analytics.clone();
+            let rp_index = shard_location_index.clone();
+            let rp_transport = shard_transport.clone();
+            let rp_local_node_id = nid.to_string();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(tokio::time::Duration::from_secs(30));
+                // Skip the immediate tick so the first fetch happens after
+                // the network has had time to come up.
+                interval.tick().await;
+                loop {
+                    interval.tick().await;
+                    let signals = match rp_analytics.lock() {
+                        Ok(guard) => engauge::ReplicationTrigger::new(
+                            engauge::ReplicationConfig::default(),
+                        )
+                        .check(&guard),
+                        Err(e) => {
+                            debug!(
+                                "replication-poll: analytics lock poisoned: {e}"
+                            );
+                            continue;
+                        }
+                    };
+                    if signals.is_empty() {
+                        continue;
+                    }
+                    for signal in signals.iter().filter(|s| s.urgency > 0.5) {
+                        // Find peers known to provide this shard.
+                        let providers = rp_index.get_providers(&signal.shard_id).await;
+                        // Skip if we are the only known provider (cannot
+                        // self-replicate) or no providers at all.
+                        let candidates: Vec<&String> = providers
+                            .iter()
+                            .filter(|id| id.as_str() != rp_local_node_id.as_str())
+                            .collect();
+                        if candidates.is_empty() {
+                            debug!(
+                                "replication-poll: no remote providers for shard {} yet",
+                                hex::encode(&signal.shard_id.0[..4])
+                            );
+                            continue;
+                        }
+                        // Pick the first candidate (alpha policy — refine
+                        // with engauge dispersion in a later sprint).
+                        let target_node_id = candidates[0].clone();
+                        let target_id = hypermesh_lib::NodeId::from_public_key(
+                            target_node_id.as_bytes(),
+                        );
+                        use blockmatrix::network::shard_transport::ShardTransport;
+                        match rp_transport
+                            .fetch_shard(&target_id, &signal.shard_id)
+                            .await
+                        {
+                            Ok(_data) => {
+                                info!(
+                                    "replication-poll: fetched extra replica of {} from {} (urgency {:.2})",
+                                    hex::encode(&signal.shard_id.0[..4]),
+                                    &target_node_id[..8.min(target_node_id.len())],
+                                    signal.urgency,
+                                );
+                            }
+                            Err(e) => {
+                                debug!(
+                                    "replication-poll: fetch from {} failed: {}",
+                                    &target_node_id[..8.min(target_node_id.len())],
+                                    e,
+                                );
+                            }
+                        }
+                    }
+                }
+            });
+            info!("Phase E.2 replication-poll loop started (interval=30s)");
+        }
     }
 
     // Propagate bootstrap blocks
@@ -751,6 +870,8 @@ async fn start_network(
         network: network_clone,
         shard_store,
         shard_transport,
+        shard_location_index,
+        consumer_provider_manager,
         #[cfg(feature = "intelligence")]
         swarm_demand_tracker,
         #[cfg(feature = "intelligence")]

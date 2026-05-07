@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use hypermesh_lib::ContentHash;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::network::shard_dedup::DedupPolicy;
 use crate::network::shard_store::ShardStore;
@@ -157,6 +157,52 @@ impl ConsumerProviderManager {
             shard_hashes.iter().map(|h| ContentHash(*h)).collect();
         build_shard_announce_payload(&content_hashes)
     }
+}
+
+/// Broadcast a TAG_SHARD_ANNOUNCE payload to a set of connected peers.
+///
+/// Each peer is sent the payload over a fresh unidirectional STOQ stream.
+/// Failures are logged at warn level but do not abort the broadcast — best-
+/// effort delivery is the goal (other consumers will pick up the slack via
+/// engauge popularity tracking).
+///
+/// Returns the number of peers successfully reached.
+///
+/// Wire format: payload begins with `TAG_SHARD_ANNOUNCE` (0x04) followed by
+/// the count and shard hashes — produced by `build_shard_announce_payload`
+/// or `ConsumerProviderManager::process_fetched_shards`.
+pub async fn broadcast_announcement(
+    payload: &[u8],
+    peers: &[Arc<stoq::Connection>],
+) -> usize {
+    if payload.is_empty() || peers.is_empty() {
+        return 0;
+    }
+    let mut sent = 0usize;
+    for conn in peers {
+        if !conn.is_active() {
+            continue;
+        }
+        match conn.open_stream().await {
+            Ok(mut stream) => {
+                if let Err(e) = stream.send(payload).await {
+                    warn!("Failed to send TAG_SHARD_ANNOUNCE to peer: {e}");
+                    continue;
+                }
+                sent += 1;
+            }
+            Err(e) => {
+                warn!("Failed to open stream for TAG_SHARD_ANNOUNCE: {e}");
+            }
+        }
+    }
+    debug!(
+        "Broadcast TAG_SHARD_ANNOUNCE to {}/{} peers ({} bytes)",
+        sent,
+        peers.len(),
+        payload.len(),
+    );
+    sent
 }
 
 #[cfg(test)]

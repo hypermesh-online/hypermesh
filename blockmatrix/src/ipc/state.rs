@@ -7,8 +7,10 @@ use crate::blockchain::node_chain::NodeBlockchain;
 use crate::bootstrap::DnsResolver;
 use crate::dns::DnsPopularityTracker;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::network::consumer_provider::ConsumerProviderManager;
 use crate::network::shard_store::ShardStore;
 use crate::network::shard_transport::StoqShardTransport;
+use crate::network::swarm_provider::ShardLocationIndex;
 use crate::network::NetworkManager;
 use crate::persistence::PersistenceManager;
 use std::path::PathBuf;
@@ -44,6 +46,14 @@ pub struct DaemonState {
     /// DNS popularity tracker for engauge-driven replication.
     /// Records resolution frequency so popular names get replicated to more nodes.
     pub dns_popularity_tracker: Option<Arc<DnsPopularityTracker>>,
+    /// Shard location index — same instance shared with PeerContext so
+    /// TAG_SHARD_ANNOUNCE updates from peers and provider registrations from
+    /// local fetches converge on a single canonical view.
+    pub shard_location_index: Option<Arc<ShardLocationIndex>>,
+    /// Consumer-becomes-provider manager (R12). When `Some`, IPC fetch handlers
+    /// route fetched shards through `process_fetched_shards` and broadcast
+    /// the resulting TAG_SHARD_ANNOUNCE payload to connected peers.
+    pub consumer_provider_manager: Option<Arc<ConsumerProviderManager>>,
     /// Caesar EVP protocol instance (None if feature disabled or init failed).
     #[cfg(feature = "caesar")]
     pub caesar: Option<Arc<tokio::sync::RwLock<caesar::CaesarProtocol>>>,

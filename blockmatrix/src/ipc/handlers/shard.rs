@@ -67,12 +67,45 @@ async fn handle_shard_fetch(
                         // BLAKE3 verify before returning
                         let computed = blake3::hash(&data);
                         if computed.as_bytes() == &shard_id_bytes {
-                            // Cache locally for future requests
-                            state.shard_store.store(content_hash, data.clone()).await;
+                            // R12: consumer-becomes-provider. Route the
+                            // freshly fetched shard through the manager so
+                            // the local node is registered as a provider in
+                            // the shared `ShardLocationIndex` and a
+                            // TAG_SHARD_ANNOUNCE payload is built. Then
+                            // broadcast the payload to connected peers so
+                            // they update their location index and discover
+                            // us as a new provider.
+                            let mut announce_targets = 0usize;
+                            if let Some(ref mgr) = state.consumer_provider_manager {
+                                let result = mgr
+                                    .process_fetched_shards(vec![(
+                                        content_hash,
+                                        data.clone(),
+                                    )])
+                                    .await;
+                                if let Some(payload) = result.announcement_payload {
+                                    let conns: Vec<Arc<stoq::Connection>> = network
+                                        .get_connected_nodes()
+                                        .await
+                                        .into_iter()
+                                        .filter_map(|n| n.connection.clone())
+                                        .collect();
+                                    announce_targets = crate::network::consumer_provider::
+                                        broadcast_announcement(&payload, &conns)
+                                        .await;
+                                }
+                            } else {
+                                // Fallback path when no manager is wired
+                                // (test fixtures, Private mode without
+                                // network). Cache locally so future fetches
+                                // hit the local store.
+                                state.shard_store.store(content_hash, data.clone()).await;
+                            }
                             return Ok(serde_json::json!({
                                 "source": "network",
                                 "peer": &peer.node_id[..8.min(peer.node_id.len())],
                                 "data": hex::encode(&data),
+                                "announce_targets": announce_targets,
                             }));
                         }
                         tracing::warn!(

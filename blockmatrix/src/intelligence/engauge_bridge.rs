@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 #[cfg(feature = "intelligence")]
 use engauge::{
-    PathPolicyRecommendation, RoutingAdvisor, RoutingIntelligence, SwarmAnalytics,
-    TensorWeightModifier,
+    PathPolicyRecommendation, ReplicationConfig, ReplicationSignal, ReplicationTrigger,
+    RoutingAdvisor, RoutingIntelligence, SwarmAnalytics, TensorWeightModifier,
 };
 use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
 
@@ -139,6 +139,36 @@ impl EngaugeBridge {
                 feed_swarm_analytics(&self.tracker, &mut analytics, self.position).await;
             }
             tokio::time::sleep(interval).await;
+        }
+    }
+
+    /// Run the engauge [`ReplicationTrigger`] against the shared analytics
+    /// snapshot and return the replication signals it produces.
+    ///
+    /// Caller is expected to drive the swarm closure: for each
+    /// `Replicate` signal, look up providers via `ShardLocationIndex` and
+    /// request additional copies via TAG_SHARD_FETCH (see Phase E.2).
+    ///
+    /// Acquires a synchronous lock on analytics. The lock is released
+    /// before this function returns, so the caller can hold the returned
+    /// signals across await points.
+    pub fn check_replication_signals(&self) -> Vec<ReplicationSignal> {
+        self.check_replication_signals_with(ReplicationConfig::default())
+    }
+
+    /// Variant of [`check_replication_signals`] that lets the caller
+    /// override the trigger configuration.
+    pub fn check_replication_signals_with(
+        &self,
+        config: ReplicationConfig,
+    ) -> Vec<ReplicationSignal> {
+        let trigger = ReplicationTrigger::new(config);
+        match self.analytics.lock() {
+            Ok(guard) => trigger.check(&guard),
+            Err(e) => {
+                tracing::warn!("engauge bridge: analytics lock poisoned: {e}");
+                Vec::new()
+            }
         }
     }
 

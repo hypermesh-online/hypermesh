@@ -35,12 +35,12 @@ items = [
     "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
     "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
     "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
+    "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
 ]
 
 [features.in_development]
 items = [
     "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
-    "Engauge-driven shard replication triggers — popularity detection drives blockmatrix replication decisions",
 ]
 
 [features.planned]
