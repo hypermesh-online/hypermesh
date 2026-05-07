@@ -12,11 +12,16 @@ use tracing::{error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 use trustchain::ca::certificate_store::CertificateStore;
+use trustchain::ca::federation::{FederationManager, FederationPolicy};
+use trustchain::ca::ocsp::OcspResponder;
 use trustchain::ca::TrustChainCA;
 use trustchain::config::TrustChainConfig;
+use trustchain::crypto::falcon::FalconCrypto;
+use trustchain::crypto::KeyUsage;
 use trustchain::http3::handlers::{
     self, DnsResolveRequest as HandlerDnsResolveRequest, HttpHandlerContext,
-    IssueCertificateRequest, RevokeCertificateRequest, ValidateCertificateRequest,
+    IssueCertificateRequest, OcspHttpRequest, RevokeCertificateRequest,
+    ValidateCertificateRequest,
 };
 use trustchain::http3::{ApiResponse, Http3StoqServer, Router};
 use trustchain::security::{SecurityConfig, SecurityMonitor};
@@ -118,11 +123,34 @@ async fn main() -> Result<()> {
     let security_config = SecurityConfig::default();
     let security_monitor = Arc::new(SecurityMonitor::new(security_config).await?);
 
+    // Phase F.2 — OCSP responder + federation manager.  Federation
+    // starts empty (alpha pattern: opt-in via add_peer); when a peer is
+    // attached, the federated_check fallback fires automatically.
+    let falcon = FalconCrypto::new()
+        .map_err(|e| anyhow::anyhow!("Failed to initialize FALCON-1024: {e}"))?;
+    let ocsp_keypair = falcon
+        .generate_keypair(KeyUsage::CertificateAuthority)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to generate OCSP signing key: {e}"))?;
+    let ocsp_responder = Arc::new(OcspResponder::new(
+        Arc::clone(&certificate_store),
+        ocsp_keypair.private_key,
+        format!("trustchain-ocsp-{}", uuid::Uuid::new_v4()),
+        None,
+    )?);
+
+    let federation = Arc::new(FederationManager::new(
+        "local-ca".to_string(),
+        FederationPolicy::default(),
+    ));
+
     let ctx = Arc::new(HttpHandlerContext {
         ca,
         certificate_store,
         security_monitor,
         start_time: std::time::Instant::now(),
+        ocsp_responder: Some(ocsp_responder),
+        federation: Some(federation),
     });
 
     // Create router with all endpoints wired to real handler functions
@@ -378,6 +406,23 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
             )
         },
     );
+
+    // OCSP endpoint (Phase F.2) — local-first, federation fallback.
+    let ctx_ocsp = Arc::clone(&ctx);
+    let router = router.post("/api/v1/trustchain/ocsp", move |req| {
+        let ctx = Arc::clone(&ctx_ocsp);
+        async move {
+            let rid = uuid::Uuid::new_v4().to_string();
+            let body: OcspHttpRequest = match parse_request_body(&req, &rid) {
+                Ok(b) => b,
+                Err(resp) => return resp,
+            };
+            match handlers::handle_ocsp(&ctx, body).await {
+                Ok(resp) => build_json_response(resp, rid),
+                Err(e) => build_error_response("OCSP_ERROR", e.to_string(), rid),
+            }
+        }
+    });
 
     // Auth certificate (stub)
 

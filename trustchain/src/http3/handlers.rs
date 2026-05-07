@@ -15,6 +15,8 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 
 use crate::ca::certificate_store::CertificateStore;
+use crate::ca::federation::FederationManager;
+use crate::ca::ocsp::{OcspCertStatus, OcspRequest, OcspResponder};
 use crate::ca::{CertificateRequest, CertificateStatus, IssuedCertificate, TrustChainCA};
 use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
@@ -113,6 +115,46 @@ pub struct HttpHandlerContext {
     pub certificate_store: Arc<CertificateStore>,
     pub security_monitor: Arc<SecurityMonitor>,
     pub start_time: std::time::Instant,
+    /// Optional OCSP responder (Phase F.2). When attached, the
+    /// `/api/v1/trustchain/ocsp` HTTP/3 endpoint serves real OCSP
+    /// responses; otherwise the endpoint returns NOT_IMPLEMENTED.
+    pub ocsp_responder: Option<Arc<OcspResponder>>,
+    /// Optional federation manager (Phase F.2). Required for OCSP
+    /// federation fallback.
+    pub federation: Option<Arc<FederationManager>>,
+}
+
+// ---------------------------------------------------------------------------
+// OCSP request / response wire types
+// ---------------------------------------------------------------------------
+
+/// HTTP/3 OCSP request body.  Mirrors [`OcspRequest`] but accepts hex
+/// strings for the issuer hashes so JSON callers can use them naturally.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcspHttpRequest {
+    pub serial_number: String,
+    /// Hex-encoded SHA-256 issuer name hash (optional, defaults to all
+    /// zeros when omitted — the responder does not enforce issuer
+    /// matching in alpha).
+    #[serde(default)]
+    pub issuer_name_hash_hex: Option<String>,
+    /// Hex-encoded SHA-256 issuer key hash (optional, see above).
+    #[serde(default)]
+    pub issuer_key_hash_hex: Option<String>,
+}
+
+/// HTTP/3 OCSP response body.  String discriminator instead of an enum
+/// because JSON readability matters more than type-system fidelity here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OcspHttpResponse {
+    /// One of `"good" | "revoked" | "unknown"`.
+    pub status: String,
+    /// Source of the verdict: `"local"` or `"federation"` (Phase F.2).
+    pub source: String,
+    pub serial_number: String,
+    pub responder_id: String,
+    /// Optional revocation reason when `status == "revoked"`.
+    pub reason: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +326,101 @@ pub async fn handle_dns_resolve(
         domain: req.domain,
         addresses: Vec::new(),
         ttl: 0,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// OCSP handler (Phase F.2)
+// ---------------------------------------------------------------------------
+
+/// Decode a hex-encoded SHA-256 hash, falling back to all zeros on
+/// missing or malformed input.  OCSP issuer hashes are advisory in our
+/// alpha and serve mostly as request identifiers; rejecting on malformed
+/// hashes would lock out clients that don't pre-compute them.
+fn parse_optional_hex_hash(hex_str: &Option<String>) -> [u8; 32] {
+    match hex_str {
+        Some(s) => {
+            let mut out = [0u8; 32];
+            match hex::decode(s) {
+                Ok(bytes) if bytes.len() == 32 => {
+                    out.copy_from_slice(&bytes);
+                    out
+                }
+                _ => out,
+            }
+        }
+        None => [0u8; 32],
+    }
+}
+
+/// Handle a `/api/v1/trustchain/ocsp` request.  Queries the local
+/// certificate store first; on Unknown, falls back to federation peers
+/// when both an `OcspResponder` and a `FederationManager` have been
+/// attached to the context (Phase F.2).
+pub async fn handle_ocsp(
+    ctx: &HttpHandlerContext,
+    req: OcspHttpRequest,
+) -> TrustChainResult<OcspHttpResponse> {
+    info!("Handler: OCSP query for serial={}", req.serial_number);
+
+    let responder = ctx
+        .ocsp_responder
+        .as_ref()
+        .ok_or_else(|| TrustChainError::Internal {
+            message: "OCSP responder not attached to handler context".into(),
+        })?;
+
+    let ocsp_req = OcspRequest {
+        serial_number: req.serial_number.clone(),
+        issuer_name_hash: parse_optional_hex_hash(&req.issuer_name_hash_hex),
+        issuer_key_hash: parse_optional_hex_hash(&req.issuer_key_hash_hex),
+    };
+
+    // 1. Fast path — local store via OcspResponder::check_status.
+    let local = responder
+        .check_status(&ocsp_req)
+        .await
+        .map_err(|e| TrustChainError::Internal {
+            message: format!("OCSP local check failed: {e}"),
+        })?;
+
+    let (status, source, reason) = match (&local.status, &ctx.federation) {
+        (OcspCertStatus::Unknown, Some(fed)) => {
+            // 2. Federation fallback (Phase F.2). Only when both
+            //    OcspResponder transport and FederationManager are
+            //    attached.  When transport is unset, federated_check
+            //    returns Unknown — keep the same answer but record the
+            //    source as `federation` for observability.
+            let fed_status = responder.federated_check(&req.serial_number, fed).await;
+            let r = if let OcspCertStatus::Revoked { reason, .. } = &fed_status {
+                Some(format!("{:?}", reason))
+            } else {
+                None
+            };
+            (fed_status, "federation".to_string(), r)
+        }
+        (other, _) => {
+            let r = if let OcspCertStatus::Revoked { reason, .. } = other {
+                Some(format!("{:?}", reason))
+            } else {
+                None
+            };
+            (other.clone(), "local".to_string(), r)
+        }
+    };
+
+    let status_label = match &status {
+        OcspCertStatus::Good => "good",
+        OcspCertStatus::Revoked { .. } => "revoked",
+        OcspCertStatus::Unknown => "unknown",
+    };
+
+    Ok(OcspHttpResponse {
+        status: status_label.to_string(),
+        source,
+        serial_number: req.serial_number,
+        responder_id: local.responder_id,
+        reason,
     })
 }
 
@@ -783,6 +920,8 @@ mod tests {
             certificate_store: Arc::new(store),
             security_monitor: Arc::new(security_monitor),
             start_time: std::time::Instant::now(),
+            ocsp_responder: None,
+            federation: None,
         };
 
         let result = handle_state_proof_status(&ctx)
@@ -812,6 +951,8 @@ mod tests {
             certificate_store: Arc::new(store),
             security_monitor: Arc::new(security_monitor),
             start_time: std::time::Instant::now(),
+            ocsp_responder: None,
+            federation: None,
         };
 
         let req = StateProofValidateRequest {
@@ -876,6 +1017,8 @@ mod tests {
             certificate_store: Arc::new(store),
             security_monitor: Arc::new(security_monitor),
             start_time: std::time::Instant::now(),
+            ocsp_responder: None,
+            federation: None,
         };
 
         let result = handle_list_certificates(&ctx)
@@ -925,6 +1068,8 @@ mod tests {
             certificate_store: Arc::new(store),
             security_monitor: Arc::new(security_monitor),
             start_time: std::time::Instant::now(),
+            ocsp_responder: None,
+            federation: None,
         };
 
         let result = handle_list_certificates(&ctx)

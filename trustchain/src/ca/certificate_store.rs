@@ -13,8 +13,11 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
+use super::crl::CrlDistributor;
+use super::federation::FederationManager;
 use super::{CertificateStatus, IssuedCertificate};
 use crate::errors::Result as TrustChainResult;
 
@@ -51,6 +54,14 @@ pub struct CertificateStore {
     revocations_path: PathBuf,
     /// Operation metrics
     metrics: Arc<CertificateStoreMetrics>,
+    /// Optional federation reference (Phase F.2). When set together
+    /// with [`Self::crl_distributor`], every successful revocation
+    /// auto-propagates to Full/Conditional peers via
+    /// `CrlDistributor::propagate_to_federation`.  Default unset: alpha
+    /// behaviour preserves single-node revocation flow.
+    federation: Arc<RwLock<Option<Arc<FederationManager>>>>,
+    /// Optional CRL distributor (Phase F.2). See [`Self::federation`].
+    crl_distributor: Arc<RwLock<Option<Arc<CrlDistributor>>>>,
 }
 
 impl CertificateStore {
@@ -68,12 +79,27 @@ impl CertificateStore {
             revocations: Arc::new(DashMap::new()),
             revocations_path,
             metrics: Arc::new(CertificateStoreMetrics::default()),
+            federation: Arc::new(RwLock::new(None)),
+            crl_distributor: Arc::new(RwLock::new(None)),
         };
 
         // Load persisted revocations from disk
         store.load_revocations();
 
         Ok(store)
+    }
+
+    /// Attach federation context for automatic CRL propagation on
+    /// revocation (Phase F.2). Both `federation` and `crl_distributor`
+    /// must be set together for propagation to fire.  Called once at
+    /// daemon startup; replacement is idempotent.
+    pub async fn set_federation(
+        &self,
+        federation: Arc<FederationManager>,
+        crl_distributor: Arc<CrlDistributor>,
+    ) {
+        *self.federation.write().await = Some(federation);
+        *self.crl_distributor.write().await = Some(crl_distributor);
     }
 
     /// Store certificate (indexed by serial number)
@@ -113,6 +139,10 @@ impl CertificateStore {
     /// Revoke certificate by serial number.
     ///
     /// Updates the in-memory store and flushes the revocation list to disk.
+    /// When federation context has been attached via
+    /// [`Self::set_federation`] (Phase F.2), the revocation is also
+    /// propagated to Full/Conditional federation peers via
+    /// `CrlDistributor::propagate_to_federation`.
     pub async fn revoke_certificate(
         &self,
         serial_number: &str,
@@ -130,7 +160,7 @@ impl CertificateStore {
         // Record in revocation list (persisted separately for restart survival)
         let entry = RevocationEntry {
             serial_number: serial_number.to_string(),
-            reason,
+            reason: reason.clone(),
             revoked_at,
         };
         self.revocations
@@ -144,6 +174,24 @@ impl CertificateStore {
         self.flush_revocations();
 
         info!("Certificate revoked: {}", serial_number);
+
+        // Phase F.2 — auto-propagate to federation if context attached.
+        // Both federation + crl_distributor must be set; otherwise the
+        // single-node alpha flow stands.
+        let fed = self.federation.read().await.as_ref().cloned();
+        let crl = self.crl_distributor.read().await.as_ref().cloned();
+        if let (Some(fed), Some(crl)) = (fed, crl) {
+            let targets = crl
+                .propagate_to_federation(serial_number, &reason, &fed)
+                .await;
+            if !targets.is_empty() {
+                info!(
+                    "Revocation propagated to {} federation peer(s)",
+                    targets.len()
+                );
+            }
+        }
+
         Ok(())
     }
 

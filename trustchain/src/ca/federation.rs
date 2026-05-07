@@ -364,6 +364,37 @@ impl FederationManager {
         Ok(())
     }
 
+    /// Check whether `cert_bytes` was signed by any trusted federated peer
+    /// (Phase F.2 cross-CA validation).
+    ///
+    /// Returns `true` iff at least one peer with `Full` or `Conditional`
+    /// trust holds a public key that successfully verifies the FALCON-1024
+    /// signature embedded in `cert_bytes` (wire format
+    /// `[4B sig_len LE][sig][cert body]`).
+    ///
+    /// Untrusted peers are skipped — their key material is retained for
+    /// auditing but cannot validate certificates.  Returns `false` if no
+    /// peer key matches, including when the cert body is malformed.
+    pub async fn is_federation_signed(&self, cert_bytes: &[u8]) -> bool {
+        let peers = self.peers.read().await;
+        for peer in peers.values() {
+            if matches!(peer.trust_level, FederationTrustLevel::Untrusted) {
+                continue;
+            }
+            if peer.public_key.is_empty() {
+                continue;
+            }
+            if Self::verify_falcon_signature(cert_bytes, &peer.public_key) {
+                debug!(
+                    "Cross-CA validation: cert signed by trusted peer '{}' ({:?})",
+                    peer.ca_id, peer.trust_level
+                );
+                return true;
+            }
+        }
+        false
+    }
+
     /// Validate a certificate issued by a federated peer CA.
     ///
     /// Looks up the peer, rejects if `Untrusted`, then verifies the FALCON-1024

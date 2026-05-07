@@ -32,6 +32,10 @@ pub(crate) const TAG_CA_KEY_SHARE: u8 = 0x30;
 pub(crate) const TAG_CA_SIGN_REQUEST: u8 = 0x31;
 /// Threshold signing response (distributed CA).
 pub(crate) const TAG_CA_SIGN_RESPONSE: u8 = 0x32;
+/// CRL fetch request (federated revocation lookup, Phase F.2).
+pub(crate) const TAG_CRL_REQUEST: u8 = 0x33;
+/// CRL fetch response (federated revocation lookup, Phase F.2).
+pub(crate) const TAG_CRL_RESPONSE: u8 = 0x34;
 /// Key rotation announcement (informational, not auth-gated).
 pub(crate) const TAG_KEY_ROTATION: u8 = 0x08;
 /// DNS resolution request (network fallback when local DNS misses).

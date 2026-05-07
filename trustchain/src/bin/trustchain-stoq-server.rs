@@ -14,7 +14,7 @@ use tracing::{error, info};
 
 use trustchain::{
     api::stoq_api::{TrustChainStoqApi, TrustChainStoqConfig},
-    ca::TrustChainCA,
+    ca::{certificate_store::CertificateStore, TrustChainCA},
     config::TrustChainConfig,
     dns::DnsResolver,
 };
@@ -65,6 +65,11 @@ async fn main() -> Result<()> {
     info!("Creating TrustChain STOQ API server...");
     let api = Arc::new(TrustChainStoqApi::new(ca, resolver, config).await?);
 
+    // Phase F.2 — register CRL lookup handler so federation peers can
+    // query our revocation list over STOQ (mirror of TAG_CRL_REQUEST 0x33).
+    let cert_store = Arc::new(CertificateStore::new().await?);
+    api.register_crl_handler(cert_store);
+
     info!("TrustChain STOQ server ready");
     info!("Listening on stoq://{}", stoq_bind);
     info!("Available STOQ endpoints:");
@@ -72,6 +77,7 @@ async fn main() -> Result<()> {
     info!("  - stoq://{}/trustchain/validate_certificate", stoq_bind);
     info!("  - stoq://{}/trustchain/issue_certificate", stoq_bind);
     info!("  - stoq://{}/trustchain/resolve_dns", stoq_bind);
+    info!("  - stoq://{}/trustchain/crl/lookup", stoq_bind);
     info!("Press Ctrl+C to shutdown gracefully");
 
     // Start server with graceful shutdown

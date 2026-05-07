@@ -670,12 +670,16 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 certificate signing in STOQ",
         "Threshold CA activation — split_ca_key() + sign_with_threshold() wire Shamir SSS into TrustChainCA",
         "FederationManager key share storage — store/get/remove/list KeyShares with fingerprint validation",
-        "CRL propagation to federation — propagate_to_federation() pushes revocations to Full+Conditional peers",
-        "OCSP federated check — federated_check() queries local store first, fallback to peers",
+        "CRL propagation to federation — CrlDistributor.propagate_to_federation() pushes revocations to Full+Conditional peers; with FederationOcspTransport attached, actually delivers over wire",
+        "OCSP federated check — federated_check() queries local store first; with FederationOcspTransport attached, polls Full/Conditional peers and returns Revoked on first hit, Unknown when all peers Unknown",
         "ThresholdSignCoordinator — broadcasts share-request via FederationTransport, awaits t-of-n responses with deadline, calls reconstruct_and_sign for FALCON-1024 signature",
         "TrustSignalProvider trait — pluggable engauge-driven trust gating in FederationManager.add_peer_with_proof",
         "engauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
-        "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback"
+        "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback",
+        "OCSP HTTP/3 endpoint with federation fallback — POST /api/v1/trustchain/ocsp serves real OcspResponder; on local Unknown, falls back to FederationOcspTransport peer queries when attached",
+        "CRL revocation auto-propagates to federation — CertificateStore.revoke_certificate calls CrlDistributor.propagate_to_federation when set_federation() context attached, alpha-default unchanged otherwise",
+        "Cross-CA cert validation — FederationManager.is_federation_signed verifies FALCON-1024 cert blob against any Full/Conditional peer's public key, rejects unknown signers and Untrusted peers",
+        "STOQ TAG_CRL_REQUEST/RESPONSE wire constants (0x33/0x34) and trustchain/crl/lookup STOQ API path — CrlLookupHandler exposes is_revoked + reason for federation peers"
       ],
       "inDevelopment": [
         "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
@@ -698,7 +702,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 69
+    "completion": 71
   },
   {
     "id": "ui",

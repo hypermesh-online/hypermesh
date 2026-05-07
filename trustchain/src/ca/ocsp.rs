@@ -11,11 +11,13 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::certificate_store::CertificateStore;
-use super::federation::FederationManager;
+use super::federation::{FederationManager, FederationTrustLevel};
 use super::stoq_ca_client::RevocationReason;
 use super::CertificateStatus;
 use crate::crypto::falcon::FalconCrypto;
@@ -67,6 +69,35 @@ pub struct OcspResponse {
     pub produced_at: SystemTime,
 }
 
+/// Pluggable transport used by [`OcspResponder::federated_check`] and
+/// [`CrlDistributor::propagate_to_federation`] to talk to federated peers
+/// over wire (Phase F.2).
+///
+/// Production wraps STOQ; tests use the in-memory mock below.  Returning
+/// `None` from `query_peer_revocation` means the peer answered "Unknown"
+/// (or did not respond before deadline).
+#[async_trait]
+pub trait FederationOcspTransport: Send + Sync {
+    /// Ask `peer_ca_id` whether `serial_number` is revoked.  Returns
+    /// `Some(status)` when the peer answers, `None` on timeout / no
+    /// answer / transport error.
+    async fn query_peer_revocation(
+        &self,
+        peer_ca_id: &str,
+        serial_number: &str,
+    ) -> Option<OcspCertStatus>;
+
+    /// Push a CRL revocation entry to `peer_ca_id`.  Returns `true` on
+    /// successful delivery, `false` otherwise.  In alpha this is best-
+    /// effort and failures are non-fatal.
+    async fn push_revocation(
+        &self,
+        peer_ca_id: &str,
+        serial_number: &str,
+        reason: &str,
+    ) -> bool;
+}
+
 /// OCSP Responder backed by the TrustChain certificate store.
 ///
 /// Checks certificate status against the in-memory store and returns
@@ -86,6 +117,11 @@ pub struct OcspResponder {
     responder_id: String,
     /// How long a response is considered valid.
     validity_period: Duration,
+    /// Optional federation transport (Phase F.2). When set,
+    /// [`Self::federated_check`] consults peers after the local store
+    /// returns Unknown.  When `None`, federated check stays local-only
+    /// (alpha default — preserves the existing single-node behaviour).
+    federation_transport: RwLock<Option<Arc<dyn FederationOcspTransport>>>,
 }
 
 impl OcspResponder {
@@ -120,7 +156,21 @@ impl OcspResponder {
             falcon,
             responder_id,
             validity_period: validity_period.unwrap_or_else(|| Duration::from_secs(3600)),
+            federation_transport: RwLock::new(None),
         })
+    }
+
+    /// Attach (or replace) the federation transport used by
+    /// [`Self::federated_check`] to query peers when the local store
+    /// returns Unknown (Phase F.2).
+    ///
+    /// Default behaviour without a transport set: local-only check (alpha
+    /// behaviour, mirrors the F.1 pattern of opt-in federation).
+    pub async fn set_federation_transport(
+        &self,
+        transport: Arc<dyn FederationOcspTransport>,
+    ) {
+        *self.federation_transport.write().await = Some(transport);
     }
 
     /// Check the revocation status of a certificate and return a signed response.
@@ -177,13 +227,18 @@ impl OcspResponder {
 
     /// Check certificate revocation status across the federation.
     ///
-    /// First checks the local certificate store. If the certificate is not
-    /// found locally, federation peers would be queried in production.
-    /// For alpha: returns Good if not locally revoked, Unknown if not found.
+    /// 1. Local store: if a matching cert is found, return its status.
+    /// 2. Federation: if a transport is attached (via
+    ///    [`Self::set_federation_transport`]) and the local store says
+    ///    Unknown, query each Full/Conditional peer.  Any peer reporting
+    ///    `Revoked` short-circuits the lookup.  If all peers report
+    ///    Unknown (or none answer), the result is Unknown.
+    /// 3. With no transport attached, behaviour is the alpha default —
+    ///    local-only — so single-node CAs preserve their existing flow.
     pub async fn federated_check(
         &self,
         serial_number: &str,
-        _federation: &FederationManager,
+        federation: &FederationManager,
     ) -> OcspCertStatus {
         // 1. Check local store first
         match self.store.get_certificate_by_serial(serial_number).await {
@@ -197,7 +252,7 @@ impl OcspResponder {
             }
             Ok(None) => {
                 debug!(
-                    "OCSP federated check: serial={} not found locally, would query federation",
+                    "OCSP federated check: serial={} not found locally, querying federation",
                     serial_number
                 );
             }
@@ -209,9 +264,59 @@ impl OcspResponder {
             }
         }
 
-        // 2. In production: query federation peers via STOQ for their OCSP status.
-        // For alpha: return Unknown for certificates not found locally.
-        OcspCertStatus::Unknown
+        // 2. Federation fallback (Phase F.2).  Only when a transport is
+        //    attached AND the federation has at least one trusted peer.
+        let transport = match self.federation_transport.read().await.as_ref().cloned() {
+            Some(t) => t,
+            None => {
+                debug!(
+                    "OCSP federated check: no transport attached, returning Unknown for {}",
+                    serial_number
+                );
+                return OcspCertStatus::Unknown;
+            }
+        };
+
+        let mut had_revoked = false;
+        let mut revoked_status = None;
+        for peer in federation.list_peers().await {
+            if matches!(peer.trust_level, FederationTrustLevel::Untrusted) {
+                continue;
+            }
+            match transport
+                .query_peer_revocation(&peer.ca_id, serial_number)
+                .await
+            {
+                Some(OcspCertStatus::Revoked { revocation_time, reason }) => {
+                    info!(
+                        "OCSP federated check: peer '{}' reports serial={} REVOKED",
+                        peer.ca_id, serial_number
+                    );
+                    had_revoked = true;
+                    revoked_status = Some(OcspCertStatus::Revoked {
+                        revocation_time,
+                        reason,
+                    });
+                    break;
+                }
+                Some(OcspCertStatus::Good) => {
+                    debug!(
+                        "OCSP federated check: peer '{}' reports serial={} GOOD",
+                        peer.ca_id, serial_number
+                    );
+                    // Don't return early — another peer may know it's revoked.
+                }
+                Some(OcspCertStatus::Unknown) | None => {
+                    // Peer didn't answer or doesn't know; keep polling others.
+                }
+            }
+        }
+
+        if had_revoked {
+            revoked_status.unwrap_or(OcspCertStatus::Unknown)
+        } else {
+            OcspCertStatus::Unknown
+        }
     }
 
     /// Map internal `CertificateStatus` to `OcspCertStatus`.

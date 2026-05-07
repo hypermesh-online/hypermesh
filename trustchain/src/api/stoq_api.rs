@@ -17,6 +17,7 @@ use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 use stoq::transport::{StoqTransport, TransportConfig};
 use stoq::StoqApiServer;
 
+use crate::ca::certificate_store::CertificateStore;
 use crate::ca::TrustChainCA;
 use crate::dns::DnsResolver;
 
@@ -410,6 +411,89 @@ impl ApiHandler for TrustChainHealthHandler {
     }
 }
 
+// === CRL lookup handler (Phase F.2) ===
+
+/// CRL lookup request — returns whether a certificate serial is revoked
+/// according to this node's local revocation list.  Used by federation
+/// peers to fulfil OCSP federated_check fallback queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrlLookupRequest {
+    pub serial_number: String,
+}
+
+/// CRL lookup response — `revoked = true` iff the serial appears in the
+/// local revocation list.  `reason` is `Some` only when the certificate
+/// is currently in revoked state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrlLookupResponse {
+    pub serial_number: String,
+    pub revoked: bool,
+    pub reason: Option<String>,
+}
+
+/// STOQ handler for `trustchain/crl/lookup` (Phase F.2).  This is the
+/// path-based mirror of the wire-protocol `TAG_CRL_REQUEST` byte (0x33)
+/// — same semantics, different transport.  Mounted opt-in via
+/// [`TrustChainStoqApi::register_crl_handler`].
+pub struct CrlLookupHandler {
+    store: Arc<CertificateStore>,
+}
+
+impl CrlLookupHandler {
+    pub fn new(store: Arc<CertificateStore>) -> Self {
+        Self { store }
+    }
+}
+
+#[async_trait]
+impl ApiHandler for CrlLookupHandler {
+    async fn handle(&self, request: ApiRequest) -> Result<ApiResponse, ApiError> {
+        debug!("Handling CRL lookup request: {}", request.id);
+
+        let lookup: CrlLookupRequest = serde_json::from_slice(&request.payload)
+            .map_err(|e| ApiError::InvalidRequest(format!("Invalid CRL lookup request: {e}")))?;
+
+        let revoked = self.store.is_revoked(&lookup.serial_number);
+        let reason = if revoked {
+            // Try to surface the revocation reason from the cert store.
+            match self
+                .store
+                .get_certificate_by_serial(&lookup.serial_number)
+                .await
+            {
+                Ok(Some(cert)) => match cert.status {
+                    crate::ca::CertificateStatus::Revoked { reason, .. } => Some(reason),
+                    _ => None,
+                },
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        let response = CrlLookupResponse {
+            serial_number: lookup.serial_number,
+            revoked,
+            reason,
+        };
+
+        let payload = serde_json::to_vec(&response)
+            .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+
+        Ok(ApiResponse {
+            request_id: request.id,
+            success: true,
+            payload: payload.into(),
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        })
+    }
+
+    fn path(&self) -> &str {
+        "trustchain/crl/lookup"
+    }
+}
+
 // === Server ===
 
 /// TrustChain STOQ API Server
@@ -495,6 +579,16 @@ impl TrustChainStoqApi {
             server,
             _config: config,
         })
+    }
+
+    /// Register the CRL lookup handler (Phase F.2).  Opt-in: the binary
+    /// passes its `CertificateStore` to enable peer-driven federated
+    /// revocation queries.  Without this call the server runs in the
+    /// alpha single-node default.
+    pub fn register_crl_handler(&self, store: Arc<CertificateStore>) {
+        self.server
+            .register_handler(Arc::new(CrlLookupHandler::new(store)));
+        info!("TrustChain STOQ CRL lookup handler registered (path: trustchain/crl/lookup)");
     }
 
     /// Start the API server

@@ -18,6 +18,7 @@ use tracing::{debug, info, warn};
 
 use super::certificate_store::CertificateStore;
 use super::federation::{FederationManager, FederationTrustLevel};
+use super::ocsp::FederationOcspTransport;
 use super::stoq_ca_client::RevocationReason;
 use super::CertificateStatus;
 use crate::crypto::falcon::FalconCrypto;
@@ -227,6 +228,11 @@ impl CrlGenerator {
 pub struct CrlDistributor {
     /// The latest published CRL.
     latest_crl: Arc<RwLock<Option<CertificateRevocationList>>>,
+    /// Optional federation transport (Phase F.2). When set,
+    /// [`Self::propagate_to_federation`] actually pushes the revocation
+    /// over wire to each Full/Conditional peer. When unset (alpha
+    /// default), behaviour is unchanged: it logs and returns peer IDs.
+    federation_transport: Arc<RwLock<Option<Arc<dyn FederationOcspTransport>>>>,
 }
 
 impl CrlDistributor {
@@ -234,7 +240,21 @@ impl CrlDistributor {
     pub fn new() -> Self {
         Self {
             latest_crl: Arc::new(RwLock::new(None)),
+            federation_transport: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Attach (or replace) the federation transport used by
+    /// [`Self::propagate_to_federation`] (Phase F.2).
+    ///
+    /// Default behaviour without a transport is the alpha pattern:
+    /// `propagate_to_federation` only logs and returns the target list.
+    /// With a transport set, it actively pushes revocations over wire.
+    pub async fn set_federation_transport(
+        &self,
+        transport: Arc<dyn FederationOcspTransport>,
+    ) {
+        *self.federation_transport.write().await = Some(transport);
     }
 
     /// Publish a new CRL, replacing the previous one.
@@ -272,29 +292,51 @@ impl CrlDistributor {
     /// Propagate a CRL update to federation peers.
     ///
     /// Each peer with Full or Conditional trust receives a notification.
-    /// In alpha: this logs the propagation. In production: would send via STOQ.
-    /// Returns the list of CA IDs that were targeted for propagation.
+    /// When a federation transport is attached (Phase F.2), the
+    /// revocation is pushed over wire and only successful pushes are
+    /// returned.  Without a transport, behaviour matches the alpha
+    /// default — log and return the targeted peers.
     pub async fn propagate_to_federation(
         &self,
         revoked_serial: &str,
         reason: &str,
         federation: &FederationManager,
     ) -> Vec<String> {
+        let transport = self.federation_transport.read().await.as_ref().cloned();
         let mut propagated_to = Vec::new();
 
         for peer in federation.list_peers().await {
-            if peer.trust_level == FederationTrustLevel::Full
-                || peer.trust_level == FederationTrustLevel::Conditional
-            {
-                // In production: send CRL update via STOQ stream
-                // For alpha: log the propagation target
-                info!(
-                    "CRL propagated to federation peer {} (serial: {}, reason: {})",
-                    &peer.ca_id[..8.min(peer.ca_id.len())],
-                    revoked_serial,
-                    reason
-                );
-                propagated_to.push(peer.ca_id.clone());
+            if !matches!(
+                peer.trust_level,
+                FederationTrustLevel::Full | FederationTrustLevel::Conditional
+            ) {
+                continue;
+            }
+
+            let short_id = &peer.ca_id[..8.min(peer.ca_id.len())];
+            match &transport {
+                Some(t) => {
+                    if t.push_revocation(&peer.ca_id, revoked_serial, reason).await {
+                        info!(
+                            "CRL propagated to federation peer {} via transport (serial: {}, reason: {})",
+                            short_id, revoked_serial, reason
+                        );
+                        propagated_to.push(peer.ca_id.clone());
+                    } else {
+                        warn!(
+                            "CRL propagation FAILED for peer {} (serial: {}, reason: {})",
+                            short_id, revoked_serial, reason
+                        );
+                    }
+                }
+                None => {
+                    // Alpha default: log + record target without actual wire push.
+                    info!(
+                        "CRL propagated to federation peer {} (serial: {}, reason: {})",
+                        short_id, revoked_serial, reason
+                    );
+                    propagated_to.push(peer.ca_id.clone());
+                }
             }
         }
 
