@@ -10,6 +10,7 @@ pub mod asset;
 pub mod auth;
 pub mod blockchain;
 pub mod caesar;
+pub mod capability_registry;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
@@ -106,6 +107,18 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     system::register(handler, &state);
     auth::register(handler, &state);
     config::register(handler);
+
+    // Phase K.2 — install capability enforcement when the daemon was
+    // started with an issuer. Alpha-default inert: when no issuer is
+    // configured, the handler dispatches with no token check (preserves
+    // pre-K.2 localhost-only IPC behavior).
+    if let Some(issuer) = state.capability_token_issuer.as_ref() {
+        let ctx = crate::ipc::handler::CapabilityContext::new(
+            issuer.as_ref(),
+            state.revocation_registry.clone(),
+        );
+        handler.set_capability_context(ctx);
+    }
 }
 
 #[cfg(test)]

@@ -47,6 +47,18 @@ type Client struct {
 	TrustChain *TrustChainApi
 	Engauge    *EngaugeApi
 	Catalog    *CatalogApi
+
+	// httpClients tracks every transport so SetCapabilityToken can
+	// rotate the K.2 token across the whole client in one call.
+	httpClients []*httpClient
+}
+
+// SetCapabilityToken installs (or rotates) the Phase K.2 capability
+// token on every underlying transport. Pass an empty string to clear it.
+func (c *Client) SetCapabilityToken(token string) {
+	for _, h := range c.httpClients {
+		h.SetCapabilityToken(token)
+	}
 }
 
 // Option configures the Client.
@@ -59,6 +71,19 @@ type clientConfig struct {
 	catalogURL    string
 	engaugeURL    string
 	httpClient    *http.Client
+	// sessionToken — Phase K.2 capability token (base64 of serialized
+	// CapabilityToken). When set, every request carries the
+	// X-HyperMesh-Capability header.
+	sessionToken string
+}
+
+// WithSessionToken — Phase K.2 — install a capability token at client
+// construction time. Required when connecting to a daemon configured
+// for token enforcement; ignored by alpha-default inert daemons.
+func WithSessionToken(token string) Option {
+	return func(cfg *clientConfig) {
+		cfg.sessionToken = token
+	}
 }
 
 // WithHTTPClient sets a custom http.Client for all requests.
@@ -136,19 +161,28 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	catalogH := newHTTPClient(cfg.catalogURL, cfg.httpClient)
 	engaugeH := newHTTPClient(cfg.engaugeURL, cfg.httpClient)
 
+	allTransports := []*httpClient{h, caesarH, trustChainH, catalogH, engaugeH}
+	// Phase K.2 — install the session token on every transport.
+	if cfg.sessionToken != "" {
+		for _, hc := range allTransports {
+			hc.SetCapabilityToken(cfg.sessionToken)
+		}
+	}
+
 	return &Client{
-		Node:       &NodeApi{http: h},
-		Blockchain: &BlockchainApi{http: h},
-		Dns:        &DnsApi{http: h},
-		Network:    &NetworkApi{http: h},
-		Topology:   &TopologyApi{http: h},
-		Asset:      &AssetApi{http: h},
-		Dashboard:  &DashboardApi{http: h},
-		Config:     &ConfigApi{http: h},
-		Domain:     &DomainApi{http: h},
-		Caesar:     &CaesarApi{http: caesarH},
-		TrustChain: &TrustChainApi{http: trustChainH},
-		Engauge:    &EngaugeApi{http: engaugeH},
-		Catalog:    &CatalogApi{http: catalogH},
+		Node:        &NodeApi{http: h},
+		Blockchain:  &BlockchainApi{http: h},
+		Dns:         &DnsApi{http: h},
+		Network:     &NetworkApi{http: h},
+		Topology:    &TopologyApi{http: h},
+		Asset:       &AssetApi{http: h},
+		Dashboard:   &DashboardApi{http: h},
+		Config:      &ConfigApi{http: h},
+		Domain:      &DomainApi{http: h},
+		Caesar:      &CaesarApi{http: caesarH},
+		TrustChain:  &TrustChainApi{http: trustChainH},
+		Engauge:     &EngaugeApi{http: engaugeH},
+		Catalog:     &CatalogApi{http: catalogH},
+		httpClients: allTransports,
 	}
 }

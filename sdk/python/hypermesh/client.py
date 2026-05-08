@@ -14,13 +14,36 @@ from .errors import ApiError, ConnectionError, HyperMeshError, NotFoundError
 
 _TIMEOUT_SECS = 30
 
+#: Phase K.2 — header used to ship the capability token on HTTP requests.
+CAPABILITY_TOKEN_HEADER = "X-HyperMesh-Capability"
+
 
 class SyncTransport:
-    """Synchronous HTTP transport using urllib (zero dependencies)."""
+    """Synchronous HTTP transport using urllib (zero dependencies).
 
-    def __init__(self, base_url: str, timeout: float = _TIMEOUT_SECS) -> None:
+    Phase K.2 — accepts an optional ``capability_token`` (base64 of a
+    serialized ``CapabilityToken``). When set, every request carries the
+    ``X-HyperMesh-Capability`` header. Pre-K.2 daemons (alpha-default
+    inert) ignore the header so untokened SDK calls continue to work.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = _TIMEOUT_SECS,
+        *,
+        capability_token: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
+        self._capability_token = capability_token
+
+    def set_capability_token(self, token: str | None) -> None:
+        """Install or rotate the capability token (Phase K.2)."""
+        self._capability_token = token
+
+    def get_capability_token(self) -> str | None:
+        return self._capability_token
 
     def get(self, path: str) -> Any:
         return self._request("GET", path)
@@ -36,7 +59,11 @@ class SyncTransport:
     ) -> Any:
         url = f"{self._base_url}{path}"
         data = json.dumps(body).encode() if body is not None else None
-        headers = {"Content-Type": "application/json"} if data else {}
+        headers: dict[str, str] = {}
+        if data:
+            headers["Content-Type"] = "application/json"
+        if self._capability_token:
+            headers[CAPABILITY_TOKEN_HEADER] = self._capability_token
 
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
@@ -64,12 +91,29 @@ class SyncTransport:
 
 
 class AsyncTransport:
-    """Async HTTP transport using httpx."""
+    """Async HTTP transport using httpx.
 
-    def __init__(self, base_url: str, timeout: float = _TIMEOUT_SECS) -> None:
+    Phase K.2 — see :class:`SyncTransport` for capability-token semantics.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = _TIMEOUT_SECS,
+        *,
+        capability_token: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._client: Any = None
+        self._capability_token = capability_token
+
+    def set_capability_token(self, token: str | None) -> None:
+        """Install or rotate the capability token (Phase K.2)."""
+        self._capability_token = token
+
+    def get_capability_token(self) -> str | None:
+        return self._capability_token
 
     async def _ensure_client(self) -> Any:
         if self._client is None:
@@ -107,8 +151,11 @@ class AsyncTransport:
             ) from exc
 
         client = await self._ensure_client()
+        headers: dict[str, str] = {}
+        if self._capability_token:
+            headers[CAPABILITY_TOKEN_HEADER] = self._capability_token
         try:
-            resp = await client.request(method, path, json=body)
+            resp = await client.request(method, path, json=body, headers=headers)
             if resp.status_code == 404:
                 msg = "Resource not found"
                 try:

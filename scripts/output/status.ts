@@ -202,7 +202,11 @@ export const crateStatuses: CrateStatus[] = [
         "Light node mode (--mode light) — HeaderSyncManager + WitnessedProofVerifier, header-only sync, no shard/pipeline state (alpha ships flag + types + tests; full startup minimization staged as K.1.5)",
         "Capability tokens — FALCON-signed CapabilityToken with ViewOnly/Wallet/AssetWrite/Admin scopes, bound to device pubkey, daemon verification, RevocationRegistry, validate() composite check",
         "auth.create_session/list_sessions/revoke_session IPC — admin-issued tokens, alpha-default inert when capability_token_issuer is None",
-        "SessionAudit chain entry — every session creation/revocation/capability-use recorded as Identity-category BlockAssetEntry with versioned JSON payload for user-side audit trail"
+        "SessionAudit chain entry — every session creation/revocation/capability-use recorded as Identity-category BlockAssetEntry with versioned JSON payload for user-side audit trail",
+        "Capability-token IPC middleware — enforces required scope per method via fail-closed registry; CAPABILITY_DENIED (-32004) on missing/expired/revoked/insufficient-scope; alpha-default skips when capability_token_issuer is None",
+        "Method-to-capability registry — explicit ViewOnly/Wallet/AssetWrite/Admin mapping for 50+ IPC methods, fail-closed Admin default for unknown",
+        "RpcRequest.capability_token optional field — backward-compat with pre-K.2 clients (None bypasses enforcement when issuer not configured); RpcRequest::new_with_token() helper for SDKs",
+        "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
@@ -411,9 +415,15 @@ export const crateStatuses: CrateStatus[] = [
         "DNS-over-HTTPS (DoH) endpoint — JSON-based DNS query/response for browser-compatible resolution",
         "Host→DNS resolution — extract_subdomain() maps Host header to blockchain DNS entries",
         "Dynamic per-domain TLS certificates — generate_domain_cert() creates ECDSA P-256 self-signed certs on demand",
-        "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing"
+        "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing",
+        "RemoteDashboardProxy (alpha structure) — Kyber-1024 KEM + AES-GCM tunnel via KyberAesTunnel trait; gateway is byte-forwarder only, sees ciphertext on wire (MockTunnel ships for K.2 tests; real KyberKemTunnel wiring staged as K.2.5)",
+        "Three remote-dashboard modes — DashboardServeMode::TrustProxy / PrivateDomain / SelfHosted (parses --dashboard-mode CLI flag)",
+        "RemoteProxyManager — per-session tunnel registry with register/get/close/reap_inactive lifecycle",
+        "ForwardedRequest/ForwardedResponse — minimal HTTP envelope shape forwarded over the E2E tunnel"
       ],
       "inDevelopment": [
+        "Kyber-1024 KEM tunnel wiring — KyberKemTunnel constructor returns error pending K.2.5 (wire to trustchain::crypto::KyberCrypto + AES-GCM symmetric)",
+        "STOQ wire path for RemoteDashboardProxy — currently uses simulate_wire_loopback; K.2.5 routes ciphertext through STOQ unidirectional streams to target node",
         "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
@@ -426,7 +436,7 @@ export const crateStatuses: CrateStatus[] = [
         "Bootstrap token flow — HTTP/3 side issues tokens but validation path beyond self-serve PoS handshake not implemented"
       ]
     },
-    "completion": 77
+    "completion": 76
   },
   {
     "id": "hypermesh",

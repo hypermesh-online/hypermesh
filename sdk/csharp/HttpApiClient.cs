@@ -9,8 +9,15 @@ namespace HyperMesh.Sdk;
 /// </summary>
 internal sealed class HttpApiClient : IDisposable
 {
+    /// <summary>
+    /// Phase K.2 — header used to ship the capability token on HTTP
+    /// requests to the gateway.
+    /// </summary>
+    public const string CapabilityTokenHeader = "X-HyperMesh-Capability";
+
     private readonly HttpClient _http;
     private readonly string _baseUrl;
+    private string? _capabilityToken; // Phase K.2
     private bool _disposed;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -19,19 +26,38 @@ internal sealed class HttpApiClient : IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
-    public HttpApiClient(string baseUrl, HttpClient? httpClient = null)
+    public HttpApiClient(string baseUrl, HttpClient? httpClient = null, string? capabilityToken = null)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _http = httpClient ?? new HttpClient();
+        _capabilityToken = capabilityToken;
+    }
+
+    /// <summary>
+    /// Phase K.2 — install or rotate the capability token. Pass null to clear.
+    /// </summary>
+    public void SetCapabilityToken(string? token) => _capabilityToken = token;
+
+    /// <summary>Currently-installed capability token (or null).</summary>
+    public string? GetCapabilityToken() => _capabilityToken;
+
+    private void AttachCapabilityHeader(HttpRequestMessage request)
+    {
+        if (!string.IsNullOrEmpty(_capabilityToken))
+        {
+            request.Headers.Add(CapabilityTokenHeader, _capabilityToken);
+        }
     }
 
     public async Task<T> GetAsync<T>(string path, CancellationToken ct = default)
     {
         var url = $"{_baseUrl}{path}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        AttachCapabilityHeader(request);
         HttpResponseMessage response;
         try
         {
-            response = await _http.GetAsync(url, ct).ConfigureAwait(false);
+            response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
@@ -44,10 +70,15 @@ internal sealed class HttpApiClient : IDisposable
     public async Task<T> PostAsync<T>(string path, object body, CancellationToken ct = default)
     {
         var url = $"{_baseUrl}{path}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body, options: JsonOptions),
+        };
+        AttachCapabilityHeader(request);
         HttpResponseMessage response;
         try
         {
-            response = await _http.PostAsJsonAsync(url, body, JsonOptions, ct).ConfigureAwait(false);
+            response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
@@ -60,10 +91,15 @@ internal sealed class HttpApiClient : IDisposable
     public async Task PostAsync(string path, object body, CancellationToken ct = default)
     {
         var url = $"{_baseUrl}{path}";
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = JsonContent.Create(body, options: JsonOptions),
+        };
+        AttachCapabilityHeader(request);
         HttpResponseMessage response;
         try
         {
-            response = await _http.PostAsJsonAsync(url, body, JsonOptions, ct).ConfigureAwait(false);
+            response = await _http.SendAsync(request, ct).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {

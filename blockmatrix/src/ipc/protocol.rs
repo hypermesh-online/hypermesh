@@ -17,6 +17,11 @@ pub const INTERNAL_ERROR: i64 = -32603;
 // HyperMesh-specific error codes
 pub const DAEMON_NOT_RUNNING: i64 = -32000;
 
+/// Phase K.2 — capability denied. Mirror of
+/// [`crate::ipc::handlers::auth::CAPABILITY_DENIED`] re-exported here so
+/// callers and tests don't have to reach into the auth handler module.
+pub const CAPABILITY_DENIED: i64 = -32004;
+
 /// Phase J.1 — IPC protocol version mismatch (CLI/daemon major version
 /// disagree). The error message hints the caller to upgrade.
 pub const PROTOCOL_VERSION_MISMATCH: i64 = -32100;
@@ -63,6 +68,15 @@ pub struct RpcRequest {
     /// backwards-compat with pre-J.1 clients.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub protocol_version: Option<String>,
+    /// Phase K.2 — optional capability token (base64 of serialized
+    /// `CapabilityToken`). When the daemon is configured for token
+    /// enforcement (`state.capability_token_issuer.is_some()`),
+    /// requests without a token, or with insufficient scope, are
+    /// rejected with [`CAPABILITY_DENIED`]. Pre-K.2 clients that omit
+    /// the field are accepted only when enforcement is not configured
+    /// (alpha-default inert behavior).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_token: Option<String>,
 }
 
 impl RpcRequest {
@@ -76,6 +90,25 @@ impl RpcRequest {
             params,
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
+            capability_token: None,
+        }
+    }
+
+    /// Phase K.2 — variant of [`RpcRequest::new`] that includes a base64
+    /// capability token. Used by SDKs that have a token from
+    /// `auth.create_session`.
+    pub fn new_with_token(
+        method: &str,
+        params: serde_json::Value,
+        capability_token: String,
+    ) -> Self {
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            method: method.to_string(),
+            params,
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
+            capability_token: Some(capability_token),
         }
     }
 
@@ -90,6 +123,7 @@ impl RpcRequest {
             params,
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             protocol_version: None,
+            capability_token: None,
         }
     }
 }

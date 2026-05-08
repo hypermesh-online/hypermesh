@@ -227,6 +227,11 @@ HttpClient::HttpResponse HttpClient::send_request(
         req << "Content-Length: " << body.size() << "\r\n";
     }
 
+    // Phase K.2 — capability token (alpha-default inert when empty).
+    if (!capability_token_.empty()) {
+        req << kCapabilityTokenHeader << ": " << capability_token_ << "\r\n";
+    }
+
     req << "\r\n";
     if (!body.empty()) {
         req << body;

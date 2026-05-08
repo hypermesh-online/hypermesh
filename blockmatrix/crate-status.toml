@@ -221,6 +221,11 @@ items = [
     "Capability tokens — FALCON-signed CapabilityToken with ViewOnly/Wallet/AssetWrite/Admin scopes, bound to device pubkey, daemon verification, RevocationRegistry, validate() composite check",
     "auth.create_session/list_sessions/revoke_session IPC — admin-issued tokens, alpha-default inert when capability_token_issuer is None",
     "SessionAudit chain entry — every session creation/revocation/capability-use recorded as Identity-category BlockAssetEntry with versioned JSON payload for user-side audit trail",
+    # Phase K.2 — capability-token IPC enforcement + SDK integration
+    "Capability-token IPC middleware — enforces required scope per method via fail-closed registry; CAPABILITY_DENIED (-32004) on missing/expired/revoked/insufficient-scope; alpha-default skips when capability_token_issuer is None",
+    "Method-to-capability registry — explicit ViewOnly/Wallet/AssetWrite/Admin mapping for 50+ IPC methods, fail-closed Admin default for unknown",
+    "RpcRequest.capability_token optional field — backward-compat with pre-K.2 clients (None bypasses enforcement when issuer not configured); RpcRequest::new_with_token() helper for SDKs",
+    "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure",
 ]
 
 [features.in_development]

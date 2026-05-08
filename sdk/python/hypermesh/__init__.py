@@ -27,7 +27,13 @@ Usage::
 
 from __future__ import annotations
 
-from .client import AsyncTransport, SyncTransport
+from typing import Any
+
+from .client import (
+    AsyncTransport,
+    CAPABILITY_TOKEN_HEADER,
+    SyncTransport,
+)
 from .errors import ApiError, ConnectionError, HyperMeshError, NotFoundError
 from .ffi import FFIError, HyperMeshFFI, LibraryNotFoundError
 from .types import (
@@ -98,6 +104,12 @@ class HyperMeshClient:
         methods become coroutines.
     timeout:
         Request timeout in seconds.
+    session_token:
+        Phase K.2 — base64-encoded ``CapabilityToken`` issued by the
+        daemon's ``auth.create_session`` IPC. When set, every request
+        carries the ``X-HyperMesh-Capability`` header. Required when
+        the daemon is configured for token enforcement; ignored by
+        alpha-default inert daemons.
     """
 
     def __init__(
@@ -110,16 +122,28 @@ class HyperMeshClient:
         engauge_url: str = _DEFAULT_ENGAUGE_URL,
         async_mode: bool = False,
         timeout: float = 30.0,
+        session_token: str | None = None,
     ) -> None:
         self._base_url = base_url
         self._async_mode = async_mode
+        self._session_token = session_token
 
         if async_mode:
-            transport = AsyncTransport(base_url, timeout=timeout)
-            caesar_transport = AsyncTransport(caesar_url, timeout=timeout)
-            trustchain_transport = AsyncTransport(trustchain_url, timeout=timeout)
-            catalog_transport = AsyncTransport(catalog_url, timeout=timeout)
-            engauge_transport = AsyncTransport(engauge_url, timeout=timeout)
+            transport = AsyncTransport(
+                base_url, timeout=timeout, capability_token=session_token
+            )
+            caesar_transport = AsyncTransport(
+                caesar_url, timeout=timeout, capability_token=session_token
+            )
+            trustchain_transport = AsyncTransport(
+                trustchain_url, timeout=timeout, capability_token=session_token
+            )
+            catalog_transport = AsyncTransport(
+                catalog_url, timeout=timeout, capability_token=session_token
+            )
+            engauge_transport = AsyncTransport(
+                engauge_url, timeout=timeout, capability_token=session_token
+            )
             self._async_transport = transport
             self._async_service_transports = [
                 caesar_transport,
@@ -156,7 +180,9 @@ class HyperMeshClient:
             self.engauge = AsyncEngaugeApi(engauge_transport)
             self.catalog = AsyncCatalogApi(catalog_transport)
         else:
-            transport = SyncTransport(base_url, timeout=timeout)  # type: ignore[assignment]
+            transport = SyncTransport(  # type: ignore[assignment]
+                base_url, timeout=timeout, capability_token=session_token
+            )
             self._async_transport = None
             self._async_service_transports = []
 
@@ -184,17 +210,109 @@ class HyperMeshClient:
             self.config = ConfigApi(transport)
             self.domain = DomainApi(transport)
             self.caesar = CaesarApi(
-                SyncTransport(caesar_url, timeout=timeout)
+                SyncTransport(
+                    caesar_url, timeout=timeout, capability_token=session_token
+                )
             )
             self.trustchain = TrustChainApi(
-                SyncTransport(trustchain_url, timeout=timeout)
+                SyncTransport(
+                    trustchain_url, timeout=timeout, capability_token=session_token
+                )
             )
             self.engauge = EngaugeApi(
-                SyncTransport(engauge_url, timeout=timeout)
+                SyncTransport(
+                    engauge_url, timeout=timeout, capability_token=session_token
+                )
             )
             self.catalog = CatalogApi(
-                SyncTransport(catalog_url, timeout=timeout)
+                SyncTransport(
+                    catalog_url, timeout=timeout, capability_token=session_token
+                )
             )
+
+        # Track every transport so set_capability_token can rotate the
+        # token across the whole client in one call.
+        self._all_transports: list[Any] = []
+        for service_attr in (
+            "node",
+            "blockchain",
+            "dns",
+            "network",
+            "topology",
+            "asset",
+            "dashboard",
+            "config",
+            "domain",
+            "caesar",
+            "trustchain",
+            "engauge",
+            "catalog",
+        ):
+            api = getattr(self, service_attr, None)
+            if api is None:
+                continue
+            t = getattr(api, "_transport", None)
+            if t is not None and t not in self._all_transports:
+                self._all_transports.append(t)
+
+    def set_capability_token(self, token: str | None) -> None:
+        """Phase K.2 — rotate the capability token on every transport.
+
+        Pass ``None`` to clear the token (e.g. after revocation).
+        """
+        self._session_token = token
+        for t in self._all_transports:
+            if hasattr(t, "set_capability_token"):
+                t.set_capability_token(token)
+
+    def get_capability_token(self) -> str | None:
+        """Phase K.2 — currently-installed token (or None)."""
+        return self._session_token
+
+    def auth_create_session(
+        self,
+        device_pubkey_hex: str,
+        requested_capabilities: list[str],
+        ttl_secs: int = 3600,
+    ) -> Any:
+        """Phase K.2 — issue a capability token via the daemon.
+
+        Returns the raw JSON payload from ``auth.create_session``. The
+        caller typically passes the returned token bytes (base64
+        encoded) into :meth:`set_capability_token`.
+
+        Sync clients only — async clients should call the underlying
+        transport directly.
+        """
+        if self._async_mode:
+            raise NotImplementedError(
+                "auth_create_session is sync-only; use the underlying "
+                "AsyncTransport.post('/api/v1/auth/create_session', ...)"
+            )
+        sync_t = self._all_transports[0]
+        return sync_t.post(
+            "/api/v1/auth/create_session",
+            {
+                "device_pubkey": device_pubkey_hex,
+                "requested_capabilities": requested_capabilities,
+                "ttl_secs": ttl_secs,
+            },
+        )
+
+    def auth_list_sessions(self) -> Any:
+        """Phase K.2 — list active sessions known to the daemon."""
+        if self._async_mode:
+            raise NotImplementedError("auth_list_sessions is sync-only")
+        return self._all_transports[0].get("/api/v1/auth/list_sessions")
+
+    def auth_revoke_session(self, session_id: str) -> Any:
+        """Phase K.2 — revoke a session by id."""
+        if self._async_mode:
+            raise NotImplementedError("auth_revoke_session is sync-only")
+        return self._all_transports[0].post(
+            "/api/v1/auth/revoke_session",
+            {"session_id": session_id},
+        )
 
     async def close(self) -> None:
         """Close all async transports. No-op for sync clients."""
@@ -217,6 +335,7 @@ __all__ = [
     "ApiError",
     "ConnectionError",
     "NotFoundError",
+    "CAPABILITY_TOKEN_HEADER",
     "NodeStatus",
     "BlockchainHeight",
     "Block",

@@ -18,6 +18,7 @@ pub mod outbound;
 pub mod pool;
 pub mod proxy;
 pub mod rate_limiter;
+pub mod remote_proxy;
 pub mod router;
 pub mod scope_bridge_proxy;
 pub mod scope_router;

@@ -12,8 +12,19 @@ namespace hypermesh {
 /// Supports GET and POST with JSON bodies. No external dependencies.
 class HttpClient {
 public:
+    /// Phase K.2 — header used to ship the capability token on HTTP
+    /// requests to the gateway.
+    static constexpr const char* kCapabilityTokenHeader = "X-HyperMesh-Capability";
+
     /// Construct with base URL, e.g. "https://localhost:8443".
     explicit HttpClient(const std::string& base_url);
+
+    /// Phase K.2 — install or rotate the capability token. Pass an
+    /// empty string to clear it.
+    void set_capability_token(const std::string& token) { capability_token_ = token; }
+
+    /// Currently-installed capability token (or empty string).
+    const std::string& capability_token() const { return capability_token_; }
 
     /// Perform a GET request. Returns parsed JSON response body.
     nlohmann::json get(const std::string& path) const;
@@ -32,6 +43,7 @@ private:
     std::string host_;
     int port_ = 80;
     std::string scheme_;
+    std::string capability_token_;  // Phase K.2
 
     HttpResponse send_request(const std::string& method,
                               const std::string& path,
