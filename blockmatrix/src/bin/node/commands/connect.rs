@@ -198,6 +198,7 @@ pub async fn run_connect(
         transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
+            release_feed_subscriber: None,
         receipt_validator: std::sync::Arc::new(
             blockmatrix::assets::cross_chain::CrossChainReceiptValidator::new(),
         ),

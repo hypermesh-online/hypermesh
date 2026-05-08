@@ -17,34 +17,88 @@ pub const INTERNAL_ERROR: i64 = -32603;
 // HyperMesh-specific error codes
 pub const DAEMON_NOT_RUNNING: i64 = -32000;
 
+/// Phase J.1 — IPC protocol version mismatch (CLI/daemon major version
+/// disagree). The error message hints the caller to upgrade.
+pub const PROTOCOL_VERSION_MISMATCH: i64 = -32100;
+
 /// JSON-RPC 2.0 version string.
 const JSONRPC_VERSION: &str = "2.0";
+
+/// Phase J.1 — current IPC protocol version (semver-tracked; tied to
+/// `CARGO_PKG_VERSION`). Major-version mismatch between CLI and daemon
+/// is rejected with [`PROTOCOL_VERSION_MISMATCH`]; minor-version
+/// mismatch is forward-compatible.
+pub const IPC_PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Parse the major-version component of a semver string, returning
+/// `None` on parse failure (treated as 0 by the comparator).
+pub fn major_version(version: &str) -> Option<u64> {
+    let core = version.split('-').next().unwrap_or(version);
+    core.split('.').next()?.parse::<u64>().ok()
+}
+
+/// True when `client_version` and `daemon_version` share the same
+/// major-version component (or both are unparseable, treated as 0).
+pub fn protocol_versions_compatible(client_version: &str, daemon_version: &str) -> bool {
+    major_version(client_version).unwrap_or(0)
+        == major_version(daemon_version).unwrap_or(0)
+}
 
 /// Global request ID counter for client-side auto-increment.
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
 /// JSON-RPC 2.0 request.
+///
+/// Phase J.1: the optional `protocol_version` field carries the
+/// caller's `CARGO_PKG_VERSION`. Daemons reject requests with a
+/// different major version. Old clients that don't send the field
+/// (`#[serde(default)]`) are accepted (forward-compat with v0 nodes).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcRequest {
     pub jsonrpc: String,
     pub method: String,
     pub params: serde_json::Value,
     pub id: u64,
+    /// Caller's IPC protocol version (semver).  Optional for
+    /// backwards-compat with pre-J.1 clients.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_version: Option<String>,
 }
 
 impl RpcRequest {
-    /// Create a new request with an auto-incrementing ID.
+    /// Create a new request with an auto-incrementing ID, embedding
+    /// the current `IPC_PROTOCOL_VERSION` so the daemon can detect
+    /// major-version mismatches.
     pub fn new(method: &str, params: serde_json::Value) -> Self {
         Self {
             jsonrpc: JSONRPC_VERSION.to_string(),
             method: method.to_string(),
             params,
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
+        }
+    }
+
+    /// Variant of [`RpcRequest::new`] that omits the protocol version.
+    /// Test-only; production callers always identify themselves so the
+    /// daemon can produce useful upgrade hints.
+    #[cfg(test)]
+    pub fn new_without_protocol_version(method: &str, params: serde_json::Value) -> Self {
+        Self {
+            jsonrpc: JSONRPC_VERSION.to_string(),
+            method: method.to_string(),
+            params,
+            id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            protocol_version: None,
         }
     }
 }
 
 /// JSON-RPC 2.0 response.
+///
+/// Phase J.1: the daemon stamps every response with the daemon's
+/// `IPC_PROTOCOL_VERSION` so newer clients can decide whether to
+/// upgrade or downgrade behavior locally.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RpcResponse {
     pub jsonrpc: String,
@@ -53,6 +107,10 @@ pub struct RpcResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<RpcError>,
     pub id: u64,
+    /// Daemon's IPC protocol version (semver). Always populated by
+    /// the daemon; old daemons that don't set it appear as `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_version: Option<String>,
 }
 
 impl RpcResponse {
@@ -63,6 +121,7 @@ impl RpcResponse {
             result: Some(result),
             error: None,
             id,
+            protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
         }
     }
 
@@ -77,6 +136,7 @@ impl RpcResponse {
                 data: None,
             }),
             id,
+            protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
         }
     }
 }
@@ -191,5 +251,50 @@ mod tests {
         let path = socket_path();
         assert_eq!(path, PathBuf::from(custom));
         std::env::remove_var("HYPERMESH_SOCK");
+    }
+
+    #[test]
+    fn test_protocol_versions_same_major_compatible() {
+        assert!(protocol_versions_compatible("0.1.0", "0.2.0"));
+        assert!(protocol_versions_compatible("1.5.0", "1.0.0"));
+        assert!(protocol_versions_compatible("2.0.0", "2.99.0"));
+    }
+
+    #[test]
+    fn test_protocol_versions_different_major_incompatible() {
+        assert!(!protocol_versions_compatible("1.0.0", "2.0.0"));
+        assert!(!protocol_versions_compatible("0.5.0", "1.0.0"));
+    }
+
+    #[test]
+    fn test_request_carries_protocol_version() {
+        let req = RpcRequest::new("ping", serde_json::json!(null));
+        assert_eq!(req.protocol_version, Some(IPC_PROTOCOL_VERSION.to_string()));
+    }
+
+    #[test]
+    fn test_request_without_protocol_version_round_trips() {
+        let req = RpcRequest::new_without_protocol_version("ping", serde_json::json!(null));
+        let s = serde_json::to_string(&req).expect("test: serialize");
+        // Old-client compatibility: field is omitted, not null.
+        assert!(!s.contains("protocol_version"));
+        let back: RpcRequest = serde_json::from_str(&s).expect("test: deserialize");
+        assert!(back.protocol_version.is_none());
+    }
+
+    #[test]
+    fn test_response_carries_protocol_version() {
+        let resp = RpcResponse::success(1, serde_json::json!(true));
+        assert_eq!(
+            resp.protocol_version,
+            Some(IPC_PROTOCOL_VERSION.to_string())
+        );
+    }
+
+    #[test]
+    fn test_major_version_parses() {
+        assert_eq!(major_version("0.1.0"), Some(0));
+        assert_eq!(major_version("1.5.3-rc1"), Some(1));
+        assert_eq!(major_version("not-semver"), None);
     }
 }

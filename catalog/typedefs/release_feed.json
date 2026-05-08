@@ -1,0 +1,71 @@
+{
+  "name": "release.feed",
+  "version": 1,
+  "description": "Foundation-issued, FALCON-1024 signed HyperMesh release announcement. Each entry is published by the foundation as a Catalog asset; subscribing daemons validate the FALCON-1024 signature against the configured foundation pubkey and update their local available_versions cache. Version selection is per-channel (stable/beta/nightly).",
+  "schema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "version",
+      "channel",
+      "binary_hashes",
+      "release_notes_url",
+      "signed_by",
+      "signature",
+      "issued_at"
+    ],
+    "properties": {
+      "version": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?$",
+        "description": "Semver version string for this release (e.g. '0.2.0', '1.0.0-rc1')."
+      },
+      "channel": {
+        "enum": ["stable", "beta", "nightly"],
+        "description": "Release channel — clients subscribe per-channel."
+      },
+      "binary_hashes": {
+        "type": "object",
+        "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "description": "Per-target SHA-256 hashes of distributed binaries, keyed by Rust target triple (e.g., {\"x86_64-unknown-linux-musl\": \"<sha256 hex>\"})."
+      },
+      "release_notes_url": {
+        "type": "string",
+        "description": "URL to release notes (clearnet HTTPS or HyperMesh DNS asset URL)."
+      },
+      "signed_by": {
+        "type": "string",
+        "format": "hex",
+        "description": "FALCON-1024 public key bytes of the foundation signer, hex-encoded."
+      },
+      "signature": {
+        "type": "string",
+        "format": "hex",
+        "description": "FALCON-1024 detached signature over the canonical signing_payload."
+      },
+      "requires_min_version": {
+        "type": "string",
+        "description": "Optional: oldest client version that can upgrade directly to this release. Clients on older versions need to chain through an intermediate version."
+      },
+      "breaking_changes": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, this release is incompatible with prior protocol_version. Clients must opt in explicitly."
+      },
+      "issued_at": {
+        "oneOf": [
+          {"type": "string", "format": "date-time"},
+          {"type": "object", "description": "RFC 3339 timestamp or SystemTime serialization"}
+        ],
+        "description": "When the foundation signed this release entry."
+      }
+    }
+  },
+  "verification": {
+    "signing_payload_format": "[version UTF-8] || 0x00 || [channel UTF-8] || 0x00 || [canonical(binary_hashes) UTF-8] || 0x00 || [issued_at u64 LE seconds]",
+    "binary_hashes_canonical": "JSON object with keys sorted lexicographically and no whitespace (canonical JSON)",
+    "signature_algorithm": "FALCON-1024 detached",
+    "verification_key": "Foundation root pubkey configured at the daemon (DaemonState.release_feed_subscriber.foundation_pubkey)"
+  }
+}

@@ -155,6 +155,9 @@ pub(crate) async fn dispatch_command(
         Some(Commands::Ping { .. }) => {
             unreachable!("ping handled before bootstrap");
         }
+        Some(Commands::Update { channel, version }) => {
+            dispatch_update(channel, version, cli.json).await;
+        }
         None => {
             info!("Node initialized successfully. Use 'connect' to run or 'status' to check.");
         }
@@ -171,6 +174,27 @@ async fn dispatch_status(bootstrap: &NodeBootstrap, json: bool) {
                 serde_json::to_string_pretty(&resp).unwrap_or_default()
             ),
             Err(e) => eprintln!("Error: {e}"),
+        }
+        // Phase J.1 — surface update-available banner alongside status.
+        if let Ok(update_resp) = client
+            .call_ok("system.check_update", serde_json::json!({}))
+            .await
+        {
+            if update_resp.get("up_to_date").and_then(|v| v.as_bool()) == Some(false) {
+                if let Some(version) =
+                    update_resp.get("available_version").and_then(|v| v.as_str())
+                {
+                    let notes = update_resp
+                        .get("release_notes_url")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    eprintln!("Update available: v{version}");
+                    if !notes.is_empty() {
+                        eprintln!("Release notes: {notes}");
+                    }
+                    eprintln!("Run 'hypermesh update --version {version}' to apply.");
+                }
+            }
         }
     } else if json {
         let height = bootstrap.blockchain().get_height().await;
@@ -196,6 +220,82 @@ async fn dispatch_status(bootstrap: &NodeBootstrap, json: bool) {
         info!("  Privacy mode: {:?}", bootstrap.privacy_mode().await);
         info!("  Self-sufficient: yes");
         eprintln!("No daemon running. Start with: hypermesh connect public");
+    }
+}
+
+/// Phase J.1 — `hypermesh update [--channel=...] [--version=...]`.
+///
+/// Resolves the requested version (or the channel's latest if omitted)
+/// via `system.check_update`, then asks the daemon to validate +
+/// apply via `system.apply_update`. Apply is a no-op placeholder in
+/// alpha — see `ipc::handlers::system` for the deferred binary-swap
+/// path.
+async fn dispatch_update(channel: String, version: Option<String>, json: bool) {
+    let client = ipc::IpcClient::new();
+    if !client.is_daemon_running().await {
+        eprintln!("No daemon running. Start with: hypermesh connect public");
+        std::process::exit(1);
+    }
+
+    let target_version = match version {
+        Some(v) => v,
+        None => match client
+            .call_ok(
+                "system.check_update",
+                serde_json::json!({"channel": channel}),
+            )
+            .await
+        {
+            Ok(resp) => match resp.get("available_version").and_then(|v| v.as_str()) {
+                Some(v) => v.to_string(),
+                None => {
+                    eprintln!(
+                        "Already up to date on channel '{channel}'. Run with \
+                         --version to force a specific entry."
+                    );
+                    return;
+                }
+            },
+            Err(e) => {
+                eprintln!("check_update failed: {e}");
+                return;
+            }
+        },
+    };
+
+    match client
+        .call_ok(
+            "system.apply_update",
+            serde_json::json!({
+                "version": target_version,
+                "channel": channel,
+            }),
+        )
+        .await
+    {
+        Ok(resp) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&resp).unwrap_or_default()
+                );
+            } else {
+                println!("Update plan validated for v{target_version}.");
+                if let Some(hash) = resp.get("expected_binary_hash").and_then(|v| v.as_str()) {
+                    println!("  Expected binary hash: {hash}");
+                }
+                if let Some(notes) = resp.get("release_notes_url").and_then(|v| v.as_str()) {
+                    println!("  Release notes: {notes}");
+                }
+                if resp.get("applied").and_then(|v| v.as_bool()) == Some(false) {
+                    println!(
+                        "  (Binary swap deferred — see notes; opt-in foundation key + \
+                         download URL configuration required.)"
+                    );
+                }
+            }
+        }
+        Err(e) => eprintln!("apply_update failed: {e}"),
     }
 }
 

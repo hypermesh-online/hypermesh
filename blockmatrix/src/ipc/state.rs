@@ -103,4 +103,15 @@ pub struct DaemonState {
     /// `dns.register` and `dns.register_with_grant` route through this
     /// registrar.
     pub dns_registrar: Option<Arc<crate::dns::DnsRegistrar>>,
+
+    /// Phase J.1: foundation release-feed subscriber — caches signed
+    /// release entries (`release.feed/v1` catalog asset) per channel
+    /// and surfaces "update available" via `system.check_update`.
+    ///
+    /// Alpha-default inert: even when this field is `Some`, the
+    /// subscriber starts with no foundation pubkey so all `ingest`
+    /// calls reject with `NotConfigured` until the operator opts in.
+    /// `system.check_update` returns "no foundation pubkey configured"
+    /// when the subscriber is `None`.
+    pub release_feed_subscriber: Option<Arc<crate::release_feed::ReleaseFeedSubscriber>>,
 }

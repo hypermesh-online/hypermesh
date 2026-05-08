@@ -243,6 +243,7 @@ mod tests {
             transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
+            release_feed_subscriber: None,
             receipt_validator: Arc::new(
                 crate::assets::cross_chain::CrossChainReceiptValidator::new(),
             ),

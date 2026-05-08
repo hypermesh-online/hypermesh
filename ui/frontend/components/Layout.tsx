@@ -5,6 +5,7 @@
 import React, { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { UpdateBanner } from './UpdateBanner';
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,6 +16,10 @@ export function Layout({ children }: LayoutProps) {
     <div className="flex h-screen bg-gradient-to-br from-black via-slate-900 to-black">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Phase J.1 — surfaces foundation-published release feed entries.
+            Renders as a no-op until the Gateway /api/v1/system/check_update
+            route lands in a follow-up sub-step. */}
+        <UpdateBanner />
         <Header />
         <main className="flex-1 overflow-auto p-6 bg-gradient-to-b from-transparent to-black/20">
           {children}

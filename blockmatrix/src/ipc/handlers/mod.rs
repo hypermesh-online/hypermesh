@@ -22,6 +22,7 @@ pub mod share;
 pub mod shard;
 pub mod stoq;
 pub mod store;
+pub mod system;
 pub mod topology;
 pub mod trustchain;
 
@@ -101,6 +102,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     engauge::register(handler, &state);
     trustchain::register(handler, &state);
     stoq::register(handler, &state);
+    system::register(handler, &state);
     config::register(handler);
 }
 
@@ -159,6 +161,7 @@ pub(crate) mod tests {
             transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
+            release_feed_subscriber: None,
             receipt_validator: Arc::new(
                 crate::assets::cross_chain::CrossChainReceiptValidator::new(),
             ),

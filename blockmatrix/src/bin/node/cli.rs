@@ -221,6 +221,22 @@ pub enum Commands {
         #[clap(long)]
         chaotic: bool,
     },
+
+    /// Phase J.1 — apply a foundation-published update.
+    ///
+    /// Validates that a release-feed entry exists for the requested
+    /// version + channel and returns the upgrade plan (binary hash to
+    /// expect, release-notes URL). Actual binary swap is gated behind
+    /// foundation-pubkey opt-in and is deferred to a follow-up.
+    Update {
+        /// Release channel (stable, beta, nightly).
+        #[clap(long, default_value = "stable")]
+        channel: String,
+        /// Specific version to apply. If omitted, uses the latest
+        /// available entry on the channel.
+        #[clap(long)]
+        version: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]

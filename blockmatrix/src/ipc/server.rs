@@ -7,7 +7,10 @@
 //! to the registered [`RequestHandler`].
 
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::{self, RpcRequest, RpcResponse, INTERNAL_ERROR};
+use crate::ipc::protocol::{
+    self, protocol_versions_compatible, RpcRequest, RpcResponse, IPC_PROTOCOL_VERSION,
+    INTERNAL_ERROR, PROTOCOL_VERSION_MISMATCH,
+};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -185,7 +188,27 @@ async fn handle_connection(
         }
 
         let response = match serde_json::from_str::<RpcRequest>(trimmed) {
-            Ok(request) => handler.dispatch(request).await,
+            Ok(request) => {
+                // Phase J.1 — gate on major-version compatibility. Old
+                // clients without `protocol_version` are accepted
+                // (forward-compat with pre-J.1 nodes); new clients with
+                // a mismatched major version are rejected with a
+                // helpful upgrade hint.
+                if let Some(ref client_v) = request.protocol_version {
+                    if !protocol_versions_compatible(client_v, IPC_PROTOCOL_VERSION) {
+                        let msg = format!(
+                            "incompatible CLI protocol version: client {} vs daemon {} (major \
+                             versions differ; run `hypermesh update` to upgrade the client)",
+                            client_v, IPC_PROTOCOL_VERSION
+                        );
+                        RpcResponse::error(request.id, PROTOCOL_VERSION_MISMATCH, msg)
+                    } else {
+                        handler.dispatch(request).await
+                    }
+                } else {
+                    handler.dispatch(request).await
+                }
+            }
             Err(e) => RpcResponse::error(0, INTERNAL_ERROR, format!("parse error: {e}")),
         };
 

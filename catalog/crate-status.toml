@@ -29,6 +29,7 @@ items = [
     "TrustChain certificate validation (real expiry/revocation)",
     "Policy rule evaluation (CertificateIssuer)",
     "foundation.dns_grant/v1 typedef hosted",
+    "release.feed/v1 typedef hosted (Phase J.1 — foundation-signed release announcements: version, channel, per-target binary hashes, release notes URL, FALCON-1024 signature)",
 ]
 
 [features.in_development]

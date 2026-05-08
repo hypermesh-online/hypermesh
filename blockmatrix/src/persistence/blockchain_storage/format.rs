@@ -31,6 +31,15 @@ use super::super::{PersistenceError, PersistenceResult};
 /// Magic bytes for HyperMesh Block format version 1
 pub(super) const BLOCK_MAGIC_V1: [u8; 4] = [b'H', b'M', b'B', 0x01];
 
+/// Phase J.1 — reserved magic bytes for HyperMesh Block format version 2.
+///
+/// V2 schema is currently identical to V1 (placeholder reservation).
+/// `deserialize_block_verified` recognises V2 so old binaries that
+/// receive V2 blocks fail with a clear error rather than mis-parsing
+/// raw bincode. The V1 writer is unchanged — V2 blocks are not yet
+/// produced. See `format_migrations.rs` for the migration registry.
+pub(super) const BLOCK_MAGIC_V2: [u8; 4] = [b'H', b'M', b'B', 0x02];
+
 /// Total header size: 4 (magic) + 4 (payload_size) + 32 (canonical_hash)
 pub(super) const BLOCK_HEADER_SIZE: usize = 40;
 
@@ -67,6 +76,26 @@ pub(super) fn serialize_block_v1(block: &Block) -> PersistenceResult<Vec<u8>> {
     Ok(buf)
 }
 
+/// Phase J.1 — Serialize a block with the V2 format header.
+///
+/// Forward-compat helper. The V1 writer remains the production path;
+/// this helper exists so future migration tooling and integration
+/// tests can produce V2-prefixed bytes that `deserialize_block_verified`
+/// will recognise. **V2 schema is currently identical to V1.**
+pub(super) fn serialize_block_v2(block: &Block) -> PersistenceResult<Vec<u8>> {
+    let payload = bincode::serialize(block)
+        .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
+    let payload_size = payload.len() as u32;
+    let hash_bytes = canonical_hash_bytes(block);
+
+    let mut buf = Vec::with_capacity(BLOCK_HEADER_SIZE + payload.len());
+    buf.extend_from_slice(&BLOCK_MAGIC_V2);
+    buf.extend_from_slice(&payload_size.to_le_bytes());
+    buf.extend_from_slice(&hash_bytes);
+    buf.extend_from_slice(&payload);
+    Ok(buf)
+}
+
 /// Deserialize a block from a buffer, handling both v1 (with header) and
 /// legacy (raw bincode) formats.
 ///
@@ -76,8 +105,14 @@ pub(super) fn serialize_block_v1(block: &Block) -> PersistenceResult<Vec<u8>> {
 /// data on disk will be detected here. Blocks are NEVER re-hashed.
 /// See papers/HYPERMESH.md Section 6.2 and Section 7.2.
 pub(super) fn deserialize_block_verified(buffer: &[u8]) -> PersistenceResult<Block> {
-    if buffer.len() >= BLOCK_HEADER_SIZE && buffer[..4] == BLOCK_MAGIC_V1 {
-        // V1 format: parse header, deserialize payload, verify hash
+    if buffer.len() >= BLOCK_HEADER_SIZE
+        && (buffer[..4] == BLOCK_MAGIC_V1 || buffer[..4] == BLOCK_MAGIC_V2)
+    {
+        // Phase J.1 — V1 OR V2 format: parse header, deserialize
+        // payload, verify hash. V2 schema is currently identical to
+        // V1 (placeholder reservation); the migration registry in
+        // `format_migrations.rs` documents the upgrade path.
+        let is_v2 = buffer[..4] == BLOCK_MAGIC_V2;
         let payload_size =
             u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
         let stored_hash_bytes: [u8; 32] = buffer[8..40]
@@ -98,6 +133,16 @@ pub(super) fn deserialize_block_verified(buffer: &[u8]) -> PersistenceResult<Blo
         let block: Block =
             bincode::deserialize(&buffer[BLOCK_HEADER_SIZE..payload_end])
                 .map_err(|e| PersistenceError::Deserialization(e.to_string()))?;
+
+        // V2 reservation: future schema changes go here. For now V2
+        // is byte-identical to V1, so the migration pass is a no-op
+        // (see `format_migrations::migrate_v1_to_v2`).
+        if is_v2 {
+            tracing::trace!(
+                index = block.index,
+                "deserialized V2 block (V2 schema currently identical to V1)"
+            );
+        }
 
         // Verify canonical hash
         let computed = canonical_hash_bytes(&block);

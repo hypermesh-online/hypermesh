@@ -225,6 +225,10 @@ pub mod verification;
 /// full Proof of State authentication and blockchain receipts on both chains.
 pub mod transfer;
 
+// Release feed subscription (Phase J.1) — foundation-signed release.feed/v1
+// Catalog asset ingestion with FALCON-1024 verification and per-channel cache.
+pub mod release_feed;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,

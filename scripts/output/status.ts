@@ -193,7 +193,12 @@ export const crateStatuses: CrateStatus[] = [
         "chain.lookup_cross_receipt IPC — queries cross-chain receipt index by transfer_id, returns both source and target block hashes so an auditor can prove transfer atomicity from either side",
         "Header-only sync mode — SyncManager prefer_headers_mode flag activates HeaderRequest/HeaderResponse for low-bandwidth peers (substrate for Phase K light client); generate_sync_request emits HeaderRequest instead of full Request, headers_only_sync_count metric tracks adoption",
         "20-node real-subprocess multi-host harness — scripts/run-matrix-harness.sh orchestrator spawns N hypermesh subprocesses, blockmatrix/tests/i1_multihost_harness.rs covers 3 in-process scenarios (DNS grant attestation, concurrent receipt convergence, validator rebuild from chain) plus subprocess-driver smoke check (ignored unless HM_RUN_SUBPROCESS_HARNESS=1)",
-        "StoqTransferTransport — production daemon TransferTransport wrapping NetworkManager + Weak<TransferCoordinator>; broadcast_lock/release/rollback fanout over STOQ unidirectional streams, send_register_request opens a stream to a specific peer and awaits oneshot ack delivered by wire handler via PeerContext.transfer_coordinator.deliver_register_ack"
+        "StoqTransferTransport — production daemon TransferTransport wrapping NetworkManager + Weak<TransferCoordinator>; broadcast_lock/release/rollback fanout over STOQ unidirectional streams, send_register_request opens a stream to a specific peer and awaits oneshot ack delivered by wire handler via PeerContext.transfer_coordinator.deliver_register_ack",
+        "Release feed subscription — foundation-signed release.feed/v1 catalog asset, FALCON-1024 verification, latest-by-channel cache (alpha-default inert until foundation pubkey configured)",
+        "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (binary swap deferred to follow-up sub-step)",
+        "IPC protocol_version field — major mismatch returns helpful error (-32100 PROTOCOL_VERSION_MISMATCH); minor forward-compat; old clients without field still accepted",
+        "Block format V2 magic reservation (BLOCK_MAGIC_V2 = HMB\\\\x02) + format_migrations registry — future format changes have a migration path; migrate_v1_to_v2 currently identity since V2 schema == V1",
+        "hypermesh update CLI command + status banner — `hypermesh status` surfaces \\\"Update available\\\" line; `hypermesh update [--channel] [--version]` invokes system.apply_update through IPC"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
@@ -309,7 +314,8 @@ export const crateStatuses: CrateStatus[] = [
         "X.509 certificate parsing for publisher info",
         "TrustChain certificate validation (real expiry/revocation)",
         "Policy rule evaluation (CertificateIssuer)",
-        "foundation.dns_grant/v1 typedef hosted"
+        "foundation.dns_grant/v1 typedef hosted",
+        "release.feed/v1 typedef hosted (Phase J.1 — foundation-signed release announcements: version, channel, per-target binary hashes, release notes URL, FALCON-1024 signature)"
       ],
       "inDevelopment": [
         "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",

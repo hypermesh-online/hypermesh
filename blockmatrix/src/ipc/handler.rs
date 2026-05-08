@@ -5,7 +5,9 @@
 //!
 //! Handlers are registered by method name and invoked on incoming requests.
 
-use crate::ipc::protocol::{RpcError, RpcRequest, RpcResponse, METHOD_NOT_FOUND};
+use crate::ipc::protocol::{
+    RpcError, RpcRequest, RpcResponse, IPC_PROTOCOL_VERSION, METHOD_NOT_FOUND,
+};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -62,6 +64,7 @@ impl RequestHandler {
                     result: None,
                     error: Some(rpc_err),
                     id: request.id,
+                    protocol_version: Some(IPC_PROTOCOL_VERSION.to_string()),
                 },
             },
             None => RpcResponse::error(
