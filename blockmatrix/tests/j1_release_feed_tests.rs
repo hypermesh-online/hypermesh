@@ -230,6 +230,9 @@ mod system_ipc {
             receipt_validator: Arc::new(
                 blockmatrix::assets::cross_chain::CrossChainReceiptValidator::new(),
             ),
+            capability_token_issuer: None,
+            revocation_registry: Arc::new(blockmatrix::auth::RevocationRegistry::new()),
+            light_sync_manager: None,
         })
     }
 

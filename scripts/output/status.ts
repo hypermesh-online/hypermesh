@@ -198,7 +198,11 @@ export const crateStatuses: CrateStatus[] = [
         "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (binary swap deferred to follow-up sub-step)",
         "IPC protocol_version field — major mismatch returns helpful error (-32100 PROTOCOL_VERSION_MISMATCH); minor forward-compat; old clients without field still accepted",
         "Block format V2 magic reservation (BLOCK_MAGIC_V2 = HMB\\\\x02) + format_migrations registry — future format changes have a migration path; migrate_v1_to_v2 currently identity since V2 schema == V1",
-        "hypermesh update CLI command + status banner — `hypermesh status` surfaces \\\"Update available\\\" line; `hypermesh update [--channel] [--version]` invokes system.apply_update through IPC"
+        "hypermesh update CLI command + status banner — `hypermesh status` surfaces \\\"Update available\\\" line; `hypermesh update [--channel] [--version]` invokes system.apply_update through IPC",
+        "Light node mode (--mode light) — HeaderSyncManager + WitnessedProofVerifier, header-only sync, no shard/pipeline state (alpha ships flag + types + tests; full startup minimization staged as K.1.5)",
+        "Capability tokens — FALCON-signed CapabilityToken with ViewOnly/Wallet/AssetWrite/Admin scopes, bound to device pubkey, daemon verification, RevocationRegistry, validate() composite check",
+        "auth.create_session/list_sessions/revoke_session IPC — admin-issued tokens, alpha-default inert when capability_token_issuer is None",
+        "SessionAudit chain entry — every session creation/revocation/capability-use recorded as Identity-category BlockAssetEntry with versioned JSON payload for user-side audit trail"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",

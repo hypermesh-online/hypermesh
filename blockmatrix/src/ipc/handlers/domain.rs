@@ -254,6 +254,9 @@ mod tests {
             receipt_validator: Arc::new(
                 crate::assets::cross_chain::CrossChainReceiptValidator::new(),
             ),
+            capability_token_issuer: None,
+            revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
+            light_sync_manager: None,
         });
         (state, tmp)
     }

@@ -229,6 +229,12 @@ pub mod transfer;
 // Catalog asset ingestion with FALCON-1024 verification and per-channel cache.
 pub mod release_feed;
 
+// Light/thin client tier (Phase K.1) — header-only sync + witnessed proofs.
+pub mod light_client;
+
+// Authentication / authorization (Phase K.1) — capability tokens.
+pub mod auth;
+
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,

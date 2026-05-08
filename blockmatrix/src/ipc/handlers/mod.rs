@@ -7,6 +7,7 @@
 //! function wires every handler into a [`RequestHandler`].
 
 pub mod asset;
+pub mod auth;
 pub mod blockchain;
 pub mod caesar;
 pub mod config;
@@ -103,6 +104,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     trustchain::register(handler, &state);
     stoq::register(handler, &state);
     system::register(handler, &state);
+    auth::register(handler, &state);
     config::register(handler);
 }
 
@@ -165,6 +167,9 @@ pub(crate) mod tests {
             receipt_validator: Arc::new(
                 crate::assets::cross_chain::CrossChainReceiptValidator::new(),
             ),
+            capability_token_issuer: None,
+            revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
+            light_sync_manager: None,
         })
     }
 
@@ -257,6 +262,9 @@ pub(crate) mod tests {
             "config.show",
             "config.get",
             "config.set",
+            "auth.create_session",
+            "auth.list_sessions",
+            "auth.revoke_session",
         ] {
             let req = RpcRequest::new(method, serde_json::json!({}));
             let resp = handler.dispatch(req).await;

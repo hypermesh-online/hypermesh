@@ -202,6 +202,14 @@ pub async fn run_connect(
         receipt_validator: std::sync::Arc::new(
             blockmatrix::assets::cross_chain::CrossChainReceiptValidator::new(),
         ),
+        // Phase K.1: alpha-default inert — operators opt in by setting
+        // these fields after constructing the daemon state when they
+        // want capability-token auth or light-mode header sync.
+        capability_token_issuer: None,
+        revocation_registry: std::sync::Arc::new(
+            blockmatrix::auth::RevocationRegistry::new(),
+        ),
+        light_sync_manager: None,
     });
 
     // Phase I.1: rebuild the cross-chain receipt index from any

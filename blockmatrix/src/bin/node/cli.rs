@@ -7,6 +7,7 @@
 use clap::{Parser, Subcommand};
 
 use blockmatrix::bootstrap::PrivacyMode;
+use blockmatrix::light_client::LightMode;
 
 #[derive(Parser, Debug)]
 #[clap(name = "blockmatrix-node")]
@@ -57,6 +58,18 @@ pub struct Cli {
     #[clap(long, env = "HYPERMESH_NAME")]
     pub name: Option<String>,
 
+    /// Phase K.1 — runtime mode selector.
+    ///
+    /// - `full` (default): full block hosting + shard storage + asset pipeline
+    /// - `light`: header-only sync, no shard or pipeline state (~256MB RAM)
+    /// - `thin`: reserved for K.2 — no local chain, remote daemon via SDK
+    ///
+    /// K.1 ships the flag and the `HeaderSyncManager` scaffolding. Full
+    /// startup-path minimization (skipping `ShardStore`, `PipelineEngine`,
+    /// Caesar, engauge, etc.) is staged as K.1.5.
+    #[clap(long, default_value = "full")]
+    pub mode: LightModeArg,
+
     /// Output in JSON format
     #[clap(long, global = true)]
     pub json: bool,
@@ -75,6 +88,28 @@ pub enum PrivacyModeArg {
     Anonymous,
     P2P,
     Public,
+}
+
+/// Phase K.1 — light-mode CLI selector.
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum LightModeArg {
+    /// Full block hosting + shard storage + asset pipeline (default).
+    Full,
+    /// Header-only sync, no shard hosting, no asset pipeline writes.
+    Light,
+    /// No local chain — connect to a remote daemon over capability-token SDK.
+    /// Reserved for K.2.
+    Thin,
+}
+
+impl From<LightModeArg> for LightMode {
+    fn from(arg: LightModeArg) -> Self {
+        match arg {
+            LightModeArg::Full => LightMode::Full,
+            LightModeArg::Light => LightMode::Light,
+            LightModeArg::Thin => LightMode::ThinClient,
+        }
+    }
 }
 
 impl From<PrivacyModeArg> for PrivacyMode {

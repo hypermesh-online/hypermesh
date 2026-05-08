@@ -114,4 +114,25 @@ pub struct DaemonState {
     /// `system.check_update` returns "no foundation pubkey configured"
     /// when the subscriber is `None`.
     pub release_feed_subscriber: Option<Arc<crate::release_feed::ReleaseFeedSubscriber>>,
+
+    /// Phase K.1: capability-token issuer (FALCON-1024 signing) for
+    /// `auth.create_session`.
+    ///
+    /// Alpha-default inert: when `None`, `auth.create_session` returns
+    /// "auth not configured". Operators opt in by populating the field
+    /// at daemon startup with the daemon's FALCON identity.
+    pub capability_token_issuer: Option<Arc<crate::auth::CapabilityTokenIssuer>>,
+
+    /// Phase K.1: in-memory revocation registry consulted by capability
+    /// token validation. Always-present (empty by default) so revocations
+    /// from `auth.revoke_session` take effect immediately.
+    pub revocation_registry: Arc<crate::auth::RevocationRegistry>,
+
+    /// Phase K.1: optional light-mode header sync manager. When the
+    /// daemon was started with `--mode light` this is `Some` and the
+    /// startup path skips full block hosting and shard pipeline. K.1
+    /// alpha ships the type/wiring; the production minimization
+    /// (skipping `ShardStore`/`PipelineEngine`/Caesar/engauge etc.)
+    /// is staged as K.1.5.
+    pub light_sync_manager: Option<Arc<crate::light_client::HeaderSyncManager>>,
 }
