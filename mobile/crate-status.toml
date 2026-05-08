@@ -1,0 +1,49 @@
+[crate]
+id = "mobile"
+name = "Mobile Shell"
+description = "React Native + Expo mobile shell — iOS + Android remote clients connecting to the user's trusted daemon (home server, trust gateway, or self-hosted) via Phase K.2 capability tokens. Phone is never a node."
+phase = "alpha"
+
+[features.working]
+items = [
+    "Expo SDK 50 React Native project structure (App.tsx + src/)",
+    "package.json with @hypermesh/sdk via file: protocol + expo + RN + RN nav + RN query + NativeWind",
+    "tsconfig.json strict TS + expo base + paths alias",
+    "babel.config.js + metro.config.js + tailwind.config.js + global.css for NativeWind 4",
+    "app.json: name HyperMesh, bundleIdentifier online.hypermesh.app, expo-secure-store plugin, ITSAppUsesNonExemptEncryption=false",
+    "eas.json: development/preview/production profiles, ios+android submit config templates",
+    "DeviceFingerprint: Expo SecureStore key persistence, WebCrypto P-256 placeholder keygen, algorithm tag for C.4.5 migration",
+    "ChallengeSign: WebCrypto ECDSA-P256 challenge signing, RequestedCapability type matching K.2 caps",
+    "TokenStore: capability token + expiry + sessionId + baseUrl + ConnectionMode in SecureStore, loadValidSession refresh window",
+    "MobileApiClient: bootstrap from persisted session, invoke wrapper catches -32004 and emits reauth events, fetchChallenge fallback to synthetic",
+    "ConnectScreen: 3-mode picker (trust-gateway/private-domain/self-hosted), URL input, fingerprint preview with alpha badge, Connect button drives challenge→sign→session",
+    "DashboardScreen: node.status + network.peers polling every 30s, RefreshControl, sign-out button (revoke + clear)",
+    "AssetsScreen: caesar.balance + asset.list read-only with TanStack Query refetch",
+    "ShareScreen: expo-document-picker file pick + share.send POST + share.inbox poll (route 404 falls back to empty)",
+    "MessageScreen: message.inbox poll + message.send compose form",
+    "DnsScreen: dns.resolve lookup + dns.list own records",
+    "RootNavigator: Connect | bottom-tabs (Home/Assets/Share/Messages/DNS), DarkTheme palette match, capability-denial reauth bounce",
+    "App.tsx: QueryClientProvider + SafeAreaProvider + StatusBar light",
+    ".gitignore: node_modules/, ios/Pods, android/build, .expo, *.ipa/*.apk/*.aab, assets/ placeholder",
+    "README.md: full developer setup, EAS build runbook, capability-token flow diagram, file map, framework-choice rationale",
+]
+
+[features.in_development]
+items = [
+    "Daemon route /api/v1/auth/challenge — mobile fetches with synthetic fallback; needs gateway-side handler in K.2.5",
+    "share.send / share.inbox / message.send / message.inbox routes — typed JSON-RPC bodies posted directly until @hypermesh/sdk enumerates them",
+    "Dashboard NodeStatus shape uses inline casts — needs typed shape from @hypermesh/sdk types.ts (currently {status?, version?, block_height?})",
+    "EAS submit metadata (ascAppId, appleTeamId, serviceAccountKeyPath) — eas.json templates ship with placeholders for foundation operator to fill",
+]
+
+[features.planned]
+items = [
+    "FALCON-1024 keygen + signing on device via UniFFI binding (hypermesh-ffi → C → JNI/Swift) — C.4.5",
+    "ios/ + android/ native folders generated via `expo prebuild` — first build materialises them",
+    "Real platform icons (assets/icon.png, splash.png, adaptive-icon.png) — placeholders gitignored",
+    "Push notifications via APNs + FCM (replaces inbox polling) — post-C.4",
+    "QR-code gateway pairing (camera permission already reserved in app.json) — C.5",
+    "Biometric unlock for the capability token (TouchID/FaceID/fingerprint) before SDK calls",
+    "Background sync for offline message queue — RN background tasks",
+    "GitHub Actions EAS integration — operator-side only; signing keys must not live in CI secrets",
+]

@@ -37,3 +37,24 @@ desktop/*.deb
 desktop/*.rpm
 desktop/*.msi
 desktop/*.nsis
+
+# Phase C.4 — React Native + Expo mobile shell (under mobile/)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/.xcode.env.local
+mobile/ios/Podfile.lock
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/keystores/
+mobile/.metro-cache/
+mobile/.babel-cache/
+mobile/*.ipa
+mobile/*.apk
+mobile/*.aab
+mobile/assets/

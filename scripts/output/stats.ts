@@ -76,6 +76,12 @@ export const crateStats: CrateStats[] = [
     "testCount": 27
   },
   {
+    "id": "mobile",
+    "files": 0,
+    "linesOfCode": 0,
+    "testCount": 0
+  },
+  {
     "id": "sdk",
     "files": 23,
     "linesOfCode": 1812,
@@ -105,5 +111,5 @@ export const totalStats = {
   "totalFiles": 1122,
   "totalLines": 350389,
   "totalTests": 4731,
-  "crateCount": 15
+  "crateCount": 16
 };
