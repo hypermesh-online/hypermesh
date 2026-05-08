@@ -198,7 +198,27 @@ pub async fn run_connect(
         transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
+        receipt_validator: std::sync::Arc::new(
+            blockmatrix::assets::cross_chain::CrossChainReceiptValidator::new(),
+        ),
     });
+
+    // Phase I.1: rebuild the cross-chain receipt index from any
+    // receipts already on the local chain. This makes restart-recovery
+    // deterministic — receipts written before a daemon restart remain
+    // queryable via `chain.lookup_cross_receipt`.
+    {
+        let count = daemon_state
+            .receipt_validator
+            .rebuild_from_chain(&daemon_state.blockchain)
+            .await;
+        if count > 0 {
+            tracing::info!(
+                "CrossChainReceiptValidator: indexed {} receipt(s) from persisted chain",
+                count
+            );
+        }
+    }
 
     let mut handler = ipc::RequestHandler::new();
     ipc::register_all(&mut handler, daemon_state.clone());
@@ -928,6 +948,7 @@ async fn register_node_dns_name(
         record_data: blockmatrix::dns::DnsRecordData::AAAA(ipv6_addr),
         ttl: 300,
         owner: node_id.to_string(),
+        grant_signature: None,
     };
     let dns_bytes = serde_json::to_vec(&dns_entry)
         .context("failed to serialize DNS entry")?;

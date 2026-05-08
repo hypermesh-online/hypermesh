@@ -74,6 +74,13 @@ pub struct DaemonState {
     /// are opted-in.
     pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
 
+    /// Phase I.1: cross-chain receipt validator. Always-on (pure read
+    /// structure, no security risk). Populated by the
+    /// `TransferCoordinator` when receipts are written, and rebuilt
+    /// from the chain at daemon startup so persisted receipts survive
+    /// restart. Queried by `chain.lookup_cross_receipt` IPC handler.
+    pub receipt_validator: Arc<crate::assets::cross_chain::CrossChainReceiptValidator>,
+
     /// Phase H.1: foundation FALCON-1024 signing identity for issuing
     /// DNS reservation grants.
     ///

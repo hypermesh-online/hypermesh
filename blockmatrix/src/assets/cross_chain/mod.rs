@@ -9,8 +9,10 @@
 //! Supports real-world business interactions like car purchasing across multiple
 //! blockchain networks (Honda->Dealer->Bank->Insurance->DMV).
 
+pub mod receipt_validator;
 pub mod types;
 
+pub use receipt_validator::{CrossChainError, CrossChainReceiptValidator};
 pub use types::*;
 
 use blake3;

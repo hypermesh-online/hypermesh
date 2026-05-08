@@ -27,6 +27,7 @@ pub mod reflector_pool;
 pub mod shard_store;
 pub mod shard_transport;
 pub mod stoq_integration;
+pub mod stoq_transfer_transport;
 pub mod swarm_provider;
 pub mod sync_dispatch;
 pub mod trust;

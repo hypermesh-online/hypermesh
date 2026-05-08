@@ -44,6 +44,7 @@ use super::transfer_protocol::{
     TransferRegisterAck, TransferRegisterRequest, TransferRelease, TransferRollback,
 };
 use super::GatewayError;
+use crate::assets::cross_chain::CrossChainReceiptValidator;
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::blockchain::NodeBlockchain;
 
@@ -167,6 +168,12 @@ pub struct TransferCoordinator {
     /// fires the sender to wake the awaiting `initiate()` future.
     /// Mock transports that respond synchronously do not use this map.
     pending_acks: Arc<TokioMutex<HashMap<String, oneshot::Sender<TransferRegisterAck>>>>,
+    /// Phase I.1: cross-chain receipt index. Always-on (pure read
+    /// structure). Receipts are inserted whenever the coordinator
+    /// writes a receipt block on the source chain or accepts a
+    /// register-request on the target chain. The IPC handler
+    /// `chain.lookup_cross_receipt` queries it directly.
+    receipt_validator: Arc<CrossChainReceiptValidator>,
 }
 
 impl TransferCoordinator {
@@ -180,6 +187,25 @@ impl TransferCoordinator {
         federation: Arc<dyn FederationGate>,
         local_chain_id: String,
     ) -> Self {
+        Self::with_validator(
+            blockchain,
+            transport,
+            federation,
+            local_chain_id,
+            Arc::new(CrossChainReceiptValidator::new()),
+        )
+    }
+
+    /// Construct a coordinator with a caller-provided receipt
+    /// validator. Used by [`crate::ipc::state::DaemonState`] so the
+    /// validator instance is shared with IPC handlers.
+    pub fn with_validator(
+        blockchain: Arc<NodeBlockchain>,
+        transport: Arc<dyn TransferTransport>,
+        federation: Arc<dyn FederationGate>,
+        local_chain_id: String,
+        receipt_validator: Arc<CrossChainReceiptValidator>,
+    ) -> Self {
         Self {
             blockchain,
             transport,
@@ -188,7 +214,14 @@ impl TransferCoordinator {
             local_chain_id,
             register_timeout: RwLock::new(DEFAULT_REGISTER_TIMEOUT),
             pending_acks: Arc::new(TokioMutex::new(HashMap::new())),
+            receipt_validator,
         }
+    }
+
+    /// Borrow the cross-chain receipt validator. Used by IPC
+    /// handlers and tests that need to query the receipt index.
+    pub fn receipt_validator(&self) -> Arc<CrossChainReceiptValidator> {
+        self.receipt_validator.clone()
     }
 
     /// Register a oneshot sender that will be fired when an ack with a
@@ -870,7 +903,12 @@ impl TransferCoordinator {
             transfer_id: transfer_id.to_string(),
             detail: format!("serialize receipt entry: {e}"),
         })?;
-        self.append_block(&bytes, "receipt", state_proof).await
+        let block_hash = self.append_block(&bytes, "receipt", state_proof).await?;
+        // Phase I.1: index the receipt for cross-chain lookups.
+        // Always-on, pure read structure — no behaviour change for
+        // alpha-default deployments.
+        self.receipt_validator.insert(receipt).await;
+        Ok(block_hash)
     }
 
     /// Append a serialized transfer entry as a block on the local chain.

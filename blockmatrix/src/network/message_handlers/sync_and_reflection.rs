@@ -294,7 +294,13 @@ async fn build_dns_response_for_query(
     let mut records: Vec<crate::dns::DnsRecord> = Vec::new();
     let mut earliest_ts: Option<u64> = None;
     let mut earliest_height: u64 = 0;
-    let foundation_grant_present = false; // H.1 alpha — grant attestation flag wired in next sub-phase
+    // Phase I.1: foundation_grant_present is now sourced from
+    // DnsBlockEntry.grant_signature (Phase H.1 deferred item). If ANY
+    // matching entry on this chain carries a grant signature, the
+    // response advertises foundation backing — distributed-DNS
+    // resolvers use this flag in conflict resolution to prefer the
+    // grant-backed registration over self-registered duplicates.
+    let mut foundation_grant_present = false;
 
     for block in chain.iter() {
         for entry in &block.entries {
@@ -316,6 +322,11 @@ async fn build_dns_response_for_query(
                 };
             if dns_entry.domain_name != query.domain_name {
                 continue;
+            }
+
+            // Phase I.1: surface grant-backing on the response.
+            if dns_entry.grant_signature.is_some() {
+                foundation_grant_present = true;
             }
 
             let rec = crate::dns::DnsRecord {

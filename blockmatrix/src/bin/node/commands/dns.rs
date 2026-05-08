@@ -127,6 +127,7 @@ pub async fn run_dns(
                 record_data: blockmatrix::dns::DnsRecordData::AAAA(ipv6_addr),
                 ttl: 300,
                 owner: node_id.to_string(),
+                grant_signature: None,
             };
             let dns_bytes = serde_json::to_vec(&dns_entry)
                 .context("failed to serialize DNS entry")?;

@@ -78,6 +78,56 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             }),
         );
     }
+
+    // chain.lookup_cross_receipt — Phase I.1.
+    //
+    // Query the local cross-chain receipt index for a given
+    // `transfer_id` and return both source and target block hashes
+    // when present. An auditor uses this to prove transfer atomicity
+    // from either side without consulting the other chain.
+    //
+    // Params: `{ "transfer_id": "<string>" }`
+    // Result on hit: `{ "found": true, "transfer_id", "source_chain_id",
+    //                   "source_block_hash", "target_chain_id",
+    //                   "target_block_hash", "completed_at",
+    //                   "asset_id" }`
+    // Result on miss: `{ "found": false, "transfer_id": "<input>" }`
+    {
+        let s = state.clone();
+        handler.register(
+            "chain.lookup_cross_receipt",
+            Arc::new(move |params| {
+                let s = s.clone();
+                Box::pin(async move {
+                    let transfer_id = params
+                        .get("transfer_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing or invalid 'transfer_id' parameter".into(),
+                            data: None,
+                        })?;
+
+                    match s.receipt_validator.get_by_transfer_id(transfer_id).await {
+                        Some(rcpt) => Ok(serde_json::json!({
+                            "found": true,
+                            "transfer_id": rcpt.transfer_id,
+                            "source_chain_id": rcpt.source_chain_id,
+                            "source_block_hash": rcpt.source_block_hash,
+                            "target_chain_id": rcpt.target_chain_id,
+                            "target_block_hash": rcpt.target_block_hash,
+                            "completed_at": rcpt.completed_at,
+                            "asset_id": rcpt.asset_id,
+                        })),
+                        None => Ok(serde_json::json!({
+                            "found": false,
+                            "transfer_id": transfer_id,
+                        })),
+                    }
+                })
+            }),
+        );
+    }
 }
 
 #[cfg(test)]
@@ -133,6 +183,9 @@ mod tests {
             transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
+            receipt_validator: Arc::new(
+                crate::assets::cross_chain::CrossChainReceiptValidator::new(),
+            ),
         })
     }
 
@@ -178,5 +231,60 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
         assert_eq!(result["valid"], true);
+    }
+
+    #[tokio::test]
+    async fn test_lookup_cross_receipt_missing() {
+        let state = test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "chain.lookup_cross_receipt",
+            serde_json::json!({ "transfer_id": "tx-nonexistent" }),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none());
+        let result = resp.result.expect("test: result");
+        assert_eq!(result["found"], false);
+        assert_eq!(result["transfer_id"], "tx-nonexistent");
+    }
+
+    #[tokio::test]
+    async fn test_lookup_cross_receipt_found() {
+        use crate::gateway::asset_transfer::TransferReceipt;
+        use hypermesh_lib::BlockchainScope;
+
+        let state = test_state().await;
+        // Inject a receipt directly into the validator (simulates
+        // a coordinator having written one to the chain).
+        let receipt = TransferReceipt {
+            transfer_id: "tx-i1-found".to_string(),
+            source_chain_id: "chain-A".to_string(),
+            target_chain_id: "chain-B".to_string(),
+            source_block_hash: "srcHash".to_string(),
+            target_block_hash: "tgtHash".to_string(),
+            completed_at: 1_700_000_000,
+            asset_id: "asset-i1".to_string(),
+            source_scope: BlockchainScope::Device,
+            target_scope: BlockchainScope::Network,
+        };
+        state.receipt_validator.insert(receipt).await;
+
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new(
+            "chain.lookup_cross_receipt",
+            serde_json::json!({ "transfer_id": "tx-i1-found" }),
+        );
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none());
+        let result = resp.result.expect("test: result");
+        assert_eq!(result["found"], true);
+        assert_eq!(result["source_chain_id"], "chain-A");
+        assert_eq!(result["target_chain_id"], "chain-B");
+        assert_eq!(result["source_block_hash"], "srcHash");
+        assert_eq!(result["target_block_hash"], "tgtHash");
     }
 }

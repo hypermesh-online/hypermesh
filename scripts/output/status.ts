@@ -186,10 +186,17 @@ export const crateStatuses: CrateStatus[] = [
         "Two-host transfer e2e integration test — bridged-transport harness exercises full source↔target choreography with JSON wire-format round-trips on every TAG; crash-recovery test drops mid-flight coordinator after Lock and asserts resume_in_flight on a fresh coordinator rediscovers the in-flight transfer",
         "Reserved-domain enforcement — top 1000 + Fortune 1000 brands + hypermesh-internal services hard-reserved; foundation CA-signed grant required for registration",
         "Foundation DNS grant flow — dns.foundation_grant IPC, FoundationGrant struct with FALCON-1024 sig, recorded as foundation.dns_grant/v1 catalog asset",
-        "Network-wide DNS resolution with conflict resolution — TAG_DNS_QUERY/RESPONSE over STOQ; canonical entry by (foundation_grant_present, registration_timestamp, chain_height)"
+        "Network-wide DNS resolution with conflict resolution — TAG_DNS_QUERY/RESPONSE over STOQ; canonical entry by (foundation_grant_present, registration_timestamp, chain_height)",
+        "DnsBlockEntry.grant_signature field — foundation FALCON-1024 signature persisted on chain, build_dns_response_for_query reads grant_signature.is_some() to set foundation_grant_present in distributed DNS responses (backward-compatible Option<Vec<u8>> via #[serde(default)])",
+        "Cross-chain receipt linking — CrossChainReceiptValidator indexes TransferReceipt entries by both source and target anchors, validate_cross_chain proves source→target block linkage from either side without consulting the other chain",
+        "CrossChainValidator::validate_cross_chain — looks up receipt by (source_chain_id, source_block_hash), verifies receipt's target_chain_id and target_block_hash match the request, returns specific error variants on mismatch",
+        "chain.lookup_cross_receipt IPC — queries cross-chain receipt index by transfer_id, returns both source and target block hashes so an auditor can prove transfer atomicity from either side",
+        "Header-only sync mode — SyncManager prefer_headers_mode flag activates HeaderRequest/HeaderResponse for low-bandwidth peers (substrate for Phase K light client); generate_sync_request emits HeaderRequest instead of full Request, headers_only_sync_count metric tracks adoption",
+        "20-node real-subprocess multi-host harness — scripts/run-matrix-harness.sh orchestrator spawns N hypermesh subprocesses, blockmatrix/tests/i1_multihost_harness.rs covers 3 in-process scenarios (DNS grant attestation, concurrent receipt convergence, validator rebuild from chain) plus subprocess-driver smoke check (ignored unless HM_RUN_SUBPROCESS_HARNESS=1)",
+        "StoqTransferTransport — production daemon TransferTransport wrapping NetworkManager + Weak<TransferCoordinator>; broadcast_lock/release/rollback fanout over STOQ unidirectional streams, send_register_request opens a stream to a specific peer and awaits oneshot ack delivered by wire handler via PeerContext.transfer_coordinator.deliver_register_ack"
       ],
       "inDevelopment": [
-        "Cross-network asset transfers — daemon STOQ TransferTransport plumbing (production wrapper that registers oneshot acks before broadcasting TAG_TRANSFER_REGISTER_REQ) still pending in bin/node, scoped to Phase I",
+        "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
         "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
         "Scope-aware Public HashMatrix filtering — SpatialBucketAssigner structural code exists, not e2e tested across nodes",
         "Asset-as-file-format — SystemAssets inline in block entries, user assets as self-contained header+body units",

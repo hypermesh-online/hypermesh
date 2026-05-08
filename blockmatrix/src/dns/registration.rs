@@ -30,6 +30,17 @@ use tracing::{info, warn};
 /// Serialized as JSON into the `AssetData::definition` field so that
 /// peers receiving the block can reconstruct the DNS record without
 /// access to the original registration request.
+///
+/// Phase I.1: `grant_signature` carries the foundation FALCON-1024
+/// signature when this domain was registered via
+/// [`DnsRegistrar::register_domain_with_grant`]. It is used by
+/// [`crate::network::message_handlers::sync_and_reflection::build_dns_response_for_query`]
+/// to set `foundation_grant_present = true` in distributed DNS responses
+/// so cross-mesh resolution can prefer foundation-backed registrations.
+///
+/// The field is `Option<Vec<u8>>` and defaults to `None` for backward
+/// compatibility — existing on-chain entries serialized without this
+/// field continue to deserialize cleanly via `#[serde(default)]`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DnsBlockEntry {
     /// Fully-qualified domain name (e.g. "nike", "admin.nike")
@@ -42,6 +53,12 @@ pub struct DnsBlockEntry {
     pub ttl: u32,
     /// Owner node ID
     pub owner: String,
+    /// Phase I.1: foundation FALCON-1024 grant signature, present only
+    /// when this entry was registered via a foundation grant. Absent for
+    /// regular self-registrations and for entries written before the
+    /// field was added (backward-compatible via `#[serde(default)]`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grant_signature: Option<Vec<u8>>,
 }
 
 /// Registration status
@@ -150,9 +167,10 @@ impl DnsRegistrar {
             });
         }
 
-        // Register to blockchain
+        // Register to blockchain (no foundation grant — public registrations
+        // are open to everyone except reserved domains).
         let tx_hash = self
-            .register_to_blockchain(&domain, &record, &proof)
+            .register_to_blockchain(&domain, &record, &proof, None)
             .await?;
 
         // Add to public pool
@@ -204,9 +222,10 @@ impl DnsRegistrar {
             });
         }
 
-        // Register to blockchain
+        // Register to blockchain (federated registrations don't carry a
+        // foundation grant — federation membership itself is the gate).
         let tx_hash = self
-            .register_to_blockchain(&domain, &record, &proof)
+            .register_to_blockchain(&domain, &record, &proof, None)
             .await?;
 
         // Add to federated pool
@@ -281,6 +300,7 @@ impl DnsRegistrar {
             owner_node_id,
             proof,
             /* foundation_grant_present = */ false,
+            /* grant_signature = */ None,
         )
         .await
     }
@@ -365,12 +385,19 @@ impl DnsRegistrar {
             owner_node_id,
             proof,
             /* foundation_grant_present = */ true,
+            /* grant_signature = */ Some(grant.foundation_signature.clone()),
         )
         .await
     }
 
     /// Internal post-validation registration path. Shared by
     /// `register_domain` (no grant) and `register_domain_with_grant`.
+    ///
+    /// `grant_signature`: when `Some`, carries the foundation
+    /// FALCON-1024 detached signature used to authorize this
+    /// registration. Persisted in [`DnsBlockEntry::grant_signature`] so
+    /// distributed-DNS resolvers can attest the registration to other
+    /// peers without requiring the original [`FoundationGrant`] struct.
     async fn register_domain_inner(
         &self,
         domain_name: &str,
@@ -378,6 +405,7 @@ impl DnsRegistrar {
         owner_node_id: String,
         proof: StateProof,
         foundation_grant_present: bool,
+        grant_signature: Option<Vec<u8>>,
     ) -> DnsResult<DomainRegistration> {
         // Validate domain name format
         Self::validate_domain_name(domain_name)?;
@@ -420,7 +448,7 @@ impl DnsRegistrar {
             reg.owner_node_id.clone(),
         );
         let _tx_hash = self
-            .register_to_blockchain(&domain_parsed, &record, &proof)
+            .register_to_blockchain(&domain_parsed, &record, &proof, grant_signature.clone())
             .await?;
 
         // Create domain pool
@@ -477,6 +505,7 @@ impl DnsRegistrar {
         domain: &Domain,
         record: &DnsRecord,
         proof: &StateProof,
+        grant_signature: Option<Vec<u8>>,
     ) -> DnsResult<String> {
         let blockchain_opt = self.blockchain.read().await;
 
@@ -490,6 +519,7 @@ impl DnsRegistrar {
                     record_data: record.data.clone(),
                     ttl: record.ttl,
                     owner: record.owner.clone(),
+                    grant_signature,
                 };
                 let dns_bytes = serde_json::to_vec(&dns_entry)
                     .map_err(|e| DnsError::BlockchainError(e.to_string()))?;
