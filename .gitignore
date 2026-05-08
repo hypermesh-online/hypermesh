@@ -26,3 +26,14 @@ scripts/test_port
 *.pem
 certs/*.crt
 certs/*.key
+
+# Phase C.3 — Tauri desktop shell bundle artifacts (under desktop/)
+desktop/target/
+desktop/gen/
+desktop/binaries/
+desktop/*.dmg
+desktop/*.AppImage
+desktop/*.deb
+desktop/*.rpm
+desktop/*.msi
+desktop/*.nsis

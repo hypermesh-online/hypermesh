@@ -1,0 +1,27 @@
+# Tauri / Rust build artifacts
+target/
+Cargo.lock
+
+# Tauri generated schema/output
+gen/
+src-tauri/target/
+
+# Platform bundles produced by `cargo tauri build`
+*.AppImage
+*.deb
+*.rpm
+*.dmg
+*.app
+*.msi
+*.exe
+*.nsis
+
+# Sidecar binaries copied in by release.yml (built externally by the
+# blockmatrix matrix job; never committed).
+binaries/
+
+# Editor noise
+.idea/
+.vscode/
+*.swp
+.DS_Store

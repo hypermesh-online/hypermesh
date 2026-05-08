@@ -20,6 +20,7 @@ import { DashboardMonitor } from './components/api/DashboardMonitor';
 import { InboxPanel } from './components/sharing/InboxPanel';
 import { MessengerPanel } from './components/messaging/MessengerPanel';
 import { blockMatrixClient } from './lib/blockmatrix-api';
+import { useSetupWizardGate } from './components/wizard';
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -37,6 +38,9 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  // Phase C.3 — gates the first-run wizard. Returns null in non-Tauri builds
+  // so the Gateway-served standalone UI is unaffected.
+  const wizardModal = useSetupWizardGate();
 
   useEffect(() => {
     // Simple liveness check against the real BlockMatrix HTTP API
@@ -51,6 +55,7 @@ export default function App() {
       <KeyboardNavigationProvider>
         <Router>
           <div className="min-h-screen bg-black text-white">
+            {wizardModal}
             {/* Compact connection indicator */}
             {backendOnline === true && (
               <div className="fixed top-4 right-4 z-50 bg-green-600/90 text-white px-3 py-1.5 rounded-lg shadow-lg text-xs font-medium">

@@ -329,6 +329,56 @@ attribute automatically; doing so would require either elevated privileges
 or running inside the user's shell context, both of which complicate the
 "pipe curl to bash" UX.
 
+## Desktop shell bundles (Phase C.3)
+
+Phase C.3 added a Tauri 2 desktop shell under `desktop/`. The release
+workflow's `desktop` matrix job builds platform bundles in parallel
+with the bare-binary matrix:
+
+| Runner | Bundles produced |
+|--------|------------------|
+| `ubuntu-latest` | `.AppImage`, `.deb` |
+| `macos-latest` (x86_64) | `.dmg`, `.app.tar.gz` |
+| `macos-latest` (aarch64) | `.dmg`, `.app.tar.gz` |
+| `windows-latest` | `.msi`, NSIS `.exe` |
+
+The desktop matrix is currently `continue-on-error: true` because:
+
+1. Tauri requires platform GUI sysdeps (libwebkit2gtk-4.1, GTK3,
+   AyatanaAppIndicator on Linux; WebView2 on Windows; Xcode CLT on
+   macOS). Workflow installs them on Linux automatically; the macOS
+   and Windows runners ship them.
+2. The desktop bundle attempts to embed the daemon binary as a Tauri
+   sidecar by downloading the `hypermesh-{target}` artifact produced
+   by the bare-binary `build` job. If that artifact is missing (for
+   experimental targets that didn't compile), the bundle falls back
+   to PATH lookup at runtime.
+3. Real platform icons (`icons/*.{png,icns,ico}`) are placeholders in
+   the alpha. Bundles will use Tauri's default icon until they're
+   replaced — `cargo tauri icon path/to/source-1024.png` regenerates
+   the full set.
+
+To build a desktop bundle locally:
+
+```bash
+# Linux sysdeps (Debian/Ubuntu)
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+    libayatana-appindicator3-dev librsvg2-dev libssl-dev
+
+# Tooling
+corepack enable && corepack prepare pnpm@9 --activate
+cargo install tauri-cli --version "^2"
+
+# Build
+cd ui/frontend && pnpm install && pnpm build
+cd ../../desktop && cargo tauri build
+# Bundles emerge under desktop/target/release/bundle/
+```
+
+The desktop project is intentionally *not* a workspace member of
+`core/Cargo.toml`. `cargo check --workspace` does not pull in Tauri
+or webview deps. See `desktop/README.md` for the full developer guide.
+
 ## Updating an existing install
 
 Operators should not re-run `install.sh` for routine updates. Once a daemon

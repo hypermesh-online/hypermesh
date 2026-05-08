@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HyperMesh",
+  "version": "0.1.0",
+  "identifier": "online.hypermesh.desktop",
+
+  "build": {
+    "frontendDist": "../ui/frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd ../ui/frontend && pnpm dev",
+    "beforeBuildCommand": "cd ../ui/frontend && pnpm install && pnpm build"
+  },
+
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "HyperMesh",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: ipc: http://ipc.localhost; img-src 'self' data: tauri: ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' tauri: ipc: http://ipc.localhost ws: wss: http://localhost:* https://*.hypermesh.online"
+    },
+    "trayIcon": {
+      "id": "hypermesh-tray",
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false,
+      "tooltip": "HyperMesh"
+    }
+  },
+
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Network",
+    "shortDescription": "HyperMesh native desktop shell",
+    "longDescription": "Native desktop shell for the HyperMesh distributed asset network. Manages the local daemon, surfaces system tray state, and hosts the React dashboard in an embedded WebView.",
+    "publisher": "Hypermesh Foundation",
+    "copyright": "Copyright © 2026 Hypermesh Foundation",
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "languages": ["English"]
+      }
+    }
+  },
+
+  "plugins": {
+    "shell": {
+      "open": "^https?://.+"
+    }
+  }
+}

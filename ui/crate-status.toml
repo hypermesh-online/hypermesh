@@ -67,6 +67,11 @@ items = [
     "CatalogBrowse: asset search/filter from blockchain",
     "CatalogInstalled: registered assets with category badges",
     "CatalogCreate: asset creation form",
+    # Phase C.3 — desktop shell + first-run wizard
+    "Tauri 2 desktop shell scaffolding (desktop/ — system tray, daemon subprocess manager, IPC bridge)",
+    "First-run setup wizard (6 pages: welcome, privacy mode, identity, trustnet-test, foundation grant, done)",
+    "Tray ↔ UpdateBanner bridge (update-available event from daemon's system.check_update IPC)",
+    "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
 ]
 
 [features.in_development]
@@ -74,12 +79,13 @@ items = [
     "GlobalSearch — searches local assets/DNS, no full-text backend yet",
     "Storybook stories — 3 existing, ~25 needed for full coverage",
     "Unit test coverage — trustchain has tests, other modules need Vitest tests",
+    "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)",
 ]
 
 [features.planned]
 items = [
     "Multi-node cluster topology 3D visualization",
-    "First-run onboarding flow (sovereign node setup, network join)",
-    "Native desktop dashboard (Tauri cross-platform)",
     "Real-time SSE/WebSocket event stream (block announcements, message notifications)",
+    "Tauri sidecar daemon binary (C.3.5 — currently relies on $PATH install)",
+    "Windows named-pipe IPC for daemon ping (C.3.5 — currently Unix-socket only)",
 ]

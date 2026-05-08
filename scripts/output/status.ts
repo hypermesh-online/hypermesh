@@ -336,6 +336,46 @@ export const crateStatuses: CrateStatus[] = [
     "completion": 85
   },
   {
+    "id": "desktop",
+    "name": "Desktop Shell",
+    "description": "Tauri 2 native desktop shell — system tray, daemon subprocess manager, first-run wizard, embedded WebView for the React UI",
+    "phase": "alpha",
+    "features": {
+      "working": [
+        "Tauri 2 project scaffolding (separate from workspace, own Cargo.toml)",
+        "tauri.conf.json: bundle config, identifier, dev/prod URLs, all platform targets",
+        "System tray: HyperMesh header, status label, Open Dashboard, Start/Stop daemon, Update available, Quit",
+        "Tray icon state colours (green/yellow/red) via state-icon swap",
+        "Daemon subprocess manager (spawn/stop/status, IPC ping over Unix socket)",
+        "Tauri commands surface: daemon_start/stop/status, daemon_check_update, wizard_should_show/state/set_*/complete",
+        "First-run wizard scaffolding (6 React pages: welcome → privacy → identity → trustnet → grant → done)",
+        "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
+        "UpdateBanner ↔ tray bridge (update-available event from daemon's system.check_update IPC)",
+        "Hide-to-tray on window close (true exit only via tray Quit)",
+        "Daemon stop on shell exit (best-effort SIGTERM → SIGKILL fallback)",
+        ".gitignore for target/, gen/, binaries/, bundle artifacts",
+        "Placeholder PNG/ICO/ICNS icons for compile-time embedding",
+        "release.yml `desktop` matrix job (Linux/macOS x86+aarch64/Windows, continue-on-error)",
+        "Daemon binary uploaded as workflow artifact for sidecar staging",
+        "docs/RELEASING.md desktop section with sysdeps + local-build instructions"
+      ],
+      "inDevelopment": [
+        "Tauri sidecar daemon binary integration — release.yml stages it but tauri.conf.json externalBin config not yet wired (C.3.5)",
+        "Real platform icons — placeholders shipped, to replace via `cargo tauri icon source-1024.png` (C.3.5)",
+        "Identity fingerprint display in wizard Page 3 — currently shows path; needs dedicated `core.identity` IPC (C.3.5)",
+        "Foundation grant submission via dns.foundation_grant IPC — wizard records intent only (post-J)"
+      ],
+      "planned": [
+        "Windows named-pipe IPC for daemon ping (currently Unix-socket only)",
+        "Auto-update flow inside the desktop bundle (current path: re-install via package manager)",
+        "macOS code-signing + notarization in release.yml (manual today; see docs/RELEASING.md C.2 section)",
+        "Tauri permissions hardening — capabilities/default.json grants broad webview access",
+        "Multi-window support (separate Caesar wallet window, Engauge dashboard window)"
+      ]
+    },
+    "completion": 64
+  },
+  {
     "id": "engauge",
     "name": "engauge",
     "description": "Work tracking, content receipts, capacity metrics, and network analytics for HyperMesh",
@@ -798,20 +838,25 @@ export const crateStatuses: CrateStatus[] = [
         "Sidebar badges: live inbox + message unread counts from polling",
         "CatalogBrowse: asset search/filter from blockchain",
         "CatalogInstalled: registered assets with category badges",
-        "CatalogCreate: asset creation form"
+        "CatalogCreate: asset creation form",
+        "Tauri 2 desktop shell scaffolding (desktop/ — system tray, daemon subprocess manager, IPC bridge)",
+        "First-run setup wizard (6 pages: welcome, privacy mode, identity, trustnet-test, foundation grant, done)",
+        "Tray ↔ UpdateBanner bridge (update-available event from daemon's system.check_update IPC)",
+        "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)"
       ],
       "inDevelopment": [
         "GlobalSearch — searches local assets/DNS, no full-text backend yet",
         "Storybook stories — 3 existing, ~25 needed for full coverage",
-        "Unit test coverage — trustchain has tests, other modules need Vitest tests"
+        "Unit test coverage — trustchain has tests, other modules need Vitest tests",
+        "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)"
       ],
       "planned": [
         "Multi-node cluster topology 3D visualization",
-        "First-run onboarding flow (sovereign node setup, network join)",
-        "Native desktop dashboard (Tauri cross-platform)",
-        "Real-time SSE/WebSocket event stream (block announcements, message notifications)"
+        "Real-time SSE/WebSocket event stream (block announcements, message notifications)",
+        "Tauri sidecar daemon binary (C.3.5 — currently relies on $PATH install)",
+        "Windows named-pipe IPC for daemon ping (C.3.5 — currently Unix-socket only)"
       ]
     },
-    "completion": 88
+    "completion": 87
   }
 ];

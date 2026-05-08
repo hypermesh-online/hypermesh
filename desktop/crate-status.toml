@@ -1,0 +1,42 @@
+[crate]
+id = "desktop"
+name = "Desktop Shell"
+description = "Tauri 2 native desktop shell — system tray, daemon subprocess manager, first-run wizard, embedded WebView for the React UI"
+phase = "alpha"
+
+[features.working]
+items = [
+    "Tauri 2 project scaffolding (separate from workspace, own Cargo.toml)",
+    "tauri.conf.json: bundle config, identifier, dev/prod URLs, all platform targets",
+    "System tray: HyperMesh header, status label, Open Dashboard, Start/Stop daemon, Update available, Quit",
+    "Tray icon state colours (green/yellow/red) via state-icon swap",
+    "Daemon subprocess manager (spawn/stop/status, IPC ping over Unix socket)",
+    "Tauri commands surface: daemon_start/stop/status, daemon_check_update, wizard_should_show/state/set_*/complete",
+    "First-run wizard scaffolding (6 React pages: welcome → privacy → identity → trustnet → grant → done)",
+    "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
+    "UpdateBanner ↔ tray bridge (update-available event from daemon's system.check_update IPC)",
+    "Hide-to-tray on window close (true exit only via tray Quit)",
+    "Daemon stop on shell exit (best-effort SIGTERM → SIGKILL fallback)",
+    ".gitignore for target/, gen/, binaries/, bundle artifacts",
+    "Placeholder PNG/ICO/ICNS icons for compile-time embedding",
+    "release.yml `desktop` matrix job (Linux/macOS x86+aarch64/Windows, continue-on-error)",
+    "Daemon binary uploaded as workflow artifact for sidecar staging",
+    "docs/RELEASING.md desktop section with sysdeps + local-build instructions",
+]
+
+[features.in_development]
+items = [
+    "Tauri sidecar daemon binary integration — release.yml stages it but tauri.conf.json externalBin config not yet wired (C.3.5)",
+    "Real platform icons — placeholders shipped, to replace via `cargo tauri icon source-1024.png` (C.3.5)",
+    "Identity fingerprint display in wizard Page 3 — currently shows path; needs dedicated `core.identity` IPC (C.3.5)",
+    "Foundation grant submission via dns.foundation_grant IPC — wizard records intent only (post-J)",
+]
+
+[features.planned]
+items = [
+    "Windows named-pipe IPC for daemon ping (currently Unix-socket only)",
+    "Auto-update flow inside the desktop bundle (current path: re-install via package manager)",
+    "macOS code-signing + notarization in release.yml (manual today; see docs/RELEASING.md C.2 section)",
+    "Tauri permissions hardening — capabilities/default.json grants broad webview access",
+    "Multi-window support (separate Caesar wallet window, Engauge dashboard window)",
+]

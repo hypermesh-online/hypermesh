@@ -280,6 +280,22 @@ jobs:
           path: hashes/${{ matrix.target }}.sha256
           retention-days: 1
 
+      # Phase C.3 — Stage the raw binary as a workflow artifact so the
+      # `desktop` matrix job can pick it up as a Tauri sidecar without
+      # needing to re-build. Best-effort: experimental targets that
+      # failed to produce a binary just skip this step.
+      - name: Upload daemon binary artifact (sidecar source)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: hypermesh-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/hypermesh
+            target/${{ matrix.target }}/release/hypermesh.exe
+          if-no-files-found: ignore
+          retention-days: 7
+
   # ------------------------------------------------------------------
   # 3. Assemble unsigned release-manifest.json from collected hashes
   # ------------------------------------------------------------------
@@ -370,3 +386,131 @@ jobs:
       - name: Notice — foundation signing required
         run: |
           echo "::notice title=Manifest unsigned::release-manifest.json is unsigned. Foundation operator must sign with FALCON-1024 root key (see docs/RELEASING.md) and re-upload."
+
+  # ------------------------------------------------------------------
+  # 4. Phase C.3 — Build the Tauri desktop shell bundles
+  #
+  # Marked experimental and continue-on-error: the desktop project
+  # depends on platform GUI sysdeps (libwebkit2gtk-4.1-dev on Linux,
+  # WebView2 SDK on Windows, Xcode on macOS) and a running daemon
+  # binary downloaded from the build matrix. C.3 alpha ships the
+  # scaffolding; the matrix job is wired so progress is visible even
+  # before all sidecar/icon work is done. Once the desktop build
+  # stabilises, drop continue-on-error.
+  #
+  # See desktop/README.md for the local-dev instructions.
+  # ------------------------------------------------------------------
+  desktop:
+    name: Desktop bundle ${{ matrix.target }}
+    needs: [create-release, build]
+    if: always() && needs.create-release.result == 'success'
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-latest
+            sidecar_target: x86_64-unknown-linux-musl
+            tauri_targets: appimage,deb
+          - target: x86_64-apple-darwin
+            runner: macos-latest
+            sidecar_target: x86_64-apple-darwin
+            tauri_targets: dmg,app
+          - target: aarch64-apple-darwin
+            runner: macos-latest
+            sidecar_target: aarch64-apple-darwin
+            tauri_targets: dmg,app
+          - target: x86_64-pc-windows-msvc
+            runner: windows-latest
+            sidecar_target: x86_64-pc-windows-msvc
+            tauri_targets: msi,nsis
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux GUI sysdeps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            patchelf
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ui/frontend/pnpm-lock.yaml
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build React UI
+        shell: bash
+        run: |
+          cd ui/frontend
+          pnpm install --frozen-lockfile || pnpm install
+          pnpm build
+
+      # Pull the pre-built daemon binary from the matrix `build` job
+      # and stage it as a Tauri sidecar. `continue-on-error: true` on
+      # both this job and the build job means a missing artifact is
+      # tolerated (the desktop bundle just won't auto-launch a daemon
+      # — it'll fall back to PATH lookup).
+      - name: Download daemon binary (sidecar)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: hypermesh-${{ matrix.sidecar_target }}
+          path: desktop/binaries/
+
+      - name: Build desktop bundle
+        shell: bash
+        run: |
+          cd desktop
+          cargo tauri build --bundles ${{ matrix.tauri_targets }} || {
+            echo "::warning title=Desktop build skipped::Tauri build failed for ${{ matrix.target }}; continuing"
+            exit 0
+          }
+
+      - name: Collect bundle artifacts
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p desktop-out
+          # Linux: AppImage / deb live under target/release/bundle/{appimage,deb}
+          # macOS: dmg / app under target/release/bundle/{dmg,macos}
+          # Windows: msi / nsis under target/release/bundle/{msi,nsis}
+          find desktop/target/release/bundle -type f \( \
+            -name "*.AppImage" -o \
+            -name "*.deb" -o \
+            -name "*.dmg" -o \
+            -name "*.msi" -o \
+            -name "*.exe" -o \
+            -name "*.app.tar.gz" \
+          \) -exec cp {} desktop-out/ \; 2>/dev/null || true
+          ls -la desktop-out/ || true
+
+      - name: Upload desktop bundle to release
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: desktop-out/*
+          fail_on_unmatched_files: false

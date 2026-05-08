@@ -19,6 +19,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, ExternalLink, X } from 'lucide-react';
+import { listenOrNoop } from './wizard/tauriBridge';
 
 interface UpdateInfo {
   up_to_date: boolean;
@@ -53,9 +54,26 @@ export function UpdateBanner() {
     };
     poll();
     const id = setInterval(poll, POLL_INTERVAL_MS);
+
+    // Phase C.3 — In the Tauri desktop bundle, the tray polls
+    // `system.check_update` directly via IPC and emits an
+    // `update-available` event. Listening here lets the banner refresh
+    // immediately when the tray detects an update, instead of waiting
+    // for the next 5-minute HTTP poll. listenOrNoop is a no-op in the
+    // standalone Gateway-served build.
+    let unlisten: (() => void) | null = null;
+    listenOrNoop<string | null>('update-available', () => {
+      // Re-fetch via the existing endpoint so we surface the same shape.
+      poll();
+    }).then((un) => {
+      if (cancelled) un();
+      else unlisten = un;
+    });
+
     return () => {
       cancelled = true;
       clearInterval(id);
+      if (unlisten) unlisten();
     };
   }, []);
 

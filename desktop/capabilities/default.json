@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for the HyperMesh desktop shell. Grants the React UI access to the daemon-management, wizard-state, and tray commands defined in src/main.rs, plus the shell plugin for opening external links.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "dialog:default",
+    {
+      "identifier": "core:event:allow-listen",
+      "allow": [{ "event": "daemon-status" }, { "event": "update-available" }]
+    }
+  ]
+}

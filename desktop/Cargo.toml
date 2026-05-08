@@ -1,0 +1,63 @@
+# Phase C.3 — HyperMesh desktop shell (Tauri 2).
+#
+# This Cargo project is intentionally NOT part of the workspace at
+# `../Cargo.toml`. Reasoning:
+#   - Tauri pulls in webview/system bindings (libwebkit2gtk on Linux,
+#     WebView2 on Windows, WebKit on macOS) that are irrelevant to the
+#     daemon's normal `cargo check --workspace` flow.
+#   - Keeping it standalone means `cargo check --workspace` stays fast
+#     and free of GUI-platform sysdeps. The desktop shell has its own
+#     CI lane (release.yml `desktop` matrix, see C.3.5).
+#
+# Build (alpha):
+#   pnpm install   (in ../ui/frontend)
+#   pnpm build     (produces ../ui/frontend/dist)
+#   cargo tauri build   (from this directory; needs `cargo-tauri` CLI)
+#
+# Local dev with hot reload:
+#   pnpm tauri dev   (uses devUrl=http://localhost:5173 from tauri.conf.json)
+
+[package]
+name = "hypermesh-desktop"
+version = "0.1.0"
+description = "HyperMesh native desktop shell (Tauri 2 system tray + first-run wizard + managed daemon subprocess)"
+edition = "2021"
+authors = ["HyperMesh Foundation"]
+license = "BUSL-1.1"
+# Marked as not-publishable — the bundle is the deliverable, not the crate.
+publish = false
+
+# Exclude from workspace scanning (the parent Cargo.toml does NOT include
+# `desktop` in its `members` list, but this guards against accidental
+# inclusion via the "default-members" mechanism).
+[workspace]
+
+[[bin]]
+name = "hypermesh-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png", "image-ico"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "process", "time", "io-util", "sync", "macros", "net"] }
+anyhow = "1"
+thiserror = "1"
+dirs = "5"
+
+[features]
+# Default features mirror Tauri's recommended set for tray + dialog plugins.
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

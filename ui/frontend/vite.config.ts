@@ -28,6 +28,14 @@ export default defineConfig(({ mode }) => {
       sourcemap: mode === 'development',
       minify: mode === 'production' ? 'esbuild' : false,
       rollupOptions: {
+        // Phase C.3 — `@tauri-apps/api/*` is loaded only when running
+        // inside the Tauri desktop bundle (where Tauri injects the
+        // module at runtime). For the standalone Gateway-served build
+        // we mark it external so Vite/Rollup doesn't try to resolve
+        // it. The dynamic `import()` in components/wizard/tauriBridge.ts
+        // is wrapped in a try/catch and gated by an `isTauri()` check,
+        // so missing modules at runtime are a graceful no-op.
+        external: [/^@tauri-apps\/api(\/.*)?$/],
         output: {
           // Ensure consistent chunk naming
           chunkFileNames: 'assets/[name]-[hash].js',
