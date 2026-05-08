@@ -42,8 +42,8 @@ export const crateStats: CrateStats[] = [
   {
     "id": "gateway",
     "files": 27,
-    "linesOfCode": 9725,
-    "testCount": 271
+    "linesOfCode": 9645,
+    "testCount": 267
   },
   {
     "id": "hypermesh-ebpf",
@@ -97,7 +97,7 @@ export const crateStats: CrateStats[] = [
 
 export const totalStats = {
   "totalFiles": 1115,
-  "totalLines": 349029,
-  "totalTests": 4735,
+  "totalLines": 348949,
+  "totalTests": 4731,
   "crateCount": 14
 };

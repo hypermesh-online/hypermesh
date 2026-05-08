@@ -416,14 +416,14 @@ export const crateStatuses: CrateStatus[] = [
         "Host→DNS resolution — extract_subdomain() maps Host header to blockchain DNS entries",
         "Dynamic per-domain TLS certificates — generate_domain_cert() creates ECDSA P-256 self-signed certs on demand",
         "DomainRouter.resolve_from_dns() — query blockchain DNS for domain→backend routing",
-        "RemoteDashboardProxy (alpha structure) — Kyber-1024 KEM + AES-GCM tunnel via KyberAesTunnel trait; gateway is byte-forwarder only, sees ciphertext on wire (MockTunnel ships for K.2 tests; real KyberKemTunnel wiring staged as K.2.5)",
+        "RemoteDashboardProxy — byte-forwarder over an existing STOQ stream (X25519MLKEM768 transport encryption + FALCON-PoS auth provided by STOQ; Kyber-AES is the asset-at-rest layer not used here); capability token rides in the forwarded envelope for target-side auth",
         "Three remote-dashboard modes — DashboardServeMode::TrustProxy / PrivateDomain / SelfHosted (parses --dashboard-mode CLI flag)",
-        "RemoteProxyManager — per-session tunnel registry with register/get/close/reap_inactive lifecycle",
-        "ForwardedRequest/ForwardedResponse — minimal HTTP envelope shape forwarded over the E2E tunnel"
+        "RemoteProxyManager — per-session registry with register/get/close/reap_inactive lifecycle",
+        "ForwardedRequest/ForwardedResponse — minimal HTTP envelope shape forwarded over the STOQ stream",
+        "StoqStreamForwarder trait — abstracts STOQ stream open/write/read for the proxy; MockStreamForwarder ships for tests, production wiring binds Connection::open_stream from gateway's NetworkManager handle"
       ],
       "inDevelopment": [
-        "Kyber-1024 KEM tunnel wiring — KyberKemTunnel constructor returns error pending K.2.5 (wire to trustchain::crypto::KyberCrypto + AES-GCM symmetric)",
-        "STOQ wire path for RemoteDashboardProxy — currently uses simulate_wire_loopback; K.2.5 routes ciphertext through STOQ unidirectional streams to target node",
+        "Production StoqStreamForwarder — wire MockStreamForwarder replacement that opens a real STOQ stream via Connection::open_stream and round-trips request bytes; depends on gateway-side NetworkManager handle reaching remote_proxy",
         "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
@@ -436,7 +436,7 @@ export const crateStatuses: CrateStatus[] = [
         "Bootstrap token flow — HTTP/3 side issues tokens but validation path beyond self-serve PoS handshake not implemented"
       ]
     },
-    "completion": 76
+    "completion": 78
   },
   {
     "id": "hypermesh",

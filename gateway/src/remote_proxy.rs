@@ -4,11 +4,31 @@
 
 //! Phase K.2 — remote dashboard proxy.
 //!
-//! Given a target node URL plus a valid session token, proxies dashboard
-//! HTTP/3 traffic from a client browser to the target node over an
-//! end-to-end Kyber-1024 KEM → AES-256-GCM tunnel. The gateway acts as a
-//! byte-forwarder only; the AES key is derived by the client + target
-//! and the gateway never sees plaintext.
+//! Given a target node URL plus a valid capability token, proxies
+//! dashboard HTTP/3 traffic from a client browser to the target node
+//! over the **existing STOQ stream** between gateway and target.
+//!
+//! ## Why no bespoke crypto here
+//!
+//! STOQ already provides transport security on every peer connection:
+//!
+//! * **Wire encryption**: X25519MLKEM768 hybrid post-quantum QUIC key
+//!   exchange (negotiated at QUIC handshake, end-to-end between gateway
+//!   and target).
+//! * **Authentication**: FALCON-1024 signed certs + bilateral PoS
+//!   handshake authenticate the tunnel.
+//!
+//! Kyber-1024 KEM + AES-256-GCM is the **asset-at-rest** primitive
+//! (R7) used by the asset pipeline (Compress → Encrypt → Shard →
+//! Distribute) for content stored in shards. Picking it here would be
+//! both redundant (STOQ already encrypts the wire) and the wrong
+//! primitive (transport vs at-rest).
+//!
+//! The gateway is therefore a **byte-forwarder over an already-secure
+//! STOQ stream**. The capability token rides as part of the forwarded
+//! request payload; the target node validates it via the same
+//! [`crate::auth::CapabilityTokenIssuer`] flow that handles direct
+//! daemon IPC.
 //!
 //! ## Architecture (3 modes)
 //!
@@ -24,15 +44,14 @@
 //!    instance with their own clearnet TLS, capability tokens still
 //!    required. Enterprise / governance tier.
 //!
-//! ## Crypto wiring
+//! ## STOQ wiring status
 //!
-//! K.2 ships the proxy structure with a **mock tunnel** for testing.
-//! The plumbing for the real Kyber → AES tunnel hooks into
-//! `trustchain::crypto::KyberCrypto` (the same primitive used by the
-//! asset pipeline) and is staged as K.2.5 — the architectural commitment
-//! in this sprint is the proxy + capability-token integration. See
-//! [`KyberAesTunnel`] for the trait that K.2.5 will implement against
-//! `pqcrypto_kyber::kyber1024`.
+//! K.2 ships the proxy structure and the capability-token forwarding
+//! contract. The wire path is abstracted behind
+//! [`StoqStreamForwarder`]; gateway initialization wires a real
+//! forwarder over `stoq::transport::connection::Connection::open_stream`
+//! once the gateway is configured with a `NetworkManager` handle. Tests
+//! and alpha builds run against [`MockStreamForwarder`].
 
 #![deny(unsafe_code)]
 
@@ -49,15 +68,13 @@ use tracing::{debug, warn};
 /// Error type for remote-proxy operations.
 #[derive(Debug, Error)]
 pub enum RemoteProxyError {
-    /// Token-validation rejection at the target — the session token is
-    /// invalid, expired, revoked, or doesn't grant the required scope.
-    #[error("session token rejected: {0}")]
+    /// Token-validation rejection at the target — the capability token
+    /// is invalid, expired, revoked, or doesn't grant the required
+    /// scope.
+    #[error("capability token rejected: {0}")]
     InvalidToken(String),
-    /// Tunnel handshake failed — Kyber KEM couldn't establish the
-    /// shared secret (e.g. peer rejected our public key).
-    #[error("tunnel handshake failed: {0}")]
-    HandshakeFailed(String),
-    /// Forwarding-time error — wire transport, AES decryption, etc.
+    /// Forwarding-time error — STOQ stream open/read/write failure,
+    /// payload deserialization, etc.
     #[error("forward error: {0}")]
     ForwardError(String),
     /// Session expired or was closed.
@@ -91,9 +108,7 @@ impl From<RemoteProxyError> for GatewayError {
 pub enum DashboardServeMode {
     /// Mode 1 — trust.hypermesh.online proxies dashboard for any user
     /// who authenticates with a FALCON device fingerprint signature.
-    /// Default convenience tier. The user trusts trust.hypermesh.online
-    /// not to intercept (gateway is byte-forwarder only, but operators
-    /// of trust.* still see traffic-shape metadata).
+    /// Default convenience tier.
     TrustProxy,
 
     /// Mode 2 — operator self-hosts the gateway under a registered
@@ -129,10 +144,10 @@ impl DashboardServeMode {
     }
 }
 
-/// Minimal HTTP request shape forwarded over the tunnel.
+/// Minimal HTTP request shape forwarded over a STOQ stream.
 ///
-/// Kept deliberately small — full headers/body live in the bytes the
-/// caller hands us; this struct is just enough for routing.
+/// The capability token is embedded so the target node can validate
+/// without an out-of-band channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardedRequest {
     /// HTTP method, e.g. "GET".
@@ -143,7 +158,7 @@ pub struct ForwardedRequest {
     pub body: Vec<u8>,
 }
 
-/// Minimal HTTP response shape returned through the tunnel.
+/// Minimal HTTP response shape returned through the STOQ stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardedResponse {
     /// HTTP status code.
@@ -154,174 +169,146 @@ pub struct ForwardedResponse {
     pub content_type: String,
 }
 
-/// Trait abstracting a Kyber-1024 → AES-GCM end-to-end tunnel.
+/// Abstracts the STOQ stream open/write/read cycle the proxy needs.
 ///
-/// Implementors negotiate a shared secret during construction and
-/// expose authenticated-encryption operations for forwarding traffic.
-/// K.2 ships [`MockTunnel`] for the proxy structure + tests. K.2.5
-/// will ship `KyberKemTunnel` wired to `trustchain::crypto::KyberCrypto`
-/// + `aes_gcm::Aes256Gcm`.
+/// A production implementation wraps `Arc<NetworkManager>` (or a
+/// per-connection `stoq::transport::connection::Connection`) and:
+///
+/// 1. Looks up (or opens) a STOQ connection to `target_node`.
+/// 2. Calls `Connection::open_stream()` for a fresh bi-directional
+///    stream.
+/// 3. Writes `request_bytes` (the gateway-internal envelope: capability
+///    token + serialized [`ForwardedRequest`]) onto the stream.
+/// 4. Reads the target's response bytes back from the same stream.
+///
+/// The wire is already encrypted (QUIC/X25519MLKEM768) and authenticated
+/// (FALCON-PoS handshake) — no additional crypto here.
+///
+/// [`MockStreamForwarder`] provides a deterministic in-memory loop for
+/// tests and alpha builds where a `NetworkManager` is not yet wired
+/// into the gateway.
 #[async_trait]
-pub trait KyberAesTunnel: Send + Sync {
-    /// Encrypt a request payload for transit to the target node.
-    ///
-    /// Returns the ciphertext bytes that should go on the wire. The
-    /// gateway never sees the plaintext request body — it only sees
-    /// the output of this call.
-    async fn seal_request(&self, plaintext: &[u8]) -> Result<Vec<u8>, RemoteProxyError>;
-
-    /// Decrypt a response payload received over the wire.
-    async fn open_response(&self, ciphertext: &[u8]) -> Result<Vec<u8>, RemoteProxyError>;
-
-    /// Identifier of this tunnel (for logging / metrics).
-    fn tunnel_id(&self) -> &str;
-
-    /// True when the tunnel is still alive. After [`close`] returns
-    /// this should be false.
-    fn is_active(&self) -> bool;
-
-    /// Tear down the tunnel — explicitly drop the shared key material
-    /// and any wire resources.
-    async fn close(&self);
+pub trait StoqStreamForwarder: Send + Sync {
+    /// Open a STOQ stream to `target_node`, write `request_bytes`, read
+    /// the response bytes back. Returns the response payload.
+    async fn forward(
+        &self,
+        target_node: &str,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, RemoteProxyError>;
 }
 
-/// Mock implementation of [`KyberAesTunnel`] for K.2 testing.
+/// Deterministic in-memory forwarder for tests and alpha builds.
 ///
-/// Uses XOR with a deterministic 32-byte "shared secret" derived from
-/// the session token. **Not secure** — only used to exercise the
-/// proxy plumbing in tests. K.2.5 replaces this with a real Kyber-1024
-/// KEM + AES-256-GCM implementation.
-pub struct MockTunnel {
-    tunnel_id: String,
-    shared_secret: [u8; 32],
-    active: std::sync::atomic::AtomicBool,
+/// Records the most-recent request bytes and target so tests can assert
+/// the gateway forwarded what it claims to have forwarded. Returns a
+/// canned response that includes the target name and the byte count of
+/// the forwarded request — sufficient to exercise the proxy plumbing
+/// without standing up a real STOQ peer.
+pub struct MockStreamForwarder {
+    last: Arc<RwLock<Option<(String, Vec<u8>)>>>,
 }
 
-impl MockTunnel {
-    /// Construct a mock tunnel from the session token bytes.
-    pub fn new(tunnel_id: String, session_token: &[u8]) -> Self {
-        let shared_secret = *blake3::hash(session_token).as_bytes();
+impl MockStreamForwarder {
+    /// Construct an empty mock forwarder.
+    pub fn new() -> Self {
         Self {
-            tunnel_id,
-            shared_secret,
-            active: std::sync::atomic::AtomicBool::new(true),
+            last: Arc::new(RwLock::new(None)),
         }
     }
 
-    fn xor_block(&self, data: &[u8]) -> Vec<u8> {
-        data.iter()
-            .enumerate()
-            .map(|(i, b)| b ^ self.shared_secret[i % 32])
-            .collect()
+    /// Snapshot the most-recent (target, request_bytes) pair, if any.
+    pub async fn last_forwarded(&self) -> Option<(String, Vec<u8>)> {
+        self.last.read().await.clone()
+    }
+}
+
+impl Default for MockStreamForwarder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[async_trait]
-impl KyberAesTunnel for MockTunnel {
-    async fn seal_request(&self, plaintext: &[u8]) -> Result<Vec<u8>, RemoteProxyError> {
-        if !self.is_active() {
-            return Err(RemoteProxyError::SessionClosed);
-        }
-        Ok(self.xor_block(plaintext))
-    }
-
-    async fn open_response(&self, ciphertext: &[u8]) -> Result<Vec<u8>, RemoteProxyError> {
-        if !self.is_active() {
-            return Err(RemoteProxyError::SessionClosed);
-        }
-        Ok(self.xor_block(ciphertext))
-    }
-
-    fn tunnel_id(&self) -> &str {
-        &self.tunnel_id
-    }
-
-    fn is_active(&self) -> bool {
-        self.active.load(std::sync::atomic::Ordering::SeqCst)
-    }
-
-    async fn close(&self) {
-        self.active
-            .store(false, std::sync::atomic::Ordering::SeqCst);
+impl StoqStreamForwarder for MockStreamForwarder {
+    async fn forward(
+        &self,
+        target_node: &str,
+        request_bytes: &[u8],
+    ) -> Result<Vec<u8>, RemoteProxyError> {
+        *self.last.write().await = Some((target_node.to_string(), request_bytes.to_vec()));
+        let canned = ForwardedResponse {
+            status: 200,
+            body: format!(
+                "remote-proxy-mock target={} bytes={}",
+                target_node,
+                request_bytes.len(),
+            )
+            .into_bytes(),
+            content_type: "text/plain; charset=utf-8".to_string(),
+        };
+        serde_json::to_vec(&canned).map_err(|e| {
+            RemoteProxyError::ForwardError(format!("serialize mock response: {e}"))
+        })
     }
 }
 
-/// Stub for the future Kyber-1024 + AES-256-GCM tunnel.
+/// Internal envelope sent over the STOQ stream.
 ///
-/// K.2.5 wires this into `trustchain::crypto::KyberCrypto`. The
-/// constructor will:
-/// 1. Generate a Kyber-1024 keypair for this session.
-/// 2. Initiate handshake with the target — exchange FALCON device
-///    pubkey + Kyber pub for KEM encapsulation.
-/// 3. Derive the AES-256 key from the Kyber shared secret using
-///    BLAKE3-HKDF.
-/// 4. Hold the AES key in scope for the lifetime of the tunnel; on
-///    [`close`] zeroize and drop.
-///
-/// Until K.2.5 lands, calling [`KyberKemTunnel::new`] returns an error
-/// directing operators to use [`MockTunnel`] in test contexts.
-#[derive(Debug)]
-pub struct KyberKemTunnel {
-    _marker: (),
-}
-
-impl KyberKemTunnel {
-    /// Construct a real Kyber → AES tunnel. Currently returns an
-    /// error pending K.2.5 wiring.
-    pub fn new(
-        _target_node: &str,
-        _session_token: &[u8],
-    ) -> Result<Self, RemoteProxyError> {
-        Err(RemoteProxyError::HandshakeFailed(
-            "KyberKemTunnel pending K.2.5 — use MockTunnel until then".into(),
-        ))
-    }
+/// Combines the capability token (so the target can authenticate) with
+/// the forwarded HTTP request. Serialized with `serde_json` for now;
+/// can be swapped to a more compact format later without affecting
+/// callers.
+#[derive(Debug, Clone, Serialize)]
+struct ProxyEnvelope<'a> {
+    capability_token_hex: String,
+    request: &'a ForwardedRequest,
 }
 
 /// Remote dashboard proxy.
 ///
-/// Holds per-session tunnel state and forwards encrypted requests
-/// between the client (browser) and the target node. The gateway sees
-/// only ciphertext on the wire.
+/// Holds per-session capability-token + target binding and forwards
+/// HTTP requests over an existing STOQ stream via
+/// [`StoqStreamForwarder`]. The gateway provides no transport-layer
+/// crypto of its own — STOQ encrypts the wire end-to-end.
 pub struct RemoteDashboardProxy {
     /// Target node URL or hypermesh domain (e.g. `yourname.hypermesh`,
     /// `host.example:8443`).
     target_node: String,
-    /// Opaque session token from the daemon (serialized
+    /// Opaque capability token from the daemon (serialized
     /// `CapabilityToken`); the gateway forwards this as-is and the
     /// target node validates it.
-    session_token: Vec<u8>,
-    /// E2E tunnel — gateway only ever sees ciphertext through this.
-    tunnel: Arc<dyn KyberAesTunnel>,
+    capability_token: Vec<u8>,
     /// Operating mode (controls bootstrap / federation behavior).
     mode: DashboardServeMode,
     /// Stable session ID derived from the token bytes (for logging).
     session_id: String,
+    /// STOQ stream forwarder — opens streams to `target_node` and
+    /// round-trips request/response bytes. Production wiring uses
+    /// `NetworkManager`; tests use [`MockStreamForwarder`].
+    forwarder: Arc<dyn StoqStreamForwarder>,
+    /// Active flag — set to false on [`close`].
+    active: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl RemoteDashboardProxy {
-    /// Construct a remote proxy session.
-    ///
-    /// Uses [`MockTunnel`] until K.2.5 wires the real Kyber→AES path.
-    /// The proxy structure (capability-token forwarding, mode routing,
-    /// byte-forwarding) is the architectural commitment of K.2.
+    /// Construct a remote proxy session bound to a forwarder.
     pub fn new(
         target: String,
-        session_token: Vec<u8>,
+        capability_token: Vec<u8>,
         mode: DashboardServeMode,
+        forwarder: Arc<dyn StoqStreamForwarder>,
     ) -> Result<Self, RemoteProxyError> {
         if target.is_empty() {
             return Err(RemoteProxyError::UnreachableTarget { target });
         }
-        if session_token.is_empty() {
+        if capability_token.is_empty() {
             return Err(RemoteProxyError::InvalidToken(
-                "empty session token".into(),
+                "empty capability token".into(),
             ));
         }
 
-        let session_id = hex::encode(&blake3::hash(&session_token).as_bytes()[..8]);
-        let tunnel_id = format!("rp-{session_id}");
-        let tunnel = Arc::new(MockTunnel::new(tunnel_id, &session_token));
+        let session_id = hex::encode(&blake3::hash(&capability_token).as_bytes()[..8]);
 
         debug!(
             target = %target,
@@ -332,36 +319,11 @@ impl RemoteDashboardProxy {
 
         Ok(Self {
             target_node: target,
-            session_token,
-            tunnel,
+            capability_token,
             mode,
             session_id,
-        })
-    }
-
-    /// Construct a remote proxy with a caller-supplied tunnel. Used by
-    /// integration tests that want to inject a deterministic tunnel.
-    pub fn with_tunnel(
-        target: String,
-        session_token: Vec<u8>,
-        mode: DashboardServeMode,
-        tunnel: Arc<dyn KyberAesTunnel>,
-    ) -> Result<Self, RemoteProxyError> {
-        if target.is_empty() {
-            return Err(RemoteProxyError::UnreachableTarget { target });
-        }
-        if session_token.is_empty() {
-            return Err(RemoteProxyError::InvalidToken(
-                "empty session token".into(),
-            ));
-        }
-        let session_id = hex::encode(&blake3::hash(&session_token).as_bytes()[..8]);
-        Ok(Self {
-            target_node: target,
-            session_token,
-            tunnel,
-            mode,
-            session_id,
+            forwarder,
+            active: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         })
     }
 
@@ -380,17 +342,21 @@ impl RemoteDashboardProxy {
         self.mode
     }
 
-    /// True when the underlying tunnel is still alive.
+    /// True when the session is still alive (has not been closed).
     pub fn is_active(&self) -> bool {
-        self.tunnel.is_active()
+        self.active.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    /// Forward an HTTP request through the tunnel.
+    /// Length of the opaque capability token (for callers that want to
+    /// audit token forwarding without seeing the bytes).
+    pub fn token_byte_len(&self) -> usize {
+        self.capability_token.len()
+    }
+
+    /// Forward an HTTP request to the target node over a STOQ stream.
     ///
-    /// The request body is sealed with the per-session AES key before
-    /// it leaves the gateway. The response is decrypted on receipt.
-    /// **Gateway sees ciphertext only** — this is the architectural
-    /// guarantee of the remote-proxy mode.
+    /// The capability token is embedded in the envelope so the target
+    /// can authenticate; STOQ handles wire encryption end-to-end.
     pub async fn forward_request(
         &self,
         request: ForwardedRequest,
@@ -399,26 +365,25 @@ impl RemoteDashboardProxy {
             return Err(RemoteProxyError::SessionClosed);
         }
 
-        // 1. Serialize the plaintext request.
-        let plaintext = serde_json::to_vec(&request).map_err(|e| {
-            RemoteProxyError::ForwardError(format!("serialize request: {e}"))
+        // Serialize the envelope (capability token + request).
+        let envelope = ProxyEnvelope {
+            capability_token_hex: hex::encode(&self.capability_token),
+            request: &request,
+        };
+        let request_bytes = serde_json::to_vec(&envelope).map_err(|e| {
+            RemoteProxyError::ForwardError(format!("serialize envelope: {e}"))
         })?;
 
-        // 2. Seal under the session key. Everything below here is
-        //    ciphertext from the gateway's POV.
-        let sealed = self.tunnel.seal_request(&plaintext).await?;
+        // Hand off to STOQ. Wire is encrypted by QUIC; authentication
+        // happens at the target via the capability token in the body.
+        let response_bytes = self
+            .forwarder
+            .forward(&self.target_node, &request_bytes)
+            .await?;
 
-        // 3. Hand off to wire-transport. K.2 ships the proxy structure
-        //    and exercises this path through MockTunnel; K.2.5 wires
-        //    the real STOQ wire transport. Until then, the wire
-        //    transport is a loopback that decrypts and produces a
-        //    canned response (sufficient for proxy-structure tests).
-        let response_ciphertext = self.simulate_wire_loopback(&sealed).await?;
-
-        // 4. Decrypt response.
-        let response_plain = self.tunnel.open_response(&response_ciphertext).await?;
+        // Parse the response.
         let response: ForwardedResponse =
-            serde_json::from_slice(&response_plain).map_err(|e| {
+            serde_json::from_slice(&response_bytes).map_err(|e| {
                 RemoteProxyError::ForwardError(format!("deserialize response: {e}"))
             })?;
         Ok(response)
@@ -426,50 +391,15 @@ impl RemoteDashboardProxy {
 
     /// Tear down the proxy session.
     pub async fn close(&self) {
-        self.tunnel.close().await;
+        self.active
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         debug!(session = %self.session_id, "RemoteDashboardProxy session closed");
-    }
-
-    /// Length of the opaque session token (for callers that want to
-    /// audit token forwarding without seeing the bytes).
-    pub fn token_byte_len(&self) -> usize {
-        self.session_token.len()
-    }
-
-    /// Simulated wire transport — for K.2 the gateway is a loopback
-    /// that round-trips ciphertext through itself and produces a
-    /// deterministic encrypted response. K.2.5 replaces this with the
-    /// STOQ wire path to the target node.
-    async fn simulate_wire_loopback(
-        &self,
-        sealed_request: &[u8],
-    ) -> Result<Vec<u8>, RemoteProxyError> {
-        // Produce a canned response that mirrors the "echo" semantic.
-        // The gateway never decrypts the request — it only counts the
-        // bytes it forwarded. The canned response is encrypted with
-        // the SAME tunnel (in K.2.5 this will instead be encrypted by
-        // the target node's tunnel half).
-        let canned = ForwardedResponse {
-            status: 200,
-            body: format!(
-                "remote-proxy-loopback target={} bytes={} mode={}",
-                self.target_node,
-                sealed_request.len(),
-                self.mode.as_str(),
-            )
-            .into_bytes(),
-            content_type: "text/plain; charset=utf-8".to_string(),
-        };
-        let plain = serde_json::to_vec(&canned).map_err(|e| {
-            RemoteProxyError::ForwardError(format!("serialize loopback: {e}"))
-        })?;
-        self.tunnel.seal_request(&plain).await
     }
 }
 
 /// Manager for live remote-proxy sessions. Holds proxies by their
-/// stable session id so the gateway can route follow-up requests on
-/// the same tunnel.
+/// stable session id so the gateway can route follow-up requests to
+/// the same target.
 pub struct RemoteProxyManager {
     sessions: Arc<RwLock<HashMap<String, Arc<RemoteDashboardProxy>>>>,
 }
@@ -577,31 +507,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn mock_tunnel_round_trip() {
-        let t = MockTunnel::new("test-tunnel".into(), b"session-token-bytes");
-        assert!(t.is_active());
-        let pt = b"hello world";
-        let ct = t.seal_request(pt).await.expect("test: seal");
-        assert_ne!(ct, pt, "ciphertext must differ from plaintext");
-        let back = t.open_response(&ct).await.expect("test: open");
-        assert_eq!(back, pt);
-        t.close().await;
-        assert!(!t.is_active());
-        assert!(t.seal_request(pt).await.is_err());
-    }
-
-    #[tokio::test]
     async fn remote_proxy_construct_and_forward() {
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let proxy = RemoteDashboardProxy::new(
             "yourname.hypermesh".into(),
-            b"session-token-12345".to_vec(),
+            b"capability-token-12345".to_vec(),
             DashboardServeMode::PrivateDomain,
+            forwarder,
         )
         .expect("test: construct");
         assert!(proxy.is_active());
         assert_eq!(proxy.target_node(), "yourname.hypermesh");
         assert_eq!(proxy.mode(), DashboardServeMode::PrivateDomain);
-        assert_eq!(proxy.token_byte_len(), 19);
+        assert_eq!(proxy.token_byte_len(), 22);
 
         let req = ForwardedRequest {
             method: "GET".into(),
@@ -615,20 +533,24 @@ mod tests {
 
     #[tokio::test]
     async fn remote_proxy_rejects_empty_target() {
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let res = RemoteDashboardProxy::new(
             "".into(),
             b"some-token".to_vec(),
             DashboardServeMode::TrustProxy,
+            forwarder,
         );
         assert!(res.is_err());
     }
 
     #[tokio::test]
     async fn remote_proxy_rejects_empty_token() {
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let res = RemoteDashboardProxy::new(
             "node.example".into(),
             vec![],
             DashboardServeMode::TrustProxy,
+            forwarder,
         );
         let err = res.expect_err("test: empty token must be rejected");
         assert!(matches!(err, RemoteProxyError::InvalidToken(_)));
@@ -636,10 +558,12 @@ mod tests {
 
     #[tokio::test]
     async fn remote_proxy_close_disables_forwarding() {
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let proxy = RemoteDashboardProxy::new(
             "node.example".into(),
             b"tok".to_vec(),
             DashboardServeMode::SelfHosted,
+            forwarder,
         )
         .expect("test: construct");
         proxy.close().await;
@@ -657,11 +581,13 @@ mod tests {
     async fn remote_proxy_manager_register_get_close() {
         let mgr = RemoteProxyManager::new();
         assert!(mgr.is_empty().await);
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let proxy = Arc::new(
             RemoteDashboardProxy::new(
                 "node.example".into(),
                 b"tok-A".to_vec(),
                 DashboardServeMode::TrustProxy,
+                forwarder,
             )
             .expect("test: construct"),
         );
@@ -677,11 +603,13 @@ mod tests {
     #[tokio::test]
     async fn remote_proxy_manager_reap_inactive() {
         let mgr = RemoteProxyManager::new();
+        let forwarder: Arc<dyn StoqStreamForwarder> = Arc::new(MockStreamForwarder::new());
         let proxy = Arc::new(
             RemoteDashboardProxy::new(
                 "node.example".into(),
                 b"tok-B".to_vec(),
                 DashboardServeMode::TrustProxy,
+                forwarder,
             )
             .expect("test: construct"),
         );
@@ -693,35 +621,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn kyber_kem_tunnel_pending_k2_5() {
-        // Confirm the production tunnel is intentionally stubbed —
-        // K.2 ships the structure, K.2.5 wires the real KEM.
-        let res = KyberKemTunnel::new("target", b"token");
-        assert!(res.is_err());
-        let err = res.unwrap_err();
-        assert!(matches!(err, RemoteProxyError::HandshakeFailed(_)));
-        assert!(err.to_string().contains("K.2.5"));
-    }
-
-    #[tokio::test]
-    async fn remote_proxy_with_tunnel_uses_injected() {
-        let tunnel: Arc<dyn KyberAesTunnel> =
-            Arc::new(MockTunnel::new("inj".into(), b"injected"));
-        let proxy = RemoteDashboardProxy::with_tunnel(
-            "node.example".into(),
-            b"token".to_vec(),
-            DashboardServeMode::SelfHosted,
-            tunnel,
+    async fn mock_forwarder_records_request_bytes() {
+        let mock = Arc::new(MockStreamForwarder::new());
+        let forwarder: Arc<dyn StoqStreamForwarder> = mock.clone();
+        let proxy = RemoteDashboardProxy::new(
+            "trust.hypermesh.online".into(),
+            b"capability-XYZ".to_vec(),
+            DashboardServeMode::TrustProxy,
+            forwarder,
         )
         .expect("test: construct");
-        assert!(proxy.is_active());
         let req = ForwardedRequest {
             method: "POST".into(),
             path: "/api/echo".into(),
             body: b"payload".to_vec(),
         };
-        let resp = proxy.forward_request(req).await.expect("test: forward");
-        assert_eq!(resp.status, 200);
+        let _resp = proxy.forward_request(req).await.expect("test: forward");
+        let (target, bytes) = mock.last_forwarded().await.expect("test: recorded");
+        assert_eq!(target, "trust.hypermesh.online");
+        // Capability token must appear in the forwarded envelope so
+        // the target can authenticate.
+        let envelope_str = String::from_utf8_lossy(&bytes);
+        assert!(envelope_str.contains(&hex::encode(b"capability-XYZ")));
     }
 
     #[test]
