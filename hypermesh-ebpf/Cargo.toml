@@ -13,11 +13,6 @@ workspace = true
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
 
-# eBPF infrastructure
-aya = "0.12"
-aya-log = "0.2"
-libbpf-sys = "1.4"
-
 # Async runtime (for AF_XDP socket operations and validation hooks)
 tokio = { workspace = true }
 async-trait = { workspace = true }
@@ -41,11 +36,22 @@ thiserror = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
-# System calls (AF_XDP socket probing behind kernel-attach)
-libc = { version = "0.2", optional = true }
-
 # Data structures
 parking_lot = { workspace = true }
+
+# -----------------------------------------------------------------------
+# Linux-only deps: aya/libbpf-sys/libc require Linux kernel headers and
+# will not link on macOS/Windows. Phase C.2: target-gate so non-Linux
+# can compile the userspace-only HyperMeshEbpf API surface.
+# -----------------------------------------------------------------------
+[target.'cfg(target_os = "linux")'.dependencies]
+# eBPF infrastructure (Linux kernel BPF integration)
+aya = "0.12"
+aya-log = "0.2"
+libbpf-sys = "1.4"
+
+# System calls (AF_XDP socket probing behind kernel-attach)
+libc = { version = "0.2", optional = true }
 
 [build-dependencies]
 # No external build deps needed; build.rs uses only std + Command

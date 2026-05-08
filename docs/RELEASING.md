@@ -147,28 +147,41 @@ daemon does not trust new public keys at runtime.
 
 ## eBPF feature gating
 
-`hypermesh-ebpf` is a hard dependency of `blockmatrix`. It currently includes
-`aya` and `libbpf-sys` unconditionally, both of which require the Linux kernel
-build environment. As a result:
+`hypermesh-ebpf` is a hard dependency of `blockmatrix`. As of Phase C.2,
+`aya`, `aya-log`, `libbpf-sys`, and `libc` are gated as
+`[target.'cfg(target_os = "linux")'.dependencies]` in
+`hypermesh-ebpf/Cargo.toml`. All `aya`/`libbpf-sys` source-level usage is
+already behind `#[cfg(feature = "kernel-attach")]`, and the
+`kernel-attach` feature itself only enables `libc` on Linux. The result:
+the eBPF crate's userspace API surface (`HyperMeshEbpf::new()`,
+`set_routing_rule`, `set_privacy_tier`, `metrics()`, etc.) compiles on
+all targets, with kernel-attach functionality silently unavailable on
+non-Linux (graceful degradation per the project's "full eBPF →
+eBPF without AF_XDP → userspace" model).
 
-| Target | Build status | Features included |
-|--------|--------------|-------------------|
-| `x86_64-unknown-linux-musl`     | **stable**       | `caesar,intelligence` |
-| `aarch64-unknown-linux-musl`    | **stable**       | `caesar,intelligence` |
-| `x86_64-apple-darwin`           | **experimental** | `caesar` (intelligence dropped) |
-| `aarch64-apple-darwin`          | **experimental** | `caesar` (intelligence dropped) |
-| `x86_64-pc-windows-msvc`        | **experimental** | `caesar` (intelligence dropped) |
+| Target | Build status | Features included | Notes |
+|--------|--------------|-------------------|-------|
+| `x86_64-unknown-linux-musl`     | **stable**       | `caesar,intelligence` | Primary deploy target |
+| `aarch64-unknown-linux-musl`    | **stable**       | `caesar,intelligence` | Raspberry Pi, ARM cloud |
+| `x86_64-apple-darwin`           | **experimental** | `caesar`              | hypermesh-ebpf compiles; broader cross-platform work pending (C.2.5) |
+| `aarch64-apple-darwin`          | **experimental** | `caesar`              | Same as above |
+| `x86_64-pc-windows-msvc`        | **experimental** | `caesar`              | Same as above |
 
-Experimental targets are marked `continue-on-error: true` in the matrix so
-the workflow surfaces porting progress without blocking foundation releases.
-If a non-Linux build fails, that target is simply omitted from
-`binary_hashes` and the manifest still ships.
+Experimental targets are still marked `continue-on-error: true` in the
+matrix because **other** Linux-specific code in the workspace has not yet
+been gated — notably:
 
-The follow-up work (Phase C.2) is to gate `aya` and `libbpf-sys` as
-`[target.'cfg(target_os = "linux")']` deps in `hypermesh-ebpf/Cargo.toml`,
-guard the source modules with `#[cfg(target_os = "linux")]`, and provide
-no-op stubs on other platforms. Once that lands, all five targets become
-stable.
+- `blockmatrix/src/assets/proxy/nat_translation/translation.rs`
+  unconditionally imports `libc::{mmap, munmap, MAP_PRIVATE, ...}` for
+  NAT-translated memory mapping. Needs `cfg(unix)` gating with a Windows
+  fallback (e.g. `VirtualAlloc`/`VirtualFree`).
+- Various `cfg(target_os = "linux")` gates in `blockmatrix/src/container/`,
+  `metrics/hardware.rs`, and `os_integration/` whose non-Linux branches
+  return placeholder values rather than real platform implementations.
+
+The follow-up sprint (**Phase C.2.5**) is the broader cross-platform port
+of `blockmatrix`. Once that lands, the non-Linux entries in this matrix
+flip to `stable` and `continue-on-error` is removed.
 
 ## Per-platform install
 
@@ -200,14 +213,121 @@ Same command as Apple Silicon. Detects `x86_64-apple-darwin`, installs to
 
 ### Windows
 
-`install.sh` does not run on Windows. Download the `.zip` archive directly:
+PowerShell installer (Phase C.2):
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.ps1 | iex
+```
+
+Or with explicit options:
+
+```powershell
+# Download install.ps1 first, then run with arguments
+iwr -useb https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.ps1 -OutFile install.ps1
+.\install.ps1 -Version v0.2.0 -Prefix "$env:LOCALAPPDATA\HyperMesh"
+```
+
+Defaults to `%ProgramFiles%\HyperMesh\bin\hypermesh.exe` when run elevated;
+falls back to `%LOCALAPPDATA%\HyperMesh\bin\hypermesh.exe` for non-elevated
+sessions. Adds the install dir to the user-level `PATH` automatically (open
+a new shell to pick it up). SHA-256 verification against
+`release-manifest.json` runs by default; pass `-NoVerify` to skip.
+
+If you prefer manual install, download the archive:
 
 ```
 https://github.com/hypermesh-online/hypermesh/releases/download/v0.2.0/hypermesh-v0.2.0-x86_64-pc-windows-msvc.zip
 ```
 
-Extract `hypermesh.exe` to a directory on `PATH`. A PowerShell installer
-(`install.ps1`) is a Phase C.2 follow-up.
+Extract `hypermesh.exe` to a directory on `PATH`.
+
+> Note: Until Phase C.2.5 ships the broader cross-platform port (see "eBPF
+> feature gating" above), the Windows binary may be absent from a given
+> release. Check the GitHub Release page for the Windows zip; if missing,
+> the build failed and only Linux artifacts shipped for that tag.
+
+## macOS code signing & notarization
+
+Releases are produced unsigned by the GitHub Actions workflow. To sign
+and notarize a macOS binary so users do not see "macOS cannot verify the
+developer", the foundation operator runs the following one-time-per-release
+flow on a macOS machine with the foundation Apple Developer ID Application
+certificate installed:
+
+```bash
+# 1. Download the unsigned archive
+gh release download v0.2.0 \
+    --repo hypermesh-online/hypermesh \
+    --pattern 'hypermesh-v0.2.0-aarch64-apple-darwin.tar.gz' \
+    --pattern 'hypermesh-v0.2.0-x86_64-apple-darwin.tar.gz'
+
+# 2. Extract, sign, re-archive
+for triple in aarch64-apple-darwin x86_64-apple-darwin; do
+    tar xzf "hypermesh-v0.2.0-${triple}.tar.gz"
+    cd "hypermesh-v0.2.0-${triple}"
+
+    # Sign with hardened runtime + timestamp (required for notarization)
+    codesign --force --options runtime --timestamp \
+        --sign "Developer ID Application: Hypermesh Foundation (TEAMID)" \
+        hypermesh
+
+    # Verify
+    codesign --verify --strict --verbose=2 hypermesh
+    spctl --assess --type execute --verbose hypermesh   # may fail until notarized
+
+    cd ..
+    tar czf "hypermesh-v0.2.0-${triple}.tar.gz" "hypermesh-v0.2.0-${triple}"
+done
+
+# 3. Notarize (one ZIP per arch, Apple's notary service is per-binary)
+for triple in aarch64-apple-darwin x86_64-apple-darwin; do
+    # notarytool wants a .zip, not .tar.gz
+    cd "hypermesh-v0.2.0-${triple}"
+    zip -r "../notarize-${triple}.zip" hypermesh
+    cd ..
+
+    xcrun notarytool submit "notarize-${triple}.zip" \
+        --apple-id "ops@hypermesh.online" \
+        --team-id "TEAMID" \
+        --password "@keychain:hm-notary" \
+        --wait
+done
+
+# 4. Re-upload signed archives, replacing originals
+gh release upload v0.2.0 \
+    --repo hypermesh-online/hypermesh \
+    --clobber \
+    hypermesh-v0.2.0-{aarch64,x86_64}-apple-darwin.tar.gz
+
+# 5. Recompute and re-sign release-manifest.json (binary hashes changed!)
+#    See "Sign offline" section above. The signing payload changed, so the
+#    foundation FALCON-1024 signature must also be regenerated.
+```
+
+The notary password lives in macOS Keychain (`security add-generic-password
+-s hm-notary -a ops@hypermesh.online -w <app-specific-password>`); it is
+**not** stored in the repo. The Apple Developer ID certificate and notary
+credentials are foundation-operator concerns; they are not wired into the
+GitHub Actions workflow because that would require uploading those secrets
+to GitHub, which is contrary to the offline-key model used for the
+FALCON-1024 release manifest signing.
+
+### Without code signing
+
+If a release ships unsigned (the default from the GitHub Actions workflow),
+macOS users will see "macOS cannot verify the developer" on first launch.
+They can either:
+
+```bash
+# Strip the quarantine attribute set by Gatekeeper
+xattr -d com.apple.quarantine /usr/local/bin/hypermesh
+```
+
+or right-click → Open in Finder, then click "Open" in the dialog (one-time
+override). The `install.sh` script does not currently strip the quarantine
+attribute automatically; doing so would require either elevated privileges
+or running inside the user's shell context, both of which complicate the
+"pipe curl to bash" UX.
 
 ## Updating an existing install
 
@@ -248,6 +368,11 @@ origin v0.2.0 && git tag -s v0.2.0 ... && git push origin v0.2.0`). Do not
 hand-edit `binary_hashes`.
 
 **A platform is missing from the release.**
-Check the build job for that target. If it failed with a `libbpf-sys` link
-error, that's the known Phase C.2 gap. If it failed for another reason,
-that's a real bug — file an issue.
+Check the build job for that target. As of Phase C.2, `libbpf-sys` is no
+longer in the non-Linux dep tree (target-gated), so a `libbpf-sys` link
+error on macOS/Windows would now be a regression. The remaining known gap
+is `blockmatrix`'s unconditional `libc::mmap` usage in
+`assets/proxy/nat_translation/translation.rs` and unimplemented non-Linux
+branches in `os_integration/`/`container/`/`metrics/hardware.rs` — those
+are tracked under Phase C.2.5. Any other failure is a real bug — file an
+issue.

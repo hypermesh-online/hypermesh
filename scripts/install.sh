@@ -66,7 +66,9 @@ detect_target() {
             ;;
         MINGW*|MSYS*|CYGWIN*)
             echo "ERROR: Windows install via bash is not supported." >&2
-            echo "Download hypermesh-<version>-x86_64-pc-windows-msvc.zip from:" >&2
+            echo "Use PowerShell instead:" >&2
+            echo "  iwr -useb https://raw.githubusercontent.com/$GITHUB_ORG/$GITHUB_REPO/main/scripts/install.ps1 | iex" >&2
+            echo "or download hypermesh-<version>-x86_64-pc-windows-msvc.zip from:" >&2
             echo "  https://github.com/$GITHUB_ORG/$GITHUB_REPO/releases" >&2
             echo "and extract hypermesh.exe to a directory on your PATH." >&2
             exit 1

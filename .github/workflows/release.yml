@@ -8,13 +8,20 @@ name: Release
 # operator signs the manifest offline with the FALCON-1024 root key and
 # re-uploads the signed version. See docs/RELEASING.md.
 #
-# eBPF feature gating
-# -------------------
-# `hypermesh-ebpf` (a hard dep of `blockmatrix`) currently includes `aya` and
-# `libbpf-sys` unconditionally. `libbpf-sys` requires Linux kernel headers and
-# will not link on macOS / Windows. Until those crates are gated as
-# `[target.'cfg(target_os = "linux")']` deps in hypermesh-ebpf/Cargo.toml
-# (Phase C.2 follow-up), only Linux targets are guaranteed buildable.
+# eBPF feature gating  (Phase C.2 — partial)
+# ------------------------------------------
+# `hypermesh-ebpf` now target-gates aya + libbpf-sys behind
+# `[target.'cfg(target_os = "linux")'.dependencies]`, so the eBPF crate
+# itself compiles on macOS/Windows (graceful degradation: kernel attach
+# unavailable, userspace API surface intact -- HyperMeshEbpf::new(),
+# set_routing_rule, set_privacy_tier, metrics() all work as no-ops).
+#
+# However, `blockmatrix` still has Linux-specific usage that has not yet
+# been gated (notably `assets/proxy/nat_translation/translation.rs`'s
+# unconditional `libc::{mmap, munmap, ...}` calls, plus various other
+# `cfg(target_os = "linux")` paths whose non-Linux branches need fleshing
+# out). Until that broader cross-platform work (Phase C.2.5) is complete,
+# non-Linux targets are kept experimental.
 #
 # Non-Linux targets are present in the matrix with `continue-on-error: true`
 # so the workflow surfaces porting progress without blocking foundation

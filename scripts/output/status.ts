@@ -499,7 +499,8 @@ export const crateStatuses: CrateStatus[] = [
         "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
         "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
         "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format",
-        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf"
+        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
+        "Cross-platform compile — Linux-only deps (aya/aya-log/libbpf-sys/libc) target-gated via [target.'cfg(target_os = \\\"linux\\\")'.dependencies] in Cargo.toml; non-Linux gets userspace-only no-op stubs that satisfy HyperMeshEbpf API surface (set_routing_rule, set_privacy_tier, metrics() return Ok with no-op). All aya usage in source is already #[cfg(feature = \\\"kernel-attach\\\")] gated. Verified: cargo tree shows aya/libbpf-sys absent from macOS/Windows dep trees, present only on Linux."
       ],
       "inDevelopment": [
         "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
