@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTrustchainCerts, useTrustchainFederation } from '@/lib/hooks/useBlockMatrix';
-import type { CertRecord } from '@/lib/blockmatrix-api';
+import type { CertRecord, FederationPeer } from '@/lib/blockmatrix-api';
 import { MetricCard } from './shared/MetricCard';
 import { StatusIndicator } from './shared/StatusIndicator';
 import { isExpiringSoon, isExpired } from './utils/dateFormatters';
@@ -34,7 +34,7 @@ function SecurityOverviewCards() {
       const daysUntilExpiry = Math.ceil((new Date(c.valid_to).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
       return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
     }).length,
-    revokedCertificates: certificates.filter(c => c.status === 'revoked').length,
+    expiredCertificates: certificates.filter(c => c.status === 'expired').length,
     totalCertificates: certificates.length
   };
   
@@ -57,9 +57,9 @@ function SecurityOverviewCards() {
         className="border-yellow-500/30"
       />
       <MetricCard
-        title="Revoked"
-        value={securityStats.revokedCertificates}
-        description="Revoked certificates"
+        title="Expired"
+        value={securityStats.expiredCertificates}
+        description="Expired certificates"
         icon={Lock}
         color="text-red-400"
         className="border-red-500/30"
@@ -248,7 +248,6 @@ function CertificateActions({ certificate }: { certificate: CertRecord }) {
 function CertificateDetails({ certificate }: { certificate: CertRecord }) {
   const expiringSoon = isExpiringSoon(certificate.valid_to);
   const expired = isExpired(certificate.valid_to);
-  const trustLevel = typeof certificate.trust_level === 'string' ? certificate.trust_level : 'unknown';
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -270,10 +269,8 @@ function CertificateDetails({ certificate }: { certificate: CertRecord }) {
         </div>
       </div>
       <div>
-        <span className="text-gray-400">Trust Level:</span>
-        <div className={cn('font-mono text-xs', getTrustLevelColor(trustLevel))}>
-          {trustLevel}
-        </div>
+        <span className="text-gray-400">Key Algorithm:</span>
+        <div className="text-cyan-400 font-mono text-xs truncate">{certificate.key_algorithm}</div>
       </div>
     </div>
   );
@@ -338,7 +335,7 @@ function FederationLoadingSkeleton() {
   );
 }
 
-function FederationPeerRow({ peer }: { peer: { node_id: string; trust_level: string;[key: string]: unknown } }) {
+function FederationPeerRow({ peer }: { peer: FederationPeer }) {
   const trustColor = getTrustLevelColor(peer.trust_level);
   return (
     <div className="border border-green-500/30 rounded-lg p-3 bg-green-500/5">

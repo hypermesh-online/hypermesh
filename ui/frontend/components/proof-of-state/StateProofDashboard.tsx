@@ -169,7 +169,7 @@ export function StateProofDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-cyan-400 font-mono truncate">
-              {identity?.key_algorithm ?? 'FALCON-1024'}
+              {identity?.falcon.key_algorithm ?? 'FALCON-1024'}
             </div>
             <p className="text-xs text-gray-400">
               {identity?.node_id

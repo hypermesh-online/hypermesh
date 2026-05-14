@@ -269,38 +269,72 @@ export interface TrustChainStatus {
   [key: string]: unknown;
 }
 
+export interface CertExtension {
+  oid: string;
+  critical: boolean;
+  name: string | null;
+}
+
 export interface CertRecord {
   id: string;
   subject: string;
   issuer: string;
   valid_from: string;
   valid_to: string;
-  status: string;
-  [key: string]: unknown;
+  status: 'active' | 'expired' | 'not_yet_valid';
+  serial_number: string;
+  signature_algorithm: string;
+  signature_algorithm_oid: string;
+  key_algorithm: string;
+  key_algorithm_oid: string;
+  fingerprint_sha256: string;
+  fingerprint_blake3: string;
+  key_usage: string[];
+  extended_key_usage: string[];
+  subject_alt_names: string[];
+  extensions: CertExtension[];
+  path: string;
 }
 
 export interface CertList {
+  node_id: string;
   certificates: CertRecord[];
   total: number;
-  [key: string]: unknown;
+  status: string;
+  error?: string;
+}
+
+export interface KeyInfo {
+  present: boolean;
+  bytes: number;
+  fingerprint: string | null;
+  key_algorithm: string;
 }
 
 export interface IdentityInfo {
   node_id: string;
-  public_key: string;
-  key_algorithm: string;
-  created_at: number;
-  [key: string]: unknown;
+  falcon: KeyInfo;
+  kyber: KeyInfo;
+  created_at: number | null;
+  privacy_mode: string;
+  status: string;
+}
+
+export interface FederationPeer {
+  node_id: string;
+  trust_level: 'full' | 'conditional' | 'untrusted';
+  joined_at?: number;
+  fingerprint?: string;
 }
 
 export interface FederationInfo {
-  peers: Array<{
-    node_id: string;
-    trust_level: string;
-    [key: string]: unknown;
-  }>;
+  node_id: string;
+  peers: FederationPeer[];
   total_peers: number;
-  [key: string]: unknown;
+  network_peers: number;
+  trust_levels: { full: number; conditional: number; untrusted: number };
+  status: string;
+  note: string;
 }
 
 // --- STOQ response types ---

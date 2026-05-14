@@ -167,17 +167,31 @@ export function SecurityMonitoringDashboard() {
           ) : identity.data ? (
             <div className="grid gap-3 md:grid-cols-2">
               <IdentityRow label="Node ID" value={identity.data.node_id} mono />
-              <IdentityRow label="Key Algorithm" value={identity.data.key_algorithm} />
+              <IdentityRow label="Privacy Mode" value={identity.data.privacy_mode} />
               <IdentityRow
-                label="Public Key"
-                value={identity.data.public_key.length > 32
-                  ? `${identity.data.public_key.slice(0, 16)}...${identity.data.public_key.slice(-16)}`
-                  : identity.data.public_key}
-                mono
+                label="Signing Key"
+                value={`${identity.data.falcon.key_algorithm}${
+                  identity.data.falcon.present ? ` · ${identity.data.falcon.bytes.toLocaleString()} bytes` : ' · not generated'
+                }`}
               />
               <IdentityRow
+                label="KEM Key"
+                value={`${identity.data.kyber.key_algorithm}${
+                  identity.data.kyber.present ? ` · ${identity.data.kyber.bytes.toLocaleString()} bytes` : ' · not generated'
+                }`}
+              />
+              {identity.data.falcon.fingerprint && (
+                <IdentityRow
+                  label="FALCON Fingerprint"
+                  value={`${identity.data.falcon.fingerprint.slice(0, 16)}...${identity.data.falcon.fingerprint.slice(-16)}`}
+                  mono
+                />
+              )}
+              <IdentityRow
                 label="Created"
-                value={new Date(identity.data.created_at).toLocaleDateString()}
+                value={identity.data.created_at != null
+                  ? new Date(identity.data.created_at * 1000).toLocaleDateString()
+                  : '—'}
               />
             </div>
           ) : (
@@ -224,11 +238,11 @@ export function SecurityMonitoringDashboard() {
                     "text-xs",
                     cert.status === 'active'
                       ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                      : cert.status === 'revoked'
+                      : cert.status === 'expired'
                       ? 'bg-red-500/20 text-red-400 border-red-500/30'
                       : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
                   )}>
-                    {cert.status}
+                    {cert.status === 'not_yet_valid' ? 'not yet valid' : cert.status}
                   </Badge>
                 </div>
               ))}
@@ -264,9 +278,9 @@ export function SecurityMonitoringDashboard() {
                   </span>
                   <Badge className={cn(
                     "text-xs",
-                    peer.trust_level === 'Full'
+                    peer.trust_level === 'full'
                       ? 'bg-green-500/20 text-green-400'
-                      : peer.trust_level === 'Conditional'
+                      : peer.trust_level === 'conditional'
                       ? 'bg-yellow-500/20 text-yellow-400'
                       : 'bg-red-500/20 text-red-400',
                   )}>

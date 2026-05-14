@@ -27,6 +27,7 @@ pub mod store;
 pub mod system;
 pub mod topology;
 pub mod trustchain;
+pub mod trustchain_x509;
 
 use std::sync::Arc;
 

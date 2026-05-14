@@ -6,6 +6,10 @@
 //! Alpha: The node uses self-signed certificates for bootstrap (Phase 0). These
 //! handlers return the identity key info from disk and structured status for the
 //! CA, certificate list, and federation peers.
+//!
+//! Phase M.2.5 — handlers parse real X.509 DER from disk and surface full
+//! cryptographic metadata (validity window, fingerprints, key usage, SANs,
+//! extensions) for dashboards. No cosmetic placeholders.
 
 use std::sync::Arc;
 
@@ -119,46 +123,65 @@ fn handle_status(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     }))
 }
 
-/// List issued certificates. Alpha: only the node's own self-signed cert.
+/// List issued certificates. Reads the node's own `node_cert.der` from disk
+/// and returns fully parsed X.509 metadata. If the cert is missing, returns
+/// an empty list (NO fake placeholder row). If present but unparseable,
+/// surfaces an `error` field instead of crashing.
 fn handle_certs(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let cert_path = identity_dir.join("node_cert.der");
-    let has_cert = cert_path.exists();
+    let cert_path_str = cert_path.to_string_lossy().to_string();
 
-    Ok(serde_json::json!({
-        "node_id": state.node_id,
-        "certificates": if has_cert {
-            serde_json::json!([{
-                "subject": state.node_id,
-                "issuer": "self",
-                "type": "self_signed",
-                "algorithm": "FALCON-1024",
-                "path": cert_path.to_string_lossy(),
-            }])
-        } else {
-            serde_json::json!([])
-        },
-        "count": if has_cert { 1 } else { 0 },
-        "status": "alpha",
-    }))
+    let bytes = match std::fs::read(&cert_path) {
+        Ok(b) => b,
+        Err(_) => {
+            return Ok(serde_json::json!({
+                "node_id": state.node_id,
+                "certificates": [],
+                "total": 0,
+                "status": "alpha",
+            }));
+        }
+    };
+
+    match super::trustchain_x509::parse_cert_to_json(&bytes, &cert_path_str) {
+        Ok(value) => Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "certificates": [value],
+            "total": 1,
+            "status": "alpha",
+        })),
+        Err(msg) => Ok(serde_json::json!({
+            "node_id": state.node_id,
+            "certificates": [],
+            "total": 0,
+            "status": "alpha",
+            "error": msg,
+        })),
+    }
 }
 
-/// Identity key summary: public key sizes, fingerprints (hex-encoded).
+/// Identity key summary: public key sizes, BLAKE3 fingerprints (HyperMesh
+/// canonical), and `created_at` derived from the node cert's `not_before` if
+/// available.
 fn handle_identity(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let falcon_pk_path = identity_dir.join("falcon_pubkey.der");
     let kyber_pk_path = identity_dir.join("kyber_pubkey.der");
+    let cert_path = identity_dir.join("node_cert.der");
 
     let falcon_info = match std::fs::read(&falcon_pk_path) {
         Ok(pk) => serde_json::json!({
             "present": true,
             "bytes": pk.len(),
-            "fingerprint": hex::encode(&pk[..32.min(pk.len())]),
+            "fingerprint": blake3::hash(&pk).to_hex().to_string(),
+            "key_algorithm": "FALCON-1024",
         }),
         Err(_) => serde_json::json!({
             "present": false,
             "bytes": 0,
             "fingerprint": null,
+            "key_algorithm": "FALCON-1024",
         }),
     };
 
@@ -166,20 +189,33 @@ fn handle_identity(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
         Ok(pk) => serde_json::json!({
             "present": true,
             "bytes": pk.len(),
-            "fingerprint": hex::encode(&pk[..32.min(pk.len())]),
+            "fingerprint": blake3::hash(&pk).to_hex().to_string(),
+            "key_algorithm": "Kyber-1024",
         }),
         Err(_) => serde_json::json!({
             "present": false,
             "bytes": 0,
             "fingerprint": null,
+            "key_algorithm": "Kyber-1024",
         }),
     };
+
+    // created_at: pull from cert not_before when the cert exists and parses.
+    let created_at = std::fs::read(&cert_path)
+        .ok()
+        .and_then(|der| {
+            x509_parser::parse_x509_certificate(&der)
+                .ok()
+                .map(|(_, cert)| cert.tbs_certificate.validity.not_before.timestamp())
+        });
 
     Ok(serde_json::json!({
         "node_id": state.node_id,
         "falcon": falcon_info,
         "kyber": kyber_info,
+        "created_at": created_at,
         "privacy_mode": state.privacy_mode,
+        "status": "alpha",
     }))
 }
 
@@ -289,19 +325,24 @@ async fn handle_request_cert(
 }
 
 /// Federation peers: connected CAs and trust levels.
+///
+/// Shape matches the UI `FederationInfo` contract: `peers[]`, `total_peers`,
+/// `network_peers`, `trust_levels{}`. Each peer (when populated by Phase F
+/// federation) carries `{node_id, trust_level, joined_at, fingerprint}`; the
+/// array stays empty until distributed CA is active.
 async fn handle_federation(
     state: &DaemonState,
 ) -> Result<serde_json::Value, RpcError> {
-    let peer_count = match &state.network {
+    let network_peers = match &state.network {
         Some(net) => net.get_connected_nodes().await.len(),
         None => 0,
     };
 
     Ok(serde_json::json!({
         "node_id": state.node_id,
-        "federation_peers": [],
-        "federation_count": 0,
-        "network_peers": peer_count,
+        "peers": [],
+        "total_peers": 0,
+        "network_peers": network_peers,
         "trust_levels": {
             "full": 0,
             "conditional": 0,
@@ -316,6 +357,17 @@ async fn handle_federation(
 mod tests {
     use super::*;
     use crate::ipc::protocol::RpcRequest;
+
+    /// Generate a self-signed DER cert via rcgen for parsing tests.
+    fn make_test_cert_der(common_name: &str) -> Vec<u8> {
+        let cert_key = rcgen::generate_simple_self_signed(vec![common_name.to_string()])
+            .expect("test: generate self-signed cert");
+        cert_key
+            .cert
+            .der()
+            .as_ref()
+            .to_vec()
+    }
 
     #[tokio::test]
     async fn test_trustchain_status_returns_json() {
@@ -336,7 +388,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trustchain_certs_returns_json() {
+    async fn test_trustchain_certs_missing_cert_returns_empty() {
+        // test_state() points at /tmp/test-node/identity which (almost
+        // certainly) has no node_cert.der — the handler must return an
+        // empty list with NO fake placeholder row, no panic, no error.
         let state = super::super::tests::test_state().await;
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
@@ -346,8 +401,123 @@ mod tests {
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
 
-        assert!(result["certificates"].is_array());
-        assert!(result["count"].is_number());
+        let certs = result["certificates"].as_array().expect("test: array");
+        // It is acceptable for the path to actually exist in /tmp if a
+        // previous test wrote there. In that case it must parse cleanly
+        // (total>=1) — but it must never be a fake/placeholder row.
+        if certs.is_empty() {
+            assert_eq!(result["total"], 0);
+        } else {
+            // Real parsed cert — must have the rich fields.
+            assert!(certs[0]["fingerprint_blake3"].is_string());
+            assert!(certs[0]["valid_from"].is_string());
+            assert!(certs[0]["valid_to"].is_string());
+        }
+        assert_eq!(result["status"], "alpha");
+    }
+
+    #[tokio::test]
+    async fn test_trustchain_certs_real_x509_parse() {
+        // Build a temporary state pointed at a fresh tempdir, write a
+        // real self-signed cert, and assert all the rich fields parse.
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let identity_dir = dir.path().join("tc-parse-test").join("identity");
+        std::fs::create_dir_all(&identity_dir).expect("test: mkdir");
+
+        let der = make_test_cert_der("parse-test.hypermesh");
+        std::fs::write(identity_dir.join("node_cert.der"), &der)
+            .expect("test: write cert");
+
+        let state = build_test_state_at(dir.path(), "tc-parse-test").await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new("trustchain.certs", serde_json::json!({}));
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result present");
+
+        assert_eq!(result["total"], 1);
+        let cert = &result["certificates"][0];
+
+        // Identity fields
+        assert!(cert["id"].is_string());
+        assert_eq!(
+            cert["id"].as_str().expect("test: id str").len(),
+            64,
+            "BLAKE3 fingerprint must be 64 hex chars"
+        );
+        assert!(cert["subject"].is_string());
+        assert!(cert["issuer"].is_string());
+
+        // Validity is RFC3339 — must start with a 4-digit year.
+        let vf = cert["valid_from"].as_str().expect("test: valid_from str");
+        let vt = cert["valid_to"].as_str().expect("test: valid_to str");
+        assert!(vf.len() >= 20 && &vf[4..5] == "-", "valid_from RFC3339: {vf}");
+        assert!(vt.len() >= 20 && &vt[4..5] == "-", "valid_to RFC3339: {vt}");
+
+        // Active status (cert was just generated)
+        assert_eq!(cert["status"], "active");
+
+        // Fingerprints — distinct hex digests
+        let blake3_hex = cert["fingerprint_blake3"]
+            .as_str()
+            .expect("test: blake3 str");
+        let sha256_hex = cert["fingerprint_sha256"]
+            .as_str()
+            .expect("test: sha256 str");
+        assert_eq!(blake3_hex.len(), 64);
+        assert_eq!(sha256_hex.len(), 64);
+        assert_ne!(blake3_hex, sha256_hex);
+        assert_eq!(cert["id"], cert["fingerprint_blake3"]);
+
+        // Arrays must exist (may be empty for a vanilla rcgen cert).
+        assert!(cert["key_usage"].is_array());
+        assert!(cert["extended_key_usage"].is_array());
+        assert!(cert["subject_alt_names"].is_array());
+        assert!(cert["extensions"].is_array());
+
+        // SAN should contain our DNS name
+        let sans = cert["subject_alt_names"]
+            .as_array()
+            .expect("test: sans array");
+        assert!(
+            sans.iter().any(|s| s.as_str() == Some("DNS:parse-test.hypermesh")),
+            "expected SAN DNS:parse-test.hypermesh, got {:?}",
+            sans
+        );
+
+        // Algorithm fields present
+        assert!(cert["signature_algorithm"].is_string());
+        assert!(cert["key_algorithm"].is_string());
+
+        // Path matches what we wrote
+        assert!(cert["path"]
+            .as_str()
+            .expect("test: path str")
+            .ends_with("node_cert.der"));
+    }
+
+    #[tokio::test]
+    async fn test_trustchain_certs_corrupt_returns_empty_with_error() {
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let identity_dir = dir.path().join("tc-bad-test").join("identity");
+        std::fs::create_dir_all(&identity_dir).expect("test: mkdir");
+        std::fs::write(identity_dir.join("node_cert.der"), b"not a cert")
+            .expect("test: write garbage");
+
+        let state = build_test_state_at(dir.path(), "tc-bad-test").await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new("trustchain.certs", serde_json::json!({}));
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result present");
+
+        assert_eq!(result["total"], 0);
+        assert!(result["certificates"].as_array().expect("test: arr").is_empty());
+        assert!(result["error"].is_string(), "error message must be surfaced");
     }
 
     #[tokio::test]
@@ -363,12 +533,18 @@ mod tests {
 
         assert!(result["falcon"].is_object());
         assert!(result["kyber"].is_object());
-        assert_eq!(result["falcon"]["present"], false);
-        assert_eq!(result["kyber"]["present"], false);
+        // Default test_state() points at /tmp/test-node and almost
+        // certainly has no keys — but tests can leak. Either way the
+        // flat shape must hold.
+        assert!(result["falcon"]["present"].is_boolean());
+        assert!(result["kyber"]["present"].is_boolean());
+        assert_eq!(result["falcon"]["key_algorithm"], "FALCON-1024");
+        assert_eq!(result["kyber"]["key_algorithm"], "Kyber-1024");
+        assert_eq!(result["status"], "alpha");
     }
 
     #[tokio::test]
-    async fn test_trustchain_identity_with_keys() {
+    async fn test_trustchain_identity_with_keys_and_cert() {
         let dir = tempfile::tempdir().expect("test: tempdir");
         let identity_dir = dir.path().join("tc-test").join("identity");
         std::fs::create_dir_all(&identity_dir).expect("test: mkdir");
@@ -378,6 +554,85 @@ mod tests {
         std::fs::write(identity_dir.join("kyber_pubkey.der"), vec![0xBB; 128])
             .expect("test: write kyber");
 
+        let der = make_test_cert_der("identity-test.hypermesh");
+        std::fs::write(identity_dir.join("node_cert.der"), &der)
+            .expect("test: write cert");
+
+        let state = build_test_state_at(dir.path(), "tc-test").await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new("trustchain.identity", serde_json::json!({}));
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result present");
+
+        assert_eq!(result["falcon"]["present"], true);
+        assert_eq!(result["falcon"]["bytes"], 64);
+        assert_eq!(
+            result["falcon"]["fingerprint"]
+                .as_str()
+                .expect("test: falcon fp str")
+                .len(),
+            64,
+            "BLAKE3 fingerprint must be full 32-byte hex (64 chars), not first-32-bytes truncated"
+        );
+
+        assert_eq!(result["kyber"]["present"], true);
+        assert_eq!(result["kyber"]["bytes"], 128);
+        assert_eq!(
+            result["kyber"]["fingerprint"]
+                .as_str()
+                .expect("test: kyber fp str")
+                .len(),
+            64,
+        );
+
+        // created_at must come from cert not_before (unix timestamp).
+        assert!(
+            result["created_at"].is_i64() || result["created_at"].is_u64(),
+            "created_at must be an integer unix timestamp, got {:?}",
+            result["created_at"]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_trustchain_federation_keys() {
+        let state = super::super::tests::test_state().await;
+        let mut handler = RequestHandler::new();
+        register(&mut handler, &state);
+
+        let req = RpcRequest::new("trustchain.federation", serde_json::json!({}));
+        let resp = handler.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result present");
+
+        // New UI-contract keys present
+        assert!(result["peers"].is_array(), "peers[] must be present");
+        assert_eq!(result["total_peers"], 0);
+        assert_eq!(result["network_peers"], 0);
+        assert!(result["trust_levels"].is_object());
+        assert_eq!(result["status"], "alpha");
+
+        // Legacy keys absent
+        assert!(
+            result.get("federation_peers").is_none(),
+            "legacy `federation_peers` must be removed"
+        );
+        assert!(
+            result.get("federation_count").is_none(),
+            "legacy `federation_count` must be removed"
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // Test helpers
+    // -----------------------------------------------------------------
+
+    async fn build_test_state_at(
+        data_dir: &std::path::Path,
+        node_id: &str,
+    ) -> Arc<crate::ipc::state::DaemonState> {
         let coord = crate::matrix::coordinate::MatrixCoordinate::new(0, 0, 0)
             .expect("test: coord");
         let bc = Arc::new(crate::blockchain::node_chain::NodeBlockchain::new(coord));
@@ -386,20 +641,20 @@ mod tests {
             ..crate::persistence::PersistenceConfig::default()
         };
         let persistence = Arc::new(
-            crate::persistence::PersistenceManager::new(config, "tc-test".into())
+            crate::persistence::PersistenceManager::new(config, node_id.to_string())
                 .await
                 .expect("test: persistence"),
         );
         let (shutdown_tx, _rx) = tokio::sync::watch::channel(false);
-        let state = Arc::new(crate::ipc::state::DaemonState {
+        Arc::new(crate::ipc::state::DaemonState {
             blockchain: bc,
             persistence,
             network: None,
             shard_store: Arc::new(crate::network::shard_store::ShardStore::new()),
             shard_transport: None,
             coordinate: coord,
-            node_id: "tc-test".into(),
-            data_dir: dir.path().to_path_buf(),
+            node_id: node_id.to_string(),
+            data_dir: data_dir.to_path_buf(),
             privacy_mode: "Private".into(),
             started_at: std::time::Instant::now(),
             shutdown_tx,
@@ -415,7 +670,6 @@ mod tests {
             federation_manager: None,
             #[cfg(feature = "intelligence")]
             threshold_coordinator: None,
-
             transfer_coordinator: None,
             foundation_signing_key: None,
             dns_registrar: None,
@@ -426,36 +680,6 @@ mod tests {
             capability_token_issuer: None,
             revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
             light_sync_manager: None,
-        });
-
-        let mut handler = RequestHandler::new();
-        register(&mut handler, &state);
-
-        let req = RpcRequest::new("trustchain.identity", serde_json::json!({}));
-        let resp = handler.dispatch(req).await;
-        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
-        let result = resp.result.expect("test: result present");
-
-        assert_eq!(result["falcon"]["present"], true);
-        assert_eq!(result["falcon"]["bytes"], 64);
-        assert_eq!(result["kyber"]["present"], true);
-        assert_eq!(result["kyber"]["bytes"], 128);
-    }
-
-    #[tokio::test]
-    async fn test_trustchain_federation_returns_json() {
-        let state = super::super::tests::test_state().await;
-        let mut handler = RequestHandler::new();
-        register(&mut handler, &state);
-
-        let req = RpcRequest::new("trustchain.federation", serde_json::json!({}));
-        let resp = handler.dispatch(req).await;
-        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
-        let result = resp.result.expect("test: result present");
-
-        assert!(result["federation_peers"].is_array());
-        assert_eq!(result["federation_count"], 0);
-        assert_eq!(result["network_peers"], 0);
-        assert!(result["trust_levels"].is_object());
+        })
     }
 }

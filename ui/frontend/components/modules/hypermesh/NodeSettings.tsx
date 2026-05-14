@@ -76,16 +76,30 @@ export function NodeSettings() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Algorithm</span>
+                <span className="text-gray-400">Signing Algorithm</span>
                 <span className="text-cyan-400 font-mono">
-                  {identity?.key_algorithm ?? 'FALCON-1024'}
+                  {identity?.falcon.key_algorithm ?? 'FALCON-1024'}
                 </span>
               </div>
-              {identity?.public_key && (
+              <div className="flex justify-between">
+                <span className="text-gray-400">KEM Algorithm</span>
+                <span className="text-cyan-400 font-mono">
+                  {identity?.kyber.key_algorithm ?? 'Kyber-1024'}
+                </span>
+              </div>
+              {identity?.falcon.fingerprint && (
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Public Key</span>
+                  <span className="text-gray-400">FALCON Fingerprint</span>
                   <span className="text-gray-300 font-mono text-sm truncate max-w-[300px]">
-                    {identity.public_key.slice(0, 32)}...
+                    {identity.falcon.fingerprint.slice(0, 32)}...
+                  </span>
+                </div>
+              )}
+              {identity?.kyber.fingerprint && (
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Kyber Fingerprint</span>
+                  <span className="text-gray-300 font-mono text-sm truncate max-w-[300px]">
+                    {identity.kyber.fingerprint.slice(0, 32)}...
                   </span>
                 </div>
               )}
