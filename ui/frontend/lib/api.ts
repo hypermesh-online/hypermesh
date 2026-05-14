@@ -117,16 +117,3 @@ export async function del<T>(url: string, options?: RequestInit): Promise<T> {
   });
 }
 
-/**
- * WebSocket connection helper for real-time data
- */
-export function createWebSocket(path: string): WebSocket {
-  const wsUrl = config.api.baseUrl
-    .replace('http://', 'ws://')
-    .replace('https://', 'wss://');
-
-  return new WebSocket(`${wsUrl}${path}`);
-}
-
-// Export all API modules
-export * from './api/index';

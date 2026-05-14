@@ -6,7 +6,7 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type PrivacyLevel } from '@/lib/api';
+import { type PrivacyLevel } from '@/lib/types';
 
 // Import modular components
 import { CatalogBrowse } from '../catalog/CatalogBrowse';

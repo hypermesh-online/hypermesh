@@ -6,15 +6,13 @@
  * Phase J.1 — UpdateBanner.
  *
  * Persistent banner that surfaces foundation-published release feed
- * entries. Polls `/api/v1/system/check_update` (proxied through the
- * Gateway to the daemon's `system.check_update` IPC handler) and
- * shows an "Update available" call-to-action when an entry is
- * available for the current channel.
+ * entries. Polls `/api/v1/blockmatrix/system/check_update` (proxied
+ * through the Gateway to the daemon's `system.check_update` IPC
+ * handler) and shows an "Update available" call-to-action when an
+ * entry is available for the current channel.
  *
- * Alpha note: The Gateway HTTP route is added as part of the J.1
- * follow-up sub-step. Until that lands, this component renders as a
- * no-op when the endpoint returns 404 — it does not block the rest of
- * the dashboard from loading.
+ * Renders as a no-op when the endpoint returns 404 — does not block
+ * the rest of the dashboard from loading.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -34,7 +32,7 @@ const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function fetchUpdate(): Promise<UpdateInfo | null> {
   try {
-    const res = await fetch('/api/v1/system/check_update');
+    const res = await fetch('/api/v1/blockmatrix/system/check_update');
     if (!res.ok) return null;
     return (await res.json()) as UpdateInfo;
   } catch {

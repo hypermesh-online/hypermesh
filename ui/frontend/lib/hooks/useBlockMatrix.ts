@@ -20,6 +20,8 @@ import {
   type TopologyNeighbor,
   type PeerInfo,
   type AssetRecord,
+  type AssetRegisterInput,
+  type AssetRegisterResponse,
   type DomainRecord,
   type ShareInboxResponse,
   type ShareActionResponse,
@@ -174,6 +176,17 @@ export function useAssetList(pollInterval = 15_000) {
     queryFn: () => blockMatrixClient.getAssetList(),
     refetchInterval: pollInterval,
     staleTime: 10_000,
+  });
+}
+
+/** Register a new asset on the blockchain (mutation) */
+export function useRegisterAsset() {
+  const qc = useQueryClient();
+  return useMutation<AssetRegisterResponse, Error, AssetRegisterInput>({
+    mutationFn: (input) => blockMatrixClient.registerAsset(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['blockmatrix', 'asset', 'list'] });
+    },
   });
 }
 

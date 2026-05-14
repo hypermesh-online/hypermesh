@@ -6,7 +6,6 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useSystemStatus } from '@/lib/api';
 import { useNodeStatus, useNetworkPeers, useDomainList } from '@/lib/hooks/useBlockMatrix';
 import { MetricCard } from './shared/MetricCard';
 import { StatusIndicator } from './shared/StatusIndicator';

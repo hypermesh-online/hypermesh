@@ -4,29 +4,41 @@
 /**
  * BlockMatrix API Client
  *
- * Simple singleton client for the BlockMatrix API via Gateway at localhost:8443.
- * All endpoints return JSON directly (no RPC wrapper on success).
+ * Single Gateway entry point for browser + Tauri desktop clients.
  *
- * Working endpoints:
- *   GET  /api/v1/status
- *   GET  /api/v1/ping
- *   GET  /api/v1/blockchain/height
- *   GET  /api/v1/blockchain/block/{index}
- *   GET  /api/v1/blockchain/validate
- *   GET  /api/v1/dns/list
- *   GET  /api/v1/dns/resolve/{name}
- *   POST /api/v1/dns/register
- *   GET  /api/v1/network/peers
- *   GET  /api/v1/topology/info
- *   GET  /api/v1/topology/neighbors
- *   GET  /api/v1/asset/list
- *   GET  /api/v1/dashboard/list
- *   GET  /api/v1/dashboard/info
- *   GET  /api/v1/config/show
- *   GET  /api/v1/config/get/{key}
- *   GET  /api/v1/domain/list
- *   POST /api/v1/domain/register
- *   POST /api/v1/domain/join
+ * The Gateway HTTP/3 surface is a multi-service reverse proxy. Path prefix
+ * encodes which daemon owns the request:
+ *
+ *   /api/v1/blockmatrix/*  → blockmatrix daemon ([::1]:9292)
+ *   /api/v1/caesar/*       → caesar daemon ([::1]:9294)
+ *   /api/v1/catalog/*      → catalog daemon ([::1]:9295)
+ *   /api/v1/engauge/*      → engauge daemon ([::1]:9296)
+ *   /api/v1/trustchain/*   → trustchain daemon ([::1]:8444)
+ *
+ * Scope-aware visibility is determined by the request's capability token +
+ * privacy-mode header — NOT by client form factor.
+ *
+ * Working endpoints (blockmatrix daemon, served via /api/v1/blockmatrix/* prefix):
+ *   GET  /api/v1/blockmatrix/status
+ *   GET  /api/v1/blockmatrix/ping
+ *   GET  /api/v1/blockmatrix/blockchain/height
+ *   GET  /api/v1/blockmatrix/blockchain/block/{index}
+ *   GET  /api/v1/blockmatrix/blockchain/validate
+ *   GET  /api/v1/blockmatrix/dns/list
+ *   GET  /api/v1/blockmatrix/dns/resolve/{name}
+ *   POST /api/v1/blockmatrix/dns/register
+ *   GET  /api/v1/blockmatrix/network/peers
+ *   GET  /api/v1/blockmatrix/topology/info
+ *   GET  /api/v1/blockmatrix/topology/neighbors
+ *   GET  /api/v1/blockmatrix/asset/list
+ *   POST /api/v1/blockmatrix/asset/register
+ *   GET  /api/v1/blockmatrix/dashboard/list
+ *   GET  /api/v1/blockmatrix/dashboard/info
+ *   GET  /api/v1/blockmatrix/config/show
+ *   GET  /api/v1/blockmatrix/config/get/{key}
+ *   GET  /api/v1/blockmatrix/domain/list
+ *   POST /api/v1/blockmatrix/domain/register
+ *   POST /api/v1/blockmatrix/domain/join
  */
 
 import { getConfig } from './config';
@@ -82,6 +94,26 @@ export interface AssetRecord {
   content_hash: string;
   block_index: number;
   [key: string]: unknown;
+}
+
+/**
+ * Input for `asset.register` IPC method.
+ *
+ * Required: `category` ('system' | 'application'), `content` (hex-encoded bytes).
+ * Optional: `type_name`, `type_hash` (hex), `metadata` (JSON object).
+ */
+export interface AssetRegisterInput {
+  category: 'system' | 'application';
+  content: string;
+  type_name?: string;
+  type_hash?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AssetRegisterResponse {
+  asset_id: string;
+  block_index: number;
+  status: string;
 }
 
 export interface DomainRecord {
@@ -351,39 +383,39 @@ class BlockMatrixClient {
   // --- Core ---
 
   async getStatus(): Promise<NodeStatus> {
-    return this.fetchJson('/api/v1/status');
+    return this.fetchJson('/api/v1/blockmatrix/status');
   }
 
   async ping(): Promise<string> {
-    return this.fetchJson('/api/v1/ping');
+    return this.fetchJson('/api/v1/blockmatrix/ping');
   }
 
   // --- Blockchain ---
 
   async getBlockchainHeight(): Promise<{ height: number }> {
-    return this.fetchJson('/api/v1/blockchain/height');
+    return this.fetchJson('/api/v1/blockmatrix/blockchain/height');
   }
 
   async getBlock(index: number): Promise<BlockData> {
-    return this.fetchJson(`/api/v1/blockchain/block/${index}`);
+    return this.fetchJson(`/api/v1/blockmatrix/blockchain/block/${index}`);
   }
 
   async validateChain(): Promise<{ valid: boolean; height: number }> {
-    return this.fetchJson('/api/v1/blockchain/validate');
+    return this.fetchJson('/api/v1/blockmatrix/blockchain/validate');
   }
 
   // --- DNS ---
 
   async getDnsList(): Promise<DnsRecord[]> {
-    return this.fetchJson('/api/v1/dns/list');
+    return this.fetchJson('/api/v1/blockmatrix/dns/list');
   }
 
   async resolveDns(name: string): Promise<DnsRecord> {
-    return this.fetchJson(`/api/v1/dns/resolve/${encodeURIComponent(name)}`);
+    return this.fetchJson(`/api/v1/blockmatrix/dns/resolve/${encodeURIComponent(name)}`);
   }
 
   async registerDns(body: { name: string; address: string }): Promise<unknown> {
-    return this.fetchJson('/api/v1/dns/register', {
+    return this.fetchJson('/api/v1/blockmatrix/dns/register', {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -392,60 +424,67 @@ class BlockMatrixClient {
   // --- Network ---
 
   async getNetworkPeers(): Promise<PeerInfo[]> {
-    return this.fetchJson('/api/v1/network/peers');
+    return this.fetchJson('/api/v1/blockmatrix/network/peers');
   }
 
   // --- Topology ---
 
   async getTopologyInfo(): Promise<TopologyInfo> {
-    return this.fetchJson('/api/v1/topology/info');
+    return this.fetchJson('/api/v1/blockmatrix/topology/info');
   }
 
   async getTopologyNeighbors(): Promise<TopologyNeighbor[]> {
-    return this.fetchJson('/api/v1/topology/neighbors');
+    return this.fetchJson('/api/v1/blockmatrix/topology/neighbors');
   }
 
   // --- Assets ---
 
   async getAssetList(): Promise<AssetRecord[]> {
-    return this.fetchJson('/api/v1/asset/list');
+    return this.fetchJson('/api/v1/blockmatrix/asset/list');
+  }
+
+  async registerAsset(body: AssetRegisterInput): Promise<AssetRegisterResponse> {
+    return this.fetchJson('/api/v1/blockmatrix/asset/register', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
   }
 
   // --- Dashboard ---
 
   async getDashboardList(): Promise<unknown[]> {
-    return this.fetchJson('/api/v1/dashboard/list');
+    return this.fetchJson('/api/v1/blockmatrix/dashboard/list');
   }
 
   async getDashboardInfo(): Promise<unknown> {
-    return this.fetchJson('/api/v1/dashboard/info');
+    return this.fetchJson('/api/v1/blockmatrix/dashboard/info');
   }
 
   // --- Config ---
 
   async getConfig(): Promise<unknown> {
-    return this.fetchJson('/api/v1/config/show');
+    return this.fetchJson('/api/v1/blockmatrix/config/show');
   }
 
   async getConfigKey(key: string): Promise<unknown> {
-    return this.fetchJson(`/api/v1/config/get/${encodeURIComponent(key)}`);
+    return this.fetchJson(`/api/v1/blockmatrix/config/get/${encodeURIComponent(key)}`);
   }
 
   // --- Domain ---
 
   async getDomainList(): Promise<DomainRecord[]> {
-    return this.fetchJson('/api/v1/domain/list');
+    return this.fetchJson('/api/v1/blockmatrix/domain/list');
   }
 
   async registerDomain(body: { name: string }): Promise<unknown> {
-    return this.fetchJson('/api/v1/domain/register', {
+    return this.fetchJson('/api/v1/blockmatrix/domain/register', {
       method: 'POST',
       body: JSON.stringify(body),
     });
   }
 
   async joinDomain(body: { domain: string; token: string }): Promise<unknown> {
-    return this.fetchJson('/api/v1/domain/join', {
+    return this.fetchJson('/api/v1/blockmatrix/domain/join', {
       method: 'POST',
       body: JSON.stringify(body),
     });
@@ -454,7 +493,7 @@ class BlockMatrixClient {
   // --- Sharing ---
 
   async shareSend(assetId: string, recipient: string): Promise<ShareActionResponse> {
-    return this.fetchJson('/api/v1/share/send', {
+    return this.fetchJson('/api/v1/blockmatrix/share/send', {
       method: 'POST',
       body: JSON.stringify({ asset_id: assetId, recipient }),
     });
@@ -462,18 +501,18 @@ class BlockMatrixClient {
 
   async shareInbox(limit?: number): Promise<ShareInboxResponse> {
     const params = limit ? `?limit=${limit}` : '';
-    return this.fetchJson(`/api/v1/share/inbox${params}`);
+    return this.fetchJson(`/api/v1/blockmatrix/share/inbox${params}`);
   }
 
   async shareAccept(inviteId: string): Promise<ShareActionResponse> {
-    return this.fetchJson('/api/v1/share/accept', {
+    return this.fetchJson('/api/v1/blockmatrix/share/accept', {
       method: 'POST',
       body: JSON.stringify({ invite_id: inviteId }),
     });
   }
 
   async shareReject(inviteId: string): Promise<ShareActionResponse> {
-    return this.fetchJson('/api/v1/share/reject', {
+    return this.fetchJson('/api/v1/blockmatrix/share/reject', {
       method: 'POST',
       body: JSON.stringify({ invite_id: inviteId }),
     });
@@ -487,7 +526,7 @@ class BlockMatrixClient {
     contentType?: string,
     replyTo?: string,
   ): Promise<{ message_id: string; status: string }> {
-    return this.fetchJson('/api/v1/message/send', {
+    return this.fetchJson('/api/v1/blockmatrix/message/send', {
       method: 'POST',
       body: JSON.stringify({
         recipient,
@@ -500,17 +539,17 @@ class BlockMatrixClient {
 
   async messageInbox(limit?: number): Promise<MessageInboxResponse> {
     const params = limit ? `?limit=${limit}` : '';
-    return this.fetchJson(`/api/v1/message/inbox${params}`);
+    return this.fetchJson(`/api/v1/blockmatrix/message/inbox${params}`);
   }
 
   async messageHistory(peer: string, limit?: number): Promise<MessageInboxResponse> {
     const params = new URLSearchParams({ peer });
     if (limit) params.set('limit', String(limit));
-    return this.fetchJson(`/api/v1/message/history?${params.toString()}`);
+    return this.fetchJson(`/api/v1/blockmatrix/message/history?${params.toString()}`);
   }
 
   async messageRead(messageId: string): Promise<{ message: MessageItem }> {
-    return this.fetchJson('/api/v1/message/read', {
+    return this.fetchJson('/api/v1/blockmatrix/message/read', {
       method: 'POST',
       body: JSON.stringify({ message_id: messageId }),
     });

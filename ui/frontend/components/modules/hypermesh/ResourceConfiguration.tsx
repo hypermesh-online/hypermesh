@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { useAssets, useSystemStatus } from '@/lib/api';
 import { useNodeStatus, useConfigShow, useConfigGet } from '@/lib/hooks/useBlockMatrix';
 import {
   Network,
@@ -24,8 +23,6 @@ import {
 } from 'lucide-react';
 
 export function ResourceConfiguration() {
-  const { assets, isLoading } = useAssets();
-  const { systemStatus } = useSystemStatus(true);
   const { data: nodeStatus } = useNodeStatus();
   const { data: configData, isLoading: configLoading } = useConfigShow();
   const [cpuLimit, setCpuLimit] = React.useState(50);

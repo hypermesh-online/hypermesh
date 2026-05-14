@@ -14,12 +14,20 @@ import {
   Code,
   FileText
 } from 'lucide-react';
-import { useCreateVMAsset } from '@/lib/api';
-import { type PrivacyLevel } from '@/lib/api';
-import type { CatalogApplication } from '@/lib/api';
+import { useRegisterAsset } from '@/lib/hooks/useBlockMatrix';
+import { type PrivacyLevel } from '@/lib/types';
+
+function toHex(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    out += bytes[i].toString(16).padStart(2, '0');
+  }
+  return out;
+}
 
 export function CatalogCreate() {
-  const createVMAsset = useCreateVMAsset();
+  const registerAsset = useRegisterAsset();
   const [formData, setFormData] = React.useState({
     name: '',
     description: '',
@@ -33,53 +41,32 @@ export function CatalogCreate() {
     }
   });
 
-  const handleCreateVMAsset = async () => {
-    try {
-      const catalogApp: CatalogApplication = {
-        id: `create-${Date.now()}`,
-        name: formData.name,
-        version: '1.0.0',
-        type: 'Application',
-        adapter: 'Native',
-        status: 'Available',
+  const handleCreateAsset = async () => {
+    const result = await registerAsset.mutateAsync({
+      category: 'application',
+      content: toHex(formData.sourceCode),
+      type_name: formData.name,
+      metadata: {
         description: formData.description || formData.name,
-        requirements: {
-          cpu: formData.resourceLimits.maxCpu,
-          memory: parseInt(formData.resourceLimits.maxMemory) || 1,
-          storage: parseInt(formData.resourceLimits.maxStorage) || 1,
-        },
-        dependencies: [],
-        author: 'local',
-        downloads: 0,
-        rating: 0,
-        size: '0',
-        lastUpdated: new Date().toISOString(),
-      };
-      await createVMAsset.mutateAsync({
-        catalogApp,
-        config: {
-          privacyLevel: formData.privacyLevel,
-          resourceLimits: formData.resourceLimits,
-        }
-      });
-      alert('VM Asset created successfully!');
-      // Reset form
-      setFormData({
-        name: '',
-        description: '',
-        sourceCode: '',
-        privacyLevel: 'private',
-        resourceLimits: {
-          maxCpu: 1,
-          maxMemory: '1GB',
-          maxStorage: '1GB',
-          maxExecutionTime: 300
-        }
-      });
-    } catch (error) {
-      console.error('Failed to create VM asset:', error);
-      alert('Failed to create VM asset. Check console for details.');
-    }
+        privacy_level: formData.privacyLevel,
+        resource_limits: formData.resourceLimits,
+        version: '1.0.0',
+        adapter: 'Native',
+      },
+    });
+    alert(`Asset registered: ${result.asset_id} (block ${result.block_index})`);
+    setFormData({
+      name: '',
+      description: '',
+      sourceCode: '',
+      privacyLevel: 'private',
+      resourceLimits: {
+        maxCpu: 1,
+        maxMemory: '1GB',
+        maxStorage: '1GB',
+        maxExecutionTime: 300
+      }
+    });
   };
 
   return (
@@ -264,14 +251,19 @@ main()`}
 
               {/* Create Button */}
               <div className="pt-4">
-                <Button 
-                  onClick={handleCreateVMAsset}
-                  disabled={createVMAsset.isPending || !formData.name || !formData.sourceCode}
+                <Button
+                  onClick={handleCreateAsset}
+                  disabled={registerAsset.isPending || !formData.name || !formData.sourceCode}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  {createVMAsset.isPending ? 'Creating Asset...' : 'Create VM Asset'}
+                  {registerAsset.isPending ? 'Registering Asset...' : 'Register Asset'}
                 </Button>
+                {registerAsset.error && (
+                  <p className="mt-2 text-sm text-red-400">
+                    {(registerAsset.error as Error).message}
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

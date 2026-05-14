@@ -17,8 +17,7 @@ export function Layout({ children }: LayoutProps) {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Phase J.1 — surfaces foundation-published release feed entries.
-            Renders as a no-op until the Gateway /api/v1/system/check_update
-            route lands in a follow-up sub-step. */}
+            Renders as a no-op when the daemon endpoint returns 404. */}
         <UpdateBanner />
         <Header />
         <main className="flex-1 overflow-auto p-6 bg-gradient-to-b from-transparent to-black/20">

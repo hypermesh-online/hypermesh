@@ -4,7 +4,6 @@
 
 import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useSystemStatus } from '@/lib/api';
 import { useNodeStatus, useBlockchainHeight, useChainValidation, useNetworkPeers } from '@/lib/hooks/useBlockMatrix';
 import { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
 import type { SystemStatus as EcoSystemStatus } from './EcosystemMetricsDashboard';
@@ -25,7 +24,6 @@ const subNavigation = [
 ];
 
 function TrustChainOverview() {
-  const { systemStatus } = useSystemStatus(true);
   const nodeStatus = useNodeStatus();
   const chainHeight = useBlockchainHeight();
   const peers = useNetworkPeers();

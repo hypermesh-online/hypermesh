@@ -22,7 +22,7 @@ import {
   Activity,
   Zap
 } from 'lucide-react';
-import type { CatalogApplication } from '@/lib/api';
+import type { CatalogApplication } from '@/lib/types';
 
 interface ApplicationCardProps {
   app: CatalogApplication;

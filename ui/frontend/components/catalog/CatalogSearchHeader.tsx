@@ -6,7 +6,7 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Search, Filter } from 'lucide-react';
-import { type PrivacyLevel } from '@/lib/api';
+import { type PrivacyLevel } from '@/lib/types';
 
 interface CatalogSearchHeaderProps {
   selectedPrivacyLevel: PrivacyLevel;

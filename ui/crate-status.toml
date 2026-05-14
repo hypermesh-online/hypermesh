@@ -72,11 +72,12 @@ items = [
     "First-run setup wizard (6 pages: welcome, privacy mode, identity, trustnet-test, foundation grant, done)",
     "Tray ↔ UpdateBanner bridge (update-available event from daemon's system.check_update IPC)",
     "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
+    "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)",
 ]
 
 [features.in_development]
 items = [
-    "GlobalSearch — searches local assets/DNS, no full-text backend yet",
+    "GlobalSearch — placeholder pending M.4 mesh fan-out search implementation",
     "Storybook stories — 3 existing, ~25 needed for full coverage",
     "Unit test coverage — trustchain has tests, other modules need Vitest tests",
     "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)",
