@@ -43,6 +43,8 @@ import {
   type StoqStats,
   type ConnectionList,
   type PerformanceMetrics,
+  type DashboardList,
+  type DashboardInfo,
 } from '../blockmatrix-api';
 
 // ---------- Core ----------
@@ -96,7 +98,8 @@ export function useChainValidation() {
   return useQuery<{ valid: boolean; height: number }>({
     queryKey: ['blockmatrix', 'blockchain', 'validate'],
     queryFn: () => blockMatrixClient.validateChain(),
-    staleTime: 30_000,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
     retry: 1,
   });
 }
@@ -163,7 +166,8 @@ export function useTopologyNeighbors() {
   return useQuery<TopologyNeighbor[]>({
     queryKey: ['blockmatrix', 'topology', 'neighbors'],
     queryFn: () => blockMatrixClient.getTopologyNeighbors(),
-    staleTime: 30_000,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
   });
 }
 
@@ -374,7 +378,8 @@ export function useCaesarTransactions(limit?: number) {
   return useQuery<TransactionList>({
     queryKey: ['caesar', 'transactions', limit],
     queryFn: () => blockMatrixClient.caesarTransactions(limit),
-    staleTime: 10_000,
+    refetchInterval: 30_000,
+    staleTime: 25_000,
   });
 }
 
@@ -510,5 +515,28 @@ export function useStoqPerformance(pollInterval = 5_000) {
     queryFn: () => blockMatrixClient.stoqPerformance(),
     refetchInterval: pollInterval,
     staleTime: 3_000,
+  });
+}
+
+// ---------- Dashboard ----------
+
+/** List dashboards registered on the blockchain */
+export function useDashboardList(pollInterval = 60_000) {
+  return useQuery<DashboardList>({
+    queryKey: ['blockmatrix', 'dashboard', 'list'],
+    queryFn: () => blockMatrixClient.getDashboardList(),
+    refetchInterval: pollInterval,
+    staleTime: 50_000,
+  });
+}
+
+/** Get manifest info for a specific dashboard by name */
+export function useDashboardInfo(name?: string) {
+  return useQuery<DashboardInfo>({
+    queryKey: ['blockmatrix', 'dashboard', 'info', name],
+    queryFn: () => blockMatrixClient.getDashboardInfo(name!),
+    enabled: !!name,
+    refetchInterval: 60_000,
+    staleTime: 50_000,
   });
 }

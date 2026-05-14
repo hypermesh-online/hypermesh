@@ -99,7 +99,7 @@ export function DashboardMonitor() {
         />
         <CompactMetric
           label="Connections"
-          value={String(stoqStats.data?.connections_active ?? 0)}
+          value={String(stoqStats.data?.connections ?? stoqStats.data?.connections_active ?? 0)}
           icon={Zap}
           color="text-purple-400"
           loading={stoqStats.isLoading}
@@ -107,7 +107,7 @@ export function DashboardMonitor() {
         <CompactMetric
           label="Throughput"
           value={stoqPerf.data
-            ? `${(stoqPerf.data.throughput_mbps / 1000).toFixed(1)} Gbps`
+            ? `${(throughputMbps(stoqPerf.data) / 1000).toFixed(1)} Gbps`
             : 'N/A'}
           icon={TrendingUp}
           color="text-green-400"
@@ -149,21 +149,21 @@ export function DashboardMonitor() {
                   <SummaryRow
                     label="Throughput"
                     value={stoqPerf.data
-                      ? `${(stoqPerf.data.throughput_mbps / 1000).toFixed(2)} Gbps`
+                      ? `${(throughputMbps(stoqPerf.data) / 1000).toFixed(2)} Gbps`
                       : '--'}
                   />
                   <SummaryRow
                     label="Latency"
-                    value={stoqPerf.data ? `${stoqPerf.data.latency_ms.toFixed(1)} ms` : '--'}
+                    value={stoqPerf.data ? `${latencyMs(stoqPerf.data).toFixed(1)} ms` : '--'}
                   />
                   <SummaryRow
                     label="Packet Loss"
-                    value={stoqPerf.data ? `${stoqPerf.data.packet_loss_pct.toFixed(2)}%` : '--'}
+                    value={stoqPerf.data ? `${packetLossPct(stoqPerf.data).toFixed(2)}%` : '--'}
                   />
                   <SummaryRow
                     label="Bytes Transferred"
                     value={stoqStats.data
-                      ? formatBytes(stoqStats.data.bytes_sent + stoqStats.data.bytes_received)
+                      ? formatBytes((stoqStats.data.bytes_sent ?? 0) + (stoqStats.data.bytes_received ?? 0))
                       : '--'}
                   />
                 </div>
@@ -211,19 +211,19 @@ export function DashboardMonitor() {
                   <div className="space-y-3">
                     <SummaryRow
                       label="Active Connections"
-                      value={String(stoqStats.data.connections_active)}
+                      value={String(stoqStats.data.connections ?? stoqStats.data.connections_active ?? 0)}
                     />
                     <SummaryRow
                       label="Total Sent"
-                      value={formatBytes(stoqStats.data.bytes_sent)}
+                      value={formatBytes(stoqStats.data.bytes_sent ?? 0)}
                     />
                     <SummaryRow
                       label="Total Received"
-                      value={formatBytes(stoqStats.data.bytes_received)}
+                      value={formatBytes(stoqStats.data.bytes_received ?? 0)}
                     />
                     <SummaryRow
                       label="Packets"
-                      value={`${stoqStats.data.packets_sent.toLocaleString()} / ${stoqStats.data.packets_received.toLocaleString()}`}
+                      value={`${(stoqStats.data.packets_sent ?? 0).toLocaleString()} / ${(stoqStats.data.packets_received ?? 0).toLocaleString()}`}
                     />
                   </div>
                 ) : (
@@ -284,4 +284,36 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${bytes} B`;
+}
+
+// --- PerformanceMetrics field normalizers ---
+// The daemon `stoq.performance` handler uses `avg_latency_ms`,
+// `throughput_bps`, and `packet_loss_rate`. Legacy `*_ms / *_mbps / *_pct`
+// names are accepted as a fallback.
+
+type PerfShape = {
+  throughput_mbps?: number;
+  latency_ms?: number;
+  packet_loss_pct?: number;
+  avg_latency_ms?: number;
+  throughput_bps?: number;
+  packet_loss_rate?: number;
+};
+
+function throughputMbps(perf: PerfShape): number {
+  if (typeof perf.throughput_mbps === 'number') return perf.throughput_mbps;
+  if (typeof perf.throughput_bps === 'number') return perf.throughput_bps / 1_000_000;
+  return 0;
+}
+
+function latencyMs(perf: PerfShape): number {
+  if (typeof perf.latency_ms === 'number') return perf.latency_ms;
+  if (typeof perf.avg_latency_ms === 'number') return perf.avg_latency_ms;
+  return 0;
+}
+
+function packetLossPct(perf: PerfShape): number {
+  if (typeof perf.packet_loss_pct === 'number') return perf.packet_loss_pct;
+  if (typeof perf.packet_loss_rate === 'number') return perf.packet_loss_rate * 100;
+  return 0;
 }

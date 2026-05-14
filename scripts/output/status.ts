@@ -890,7 +890,9 @@ export const crateStatuses: CrateStatus[] = [
         "First-run setup wizard (6 pages: welcome, privacy mode, identity, trustnet-test, foundation grant, done)",
         "Tray ↔ UpdateBanner bridge (update-available event from daemon's system.check_update IPC)",
         "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
-        "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)"
+        "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)",
+        "TrustChain module — 9 sub-routes wired to real daemon X.509 data (M.2 + M.2.5)",
+        "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added"
       ],
       "inDevelopment": [
         "GlobalSearch — placeholder pending M.4 mesh fan-out search implementation",
@@ -905,6 +907,6 @@ export const crateStatuses: CrateStatus[] = [
         "Windows named-pipe IPC for daemon ping (C.3.5 — currently Unix-socket only)"
       ]
     },
-    "completion": 87
+    "completion": 88
   }
 ];

@@ -44,8 +44,23 @@ export function PerformanceMonitor() {
   }
 
   const perf = performance.data;
-  const throughputPct = perf?.throughput_mbps
-    ? Math.min(100, (perf.throughput_mbps / 40000) * 100)
+  // Daemon `stoq.performance` returns avg_latency_ms / throughput_bps /
+  // packet_loss_rate. Legacy `*_ms / *_mbps / *_pct` fields are accepted as
+  // a forward-compatibility fallback.
+  const throughputMbpsVal = (() => {
+    if (typeof perf?.throughput_mbps === 'number') return perf.throughput_mbps;
+    if (typeof perf?.throughput_bps === 'number') return perf.throughput_bps / 1_000_000;
+    return 0;
+  })();
+  const latencyMsVal =
+    perf?.latency_ms ?? perf?.avg_latency_ms ?? 0;
+  const packetLossPctVal = (() => {
+    if (typeof perf?.packet_loss_pct === 'number') return perf.packet_loss_pct;
+    if (typeof perf?.packet_loss_rate === 'number') return perf.packet_loss_rate * 100;
+    return 0;
+  })();
+  const throughputPct = throughputMbpsVal > 0
+    ? Math.min(100, (throughputMbpsVal / 40000) * 100)
     : 0;
 
   return (
@@ -57,7 +72,7 @@ export function PerformanceMonitor() {
         </h3>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs text-purple-400 border-purple-500/30">
-            {connections.data?.total ?? stats.data?.connections_active ?? 0} Connections
+            {connections.data?.count ?? connections.data?.total ?? stats.data?.connections ?? stats.data?.connections_active ?? 0} Connections
           </Badge>
         </div>
       </div>
@@ -66,26 +81,26 @@ export function PerformanceMonitor() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
           title="Throughput"
-          value={perf ? formatThroughput(perf.throughput_mbps) : 'N/A'}
+          value={perf ? formatThroughput(throughputMbpsVal) : 'N/A'}
           subtitle={`Target: 40 Gbps (${throughputPct.toFixed(1)}%)`}
           loading={performance.isLoading}
           color={getThroughputColor(throughputPct)}
         />
         <MetricCard
           title="Latency"
-          value={perf ? `${perf.latency_ms.toFixed(1)} ms` : 'N/A'}
+          value={perf ? `${latencyMsVal.toFixed(1)} ms` : 'N/A'}
           subtitle={`Jitter: ${perf?.jitter_ms?.toFixed(1) ?? '0'} ms`}
           loading={performance.isLoading}
           color="text-blue-400"
         />
         <MetricCard
           title="Packet Loss"
-          value={perf ? `${perf.packet_loss_pct.toFixed(2)}%` : 'N/A'}
-          subtitle={perf?.packet_loss_pct != null && perf.packet_loss_pct < 0.1
+          value={perf ? `${packetLossPctVal.toFixed(2)}%` : 'N/A'}
+          subtitle={perf && packetLossPctVal < 0.1
             ? 'Minimal loss'
             : 'Monitor closely'}
           loading={performance.isLoading}
-          color={perf?.packet_loss_pct != null && perf.packet_loss_pct < 0.5
+          color={perf && packetLossPctVal < 0.5
             ? 'text-green-400'
             : 'text-yellow-400'}
         />
@@ -110,31 +125,35 @@ export function PerformanceMonitor() {
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {connections.data.connections.map((conn) => (
                 <div
-                  key={conn.id}
+                  key={conn.node_id}
                   className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800"
                 >
                   <div>
-                    <p className="text-sm text-white font-mono">{conn.id.slice(0, 12)}...</p>
-                    <p className="text-xs text-gray-400">{conn.remote_addr}</p>
+                    <p className="text-sm text-white font-mono">
+                      {conn.node_id.length > 12 ? `${conn.node_id.slice(0, 12)}...` : conn.node_id}
+                    </p>
+                    <p className="text-xs text-gray-400">{conn.address}</p>
                   </div>
                   <div className="text-right">
                     <Badge className={cn(
                       "text-xs",
-                      conn.state === 'connected'
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-gray-500/20 text-gray-400',
+                      'bg-cyan-500/20 text-cyan-400',
                     )}>
-                      {conn.state}
+                      {conn.protocol ?? 'QUIC'}
                     </Badge>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatBytes(conn.bytes_sent)} / {formatBytes(conn.bytes_received)}
-                    </p>
+                    {conn.coordinate ? (
+                      <p className="text-xs text-gray-400 mt-1 font-mono">
+                        ({conn.coordinate.x}, {conn.coordinate.y}, {conn.coordinate.z})
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">No active connections</div>
+            <div className="text-center py-8 text-gray-400">
+              {connections.data?.note ?? 'No active connections'}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -154,10 +173,10 @@ export function PerformanceMonitor() {
             <p className="text-gray-500 text-center py-4">Stats unavailable</p>
           ) : stats.data ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatBlock label="Bytes Sent" value={formatBytes(stats.data.bytes_sent)} />
-              <StatBlock label="Bytes Received" value={formatBytes(stats.data.bytes_received)} />
-              <StatBlock label="Packets Sent" value={stats.data.packets_sent.toLocaleString()} />
-              <StatBlock label="Packets Received" value={stats.data.packets_received.toLocaleString()} />
+              <StatBlock label="Bytes Sent" value={formatBytes(stats.data.bytes_sent ?? 0)} />
+              <StatBlock label="Bytes Received" value={formatBytes(stats.data.bytes_received ?? 0)} />
+              <StatBlock label="Packets Sent" value={(stats.data.packets_sent ?? 0).toLocaleString()} />
+              <StatBlock label="Packets Received" value={(stats.data.packets_received ?? 0).toLocaleString()} />
             </div>
           ) : null}
         </CardContent>

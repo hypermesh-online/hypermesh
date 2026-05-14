@@ -74,6 +74,7 @@ items = [
     "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
     "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)",
     "TrustChain module — 9 sub-routes wired to real daemon X.509 data (M.2 + M.2.5)",
+    "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added",
 ]
 
 [features.in_development]

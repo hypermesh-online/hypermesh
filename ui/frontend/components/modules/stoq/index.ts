@@ -4,8 +4,6 @@
 
 export { StoqOverview } from './StoqOverview';
 export { ProtocolDetails } from './ProtocolDetails';
-export { TunnelManagement } from './TunnelManagement';
-export { PerformanceAnalytics } from './PerformanceAnalytics';
 export { SubNavigation } from './SubNavigation';
 export { TransportDashboard } from './TransportDashboard';
 export { PerformanceView } from './PerformanceView';

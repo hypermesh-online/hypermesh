@@ -340,34 +340,117 @@ export interface FederationInfo {
 // --- STOQ response types ---
 
 export interface StoqStats {
-  connections_active: number;
-  bytes_sent: number;
-  bytes_received: number;
-  packets_sent: number;
-  packets_received: number;
+  node_id?: string;
+  connections?: number;
+  /** Legacy alias kept for compatibility with older daemons that emitted
+   * `connections_active` instead of `connections`. */
+  connections_active?: number;
+  unique_endpoints?: number;
+  transport_active?: boolean;
+  shard_transport_active?: boolean;
+  bytes_sent?: number;
+  bytes_received?: number;
+  packets_sent?: number;
+  packets_received?: number;
+  protocol?: string;
+  privacy_mode?: string;
+  uptime_secs?: number;
   [key: string]: unknown;
 }
 
+/**
+ * STOQ connection record. Shape matches the daemon `stoq.connections` IPC
+ * handler in `blockmatrix/src/ipc/handlers/stoq.rs::handle_connections`.
+ * Per-connection byte counters are not yet exposed by the daemon — fields
+ * are optional so consumers can render honest empty states.
+ */
 export interface ConnectionRecord {
-  id: string;
-  remote_addr: string;
-  state: string;
-  bytes_sent: number;
-  bytes_received: number;
+  node_id: string;
+  address: string;
+  coordinate?: { x: number; y: number; z: number };
+  protocol?: string;
+  /** Reserved for future per-connection byte counters. */
+  bytes_sent?: number;
+  /** Reserved for future per-connection byte counters. */
+  bytes_received?: number;
+  /** Reserved for future per-connection state reporting. */
+  state?: string;
   [key: string]: unknown;
 }
 
 export interface ConnectionList {
+  count: number;
   connections: ConnectionRecord[];
-  total: number;
+  /** Legacy alias for `count`. */
+  total?: number;
+  note?: string;
   [key: string]: unknown;
 }
 
+/**
+ * STOQ performance metrics. Daemon `stoq.performance` IPC handler currently
+ * returns: `node_id, active_connections, avg_latency_ms, min_latency_ms,
+ * max_latency_ms, throughput_bps, packet_loss_rate, congestion_window,
+ * uptime_secs, status`. The forward-compatible fields below match the
+ * stable contract; consumers should null-check before formatting.
+ */
 export interface PerformanceMetrics {
-  throughput_mbps: number;
-  latency_ms: number;
-  packet_loss_pct: number;
-  jitter_ms: number;
+  node_id?: string;
+  active_connections?: number;
+  avg_latency_ms?: number;
+  min_latency_ms?: number;
+  max_latency_ms?: number;
+  throughput_bps?: number;
+  packet_loss_rate?: number;
+  congestion_window?: number;
+  uptime_secs?: number;
+  status?: string;
+  /** Legacy alias: throughput in megabits/sec. */
+  throughput_mbps?: number;
+  /** Legacy alias: latency in milliseconds. */
+  latency_ms?: number;
+  /** Legacy alias: packet loss as a percentage (0-100). */
+  packet_loss_pct?: number;
+  /** Legacy alias: jitter in milliseconds. */
+  jitter_ms?: number;
+  [key: string]: unknown;
+}
+
+// --- Dashboard response types ---
+
+export interface DashboardEntry {
+  name?: string;
+  version?: string;
+  domain?: string;
+  description?: string;
+  hash: string;
+  block?: number;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface DashboardList {
+  count: number;
+  dashboards: DashboardEntry[];
+  [key: string]: unknown;
+}
+
+export interface DashboardAccess {
+  public?: boolean;
+  private?: boolean;
+  [key: string]: unknown;
+}
+
+export interface DashboardInfo {
+  name: string;
+  version?: string;
+  domain?: string;
+  description?: string;
+  found: boolean;
+  hash: string;
+  block?: number;
+  files?: number;
+  access?: DashboardAccess;
   [key: string]: unknown;
 }
 
@@ -486,12 +569,15 @@ class BlockMatrixClient {
 
   // --- Dashboard ---
 
-  async getDashboardList(): Promise<unknown[]> {
+  async getDashboardList(): Promise<DashboardList> {
     return this.fetchJson('/api/v1/blockmatrix/dashboard/list');
   }
 
-  async getDashboardInfo(): Promise<unknown> {
-    return this.fetchJson('/api/v1/blockmatrix/dashboard/info');
+  async getDashboardInfo(name: string): Promise<DashboardInfo> {
+    return this.fetchJson('/api/v1/blockmatrix/dashboard/info', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
   }
 
   // --- Config ---

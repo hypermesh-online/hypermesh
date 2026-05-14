@@ -45,7 +45,7 @@ export function TransportDashboard() {
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard
           title="Active Connections"
-          value={String(stats.data?.connections_active ?? 0)}
+          value={String(stats.data?.connections ?? stats.data?.connections_active ?? 0)}
           icon={Network}
           loading={stats.isLoading}
         />
@@ -93,32 +93,35 @@ export function TransportDashboard() {
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {connections.data.connections.map((conn) => (
                 <div
-                  key={conn.id}
+                  key={conn.node_id}
                   className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-gray-800"
                 >
                   <div>
-                    <p className="text-sm font-mono text-white">{conn.id.slice(0, 12)}...</p>
-                    <p className="text-xs text-gray-400">{conn.remote_addr}</p>
+                    <p className="text-sm font-mono text-white">
+                      {conn.node_id.length > 12 ? `${conn.node_id.slice(0, 12)}...` : conn.node_id}
+                    </p>
+                    <p className="text-xs text-gray-400">{conn.address}</p>
+                    {conn.coordinate ? (
+                      <p className="text-xs text-gray-500 font-mono">
+                        matrix ({conn.coordinate.x}, {conn.coordinate.y}, {conn.coordinate.z})
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="text-right text-xs text-gray-400">
-                      <div>{formatBytes(conn.bytes_sent)} sent</div>
-                      <div>{formatBytes(conn.bytes_received)} recv</div>
-                    </div>
                     <Badge className={cn(
                       "text-xs",
-                      conn.state === 'connected'
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-gray-500/20 text-gray-400',
+                      'bg-cyan-500/20 text-cyan-400',
                     )}>
-                      {conn.state}
+                      {conn.protocol ?? 'QUIC'}
                     </Badge>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">No active connections</div>
+            <div className="text-center py-8 text-gray-400">
+              {connections.data?.note ?? 'No active connections'}
+            </div>
           )}
         </CardContent>
       </Card>

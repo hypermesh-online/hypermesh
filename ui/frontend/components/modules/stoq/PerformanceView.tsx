@@ -35,11 +35,20 @@ export function PerformanceView() {
     );
   }
 
+  // Daemon `stoq.performance` returns `avg_latency_ms`, `throughput_bps`,
+  // `packet_loss_rate` today. The legacy `*_ms / *_mbps / *_pct` fields are
+  // retained as a fallback so consumers can continue to render the same
+  // dashboard if the daemon contract is extended.
   const perf = performance.data;
-  const throughputMbps = perf?.throughput_mbps ?? 0;
+  const throughputBps = perf?.throughput_bps;
+  const throughputMbps =
+    perf?.throughput_mbps ??
+    (typeof throughputBps === 'number' ? throughputBps / 1_000_000 : 0);
   const throughputPct = Math.min(100, (throughputMbps / 40000) * 100);
-  const latency = perf?.latency_ms ?? 0;
-  const packetLoss = perf?.packet_loss_pct ?? 0;
+  const latency = perf?.latency_ms ?? perf?.avg_latency_ms ?? 0;
+  const packetLoss =
+    perf?.packet_loss_pct ??
+    (typeof perf?.packet_loss_rate === 'number' ? perf.packet_loss_rate * 100 : 0);
   const jitter = perf?.jitter_ms ?? 0;
 
   return (

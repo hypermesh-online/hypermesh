@@ -5,12 +5,12 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Zap } from 'lucide-react';
-import { 
-  StoqOverview, 
-  ProtocolDetails, 
-  TunnelManagement, 
-  PerformanceAnalytics,
-  SubNavigation 
+import {
+  StoqOverview,
+  ProtocolDetails,
+  TransportDashboard,
+  PerformanceView,
+  SubNavigation,
 } from './stoq';
 
 
@@ -25,7 +25,7 @@ export function StoqModule() {
           STOQ
         </h1>
         <p className="text-gray-400 mt-2">
-          Secure Tokenization Over QUIC - High-performance transport protocol targeting 40 Gbps
+          Secure Tokenization Over QUIC - High-performance transport protocol
         </p>
       </div>
 
@@ -34,8 +34,8 @@ export function StoqModule() {
       <Routes>
         <Route path="/" element={<StoqOverview />} />
         <Route path="/protocol" element={<ProtocolDetails />} />
-        <Route path="/tunnels" element={<TunnelManagement />} />
-        <Route path="/performance" element={<PerformanceAnalytics />} />
+        <Route path="/tunnels" element={<TransportDashboard />} />
+        <Route path="/performance" element={<PerformanceView />} />
       </Routes>
     </div>
   );
