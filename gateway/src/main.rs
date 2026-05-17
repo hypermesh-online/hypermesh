@@ -11,6 +11,7 @@ mod onboarding;
 mod pool;
 mod proxy;
 mod router;
+mod sse_engauge;
 mod stoq_bridge;
 mod stoq_listener;
 
@@ -244,6 +245,12 @@ where
     let path = req.uri().path().to_string();
     let start = std::time::Instant::now();
 
+    // Intercept engauge SSE streaming requests before reading any body. SSE
+    // is GET-only and must NOT be passed through the buffering proxy path.
+    if let Some(handshake) = router.try_engauge_sse(&req) {
+        return handle_sse_request(handshake, stream, router, method, path, start).await;
+    }
+
     // Read request body if present
     let body = if has_body(&req) {
         let mut body_data = Vec::new();
@@ -286,6 +293,82 @@ where
     );
 
     Ok(())
+}
+
+/// Drive an engauge SSE streaming response. Sends response headers immediately,
+/// then pumps each `Bytes` chunk received from the bridge into the HTTP/3
+/// response body until the producer closes or the client disconnects.
+async fn handle_sse_request<T>(
+    handshake: crate::sse_engauge::SseHandshake,
+    mut stream: h3::server::RequestStream<T, Bytes>,
+    router: Arc<GatewayRouter>,
+    method: http::Method,
+    path: String,
+    start: std::time::Instant,
+) -> Result<()>
+where
+    T: quic::BidiStream<Bytes>,
+{
+    use crate::sse_engauge::SseHandshake;
+
+    match handshake {
+        SseHandshake::Error(resp) => {
+            let status = resp.status().as_u16();
+            let (parts, body) = resp.into_parts();
+            let head = Response::from_parts(parts, ());
+            stream.send_response(head).await?;
+            stream.send_data(body).await?;
+            stream.finish().await?;
+            info!(
+                method = %method,
+                path = %path,
+                status = status,
+                latency_ms = start.elapsed().as_millis() as u64,
+                "sse-rejected"
+            );
+            Ok(())
+        }
+        SseHandshake::Stream(sse) => {
+            let mut parts = sse.parts;
+            router.apply_sse_cors(&mut parts);
+            let status = parts.status.as_u16();
+            let head = Response::from_parts(parts, ());
+            stream.send_response(head).await?;
+
+            info!(
+                method = %method,
+                path = %path,
+                status = status,
+                "sse-open"
+            );
+
+            let mut chunks = sse.chunks;
+            let mut bytes_sent: u64 = 0;
+            while let Some(chunk) = chunks.recv().await {
+                let len = chunk.len() as u64;
+                if let Err(e) = stream.send_data(chunk).await {
+                    info!(
+                        path = %path,
+                        bytes = bytes_sent,
+                        duration_ms = start.elapsed().as_millis() as u64,
+                        reason = %e,
+                        "sse-closed"
+                    );
+                    return Ok(());
+                }
+                bytes_sent = bytes_sent.saturating_add(len);
+            }
+
+            stream.finish().await?;
+            info!(
+                path = %path,
+                bytes = bytes_sent,
+                duration_ms = start.elapsed().as_millis() as u64,
+                "sse-finish"
+            );
+            Ok(())
+        }
+    }
 }
 
 /// Check if request has a body

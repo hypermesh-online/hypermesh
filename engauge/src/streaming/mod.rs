@@ -15,6 +15,7 @@ pub mod aggregator;
 pub mod privacy_filter;
 pub mod protocol;
 pub mod publisher;
+pub mod sse_bridge;
 pub mod subscriber;
 
 // Re-export primary types at module root.
@@ -25,4 +26,5 @@ pub use protocol::{
     ProtocolError, RoutingSnapshot, VerificationSnapshot,
 };
 pub use publisher::MetricsPublisher;
+pub use sse_bridge::{SseFrameBridge, DEFAULT_CHANNEL_CAPACITY};
 pub use subscriber::MetricsSubscriber;

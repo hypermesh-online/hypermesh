@@ -15,9 +15,11 @@ use crate::config::{GatewayConfig, RetryConfig};
 use crate::middleware::{CircuitBreaker, CorsMiddleware, LoggingMiddleware, RequestIdMiddleware};
 use crate::pool::ConnectionPool;
 use crate::proxy::{transform_backend_path, Http3Proxy};
+use crate::sse_engauge::{is_sse_path, EngaugeStream, SseHandshake};
 
 use crate::dashboard_server::{DashboardScope, DashboardServer};
 use crate::onboarding::{GATEWAY_ADMIN_HTML, GATEWAY_PRIVATE_HTML, GATEWAY_PUBLIC_HTML};
+use hypermesh_lib::{NodeId, PrivacyMode};
 
 /// Gateway router for routing requests to backend services
 pub struct GatewayRouter {
@@ -49,6 +51,10 @@ pub struct GatewayRouter {
     caesar_breaker: Arc<CircuitBreaker>,
     catalog_breaker: Arc<CircuitBreaker>,
     engauge_breaker: Arc<CircuitBreaker>,
+    /// Engauge SSE streaming endpoint state (M.6b).
+    engauge_stream: EngaugeStream,
+    /// Background stub frame producer task handle.
+    _engauge_stream_task: Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl GatewayRouter {
@@ -121,6 +127,13 @@ impl GatewayRouter {
 
         let engauge_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
+        // Initialize the engauge SSE streaming endpoint and spawn its frame
+        // producer. In alpha the gateway publishes stub frames; later this can
+        // be wired to a real engauge daemon feed.
+        let engauge_node = NodeId::from_public_key(b"gateway-engauge-sse");
+        let engauge_stream = EngaugeStream::new(engauge_node, PrivacyMode::PUBLIC);
+        let engauge_stream_task = Arc::new(engauge_stream.spawn_stub_producer());
+
         // Initialize dashboard server with onboarding HTML
         let dashboard = DashboardServer::new(Duration::from_secs(3600));
         dashboard
@@ -157,7 +170,38 @@ impl GatewayRouter {
             caesar_breaker,
             catalog_breaker,
             engauge_breaker,
+            engauge_stream,
+            _engauge_stream_task: engauge_stream_task,
         })
+    }
+
+    /// Attempt to handle a request as an engauge SSE stream.
+    ///
+    /// Returns `Some(handshake)` when the path matches the SSE endpoint and
+    /// the method is `GET`. Returns `None` to let the regular request flow
+    /// proceed (including for non-GET methods on the SSE path, which will get
+    /// a 405 via the standard backend route).
+    pub fn try_engauge_sse(&self, req: &Request<()>) -> Option<SseHandshake> {
+        if req.method() != Method::GET {
+            return None;
+        }
+        if !is_sse_path(req.uri().path()) {
+            return None;
+        }
+        Some(self.engauge_stream.handle(req.headers()))
+    }
+
+    /// Apply CORS headers to a streaming response head before transmission.
+    pub fn apply_sse_cors(&self, parts: &mut http::response::Parts) {
+        // Build a transient Response to reuse the existing CORS middleware,
+        // then merge its headers back in. Avoids duplicating header logic.
+        let mut tmp = Response::builder()
+            .status(parts.status)
+            .body(Bytes::new())
+            .expect("static SSE CORS response always builds");
+        *tmp.headers_mut() = parts.headers.clone();
+        self.cors.apply_cors(&mut tmp);
+        parts.headers = tmp.headers().clone();
     }
 
     /// Route incoming request to appropriate backend

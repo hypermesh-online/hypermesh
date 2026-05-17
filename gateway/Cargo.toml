@@ -10,6 +10,9 @@ hypermesh-lib = { workspace = true }
 # STOQ transport (for STOQ bridge)
 stoq = { path = "../stoq" }
 
+# Engauge for SSE metrics streaming (MetricsPublisher + SseFrameBridge)
+engauge = { path = "../engauge" }
+
 tokio = { workspace = true }
 h3 = "0.0.8"
 h3-quinn = "0.0.10"
