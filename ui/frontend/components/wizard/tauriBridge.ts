@@ -54,6 +54,9 @@ export async function invokeOrFallback<T>(
 ): Promise<T> {
   if (!isTauri()) return fallback;
   // Lazy import — module is only resolved when running inside the desktop bundle.
+  // @ts-expect-error tauri optional: '@tauri-apps/api/core' is intentionally not a declared
+  // dependency in package.json. It is injected by the Tauri runtime at desktop bundle time.
+  // Browser/Gateway builds must not require it, so TS cannot resolve it at typecheck time.
   const mod = (await import(/* @vite-ignore */ '@tauri-apps/api/core').catch(() => null)) as
     | { invoke: <R>(cmd: string, args?: Record<string, unknown>) => Promise<R> }
     | null;
@@ -70,6 +73,9 @@ export async function listenOrNoop<T>(
   handler: (payload: T) => void,
 ): Promise<() => void> {
   if (!isTauri()) return () => {};
+  // @ts-expect-error tauri optional: '@tauri-apps/api/event' is intentionally not a declared
+  // dependency in package.json. It is injected by the Tauri runtime at desktop bundle time.
+  // Browser/Gateway builds must not require it, so TS cannot resolve it at typecheck time.
   const mod = (await import(/* @vite-ignore */ '@tauri-apps/api/event').catch(() => null)) as
     | {
         listen: <P>(

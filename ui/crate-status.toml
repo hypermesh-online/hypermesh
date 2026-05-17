@@ -76,12 +76,12 @@ items = [
     "TrustChain module — 9 sub-routes wired to real daemon X.509 data (M.2 + M.2.5)",
     "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added",
     "Catalog deps + search + system check-update — UI wires (M.4) consuming real daemon handlers (M.4.5a/b/c)",
+    "Test harness restored — tsc clean, vitest green, Playwright enumerable, legacy EnhancedCertificate chain retired (M.5)",
 ]
 
 [features.in_development]
 items = [
     "Storybook stories — 3 existing, ~25 needed for full coverage",
-    "Unit test coverage — trustchain has tests, other modules need Vitest tests",
     "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)",
 ]
 

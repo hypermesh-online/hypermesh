@@ -45,6 +45,7 @@
     "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.51.0",
     "@tailwindcss/oxide": "^4.1.12",
     "@testing-library/jest-dom": "^6.7.0",

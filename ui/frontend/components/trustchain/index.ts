@@ -18,12 +18,6 @@ export type {
   StateProofBlock
 } from './StateProofMetricsPanel';
 
-export { CertificateDetailsPanel } from './CertificateDetailsPanel';
-export type {
-  CertificateExtension,
-  EnhancedCertificate
-} from './shared/CertificateCard';
-
 export { EcosystemMetricsDashboard } from './EcosystemMetricsDashboard';
 export type {
   EcosystemMetrics,

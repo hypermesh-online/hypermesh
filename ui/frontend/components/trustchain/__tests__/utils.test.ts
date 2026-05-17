@@ -199,7 +199,7 @@ describe('TrustChain Utility Functions', () => {
       expect(falcon.type).toBe('Post-Quantum Digital Signature');
       expect(falcon.security).toBe('NIST Level 5');
       expect(falcon.keySize).toBe('1024 bits');
-      expect(falcon.description).toContain('quantum-resistant');
+      expect(falcon.description).toContain('Quantum-resistant');
     });
 
     it('contains Kyber-768 algorithm info', () => {

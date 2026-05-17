@@ -892,10 +892,10 @@ export const crateStatuses: CrateStatus[] = [
         "Tauri bridge with graceful no-op fallback (UI builds standalone for Gateway use case)",
         "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)",
         "TrustChain module — 9 sub-routes wired to real daemon X.509 data (M.2 + M.2.5)",
-        "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added"
+        "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added",
+        "Catalog deps + search + system check-update — UI wires (M.4) consuming real daemon handlers (M.4.5a/b/c)"
       ],
       "inDevelopment": [
-        "GlobalSearch — placeholder pending M.4 mesh fan-out search implementation",
         "Storybook stories — 3 existing, ~25 needed for full coverage",
         "Unit test coverage — trustchain has tests, other modules need Vitest tests",
         "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)"
@@ -907,6 +907,6 @@ export const crateStatuses: CrateStatus[] = [
         "Windows named-pipe IPC for daemon ping (C.3.5 — currently Unix-socket only)"
       ]
     },
-    "completion": 88
+    "completion": 89
   }
 ];
