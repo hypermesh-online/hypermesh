@@ -95,6 +95,7 @@ async fn build_state_with_issuer(
         capability_token_issuer: issuer,
         revocation_registry: Arc::new(RevocationRegistry::new()),
         light_sync_manager: None,
+            catalog_registry: None,
     })
 }
 

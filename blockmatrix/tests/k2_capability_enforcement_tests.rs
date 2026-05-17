@@ -88,6 +88,7 @@ async fn build_state(
         capability_token_issuer: issuer,
         revocation_registry: revocation,
         light_sync_manager: None,
+            catalog_registry: None,
     })
 }
 

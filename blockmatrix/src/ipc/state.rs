@@ -135,4 +135,17 @@ pub struct DaemonState {
     /// (skipping `ShardStore`/`PipelineEngine`/Caesar/engauge etc.)
     /// is staged as K.1.5.
     pub light_sync_manager: Option<Arc<crate::light_client::HeaderSyncManager>>,
+
+    /// Phase M.4.5b: optional catalog registry provider for typedef
+    /// dependency resolution.
+    ///
+    /// Alpha-default inert: when `None`, the `catalog.dependencies` IPC
+    /// handler returns `{"status":"alpha","note":"catalog registry not
+    /// wired"}` with empty arrays — never a fabricated graph. Operators
+    /// opt in by wiring an adapter that bridges
+    /// `catalog::registry::CatalogRegistry` into this trait object at
+    /// daemon startup (wiring is M.4.5c — the catalog crate already
+    /// depends on blockmatrix, so the adapter must live downstream of
+    /// blockmatrix to avoid a dependency cycle).
+    pub catalog_registry: Option<Arc<dyn crate::catalog::CatalogProvider>>,
 }

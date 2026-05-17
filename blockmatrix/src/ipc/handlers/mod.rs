@@ -11,6 +11,7 @@ pub mod auth;
 pub mod blockchain;
 pub mod caesar;
 pub mod capability_registry;
+pub mod catalog;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
@@ -107,6 +108,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     stoq::register(handler, &state);
     system::register(handler, &state);
     auth::register(handler, &state);
+    catalog::register(handler, &state);
     config::register(handler);
 
     // Phase K.2 — install capability enforcement when the daemon was
@@ -184,6 +186,7 @@ pub(crate) mod tests {
             capability_token_issuer: None,
             revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
             light_sync_manager: None,
+            catalog_registry: None,
         })
     }
 
@@ -279,6 +282,8 @@ pub(crate) mod tests {
             "auth.create_session",
             "auth.list_sessions",
             "auth.revoke_session",
+            "catalog.dependencies",
+            "catalog.search",
         ] {
             let req = RpcRequest::new(method, serde_json::json!({}));
             let resp = handler.dispatch(req).await;

@@ -13,6 +13,7 @@ use serde_json::Value as JsonValue;
 
 // Import BlockMatrix asset types directly
 use blockmatrix::assets::{AssetRegistration, StateProof};
+use hypermesh_lib::ContentHash;
 
 /// Asset Type Definition - defines schema and validation for a type of asset
 ///
@@ -35,8 +36,14 @@ pub struct AssetTypeDefinition {
     /// Execution templates (references to contract/script assets)
     pub execution_templates: Vec<AssetRegistration>,
 
-    /// Dependencies on other type definitions
-    pub dependencies: Vec<String>,
+    /// Dependencies on other type definitions, referenced by their canonical
+    /// content hash (BLAKE3 of the dependency typedef's schema bytes).
+    ///
+    /// This is the type-level dependency declaration — pure type-system layer,
+    /// NOT data-payload scanning. The schema-content scanner can additionally
+    /// surface embedded BLAKE3 references inside the schema body itself; both
+    /// streams are unioned by `CatalogRegistry::resolve_dependencies`.
+    pub dependencies: Vec<ContentHash>,
 
     /// Proof of State (all four: PoSp/PoSt/PoWk/PoTm)
     pub state_proof: StateProof,
@@ -165,8 +172,8 @@ impl AssetTypeDefinition {
         self.metadata.updated_at = chrono::Utc::now();
     }
 
-    /// Add dependency
-    pub fn add_dependency(&mut self, dependency: String) {
+    /// Add a dependency by its content-addressed typedef hash.
+    pub fn add_dependency(&mut self, dependency: ContentHash) {
         self.dependencies.push(dependency);
         self.metadata.updated_at = chrono::Utc::now();
     }

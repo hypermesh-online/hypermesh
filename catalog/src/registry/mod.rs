@@ -14,6 +14,7 @@
 
 pub mod asset_type;
 pub mod catalog_registry;
+pub mod schema_scanner;
 
 // Re-export main types
 pub use asset_type::{
@@ -21,9 +22,12 @@ pub use asset_type::{
 };
 
 pub use catalog_registry::{
-    CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics, SearchQuery, SearchResult,
-    SearchResults, SortCriteria, TrustPolicy, TypeRegistration,
+    CatalogRegistry, DateRange, DependencyGraph, DependencyNode, RegistryConfig,
+    RegistryStatistics, SearchQuery, SearchResult, SearchResults, SortCriteria, TrustPolicy,
+    TypeRegistration,
 };
+
+pub use schema_scanner::scan_schema_for_typedef_refs;
 
 // Legacy compatibility exports (DEPRECATED - use new types above)
 // These are kept temporarily to avoid breaking existing code during migration

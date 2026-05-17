@@ -161,15 +161,23 @@ async fn test_registry_resolve_dependencies() {
     );
 
     let schema = json!({"type": "object"});
-    let type_def = AssetTypeDefinition::new("DepTest".to_string(), schema, test_state_proof());
+    let type_def = AssetTypeDefinition::new("DepTest".to_string(), schema.clone(), test_state_proof());
     registry.register_type(type_def).await.unwrap();
 
-    // resolve_dependencies returns empty for now (stub)
-    let deps = registry.resolve_dependencies("DepTest").await.unwrap();
-    assert!(
-        deps.is_empty(),
-        "resolve_dependencies currently returns empty"
-    );
+    // Look up the typedef's content hash and resolve via the new API.
+    let reg = registry
+        .lookup_type("DepTest")
+        .await
+        .expect("DepTest registered");
+    let mut bytes = [0u8; 32];
+    let decoded = hex::decode(&reg.type_hash).expect("hex");
+    bytes.copy_from_slice(&decoded);
+    let root = hypermesh_lib::ContentHash::from_bytes(bytes);
+
+    let graph = registry.resolve_dependencies(&root).await.unwrap();
+    assert!(graph.direct.is_empty(), "no declared deps");
+    assert!(graph.transitive.is_empty(), "no transitive deps");
+    assert!(graph.missing.is_empty(), "nothing missing");
 }
 
 #[tokio::test]
@@ -299,8 +307,10 @@ fn test_type_definition_add_dependency() {
     let mut type_def =
         AssetTypeDefinition::new("WithDeps".to_string(), schema, test_state_proof());
 
-    type_def.add_dependency("BaseType".to_string());
-    type_def.add_dependency("MixinType".to_string());
+    let base = hypermesh_lib::ContentHash::from_bytes(*blake3::hash(b"BaseType").as_bytes());
+    let mixin = hypermesh_lib::ContentHash::from_bytes(*blake3::hash(b"MixinType").as_bytes());
+    type_def.add_dependency(base);
+    type_def.add_dependency(mixin);
     assert_eq!(type_def.dependencies.len(), 2);
 }
 

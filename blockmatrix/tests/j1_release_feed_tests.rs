@@ -233,6 +233,7 @@ mod system_ipc {
             capability_token_issuer: None,
             revocation_registry: Arc::new(blockmatrix::auth::RevocationRegistry::new()),
             light_sync_manager: None,
+            catalog_registry: None,
         })
     }
 

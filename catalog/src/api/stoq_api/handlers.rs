@@ -94,7 +94,12 @@ pub(crate) fn build_package_response(
             featured: false,
             created_at: Some(def.metadata.created_at.to_rfc3339()),
             updated_at: Some(def.metadata.updated_at.to_rfc3339()),
-            dependencies: def.dependencies.clone(),
+            // ContentHash deps are encoded as full hex for the wire format.
+            dependencies: def
+                .dependencies
+                .iter()
+                .map(|h| hex::encode(h.as_bytes()))
+                .collect(),
             publisher_authenticated: None,
             schema: Some(def.schema.clone()),
             validation_rules_count: def.validation_rules.len() as u32,

@@ -3,81 +3,62 @@
 // See the LICENSE file in the repository root for full license text.
 
 /**
- * Phase J.1 — UpdateBanner.
+ * Phase J.1 — UpdateBanner (M.4 wiring).
  *
  * Persistent banner that surfaces foundation-published release feed
- * entries. Polls `/api/v1/blockmatrix/system/check_update` (proxied
- * through the Gateway to the daemon's `system.check_update` IPC
- * handler) and shows an "Update available" call-to-action when an
- * entry is available for the current channel.
+ * entries. Consumes the typed `useSystemCheckUpdate` hook (polled every
+ * 5 minutes) which calls the daemon's `system.check_update` IPC handler
+ * via the Gateway proxy.
  *
- * Renders as a no-op when the endpoint returns 404 — does not block
- * the rest of the dashboard from loading.
+ * Renders nothing when:
+ *   - the daemon's release feed is not configured (alpha-default inert)
+ *   - the node is up-to-date
+ *   - the query errors (best-effort — banner is non-blocking)
+ *   - the user has dismissed it
+ *
+ * In the Tauri desktop bundle, the tray emits an `update-available`
+ * event when it polls the IPC directly; we listen for that and force a
+ * refetch via the React Query client so the banner can appear without
+ * waiting for the next 5-minute HTTP poll.
  */
 
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, ExternalLink, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { listenOrNoop } from './wizard/tauriBridge';
-
-interface UpdateInfo {
-  up_to_date: boolean;
-  available_version?: string;
-  current_version?: string;
-  release_notes_url?: string;
-  breaking_changes?: boolean;
-  channel?: string;
-}
-
-const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-
-async function fetchUpdate(): Promise<UpdateInfo | null> {
-  try {
-    const res = await fetch('/api/v1/blockmatrix/system/check_update');
-    if (!res.ok) return null;
-    return (await res.json()) as UpdateInfo;
-  } catch {
-    return null;
-  }
-}
+import { useSystemCheckUpdate } from '@/lib/hooks/useBlockMatrix';
 
 export function UpdateBanner() {
-  const [info, setInfo] = useState<UpdateInfo | null>(null);
+  const queryClient = useQueryClient();
+  const { data: info, isError } = useSystemCheckUpdate();
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const poll = async () => {
-      const result = await fetchUpdate();
-      if (!cancelled) setInfo(result);
-    };
-    poll();
-    const id = setInterval(poll, POLL_INTERVAL_MS);
-
-    // Phase C.3 — In the Tauri desktop bundle, the tray polls
-    // `system.check_update` directly via IPC and emits an
-    // `update-available` event. Listening here lets the banner refresh
-    // immediately when the tray detects an update, instead of waiting
-    // for the next 5-minute HTTP poll. listenOrNoop is a no-op in the
-    // standalone Gateway-served build.
     let unlisten: (() => void) | null = null;
     listenOrNoop<string | null>('update-available', () => {
-      // Re-fetch via the existing endpoint so we surface the same shape.
-      poll();
+      queryClient.invalidateQueries({
+        queryKey: ['blockmatrix', 'system', 'check_update'],
+      });
     }).then((un) => {
       if (cancelled) un();
       else unlisten = un;
     });
-
     return () => {
       cancelled = true;
-      clearInterval(id);
       if (unlisten) unlisten();
     };
-  }, []);
+  }, [queryClient]);
 
   if (dismissed) return null;
-  if (!info || info.up_to_date) return null;
+  if (isError || !info) return null;
+  if (info.up_to_date) return null;
   if (!info.available_version) return null;
+  // Defensive: if the daemon reports a release-feed-not-configured note,
+  // stay silent even if some other field looks update-ish.
+  if (typeof info.note === 'string' && info.note.toLowerCase().includes('not configured')) {
+    return null;
+  }
 
   const breaking = info.breaking_changes === true;
   const bannerColor = breaking

@@ -32,8 +32,12 @@ export function Header() {
     return 'cyan';
   };
 
-  const handleSearchResult = (result: any) => {
-    navigate(result.path);
+  // M.4: search returns catalog typedef matches (type_hash / name /
+  // version / source). Route the user to the catalog dependencies view
+  // pre-seeded with the selected type_hash via query param so the
+  // dependency graph resolves immediately.
+  const handleSearchResult = (result: { type_hash: string; name: string }) => {
+    navigate(`/catalog/dependencies?type_hash=${encodeURIComponent(result.type_hash)}`);
   };
 
   return (

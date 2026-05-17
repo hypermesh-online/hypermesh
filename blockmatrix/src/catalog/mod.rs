@@ -8,8 +8,15 @@
 //! handling package definitions, versioning, and distribution.
 
 pub mod integration;
+pub mod peer_client;
+pub mod provider;
 
 pub use integration::{
     BridgeConfiguration, CatalogAssetType, CatalogDeploymentResult, CatalogDeploymentSpec,
     CatalogHyperMeshBridge, DeploymentStrategy,
+};
+pub use peer_client::{CatalogPeerClient, PeerSearchError, PeerSearchResult};
+pub use provider::{
+    CatalogDependencyGraph, CatalogDependencyNode, CatalogProvider, CatalogProviderError,
+    CatalogTypeInfo,
 };

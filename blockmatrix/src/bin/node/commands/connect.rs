@@ -210,6 +210,17 @@ pub async fn run_connect(
             blockmatrix::auth::RevocationRegistry::new(),
         ),
         light_sync_manager: None,
+        // Phase M.4.5c.1: the adapter that bridges
+        // `catalog::CatalogRegistry` into this trait object lives in the
+        // `catalog` crate (see `catalog::wire_catalog_registry`). The
+        // blockmatrix bin cannot depend on the catalog crate without
+        // re-introducing the `catalog -> blockmatrix` dependency cycle,
+        // so the wiring is done from a downstream binary that depends on
+        // both crates. Until then, `catalog.dependencies` and
+        // `catalog.search` IPC handlers return alpha-honest empty
+        // responses ("status":"alpha","note":"catalog registry not
+        // wired").
+        catalog_registry: None,
     });
 
     // Phase I.1: rebuild the cross-chain receipt index from any

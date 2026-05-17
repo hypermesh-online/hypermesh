@@ -416,6 +416,61 @@ export interface PerformanceMetrics {
   [key: string]: unknown;
 }
 
+// --- Catalog dependency / search response types (M.4) ---
+
+export interface DependencyNode {
+  type_hash: string;
+  name: string;
+  version: string;
+  depth: number;
+}
+
+export interface DependencyGraph {
+  status: 'ok' | 'alpha';
+  type_hash?: string;
+  note?: string;
+  direct_deps: DependencyNode[];
+  transitive_deps: DependencyNode[];
+  missing: string[];
+  total: number;
+}
+
+export interface CatalogSearchMatch {
+  type_hash: string;
+  name: string;
+  version: string;
+  /** "local" or "neighbor:<node_id>" */
+  source: string;
+}
+
+export interface CatalogSearchNeighborError {
+  node_id: string;
+  error: string;
+}
+
+export interface CatalogSearchResult {
+  status: 'ok' | 'alpha';
+  query: string;
+  note?: string;
+  matches: CatalogSearchMatch[];
+  total: number;
+  neighbors_queried: number;
+  neighbor_errors: CatalogSearchNeighborError[];
+}
+
+// --- System update response (M.4) ---
+
+export interface SystemUpdateInfo {
+  up_to_date: boolean;
+  current_version: string;
+  channel: 'stable' | 'beta' | 'nightly';
+  available_version?: string;
+  release_notes_url?: string;
+  breaking_changes?: boolean;
+  requires_min_version?: string;
+  note?: string;
+}
+
 // --- Dashboard response types ---
 
 export interface DashboardEntry {
@@ -746,6 +801,36 @@ class BlockMatrixClient {
 
   async stoqPerformance(): Promise<PerformanceMetrics> {
     return this.fetchJson('/api/v1/stoq/performance');
+  }
+
+  // --- Catalog dependencies + search (M.4) ---
+
+  async getCatalogDependencies(params: {
+    type_hash?: string;
+    type_name?: string;
+  }): Promise<DependencyGraph> {
+    return this.fetchJson('/api/v1/blockmatrix/catalog/dependencies', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async catalogSearch(params: {
+    query: string;
+    recursive?: boolean;
+    max_neighbors?: number;
+    timeout_ms?: number;
+  }): Promise<CatalogSearchResult> {
+    return this.fetchJson('/api/v1/blockmatrix/catalog/search', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // --- System (M.4) ---
+
+  async getSystemCheckUpdate(): Promise<SystemUpdateInfo> {
+    return this.fetchJson('/api/v1/blockmatrix/system/check_update');
   }
 }
 

@@ -45,6 +45,9 @@ import {
   type PerformanceMetrics,
   type DashboardList,
   type DashboardInfo,
+  type DependencyGraph,
+  type CatalogSearchResult,
+  type SystemUpdateInfo,
 } from '../blockmatrix-api';
 
 // ---------- Core ----------
@@ -538,5 +541,67 @@ export function useDashboardInfo(name?: string) {
     enabled: !!name,
     refetchInterval: 60_000,
     staleTime: 50_000,
+  });
+}
+
+// ---------- Catalog dependencies + search (M.4) ----------
+
+/**
+ * Resolve the dependency graph for a typedef. Caller may pass either a
+ * `type_hash` (hex) or `type_name`. Hook is disabled when neither is set.
+ *
+ * Returns `status: 'alpha'` when the daemon catalog registry is not
+ * wired — render an honest empty state in that case.
+ */
+export function useCatalogDependencies(params?: {
+  type_hash?: string;
+  type_name?: string;
+}) {
+  return useQuery<DependencyGraph>({
+    queryKey: ['blockmatrix', 'catalog', 'dependencies', params],
+    queryFn: () => blockMatrixClient.getCatalogDependencies(params!),
+    enabled: !!(params?.type_hash || params?.type_name),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Search the catalog (local + recursive neighbor fan-out when wired).
+ * Hook is disabled for queries shorter than 2 characters to avoid
+ * thrashing on every keystroke.
+ */
+export function useCatalogSearch(
+  query: string,
+  recursive = true,
+  maxNeighbors = 8,
+) {
+  return useQuery<CatalogSearchResult>({
+    queryKey: ['blockmatrix', 'catalog', 'search', query, recursive, maxNeighbors],
+    queryFn: () =>
+      blockMatrixClient.catalogSearch({
+        query,
+        recursive,
+        max_neighbors: maxNeighbors,
+        timeout_ms: 2000,
+      }),
+    enabled: query.length >= 2,
+    staleTime: 30_000,
+  });
+}
+
+// ---------- System (M.4) ----------
+
+/**
+ * Poll the foundation release feed for an available update. Returns
+ * `up_to_date: true` with a `note` when no subscriber is configured
+ * (alpha-default inert) — render no banner in that case.
+ */
+export function useSystemCheckUpdate() {
+  return useQuery<SystemUpdateInfo>({
+    queryKey: ['blockmatrix', 'system', 'check_update'],
+    queryFn: () => blockMatrixClient.getSystemCheckUpdate(),
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 4 * 60 * 1000,
+    retry: 0,
   });
 }

@@ -9,15 +9,16 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use blockmatrix::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 use blockmatrix::assets::{AssetRegistration, StateProof};
-use hypermesh_lib::PrivacyMode;
+use hypermesh_lib::{ContentHash, PrivacyMode};
 
 use super::asset_type::AssetTypeDefinition;
+use super::schema_scanner::scan_schema_for_typedef_refs;
 
 /// Content-addressed type registration record.
 ///
@@ -429,15 +430,192 @@ impl CatalogRegistry {
         })
     }
 
-    /// Resolve dependencies for a type
-    pub async fn resolve_dependencies(&self, _type_name: &str) -> Result<Vec<AssetRegistration>> {
+    /// Resolve the full dependency graph for a typedef, by content hash.
+    ///
+    /// Walks declared dependencies AND scanner-discovered embedded refs in BFS
+    /// order. Cycles are handled via a visited set — every typedef appears at
+    /// most once regardless of how many paths reach it.
+    ///
+    /// Returns a [`DependencyGraph`] with:
+    /// - `direct`: typedefs the root immediately depends on.
+    /// - `transitive`: typedefs reached via direct deps (excludes root + direct).
+    /// - `missing`: declared/embedded hashes that have no registered typedef.
+    ///
+    /// If the root itself is not registered, returns a graph whose `missing`
+    /// contains only the root hash. No error is raised — missing is honest
+    /// state, not a failure.
+    pub async fn resolve_dependencies(
+        &self,
+        root: &ContentHash,
+    ) -> Result<DependencyGraph> {
+        if !self.config.enable_dependency_resolution {
+            return Ok(DependencyGraph::default());
+        }
+
+        // 1. Look up the root typedef. If absent → return with missing: [root].
+        let root_hex = hex::encode(root.as_bytes());
+        let root_reg = match self.lookup_type_by_hash(&root_hex).await {
+            Some(r) => r,
+            None => {
+                return Ok(DependencyGraph {
+                    direct: Vec::new(),
+                    transitive: Vec::new(),
+                    missing: vec![*root],
+                });
+            }
+        };
+
+        // 2. Compute direct dependencies = declared ∪ embedded.
+        let direct_hashes = self
+            .deps_for(&root_reg, Some(root))
+            .await;
+
+        // 3. BFS. Track visited by ContentHash so cycles terminate.
+        let mut direct: Vec<DependencyNode> = Vec::new();
+        let mut transitive: Vec<DependencyNode> = Vec::new();
+        let mut missing: Vec<ContentHash> = Vec::new();
+        let mut visited: HashSet<ContentHash> = HashSet::new();
+        visited.insert(*root);
+
+        // Mark all direct hashes as visited up front so a direct dep does not
+        // re-appear in transitive when reached via a sibling.
+        let mut direct_set: HashSet<ContentHash> = HashSet::new();
+        for h in &direct_hashes {
+            direct_set.insert(*h);
+            visited.insert(*h);
+        }
+
+        // Resolve direct nodes.
+        let mut queue: std::collections::VecDeque<(ContentHash, usize)> =
+            std::collections::VecDeque::new();
+        for h in &direct_hashes {
+            let hex_h = hex::encode(h.as_bytes());
+            match self.lookup_type_by_hash(&hex_h).await {
+                Some(reg) => {
+                    direct.push(DependencyNode {
+                        type_hash: *h,
+                        name: reg.type_name.clone(),
+                        version: reg.version.clone(),
+                        depth: 1,
+                    });
+                    queue.push_back((*h, 1));
+                }
+                None => missing.push(*h),
+            }
+        }
+
+        // BFS transitive layers.
+        while let Some((parent_hash, depth)) = queue.pop_front() {
+            let parent_hex = hex::encode(parent_hash.as_bytes());
+            let parent_reg = match self.lookup_type_by_hash(&parent_hex).await {
+                Some(r) => r,
+                None => continue, // already counted as missing above
+            };
+            let child_hashes = self.deps_for(&parent_reg, Some(&parent_hash)).await;
+            for ch in child_hashes {
+                if !visited.insert(ch) {
+                    continue; // already seen — cycle or shared dep
+                }
+                let ch_hex = hex::encode(ch.as_bytes());
+                match self.lookup_type_by_hash(&ch_hex).await {
+                    Some(child_reg) => {
+                        let node = DependencyNode {
+                            type_hash: ch,
+                            name: child_reg.type_name.clone(),
+                            version: child_reg.version.clone(),
+                            depth: depth + 1,
+                        };
+                        // Direct set is already populated; everything else
+                        // discovered here is transitive.
+                        if direct_set.contains(&ch) {
+                            // Should not happen because direct_set entries
+                            // are pre-inserted into visited, but keep the
+                            // branch for defensive symmetry.
+                            continue;
+                        }
+                        transitive.push(node);
+                        queue.push_back((ch, depth + 1));
+                    }
+                    None => missing.push(ch),
+                }
+            }
+        }
+
+        Ok(DependencyGraph {
+            direct,
+            transitive,
+            missing,
+        })
+    }
+
+    /// Compute the union of declared + scanner-discovered dependencies for a
+    /// registered typedef. `self_hash` is excluded from scanner results so a
+    /// schema that mentions its own hash does not self-depend.
+    async fn deps_for(
+        &self,
+        reg: &TypeRegistration,
+        self_hash: Option<&ContentHash>,
+    ) -> Vec<ContentHash> {
+        // Declared dependencies live on the full `AssetTypeDefinition`, not
+        // on `TypeRegistration` (which is the wire/cache record).
+        let mut out: Vec<ContentHash> = Vec::new();
+        let mut seen: HashSet<ContentHash> = HashSet::new();
+
+        if let Some(def) = self.get_type_definition(&reg.type_name).await {
+            for dep in &def.dependencies {
+                if seen.insert(*dep) {
+                    out.push(*dep);
+                }
+            }
+        }
+
+        // Scan the registered schema for embedded BLAKE3 refs.
+        let schema_bytes = match serde_json::to_vec(&reg.schema) {
+            Ok(v) => v,
+            Err(_) => return out,
+        };
+        let embedded =
+            scan_schema_for_typedef_refs(&schema_bytes, self, self_hash).await;
+        for h in embedded {
+            if seen.insert(h) {
+                out.push(h);
+            }
+        }
+        out
+    }
+
+    /// Compatibility shim: resolve dependencies by typedef NAME and return the
+    /// direct-dep [`AssetRegistration`]s. Used by the library resolver during
+    /// the migration to content-addressed deps.
+    ///
+    /// Prefer [`Self::resolve_dependencies`] (by hash) for new code.
+    pub async fn resolve_dependencies_by_name(
+        &self,
+        type_name: &str,
+    ) -> Result<Vec<AssetRegistration>> {
         if !self.config.enable_dependency_resolution {
             return Ok(Vec::new());
         }
 
-        // STUB: Phase 4b - Implement dependency resolution
-        // For now, return empty list
-        Ok(Vec::new())
+        let reg = match self.lookup_type(type_name).await {
+            Some(r) => r,
+            None => return Ok(Vec::new()),
+        };
+        let mut root_bytes = [0u8; 32];
+        match hex::decode(&reg.type_hash) {
+            Ok(bs) if bs.len() == 32 => root_bytes.copy_from_slice(&bs),
+            _ => return Ok(Vec::new()),
+        }
+        let root = ContentHash::from_bytes(root_bytes);
+
+        let graph = self.resolve_dependencies(&root).await?;
+        let index = self.index.read().await;
+        let regs: Vec<AssetRegistration> = graph
+            .direct
+            .iter()
+            .filter_map(|node| index.get(&node.name).cloned())
+            .collect();
+        Ok(regs)
     }
 
     /// Get registry statistics
@@ -504,6 +682,35 @@ impl CatalogRegistry {
     pub fn privacy_level(&self) -> &PrivacyMode {
         &self.privacy
     }
+}
+
+/// A single resolved dependency node.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DependencyNode {
+    /// Content-addressed typedef hash.
+    pub type_hash: ContentHash,
+    /// Human-readable typedef name at resolution time.
+    pub name: String,
+    /// Typedef version at resolution time.
+    pub version: String,
+    /// BFS distance from the root (root = 0, direct = 1, transitive ≥ 2).
+    pub depth: usize,
+}
+
+/// Full dependency graph returned by [`CatalogRegistry::resolve_dependencies`].
+///
+/// `missing` captures any declared/embedded reference that has no registered
+/// typedef — honest tracking, NOT silently dropped.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DependencyGraph {
+    /// Typedefs the root immediately depends on (depth = 1).
+    pub direct: Vec<DependencyNode>,
+    /// Typedefs reached via direct deps (depth ≥ 2). Each appears at most
+    /// once even if reachable by multiple paths.
+    pub transitive: Vec<DependencyNode>,
+    /// Declared or embedded hashes that did not resolve to a registered
+    /// typedef.
+    pub missing: Vec<ContentHash>,
 }
 
 /// Search query (compatible with old registry)
@@ -841,5 +1048,201 @@ mod tests {
         let msg = registry.lookup_type("Message").await.expect("test: Message");
         let required = msg.schema.get("required").expect("test: required field");
         assert!(required.as_array().expect("test: array").iter().any(|v| v == "sender_node_id"));
+    }
+
+    // ===========================================================================
+    // Dependency resolution (BFS, content-addressed)
+    // ===========================================================================
+
+    /// Permissive trust policy for dependency-resolution tests so we can wire
+    /// up arbitrary registered typedefs without constructing real proofs.
+    fn relaxed_policy() -> TrustPolicy {
+        TrustPolicy {
+            require_state_proof: false,
+            minimum_stake: 0,
+            allowed_publishers: Vec::new(),
+            require_certificate: false,
+        }
+    }
+
+    /// Register `name` with the given schema and return its computed
+    /// canonical [`ContentHash`].
+    async fn register_named(
+        registry: &CatalogRegistry,
+        name: &str,
+        schema: serde_json::Value,
+        dependencies: Vec<ContentHash>,
+    ) -> ContentHash {
+        let mut type_def =
+            AssetTypeDefinition::new(name.to_string(), schema.clone(), create_test_state_proof());
+        for d in dependencies {
+            type_def.add_dependency(d);
+        }
+        registry.register_type(type_def).await.expect("test: register");
+        let hex_str = hex::encode(
+            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+        );
+        let mut bytes = [0u8; 32];
+        let decoded = hex::decode(&hex_str).expect("test: hex decode");
+        bytes.copy_from_slice(&decoded);
+        ContentHash::from_bytes(bytes)
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_empty() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        let root = register_named(&registry, "Solo", json!({"type": "object"}), vec![]).await;
+        let graph = registry.resolve_dependencies(&root).await.expect("resolve");
+        assert!(graph.direct.is_empty());
+        assert!(graph.transitive.is_empty());
+        assert!(graph.missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_direct() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        // B is a leaf, A depends on B.
+        let b_hash = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
+        let a_hash =
+            register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b_hash]).await;
+
+        let graph = registry.resolve_dependencies(&a_hash).await.expect("resolve");
+        assert_eq!(graph.direct.len(), 1, "exactly one direct dep");
+        assert_eq!(graph.direct[0].name, "B");
+        assert_eq!(graph.direct[0].type_hash, b_hash);
+        assert_eq!(graph.direct[0].depth, 1);
+        assert!(graph.transitive.is_empty());
+        assert!(graph.missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_transitive() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        // C leaf, B → C, A → B.
+        let c = register_named(&registry, "C", json!({"type": "object", "id": "c"}), vec![]).await;
+        let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![c]).await;
+        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+
+        let graph = registry.resolve_dependencies(&a).await.expect("resolve");
+        assert_eq!(graph.direct.len(), 1);
+        assert_eq!(graph.direct[0].name, "B");
+        assert_eq!(graph.direct[0].depth, 1);
+        assert_eq!(graph.transitive.len(), 1, "C is transitive");
+        assert_eq!(graph.transitive[0].name, "C");
+        assert_eq!(graph.transitive[0].depth, 2);
+        assert!(graph.missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_missing() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        // A declares a dep on a hash that does NOT exist in the registry.
+        let phantom = ContentHash::from_bytes(*blake3::hash(b"phantom").as_bytes());
+        let a = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![phantom],
+        )
+        .await;
+
+        let graph = registry.resolve_dependencies(&a).await.expect("resolve");
+        assert!(graph.direct.is_empty(), "phantom resolved → missing, not direct");
+        assert_eq!(graph.missing.len(), 1);
+        assert_eq!(graph.missing[0], phantom);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_root_missing() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        let nonexistent = ContentHash::from_bytes(*blake3::hash(b"unknown-root").as_bytes());
+        let graph = registry.resolve_dependencies(&nonexistent).await.expect("resolve");
+        assert!(graph.direct.is_empty());
+        assert!(graph.transitive.is_empty());
+        assert_eq!(graph.missing, vec![nonexistent]);
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_cycle() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        // Register B first with NO deps (its canonical hash is fixed by schema).
+        let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
+        // Register A → B.
+        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        // Mutate B's stored definition so B → A (introduce the cycle).
+        // We do this directly on the type_definitions map because the public
+        // API does not support replacing a registered definition.
+        {
+            let mut defs = registry.type_definitions.write().await;
+            let b_def = defs.get_mut("B").expect("B registered");
+            b_def.add_dependency(a);
+        }
+
+        // Now A → B → A. BFS must terminate.
+        let graph = registry.resolve_dependencies(&a).await.expect("resolve");
+        // Direct: B. Transitive: nothing (A is the root, already visited).
+        assert_eq!(graph.direct.len(), 1);
+        assert_eq!(graph.direct[0].name, "B");
+        assert!(
+            graph.transitive.is_empty(),
+            "A reaches itself via B → A but is already visited; expected empty transitive, got {:?}",
+            graph.transitive
+        );
+        assert!(graph.missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_disabled() {
+        let mut cfg = RegistryConfig::default();
+        cfg.enable_dependency_resolution = false;
+        let registry = CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), cfg);
+
+        let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
+        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        let graph = registry.resolve_dependencies(&a).await.expect("resolve");
+        assert!(graph.direct.is_empty());
+        assert!(graph.transitive.is_empty());
+        assert!(graph.missing.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dependencies_embedded_ref_via_scanner() {
+        let registry =
+            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+
+        // Register a leaf typedef, then a parent whose schema body EMBEDS the
+        // leaf's hex hash (without declaring it via `dependencies`).
+        let leaf_schema = json!({"type": "object", "id": "leaf-emb"});
+        let leaf_hash = register_named(&registry, "Leaf", leaf_schema, vec![]).await;
+        let leaf_hex = hex::encode(leaf_hash.as_bytes());
+
+        let parent_schema = json!({
+            "type": "object",
+            "linked": format!("typedef://{}", leaf_hex)
+        });
+        let parent_hash = register_named(&registry, "Parent", parent_schema, vec![]).await;
+
+        let graph = registry.resolve_dependencies(&parent_hash).await.expect("resolve");
+        assert_eq!(
+            graph.direct.len(),
+            1,
+            "embedded ref must surface as a direct dep"
+        );
+        assert_eq!(graph.direct[0].type_hash, leaf_hash);
+        assert_eq!(graph.direct[0].name, "Leaf");
+        assert!(graph.transitive.is_empty());
+        assert!(graph.missing.is_empty());
     }
 }

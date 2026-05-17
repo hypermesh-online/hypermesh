@@ -27,6 +27,7 @@ pub mod documentation;
 pub mod extension;
 pub(crate) mod hypermesh_bridge;
 pub(crate) mod hypermesh_integration;
+pub mod integration;
 pub mod library;
 pub(crate) mod plugin;
 pub mod registry;
@@ -85,6 +86,7 @@ pub use assets::{
 };
 pub use distribution::DistributionConfig;
 pub use documentation::DocumentationGenerator;
+pub use integration::{wire_catalog_registry, CatalogRegistryAdapter};
 pub use registry::{
     AssetTypeDefinition, CatalogRegistry, DateRange, RegistryConfig, RegistryStatistics,
     SearchQuery, SearchResult, SearchResults, SortCriteria, TrustPolicy, TypeMetadata,

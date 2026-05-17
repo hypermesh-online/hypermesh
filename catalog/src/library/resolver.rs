@@ -220,9 +220,11 @@ impl DependencyResolver {
     ) -> Result<DependencyResolution> {
         let start = std::time::Instant::now();
 
-        // Query registry for dependencies
+        // Query registry for dependencies. The legacy resolver still operates
+        // by package NAME; the by-name shim adapts to the content-addressed
+        // resolution layer and returns the direct-dep `AssetRegistration`s.
         let registry_deps = registry
-            .resolve_dependencies(&package.name)
+            .resolve_dependencies_by_name(&package.name)
             .await
             .unwrap_or_default();
 

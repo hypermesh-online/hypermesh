@@ -76,8 +76,14 @@ impl LibraryAssetPackage {
                 .unwrap_or_else(chrono::Utc::now);
         }
 
+        // The legacy library/package dep model carries name+version pairs,
+        // not content hashes. Until publishers re-emit packages with real
+        // typedef hashes, derive a stable placeholder hash from the dep name
+        // so the dependency surface area is preserved. M.4.5b will switch
+        // these call sites to real typedef-hash resolution.
         for dep in self.dependencies() {
-            type_def.add_dependency(dep.name.to_string());
+            let hash_bytes: [u8; 32] = *blake3::hash(dep.name.as_bytes()).as_bytes();
+            type_def.add_dependency(hypermesh_lib::ContentHash::from_bytes(hash_bytes));
         }
 
         Ok(type_def)
