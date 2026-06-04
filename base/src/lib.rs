@@ -37,6 +37,7 @@
 
 pub mod adapters;
 pub mod address;
+pub mod default;
 pub mod error;
 pub mod link;
 pub mod reachability;
@@ -44,6 +45,7 @@ pub mod substrate;
 
 pub use adapters::SubstrateAdapterRegistry;
 pub use address::{derive_address, verify_address, HYPERMESH_PREFIX, SUBNET_DEVICE_SCOPE};
+pub use default::DefaultSubstrate;
 pub use error::{SubstrateError, SubstrateResult};
 pub use link::{InterfaceAddress, InterfaceId, LinkEvent, LinkState};
 pub use reachability::{PathKind, Reachability};

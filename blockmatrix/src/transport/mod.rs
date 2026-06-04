@@ -23,6 +23,7 @@ pub mod config;
 pub mod error;
 pub mod monitoring;
 pub mod pool;
+pub mod substrate;
 pub mod types;
 
 // Re-export main types
@@ -37,6 +38,8 @@ pub use error::TransportError;
 pub use monitoring::{TransportMetrics, TransportMonitor};
 
 pub use pool::{ConnectionPool, Endpoint, StoqConnection};
+
+pub use substrate::{apply_substrate_addressing, substrate_transport_config};
 
 // Main transport types
 use anyhow::Result;

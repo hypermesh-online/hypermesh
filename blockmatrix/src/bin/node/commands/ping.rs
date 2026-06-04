@@ -39,12 +39,20 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
         ),
     );
 
-    // Create a lightweight STOQ transport (ephemeral, OS-assigned port)
-    let stoq_config = stoq::TransportConfig {
+    // Create a lightweight STOQ transport (ephemeral, OS-assigned port).
+    // Substrate Phase A: advertise the sovereign address via public_ipv6;
+    // bind_address stays UNSPECIFIED until Phase B assigns the ULA to an interface.
+    let mut stoq_config = stoq::TransportConfig {
         port: 0, // OS-assigned
         bind_address: Ipv6Addr::UNSPECIFIED,
         ..stoq::TransportConfig::default()
     };
+    let substrate_node_id = {
+        use hypermesh_lib::NodeSigner as _;
+        hypermesh_lib::NodeId::from_public_key(signer.public_key_bytes())
+    };
+    blockmatrix::transport::apply_substrate_addressing(&mut stoq_config, &substrate_node_id)
+        .await?;
     let transport = Arc::new(
         stoq::StoqTransport::new_for_network(
             stoq_config,
