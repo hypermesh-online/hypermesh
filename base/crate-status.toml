@@ -1,0 +1,28 @@
+[crate]
+id = "base"
+name = "Substrate"
+description = "Sovereign addressing and link/carrier management beneath the kernel"
+phase = "planning"
+
+[features.working]
+items = []
+
+[features.in_development]
+items = []
+
+[features.planned]
+items = [
+    "Substrate.a — sovereign addressing: NodeId → fd48:4d00::/32 derivation (R15)",
+    "Substrate.a — address verification (peer recomputes from Falcon pubkey)",
+    "Substrate.a — reachability discovery via STOQ reflector extension",
+    "Substrate.b — rtnetlink interface enumeration (replaces hardcoded guess, R16)",
+    "Substrate.b — carrier/link-state monitoring",
+    "Substrate.b — lease-free address assignment (no DHCP)",
+    "Substrate.b — link-flap self-healing + QUIC connection-migration signal",
+    "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback)",
+    "rtnetlink_linux backend (Phase 1/2)",
+    "sysfs_fallback backend (read-only degraded tier)",
+    "radio_mesh backend — Substrate.c device-to-device (roadmap R&D)",
+    "windows backend — future cross-platform (roadmap)",
+    "Inject derived bind_address/public_ipv6/ebpf_interface into STOQ at node binary",
+]

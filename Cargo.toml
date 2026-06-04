@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lib",
+    "base",
     "stoq",
     "trustchain",
     "caesar",
@@ -34,6 +35,11 @@ rcgen = "0.13"
 socket2 = "0.5"
 bytes = { version = "1.6", features = ["serde"] }
 webpki-roots = "0.26"
+# Substrate layer (core/base) — link/carrier/address management via netlink.
+# Declared now for the scaffold; consumed by the rtnetlink_linux adapter in Phase 1/2.
+# NOTE: verify musl-buildability before Phase 1 (deploy target builds musl static-pie).
+rtnetlink = "0.14"
+netlink-packet-route = "0.19"
 
 # HTTP and web
 # REMOVED: Legacy HTTP/REST frameworks (axum, tower, hyper, warp, reqwest, http, http-body-util)

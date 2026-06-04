@@ -1,0 +1,32 @@
+[package]
+name = "base"
+version = "0.1.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+description = "Substrate layer — sovereign addressing, link/carrier management beneath the kernel"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Shared canonical types (single source of truth). NodeId lives here.
+# base depends ONLY on lib + leaf deps — never upward on stoq/trustchain.
+hypermesh-lib = { workspace = true }
+
+# Async runtime + trait support (matches the AssetAdapter async-trait pattern)
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Errors, logging, addressing math
+thiserror = { workspace = true }
+tracing = { workspace = true }
+blake3 = { workspace = true }
+
+# Real netlink backend — only compiled with the `rtnetlink-backend` feature so the
+# scaffold builds on any platform and the stub doesn't drag heavy deps unconditionally.
+rtnetlink = { workspace = true, optional = true }
+netlink-packet-route = { workspace = true, optional = true }
+
+[features]
+# Off by default in the scaffold pass. Phase 1/2 implementation turns this on.
+default = []
+rtnetlink-backend = ["dep:rtnetlink", "dep:netlink-packet-route"]

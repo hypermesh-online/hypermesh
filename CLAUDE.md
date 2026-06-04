@@ -6,7 +6,7 @@
 
 **RULE**: Whenever the user says "this is a hard requirement" (or equivalent), check if it's already in `papers/HYPERMESH.md` Section 3. If not, add it as the next R-number. Keep requirements concrete and testable. Update this section's summary when requirements change.
 
-**Current requirements (R1-R14)**:
+**Current requirements (R1-R16)**:
 - **R1** Sovereign genesis with asset instantiation — hardware assessed (not self-reported) as IPv6-addressed assets with Proof of State
 - **R2** Four-proof authentication — PoSpace/PoStake/PoWork/PoTime on every state claim, binary authentic/not
 - **R3** Pipeline ordering — Compress→Encrypt→Shard→Distribute, whole-blob encryption before sharding
@@ -21,6 +21,8 @@
 - **R12** Shard commitment with swarm scaling — `BLAKE3(sorted placements)` per block; consumers become providers; O(log N) per-node load for N consumers
 - **R13** Minimum device spec — 1 Mb/s network, 50GB storage, 4GB RAM, 2-core 1GHz; streaming reconstruction mandatory
 - **R14** Adaptive shard sizing — RS parameters scale with asset size, NO post-creation shard splitting (breaks content-addressing hashes), QUIC handles wire chunking, copy-then-redirect migration
+- **R15** Sovereign self-assigned addressing — node derives its `fd48:4d00::/32` IPv6 deterministically from `node_id = BLAKE3(falcon_pubkey)`, no DHCP/lease/authority, peer-verifiable; produced by the Substrate layer (`core/base/`)
+- **R16** Link-sovereign interface management — enumerate own interfaces + monitor carrier without a hardcoded list; on link change re-select interface, re-assign derived address, signal connection migration; graceful tier degradation (netlink→sysfs→fallback)
 
 ---
 
