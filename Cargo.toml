@@ -134,9 +134,6 @@ tar = "0.4"
 
 # Shared library
 hypermesh-lib = { path = "lib" }
-# Substrate layer (sovereign addressing). Depends only on hypermesh-lib;
-# imported by the node/orchestration layer (blockmatrix), never by stoq.
-base = { path = "base" }
 
 # Additional
 glob = "0.3"

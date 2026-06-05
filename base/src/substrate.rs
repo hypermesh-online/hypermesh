@@ -11,10 +11,15 @@
 //! and `core/base/SPEC.md` for the implementation contract.
 //!
 //! ## Layering rule
-//! The node binary constructs a `Substrate` and *injects* the resolved
-//! `bind_address` / `public_ipv6` / `ebpf_interface` into STOQ's `TransportConfig`.
-//! STOQ does NOT depend on `base`; `base` depends only on `hypermesh-lib`. The
-//! Substrate therefore stays strictly beneath transport — no upward dependency.
+//! The Substrate is the link/carrier floor *under* STOQ's dataplane. STOQ does
+//! NOT depend on `base`; `base` depends only on `hypermesh-lib`. The Substrate
+//! therefore stays strictly beneath transport — no upward dependency.
+//!
+//! ## Addressing is not the Substrate's job
+//! HyperMesh addresses assets by content (`lib::AssetAddress`); nodes are
+//! traceable through their assets and identity is the signed StateProof. The
+//! Substrate realizes those addresses on the wire — it does not derive a
+//! node address from a public key.
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
@@ -51,14 +56,12 @@ pub struct SubstrateCapabilities {
 /// is stable.
 #[async_trait]
 pub trait Substrate: Send + Sync {
-    /// Derive this node's sovereign `fd48:4d00::/32` address from its identity (R15).
-    ///
-    /// Feeds STOQ `bind_address` (`stoq/src/transport/config.rs`).
+    /// Resolve a pointer to "this" node — its PoS / chain head — for the given
+    /// identity. This is NOT an IPv6 derivation; addresses are content-derived
+    /// (`lib::AssetAddress`). Awaiting the corrected link/carrier impl.
     async fn local_address(&self, node_id: &NodeId) -> SubstrateResult<Ipv6Addr>;
 
-    /// Determine how this node is reachable from the mesh (R15 reachability half).
-    ///
-    /// Feeds STOQ `public_ipv6`.
+    /// Determine how this node is reachable from the mesh (carrier/path).
     async fn reachability(&self) -> SubstrateResult<Reachability>;
 
     /// Select the active outbound interface (R16).

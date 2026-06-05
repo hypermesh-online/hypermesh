@@ -50,8 +50,6 @@ harness = false
 [dependencies]
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
-# Substrate layer — sovereign addressing injected into STOQ's TransportConfig.
-base = { workspace = true }
 
 # Core dependencies
 tokio = { workspace = true }

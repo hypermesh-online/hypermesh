@@ -383,30 +383,11 @@ async fn start_network(
 ) -> Result<NetworkStartResult> {
     info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
-    // Load the node identity first so the Substrate can derive the sovereign
-    // `fd48:4d00::/32` address from it before the transport is constructed.
-    let identity_dir = data_dir.join(nid).join("identity");
-    let falcon_identity =
-        blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
-    info!(
-        "Node identity: {}... (FALCON-1024)",
-        &falcon_identity.node_id[..16]
-    );
-
     let mut stoq_config = stoq::TransportConfig {
         port: cli.stoq_port,
         bind_address: std::net::Ipv6Addr::UNSPECIFIED,
         ..stoq::TransportConfig::default()
     };
-
-    // Substrate Phase A: inject the sovereign address (advertised via public_ipv6;
-    // bind_address stays UNSPECIFIED until Phase B assigns the ULA to an interface).
-    let substrate_node_id = {
-        use hypermesh_lib::NodeSigner as _;
-        hypermesh_lib::NodeId::from_public_key(falcon_identity.public_key_bytes())
-    };
-    blockmatrix::transport::apply_substrate_addressing(&mut stoq_config, &substrate_node_id)
-        .await?;
 
     let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
         stoq_config.enable_falcon_crypto = false;
@@ -442,6 +423,14 @@ async fn start_network(
     info!(
         "Shard store and transport initialized (store={} shards)",
         shard_store.count().await
+    );
+
+    let identity_dir = data_dir.join(nid).join("identity");
+    let falcon_identity =
+        blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
+    info!(
+        "Node identity: {}... (FALCON-1024)",
+        &falcon_identity.node_id[..16]
     );
 
     let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner> =
