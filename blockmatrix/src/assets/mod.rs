@@ -17,6 +17,7 @@ pub mod pipeline;
 pub mod privacy;
 pub mod proxy;
 pub mod storage;
+pub mod system_adapter;
 
 // Re-export main types for easy access
 pub use core::{
