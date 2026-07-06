@@ -1,0 +1,25 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F8 — Gateway STOQ listener performs ZERO PoS validation (defense-in-depth gap)
+
+- **Severity:** LOW
+- **Exploitability:** theoretical (routing not wired to the accept handler; connection-slot DoS only today)
+- **Verdict:** CONFIRMED (adversarially verified; finder's "critical" DOWNGRADED to low — routing not yet reachable)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+The gateway crate's inbound STOQ path accepts connections with no bilateral handshake and no StateProof/pos_token check: `bridge.accept_connection()` is just the QUIC/TLS accept, and there are zero StateProof/`validate_proof` references in `gateway/src`. Since trust.hypermesh.online runs as the public gateway/reflector, any attacker who reaches its STOQ listener establishes a gateway-accepted connection without proving identity or state.
+
+However, the exploit chain breaks at the pivotal step: the STOQ accept handler is a no-op that logs and returns `Ok(())` — nothing reads a byte off the connection, and no scope_router / scope_bridge_proxy / inter-network forwarding consumes accepted STOQ connections. So today an attacker gets a QUIC connection that is logged and dropped, inserted into a bounded (default 100) connection map — a minor connection-slot resource-DoS surface. It is a genuine defense-in-depth gap that becomes a real cross-scope vulnerability the moment routing is wired to the handler, but the claimed unauthenticated cross-scope/proxy access is not currently reachable. (Gateway STOQ default port is 8444, not the node's 9292; the gateway is a separate binary.)
+
+## Root cause
+The gateway accepts STOQ connections without the bilateral PoS handshake that the blockmatrix node path requires; impact is bounded today only because routing has not yet been connected to the accept handler.
+
+## Evidence (file:line)
+- `gateway/src/main.rs:130-148` — STOQ accept handler is a no-op: logs and returns `Ok(())`; connection never routed, proxied, or read
+- `gateway/src/stoq_bridge.rs:175-191` — `accept_connection()` only does QUIC accept + track, no PoS; `StoqBridge` holds no NodeSigner/StateProofProvider
+- `gateway/src/stoq_listener.rs:64-84` — inbound path calls `accept_connection()` and drops the live `Connection` (passes only metadata to the handler)
+- `stoq/src/transport/manager/connections.rs:164` — `StoqTransport::accept()` does QUIC/TLS only; bilateral PoS handshake (`bilateral.rs:195`) never invoked on this path
+
+## Fix (fix after F2) (see .report on resolution)
+Require the bilateral PoS handshake (`stoq::accept_handshake`, bilateral.rs:195) on every gateway-accepted STOQ connection before any routing/proxy handling; reject connections that do not complete it — before any routing is wired to the handler. Requires wiring a `NodeSigner` + `StateProofProvider` into `StoqBridge` and changing the listener to pass the live `Connection`/`Stream`. Inherits F2's fixed binding, so F2 first.

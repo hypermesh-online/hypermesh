@@ -110,11 +110,40 @@ pub(super) async fn handle_transfer_register_req(
         }
     };
 
-    // Use a fresh state proof for the target side. In production the
-    // coordinator's owning daemon supplies a real PoS proof; for the
-    // wire path we use the testing proof — the lock_state_proof
-    // attached to the request is what's actually validated.
-    let target_proof = StateProof::new_for_testing();
+    // Generate a REAL PoS proof for the target side from this node's own
+    // identity (R1: hardware-assessed, not self-reported). The
+    // `lock_state_proof` attached to the request is what the coordinator
+    // actually validates for the transfer; this proof authenticates the
+    // target daemon accepting the registration.
+    let target_proof = match StateProof::generate_from_network(&ctx.node_id).await {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(
+                "TAG_TRANSFER_REGISTER_REQ {} — failed to generate target PoS proof: {}",
+                req.transfer_id, e
+            );
+            // Reply with a non-accepted ack so the source rolls back
+            // rather than hanging; never fall back to a fake proof.
+            // The sentinel proof is structurally INVALID by construction
+            // (stake_amount = 0 fails StakeProof::validate), so it can never
+            // be mistaken for an authentic proof even if a future caller
+            // validates it independently of the `accepted` flag.
+            let mut rejected_proof = StateProof::default();
+            rejected_proof.stake_proof.stake_amount = 0;
+            let ack = TransferRegisterAck {
+                transfer_id: req.transfer_id.clone(),
+                target_block_hash: String::new(),
+                state_proof: rejected_proof,
+                accepted: false,
+                reason: Some(format!("target proof generation failed: {e}")),
+                acked_at: chrono::Utc::now().timestamp(),
+            };
+            if let Ok(payload) = serde_json::to_vec(&ack) {
+                let _ = stream.send(&payload).await;
+            }
+            return;
+        }
+    };
     let ack = match coordinator
         .handle_register_request(req.clone(), target_proof)
         .await

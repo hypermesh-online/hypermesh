@@ -1,0 +1,23 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F6 — Same-network shard serving has no per-shard authorization
+
+- **Severity:** MEDIUM
+- **Exploitability:** live-remote (requires a handshaked same-network peer)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+`TAG_SHARD_FETCH` is gated only by `verify_peer_access`, which checks solely that the requester is in `AuthenticatedPeers` and shares our `network_id`. `handle_shard_dispatch` then serves the shard via a bare `shard_store.get(shard_id)` HashMap lookup by content hash, with no check of whether the requester is authorized for that specific asset or shard; a missing shard returns an empty response, giving an existence oracle. Any peer who joined the same Network scope can enumerate and fetch every shard the node holds by supplying its BLAKE3 hash — Private-network membership grants blanket read of all stored shards, defeating per-asset access scoping and the invitation gate. The barrier is weaker than it appears because `network_id` is self-asserted in post-handshake metadata and not bound to the FALCON/PoS proof. What is served is encrypted-at-rest shard data, so standalone impact is ciphertext/metadata exposure + the existence oracle; paired with F5 it can become plaintext read.
+
+## Root cause
+Authorization is coarse membership-based rather than per-asset: same-network membership (with a self-asserted, unbound `network_id`) is treated as blanket read authorization, and the shard store performs a bare content-hash lookup with no owner/scope/PrivacyMode check and no invitation-token enforcement.
+
+## Evidence (file:line)
+- `blockmatrix/src/network/message_handlers/peer_connection.rs:129-138` — `TAG_SHARD_FETCH` gated only by `verify_peer_access`, no per-asset check
+- `blockmatrix/src/network/peer_auth.rs:126-164` — `verify_peer_access` checks only AuthenticatedPeers membership + `network_id` equality + TTL
+- `blockmatrix/src/network/shard_transport.rs:369-388` — SHARD_FETCH does bare `store.get(&shard_id)` by BLAKE3 hash; missing → empty response (existence oracle)
+- `blockmatrix/src/network/shard_store.rs:17-21,210-217` — `ShardEntry` = `{data, ref_count}` — NO owner/asset/PrivacyMode to authorize against; `get()` is a bare HashMap lookup
+
+## Fix (see .report on resolution)
+Data-model change: add `owner_node_id` + `network_scope`/`PrivacyMode` metadata to `ShardEntry` (populated at store time in `ipc/handlers/store.rs` + `shard_transport.rs:365`), OR a side ACL keyed by ContentHash. Enforce a per-asset access-policy check at serve time (`shard_transport.rs:369-388`). Bind `network_id` to the PoS proof (interacts with F2).

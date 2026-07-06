@@ -230,9 +230,14 @@ impl NodeBlockchain {
     /// Records old->new key transition with FALCON-signed proof (§6.2.2).
     /// The rotation entry is stored as a `StoragePointer::Local` payload
     /// so peers receiving the block can extract and verify the chain.
+    ///
+    /// The caller supplies a real `&StateProof` for the owning node
+    /// (mirroring [`register_asset_records`]); this method never fabricates
+    /// a proof.
     pub async fn add_key_rotation_block(
         &self,
         entry: &trustchain::identity::KeyRotationEntry,
+        state_proof: &StateProof,
     ) -> Result<Block, String> {
         let entry_bytes = serde_json::to_vec(entry).map_err(|e| {
             format!("Failed to serialize key rotation entry: {e}")
@@ -243,7 +248,7 @@ impl NodeBlockchain {
         let block_entry = BlockAssetEntry {
             asset_hash,
             proof_hash,
-            state_proof: StateProof::new_for_testing(), // alpha: bootstrap phase
+            state_proof: state_proof.clone(),
             storage_pointer: StoragePointer::Local {
                 path: String::from_utf8_lossy(&entry_bytes).to_string(),
             },

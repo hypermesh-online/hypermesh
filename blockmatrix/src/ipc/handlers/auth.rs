@@ -148,10 +148,16 @@ async fn record_session_audit(
 
     let payload_str = String::from_utf8_lossy(&entry_bytes).to_string();
 
+    // Generate a REAL PoS proof from this node's own identity
+    // (R1: hardware-assessed, not self-reported).
+    let state_proof = StateProof::generate_from_network(&state.node_id)
+        .await
+        .map_err(|e| format!("session-audit proof generation: {e}"))?;
+
     let entry = BlockAssetEntry {
         asset_hash,
         proof_hash,
-        state_proof: StateProof::new_for_testing(),
+        state_proof,
         storage_pointer: StoragePointer::Local { path: payload_str },
         registration,
     };

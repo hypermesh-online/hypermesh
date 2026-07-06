@@ -1,0 +1,24 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F2 — PoS handshake bypass / no Sybil resistance
+
+- **Severity:** CRITICAL
+- **Exploitability:** live-remote (no pre-existing trust required)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+The bilateral handshake's only authorization gate is `proof_provider.validate_proof`, which authenticates nothing about stake or resources. An attacker generates a fresh FALCON-1024 keypair (so `BLAKE3(pubkey)==node_id` passes trivially) and completes the challenge-response (proving only key possession). For the StateProof they supply either a self-signed `WireSignedProof` — whose signature is verified against the attacker-supplied `signer_pubkey`, so it always verifies — or a bincode-serialized raw `StateProof` that fails JSON parsing and drops into the `Err(_)` legacy fallback, which logs "cryptographic verification skipped" and returns `proof.validate()` with no signature check at all. In every branch, `validate_proof` calls only structural `proof.validate()` (`StakeProof::verify_signature` = `!id.is_empty() && amount>0`), never `validate_with_requirements`, and never compares the proof's `signer_pubkey`/`stake_holder_id` to the handshake identity. The attacker sets `stake_amount=10000` and becomes an `AuthenticatedPeer`, then supplies the target's `network_id` in post-handshake metadata to pass the same-network gate — unlocking shard fetch, sync, CA sign requests, and cross-scope transfers. Identity is a free keypair with no cost anchor, so they spin up unlimited nodes, defeating R11 and R2.
+
+## Root cause
+The StateProof presented in the handshake is never cryptographically bound to the presenter: `validate_proof` verifies self-signed proofs against an attacker-supplied `signer_pubkey`, retains a legacy fallback accepting unsigned bincode StateProofs, uses structural `validate()` instead of `validate_with_requirements`, and the handshake never checks `signer_pubkey == handshake pubkey` or `stake_holder_id == node_id`. Stake is self-declared, not attested.
+
+## Evidence (file:line)
+- `trustchain/src/proof_of_state/mod.rs:391-401` — `Err(_)` arm accepts raw bincode StateProof with only a `warn!`, no signature check
+- `trustchain/src/proof_of_state/mod.rs:376-389` — signed path verifies against attacker-supplied `wire.signer_pubkey`, then only `proof.validate()`; never `validate_with_requirements`
+- `stoq/src/protocol/bilateral.rs:250,277-289` — `accept_handshake` gates solely on `validate_proof`; `verify_identity_binding` only checks `node_id==BLAKE3(pubkey)`; stake never compared to identity
+- `trustchain/src/proof_of_state/proof.rs:199-201,224-240` — `StakeProof::verify_signature` is a non-crypto stub; any `stake_amount>0` passes
+- `blockmatrix/src/network/stoq_integration.rs:396-423` — duplicate unsigned validator `validate_peer_pos_token`/`generate_pos_token` (legacy MatrixStoqIntegration path)
+
+## Fix (see .report on resolution)
+Delete the legacy raw-StateProof bincode fallback; Err on deserialize failure. Require a `WireSignedProof` whose FALCON signature verifies AND whose `signer_pubkey` equals the handshake FALCON pubkey AND whose `stake_holder_id == node_id`. Call `validate_with_requirements(&StateRequirements::production())`. Stake must be attested, never self-declared. DELETE the duplicate unsigned validator path.

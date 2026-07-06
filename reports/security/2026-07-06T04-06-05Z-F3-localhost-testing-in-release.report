@@ -1,0 +1,43 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F3 — Resolution Report
+
+- **Finding:** [F3 audit](2026-07-06T04-06-05Z-F3-localhost-testing-in-release.audit)
+- **Status:** RESOLVED — implemented + independently QA-verified (PASS)
+- **Branch:** `security/f3-remove-localhost-testing-release`
+- **Date:** 2026-07-06
+
+## What was fixed
+`localhost-testing` no longer compiles into the shipped release binary, so `StateProof::new_for_testing()` (canned fake proof: stake 10000 / `test_node_001` / 100GB) can no longer be stamped into real blockchain blocks in production. The feature remains available for test builds only, via resolver-2 dev-dependency scoping. **No proof is fabricated anywhere** — every live site now sources a real four-proof from an available node identity.
+
+## Scope discovery
+The original audit undercounted: it named **2** live call sites; implementation found **7** (plus a live dev binary). This tripled the true blast radius of the test-proof leak. All 7 fixed; the audit record was corrected.
+
+## Changes
+
+### Feature removal (2 files)
+- `blockmatrix/Cargo.toml:73` — removed `"localhost-testing"` from the trustchain dependency feature list (normal `[dependencies]`); added it under `[dev-dependencies]` (line ~196) so tests still compile.
+- `trustchain/Cargo.toml:130` — removed `"localhost-testing"` from the `default` feature set; kept the definition (`localhost-testing = []`, ~line 136); added self dev-dependency with the feature; gated the `trustchain_ca` dev binary with `required-features = ["localhost-testing"]` (~line 167).
+
+### Live call sites → real proofs (7)
+Real-proof source is `StateProof::generate_from_network(node_id)` (genuine four-proof; node_id must be non-empty and not `"test_node_001"`).
+1. `blockmatrix/src/blockchain/mutations.rs:251` (`add_key_rotation_block`) — signature changed to take `state_proof: &StateProof` (dead code — zero callers — so no caller impact); uses `state_proof.clone()`. No fabricated proof, no invented identity.
+2. `blockmatrix/src/network/message_handlers/transfer_handlers.rs:115` — `generate_from_network(&ctx.node_id)`; on generation failure replies with a non-accepted `TransferRegisterAck` (rejection sentinel — see hardening below), never a fake authentic proof.
+3. `blockmatrix/src/ipc/handlers/asset.rs:245` — `generate_from_network(&state.node_id)`.
+4. `blockmatrix/src/ipc/handlers/auth.rs:151` — `generate_from_network(&state.node_id)`.
+5. `blockmatrix/src/sharing/inbox.rs:247` — `generate_from_network(&bootstrap::node_id(coordinate))`.
+6. `blockmatrix/src/messaging/store.rs:206` — same coordinate→node_id derivation.
+7. `blockmatrix/src/gateway/scope_bridge.rs:277` — same; error → `GatewayError::ProofValidationFailed`.
+
+### Rejection-sentinel hardening (QA advisory, applied)
+QA proved `StateProof::default()` unexpectedly PASSES bare `validate()` (structurally valid: stake 1000 / 1GB / compute 1000). It was safe today only because callers gate on `accepted: false` before ever validating `ack.state_proof`, and it is never written to a block. Per the zero-trust directive, the sentinel was replaced with a structurally-INVALID proof (`stake_amount = 0`, which fails `StakeProof::validate()` at `proof.rs:226`) at both sentinel sites (`transfer_handlers.rs`, `gateway/transfer_coordinator.rs` `rejected_ack`), so the ack proof is invalid by construction, not by caller discipline.
+
+## How the invariant is now enforced
+`cargo tree -p blockmatrix -e no-dev` shows trustchain as `ca,ct,dns,proof-of-state` — `localhost-testing` is ABSENT from the release graph. `new_for_testing()` is `#[cfg(any(test, feature="localhost-testing"))]`, so it does not exist in the release binary. Every remaining source use is under `#[cfg(test)]` or the gated dev binary.
+
+## Residual risk
+- F3 stops the node from EMITTING fake proofs, but does NOT yet make received proofs device-authenticated or block-signed — that is Track B Phase 1 (make `generate_from_network` device-authenticating) + Track A F1/F2 (signed blocks + signer binding). F3 is "stop faking"; the invariant is completed by those.
+- `generate_from_network` proofs are still self-measured (not bilaterally attested) — closed by Phase 1.
+
+## QA verdict
+PASS (independent agent). Security property "no test-proof can enter a real block in the release binary" confirmed via dependency graph + exhaustive source sweep + build + targeted tests (trustchain proof 46 pass; blockmatrix mutations 9, scope_bridge 11, validation 5, transfer_coordinator 7, asset 9, auth 1, inbox 7, store 4 — all pass).

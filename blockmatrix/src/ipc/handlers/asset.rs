@@ -240,9 +240,15 @@ async fn handle_asset_register(
 
     let content_hash_hex = hex::encode(registration.content_hash);
 
-    // Use a minimal testing-grade state proof for alpha.
-    // Production will require real PoS from the caller.
-    let state_proof = StateProof::new_for_testing();
+    // Generate a REAL PoS proof from this node's own identity
+    // (R1: hardware-assessed, not self-reported).
+    let state_proof = StateProof::generate_from_network(&state.node_id)
+        .await
+        .map_err(|e| RpcError {
+            code: INTERNAL_ERROR,
+            message: format!("state proof generation failed: {e}"),
+            data: None,
+        })?;
 
     match state
         .blockchain

@@ -273,7 +273,17 @@ impl ScopeBridge {
         )
         .as_bytes();
 
-        let state_proof = StateProof::new_for_testing();
+        // Generate a REAL PoS proof from this node's own identity, derived
+        // deterministically from its matrix coordinate (R1: hardware-assessed).
+        let node_id = crate::bootstrap::node_id(bc.node_coordinate());
+        let state_proof = StateProof::generate_from_network(&node_id)
+            .await
+            .map_err(|e| GatewayError::ProofValidationFailed {
+                scope: "blockchain".to_string(),
+                reason: format!(
+                    "state proof generation for transfer {transfer_id}: {e}"
+                ),
+            })?;
         let registration = crate::assets::core::AssetRegistration::from_asset_data(
             &crate::assets::core::asset_id::AssetData {
                 config: Vec::new(),

@@ -6,6 +6,10 @@ logs/
 *.log
 .DS_Store
 
+# Security remediation logs are formal, version-controlled deliverables
+# (the $DateTime-$Issue.{audit,report,log} triple), exempt from the *.log rule.
+!reports/security/*.log
+
 # Compiled binaries and object files
 *.o
 *.so

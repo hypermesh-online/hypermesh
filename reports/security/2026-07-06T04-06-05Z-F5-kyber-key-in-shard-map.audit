@@ -1,0 +1,24 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F5 — Shard map embeds the raw Kyber-1024 secret key (disk + stdout)
+
+- **Severity:** MEDIUM
+- **Exploitability:** live-local (no network vector; key never crosses any wire)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+The store CLI subcommand and IPC store handler run the asset pipeline, producing a `ProcessedAsset` whose `DecryptionKey::Kyber`/`KyberSegmented` contains `secret_key: Vec<u8>` — the real Kyber-1024 decapsulation key (encryption.rs sets it from `sk.as_bytes()`; decryption.rs feeds the same bytes into `kyber1024::decapsulate` to recover the AES-GCM key for every shard). Both store paths serialize `decryption_key` into the shard-map JSON and `std::fs::write` it to disk with no restrictive file mode, and the CLI standalone path additionally `println!`s the full map — including the secret key — to stdout. The shard map is a self-decrypting bundle: any co-located local user, log aggregator, or backup that reads the file or captures stdout holds the key that decrypts every shard, defeating R7 at-rest confidentiality. Scope is local only — the IPC daemon binds a Unix socket, store responses return only asset_id + counts, so the key never crosses the wire.
+
+## Root cause
+The pipeline persists the raw Kyber secret key inside the same shard-map artifact as the data it protects, and echoes it to stdout, instead of storing only ciphertext_kem+nonce and keeping the secret key in an access-controlled keystore or wrapping it per-recipient.
+
+## Evidence (file:line)
+- `blockmatrix/src/assets/pipeline/encryption.rs:163` — `secret_key = sk.as_bytes().to_vec()`; decryption.rs:250-260 confirms it is the working decapsulation key
+- `blockmatrix/src/assets/pipeline/orchestrator.rs:58-90` — `DecryptionKey::Kyber`/`KyberSegmented` embed `secret_key: Vec<u8>`, `#[derive(Serialize, Deserialize)]`
+- `blockmatrix/src/bin/node/commands/store.rs:102-146` — serializes `decryption_key` into shard map, `fs::write` to disk, and `println!("{map_json}")` to stdout
+- `blockmatrix/src/ipc/handlers/store.rs:113-136` — IPC store path serializes and writes the same key-bearing map
+- **Reusable fix helper (built + tested, zero live callers):** `blockmatrix/src/sharing/key_wrap.rs:25-51` `wrap_key_for_recipient(&DecryptionKey, recipient_kyber_pubkey) -> (enc, kem_ct)`; inverse `unwrap_key` at :54
+
+## Fix (see .report on resolution)
+Never serialize the Kyber `secret_key` into the shard map. Wrap the `DecryptionKey` to the node's OWN Kyber pubkey via `wrap_key_for_recipient` before persisting; persist only wrapped-key + `ciphertext_kem` + nonce; call `unwrap_key` on the fetch/reconstruct read path. Remove the `println!` of the map (store.rs:146).
