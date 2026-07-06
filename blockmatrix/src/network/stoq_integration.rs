@@ -7,18 +7,16 @@
 //! This module provides the integration between the Matrix Foundation and STOQ transport layer.
 //! All matrix node communication goes through STOQ for secure, efficient transport.
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::proof_of_state::StateProof;
-use stoq::{Connection, Endpoint, StoqTransport};
+use stoq::{Connection, StoqTransport};
 
 /// Service discovery tag for matrix nodes
 const MATRIX_SERVICE_TAG: &str = "blockmatrix.node";
@@ -350,124 +348,20 @@ impl MatrixStoqIntegration {
         Ok(())
     }
 
-    /// Connect to a matrix node via STOQ
-    pub async fn connect_to_node(&self, address: SocketAddr) -> Result<String> {
-        info!("Connecting to matrix node at {} via STOQ", address);
-
-        // Extract IPv6 address
-        let ipv6_addr = match address {
-            SocketAddr::V6(v6) => *v6.ip(),
-            _ => return Err(anyhow!("Matrix nodes require IPv6 addresses")),
-        };
-
-        // Create STOQ endpoint
-        let endpoint = Endpoint::new(ipv6_addr, address.port());
-
-        // Connect via STOQ transport
-        let connection = self.transport.connect(&endpoint).await?;
-
-        // Exchange matrix node information
-        let peer_info = self.exchange_node_info(&connection).await?;
-
-        // Store the connection
-        let mut nodes = self.connected_nodes.write().await;
-        nodes.insert(
-            peer_info.node_id.clone(),
-            MatrixNodeConnection {
-                coordinate: peer_info.coordinate,
-                node_id: peer_info.node_id.clone(),
-                connection: connection.clone(),
-                last_heartbeat: Self::current_timestamp(),
-            },
-        );
-
-        info!(
-            "Successfully connected to matrix node {} at ({},{},{})",
-            peer_info.node_id,
-            peer_info.coordinate.x,
-            peer_info.coordinate.y,
-            peer_info.coordinate.z
-        );
-
-        Ok(peer_info.node_id)
-    }
-
-    /// Generate PoS token bytes for handshake
-    async fn generate_pos_token(node_id: &str) -> Result<Vec<u8>> {
-        let state_proof = StateProof::generate_from_network(node_id)
-            .await
-            .context("PoS proof generation failed")?;
-        state_proof.to_bytes()
-            .map_err(|e| anyhow!("Failed to serialize PoS token: {e}"))
-    }
-
-    /// Validate a peer's PoS token from announcement
-    fn validate_peer_pos_token(pos_token: &Option<Vec<u8>>) -> Result<()> {
-        let token_bytes = pos_token
-            .as_ref()
-            .ok_or_else(|| anyhow!("Missing pos_token in peer announcement"))?;
-
-        if token_bytes.is_empty() {
-            return Err(anyhow!("Empty pos_token in peer announcement"));
-        }
-
-        let peer_proof = StateProof::from_bytes(token_bytes)
-            .map_err(|e| anyhow!("Invalid state proof format: {e}"))?;
-
-        if !peer_proof.validate() {
-            return Err(anyhow!("Peer state proof validation failed"));
-        }
-
-        debug!("Peer PoS token validated successfully");
-        Ok(())
-    }
-
-    /// Exchange node information with peer
-    async fn exchange_node_info(&self, connection: &Arc<Connection>) -> Result<MatrixNodeInfo> {
-        // Open a bidirectional stream
-        let mut stream = connection.open_stream().await?;
-
-        // Generate real PoS token for handshake
-        let pos_token_bytes = Self::generate_pos_token(&self.node_id).await?;
-
-        // Create our announcement with PoS token
-        let announcement = MatrixNodeAnnouncement {
-            coordinate: self.local_coordinate,
-            node_id: self.node_id.clone(),
-            privacy_mode: format!("{:?}", self.privacy_mode),
-            protocol_version: MATRIX_PROTOCOL_VERSION.to_string(),
-            pos_token: Some(pos_token_bytes),
-            services: vec!["matrix".to_string()],
-        };
-
-        let message = MatrixMessage::Announcement(announcement);
-        let data = serde_json::to_vec(&message)?;
-
-        // Send our announcement
-        stream.send(&data).await?;
-
-        // Receive peer announcement
-        let peer_data = stream.receive().await?;
-        let peer_message: MatrixMessage = serde_json::from_slice(&peer_data)?;
-
-        match peer_message {
-            MatrixMessage::Announcement(peer_announcement) => {
-                // Validate peer's PoS token
-                Self::validate_peer_pos_token(&peer_announcement.pos_token)?;
-
-                Ok(MatrixNodeInfo {
-                    coordinate: peer_announcement.coordinate,
-                    node_id: peer_announcement.node_id,
-                    address: connection.endpoint().to_socket_addr().to_string(),
-                    privacy_mode: peer_announcement.privacy_mode,
-                    distance: self
-                        .local_coordinate
-                        .euclidean_distance(&peer_announcement.coordinate),
-                })
-            }
-            _ => Err(anyhow!("Expected announcement message from peer")),
-        }
-    }
+    // ── Legacy unsigned-PoS handshake path REMOVED (F2) ────────────────────
+    //
+    // `connect_to_node`, `exchange_node_info`, `handle_incoming_connection`,
+    // `generate_pos_token`, and `validate_peer_pos_token` implemented the old
+    // `MatrixMessage::Announcement` handshake that exchanged a RAW, UNSIGNED
+    // `StateProof` and accepted it after only a structural `.validate()` — no
+    // signature, no signer↔identity binding. That is exactly the F2 Sybil
+    // vector. These methods were never reachable from production: the real
+    // handshake goes through `NetworkManager::exchange_node_info`, which uses
+    // `stoq::initiate_handshake_on_stream` / `accept_handshake` (the bilateral
+    // FALCON-signed path). `connect_to_node` / `handle_incoming_connection`
+    // were the only writers of `connected_nodes`, so `broadcast_position` /
+    // `discover_neighbors` iterate an always-empty map in production; they were
+    // exercised only by `tests/matrix_stoq_integration.rs`. Path deleted.
 
     /// Broadcast matrix position to all connected nodes
     pub async fn broadcast_position(&self) -> Result<()> {
@@ -588,68 +482,6 @@ impl MatrixStoqIntegration {
                 Err(e) => {
                     debug!("Failed to open stream for heartbeat to {}: {}", node_id, e);
                 }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Handle incoming STOQ connections
-    pub async fn handle_incoming_connection(&self, connection: Arc<Connection>) -> Result<()> {
-        debug!("Handling incoming STOQ connection");
-
-        // Accept stream and exchange info
-        let mut stream = connection.accept_stream().await?;
-
-        // Receive peer announcement
-        let peer_data = stream.receive().await?;
-        let peer_message: MatrixMessage = serde_json::from_slice(&peer_data)?;
-
-        match peer_message {
-            MatrixMessage::Announcement(peer_announcement) => {
-                // Validate peer's PoS token
-                Self::validate_peer_pos_token(&peer_announcement.pos_token)?;
-
-                // Generate real PoS token for our response
-                let pos_token_bytes = Self::generate_pos_token(&self.node_id).await?;
-
-                // Send our announcement back with PoS token
-                let our_announcement = MatrixNodeAnnouncement {
-                    coordinate: self.local_coordinate,
-                    node_id: self.node_id.clone(),
-                    privacy_mode: format!("{:?}", self.privacy_mode),
-                    protocol_version: MATRIX_PROTOCOL_VERSION.to_string(),
-                    pos_token: Some(pos_token_bytes),
-                    services: vec!["matrix".to_string()],
-                };
-
-                let response = MatrixMessage::Announcement(our_announcement);
-                let response_data = serde_json::to_vec(&response)?;
-                stream.send(&response_data).await?;
-
-                // Store the connection
-                let mut nodes = self.connected_nodes.write().await;
-                nodes.insert(
-                    peer_announcement.node_id.clone(),
-                    MatrixNodeConnection {
-                        coordinate: peer_announcement.coordinate,
-                        node_id: peer_announcement.node_id.clone(),
-                        connection,
-                        last_heartbeat: Self::current_timestamp(),
-                    },
-                );
-
-                info!(
-                    "Accepted incoming connection from matrix node {} at ({},{},{})",
-                    peer_announcement.node_id,
-                    peer_announcement.coordinate.x,
-                    peer_announcement.coordinate.y,
-                    peer_announcement.coordinate.z
-                );
-            }
-            _ => {
-                warn!("Unexpected initial message from incoming connection");
-                return Err(anyhow!("Expected announcement message"));
             }
         }
 

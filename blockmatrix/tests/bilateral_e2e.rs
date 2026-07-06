@@ -304,6 +304,116 @@ async fn run_forged_identity_test() -> Result<()> {
     Ok(())
 }
 
+/// F2 regression: reject a proof whose FALCON signer key does NOT match the
+/// peer's authenticated handshake identity.
+///
+/// The attack: Node A presents an HONEST identity (node_id == BLAKE3(pubkey),
+/// challenge signed with its real key — so it passes `verify_identity_binding`
+/// AND `verify_challenge_response`), but its STATE PROOF is a `WireSignedProof`
+/// signed by a DIFFERENT (throwaway) key, carrying that key as `signer_pubkey`.
+/// Before F2, `validate_proof` verified the proof signature against the key
+/// carried inside the proof and passed — letting any peer join as trusted at
+/// zero cost (unlimited Sybils). After F2, the handshake decodes the proof's
+/// `signer_pubkey` and rejects it when it differs from the authenticated
+/// handshake key.
+///
+/// We construct this by giving A's `BlockMatrixProofProvider` a signer that is
+/// a DIFFERENT identity than the one A uses for the handshake itself.
+#[tokio::test]
+async fn bilateral_handshake_rejects_mismatched_proof_signer() {
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        run_mismatched_signer_test(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(())) => {} // success
+        Ok(Err(e)) => panic!("Test failed: {e:#}"),
+        Err(_) => panic!("Test timed out after 10 seconds"),
+    }
+}
+
+async fn run_mismatched_signer_test() -> Result<()> {
+    // Node A's HANDSHAKE identity (honest: node_id == BLAKE3(pubkey))
+    let identity_a = FalconIdentity::generate();
+    let node_id_a = identity_a.node_id.clone();
+    let signer_a: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_a);
+
+    // A DIFFERENT identity used ONLY to sign A's state proof — the mismatch.
+    let proof_key_x = FalconIdentity::generate();
+    let signer_x: Arc<dyn NodeSigner + Send + Sync> = Arc::new(proof_key_x);
+
+    // A's proof provider signs with signer_x, so the WireSignedProof carries
+    // signer_x's pubkey — which does NOT match A's handshake key (signer_a).
+    let proof_provider_a = BlockMatrixProofProvider::new(
+        node_id_a.clone(),
+        signer_x.clone(),
+    );
+
+    // Node B is fully honest.
+    let identity_b = FalconIdentity::generate();
+    let signer_b: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_b);
+    let proof_provider_b = BlockMatrixProofProvider::new(
+        signer_b.node_id().to_string(),
+        signer_b.clone(),
+    );
+
+    let transport_a = Arc::new(make_transport().await?);
+    let transport_b = Arc::new(make_transport().await?);
+    let addr_b = transport_b.local_addr()?;
+
+    let coord: (i64, i64, i64) = (0, 0, 0);
+
+    let signer_b_clone = signer_b.clone();
+    let acceptor = tokio::spawn(async move {
+        let conn = transport_b.accept().await
+            .expect("test: accept");
+        let mut stream = conn.accept_stream().await
+            .expect("test: accept stream");
+        stoq::protocol::bilateral::accept_handshake(
+            &mut stream,
+            signer_b_clone.as_ref(),
+            &proof_provider_b,
+            coord,
+        )
+        .await
+    });
+
+    let endpoint_b = stoq::transport::connection::Endpoint::new(
+        std::net::Ipv6Addr::LOCALHOST,
+        addr_b.port(),
+    );
+    let conn_a = transport_a.connect(&endpoint_b).await?;
+
+    // A initiates with its honest handshake signer but a mismatched proof.
+    let initiate_result = stoq::protocol::bilateral::initiate_handshake(
+        &conn_a,
+        signer_a.as_ref(),
+        &proof_provider_a,
+        coord,
+    )
+    .await;
+
+    let accept_result = acceptor.await.expect("test: join acceptor");
+
+    // B (the responder) MUST reject: A's Msg3 proof is signed by signer_x, but
+    // A's authenticated identity is signer_a → signer mismatch → rejected.
+    assert!(
+        accept_result.is_err(),
+        "Responder must reject a proof whose signer != authenticated peer identity"
+    );
+
+    // The whole handshake must not succeed on both sides.
+    let both_ok = initiate_result.is_ok() && accept_result.is_ok();
+    assert!(
+        !both_ok,
+        "Handshake must fail when the proof signer does not match peer identity"
+    );
+
+    Ok(())
+}
+
 /// A NodeSigner that lies about its node_id (BLAKE3(pubkey) != declared id).
 struct RogueNodeSigner {
     real_identity: FalconIdentity,

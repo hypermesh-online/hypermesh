@@ -308,6 +308,28 @@ pub struct WireSignedProof {
     pub nonce: [u8; 32],
 }
 
+impl WireSignedProof {
+    /// Raw FALCON-1024 public key that signed this proof.
+    ///
+    /// The bilateral handshake binds this to the peer's authenticated
+    /// identity key: a proof is only accepted when this key equals the
+    /// FALCON key that satisfied the handshake identity binding
+    /// (`BLAKE3(pubkey) == node_id`). Without this check, an attacker could
+    /// present a self-signed proof carrying its own key and always pass
+    /// signature verification (F2 Sybil vector).
+    pub fn signer_pubkey_bytes(&self) -> &[u8] {
+        &self.signer_pubkey
+    }
+
+    /// Returns true iff this proof was signed by `pubkey` (raw FALCON bytes).
+    ///
+    /// Used by the handshake to enforce signer↔identity binding: the proof
+    /// signer MUST be the same key that authenticated the peer's identity.
+    pub fn signer_matches(&self, pubkey: &[u8]) -> bool {
+        self.signer_pubkey == pubkey
+    }
+}
+
 /// [`StateProofProvider`] implementation backed by TrustChain's `SignedStateProof`.
 ///
 /// Wraps TrustChain's `StateProof` generation and validation so that
@@ -388,15 +410,16 @@ impl hypermesh_lib::StateProofProvider for TrustChainProofProvider {
                     .map_err(|e| anyhow!("Failed to deserialize inner StateProof: {e}"))?;
                 Ok(proof.validate())
             }
-            Err(_) => {
-                // Backward compatibility: try raw StateProof (bincode format)
-                tracing::warn!(
-                    "Received unsigned state proof (legacy format) — \
-                     cryptographic verification skipped"
-                );
-                let proof = StateProof::from_bytes(incoming)
-                    .map_err(|e| anyhow!("Failed to deserialize state proof: {e}"))?;
-                Ok(proof.validate())
+            Err(e) => {
+                // F2 (zero-trust directive): the unsigned-proof fallback is
+                // removed. Every proof MUST be a FALCON-signed WireSignedProof.
+                // Accepting a raw bincode StateProof with no signature was a
+                // downgrade path that let an attacker bypass authentication
+                // entirely. On decode failure we REJECT — never fall back to a
+                // structural-only check.
+                Err(anyhow!(
+                    "Rejecting proof: not a valid FALCON-signed WireSignedProof ({e})"
+                ))
             }
         }
     }
@@ -747,7 +770,10 @@ mod proof_provider_tests {
     }
 
     #[tokio::test]
-    async fn test_proof_provider_backward_compat_raw_state_proof() {
+    async fn test_proof_provider_rejects_legacy_unsigned_proof() {
+        // F2: the unsigned-proof downgrade path is removed. A raw bincode
+        // StateProof (no signature) must be REJECTED, not accepted after a
+        // structural-only check.
         let signer = Arc::new(TestNodeSigner::new());
         let provider = TrustChainProofProvider::new(
             signer.node_id().to_string(),
@@ -759,8 +785,45 @@ mod proof_provider_tests {
         let raw_bytes = proof.to_bytes()
             .expect("test: serialization should succeed");
 
-        let valid = provider.validate_proof(&raw_bytes).await
-            .expect("test: validation should not error");
-        assert!(valid, "Legacy unsigned proof should still validate");
+        // validate_proof must now ERROR (reject) — no silent structural pass.
+        let result = provider.validate_proof(&raw_bytes).await;
+        assert!(
+            result.is_err(),
+            "Legacy unsigned proof must be rejected (F2), got: {result:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wire_signed_proof_signer_binding_helpers() {
+        // F2: the WireSignedProof exposes its signer key so the handshake can
+        // enforce that the proof signer == the authenticated peer identity.
+        let signer = Arc::new(TestNodeSigner::new());
+        let provider = TrustChainProofProvider::new(
+            signer.node_id().to_string(),
+            signer.clone(),
+        );
+
+        let proof_bytes = provider.generate_proof().await
+            .expect("test: proof generation should succeed");
+        let wire: WireSignedProof = serde_json::from_slice(&proof_bytes)
+            .expect("test: should deserialize WireSignedProof");
+
+        // The signer key equals the node's own FALCON pubkey.
+        assert_eq!(
+            wire.signer_pubkey_bytes(),
+            signer.public_key_bytes(),
+            "signer_pubkey_bytes must return the signing key"
+        );
+        assert!(
+            wire.signer_matches(signer.public_key_bytes()),
+            "signer_matches must be true for the actual signer"
+        );
+
+        // A different key must NOT match.
+        let other = TestNodeSigner::new();
+        assert!(
+            !wire.signer_matches(other.public_key_bytes()),
+            "signer_matches must be false for a different key (Sybil vector)"
+        );
     }
 }
