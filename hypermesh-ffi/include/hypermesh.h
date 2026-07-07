@@ -2,267 +2,648 @@
  * Copyright 2026 Hypermesh Foundation. All rights reserved.
  * Licensed under the Business Source License 1.1.
  *
- * C FFI bindings for the HyperMesh SDK.
+ * HyperMesh C ABI — stable interface for non-Rust consumers.
  *
- * Usage:
- *   1. Call hypermesh_connect() to obtain a client handle.
- *   2. Use the typed API functions (or hypermesh_call for raw RPC).
- *   3. Free every returned char* with hypermesh_free_string().
- *   4. On NULL return, inspect the error via hypermesh_last_error().
- *   5. Call hypermesh_disconnect() when done.
+ * Two families of functions:
  *
- * Thread safety:
- *   - The client handle is safe to share across threads.
- *   - hypermesh_last_error() returns a thread-local pointer.
+ *  1. Daemon IPC (hypermesh_connect / hypermesh_call / hypermesh_status / ...):
+ *     open a client handle to a running daemon and marshal JSON. Every returned
+ *     char* MUST be freed with hypermesh_free_string(); on NULL, inspect
+ *     hypermesh_last_error().
+ *
+ *  2. Direct crate ABI (hypermesh_identity_* / hypermesh_asset_address_* /
+ *     hypermesh_verify_* / hypermesh_compute_content_hash /
+ *     hypermesh_signed_proof_verify): call the TrustChain and lib Rust paths
+ *     in-process — no daemon required. These preserve the Proof-of-State gate
+ *     (signed-proof verification) and the BLAKE3 content-hash mirror invariant
+ *     (R4). They cannot mint a valid proof without the signing secret key, nor
+ *     serve an asset payload that fails its content hash.
+ *
+ * Return-code convention for the direct ABI (HM_* constants):
+ *   HM_OK (0) success; HM_VERIFY_OK (1) / HM_VERIFY_FAIL (0) for checks;
+ *   negative values are errors (also set the thread-local error string).
+ *
+ * Memory / ownership:
+ *   - hypermesh_client_t*  -> hypermesh_disconnect()
+ *   - hypermesh_identity_t* -> hypermesh_identity_free()
+ *   - char* (IPC results)   -> hypermesh_free_string()
+ *   Byte / string outputs use caller-provided buffers with a two-call length
+ *   pattern (pass NULL/0 first to learn the required length via *out_len).
+ *   All pointer arguments are NULL-checked; no Rust panic crosses the boundary.
  */
+
 
 #ifndef HYPERMESH_H
 #define HYPERMESH_H
 
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+
+// FFI status codes returned by the direct identity/asset ABI.
+//
+// `0` is success. Negative values are error classes; on any error the
+// thread-local message is also set (see `hypermesh_last_error`).
+#define HM_OK 0
+
+// A required pointer argument was NULL.
+#define HM_ERR_NULL -1
+
+// An argument was invalid (bad length, non-UTF-8, out of range, etc).
+#define HM_ERR_INVALID -2
+
+// The caller-provided output buffer was too small; required length is
+// written to the `*_len` out-parameter so the caller can retry.
+#define HM_ERR_BUFFER_TOO_SMALL -3
+
+// An underlying cryptographic or I/O operation failed.
+#define HM_ERR_INTERNAL -4
+
+// A verification check ran successfully but the result was "not authentic".
+#define HM_VERIFY_FAIL 0
+
+// A verification check ran successfully and the result was "authentic".
+#define HM_VERIFY_OK 1
+
+// Opaque handle wrapping a [`FalconIdentity`] (holds secret key material).
+//
+// Exposed to C as `hypermesh_identity_t`. Never dereferenced by the caller.
+// Must be freed exactly once with [`hypermesh_identity_free`].
+typedef struct hypermesh_identity_t hypermesh_identity_t;
+
+// Opaque handle exposed through the C API as `hypermesh_client_t`.
+//
+// Contains the tokio runtime (owned) and the async SDK client.
+typedef struct hypermesh_client_t hypermesh_client_t;
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif // __cplusplus
 
-/* Opaque client handle. */
-typedef struct hypermesh_client_t hypermesh_client_t;
+// Send an arbitrary JSON-RPC call to the daemon.
+//
+// `method` and `params_json` are null-terminated UTF-8 C strings.
+// Returns a JSON string the caller must free with `hypermesh_free_string`,
+// or `NULL` on error (inspect via `hypermesh_last_error`).
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `method` and `params_json` must be valid null-terminated UTF-8 strings.
+char *hypermesh_call(hypermesh_client_t *client, const char *method, const char *params_json);
 
-/* -----------------------------------------------------------------------
- * Connection lifecycle
- * ----------------------------------------------------------------------- */
+// Free a string previously returned by any `hypermesh_*` function.
+//
+// # Safety
+//
+// `s` must be a pointer previously returned by this library, or `NULL`.
+// Calling with any other pointer is undefined behavior.
+void hypermesh_free_string(char *s);
 
-/*
- * Connect to a running HyperMesh daemon.
- *
- * socket_path: Path to the Unix domain socket, or NULL to use the default
- *              3-tier fallback ($HYPERMESH_SOCK / $XDG_RUNTIME_DIR / ~/.hypermesh).
- *
- * Returns an opaque handle on success, or NULL on error.
- */
-hypermesh_client_t *hypermesh_connect(const char *socket_path);
+// Return the last error message, or `NULL` if no error has occurred.
+//
+// The returned pointer is valid until the next FFI call **on the same
+// thread**. The caller must NOT free this pointer.
+//
+// # Safety
+//
+// `_client` is accepted for API consistency but currently unused
+// (errors are thread-local). May be `NULL`.
+const char *hypermesh_last_error(const hypermesh_client_t *_client);
 
-/*
- * Disconnect and free a client handle. After this call the pointer is
- * invalid. Passing NULL is a safe no-op.
- */
-void hypermesh_disconnect(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Raw RPC call
- * ----------------------------------------------------------------------- */
-
-/*
- * Send an arbitrary JSON-RPC method call to the daemon.
- *
- * method:      Null-terminated method name (e.g. "node.status").
- * params_json: Null-terminated JSON string for the params object.
- *
- * Returns a heap-allocated JSON string (caller frees with
- * hypermesh_free_string), or NULL on error.
- */
-char *hypermesh_call(hypermesh_client_t *client,
-                     const char *method,
-                     const char *params_json);
-
-/* -----------------------------------------------------------------------
- * Typed API — Node
- * ----------------------------------------------------------------------- */
-
-/* Fetch the current node status. Returns JSON. */
-char *hypermesh_status(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Typed API — DNS
- * ----------------------------------------------------------------------- */
-
-/* Resolve a DNS name. Returns the address string. */
-char *hypermesh_dns_resolve(hypermesh_client_t *client, const char *name);
-
-/* List all registered DNS entries. Returns JSON array. */
-char *hypermesh_dns_list(hypermesh_client_t *client);
-
-/* Register a DNS name pointing to the given address. Returns JSON. */
-char *hypermesh_dns_register(hypermesh_client_t *client,
-                             const char *name,
-                             const char *addr);
-
-/* -----------------------------------------------------------------------
- * Typed API — Network
- * ----------------------------------------------------------------------- */
-
-/* List connected peers. Returns JSON array. */
-char *hypermesh_peers(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Typed API — Blockchain
- * ----------------------------------------------------------------------- */
-
-/* Get the current blockchain height. Returns JSON number. */
-char *hypermesh_blockchain_height(hypermesh_client_t *client);
-
-/* Get a block by index. Returns JSON. */
-char *hypermesh_blockchain_block(hypermesh_client_t *client, uint64_t index);
-
-/* -----------------------------------------------------------------------
- * Typed API — Topology
- * ----------------------------------------------------------------------- */
-
-/* Get this node's topology info. Returns JSON. */
-char *hypermesh_topology_info(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Typed API — Assets
- * ----------------------------------------------------------------------- */
-
-/* List all stored assets. Returns JSON array. */
+// List all stored assets as a JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_asset_list(hypermesh_client_t *client);
 
-/* Store a file as a HyperMesh asset. Returns JSON with asset_id. */
+// Store a file as a HyperMesh asset. Returns the store result as JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `file_path` must be a valid null-terminated UTF-8 string.
 char *hypermesh_asset_store(hypermesh_client_t *client, const char *file_path);
 
-/* Fetch an asset by ID and write it to output_path. Returns "ok" on success. */
+// Fetch an asset by ID and write it to the output path.
+// Returns `"ok"` on success.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `asset_id` and `output_path` must be valid null-terminated UTF-8 strings.
 char *hypermesh_asset_fetch(hypermesh_client_t *client,
                             const char *asset_id,
                             const char *output_path);
 
-/* -----------------------------------------------------------------------
- * Typed API — Domains
- * ----------------------------------------------------------------------- */
+// Construct an `AssetAddress` from matrix coords, a 32-byte content hash, and
+// a shard index (0-15), writing the 16 address bytes into `out16`.
+//
+// `x`/`y`/`z` must fit in i16 range `[-32768, 32767]`. Returns `HM_OK`,
+// `HM_ERR_INVALID` (coord overflow or shard > 15), or `HM_ERR_NULL`.
+//
+// # Safety
+//
+// `content_hash32` must point to 32 readable bytes; `out16` to 16 writable
+// bytes.
+int hypermesh_asset_address_new(int64_t x,
+                                int64_t y,
+                                int64_t z,
+                                const uint8_t *content_hash32,
+                                uint8_t shard,
+                                uint8_t *out16);
 
-/* List registered domains. Returns JSON array. */
-char *hypermesh_domain_list(hypermesh_client_t *client);
+// Format the 16-byte address in `bytes16` as an IPv6 string, writing a
+// null-terminated string into `out` (capacity `out_cap`). A full IPv6 text
+// form fits in 46 bytes; pass at least 46.
+//
+// # Safety
+//
+// `bytes16` must point to 16 readable bytes; `out` to `out_cap` writable bytes.
+int hypermesh_asset_address_to_ipv6(const uint8_t *bytes16, char *out, uintptr_t out_cap);
 
-/* Register a domain with name and privacy mode. Returns JSON. */
-char *hypermesh_domain_register(hypermesh_client_t *client,
-                                const char *name,
-                                const char *privacy);
+// Parse an IPv6 string (`ipv6_str`) into the 16-byte address form (`out16`),
+// validating the HyperMesh `fd48:4d00` prefix.
+//
+// Returns `HM_OK`, `HM_ERR_INVALID` (bad IPv6 or wrong prefix), or
+// `HM_ERR_NULL`.
+//
+// # Safety
+//
+// `ipv6_str` must be a valid null-terminated UTF-8 string; `out16` must point
+// to 16 writable bytes.
+int hypermesh_asset_address_from_ipv6(const char *ipv6_str, uint8_t *out16);
 
-/* -----------------------------------------------------------------------
- * Typed API — Dashboards
- * ----------------------------------------------------------------------- */
+// Extract the 6-byte asset fingerprint (bytes 10-15: 5 BLAKE3 hash bytes +
+// hash-nibble/shard byte) from `bytes16` into `out6`.
+//
+// # Safety
+//
+// `bytes16` must point to 16 readable bytes; `out6` to 6 writable bytes.
+int hypermesh_asset_address_fingerprint(const uint8_t *bytes16, uint8_t *out6);
 
-/* List deployed dashboards. Returns JSON array. */
-char *hypermesh_dashboard_list(hypermesh_client_t *client);
+// Extract the matrix coordinates (x,y,z) from `bytes16` into the three
+// out-params.
+//
+// # Safety
+//
+// `bytes16` must point to 16 readable bytes; `out_x`/`out_y`/`out_z` must be
+// valid pointers.
+int hypermesh_asset_address_coords(const uint8_t *bytes16,
+                                   int64_t *out_x,
+                                   int64_t *out_y,
+                                   int64_t *out_z);
 
-/* Deploy a dashboard from the given path. Returns JSON. */
-char *hypermesh_dashboard_deploy(hypermesh_client_t *client, const char *path);
+// Return the shard index (0-15) of the address in `bytes16`, or a negative
+// error code (`HM_ERR_NULL`).
+//
+// # Safety
+//
+// `bytes16` must point to 16 readable bytes.
+int hypermesh_asset_address_shard_index(const uint8_t *bytes16);
 
-/* -----------------------------------------------------------------------
- * Typed API — Config
- * ----------------------------------------------------------------------- */
+// Return `HM_VERIFY_OK` (1) if the address in `bytes16` carries the HyperMesh
+// `fd48:4d00` prefix, `HM_VERIFY_FAIL` (0) if not, or `HM_ERR_NULL`.
+//
+// # Safety
+//
+// `bytes16` must point to 16 readable bytes.
+int hypermesh_asset_address_is_hypermesh(const uint8_t *bytes16);
 
-/* Show the full daemon config. Returns JSON. */
-char *hypermesh_config_show(hypermesh_client_t *client);
+// Compute the BLAKE3 content hash of `data` (`data_len` bytes) into `out32`.
+//
+// This is the content-addressing primitive: the asset's identity is
+// `BLAKE3(payload)`. Use it to derive the `content_hash32` argument to
+// [`hypermesh_asset_address_new`].
+//
+// # Safety
+//
+// `data` must point to `data_len` readable bytes; `out32` to 32 writable bytes.
+int hypermesh_compute_content_hash(const uint8_t *data, uintptr_t data_len, uint8_t *out32);
 
-/* Get a single config value by key. Returns JSON. */
-char *hypermesh_config_get(hypermesh_client_t *client, const char *key);
+// Verify the mirror invariant: `BLAKE3(data) == hash32` (R4).
+//
+// Returns `HM_VERIFY_OK` (1) if the content matches the claimed hash,
+// `HM_VERIFY_FAIL` (0) if it does not, or `HM_ERR_NULL`.
+//
+// This is the same integrity check the internal pipeline runs before trusting
+// any asset payload — exposed directly so C consumers cannot bypass it.
+//
+// # Safety
+//
+// `hash32` must point to 32 readable bytes; `data` to `data_len` readable bytes.
+int hypermesh_verify_content_hash(const uint8_t *hash32, const uint8_t *data, uintptr_t data_len);
 
-/* -----------------------------------------------------------------------
- * Typed API — Caesar EVP
- * ----------------------------------------------------------------------- */
+// Get the current blockchain height as a JSON number.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_blockchain_height(hypermesh_client_t *client);
 
-/* Fetch the caller's Caesar wallet info. Returns JSON. */
+// Get a block by index. Returns block info as a JSON string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_blockchain_block(hypermesh_client_t *client, uint64_t index);
+
+// Fetch the caller's Caesar wallet info. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_caesar_wallet(hypermesh_client_t *client);
 
-/* Fetch the current Caesar balance. Returns JSON. */
+// Fetch the current Caesar balance. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_caesar_balance(hypermesh_client_t *client);
 
-/* Fetch recent Caesar transactions (limit=0 for default). Returns JSON array. */
+// Fetch recent Caesar transactions. Returns JSON array.
+//
+// `limit` controls the maximum number of transactions returned (0 = default).
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_caesar_transactions(hypermesh_client_t *client, uint32_t limit);
 
-/* Fetch accumulated Caesar rewards. Returns JSON. */
+// Fetch accumulated Caesar rewards. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_caesar_rewards(hypermesh_client_t *client);
 
-/* Route a Caesar EVP packet to a destination. Returns JSON. */
+// Route a Caesar EVP packet to a destination. Returns JSON result.
+//
+// `destination` is the target node or address.
+// `amount_grams` is the gold-gram equivalent value to send.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `destination` must be a valid null-terminated UTF-8 string.
 char *hypermesh_caesar_route_packet(hypermesh_client_t *client,
                                     const char *destination,
                                     double amount_grams);
 
-/* Fetch current Caesar Governor parameters. Returns JSON. */
+// Fetch the current Caesar Governor parameters. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_caesar_governor_params(hypermesh_client_t *client);
 
-/* -----------------------------------------------------------------------
- * Typed API — TrustChain
- * ----------------------------------------------------------------------- */
+// Browse catalog packages. Returns JSON with paginated results.
+//
+// `query` is an optional search filter (may be NULL for unfiltered).
+// `page` is the zero-based page number.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `query` must be a valid null-terminated UTF-8 string or NULL.
+char *hypermesh_catalog_browse(hypermesh_client_t *client, const char *query, uint32_t page);
 
-/* List all TrustChain certificates. Returns JSON array. */
+// Search catalog packages by query string. Returns JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `query` must be a valid null-terminated UTF-8 string.
+char *hypermesh_catalog_search(hypermesh_client_t *client, const char *query);
+
+// Get detailed info about a specific catalog package. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `name` must be a valid null-terminated UTF-8 string.
+char *hypermesh_catalog_package_info(hypermesh_client_t *client, const char *name);
+
+// Fetch catalog registry statistics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_catalog_registry_stats(hypermesh_client_t *client);
+
+// Show the full daemon config as a JSON string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_config_show(hypermesh_client_t *client);
+
+// Get a single config value by key. Returns the value as a JSON string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `key` must be a valid null-terminated UTF-8 string.
+char *hypermesh_config_get(hypermesh_client_t *client, const char *key);
+
+// List deployed dashboards as a JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_dashboard_list(hypermesh_client_t *client);
+
+// Deploy a dashboard from the given path. Returns result as JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `path` must be a valid null-terminated UTF-8 string.
+char *hypermesh_dashboard_deploy(hypermesh_client_t *client, const char *path);
+
+// Resolve a DNS name. Returns the address as a C string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `name` must be a valid null-terminated UTF-8 string.
+char *hypermesh_dns_resolve(hypermesh_client_t *client, const char *name);
+
+// List all DNS entries as a JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_dns_list(hypermesh_client_t *client);
+
+// Register a DNS name pointing to the given address.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `name` and `addr` must be valid null-terminated UTF-8 strings.
+char *hypermesh_dns_register(hypermesh_client_t *client, const char *name, const char *addr);
+
+// List registered domains as a JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_domain_list(hypermesh_client_t *client);
+
+// Register a domain with the given name and privacy mode.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `name` and `privacy` must be valid null-terminated UTF-8 strings.
+char *hypermesh_domain_register(hypermesh_client_t *client, const char *name, const char *privacy);
+
+// Fetch current node capacity metrics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_engauge_capacity(hypermesh_client_t *client);
+
+// Fetch current traffic statistics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_engauge_traffic(hypermesh_client_t *client);
+
+// Fetch marketplace resource pool info. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_engauge_marketplace(hypermesh_client_t *client);
+
+// Fetch detailed node-level metrics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_engauge_node_metrics(hypermesh_client_t *client);
+
+// Fetch active resource leases. Returns JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_engauge_leases(hypermesh_client_t *client);
+
+// Generate a fresh post-quantum identity (FALCON-1024 + Kyber-1024).
+//
+// Returns an opaque handle the caller must free with
+// [`hypermesh_identity_free`], or `NULL` on error (see `hypermesh_last_error`).
+hypermesh_identity_t *hypermesh_identity_generate(void);
+
+// Load an identity from `data_dir`, generating and persisting one if absent.
+//
+// `data_dir` is a null-terminated UTF-8 path. Returns an opaque handle the
+// caller must free with [`hypermesh_identity_free`], or `NULL` on error.
+//
+// # Safety
+//
+// `data_dir` must be a valid null-terminated UTF-8 string.
+hypermesh_identity_t *hypermesh_identity_load(const char *data_dir);
+
+// Free an identity handle. Passing `NULL` is a safe no-op.
+//
+// # Safety
+//
+// `identity` must be a pointer returned by `hypermesh_identity_generate` /
+// `hypermesh_identity_load`, or `NULL`. Must not be freed twice.
+void hypermesh_identity_free(hypermesh_identity_t *identity);
+
+// Write the node ID (64-char BLAKE3 hex of the FALCON public key) as a
+// null-terminated string into `out` (capacity `out_cap` bytes).
+//
+// Returns `HM_OK` on success, `HM_ERR_BUFFER_TOO_SMALL` if `out_cap < 65`
+// (64 chars + NUL), or a negative error code.
+//
+// # Safety
+//
+// `identity` must be a valid handle; `out` must point to at least `out_cap`
+// writable bytes.
+int hypermesh_identity_node_id(const hypermesh_identity_t *identity, char *out, uintptr_t out_cap);
+
+// Copy the raw FALCON-1024 public key bytes into `out`.
+//
+// Two-call pattern: pass `out = NULL` (any `out_cap`) to learn the required
+// length via `*out_len`, then call again with a buffer of that size.
+//
+// Returns `HM_OK` on success (with `*out_len` = bytes written),
+// `HM_ERR_BUFFER_TOO_SMALL` if `out_cap` is too small (`*out_len` = required).
+//
+// # Safety
+//
+// `identity` must be valid; if non-NULL, `out` must have `out_cap` writable
+// bytes; `out_len` must be a valid pointer.
+int hypermesh_identity_public_key(const hypermesh_identity_t *identity,
+                                  uint8_t *out,
+                                  uintptr_t out_cap,
+                                  uintptr_t *out_len);
+
+// Copy the raw Kyber-1024 public key bytes into `out` (same two-call pattern
+// as [`hypermesh_identity_public_key`]). Peers use this to encrypt assets FOR
+// this node (KEM encapsulation).
+//
+// # Safety
+//
+// See [`hypermesh_identity_public_key`].
+int hypermesh_identity_kyber_public_key(const hypermesh_identity_t *identity,
+                                        uint8_t *out,
+                                        uintptr_t out_cap,
+                                        uintptr_t *out_len);
+
+// Sign `data` (`data_len` bytes) with the identity's FALCON-1024 secret key,
+// writing the detached signature into `out` (two-call pattern).
+//
+// Returns `HM_OK` with `*out_len` = signature length on success.
+//
+// # Safety
+//
+// `identity` must be valid; `data` must have `data_len` readable bytes; if
+// `out` is non-NULL it must have `out_cap` writable bytes; `out_len` valid.
+int hypermesh_identity_sign(const hypermesh_identity_t *identity,
+                            const uint8_t *data,
+                            uintptr_t data_len,
+                            uint8_t *out,
+                            uintptr_t out_cap,
+                            uintptr_t *out_len);
+
+// Verify a FALCON-1024 detached signature (stateless — no identity handle).
+//
+// Returns `HM_VERIFY_OK` (1) if the signature is authentic for `data` under
+// `pubkey`, `HM_VERIFY_FAIL` (0) if not authentic, or a negative error code
+// on malformed input.
+//
+// # Safety
+//
+// `pubkey`/`data`/`signature` must point to their respective lengths of
+// readable bytes.
+int hypermesh_verify_signature(const uint8_t *pubkey,
+                               uintptr_t pubkey_len,
+                               const uint8_t *data,
+                               uintptr_t data_len,
+                               const uint8_t *signature,
+                               uintptr_t signature_len);
+
+// Verify a `WireSignedProof` envelope — the on-the-wire PoS-signed proof.
+//
+// `wire` is the JSON-serialized `WireSignedProof` (`wire_len` bytes). This
+// runs the SAME verification the internal Rust path runs:
+// 1. Recompute `BLAKE3(proof_bytes || nonce)`.
+// 2. Verify the FALCON-1024 detached signature against the embedded pubkey.
+// 3. Validate the inner four-proof `StateProof` (binary pass/fail).
+//
+// Returns `HM_VERIFY_OK` (1) if authentic, `HM_VERIFY_FAIL` (0) if the
+// signature or inner proof is invalid, or a negative error on malformed input.
+//
+// This is the PoS gate exposed over C: a forged or tampered proof returns 0,
+// and no ABI function can mint a valid proof without the signing secret key.
+//
+// # Safety
+//
+// `wire` must point to `wire_len` readable bytes.
+int hypermesh_signed_proof_verify(const uint8_t *wire, uintptr_t wire_len);
+
+// List connected peers as a JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_peers(hypermesh_client_t *client);
+
+// Fetch the current node status as a JSON string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_status(hypermesh_client_t *client);
+
+// Get this node's topology info as a JSON string.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_topology_info(hypermesh_client_t *client);
+
+// List all TrustChain certificates. Returns JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_trustchain_certificates(hypermesh_client_t *client);
 
-/* Issue a new certificate for a subject and scope. Returns JSON. */
+// Issue a new certificate for the given subject and scope. Returns JSON.
+//
+// `subject` is the entity name (e.g. node ID or domain).
+// `scope` is the certificate scope (e.g. "device", "network").
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `subject` and `scope` must be valid null-terminated UTF-8 strings.
 char *hypermesh_trustchain_issue(hypermesh_client_t *client,
                                  const char *subject,
                                  const char *scope);
 
-/* Validate a PEM-encoded certificate. Returns JSON validation result. */
-char *hypermesh_trustchain_validate(hypermesh_client_t *client,
-                                    const char *cert_pem);
+// Validate a PEM-encoded certificate. Returns JSON validation result.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `cert_pem` must be a valid null-terminated UTF-8 string.
+char *hypermesh_trustchain_validate(hypermesh_client_t *client, const char *cert_pem);
 
-/* Revoke a certificate by ID. Returns JSON result. */
-char *hypermesh_trustchain_revoke(hypermesh_client_t *client,
-                                  const char *cert_id);
+// Revoke a certificate by its ID. Returns JSON result.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+// `cert_id` must be a valid null-terminated UTF-8 string.
+char *hypermesh_trustchain_revoke(hypermesh_client_t *client, const char *cert_id);
 
-/* List TrustChain DNS zones. Returns JSON array. */
+// List TrustChain DNS zones. Returns JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_trustchain_dns_zones(hypermesh_client_t *client);
 
-/* -----------------------------------------------------------------------
- * Typed API — Engauge Analytics
- * ----------------------------------------------------------------------- */
+// Connect to a running HyperMesh daemon.
+//
+// `socket_path` may be `NULL` to use the default 3-tier fallback
+// (`$HYPERMESH_SOCK` / `$XDG_RUNTIME_DIR/hypermesh/ctl.sock` /
+// `~/.hypermesh/ctl.sock`).
+//
+// Returns an opaque pointer the caller must eventually pass to
+// `hypermesh_disconnect`, or `NULL` on error.
+//
+// # Safety
+//
+// `socket_path` must be a valid null-terminated UTF-8 string or `NULL`.
+hypermesh_client_t *hypermesh_connect(const char *socket_path);
 
-/* Fetch current node capacity metrics. Returns JSON. */
-char *hypermesh_engauge_capacity(hypermesh_client_t *client);
-
-/* Fetch current traffic statistics. Returns JSON. */
-char *hypermesh_engauge_traffic(hypermesh_client_t *client);
-
-/* Fetch marketplace resource pool info. Returns JSON. */
-char *hypermesh_engauge_marketplace(hypermesh_client_t *client);
-
-/* Fetch detailed node-level metrics. Returns JSON. */
-char *hypermesh_engauge_node_metrics(hypermesh_client_t *client);
-
-/* Fetch active resource leases. Returns JSON array. */
-char *hypermesh_engauge_leases(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Typed API — Catalog Registry
- * ----------------------------------------------------------------------- */
-
-/* Browse catalog packages. query may be NULL. Returns paginated JSON. */
-char *hypermesh_catalog_browse(hypermesh_client_t *client,
-                               const char *query,
-                               uint32_t page);
-
-/* Search catalog packages by query string. Returns JSON array. */
-char *hypermesh_catalog_search(hypermesh_client_t *client,
-                               const char *query);
-
-/* Get detailed info about a specific catalog package. Returns JSON. */
-char *hypermesh_catalog_package_info(hypermesh_client_t *client,
-                                     const char *name);
-
-/* Fetch catalog registry statistics. Returns JSON. */
-char *hypermesh_catalog_registry_stats(hypermesh_client_t *client);
-
-/* -----------------------------------------------------------------------
- * Memory management
- * ----------------------------------------------------------------------- */
-
-/*
- * Free a string previously returned by any hypermesh_* function.
- * Passing NULL is a safe no-op.
- */
-void hypermesh_free_string(char *s);
-
-/*
- * Return the last error message for the current thread, or NULL if no
- * error has occurred. The returned pointer is valid until the next FFI
- * call on the same thread. Do NOT free this pointer.
- */
-const char *hypermesh_last_error(const hypermesh_client_t *client);
+// Disconnect and free a client handle.
+//
+// After this call the pointer is invalid and must not be used.
+//
+// # Safety
+//
+// `client` must be a pointer previously returned by `hypermesh_connect`,
+// or `NULL` (which is a no-op).
+void hypermesh_disconnect(hypermesh_client_t *client);
 
 #ifdef __cplusplus
-} /* extern "C" */
-#endif
+}  // extern "C"
+#endif  // __cplusplus
 
-#endif /* HYPERMESH_H */
+#endif  /* HYPERMESH_H */
