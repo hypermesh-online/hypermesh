@@ -27,10 +27,42 @@ use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::config::GatewayConfig;
+use crate::config::{GatewayConfig, StoqAuthMode};
 use crate::router::GatewayRouter;
 use crate::stoq_bridge::{StoqBridge, StoqBridgeConfig};
 use crate::stoq_listener::StoqListener;
+
+/// Resolve the directory used to persist this gateway node's FALCON-1024
+/// identity in full-STOQ-PoS mode. Uses `HYPERMESH_DATA` if set, else
+/// `~/.hypermesh/gateway`. The identity is loaded on restart so the
+/// gateway keeps a stable node id.
+fn gateway_identity_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("HYPERMESH_DATA") {
+        return std::path::PathBuf::from(dir).join("gateway");
+    }
+    let home = std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    home.join(".hypermesh").join("gateway")
+}
+
+/// Build the FALCON-1024 signer + TrustChain proof provider for
+/// full-STOQ-PoS mode. Returns an error if the identity cannot be
+/// loaded/created.
+fn build_pos_identity() -> Result<(
+    Arc<dyn hypermesh_lib::NodeSigner>,
+    Arc<dyn hypermesh_lib::StateProofProvider>,
+)> {
+    let data_dir = gateway_identity_dir();
+    std::fs::create_dir_all(&data_dir)?;
+    let identity = trustchain::identity::FalconIdentity::load_or_create(&data_dir)?;
+    let node_id = identity.node_id.clone();
+    let signer: Arc<dyn hypermesh_lib::NodeSigner> = Arc::new(identity);
+    let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> = Arc::new(
+        trustchain::proof_of_state::TrustChainProofProvider::new(node_id, signer.clone()),
+    );
+    Ok((signer, proof_provider))
+}
 
 /// Parse `--config <path>` from CLI arguments.
 /// Returns `Some(path)` if found, `None` otherwise.
@@ -105,10 +137,31 @@ async fn main() -> Result<()> {
         let bridge_config = StoqBridgeConfig {
             bind_addr: stoq_addr,
             max_connections: config.stoq_max_connections,
+            auth_mode: config.stoq_auth_mode,
             ..StoqBridgeConfig::default()
         };
 
-        match StoqBridge::new(bridge_config).await {
+        // F8: choose the constructor based on the configured auth mode.
+        // FullStoqPos installs a FALCON identity + proof provider so the
+        // listener can enforce a bilateral PoS handshake; HttpProxy skips it.
+        let bridge_result = match config.stoq_auth_mode {
+            StoqAuthMode::FullStoqPos => {
+                info!("STOQ auth mode: full-stoq-pos (bilateral PoS handshake required)");
+                match build_pos_identity() {
+                    Ok((signer, proof_provider)) => {
+                        info!("Gateway FALCON identity: {}", signer.node_id());
+                        StoqBridge::new_with_pos(bridge_config, signer, proof_provider).await
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+            StoqAuthMode::HttpProxy => {
+                info!("STOQ auth mode: http-proxy (no PoS handshake — passthrough)");
+                StoqBridge::new(bridge_config).await
+            }
+        };
+
+        match bridge_result {
             Ok(bridge) => {
                 let bridge = Arc::new(bridge);
                 info!("STOQ bridge listening on {}", stoq_addr);

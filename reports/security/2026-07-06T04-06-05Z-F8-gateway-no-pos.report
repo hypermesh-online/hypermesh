@@ -1,0 +1,26 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F8 — Resolution Report (delivered as P4: configurable gateway)
+
+- **Finding:** [F8 audit](2026-07-06T04-06-05Z-F8-gateway-no-pos.audit)
+- **Status:** RESOLVED — implemented + self-QA'd (a P4-introduced regression was caught and fixed at the gate)
+- **Phase:** P4. **Branch:** `feat/p4-configurable-gateway`. **Date:** 2026-07-11
+
+## What was fixed
+The gateway accepted STOQ connections with zero PoS/handshake. F8 is delivered as the owner's reframe: a **configurable two-mode gateway**.
+- **`StoqAuthMode` enum** (`gateway/src/config.rs`): `HttpProxy` (default) | `FullStoqPos`, with string parse (`http-proxy`/`stoq-pos`/…) and a `requires_pos()` helper.
+- **HttpProxy mode** — plain reverse proxy for backwards compatibility; no STOQ/PoS; connections pass through.
+- **FullStoqPos mode** — decentralized port to an Asset; `StoqListener::run` (`stoq_listener.rs:92-100`) runs `bridge.perform_pos_handshake(&conn)` after accept and **drops the connection on failure** ("rejecting un-authenticated STOQ connection"). Wired a `NodeSigner` + `StateProofProvider` into `StoqBridge` (previously held neither) — hence the new `trustchain` dependency.
+- Fixed the pre-existing `remote_proxy.rs` `RemoteDashboardProxy` `Debug` compile error (manual `impl Debug`) that had blocked the gateway crate from building.
+
+## Regression caught + fixed at the QA gate
+Adding `trustchain` to `gateway/Cargo.toml` (needed for the PoS handshake) transitively enabled the `aws-lc-rs` rustls backend alongside the pre-existing `ring` (via quinn). With two rustls `CryptoProvider`s compiled in, 5 TLS-using integration tests (`test_gateway_health_check`, `test_blockmatrix_routing`, `test_trustchain_routing`, `test_gateway_cors_headers`, `test_request_id_propagation`) panicked: *"Could not automatically determine the process-level CryptoProvider."* The gateway BINARY already installs one (`main.rs:86`, `ring::default_provider().install_default()`), so production is unaffected — but the test harness did not.
+**Fix:** `ensure_crypto_provider()` (a `Once`-guarded `ring::default_provider().install_default()`) at the top of `TestClient::new` in `gateway/tests/integration_test.rs`, matching the binary. Not a logic change; test-harness scaffolding for the new dual-backend reality. All 5 now pass.
+
+## Verification (self-QA)
+- `cargo test -p gateway`: gateway lib 221/0, other suites 73/0 + 3/0 (incl. new `stoq_auth_mode_tests`), integration_test 7/0 after the crypto-provider fix. Full suite green.
+- Two-mode logic read + confirmed: FullStoqPos rejects un-handshaked (stoq_listener.rs:92-100); HttpProxy skips the handshake.
+
+## Residual / follow-on
+- The FullStoqPos handshake inherits F2's fixed signer↔identity binding (correct). Full cross-scope proxy behavior in FullStoqPos mode over a live two-node link is exercised in P8 (E2E).
+- Default mode is `HttpProxy` (backwards-compat); operators opt into `FullStoqPos` per config.

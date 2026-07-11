@@ -291,6 +291,22 @@ pub struct RemoteDashboardProxy {
     active: Arc<std::sync::atomic::AtomicBool>,
 }
 
+// Manual `Debug` — the `forwarder` field is a `dyn StoqStreamForwarder`
+// trait object with no `Debug` bound, and the `capability_token` bytes
+// are opaque secret material that must never be printed. This impl
+// exposes only the non-sensitive routing/session fields.
+impl std::fmt::Debug for RemoteDashboardProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RemoteDashboardProxy")
+            .field("target_node", &self.target_node)
+            .field("mode", &self.mode)
+            .field("session_id", &self.session_id)
+            .field("token_byte_len", &self.capability_token.len())
+            .field("active", &self.is_active())
+            .finish_non_exhaustive()
+    }
+}
+
 impl RemoteDashboardProxy {
     /// Construct a remote proxy session bound to a forwarder.
     pub fn new(
