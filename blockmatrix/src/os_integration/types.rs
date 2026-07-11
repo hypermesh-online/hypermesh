@@ -133,6 +133,143 @@ pub enum StorageType {
     Unknown,
 }
 
+/// Raw device-unique identifiers read from the OS.
+///
+/// These are the AUTHENTICATION INPUTS to the four-proof State Proof.
+/// Every field is optional because sources degrade gracefully — DMI is
+/// often root-only, machine-id may be absent in minimal containers, and
+/// disk serials require a physical backing device. The composed
+/// `DeviceFingerprint` tolerates missing components but requires
+/// `min_sources` independent sources to be considered trustworthy.
+///
+/// NONE of these are addresses — assets get IPv6 addresses, devices do not.
+/// The fingerprint derived from these binds the node's genesis proofs to
+/// this specific physical machine.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceIdentifiers {
+    /// `/etc/machine-id` (or `/var/lib/dbus/machine-id` fallback).
+    pub machine_id: Option<String>,
+    /// `/sys/class/dmi/id/product_uuid` (root-only on most systems).
+    pub product_uuid: Option<String>,
+    /// `/sys/class/dmi/id/board_serial` (root-only on most systems).
+    pub board_serial: Option<String>,
+    /// `/sys/class/dmi/id/product_serial` (root-only on most systems).
+    pub product_serial: Option<String>,
+    /// Serial of the disk backing the largest mounted filesystem.
+    pub primary_disk_serial: Option<String>,
+    /// MAC address of the primary (non-loopback, carrier-up) interface.
+    pub primary_mac: Option<String>,
+}
+
+impl DeviceIdentifiers {
+    /// Count of independent identifier sources actually present.
+    ///
+    /// machine-id, DMI (any of uuid/board/product serial counts once),
+    /// disk serial, and MAC are treated as four independent source classes.
+    pub fn source_count(&self) -> usize {
+        let mut n = 0;
+        if self.machine_id.as_ref().is_some_and(|s| !s.is_empty()) {
+            n += 1;
+        }
+        let has_dmi = [&self.product_uuid, &self.board_serial, &self.product_serial]
+            .iter()
+            .any(|f| f.as_ref().is_some_and(|s| !s.is_empty()));
+        if has_dmi {
+            n += 1;
+        }
+        if self
+            .primary_disk_serial
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+        {
+            n += 1;
+        }
+        if self.primary_mac.as_ref().is_some_and(|s| !s.is_empty()) {
+            n += 1;
+        }
+        n
+    }
+}
+
+/// Primary network interface identity (MAC + carrier state).
+///
+/// Replaces the historic hardcoded loopback `::1` network asset. The MAC
+/// is a device-unique fingerprint component; carrier state selects a live
+/// interface over dead ones.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct NicInfo {
+    /// Interface name (e.g. "eth0", "wlan0", "enp3s0").
+    pub name: String,
+    /// Hardware MAC address (e.g. "aa:bb:cc:dd:ee:ff").
+    pub mac: String,
+    /// Whether the link reports carrier (physically connected).
+    pub carrier: bool,
+    /// Whether this is the loopback interface.
+    pub is_loopback: bool,
+}
+
+/// Composed, device-bound fingerprint = `BLAKE3(machine_id || product_uuid
+/// || board_serial || disk_serial || mac)`.
+///
+/// This is an AUTHENTICATION INPUT to the four proofs, NOT an address.
+/// It is folded into all four genesis proofs so a copied identity directory
+/// run on a different physical machine fails the continuity gate.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeviceFingerprint {
+    /// 32-byte BLAKE3 digest of the concatenated available identifiers.
+    pub digest: [u8; 32],
+    /// Number of independent identifier sources that contributed.
+    pub source_count: usize,
+    /// The raw identifiers used (for audit + continuity re-derivation).
+    pub identifiers: DeviceIdentifiers,
+}
+
+impl DeviceFingerprint {
+    /// Compose a fingerprint from raw identifiers.
+    ///
+    /// Components are hashed in a FIXED order with domain-separating labels
+    /// so the digest is deterministic and stable across boots on the same
+    /// machine. Missing components are simply skipped (tolerant).
+    pub fn compose(ids: DeviceIdentifiers) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"hypermesh-device-fingerprint-v1");
+        for (label, value) in [
+            (b"machine_id".as_slice(), ids.machine_id.as_deref()),
+            (b"product_uuid".as_slice(), ids.product_uuid.as_deref()),
+            (b"board_serial".as_slice(), ids.board_serial.as_deref()),
+            (b"product_serial".as_slice(), ids.product_serial.as_deref()),
+            (b"disk_serial".as_slice(), ids.primary_disk_serial.as_deref()),
+            (b"mac".as_slice(), ids.primary_mac.as_deref()),
+        ] {
+            if let Some(v) = value {
+                if !v.is_empty() {
+                    hasher.update(label);
+                    hasher.update(b"=");
+                    hasher.update(v.as_bytes());
+                    hasher.update(b";");
+                }
+            }
+        }
+        let digest = *hasher.finalize().as_bytes();
+        let source_count = ids.source_count();
+        Self {
+            digest,
+            source_count,
+            identifiers: ids,
+        }
+    }
+
+    /// Hex-encoded digest (used as the recoverable device binding token).
+    pub fn hex(&self) -> String {
+        blake3::Hash::from(self.digest).to_hex().to_string()
+    }
+
+    /// True if at least `min_sources` independent sources contributed.
+    pub fn has_min_sources(&self, min_sources: usize) -> bool {
+        self.source_count >= min_sources
+    }
+}
+
 /// Real-time Resource Usage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceUsage {

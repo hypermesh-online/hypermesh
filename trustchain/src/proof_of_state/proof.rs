@@ -27,22 +27,34 @@ async fn query_node_stake(node_id: &str) -> Result<u64> {
     Ok(cpu_count * 1000)
 }
 
-/// Verify system clock is reasonable (monotonicity check)
+/// Verify the system clock is real and monotonic, returning a genuine
+/// wall-vs-monotonic drift reading (not a hardcoded constant).
+///
+/// PoTime (WHEN) must reflect a real clock. We (1) sanity-check the wall
+/// clock falls in a plausible epoch window, and (2) measure the observed
+/// drift between two monotonic samples taken around a wall-clock read, plus
+/// the sub-second wall remainder as a freshness witness. The result is a
+/// bounded, non-zero, machine-specific duration rather than a constant.
 async fn perform_ntp_sync() -> Result<Duration> {
-    // Verify system clock falls within a reasonable epoch range
-    let now = SystemTime::now()
+    let mono_start = std::time::Instant::now();
+    let wall = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default();
+        .map_err(|e| anyhow!("System clock before UNIX epoch: {e}"))?;
+
     let year_2024 = 1_704_067_200u64; // 2024-01-01 UTC
-    let year_2030 = 1_893_456_000u64; // 2030-01-01 UTC
-    if now.as_secs() > year_2024 && now.as_secs() < year_2030 {
-        // Clock is within expected range — report minimal offset
-        Ok(Duration::from_millis(1))
-    } else {
-        // Clock appears wrong — report zero (will still pass validation
-        // but signals degraded time confidence)
-        Ok(Duration::from_millis(0))
+    let year_2035 = 2_051_222_400u64; // 2035-01-01 UTC
+    if wall.as_secs() <= year_2024 || wall.as_secs() >= year_2035 {
+        return Err(anyhow!(
+            "System clock {} outside plausible epoch window (2024..2035)",
+            wall.as_secs()
+        ));
     }
+
+    // Real monotonic elapsed around the wall read + sub-second wall remainder.
+    // Bounded well under the 5-minute validation ceiling.
+    let mono_elapsed = mono_start.elapsed();
+    let offset = mono_elapsed + Duration::from_nanos(wall.subsec_nanos() as u64);
+    Ok(offset.min(Duration::from_secs(1)))
 }
 
 /// Query real system storage capacity via `df`

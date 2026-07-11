@@ -257,13 +257,37 @@ impl NodeBootstrap {
     /// 3. DNS with localhost → ::1
     /// 4. Default to Private mode (no network)
     pub async fn initialize(node_coordinate: MatrixCoordinate) -> Result<Self> {
+        Self::initialize_inner(node_coordinate, None).await
+    }
+
+    /// Initialize a new node whose genesis is bound to a canonical device
+    /// identity (`BLAKE3(falcon_pubkey)` hex).
+    ///
+    /// Device-auth invariant: the genesis proofs collapse the three
+    /// historical node IDs into `device_node_id` and fold the device
+    /// fingerprint (captured from the OS) into all four proofs.
+    pub async fn initialize_with_identity(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: &str,
+    ) -> Result<Self> {
+        Self::initialize_inner(node_coordinate, Some(device_node_id)).await
+    }
+
+    async fn initialize_inner(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: Option<&str>,
+    ) -> Result<Self> {
         info!(
             "Initializing node at ({}, {}, {}) with self-sufficient bootstrap",
             node_coordinate.x, node_coordinate.y, node_coordinate.z
         );
 
-        // 1. Create unique genesis block for THIS node
-        let genesis_block = Block::genesis(node_coordinate);
+        // 1. Create unique genesis block for THIS node. When a canonical
+        //    device identity is supplied, bind the genesis proofs to it.
+        let genesis_block = match device_node_id {
+            Some(id) => Block::genesis_with_identity(node_coordinate, id),
+            None => Block::genesis(node_coordinate),
+        };
         info!("Created genesis block: {}", genesis_block.hash);
 
         // 2. Initialize blockchain with the SAME genesis we just built.

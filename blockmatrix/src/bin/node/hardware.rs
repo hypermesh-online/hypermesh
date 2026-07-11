@@ -26,7 +26,7 @@ pub fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
     assess_cpu(os.as_ref(), &platform, &mut assets);
     assess_memory(os.as_ref(), &platform, &mut assets);
     assess_storage(os.as_ref(), &platform, &mut assets);
-    assess_network(&platform, &mut assets);
+    assess_network(os.as_ref(), &platform, &mut assets);
     assess_gpu(os.as_ref(), &platform, &mut assets);
 
     if assets.is_empty() {
@@ -44,6 +44,11 @@ pub fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
 ///
 /// Per R1: hardware assessed, not self-reported.
 /// Per R2: four proofs from actual hardware measurements.
+///
+/// `node_id` should be the canonical device node ID (`BLAKE3(falcon_pubkey)`)
+/// so the collapsed identity flows into all four proofs. The device
+/// fingerprint is captured from the OS and folded into every proof
+/// (device-auth invariant).
 pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -> StateProof {
     match create_os_abstraction() {
         Ok(os) => {
@@ -54,6 +59,9 @@ pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -
             warn!(
                 "OS abstraction unavailable ({e}), using fallback hardware values"
             );
+            let device_fingerprint = blockmatrix::os_integration::DeviceFingerprint::compose(
+                Default::default(),
+            );
             let hw = HardwareAssessment {
                 cpu_cores: num_cpus::get() as u32,
                 cpu_mhz: 1000,
@@ -62,6 +70,8 @@ pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -
                 storage_available_bytes: 25 * 1024 * 1024 * 1024,
                 node_id: node_id.to_string(),
                 coordinate,
+                device_fingerprint,
+                disk_serial: None,
             };
             generate_genesis_proof(&hw)
         }
@@ -198,18 +208,51 @@ fn assess_storage(
     }
 }
 
-fn assess_network(platform: &str, assets: &mut Vec<AssetRegistration>) {
+/// Register the node's PRIMARY network interface as an asset.
+///
+/// Device-auth invariant: replaces the historic hardcoded loopback `::1`.
+/// Reads the real primary NIC (non-loopback, carrier-up) — its MAC is a
+/// device-unique fingerprint component. Falls back to loopback only when no
+/// interface can be read at all, and records that degradation in metadata.
+fn assess_network(
+    os: &dyn blockmatrix::os_integration::OsAbstraction,
+    platform: &str,
+    assets: &mut Vec<AssetRegistration>,
+) {
+    let (definition, metadata, log) = match os.primary_nic() {
+        Some(nic) => (
+            format!(
+                "network:iface={},mac={},carrier={}",
+                nic.name, nic.mac, nic.carrier
+            )
+            .into_bytes(),
+            format!(
+                "interface={},loopback={},carrier={}",
+                nic.name, nic.is_loopback, nic.carrier
+            )
+            .into_bytes(),
+            format!(
+                "Hardware: Network {} (MAC {}, carrier={})",
+                nic.name, nic.mac, nic.carrier
+            ),
+        ),
+        None => (
+            b"network:iface=lo,mac=00:00:00:00:00:00,carrier=false".to_vec(),
+            b"interface=lo,loopback=true,carrier=false,degraded=true".to_vec(),
+            "Hardware: Network degraded to loopback (no NIC readable)".to_string(),
+        ),
+    };
     let asset_data = AssetData {
         config: format!("platform={platform}").into_bytes(),
-        definition: b"network:ipv6:loopback=::1".to_vec(),
-        metadata: b"interface=lo".to_vec(),
+        definition,
+        metadata,
     };
     assets.push(AssetRegistration::from_asset_data(
         &asset_data,
         NetworkScope::Global,
         AssetCategory::BaseSystem(BaseSystemType::Network),
     ));
-    info!("Hardware: Network interface registered");
+    info!("{log}");
 }
 
 fn assess_gpu(
