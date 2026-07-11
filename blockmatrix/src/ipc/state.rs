@@ -148,4 +148,14 @@ pub struct DaemonState {
     /// depends on blockmatrix, so the adapter must live downstream of
     /// blockmatrix to avoid a dependency cycle).
     pub catalog_registry: Option<Arc<dyn crate::catalog::CatalogProvider>>,
+
+    /// P3 (F5): shared inbox for received share invitations.
+    ///
+    /// This is the SAME `Arc` handed to the network `PeerContext`, so invites
+    /// delivered over `TAG_SHARE_INVITE` land in the store that `share.inbox`
+    /// reads and `share.accept` consumes.
+    ///
+    /// Alpha-default inert: when `None`, `share.inbox` returns an empty list
+    /// and `share.accept` returns a "sharing inbox not configured" error.
+    pub inbox_store: Option<Arc<crate::sharing::inbox::InboxStore>>,
 }

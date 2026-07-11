@@ -234,6 +234,7 @@ mod system_ipc {
             revocation_registry: Arc::new(blockmatrix::auth::RevocationRegistry::new()),
             light_sync_manager: None,
             catalog_registry: None,
+            inbox_store: None,
         })
     }
 

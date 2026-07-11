@@ -13,3 +13,4 @@
 pub mod inbox;
 pub mod invite;
 pub mod key_wrap;
+pub mod shard_map;

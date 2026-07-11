@@ -113,9 +113,24 @@ pub async fn run_connect(
     let privacy_mode = bootstrap.privacy_mode().await;
     let has_bootstrap_peers = !cli.bootstrap.is_empty();
 
+    // P3 (F5): a single shared InboxStore for received share invitations. The
+    // SAME Arc is handed to the network `PeerContext` (so TAG_SHARE_INVITE
+    // deliveries land here) and to the daemon state (so `share.inbox` /
+    // `share.accept` read the same store).
+    let share_inbox_store = std::sync::Arc::new(
+        blockmatrix::sharing::inbox::InboxStore::new(Some(data_dir.join(nid).join("inbox"))),
+    );
+
     if privacy_mode != PrivacyMode::PRIVATE || has_bootstrap_peers {
         let result = start_network(
-            cli, coord, nid, data_dir, bootstrap, privacy_mode, has_bootstrap_peers,
+            cli,
+            coord,
+            nid,
+            data_dir,
+            bootstrap,
+            privacy_mode,
+            has_bootstrap_peers,
+            share_inbox_store.clone(),
         )
         .await?;
         network_ref = Some(result.network);
@@ -221,6 +236,9 @@ pub async fn run_connect(
         // responses ("status":"alpha","note":"catalog registry not
         // wired").
         catalog_registry: None,
+        // P3 (F5): share the SAME inbox Arc the network PeerContext uses so
+        // TAG_SHARE_INVITE deliveries are visible to `share.inbox`/`accept`.
+        inbox_store: Some(share_inbox_store.clone()),
     });
 
     // Phase I.1: rebuild the cross-chain receipt index from any
@@ -372,6 +390,7 @@ struct NetworkStartResult {
 
 /// Initialize STOQ transport, network manager, and all background loops.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 async fn start_network(
     cli: &Cli,
     coord: MatrixCoordinate,
@@ -380,6 +399,7 @@ async fn start_network(
     bootstrap: &NodeBootstrap,
     privacy_mode: PrivacyMode,
     has_bootstrap_peers: bool,
+    share_inbox_store: std::sync::Arc<blockmatrix::sharing::inbox::InboxStore>,
 ) -> Result<NetworkStartResult> {
     info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
@@ -566,11 +586,7 @@ async fn start_network(
             blockmatrix::dns::DnsPopularityTracker::new(),
         )),
         shard_location_index: Some(shard_location_index.clone()),
-        inbox_store: Some(std::sync::Arc::new(
-            blockmatrix::sharing::inbox::InboxStore::new(
-                Some(data_dir.join(nid).join("inbox")),
-            ),
-        )),
+        inbox_store: Some(share_inbox_store.clone()),
         message_store: Some(std::sync::Arc::new(
             blockmatrix::messaging::store::MessageStore::new(
                 Some(data_dir.join(nid).join("messages")),
