@@ -1,0 +1,27 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F5 / P3 — Remediation Log
+
+## Reframe (owner)
+F5 "Kyber key in shard map" reframed as the R6 transmission-payload model: no file sent — a payload (recipient-wrapped key + hash + address + instructions) goes to an authorized recipient; recipient fetches/reassembles/validates/unpacks. TrustChain = auth + per-recipient key wrap; NGauge = address resolution + fetch.
+
+## Implementation (dev agent, isolated worktree)
+- Built KeyEnvelope (wrap_for/unwrap_with) over existing wrap_key_for_recipient/unwrap_key; new ShardMap without secret_key; wired share.send/accept; Public/Anonymous cleartext; DaemonState.inbox_store + test-init fixes.
+
+## Incident + recovery
+- The dev agent completed the work (~1921 lines + shard_map.rs) but DIED on an org-access infra error ("Claude subscription access disabled for Claude Code") BEFORE its own QA/report.
+- Preserved its full diff to scratchpad/salvage (p3-f5-COMPLETED.patch + shard_map-COMPLETED.rs) before anything.
+- Also navigated: a 99%-full disk (reclaimed ~40G of worktree target artifacts) and a stale HEAD.lock from a timeout-killed branch rename (blocked commits until removed).
+- Re-applied the saved patch to a clean branch off F2 (feat/p3-transmission-payload); applied clean.
+
+## Self-QA (orchestrator, no new agent — infra-constrained)
+- Static: no secret_key field in ShardMap; wrap_for/unwrap_with on send/accept; owner self-fetch uses identity.kyber_secret_key_bytes(); process_asset_with_privacy gates encryption on Bounded scope; ipc/state.rs merge-clean vs P2.
+- Build: cargo build -p blockmatrix --bin hypermesh — clean (exit 0).
+- Tests: cargo test -p blockmatrix --lib sharing — 22 passed / 0 failed, INCLUDING test_key_envelope_hides_raw_secret_key + test_encrypted_map_hides_raw_secret_key (the core F5 property).
+
+## Result
+Commit e50a9c52, branch feat/p3-transmission-payload. 26 files (25 code + F5 report). The raw Kyber secret never travels in a stored map or stdout; recipients get a per-recipient KeyEnvelope; public assets have no key to custody.
+
+## Follow-on (not blocking)
+- Network fetch half still needs the live daemon (transmission-payload FETCH) — closed with P6 NGauge routing.
+- KyberSegmented whole-blob reconstruct gap — pre-existing pipeline carry-over.
