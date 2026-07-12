@@ -11,6 +11,9 @@
  *      confirm tampered data is rejected.
  *   3. Identity: generate a FALCON-1024 identity, read the node id, sign a
  *      message, and verify the signature (valid + tampered).
+ *   4. Publish / verify_proof: publish a payload -> get its BLAKE3 content
+ *      address AND a WireSignedProof; cross-check the address against
+ *      compute_content_hash; verify the proof; tamper it and confirm rejection.
  *
  * Build (linking the staticlib or the cdylib) is driven by run_smoke.sh.
  */
@@ -19,6 +22,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures = 0;
@@ -131,14 +135,17 @@ static int test_identity(void) {
     rc = hypermesh_identity_public_key(id, pk, sizeof(pk), &pk_len);
     check(rc == HM_OK, "public key copied into buffer");
 
-    /* Sign a message (two-call length pattern). */
+    /* Sign a message. FALCON-1024 signatures are variable length; size the
+     * buffer to the authoritative max (hypermesh_falcon_signature_max_len)
+     * so a shorter probe never under-allocates. */
     const char *msg = "hypermesh ffi smoke-test message";
     size_t msg_len = strlen(msg);
     size_t sig_len = 0;
     hypermesh_identity_sign(id, (const uint8_t *)msg, msg_len, NULL, 0, &sig_len);
     check(sig_len > 0, "signature length query works");
 
-    uint8_t sig[4096];
+    uint8_t sig[4096]; /* >= hypermesh_falcon_signature_max_len() (1280) */
+    sig_len = sizeof(sig);
     rc = hypermesh_identity_sign(id, (const uint8_t *)msg, msg_len, sig,
                                  sizeof(sig), &sig_len);
     check(rc == HM_OK, "message signed with FALCON-1024");
@@ -160,6 +167,104 @@ static int test_identity(void) {
     return 0;
 }
 
+static int test_publish_verify_proof(void) {
+    printf("[4] Publish / verify_proof (content address + WireSignedProof)\n");
+
+    /* FALCON-1024 sizes are PQClean-authoritative. */
+    check(hypermesh_falcon_signature_max_len() == 1280,
+          "FALCON-1024 signature length is 1280 (PQClean)");
+
+    hypermesh_identity_t *id = hypermesh_identity_generate();
+    check(id != NULL, "identity generated for publish");
+    if (id == NULL) {
+        return 1;
+    }
+
+    const char *payload = "the raw asset payload to publish";
+    size_t len = strlen(payload);
+
+    /* Sizing call: content address is written, proof length reported. */
+    uint8_t blake3_out[32];
+    size_t proof_len = 0;
+    int rc = hypermesh_publish(id, (const uint8_t *)payload, len, blake3_out,
+                               NULL, 0, &proof_len);
+    check(rc == HM_ERR_BUFFER_TOO_SMALL && proof_len > 0,
+          "publish sizing call reports proof length");
+
+    /* Cross-check: blake3_out == BLAKE3(payload) via compute_content_hash. */
+    uint8_t expect_hash[32];
+    rc = hypermesh_compute_content_hash((const uint8_t *)payload, len,
+                                        expect_hash);
+    check(rc == HM_OK, "compute_content_hash for cross-check");
+    check(memcmp(blake3_out, expect_hash, 32) == 0,
+          "blake3_out == BLAKE3(bytes) (content address, NOT the signed preimage)");
+
+    /* Real call: obtain the serialized WireSignedProof. Each publish
+     * regenerates a fresh proof (fresh nonce/timestamps), so the length can
+     * drift between calls — loop-grow the buffer until it fits. */
+    uint8_t *proof = NULL;
+    for (;;) {
+        uint8_t *tmp = (uint8_t *)realloc(proof, proof_len);
+        check(tmp != NULL, "allocate proof buffer");
+        if (tmp == NULL) {
+            free(proof);
+            hypermesh_identity_free(id);
+            return 1;
+        }
+        proof = tmp;
+        size_t cap = proof_len;
+        rc = hypermesh_publish(id, (const uint8_t *)payload, len, blake3_out,
+                               proof, cap, &proof_len);
+        if (rc == HM_ERR_BUFFER_TOO_SMALL) {
+            continue; /* proof_len now holds the larger required size */
+        }
+        break;
+    }
+    check(rc == HM_OK, "publish emits a WireSignedProof");
+    printf("       content_hash[0..4] = %02x %02x %02x %02x\n",
+           blake3_out[0], blake3_out[1], blake3_out[2], blake3_out[3]);
+    printf("       wire proof bytes   = %zu\n", proof_len);
+
+    /* The genuine proof verifies (verify-only path, no key). */
+    rc = hypermesh_verify_proof(proof, proof_len);
+    check(rc == HM_VERIFY_OK, "genuine WireSignedProof verifies");
+
+    /* Tamper INSIDE the FALCON `signature` field so the envelope still parses
+     * as a WireSignedProof but the signature over BLAKE3(proof_bytes||nonce)
+     * no longer matches — exercising the FALCON verification gate itself.
+     * The signature serializes as a JSON number array; zero out the first
+     * value's leading digit region so at least one signature byte differs
+     * while every element stays a valid 0..255 u8. */
+    const char *sig_key = "\"signature\":[";
+    char *sig_pos = strstr((char *)proof, sig_key);
+    check(sig_pos != NULL, "locate signature field in wire proof");
+    char *p0 = sig_pos + strlen(sig_key); /* first digit of signature[0] */
+    /* Overwrite the first number's first digit with a guaranteed-different
+     * single digit '0', then pad any remaining digits of that number with a
+     * leading-zero-safe rewrite: set the whole first element to a fixed
+     * small value by replacing digits up to the first ',' or ']'. */
+    {
+        char *q = p0;
+        /* Replace the first element's digits with "0" followed by spaces is
+         * invalid JSON; instead flip just the last digit of the first number,
+         * which keeps the value in 0..255 (e.g. 137 -> 138, 9 -> 8). */
+        while (*q >= '0' && *q <= '9') {
+            q++;
+        }
+        char *last_digit = q - 1; /* last digit of signature[0] */
+        *last_digit = (*last_digit == '0') ? '1' : (char)(*last_digit - 1);
+    }
+    rc = hypermesh_verify_proof(proof, proof_len);
+    check(rc == HM_VERIFY_FAIL,
+          "tampered signature is REJECTED by the FALCON gate (HM_VERIFY_FAIL)");
+
+    free(proof);
+    hypermesh_identity_free(id);
+    check(1, "publish identity freed without crash");
+
+    return 0;
+}
+
 int main(void) {
     printf("=== HyperMesh C ABI smoke test ===\n\n");
 
@@ -168,6 +273,8 @@ int main(void) {
     test_content_hash();
     printf("\n");
     test_identity();
+    printf("\n");
+    test_publish_verify_proof();
     printf("\n");
 
     if (failures == 0) {
