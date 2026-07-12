@@ -1,6 +1,6 @@
 [package]
 name = "base"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "Substrate layer — sovereign addressing, link/carrier management beneath the kernel"

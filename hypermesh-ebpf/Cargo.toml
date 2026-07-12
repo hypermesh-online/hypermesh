@@ -1,6 +1,6 @@
 [package]
 name = "hypermesh-ebpf"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "HyperMesh eBPF Intelligence Layer - THE single source of truth for all eBPF code"

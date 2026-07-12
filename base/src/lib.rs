@@ -14,13 +14,18 @@
 //! `detect_outbound_interface()` is a hardcoded guess). The Substrate manages
 //! that link floor instead of borrowing it from the incumbent network.
 //!
-//! Addressing is **not** the Substrate's job. HyperMesh addresses assets by
-//! content (`lib::AssetAddress`: BLAKE3 + matrix coordinate); nodes are traceable
-//! through the assets they hold, and identity is the signed StateProof — never a
-//! hash-of-pubkey IPv6. The Substrate realizes content/PoS addresses on the wire;
-//! it does not invent them.
+//! Addressing IS realized here, but not invented here. HyperMesh addresses
+//! assets by content (`lib::AssetAddress`: BLAKE3 + matrix coordinate); nodes are
+//! traceable through the assets they hold and identity is the signed StateProof.
+//! The Substrate owns the ONE derivation ([`address`]) that turns a `NodeId` into
+//! its matrix cell and its `fd48:4d00::/32` address and then realizes that address
+//! on the wire (lease-free, no DHCP). It composes existing `lib` primitives; it
+//! does not mint a new addressing scheme.
 //!
 //! ## Scope (phased)
+//! - **Sovereign addressing** ([`address`]). Derive a node's matrix cell and
+//!   routable `fd48:4d00::/32` address from its identity — the single canonical
+//!   construction `blockmatrix`'s `MatrixCoordinate::derive_cell` delegates to.
 //! - **Link/carrier/interface management** ([`link`]). Enumerate interfaces,
 //!   monitor carrier, self-heal on link flap (R16).
 //! - **Physical/radio** (zero ISP). Roadmap stub ([`adapters::radio_mesh`]); not
@@ -36,13 +41,15 @@
 //! lands. See `papers/SUBSTRATE.md` (canonical) and `core/base/SPEC.md` (contract).
 
 pub mod adapters;
+pub mod address;
 pub mod error;
 pub mod link;
 pub mod reachability;
 pub mod substrate;
 
 pub use adapters::SubstrateAdapterRegistry;
+pub use address::{derive_address, derive_cell};
 pub use error::{SubstrateError, SubstrateResult};
 pub use link::{InterfaceAddress, InterfaceId, LinkEvent, LinkState};
 pub use reachability::{PathKind, Reachability};
-pub use substrate::{Substrate, SubstrateAdapter, SubstrateCapabilities};
+pub use substrate::{DefaultSubstrate, Substrate, SubstrateAdapter, SubstrateCapabilities};

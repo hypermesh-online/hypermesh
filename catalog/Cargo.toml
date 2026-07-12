@@ -1,6 +1,6 @@
 [package]
 name = "catalog"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "Catalog - HyperMesh Asset Package Manager for catalog.hypermesh.online"

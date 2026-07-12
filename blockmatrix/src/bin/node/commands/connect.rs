@@ -409,6 +409,24 @@ async fn start_network(
         ..stoq::TransportConfig::default()
     };
 
+    // Substrate selects the real, carrier-aware outbound interface (R16) and
+    // injects it into STOQ (STOQ does not depend on base — injection only).
+    // Falls back to STOQ's own auto-detection if selection fails.
+    use base::Substrate as _;
+    let substrate = base::DefaultSubstrate::new();
+    match substrate.active_interface().await {
+        Ok(iface) => {
+            info!("Substrate selected outbound interface: {}", iface.name);
+            stoq_config.interface = Some(iface.name);
+        }
+        Err(e) => {
+            warn!(
+                "Substrate interface selection failed ({e}); \
+                 STOQ will auto-detect the interface"
+            );
+        }
+    }
+
     let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
         stoq_config.enable_falcon_crypto = false;
         info!("Anonymous mode: using ephemeral certificates, no CA dependency");

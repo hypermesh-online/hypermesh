@@ -13,24 +13,185 @@
 //! - `system.apply_update` — orchestrates a binary swap workflow.
 //!   Alpha-default: returns `not configured` unless the subscriber is
 //!   wired AND a candidate entry actually exists for the requested
-//!   version. The actual binary swap (download → verify hash → replace
-//!   `/usr/local/bin/hypermesh` → restart daemon) is deferred to a
-//!   follow-up sub-step; this handler validates intent and returns the
-//!   plan as JSON so an operator can audit.
+//!   version. When an entry exists the handler:
+//!     1. Re-verifies the release's FALCON-1024 signature against the
+//!        subscriber's configured foundation public key.
+//!     2. Checks protocol-version compatibility (major must match the
+//!        running daemon — reuses P6's
+//!        [`crate::ipc::protocol::protocol_versions_compatible`]).
+//!     3. Gates on `requires_min_version` (refuses a jump that skips a
+//!        required compatibility step).
+//!     4. Stages the binary to a temp path, verifies its SHA-256 against
+//!        the signed `binary_hashes`, and atomically renames it over the
+//!        target, preserving all DURABLE state.
+//!     5. Schedules a restart (the daemon handles SIGTERM gracefully).
+//!   On signature failure or version-incompatibility it returns an error
+//!   and `applied` never becomes `true`.
 //!
 //! See `papers/HYPERMESH.md` Phase J for the upgrade-substrate
 //! commitment.
 
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{
-    RpcError, INTERNAL_ERROR, INVALID_PARAMS, IPC_PROTOCOL_VERSION,
+    protocol_versions_compatible, RpcError, INTERNAL_ERROR, INVALID_PARAMS,
+    IPC_PROTOCOL_VERSION, PROTOCOL_VERSION_MISMATCH,
 };
 use crate::ipc::state::DaemonState;
-use crate::release_feed::{ReleaseChannel, ReleaseFeedSubscriber};
+use crate::release_feed::{
+    compare_versions, ReleaseChannel, ReleaseFeedEntry, ReleaseFeedSubscriber,
+};
 
 const DEFAULT_TARGET_TRIPLE: &str = "x86_64-unknown-linux-musl";
+
+/// Outcome of staging + swapping a verified release binary.
+///
+/// Separated from the RPC handler so the verify+stage+swap logic is unit-testable
+/// without a live IPC round-trip. `restart_scheduled` is `false` in tests (no
+/// candidate binary), `true` in production once the atomic rename succeeds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SwapOutcome {
+    /// Absolute path the new binary was installed to.
+    pub installed_to: PathBuf,
+    /// Whether a restart was scheduled after a successful swap.
+    pub restart_scheduled: bool,
+}
+
+/// Errors from the verify → version-gate → stage → swap pipeline.
+#[derive(Debug)]
+pub(crate) enum ApplyUpdateError {
+    /// The release's FALCON signature did not verify against the foundation key.
+    SignatureInvalid,
+    /// The daemon has no foundation public key configured (cannot verify).
+    NoFoundationKey,
+    /// The release's major protocol version is incompatible with the daemon.
+    VersionIncompatible { release: String, daemon: String },
+    /// `requires_min_version` is newer than the running daemon — the jump would
+    /// skip a required compatibility step.
+    MinVersionUnmet { requires: String, running: String },
+    /// The staged binary's SHA-256 did not match the signed hash.
+    HashMismatch { expected: String, actual: String },
+    /// A filesystem operation (download/stage/rename) failed.
+    Io(String),
+}
+
+/// Verify a release entry against the foundation key, then gate it on protocol
+/// compatibility and `requires_min_version`. Pure and testable: performs NO
+/// filesystem I/O.
+pub(crate) fn verify_and_gate(
+    entry: &ReleaseFeedEntry,
+    foundation_pubkey: Option<&[u8]>,
+    running_version: &str,
+) -> Result<(), ApplyUpdateError> {
+    // 1. Signature must verify against the configured foundation key.
+    let pubkey = foundation_pubkey.ok_or(ApplyUpdateError::NoFoundationKey)?;
+    entry
+        .verify(pubkey)
+        .map_err(|_| ApplyUpdateError::SignatureInvalid)?;
+
+    // 2. Major protocol version must match the running daemon (P6 rule).
+    if !protocol_versions_compatible(&entry.version, running_version) {
+        return Err(ApplyUpdateError::VersionIncompatible {
+            release: entry.version.clone(),
+            daemon: running_version.to_string(),
+        });
+    }
+
+    // 3. requires_min_version must not be newer than the running daemon — a jump
+    //    that skips a required compatibility step is refused.
+    if let Some(ref min) = entry.requires_min_version {
+        if compare_versions(running_version, min) == std::cmp::Ordering::Less {
+            return Err(ApplyUpdateError::MinVersionUnmet {
+                requires: min.clone(),
+                running: running_version.to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// Stage a candidate binary and atomically swap it over `target`, verifying its
+/// SHA-256 against `expected_hash` first. The caller must have already run
+/// [`verify_and_gate`].
+///
+/// Safety: the new binary is written to a sibling temp path, fsync'd, hash-checked,
+/// then `rename`d over the target (atomic on the same filesystem). Durable state
+/// (blockchain, identity DER, matrix snapshots, WAL) lives elsewhere and is never
+/// touched. `schedule_restart` is invoked only after a successful rename.
+pub(crate) fn stage_and_swap(
+    candidate_bytes: &[u8],
+    expected_hash: &str,
+    target: &Path,
+    schedule_restart: impl FnOnce(),
+) -> Result<SwapOutcome, ApplyUpdateError> {
+    // Hash the candidate before it touches the target path.
+    let actual_hash = sha256_hex(candidate_bytes);
+    if !actual_hash.eq_ignore_ascii_case(expected_hash) {
+        return Err(ApplyUpdateError::HashMismatch {
+            expected: expected_hash.to_string(),
+            actual: actual_hash,
+        });
+    }
+
+    let dir = target.parent().unwrap_or_else(|| Path::new("."));
+    let staging = dir.join(format!(
+        ".hypermesh-upgrade-staging-{}",
+        std::process::id()
+    ));
+
+    // Write → fsync → set executable → atomic rename over the target.
+    write_and_sync(&staging, candidate_bytes)
+        .map_err(|e| ApplyUpdateError::Io(format!("stage write failed: {e}")))?;
+    make_executable(&staging)
+        .map_err(|e| ApplyUpdateError::Io(format!("chmod +x staging failed: {e}")))?;
+    std::fs::rename(&staging, target).map_err(|e| {
+        // Best-effort cleanup of the staging file on rename failure.
+        let _ = std::fs::remove_file(&staging);
+        ApplyUpdateError::Io(format!("atomic rename over {} failed: {e}", target.display()))
+    })?;
+
+    schedule_restart();
+    Ok(SwapOutcome {
+        installed_to: target.to_path_buf(),
+        restart_scheduled: true,
+    })
+}
+
+/// SHA-256 hex digest (matches the `binary_hashes` encoding in the release feed).
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Write `bytes` to `path`, flushing and fsync'ing before returning.
+fn write_and_sync(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut f = std::fs::File::create(path)?;
+    f.write_all(bytes)?;
+    f.flush()?;
+    f.sync_all()?;
+    Ok(())
+}
+
+/// Mark `path` executable (owner rwx, group/other rx) on Unix; no-op elsewhere.
+fn make_executable(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(path)?.permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(path, perms)?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    Ok(())
+}
 
 /// Parse the optional `channel` parameter; defaults to `stable`.
 fn parse_channel(params: &serde_json::Value) -> Result<ReleaseChannel, RpcError> {
@@ -108,80 +269,190 @@ fn register_apply_update(handler: &mut RequestHandler, state: &Arc<DaemonState>)
         "system.apply_update",
         Arc::new(move |params| {
             let s = s.clone();
-            Box::pin(async move {
-                let target_version = params
-                    .get("version")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| RpcError {
-                        code: INVALID_PARAMS,
-                        message: "missing 'version' parameter".into(),
-                        data: None,
-                    })?
-                    .to_string();
-                let channel = parse_channel(&params)?;
+            Box::pin(async move { apply_update_impl(&s, params).await })
+        }),
+    );
+}
 
-                let subscriber = s.release_feed_subscriber.clone().ok_or_else(|| RpcError {
-                    code: INTERNAL_ERROR,
-                    message: "release feed not configured (alpha-default inert); set \
-                              release_feed_subscriber on daemon startup to opt-in"
-                        .into(),
+/// Map an [`ApplyUpdateError`] to a JSON-RPC error. Signature failure and
+/// version-incompatibility are `INVALID_PARAMS`/`PROTOCOL_VERSION_MISMATCH` so a
+/// caller can distinguish "you asked for the wrong thing" from an internal fault.
+fn apply_error_to_rpc(e: ApplyUpdateError) -> RpcError {
+    match e {
+        ApplyUpdateError::SignatureInvalid => RpcError {
+            code: INVALID_PARAMS,
+            message: "release signature failed FALCON-1024 verification; refusing to apply"
+                .into(),
+            data: None,
+        },
+        ApplyUpdateError::NoFoundationKey => RpcError {
+            code: INTERNAL_ERROR,
+            message: "no foundation public key configured; cannot verify release".into(),
+            data: None,
+        },
+        ApplyUpdateError::VersionIncompatible { release, daemon } => RpcError {
+            code: PROTOCOL_VERSION_MISMATCH,
+            message: format!(
+                "release {release} is protocol-incompatible with daemon {daemon} \
+                 (major version differs); refusing to apply"
+            ),
+            data: None,
+        },
+        ApplyUpdateError::MinVersionUnmet { requires, running } => RpcError {
+            code: INVALID_PARAMS,
+            message: format!(
+                "release requires_min_version {requires} is newer than running {running}; \
+                 upgrade to the required compatibility step first"
+            ),
+            data: None,
+        },
+        ApplyUpdateError::HashMismatch { expected, actual } => RpcError {
+            code: INVALID_PARAMS,
+            message: format!(
+                "staged binary hash {actual} does not match signed hash {expected}; \
+                 refusing to swap"
+            ),
+            data: None,
+        },
+        ApplyUpdateError::Io(msg) => RpcError {
+            code: INTERNAL_ERROR,
+            message: format!("binary swap failed: {msg}"),
+            data: None,
+        },
+    }
+}
+
+/// Core of `system.apply_update`. Split out so both the handler closure and the
+/// tests can call it directly.
+async fn apply_update_impl(
+    s: &Arc<DaemonState>,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, RpcError> {
+    let target_version = params
+        .get("version")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: "missing 'version' parameter".into(),
+            data: None,
+        })?
+        .to_string();
+    let channel = parse_channel(&params)?;
+
+    let subscriber = s.release_feed_subscriber.clone().ok_or_else(|| RpcError {
+        code: INTERNAL_ERROR,
+        message: "release feed not configured (alpha-default inert); set \
+                  release_feed_subscriber on daemon startup to opt-in"
+            .into(),
+        data: None,
+    })?;
+
+    // Find an entry matching channel+version.
+    let entries = subscriber.all_versions().await;
+    let entry = entries
+        .into_iter()
+        .find(|e| e.channel == channel && e.version == target_version)
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: format!(
+                "no cached release entry for version '{}' on channel '{}'",
+                target_version,
+                channel.as_str()
+            ),
+            data: None,
+        })?;
+
+    // 1-3. Re-verify signature + gate on protocol compatibility and
+    // requires_min_version. On any failure, `applied` never becomes true.
+    let foundation_pubkey = subscriber.foundation_pubkey().await;
+    verify_and_gate(&entry, foundation_pubkey.as_deref(), IPC_PROTOCOL_VERSION)
+        .map_err(apply_error_to_rpc)?;
+
+    // Resolve the target triple's signed binary hash.
+    let target_triple = params
+        .get("target")
+        .and_then(|v| v.as_str())
+        .unwrap_or(DEFAULT_TARGET_TRIPLE)
+        .to_string();
+    let expected_hash = entry
+        .binary_hashes
+        .get(&target_triple)
+        .cloned()
+        .ok_or_else(|| RpcError {
+            code: INVALID_PARAMS,
+            message: format!(
+                "release entry for {} has no binary hash for target '{}'",
+                target_version, target_triple
+            ),
+            data: None,
+        })?;
+
+    // 4-5. Stage + atomic-swap + schedule restart. The candidate binary bytes
+    // arrive via the optional base64 `binary` param (a fetched-and-staged blob).
+    // Absent that, the verification + gating succeeded but there is nothing to
+    // swap yet: report `staged=false` while still confirming the update is
+    // authorized. When present, we verify the hash, atomically replace the
+    // target, and schedule a graceful restart — `applied` becomes true.
+    let target_path: PathBuf = params
+        .get("install_path")
+        .and_then(|v| v.as_str())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/usr/local/bin/hypermesh"));
+
+    let candidate_b64 = params.get("binary").and_then(|v| v.as_str());
+
+    match candidate_b64 {
+        Some(b64) => {
+            use base64::Engine;
+            let candidate = base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .map_err(|e| RpcError {
+                    code: INVALID_PARAMS,
+                    message: format!("'binary' is not valid base64: {e}"),
                     data: None,
                 })?;
 
-                // Find an entry matching channel+version.
-                let entries = subscriber.all_versions().await;
-                let entry = entries
-                    .into_iter()
-                    .find(|e| e.channel == channel && e.version == target_version)
-                    .ok_or_else(|| RpcError {
-                        code: INVALID_PARAMS,
-                        message: format!(
-                            "no cached release entry for version '{}' on channel '{}'",
-                            target_version,
-                            channel.as_str()
-                        ),
-                        data: None,
-                    })?;
+            let shutdown_tx = s.shutdown_tx.clone();
+            let outcome = stage_and_swap(
+                &candidate,
+                &expected_hash,
+                &target_path,
+                move || {
+                    // Signal graceful shutdown; the process supervisor re-execs
+                    // the freshly-swapped binary. Durable state is untouched.
+                    let _ = shutdown_tx.send(true);
+                },
+            )
+            .map_err(apply_error_to_rpc)?;
 
-                // Resolve the target triple's binary hash (defaulting
-                // to x86_64-unknown-linux-musl).  Phase J.1 alpha
-                // returns the verification plan as JSON so an operator
-                // can audit; the actual binary swap is deferred to a
-                // follow-up so we don't bake permission/elevation
-                // logic into the daemon ahead of an explicit opt-in.
-                let target_triple = params
-                    .get("target")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or(DEFAULT_TARGET_TRIPLE)
-                    .to_string();
-                let expected_hash = entry
-                    .binary_hashes
-                    .get(&target_triple)
-                    .cloned()
-                    .ok_or_else(|| RpcError {
-                        code: INVALID_PARAMS,
-                        message: format!(
-                            "release entry for {} has no binary hash for target '{}'",
-                            target_version, target_triple
-                        ),
-                        data: None,
-                    })?;
-
-                Ok(serde_json::json!({
-                    "status": "validated",
-                    "applied": false,
-                    "version": entry.version,
-                    "channel": channel.as_str(),
-                    "target": target_triple,
-                    "release_notes_url": entry.release_notes_url,
-                    "expected_binary_hash": expected_hash,
-                    "breaking_changes": entry.breaking_changes,
-                    "note": "binary swap deferred to follow-up sub-step; \
-                             current handler validates the upgrade plan only",
-                }))
-            })
-        }),
-    );
+            Ok(serde_json::json!({
+                "status": "applied",
+                "applied": true,
+                "version": entry.version,
+                "channel": channel.as_str(),
+                "target": target_triple,
+                "installed_to": outcome.installed_to.display().to_string(),
+                "restart_scheduled": outcome.restart_scheduled,
+                "release_notes_url": entry.release_notes_url,
+                "expected_binary_hash": expected_hash,
+                "breaking_changes": entry.breaking_changes,
+            }))
+        }
+        None => Ok(serde_json::json!({
+            "status": "authorized",
+            "applied": false,
+            "staged": false,
+            "version": entry.version,
+            "channel": channel.as_str(),
+            "target": target_triple,
+            "install_path": target_path.display().to_string(),
+            "release_notes_url": entry.release_notes_url,
+            "expected_binary_hash": expected_hash,
+            "breaking_changes": entry.breaking_changes,
+            "note": "signature + version compatibility verified; supply base64 'binary' \
+                     to stage and atomically swap",
+        })),
+    }
 }
 
 #[cfg(test)]
@@ -255,15 +526,35 @@ mod tests {
         })
     }
 
+    /// SHA-256 hex of the canonical test binary blob, so `binary_hashes` matches
+    /// what `stage_and_swap` computes over the same bytes.
+    fn test_binary_bytes() -> Vec<u8> {
+        b"#!/bin/sh\n# hypermesh test binary\nexit 0\n".to_vec()
+    }
+
+    fn test_binary_sha256() -> String {
+        super::sha256_hex(&test_binary_bytes())
+    }
+
     fn signed_entry(
         signer: &FalconIdentity,
         version: &str,
         channel: ReleaseChannel,
     ) -> ReleaseFeedEntry {
+        signed_entry_with(signer, version, channel, &test_binary_sha256(), None)
+    }
+
+    fn signed_entry_with(
+        signer: &FalconIdentity,
+        version: &str,
+        channel: ReleaseChannel,
+        binary_hash: &str,
+        requires_min_version: Option<&str>,
+    ) -> ReleaseFeedEntry {
         let mut hashes = HashMap::new();
         hashes.insert(
             "x86_64-unknown-linux-musl".to_string(),
-            "00".repeat(32),
+            binary_hash.to_string(),
         );
         let mut entry = ReleaseFeedEntry {
             version: version.to_string(),
@@ -272,7 +563,7 @@ mod tests {
             release_notes_url: format!("https://release.hypermesh.online/{}", version),
             signed_by: signer.public_key.clone(),
             signature: Vec::new(),
-            requires_min_version: None,
+            requires_min_version: requires_min_version.map(|s| s.to_string()),
             breaking_changes: false,
             issued_at: SystemTime::now(),
         };
@@ -280,6 +571,17 @@ mod tests {
             .sign(&entry.signing_payload())
             .expect("test: sign");
         entry
+    }
+
+    /// The daemon's running protocol version = its `CARGO_PKG_VERSION`. Tests use
+    /// a release version with the SAME major so version-compat passes; a distinct
+    /// minor keeps `check_update` "newer" logic meaningful.
+    fn compat_version() -> String {
+        let major = IPC_PROTOCOL_VERSION
+            .split('.')
+            .next()
+            .unwrap_or("1");
+        format!("{major}.999.0")
     }
 
     #[tokio::test]
@@ -300,7 +602,8 @@ mod tests {
         let sub = Arc::new(ReleaseFeedSubscriber::with_foundation_pubkey(
             foundation.public_key.clone(),
         ));
-        let entry = signed_entry(&foundation, "99.0.0", ReleaseChannel::Stable);
+        let newer = compat_version();
+        let entry = signed_entry(&foundation, &newer, ReleaseChannel::Stable);
         sub.ingest(entry).await.expect("test: ingest");
         let state = make_state(Some(sub)).await;
         let mut h = RequestHandler::new();
@@ -310,7 +613,7 @@ mod tests {
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
         assert_eq!(result["up_to_date"], false);
-        assert_eq!(result["available_version"], "99.0.0");
+        assert_eq!(result["available_version"], newer);
     }
 
     #[tokio::test]
@@ -320,7 +623,7 @@ mod tests {
         register(&mut h, &state);
         let req = RpcRequest::new(
             "system.apply_update",
-            serde_json::json!({"version": "0.99.0"}),
+            serde_json::json!({"version": compat_version()}),
         );
         let resp = h.dispatch(req).await;
         let err = resp.error.expect("test: error");
@@ -332,25 +635,174 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn apply_update_validates_when_entry_present() {
+    async fn apply_update_authorizes_when_entry_present_without_binary() {
         let foundation = FalconIdentity::generate();
         let sub = Arc::new(ReleaseFeedSubscriber::with_foundation_pubkey(
             foundation.public_key.clone(),
         ));
-        let entry = signed_entry(&foundation, "0.99.0", ReleaseChannel::Stable);
+        let version = compat_version();
+        let entry = signed_entry(&foundation, &version, ReleaseChannel::Stable);
         sub.ingest(entry).await.expect("test: ingest");
         let state = make_state(Some(sub)).await;
         let mut h = RequestHandler::new();
         register(&mut h, &state);
         let req = RpcRequest::new(
             "system.apply_update",
-            serde_json::json!({"version": "0.99.0"}),
+            serde_json::json!({"version": version}),
         );
         let resp = h.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
-        assert_eq!(result["status"], "validated");
+        // No binary supplied: verified + authorized but not yet applied.
+        assert_eq!(result["status"], "authorized");
         assert_eq!(result["applied"], false);
-        assert_eq!(result["version"], "0.99.0");
+        assert_eq!(result["version"], version);
+    }
+
+    #[tokio::test]
+    async fn apply_update_stages_and_applies_with_valid_binary() {
+        let foundation = FalconIdentity::generate();
+        let sub = Arc::new(ReleaseFeedSubscriber::with_foundation_pubkey(
+            foundation.public_key.clone(),
+        ));
+        let version = compat_version();
+        let entry = signed_entry(&foundation, &version, ReleaseChannel::Stable);
+        sub.ingest(entry).await.expect("test: ingest");
+        let state = make_state(Some(sub)).await;
+        let mut h = RequestHandler::new();
+        register(&mut h, &state);
+
+        // Stage into a temp dir so the atomic rename has a real target.
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let target = dir.path().join("hypermesh");
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(test_binary_bytes());
+
+        let req = RpcRequest::new(
+            "system.apply_update",
+            serde_json::json!({
+                "version": version,
+                "binary": b64,
+                "install_path": target.display().to_string(),
+            }),
+        );
+        let resp = h.dispatch(req).await;
+        assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
+        let result = resp.result.expect("test: result");
+        assert_eq!(result["status"], "applied");
+        assert_eq!(result["applied"], true);
+        assert_eq!(result["restart_scheduled"], true);
+        // The swap actually placed the binary at the target path.
+        assert!(target.exists(), "swapped binary should exist at target");
+    }
+
+    #[tokio::test]
+    async fn apply_update_rejects_binary_with_wrong_hash() {
+        let foundation = FalconIdentity::generate();
+        let sub = Arc::new(ReleaseFeedSubscriber::with_foundation_pubkey(
+            foundation.public_key.clone(),
+        ));
+        let version = compat_version();
+        let entry = signed_entry(&foundation, &version, ReleaseChannel::Stable);
+        sub.ingest(entry).await.expect("test: ingest");
+        let state = make_state(Some(sub)).await;
+        let mut h = RequestHandler::new();
+        register(&mut h, &state);
+
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let target = dir.path().join("hypermesh");
+        use base64::Engine;
+        // Wrong bytes → hash mismatch against the signed hash.
+        let b64 = base64::engine::general_purpose::STANDARD.encode(b"tampered binary");
+        let req = RpcRequest::new(
+            "system.apply_update",
+            serde_json::json!({
+                "version": version,
+                "binary": b64,
+                "install_path": target.display().to_string(),
+            }),
+        );
+        let resp = h.dispatch(req).await;
+        let err = resp.error.expect("test: expected hash-mismatch error");
+        assert!(err.message.contains("does not match"), "got: {}", err.message);
+        assert!(!target.exists(), "target must not be swapped on hash mismatch");
+    }
+
+    #[tokio::test]
+    async fn apply_update_rejects_version_incompatible_release() {
+        let foundation = FalconIdentity::generate();
+        let sub = Arc::new(ReleaseFeedSubscriber::with_foundation_pubkey(
+            foundation.public_key.clone(),
+        ));
+        // Bump the major so it is protocol-incompatible with the daemon.
+        let daemon_major: u64 = IPC_PROTOCOL_VERSION
+            .split('.')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
+        let incompatible = format!("{}.0.0", daemon_major + 1);
+        let entry = signed_entry(&foundation, &incompatible, ReleaseChannel::Stable);
+        sub.ingest(entry).await.expect("test: ingest");
+        let state = make_state(Some(sub)).await;
+        let mut h = RequestHandler::new();
+        register(&mut h, &state);
+        let req = RpcRequest::new(
+            "system.apply_update",
+            serde_json::json!({"version": incompatible}),
+        );
+        let resp = h.dispatch(req).await;
+        let err = resp.error.expect("test: expected version-mismatch error");
+        assert_eq!(err.code, PROTOCOL_VERSION_MISMATCH);
+    }
+
+    #[test]
+    fn verify_and_gate_rejects_bad_signature() {
+        let foundation = FalconIdentity::generate();
+        let attacker = FalconIdentity::generate();
+        let version = compat_version();
+        let entry = signed_entry(&foundation, &version, ReleaseChannel::Stable);
+        // Verified against the WRONG key → signature invalid.
+        let r = verify_and_gate(&entry, Some(&attacker.public_key), &version);
+        assert!(matches!(r, Err(ApplyUpdateError::SignatureInvalid)));
+    }
+
+    #[test]
+    fn verify_and_gate_rejects_unmet_min_version() {
+        let foundation = FalconIdentity::generate();
+        let daemon_major: u64 = IPC_PROTOCOL_VERSION
+            .split('.')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
+        let running = format!("{daemon_major}.1.0");
+        let release = format!("{daemon_major}.9.0");
+        // requires_min_version newer than running → refused.
+        let min_required = format!("{daemon_major}.5.0");
+        let entry = signed_entry_with(
+            &foundation,
+            &release,
+            ReleaseChannel::Stable,
+            &test_binary_sha256(),
+            Some(&min_required),
+        );
+        let r = verify_and_gate(&entry, Some(&foundation.public_key), &running);
+        assert!(matches!(r, Err(ApplyUpdateError::MinVersionUnmet { .. })));
+    }
+
+    #[test]
+    fn stage_and_swap_places_binary_and_schedules_restart() {
+        let dir = tempfile::tempdir().expect("test: tempdir");
+        let target = dir.path().join("hypermesh");
+        let bytes = test_binary_bytes();
+        let mut restarted = false;
+        let outcome = stage_and_swap(&bytes, &test_binary_sha256(), &target, || {
+            restarted = true;
+        })
+        .expect("test: swap succeeds");
+        assert!(outcome.restart_scheduled);
+        assert!(restarted);
+        assert!(target.exists());
+        let installed = std::fs::read(&target).expect("test: read installed");
+        assert_eq!(installed, bytes);
     }
 }

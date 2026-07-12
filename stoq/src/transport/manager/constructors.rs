@@ -29,16 +29,19 @@ use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, Sto
 
 use super::{StoqTransport, CRYPTO_INIT};
 
-/// Detect the primary outbound network interface name.
+/// Fallback interface detection when no interface was injected.
 ///
-/// Probes common interface names and returns the first that exists.
-/// Falls back to "lo" if none are found.
+/// The Substrate (`base::Substrate::active_interface()`) is the real, carrier-aware
+/// producer; the node binary injects its result into `config.interface`. This
+/// probe list is only the degraded fallback for callers that construct a transport
+/// without a Substrate (tests, embedded uses). Probes common names and returns the
+/// first that exists, falling back to "lo".
 fn detect_outbound_interface() -> String {
     // Check common interface names in priority order
     for iface in &["eth0", "ens3", "ens4", "enp0s3", "wlan0", "wlp2s0"] {
         let path = format!("/sys/class/net/{}", iface);
         if std::path::Path::new(&path).exists() {
-            debug!("Detected outbound interface: {}", iface);
+            debug!("Fallback-detected outbound interface: {}", iface);
             return iface.to_string();
         }
     }
@@ -50,26 +53,28 @@ fn detect_outbound_interface() -> String {
 ///
 /// Priority:
 /// 1. Explicit `config.ebpf_interface` override (if set)
-/// 2. "lo" when bind_address is localhost (and NOT wan_enabled)
-/// 3. Auto-detected outbound interface when UNSPECIFIED or wan_enabled
-/// 4. "eth0" as a final fallback for non-localhost addresses
+/// 2. Substrate-injected `config.interface` (R16 carrier-aware selection)
+/// 3. "lo" when bind_address is localhost (and NOT wan_enabled)
+/// 4. Fallback auto-detection when UNSPECIFIED or wan_enabled or other
 fn resolve_ebpf_interface(config: &TransportConfig) -> String {
-    // Explicit override takes priority
+    // Explicit override takes highest priority.
     if let Some(ref iface) = config.ebpf_interface {
         return iface.clone();
     }
 
-    // Localhost without WAN uses loopback
+    // Substrate-selected interface: the real, carrier-aware choice injected by
+    // the node binary. Preferred over the hardcoded probe list.
+    if let Some(ref iface) = config.interface {
+        debug!("Using Substrate-injected interface: {}", iface);
+        return iface.clone();
+    }
+
+    // Localhost without WAN uses loopback.
     if config.bind_address == Ipv6Addr::LOCALHOST && !config.wan_enabled {
         return "lo".to_string();
     }
 
-    // UNSPECIFIED or wan_enabled: detect the real outbound interface
-    if config.bind_address == Ipv6Addr::UNSPECIFIED || config.wan_enabled {
-        return detect_outbound_interface();
-    }
-
-    // For non-localhost, non-unspecified addresses, try detection
+    // UNSPECIFIED, wan_enabled, or any other address: fall back to detection.
     detect_outbound_interface()
 }
 
@@ -388,5 +393,41 @@ impl StoqTransport {
             pos_integration,
             pos_fast_validator,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn substrate_injected_interface_is_used() {
+        let mut config = TransportConfig {
+            bind_address: Ipv6Addr::UNSPECIFIED,
+            wan_enabled: true,
+            ..TransportConfig::default()
+        };
+        config.interface = Some("eno1".to_string());
+        assert_eq!(resolve_ebpf_interface(&config), "eno1");
+    }
+
+    #[test]
+    fn explicit_ebpf_interface_overrides_substrate_injection() {
+        let mut config = TransportConfig::default();
+        config.ebpf_interface = Some("wlan5".to_string());
+        config.interface = Some("eno1".to_string());
+        // Explicit eBPF override wins over the Substrate-injected interface.
+        assert_eq!(resolve_ebpf_interface(&config), "wlan5");
+    }
+
+    #[test]
+    fn localhost_without_injection_uses_loopback() {
+        let config = TransportConfig {
+            bind_address: Ipv6Addr::LOCALHOST,
+            wan_enabled: false,
+            ..TransportConfig::default()
+        };
+        assert!(config.interface.is_none());
+        assert_eq!(resolve_ebpf_interface(&config), "lo");
     }
 }

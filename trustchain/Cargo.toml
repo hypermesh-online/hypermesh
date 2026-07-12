@@ -1,6 +1,6 @@
 [package]
 name = "trustchain"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["Web3 Ecosystem Team"]
 description = "TrustChain - Certificate Authority with Certificate Transparency and DNS resolution"

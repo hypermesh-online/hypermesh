@@ -1,6 +1,6 @@
 [package]
 name = "hypermesh-sdk"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 description = "Rust SDK for HyperMesh daemon"
 license = "BSL-1.1"

@@ -23,6 +23,10 @@ pub use recovery::{RecoveryManager, RecoveryReport, RecoveryStatus};
 pub use snapshots::{SnapshotManager, SnapshotMetadata, SnapshotSchedule};
 pub use topology_backup::{BackupMode, TopologyBackup};
 
+// Explicit durable/ephemeral persistence boundary (defined below).
+// Re-exported here so callers use `persistence::{classify, StateKind,
+// StatePersistence}` without reaching into the module body.
+
 use thiserror::Error;
 
 /// Errors that can occur during persistence operations
@@ -95,6 +99,146 @@ pub enum PersistenceError {
 }
 
 pub type PersistenceResult<T> = Result<T, PersistenceError>;
+
+/// Whether a piece of node state is written to disk (durable) or rebuilt on boot
+/// (ephemeral).
+///
+/// This classification makes the persistence boundary EXPLICIT and verifiable so
+/// an upgrade / restart preserves exactly the durable set and discards the
+/// ephemeral set without ambiguity. It documents intent; it does not itself move
+/// bytes. See [`classify`] for the authoritative mapping.
+///
+/// ## Durable (survives restart, on disk)
+/// - Blockchain (`persistence/blockchain_storage/`) and the genesis block that
+///   carries the device fingerprint.
+/// - Node identity DER (FALCON-1024 / Kyber-1024 key material).
+/// - Matrix snapshots (`persistence/matrix_state.rs`) and the WAL.
+///
+/// ## Ephemeral (rebuilt on boot from chain + peer announcements)
+/// - DNS registrations, `ShardLocationIndex`, `SwarmAnalytics`, propagation
+///   weights.
+/// - Live interface / carrier state (owned by the Substrate, re-enumerated each
+///   boot) and the connection pool.
+///
+/// ## The address is durable-by-derivation
+/// The node's `fd48:4d00::/32` address is NEITHER a stored durable value NOR a
+/// rebuilt-from-peers ephemeral one: it is recomputed byte-identically every boot
+/// by `base::derive_address(node_id)`. It is therefore classified
+/// [`StatePersistence::DurableByDerivation`] — nothing writes it to disk as
+/// authoritative state, and any peer can recompute and verify it (R15/R16).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatePersistence {
+    /// Written to disk; must survive a restart or upgrade unchanged.
+    Durable,
+    /// Rebuilt on boot from the chain and peer announcements; safe to discard.
+    Ephemeral,
+    /// Recomputed identically every boot from a pure function of identity; never
+    /// stored as authoritative state, never leased (e.g. the derived address).
+    DurableByDerivation,
+}
+
+/// Node-state kinds classified by [`StatePersistence`].
+///
+/// Enumerating the kinds (rather than free-form strings) lets a restart / upgrade
+/// path assert, at compile time, that every known state category has an explicit
+/// persistence policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StateKind {
+    /// The device/network blockchain and its blocks.
+    Blockchain,
+    /// The genesis block carrying the device fingerprint.
+    GenesisBlock,
+    /// FALCON/Kyber identity key material (DER).
+    IdentityKeys,
+    /// Matrix state snapshots.
+    MatrixSnapshot,
+    /// Write-ahead log.
+    Wal,
+    /// The node's derived `fd48:4d00::/32` address.
+    DerivedAddress,
+    /// DNS registrations (re-registered from chain on boot).
+    DnsRegistrations,
+    /// The shard location index.
+    ShardLocationIndex,
+    /// Swarm analytics / popularity metrics.
+    SwarmAnalytics,
+    /// Shard/asset propagation weights.
+    PropagationWeights,
+    /// Live interface and carrier state (Substrate-owned).
+    LiveInterfaceState,
+    /// The transport connection pool.
+    ConnectionPool,
+}
+
+/// The authoritative durable/ephemeral classification for each [`StateKind`].
+///
+/// One `match` with no wildcard arm: adding a new [`StateKind`] forces a
+/// deliberate persistence decision here (the compiler rejects a missing arm),
+/// which is exactly the "make the boundary explicit and verifiable" goal.
+pub fn classify(kind: StateKind) -> StatePersistence {
+    match kind {
+        StateKind::Blockchain
+        | StateKind::GenesisBlock
+        | StateKind::IdentityKeys
+        | StateKind::MatrixSnapshot
+        | StateKind::Wal => StatePersistence::Durable,
+
+        StateKind::DerivedAddress => StatePersistence::DurableByDerivation,
+
+        StateKind::DnsRegistrations
+        | StateKind::ShardLocationIndex
+        | StateKind::SwarmAnalytics
+        | StateKind::PropagationWeights
+        | StateKind::LiveInterfaceState
+        | StateKind::ConnectionPool => StatePersistence::Ephemeral,
+    }
+}
+
+#[cfg(test)]
+mod persistence_classification_tests {
+    use super::*;
+
+    #[test]
+    fn durable_state_is_classified_durable() {
+        for kind in [
+            StateKind::Blockchain,
+            StateKind::GenesisBlock,
+            StateKind::IdentityKeys,
+            StateKind::MatrixSnapshot,
+            StateKind::Wal,
+        ] {
+            assert_eq!(classify(kind), StatePersistence::Durable, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn ephemeral_state_is_classified_ephemeral() {
+        for kind in [
+            StateKind::DnsRegistrations,
+            StateKind::ShardLocationIndex,
+            StateKind::SwarmAnalytics,
+            StateKind::PropagationWeights,
+            StateKind::LiveInterfaceState,
+            StateKind::ConnectionPool,
+        ] {
+            assert_eq!(classify(kind), StatePersistence::Ephemeral, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn derived_address_is_durable_by_derivation_not_stored() {
+        // The address is recomputed every boot; it is never a stored durable
+        // value nor a peer-rebuilt ephemeral one.
+        assert_eq!(
+            classify(StateKind::DerivedAddress),
+            StatePersistence::DurableByDerivation
+        );
+        assert_ne!(
+            classify(StateKind::DerivedAddress),
+            StatePersistence::Durable
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {

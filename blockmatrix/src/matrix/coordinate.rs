@@ -129,29 +129,23 @@ impl MatrixCoordinate {
 
     /// Deterministically derive a matrix cell from a device node ID.
     ///
-    /// Device-auth invariant: the node's cell is DERIVED from its identity,
-    /// not freely self-declared. `device_node_id` is the canonical node ID
-    /// (`BLAKE3(falcon_pubkey)` hex). We hash it with a domain separator and
-    /// map three 16-bit windows of the digest into signed `i16` axes.
+    /// Device-auth invariant: the node's cell is DERIVED from its identity, not
+    /// freely self-declared. `device_node_id` is the canonical node ID
+    /// (`BLAKE3(falcon_pubkey)` hex).
     ///
-    /// The coordinate space matches [`hypermesh_lib::AssetAddress`], which
-    /// encodes matrix coords as `i16` big-endian (bytes 4-9). Producing
-    /// coords in `i16` range guarantees every asset this node hosts gets a
-    /// valid `AssetAddress` under its derived cell prefix.
+    /// The BLAKE3 construction lives in ONE place — [`base::derive_cell`] — so the
+    /// cell derivation cannot drift between the Substrate and BlockMatrix. This
+    /// method delegates there and wraps the returned `i16` axes in a
+    /// [`MatrixCoordinate`].
+    ///
+    /// The coordinate space matches [`hypermesh_lib::AssetAddress`], which encodes
+    /// matrix coords as `i16` big-endian (bytes 4-9). `i16` axes are always inside
+    /// [`MatrixCoordinate`] bounds, so `new()` cannot fail; the fallback to origin
+    /// is defensive and never taken.
     pub fn derive_cell(device_node_id: &str) -> MatrixCoordinate {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"hypermesh-matrix-cell-v1");
-        hasher.update(device_node_id.as_bytes());
-        let digest = hasher.finalize();
-        let bytes = digest.as_bytes();
-
-        let x = i16::from_be_bytes([bytes[0], bytes[1]]) as i64;
-        let y = i16::from_be_bytes([bytes[2], bytes[3]]) as i64;
-        let z = i16::from_be_bytes([bytes[4], bytes[5]]) as i64;
-
-        // i16 range is always inside MatrixCoordinate bounds; new() cannot
-        // fail here, but fall back to origin defensively rather than panic.
-        MatrixCoordinate::new(x, y, z).unwrap_or_else(|_| MatrixCoordinate::origin())
+        let (x, y, z) = base::derive_cell(device_node_id);
+        MatrixCoordinate::new(x as i64, y as i64, z as i64)
+            .unwrap_or_else(|_| MatrixCoordinate::origin())
     }
 }
 
@@ -263,5 +257,26 @@ mod tests {
         let dist = a.euclidean_distance(&b);
         // sqrt(20^2 + 40^2 + 60^2) = sqrt(5600) = 74.83315...
         assert!((dist - 74.83315).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_derive_cell_delegates_to_base_byte_identically() {
+        // Delegation must produce exactly the axes base::derive_cell computes —
+        // proving the single canonical construction survives the crate boundary.
+        for id in ["9f4fc6ed4ba7", "node-a", ""] {
+            let (bx, by, bz) = base::derive_cell(id);
+            let coord = MatrixCoordinate::derive_cell(id);
+            assert_eq!(coord.x, bx as i64);
+            assert_eq!(coord.y, by as i64);
+            assert_eq!(coord.z, bz as i64);
+        }
+    }
+
+    #[test]
+    fn test_derive_cell_is_deterministic() {
+        assert_eq!(
+            MatrixCoordinate::derive_cell("stable-id"),
+            MatrixCoordinate::derive_cell("stable-id")
+        );
     }
 }

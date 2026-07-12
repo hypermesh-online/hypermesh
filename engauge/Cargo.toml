@@ -1,6 +1,6 @@
 [package]
 name = "engauge"
-version = "1.0.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "Work tracking, content receipts, and capacity metrics for HyperMesh"
