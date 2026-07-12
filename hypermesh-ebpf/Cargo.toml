@@ -45,10 +45,13 @@ parking_lot = { workspace = true }
 # can compile the userspace-only HyperMeshEbpf API surface.
 # -----------------------------------------------------------------------
 [target.'cfg(target_os = "linux")'.dependencies]
-# eBPF infrastructure (Linux kernel BPF integration)
+# eBPF infrastructure (Linux kernel BPF integration).
+# Loader is aya (pure Rust) — see src/{loader,xdp/manager,policy_maps}.rs.
+# libbpf-sys was declared but never referenced in code; it only broke the musl
+# static-pie deploy build (vendored-C glibc/musl UAPI conflict). Removed — the
+# aya loader is unaffected and the XDP kernel gate stays fully functional.
 aya = "0.12"
 aya-log = "0.2"
-libbpf-sys = "1.4"
 
 # System calls (AF_XDP socket probing behind kernel-attach)
 libc = { version = "0.2", optional = true }
