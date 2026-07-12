@@ -114,9 +114,15 @@ async fn two_node_send_shard() {
     // Give the acceptor a moment to start listening
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-    // Prepare test shard
-    let shard_id = ContentHash([0x42; 32]);
+    // Prepare test shard.
+    //
+    // The shard_id MUST be the content hash of the shard data: the receive
+    // path (`handle_incoming_shard_stream`) enforces the content-validity
+    // invariant (`BLAKE3(shard_data) == shard_id`) and rejects any shard whose
+    // claimed id does not match its bytes. Sending a content-valid shard is
+    // exactly what this test now validates.
     let shard_data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
+    let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
 
     // A sends shard to B
     shard_transport_a

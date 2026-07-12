@@ -208,17 +208,14 @@ impl MessageStore {
             .await
             .map_err(|e| anyhow::anyhow!("state proof generation: {e}"))?;
 
+        // Bind the proof to the content hash (signed-to-content invariant, P1).
         let asset_hash = registration.content_hash;
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
-
-        let entry = BlockAssetEntry {
+        let entry = BlockAssetEntry::new_bound(
             asset_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Local { path: msg_json },
+            &state_proof,
+            StoragePointer::Local { path: msg_json },
             registration,
-        };
+        );
 
         match chain.add_block(vec![entry]).await {
             Ok(block) => {

@@ -101,6 +101,17 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
             );
             return None;
         }
+        // Signed-to-content (mirror invariant, P1): the proof MUST be bound to
+        // this entry's asset_hash (SpaceProof.file_hash == hex(asset_hash)).
+        // Rejects a valid proof detached from asset A and replayed for asset B.
+        if !entry.content_binding_ok() {
+            warn!(
+                "Block {} entry {} proof not bound to its asset_hash from peer {} \
+                 (signed-to-content violation)",
+                block.index, i, short_id,
+            );
+            return None;
+        }
         if !entry.state_proof.validate() {
             warn!(
                 "Block {} entry {} state proof validation failed from peer {}",

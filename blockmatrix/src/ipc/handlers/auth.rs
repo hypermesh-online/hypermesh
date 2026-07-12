@@ -144,8 +144,6 @@ async fn record_session_audit(
         AssetCategory::BaseSystem(BaseSystemType::Identity),
     );
 
-    let proof_hash = *blake3::hash(b"session-audit-proof-v1").as_bytes();
-
     let payload_str = String::from_utf8_lossy(&entry_bytes).to_string();
 
     // Generate a REAL PoS proof from this node's own identity
@@ -154,13 +152,13 @@ async fn record_session_audit(
         .await
         .map_err(|e| format!("session-audit proof generation: {e}"))?;
 
-    let entry = BlockAssetEntry {
+    // Bind the proof to the content hash (signed-to-content invariant, P1).
+    let entry = BlockAssetEntry::new_bound(
         asset_hash,
-        proof_hash,
-        state_proof,
-        storage_pointer: StoragePointer::Local { path: payload_str },
+        &state_proof,
+        StoragePointer::Local { path: payload_str },
         registration,
-    };
+    );
 
     state
         .blockchain

@@ -38,26 +38,26 @@ async fn make_transport() -> Result<StoqTransport> {
     StoqTransport::new(config).await
 }
 
-/// Build a test BlockAssetEntry with a default StateProof.
+/// Build a test BlockAssetEntry whose proof is bound to its asset_hash.
+///
+/// The proof is bound via `BlockAssetEntry::new_bound` so the entry satisfies
+/// the signed-to-content half of the mirror invariant (P1) enforced on the
+/// block-receive path.
 fn test_asset_entry(label: &str) -> BlockAssetEntry {
     let data = format!("test-asset-{label}");
     let asset_hash = *blake3::hash(data.as_bytes()).as_bytes();
-    let state_proof = StateProof::default();
-    let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-    let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
     let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
     let registration = blockmatrix::assets::core::AssetRegistration::genesis(coord);
 
-    BlockAssetEntry {
+    BlockAssetEntry::new_bound(
         asset_hash,
-        proof_hash,
-        state_proof,
-        storage_pointer: StoragePointer::Local {
+        &StateProof::new_for_testing(),
+        StoragePointer::Local {
             path: format!("/test/{label}"),
         },
         registration,
-    }
+    )
 }
 
 /// Build the wire payload for a block announcement.
@@ -263,6 +263,15 @@ async fn run_full_insertion_test() -> Result<()> {
         "different coordinates should produce different genesis blocks"
     );
 
+    // Zero-trust (P1/F7): a block only links into a chain that shares its
+    // predecessor. To join A's network, B ADOPTS A's genesis first — a foreign
+    // block-1 referencing a genesis B does not have would be HARD-REJECTED
+    // (no cross-genesis graft). This mirrors the real join-a-network flow.
+    blockchain_b
+        .adopt_genesis(genesis_a.clone())
+        .await
+        .expect("test: B adopts A's genesis to join A's chain");
+
     // --- 2. Node A creates a block with a test asset ---
     let entry = test_asset_entry("sync-test");
     let block_from_a = blockchain_a
@@ -302,8 +311,8 @@ async fn run_full_insertion_test() -> Result<()> {
     let received_block = parse_block_from_wire(&received[1..])
         .expect("test: parse block");
 
-    // insert_received_block handles cross-genesis tolerance (block.index == 1
-    // with different previous_hash logs a warning but succeeds)
+    // B adopted A's genesis (step 1), so A's block-1 links legitimately —
+    // verified predecessor, zero-trust insertion succeeds.
     blockchain_b
         .insert_received_block(received_block.clone())
         .await
@@ -380,6 +389,15 @@ async fn run_handshake_then_sync() -> Result<()> {
 
     let blockchain_a = Arc::new(NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing()));
     let blockchain_b = Arc::new(NodeBlockchain::with_requirements(coord_b, StateRequirements::localhost_testing()));
+
+    // Zero-trust (P1/F7): B joins A's chain by adopting A's genesis, so A's
+    // block-1 links to a verified predecessor. A foreign block-1 would be
+    // hard-rejected (no cross-genesis graft).
+    let genesis_a = blockchain_a.get_block(0).await.expect("test: A genesis");
+    blockchain_b
+        .adopt_genesis(genesis_a)
+        .await
+        .expect("test: B adopts A's genesis");
 
     // --- 3. Create a block on A ---
     let entry = test_asset_entry("handshake-sync");
