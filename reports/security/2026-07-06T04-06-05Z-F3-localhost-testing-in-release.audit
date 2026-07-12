@@ -1,0 +1,33 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F3 — Release binary ships `localhost-testing`, stamping canned test proofs into real blocks
+
+- **Severity:** HIGH
+- **Exploitability:** requires-config (build-config defect present in current Cargo.toml)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+`blockmatrix/Cargo.toml:73` enables the `localhost-testing` feature on the production trustchain dependency, so `StateProof::new_for_testing()` — gated on `#[cfg(any(test, feature="localhost-testing"))]` and hard-coding stake 10000 / 100GB / `test_node_001` — is compiled into the shipped node binary. It is invoked on live, network-reachable code paths: key-rotation block creation and the cross-network transfer wire handler (reachable via `TAG_TRANSFER_REGISTER_REQ`). Each stamps a canned four-proof that self-validates (StakeProof passes because `verify_signature` is a stub; SpaceProof/Work/Time all self-consistent) into a real `BlockAssetEntry`. Receiving peers accept these gossiped blocks with only the toothless `validate()` check. The intended "real PoS" requirement is voided in production: the node itself emits a universal skeleton-key proof, compounding F1 and F2.
+
+## Root cause
+A test-only convenience (`new_for_testing` with canned all-passing fields) is compiled into the release build because `localhost-testing` is listed in the production trustchain feature set, and multiple live call sites use it instead of generating real network-signed proofs.
+
+## Evidence (file:line)
+- `blockmatrix/Cargo.toml:73` — trustchain dep in release build enables `features=[...,"localhost-testing"]`
+- `trustchain/Cargo.toml:122,131` — `localhost-testing` in `default` feature set
+- `trustchain/src/proof_of_state/mod.rs:102-131` — `new_for_testing()` gated on `#[cfg(any(test, feature="localhost-testing"))]`, hard-codes stake 10000 / 100GB / `test_node_001`
+- **Live call sites (7 — WIDER than the original audit's count of 2; discovered during A0 implementation):**
+  1. `blockmatrix/src/blockchain/mutations.rs:246` (`add_key_rotation_block` — dead code, zero callers)
+  2. `blockmatrix/src/network/message_handlers/transfer_handlers.rs:117` (transfer target proof)
+  3. `blockmatrix/src/ipc/handlers/asset.rs:245` (`asset.register` IPC — writes real blocks)
+  4. `blockmatrix/src/ipc/handlers/auth.rs:154` (`record_session_audit`)
+  5. `blockmatrix/src/sharing/inbox.rs:243` (`register_invite_asset`)
+  6. `blockmatrix/src/messaging/store.rs:203` (`register_message_asset`)
+  7. `blockmatrix/src/gateway/scope_bridge.rs:276` (`write_transfer_entry`)
+  Plus the live dev binary `trustchain/src/bin/trustchain_ca.rs:395,398,558` (auto-issue path).
+- **Test-only sites (safe, remain valid under `test` cfg):** `assets/adapters/cpu/mod.rs:48` (`#[cfg(test)]` at line 21), `assets/adapters/memory/mod.rs:699` (`#[cfg(test)]` at line 676), `network/validation.rs:430+`, `transfer/mod.rs:460`, `network/ca_enrollment.rs:190+`, `gateway/transfer_coordinator.rs:1024+`, `mutations.rs:323+` — all under `#[cfg(test)]`, VERIFIED.
+- **Note:** the original audit workflow undercounted live sites (found 2 of 7). The 5 additional live sites (asset.rs, auth.rs, inbox.rs, store.rs, scope_bridge.rs) were flagged incidentally by other audit areas but not consolidated into F3. The true blast radius of the test-proof leak was 3.5× the headline count.
+
+## Fix (see .report on resolution)
+Remove `localhost-testing` from `blockmatrix/Cargo.toml:73` and from trustchain `default` (`Cargo.toml:122`). Gate `new_for_testing` strictly behind `#[cfg(test)]` (keeps test-only call sites valid). Replace the 2 live-path sites (`mutations.rs:246`, `transfer_handlers.rs:117`) with real `StateProof::generate_from_network`. (Overlaps Track B Phase 1: F3 = "stop faking," Phase 1 = "make real / device-authenticating.")

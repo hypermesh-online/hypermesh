@@ -70,7 +70,7 @@ lazy_static = { workspace = true }
 
 # TrustChain - Proof of State and certificate system
 # NOTE: TrustChain bootstraps independently first (see trustchain/BOOTSTRAP.md)
-trustchain = { path = "../trustchain", default-features = false, features = ["ca", "ct", "dns", "proof-of-state", "localhost-testing"] }
+trustchain = { path = "../trustchain", default-features = false, features = ["ca", "ct", "dns", "proof-of-state"] }
 
 # Blockchain dependencies already included below
 
@@ -188,6 +188,12 @@ criterion = { workspace = true }
 proptest = { workspace = true }
 ctor = "0.2"  # Test initialization functions
 engauge = { path = "../engauge" }
+# F3: unit and integration tests use trustchain's `StateProof::new_for_testing()`,
+# which is only available with the `localhost-testing` feature (the `test` cfg
+# does not cross the trustchain crate boundary). Enabling it here scopes the
+# feature to blockmatrix test builds only — resolver "2" keeps release builds
+# (the shipped hypermesh binary) free of the canned test proof.
+trustchain = { path = "../trustchain", default-features = false, features = ["ca", "ct", "dns", "proof-of-state", "localhost-testing"] }
 
 [features]
 default = ["proof-of-state", "assets", "intelligence", "caesar"]

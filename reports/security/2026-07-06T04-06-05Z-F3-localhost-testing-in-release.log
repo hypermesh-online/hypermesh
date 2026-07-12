@@ -1,0 +1,34 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F3 — Remediation Log
+
+Chronological trail of the F3 fix (remove `localhost-testing` from release). Times approximate; sequence exact.
+
+## 2026-07-06 — Scoping
+- Created `reports/security/` (initially mis-placed in `~/reports`, corrected to project root).
+- Wrote 8 `.audit` files (F1–F8) — frozen findings.
+- Verified the two "uncertain" F3 test-vs-live sites myself: `cpu/mod.rs:48` (under `#[cfg(test)]` @21), `memory/mod.rs:699` (under `#[cfg(test)]` @676) → both test-only. Scoped F3 to 2 live sites (later found to be 7).
+
+## Implementation (Developer agent, branch `security/f3-remove-localhost-testing-release`)
+- Removed `"localhost-testing"` from `blockmatrix/Cargo.toml` (normal deps) + `trustchain/Cargo.toml` default; kept the definition; added dev-dependency scoping under resolver-2.
+- Gated `trustchain_ca` dev binary behind `required-features = ["localhost-testing"]`.
+- **Discovered 7 live call sites (audit said 2)** — replaced all with `StateProof::generate_from_network(node_id)`; no fabricated proofs.
+- `add_key_rotation_block` (dead code) signature → takes `&StateProof`.
+- Build: `cargo build -p trustchain` clean; `cargo build -p blockmatrix --bin hypermesh` clean (0 errors).
+
+## Independent verification (I ran, before QA)
+- `cargo tree -p blockmatrix -e no-dev` → trustchain `ca,ct,dns,proof-of-state` (NO localhost-testing in release graph). ✓
+- Grep sweep: every remaining `new_for_testing()` in source is under a `#[cfg(test)]` block (checked nearest cfg above each). ✓
+
+## QA verification (QA agent) — VERDICT: PASS
+- All 6 QA tasks passed with evidence (dependency graph, per-site correctness, feature scoping, no regressions, scope discipline).
+- Tests: trustchain proof 46 pass; blockmatrix mutations 9 / scope_bridge 11 / validation 5 / transfer_coordinator 7 / asset 9 / auth 1 / inbox 7 / store 4 — all pass, 0 fail.
+- **QA caught a subtlety:** `StateProof::default()` (used as a rejection sentinel on the transfer-proof-failure path) unexpectedly PASSES bare `validate()`. Safe today (callers gate on `accepted: false`, never written to a block) but a latent footgun. Advisory: use a structurally-invalid sentinel.
+- QA removed its own scratch test file; working tree clean.
+
+## Hardening (applied per QA advisory, zero-trust directive)
+- Replaced `StateProof::default()` sentinel at 2 sites (`transfer_handlers.rs`, `gateway/transfer_coordinator.rs::rejected_ack`) with a proof whose `stake_proof.stake_amount = 0` → fails `StakeProof::validate()` (`proof.rs:226`) → invalid by construction, not by caller discipline.
+- Confirmed `stake_proof`/`stake_amount` are `pub` fields. Rebuild to confirm green.
+
+## Result
+Security property "no test-proof can enter a real block in the release binary" HOLDS. Ready to commit (F3 source + reports; excludes unrelated pre-existing working-tree changes).

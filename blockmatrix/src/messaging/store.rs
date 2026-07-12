@@ -199,8 +199,16 @@ impl MessageStore {
             }),
         );
 
+        let chain = blockchain.read().await;
+
+        // Generate a REAL PoS proof from this node's own identity, derived
+        // deterministically from its matrix coordinate (R1: hardware-assessed).
+        let node_id = crate::bootstrap::node_id(chain.node_coordinate());
+        let state_proof = StateProof::generate_from_network(&node_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("state proof generation: {e}"))?;
+
         let asset_hash = registration.content_hash;
-        let state_proof = StateProof::new_for_testing();
         let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
@@ -212,7 +220,6 @@ impl MessageStore {
             registration,
         };
 
-        let chain = blockchain.read().await;
         match chain.add_block(vec![entry]).await {
             Ok(block) => {
                 info!(
