@@ -5,7 +5,6 @@
 //! Store and Fetch commands for the asset pipeline.
 
 use anyhow::{anyhow, Context, Result};
-use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use blockmatrix::assets::pipeline::{
@@ -14,27 +13,19 @@ use blockmatrix::assets::pipeline::{
 };
 use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
 use blockmatrix::assets::pipeline::PipelineStats;
+use blockmatrix::identity::FalconIdentity;
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::shard_transport::StoqShardTransport;
 use blockmatrix::network::NetworkManager;
+use blockmatrix::sharing::key_wrap::KeyEnvelope;
+use blockmatrix::sharing::shard_map::ShardMap;
 use blockmatrix::ipc;
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{AccessScope, ContentHash, NodeEncryptor, PrivacyMode};
 
 /// Optional network context for shard distribution during asset storage.
 pub struct ShardDistributionCtx {
     pub network: std::sync::Arc<NetworkManager>,
     pub shard_transport: std::sync::Arc<StoqShardTransport>,
-}
-
-/// Shard map persisted to disk after Store, used by Fetch to reconstruct.
-#[derive(Serialize, Deserialize)]
-struct ShardMap {
-    asset_id: String,
-    shard_hashes: Vec<String>,
-    decryption_key: DecryptionKey,
-    shard_count: usize,
-    original_size: usize,
-    shard_metadata: Vec<ShardMetadata>,
 }
 
 /// Return the directory used for shard map files (`~/.hypermesh/shard_maps/`).
@@ -45,9 +36,16 @@ fn shard_maps_dir() -> Result<std::path::PathBuf> {
 
 /// Run the Store subcommand: ingest a file through the asset pipeline and
 /// persist the resulting shards + shard map locally.
+///
+/// `identity_dir` is the node's identity directory (holds the Kyber keys used
+/// to self-custody the decryption key). `privacy_mode` gates encryption:
+/// Private → encrypted + self-wrapped key envelope; Public/Anonymous →
+/// content-addressed cleartext shards (no key on disk).
 pub async fn run_store(
     path: std::path::PathBuf,
     dist_ctx: Option<&ShardDistributionCtx>,
+    identity_dir: &std::path::Path,
+    privacy_mode: PrivacyMode,
 ) -> Result<()> {
     let file_data =
         std::fs::read(&path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -60,8 +58,8 @@ pub async fn run_store(
     let asset_id = hex::encode(blake3::hash(&file_data).as_bytes());
 
     info!(
-        "Storing file {} ({} bytes) as asset {}",
-        file_name, file_size, asset_id,
+        "Storing file {} ({} bytes) as asset {} ({})",
+        file_name, file_size, asset_id, privacy_mode,
     );
 
     let asset = Asset {
@@ -78,7 +76,7 @@ pub async fn run_store(
 
     let pipeline = AssetPipeline::default().context("failed to create asset pipeline")?;
     let processed = pipeline
-        .process_asset(asset)
+        .process_asset_with_privacy(asset, privacy_mode)
         .await
         .context("pipeline processing failed")?;
 
@@ -99,10 +97,25 @@ pub async fn run_store(
         processed.shards.len()
     );
 
+    // Self-custody the decryption key for encrypted assets: wrap it for the
+    // node's own Kyber identity. The raw secret never touches disk.
+    let key_envelope = if privacy_mode.scope == AccessScope::Bounded {
+        let identity = FalconIdentity::load_or_create(identity_dir)
+            .context("failed to load node identity for key self-custody")?;
+        let env = KeyEnvelope::wrap_for(
+            &processed.decryption_key,
+            identity.encryption_public_key(),
+        )
+        .map_err(|e| anyhow!("failed to self-wrap decryption key: {e}"))?;
+        Some(env)
+    } else {
+        None
+    };
+
     let map = ShardMap {
         asset_id: asset_id.clone(),
         shard_hashes: shard_hashes.clone(),
-        decryption_key: processed.decryption_key,
+        key_envelope,
         shard_count: processed.shards.len(),
         original_size: processed.stats.original_size,
         shard_metadata,
@@ -143,15 +156,27 @@ pub async fn run_store(
         debug!("Standalone store: no network available for shard distribution");
     }
 
-    println!("{map_json}");
-    info!("Asset ID: {}", asset_id);
+    info!(
+        "Asset {} stored ({} shards, encrypted={})",
+        asset_id,
+        processed.shards.len(),
+        map.key_envelope.is_some(),
+    );
 
     Ok(())
 }
 
 /// Run the Fetch subcommand: load a shard map from disk, reconstruct the
 /// original file through the reverse pipeline, and write the output.
-pub async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> Result<()> {
+///
+/// `identity_dir` holds the node's Kyber secret used to unwrap the
+/// self-custodied decryption key for encrypted assets. Cleartext assets
+/// (no key envelope) reconstruct without any key material.
+pub async fn run_fetch(
+    asset_id: String,
+    output: Option<std::path::PathBuf>,
+    identity_dir: &std::path::Path,
+) -> Result<()> {
     let maps_dir = shard_maps_dir()?;
     let map_path = maps_dir.join(format!("{}.json", asset_id));
 
@@ -168,9 +193,29 @@ pub async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> 
         serde_json::from_str(&map_json).context("failed to deserialize shard map")?;
 
     info!(
-        "Loaded shard map for asset {} ({} shards, {} bytes original)",
-        map.asset_id, map.shard_count, map.original_size,
+        "Loaded shard map for asset {} ({} shards, {} bytes original, encrypted={})",
+        map.asset_id,
+        map.shard_count,
+        map.original_size,
+        map.key_envelope.is_some(),
     );
+
+    // Recover the decryption key from self-custody envelope, if present.
+    let decryption_key = match &map.key_envelope {
+        Some(env) => {
+            let identity = FalconIdentity::load_or_create(identity_dir)
+                .context("failed to load node identity for key unwrap")?;
+            env.unwrap_with(identity.kyber_secret_key_bytes())
+                .map_err(|e| anyhow!("failed to unwrap self-custodied key: {e}"))?
+        }
+        // Cleartext asset: no decryption key. Use an inert placeholder that the
+        // reconstruction path ignores (shards are already plaintext).
+        None => DecryptionKey::Aes(blockmatrix::assets::pipeline::AesKey {
+            key: vec![0u8; 32],
+            nonce: vec![0u8; 12],
+        }),
+    };
+    let cleartext = map.key_envelope.is_none();
 
     let shards_dir = maps_dir.join(&asset_id);
     let mut shards: Vec<Shard> = Vec::with_capacity(map.shard_count);
@@ -244,7 +289,7 @@ pub async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> 
     let processed = ProcessedAsset {
         asset_id: map.asset_id.clone(),
         shards,
-        decryption_key: map.decryption_key,
+        decryption_key,
         distributed: DistributedAsset {
             asset_id: map.asset_id.clone(),
             placements: vec![],
@@ -261,7 +306,15 @@ pub async fn run_fetch(asset_id: String, output: Option<std::path::PathBuf>) -> 
         stats: PipelineStats::default(),
     };
 
-    let pipeline = AssetPipeline::default().context("failed to create asset pipeline")?;
+    // Cleartext (Public/Anonymous) assets skip the decryption stage on the
+    // reverse pipeline; encrypted assets use the default (encryption enabled).
+    let pipeline = if cleartext {
+        let mut config = blockmatrix::assets::pipeline::orchestrator::PipelineConfig::default();
+        config.stages_enabled.encryption = false;
+        AssetPipeline::new(config).context("failed to create cleartext asset pipeline")?
+    } else {
+        AssetPipeline::default().context("failed to create asset pipeline")?
+    };
     let reconstructed = pipeline
         .reconstruct_asset(&processed)
         .await

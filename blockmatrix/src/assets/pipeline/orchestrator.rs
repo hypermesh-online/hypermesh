@@ -187,14 +187,52 @@ impl AssetPipeline {
     /// 7. Distribute (tensor-based placement)
     ///
     /// Ledger entry: L = { H, PH, shard_locations }
+    ///
+    /// Defaults to the encrypting (Private) path. For Public/Anonymous assets
+    /// use [`process_asset_with_privacy`](Self::process_asset_with_privacy),
+    /// which produces content-addressed *cleartext* shards (no key to custody).
     pub async fn process_asset(&self, asset: Asset) -> PipelineResult<ProcessedAsset> {
+        self.process_asset_inner(asset, true).await
+    }
+
+    /// Process an asset honoring its `PrivacyMode` for the encryption stage.
+    ///
+    /// Encryption gating (R8/R9): Private assets are encrypted (Kyber-1024 KEM
+    /// + AES-256-GCM whole-blob) so the key must be custodied and wrapped
+    /// per-recipient. Public and Anonymous assets are torrent-style —
+    /// content-addressed **cleartext** shards protected by BLAKE3 integrity
+    /// and PoS-gated fetch, with NO decryption key. This removes the
+    /// "the key must reach everyone" contradiction for open assets.
+    pub async fn process_asset_with_privacy(
+        &self,
+        asset: Asset,
+        privacy_mode: hypermesh_lib::PrivacyMode,
+    ) -> PipelineResult<ProcessedAsset> {
+        // Only Private (bounded, tracked) assets are encrypted. Public and
+        // Anonymous (unbounded scope) assets are stored as cleartext shards.
+        let encrypt = privacy_mode.scope == hypermesh_lib::AccessScope::Bounded;
+        self.process_asset_inner(asset, encrypt).await
+    }
+
+    /// Core pipeline implementation shared by the public entry points.
+    ///
+    /// `encrypt` gates the whole-blob encryption stage independently of
+    /// `stages_enabled.encryption`: when `false`, shards are cleartext and the
+    /// returned `decryption_key` is an inert placeholder (never used because
+    /// callers signal cleartext via an absent key envelope on disk).
+    async fn process_asset_inner(
+        &self,
+        asset: Asset,
+        encrypt: bool,
+    ) -> PipelineResult<ProcessedAsset> {
         let start = std::time::Instant::now();
         let original_size = asset.data.len();
 
         tracing::info!(
-            "Starting pipeline for asset {} ({} bytes)",
+            "Starting pipeline for asset {} ({} bytes, encrypt={})",
             asset.id,
-            original_size
+            original_size,
+            encrypt,
         );
 
         // Stage 1: Compress (Brotli)
@@ -245,7 +283,7 @@ impl AssetPipeline {
         // Uses Kyber-1024 KEM + AES-256-GCM when quantum_resistant is true,
         // otherwise falls back to plain AES-256-GCM.
         let (encrypted_blob, decryption_key, encryption_stats) =
-            if self.config.stages_enabled.encryption {
+            if self.config.stages_enabled.encryption && encrypt {
                 tracing::debug!("Stage 5: Encrypt (whole blob)");
                 if self.config.encryption.quantum_resistant {
                     let keypair = self.encryptor.generate_keypair()?;
@@ -666,5 +704,115 @@ mod tests {
 
         let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
         assert_eq!(reconstructed, original_data);
+    }
+
+    /// Build a fixed test asset with `data` (helper for the privacy tests).
+    fn privacy_test_asset(id: &str, data: Vec<u8>) -> Asset {
+        let size = data.len();
+        Asset {
+            id: id.to_string(),
+            data,
+            metadata: crate::assets::pipeline::PipelineInputMetadata {
+                name: "clip.bin".to_string(),
+                content_type: "application/octet-stream".to_string(),
+                size,
+                created_at: 1234567890,
+                custom: std::collections::HashMap::new(),
+            },
+        }
+    }
+
+    /// Concatenate all shard bytes (index order) for comparing whether the
+    /// underlying blob changed between privacy modes.
+    fn concat_shards(processed: &ProcessedAsset) -> Vec<u8> {
+        let mut shards: Vec<&Shard> = processed.shards.iter().collect();
+        shards.sort_by_key(|s| (s.metadata.is_parity, s.metadata.index));
+        let mut blob = Vec::new();
+        for s in shards {
+            blob.extend_from_slice(&s.data);
+        }
+        blob
+    }
+
+    /// F5 regression: a Public (Unbounded) asset is processed as
+    /// content-addressed *cleartext* shards — no encryption key to custody.
+    /// Proof: (1) the same input yields DIFFERENT shard bytes for PUBLIC vs
+    /// PRIVATE (encryption changed them), and (2) the PUBLIC asset reconstructs
+    /// through the decryption-disabled reverse pipeline with NO key material.
+    #[tokio::test]
+    async fn test_public_asset_produces_cleartext_shards() {
+        let data = {
+            let marker = b"HYPERMESH-CLEARTEXT-MARKER-0123456789";
+            let mut d = Vec::new();
+            for _ in 0..200 {
+                d.extend_from_slice(marker);
+            }
+            d
+        };
+
+        let pipeline = AssetPipeline::default().expect("test: pipeline");
+
+        let public = pipeline
+            .process_asset_with_privacy(
+                privacy_test_asset("public-cleartext", data.clone()),
+                hypermesh_lib::PrivacyMode::PUBLIC,
+            )
+            .await
+            .expect("test: public pipeline");
+
+        let private = pipeline
+            .process_asset_with_privacy(
+                privacy_test_asset("private-encrypted", data.clone()),
+                hypermesh_lib::PrivacyMode::PRIVATE,
+            )
+            .await
+            .expect("test: private pipeline");
+
+        // Identical input, identical RS parameters — the only difference is the
+        // encryption stage. Cleartext (Public) and ciphertext (Private) shard
+        // bytes MUST differ.
+        assert_ne!(
+            concat_shards(&public),
+            concat_shards(&private),
+            "cleartext (Public) and encrypted (Private) shards must differ"
+        );
+        // Private produced a real Kyber key to custody; Public did not encrypt.
+        assert!(matches!(private.decryption_key, DecryptionKey::Kyber { .. }));
+
+        // The cleartext fetch path reconstructs with encryption disabled and
+        // NO key material — the defining property of a Public asset.
+        let mut config = PipelineConfig::default();
+        config.stages_enabled.encryption = false;
+        let cleartext_pipeline = AssetPipeline::new(config).expect("test: cleartext pipeline");
+        let reconstructed = cleartext_pipeline
+            .reconstruct_asset(&public)
+            .await
+            .expect("test: reconstruct cleartext");
+        assert_eq!(reconstructed, data);
+    }
+
+    /// A Private (Bounded) asset takes the encrypting path — a real Kyber
+    /// `DecryptionKey` is produced and the asset round-trips through the
+    /// encrypting reverse pipeline.
+    #[tokio::test]
+    async fn test_private_asset_encrypts_shards() {
+        let data = vec![7u8; 8000];
+        let pipeline = AssetPipeline::default().expect("test: pipeline");
+
+        let processed = pipeline
+            .process_asset_with_privacy(
+                privacy_test_asset("private-encrypted", data.clone()),
+                hypermesh_lib::PrivacyMode::PRIVATE,
+            )
+            .await
+            .expect("test: private pipeline");
+
+        assert!(matches!(processed.decryption_key, DecryptionKey::Kyber { .. }));
+
+        let reconstructed = pipeline
+            .reconstruct_asset(&processed)
+            .await
+            .expect("test: reconstruct private");
+        assert_eq!(reconstructed, data);
     }
 }
