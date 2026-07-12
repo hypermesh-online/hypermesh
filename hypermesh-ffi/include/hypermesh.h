@@ -349,6 +349,90 @@ char *hypermesh_config_show(hypermesh_client_t *client);
 // `key` must be a valid null-terminated UTF-8 string.
 char *hypermesh_config_get(hypermesh_client_t *client, const char *key);
 
+// Publish an asset payload: compute its content address AND produce a
+// FALCON-signed [`WireSignedProof`] for this identity.
+//
+// This performs the THREE distinct operations of a publish without conflating
+// them (see module docs):
+//
+// 1. `blake3_out = BLAKE3(bytes)` — the 32-byte content address (R4). Written
+//    to `blake3_out` (must point to 32 writable bytes).
+// 2. Build a [`WireSignedProof`] — FALCON-1024 over `BLAKE3(proof_bytes ||
+//    nonce)` where `proof_bytes` is the serialized four-proof StateProof — the
+//    SAME wire envelope the node exchanges. Serialized (JSON) into `proof_out`
+//    using the two-call length pattern.
+//
+// The FALCON signature inside the proof is over the proof digest, NOT over the
+// raw `bytes`.
+//
+// # Two-call pattern for `proof_out`
+//
+// Pass `proof_out = NULL` (any `proof_cap`) to learn the required serialized
+// length via `*proof_len`, then call again with a buffer of that size. The
+// content address is still computed and written to `blake3_out` on the sizing
+// call, so a caller can obtain the hash and size in one pass.
+//
+// IMPORTANT: every call regenerates a FRESH `WireSignedProof` (new nonce, new
+// timestamps, new system readings), so the serialized length can differ
+// slightly between the sizing call and the real call. A robust caller loops:
+// if the real call returns `HM_ERR_BUFFER_TOO_SMALL`, grow the buffer to the
+// newly reported `*proof_len` and retry (or simply oversize the buffer). The
+// content address in `blake3_out` is stable — only the proof envelope drifts.
+//
+// # Returns
+//
+// `HM_OK` on success (content hash written, proof serialized, `*proof_len` set),
+// `HM_ERR_BUFFER_TOO_SMALL` if `proof_out` is too small (`*proof_len` = required),
+// `HM_ERR_NULL` for a NULL required argument, or `HM_ERR_INTERNAL` on a crypto
+// or serialization failure (message in `hypermesh_last_error`).
+//
+// # Safety
+//
+// `identity` must be a valid handle; `bytes` must point to `len` readable
+// bytes (or be NULL iff `len == 0`); `blake3_out` must point to 32 writable
+// bytes; if `proof_out` is non-NULL it must have `proof_cap` writable bytes;
+// `proof_len` must be a valid pointer.
+int hypermesh_publish(const hypermesh_identity_t *identity,
+                      const uint8_t *bytes,
+                      uintptr_t len,
+                      uint8_t *blake3_out,
+                      uint8_t *proof_out,
+                      uintptr_t proof_cap,
+                      uintptr_t *proof_len);
+
+// Verify a [`WireSignedProof`] exactly as `TrustChainProofProvider::validate_proof`
+// does — FALCON verify over `BLAKE3(proof_bytes || nonce)` against the embedded
+// signer pubkey, then inner four-proof [`StateProof`] structural validation.
+//
+// This is the contract-named verify seam. It delegates to the existing
+// [`crate::api::identity::hypermesh_signed_proof_verify`], which already
+// implements the exact `validate_proof` semantics — no duplicated logic.
+//
+// Verify-only: holds no key, cannot mint. A forged or tampered proof returns
+// `HM_VERIFY_FAIL`.
+//
+// # Returns
+//
+// `HM_VERIFY_OK` (1) if authentic, `HM_VERIFY_FAIL` (0) if the signature or
+// inner proof is invalid, `HM_ERR_NULL` if `wire_proof` is NULL, or
+// `HM_ERR_INVALID` (negative) on malformed input.
+//
+// # Safety
+//
+// `wire_proof` must point to `wire_len` readable bytes.
+int hypermesh_verify_proof(const uint8_t *wire_proof, uintptr_t wire_len);
+
+// Return the FALCON-1024 detached signature length in bytes (PQClean: 1280).
+//
+// PQClean is authoritative for the concrete sizes:
+// - signature: 1280 bytes (this function)
+// - public key: 1793 bytes
+// - secret key: 2305 bytes
+//
+// A consumer sizing a buffer for the FALCON signature inside a
+// [`WireSignedProof`] should use this rather than a hardcoded constant.
+uintptr_t hypermesh_falcon_signature_max_len(void);
+
 // List deployed dashboards as a JSON array.
 //
 // # Safety

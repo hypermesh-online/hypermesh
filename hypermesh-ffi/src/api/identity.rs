@@ -57,6 +57,15 @@ pub struct HmIdentity {
     inner: FalconIdentity,
 }
 
+impl HmIdentity {
+    /// In-crate borrow of the wrapped [`FalconIdentity`] for the PoS-proof
+    /// publish seam (`super::crypto`). Crate-private: the secret key material
+    /// inside never crosses the C boundary.
+    pub(crate) fn identity(&self) -> &FalconIdentity {
+        &self.inner
+    }
+}
+
 /// Generate a fresh post-quantum identity (FALCON-1024 + Kyber-1024).
 ///
 /// Returns an opaque handle the caller must free with
@@ -437,7 +446,9 @@ mod tests {
         };
         assert_eq!(rc, HM_OK);
 
-        // Sign.
+        // Sign. FALCON-1024 signatures are VARIABLE length, so a size probed
+        // from one signing may be shorter than the next signature. Loop-grow
+        // the buffer until the real signing fits (the robust caller pattern).
         let msg = b"hypermesh ffi signing test";
         let mut sig_len = 0usize;
         let _ = unsafe {
@@ -445,13 +456,20 @@ mod tests {
                 h, msg.as_ptr(), msg.len(), std::ptr::null_mut(), 0, &mut sig_len,
             )
         };
-        let mut sig = vec![0u8; sig_len];
-        let rc = unsafe {
-            hypermesh_identity_sign(
-                h, msg.as_ptr(), msg.len(), sig.as_mut_ptr(), sig.len(), &mut sig_len,
-            )
-        };
-        assert_eq!(rc, HM_OK);
+        let mut sig;
+        loop {
+            sig = vec![0u8; sig_len];
+            let rc = unsafe {
+                hypermesh_identity_sign(
+                    h, msg.as_ptr(), msg.len(), sig.as_mut_ptr(), sig.len(), &mut sig_len,
+                )
+            };
+            if rc == HM_ERR_BUFFER_TOO_SMALL {
+                continue; // sig_len now holds the larger required size
+            }
+            assert_eq!(rc, HM_OK);
+            break;
+        }
         sig.truncate(sig_len);
 
         // Verify: valid.

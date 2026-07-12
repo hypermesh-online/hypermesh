@@ -25,6 +25,7 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/api/identity.rs");
     println!("cargo:rerun-if-changed=src/api/asset_address.rs");
+    println!("cargo:rerun-if-changed=src/api/crypto.rs");
     println!("cargo:rerun-if-changed=src/ffi_util.rs");
     println!("cargo:rerun-if-changed=cbindgen.toml");
 

@@ -21,6 +21,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 blake3 = { workspace = true }
 anyhow = { workspace = true }
+# PoS-proof publish seam: FALCON-1024 size constants + wire-proof nonce.
+pqcrypto-falcon = { workspace = true }
+rand = { workspace = true }
 libc = "0.2"
 
 [build-dependencies]
@@ -28,3 +31,7 @@ cbindgen = "0.27"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Tests build genuine proofs via `StateProof::new_for_testing()`, which is
+# gated behind trustchain's `localhost-testing` feature. Enabling it here
+# (dev-only) keeps it out of the production cdylib/staticlib.
+trustchain = { path = "../trustchain", features = ["localhost-testing"] }
