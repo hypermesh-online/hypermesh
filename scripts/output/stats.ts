@@ -10,10 +10,16 @@ export interface CrateStats {
 
 export const crateStats: CrateStats[] = [
   {
+    "id": "base",
+    "files": 10,
+    "linesOfCode": 709,
+    "testCount": 0
+  },
+  {
     "id": "block-matrix",
-    "files": 497,
-    "linesOfCode": 174469,
-    "testCount": 2456
+    "files": 498,
+    "linesOfCode": 176408,
+    "testCount": 2468
   },
   {
     "id": "caesar",
@@ -41,15 +47,15 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "engauge",
-    "files": 34,
-    "linesOfCode": 11284,
-    "testCount": 214
+    "files": 35,
+    "linesOfCode": 11597,
+    "testCount": 223
   },
   {
     "id": "gateway",
-    "files": 27,
-    "linesOfCode": 9643,
-    "testCount": 267
+    "files": 28,
+    "linesOfCode": 10697,
+    "testCount": 285
   },
   {
     "id": "hypermesh-ebpf",
@@ -59,9 +65,9 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "hypermesh-ffi",
-    "files": 17,
-    "linesOfCode": 1681,
-    "testCount": 12
+    "files": 20,
+    "linesOfCode": 2852,
+    "testCount": 32
   },
   {
     "id": "hypermesh-lib",
@@ -90,26 +96,26 @@ export const crateStats: CrateStats[] = [
   {
     "id": "stoq",
     "files": 65,
-    "linesOfCode": 21964,
+    "linesOfCode": 22004,
     "testCount": 368
   },
   {
     "id": "trustchain",
     "files": 99,
-    "linesOfCode": 42340,
-    "testCount": 438
+    "linesOfCode": 42415,
+    "testCount": 439
   },
   {
     "id": "ui",
-    "files": 183,
-    "linesOfCode": 25901,
-    "testCount": 8
+    "files": 201,
+    "linesOfCode": 27316,
+    "testCount": 7
   }
 ];
 
 export const totalStats = {
-  "totalFiles": 1131,
-  "totalLines": 353374,
-  "totalTests": 4772,
-  "crateCount": 16
+  "totalFiles": 1165,
+  "totalLines": 360090,
+  "totalTests": 4831,
+  "crateCount": 17
 };
