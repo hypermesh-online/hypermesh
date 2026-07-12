@@ -2,8 +2,16 @@
 // Licensed under the Business Source License 1.1.
 
 //! Typed C API wrappers organized by domain.
+//!
+//! Two families live here:
+//! - IPC proxies (`asset`, `trustchain`, `caesar`, ...) marshal JSON to a
+//!   running daemon.
+//! - Direct crate ABIs (`identity`, `asset_address`) call the TrustChain /
+//!   lib Rust paths in-process, so consumers can build cert/asset primitives
+//!   without a daemon. These preserve the PoS and BLAKE3 mirror invariants.
 
 mod asset;
+pub mod asset_address;
 mod blockchain;
 mod caesar;
 mod catalog;
@@ -12,6 +20,7 @@ mod dashboard;
 mod dns;
 mod domain;
 mod engauge;
+pub mod identity;
 mod network;
 mod node;
 mod topology;
@@ -19,6 +28,7 @@ mod trustchain;
 
 // Re-export all extern "C" functions so they appear in the shared library.
 pub use asset::*;
+pub use asset_address::*;
 pub use blockchain::*;
 pub use caesar::*;
 pub use catalog::*;
@@ -27,6 +37,7 @@ pub use dashboard::*;
 pub use dns::*;
 pub use domain::*;
 pub use engauge::*;
+pub use identity::*;
 pub use network::*;
 pub use node::*;
 pub use topology::*;
