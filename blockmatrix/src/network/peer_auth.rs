@@ -163,6 +163,54 @@ pub async fn verify_peer_access(
     true
 }
 
+/// Verify a peer's PoS proof binding for a specific shard fetch (F6).
+///
+/// This is the per-asset half of shard authorization. Coarse membership
+/// (`verify_peer_access`) answers "is this peer authenticated for our
+/// network"; this answers "does this authenticated peer's PoS proof bind
+/// it to THIS asset". A peer may only fetch a shard when BOTH hold:
+///
+///  1. `verify_peer_access` passed (authenticated + same network + fresh), and
+///  2. the peer carries a non-empty validated PoS proof (`proof_bytes`),
+///     which the bilateral handshake established.
+///
+/// The asset-level anchor — that the shard actually belongs to a
+/// registered asset on a shared chain — is supplied by the caller via
+/// [`crate::blockchain::node_chain::NodeBlockchain::authorizes_shard`].
+/// This function enforces the requester-side proof binding; the caller
+/// combines it with the chain anchor. Returns `true` only when the peer
+/// is authenticated AND carries a bound proof.
+///
+/// Rationale (F6): the previous gate served any shard to any same-network
+/// peer. Binding the fetch to the requester's PoS proof means a peer that
+/// passed handshake but has no proof-of-state stake in the network cannot
+/// pull arbitrary shards — authorization is per-asset (via the chain
+/// anchor) and per-proof (here), not membership-only.
+pub async fn verify_shard_proof_binding(
+    peers: &AuthenticatedPeers,
+    node_id: &str,
+    our_network_id: &str,
+) -> bool {
+    // Reuse the membership/freshness gate first.
+    if !verify_peer_access(peers, node_id, our_network_id).await {
+        return false;
+    }
+    // Then require a non-empty bound PoS proof from the handshake.
+    let map = peers.read().await;
+    match map.get(node_id) {
+        Some(peer) if !peer.proof_bytes.is_empty() => true,
+        Some(_) => {
+            let short_id = &node_id[..8.min(node_id.len())];
+            warn!(
+                "Rejected shard fetch from peer {} — no bound PoS proof (F6 per-asset auth)",
+                short_id,
+            );
+            false
+        }
+        None => false,
+    }
+}
+
 /// Validate that a peer's claimed public key is consistent with their
 /// known rotation chain. Returns `true` if the key is either:
 /// 1. The original key (no rotations recorded), or
@@ -299,6 +347,44 @@ mod tests {
         assert!(register_authenticated_peer(&peers, make_peer("nodeY456", "other-net")).await);
 
         assert!(!verify_peer_access(&peers, "nodeY456", "main").await);
+    }
+
+    // ── F6: per-asset shard-fetch proof binding ─────────────────────────
+
+    #[tokio::test]
+    async fn test_shard_proof_binding_ok_for_authenticated_peer() {
+        let peers = new_authenticated_peers();
+        // make_peer sets non-empty proof_bytes (vec![4,5,6]).
+        assert!(register_authenticated_peer(&peers, make_peer("shardOK01", "main")).await);
+        assert!(verify_shard_proof_binding(&peers, "shardOK01", "main").await);
+    }
+
+    #[tokio::test]
+    async fn test_shard_proof_binding_rejects_unauthenticated() {
+        let peers = new_authenticated_peers();
+        // Never registered → no proof binding.
+        assert!(!verify_shard_proof_binding(&peers, "ghostpeer", "main").await);
+    }
+
+    #[tokio::test]
+    async fn test_shard_proof_binding_rejects_wrong_network() {
+        let peers = new_authenticated_peers();
+        assert!(register_authenticated_peer(&peers, make_peer("shardWN01", "other")).await);
+        // Authenticated, but for a different network → refused.
+        assert!(!verify_shard_proof_binding(&peers, "shardWN01", "main").await);
+    }
+
+    #[tokio::test]
+    async fn test_shard_proof_binding_rejects_empty_proof() {
+        // A peer inserted DIRECTLY (bypassing register_authenticated_peer's
+        // non-empty-proof guard) with empty proof_bytes must be refused by
+        // the F6 binding check — membership alone is not enough.
+        let peers = new_authenticated_peers();
+        let mut peer = make_peer("noproof01", "main");
+        peer.proof_bytes = Vec::new();
+        peers.write().await.insert(peer.node_id.clone(), peer);
+
+        assert!(!verify_shard_proof_binding(&peers, "noproof01", "main").await);
     }
 
     #[tokio::test]

@@ -77,8 +77,12 @@ trustchain = { path = "../trustchain", default-features = false, features = ["ca
 # STOQ Protocol - Our transport layer
 stoq = { path = "../stoq" }
 
-# HyperMesh eBPF Intelligence Layer
-hypermesh-ebpf = { path = "../hypermesh-ebpf" }
+# HyperMesh eBPF Intelligence Layer.
+# kernel-attach + ebpf-loader compile the aya/libc kernel path and the
+# clang-built XDP object (P5). The kernel path is guarded at runtime by
+# capability detection (bpffs presence + graceful load fallback), so a
+# node with no root/bpffs still runs unchanged in the userspace-only tier.
+hypermesh-ebpf = { path = "../hypermesh-ebpf", features = ["kernel-attach", "ebpf-loader"] }
 
 # Engauge Intelligence Layer (optional — routing + swarm analytics)
 engauge = { path = "../engauge", optional = true }

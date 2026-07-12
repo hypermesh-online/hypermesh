@@ -117,14 +117,24 @@ impl NodeBlockchain {
 
     /// Accept a mirror: insert a block received from a peer, zero-trust.
     ///
-    /// Mirror invariant (P1) + accept-a-mirror refactor (F7): a received block
-    /// enters this chain ONLY with authenticated, verified linkage. Nothing is
-    /// ever spliced in on a non-matching or missing predecessor:
+    /// Mirror invariant (P1) + accept-a-mirror refactor (F7) + sync-fetch
+    /// symmetry (task #22.1): a received block enters this chain ONLY with
+    /// authenticated, verified linkage AND full per-entry proof integrity.
+    /// This is now the SINGLE symmetric gate — both the block-announce path
+    /// (`parse_and_verify_block`) and the reflector sync-fetch path
+    /// (`fetch_blocks` → here) run the identical per-entry checks, so a
+    /// block cannot enter via one path with weaker verification than the
+    /// other. Nothing is ever spliced in on a non-matching/missing
+    /// predecessor:
     ///
     /// 1. Block hash must recompute (`verify_hash`).
-    /// 2. Every entry's proof must be bound to its `asset_hash`
+    /// 2. Every entry's `proof_hash` must equal `BLAKE3(serialize(proof))`
+    ///    (integrity — task #22.1, previously only the announce path did this).
+    /// 3. Every entry's proof must be bound to its `asset_hash`
     ///    (signed-to-content: `content_binding_ok`).
-    /// 3. Linkage (for non-genesis):
+    /// 4. Every entry's `state_proof.validate()` must pass (task #22.1,
+    ///    previously only the announce path did this).
+    /// 5. Linkage (for non-genesis):
     ///    - Predecessor present + hash matches → insert, then drain any orphan
     ///      that was waiting on THIS block.
     ///    - Predecessor present + hash does NOT match → **hard reject** (this
@@ -141,14 +151,45 @@ impl NodeBlockchain {
             ));
         }
 
-        // Signed-to-content: reject any mirror whose proof is not bound to the
-        // content it claims. A valid proof for asset A must not be replayable
-        // inside an entry claiming asset B.
+        // Per-entry proof integrity + binding + validity. Task #22.1: these
+        // checks previously lived ONLY in the announce path
+        // (`parse_and_verify_block`); the reflector sync-fetch path
+        // (`fetch_blocks`) verified only the block hash. Centralizing them
+        // here makes BOTH paths symmetric — a fetched block is now held to
+        // the exact same standard as an announced one.
         for (i, entry) in block.entries.iter().enumerate() {
+            // (a) proof_hash integrity: hπ == BLAKE3(serialize(state_proof)).
+            let proof_bytes = serde_json::to_vec(&entry.state_proof).map_err(|e| {
+                format!(
+                    "Block {} entry {i} proof serialization failed — mirror rejected: {e}",
+                    block.index,
+                )
+            })?;
+            let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
+            if computed_hash != entry.proof_hash {
+                return Err(format!(
+                    "Block {} entry {i} proof_hash mismatch \
+                     (integrity violation) — mirror rejected",
+                    block.index,
+                ));
+            }
+
+            // (b) Signed-to-content: reject any mirror whose proof is not
+            // bound to the content it claims. A valid proof for asset A must
+            // not be replayable inside an entry claiming asset B.
             if !entry.content_binding_ok() {
                 return Err(format!(
                     "Block {} entry {i} proof not bound to its asset_hash \
                      (signed-to-content violation) — mirror rejected",
+                    block.index,
+                ));
+            }
+
+            // (c) State proof validity: the four-proof StateProof must pass
+            // its own structural/temporal validation.
+            if !entry.state_proof.validate() {
+                return Err(format!(
+                    "Block {} entry {i} state proof validation failed — mirror rejected",
                     block.index,
                 ));
             }
@@ -590,6 +631,67 @@ mod tests {
             result.unwrap_err().contains("signed-to-content"),
             "error should cite the signed-to-content violation",
         );
+    }
+
+    /// SYNC-FETCH SYMMETRY (task #22.1): a mirror whose entry `proof_hash`
+    /// does NOT equal `BLAKE3(serialize(state_proof))` is rejected at
+    /// insert. Previously this check lived ONLY in the announce path; now
+    /// it is centralized in `insert_received_block` so the reflector
+    /// sync-fetch path (`fetch_blocks`) is held to the same standard.
+    #[tokio::test]
+    async fn test_insert_received_block_rejects_bad_proof_hash() {
+        let coord = MatrixCoordinate::new(30, 30, 30).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        // Build a properly content-bound entry, then CORRUPT its proof_hash
+        // so it no longer matches BLAKE3(serialize(state_proof)).
+        let mut entry = test_entry(coord);
+        entry.proof_hash = [0xEE; 32]; // wrong hash
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+
+        let result = chain.insert_received_block(block).await;
+        assert!(result.is_err(), "corrupted proof_hash must be rejected");
+        assert!(
+            result.unwrap_err().contains("proof_hash mismatch"),
+            "error should cite the proof_hash integrity violation",
+        );
+        assert_eq!(chain.get_height().await, 0, "chain must be untouched");
+    }
+
+    /// SYNC-FETCH SYMMETRY (task #22.1): a mirror whose entry state proof
+    /// FAILS `state_proof.validate()` is rejected at insert. Previously
+    /// this ran only in the announce path; now both paths share it.
+    #[tokio::test]
+    async fn test_insert_received_block_rejects_invalid_state_proof() {
+        let coord = MatrixCoordinate::new(31, 31, 31).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        // Build an entry whose StateProof is invalid (zero stake fails
+        // stake_proof.validate()), keeping proof_hash + content-binding
+        // internally consistent so this test isolates the validate() gate.
+        let reg = AssetRegistration::genesis(coord);
+        let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let mut bad_proof = StateProof::new_for_testing();
+        bad_proof.stake_proof.stake_amount = 0; // invalidates stake_proof
+        let entry = BlockAssetEntry::new_bound(
+            asset_hash,
+            &bad_proof,
+            StoragePointer::Genesis,
+            reg,
+        );
+        // Sanity: the proof really is invalid.
+        assert!(!entry.state_proof.validate(), "test setup: proof must be invalid");
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+
+        let result = chain.insert_received_block(block).await;
+        assert!(result.is_err(), "invalid state proof must be rejected");
+        assert!(
+            result.unwrap_err().contains("state proof validation failed"),
+            "error should cite state proof validation failure",
+        );
+        assert_eq!(chain.get_height().await, 0, "chain must be untouched");
     }
 
     /// FORGED MIRROR (c) part 1: a foreign block-1 (previous_hash != our

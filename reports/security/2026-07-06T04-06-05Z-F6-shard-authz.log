@@ -1,0 +1,31 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F6 / P5 — Remediation Log
+
+## Scope (decided): build+wire eBPF kernel gate now; kernel-DROP runtime verify on remote (P8)
+Env is non-root / no bpffs / no bpftool -> can COMPILE the XDP .o + wire the aya map writes (must compile), cannot LOAD/attach here.
+
+## Implementation (Developer agent, isolated worktree off main ae0a0503)
+- Compiled hypermesh_xdp.c -> target/bpf/hypermesh_xdp.o (added #include <linux/in.h>; build.rs probes include dirs). Enabled kernel-attach+ebpf-loader in blockmatrix->hypermesh-ebpf dep.
+- Made aya map writes REAL (XdpManager.bpf -> Arc<Mutex<Option<Bpf>>>, attach() calls sync_policies_to_bpf, new per-event writers). Fixed a latent bug: old sync_policies_to_bpf used wrong map key/value types (would fail try_from at runtime; never worked).
+- Unified kernel+userspace policy: register_authenticated_peer -> pos_header_map+policy_map (re-keyed to 16-byte IPv6 source); register_asset -> asset_hash_map.
+- F6: authorize_shard_fetch = verify_shard_proof_binding (bound PoS proof) + NodeBlockchain::authorizes_shard (on-chain Sharded allowlist).
+- Sync-fetch symmetry (#22.1): moved proof_hash + state_proof.validate() into insert_received_block.
+- XDP_TX routing_map + branch skeleton (cross-device delivery deferred to P8).
+- Graceful degradation preserved (kernel writes behind if-attached; shared Arc can't attach -> None -> no-ops).
+
+## QA verification (QA agent) — VERDICT: PASS with 1 latent non-blocking defect
+- Both build configs clean; valid BPF ELF (5 maps); F6 rejects unauthorized fetch (no bypass); sync-fetch validates proofs; graceful degradation guaranteed by the type system; ebpf 168 + blockmatrix blockchain+network 395 + security::ebpf 20, 0 fail, 0 weakened; P1/P2/F2 intact.
+- DEFECT (found via byte-for-byte C-struct serializer check): KernelPosConfig::to_bytes was 24-byte packed vs C struct pos_config natural 32-byte layout. LATENT (set_kernel_pos_config needs &mut self; node shares Arc -> unreachable today).
+
+## Fix applied at the gate (orchestrator, QA-spec'd)
+- xdp/types.rs to_bytes/from_bytes -> 32-byte natural layout (u64s @8/@16, enabled @24).
+- hypermesh_xdp.c pos_config doc comment corrected to 32-byte natural layout.
+- xdp/manager.rs aya writer value type [u8;24] -> [u8;32].
+- Rebuilt + tested to confirm.
+
+## Result
+Commit <FILLED ON COMMIT>, branch feat/p5-ebpf-kernel-gate. F6 shard-fetch is now PoS-authorized (per-asset, on-chain allowlist), mirrored into a kernel drop-gate (runtime-verified in P8). Sync-fetch symmetry closed. pos_config byte layout corrected.
+
+## Deferred to P8
+Kernel DROP==userspace-reject runtime verification (root+bpffs+NIC); XDP_TX L2 rewrite. Encoded as #[ignore]d p8_kernel_drop_equals_userspace_reject with a 7-step checklist.

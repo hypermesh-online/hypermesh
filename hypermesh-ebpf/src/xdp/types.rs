@@ -24,7 +24,8 @@ use hypermesh_lib::MatrixPosition;
 /// verification (FALCON-1024, Ed25519, ECDSA) MUST remain in
 /// userspace because the BPF instruction set has no such helpers.
 ///
-/// Serialization layout (24 bytes, little-endian, matches C `struct pos_config`):
+/// Serialization layout (32 bytes, little-endian, natural alignment — matches
+/// C `struct pos_config`; u64 fields are 8-byte aligned):
 ///   `[0..4]`   min_difficulty        (u32 LE)
 ///   `[4..12]`  max_timestamp_skew_ns (u64 LE)
 ///   `[12..20]` validation_ttl_ns     (u64 LE)
@@ -57,39 +58,44 @@ impl Default for KernelPosConfig {
 }
 
 impl KernelPosConfig {
-    /// Serialize to 24 bytes matching the C `struct pos_config` layout.
+    /// Serialize to 32 bytes matching the C `struct pos_config` NATURAL
+    /// (non-packed) layout — the u64 fields are 8-byte aligned, so there are
+    /// 4 bytes of padding after `min_difficulty` and 4 trailing pad bytes.
     ///
-    /// Layout (all little-endian):
+    /// Layout (all little-endian; matches `struct pos_config` in hypermesh_xdp.c):
     ///   `[0..4]`   min_difficulty        u32
-    ///   `[4..12]`  max_timestamp_skew_ns u64
-    ///   `[12..20]` validation_ttl_ns     u64
-    ///   `[20..24]` enabled               u32
-    pub fn to_bytes(&self) -> [u8; 24] {
-        let mut buf = [0u8; 24];
+    ///   `[4..8]`   (padding)
+    ///   `[8..16]`  max_timestamp_skew_ns u64
+    ///   `[16..24]` validation_ttl_ns     u64
+    ///   `[24..28]` enabled               u32
+    ///   `[28..32]` (padding)
+    pub fn to_bytes(&self) -> [u8; 32] {
+        let mut buf = [0u8; 32];
         buf[0..4].copy_from_slice(&self.min_difficulty.to_le_bytes());
-        buf[4..12].copy_from_slice(&self.max_timestamp_skew_ns.to_le_bytes());
-        buf[12..20].copy_from_slice(&self.validation_ttl_ns.to_le_bytes());
-        buf[20..24].copy_from_slice(&(self.enabled as u32).to_le_bytes());
+        buf[8..16].copy_from_slice(&self.max_timestamp_skew_ns.to_le_bytes());
+        buf[16..24].copy_from_slice(&self.validation_ttl_ns.to_le_bytes());
+        buf[24..28].copy_from_slice(&(self.enabled as u32).to_le_bytes());
         buf
     }
 
-    /// Deserialize from 24 bytes (C `struct pos_config` layout).
+    /// Deserialize from 32 bytes (C `struct pos_config` natural layout).
     ///
     /// Returns `None` if the slice is too short.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() < 24 {
+        if bytes.len() < 32 {
             return None;
         }
         Some(Self {
             min_difficulty: u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
             max_timestamp_skew_ns: u64::from_le_bytes([
-                bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10], bytes[11],
+                bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14],
+                bytes[15],
             ]),
             validation_ttl_ns: u64::from_le_bytes([
-                bytes[12], bytes[13], bytes[14], bytes[15], bytes[16], bytes[17], bytes[18],
-                bytes[19],
+                bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21], bytes[22],
+                bytes[23],
             ]),
-            enabled: u32::from_le_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]) != 0,
+            enabled: u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]) != 0,
         })
     }
 }

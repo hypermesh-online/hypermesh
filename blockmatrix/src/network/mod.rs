@@ -216,6 +216,17 @@ pub struct PeerContext {
     /// Alpha-default inert: when `None`, handlers fall back to the
     /// G.1 log-only behaviour and drop the messages.
     pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
+    /// P5 unification — optional eBPF orchestrator for mirroring peer
+    /// authentication into the kernel fast-path maps.
+    ///
+    /// When `Some`, a successful bilateral PoS handshake ALSO writes the
+    /// peer's IPv6 source into the kernel `pos_header_map` (validated=1)
+    /// and `policy_map` (requires_pos=1) via
+    /// [`hypermesh_ebpf::HyperMeshEbpf::set_peer_pos_validated`], so the
+    /// kernel gate keys on the SAME source P1's userspace gate authorized.
+    /// When `None` (or when the XDP program is not attached), the node runs
+    /// in the userspace-only tier unchanged — graceful degradation.
+    pub ebpf: Option<Arc<hypermesh_ebpf::HyperMeshEbpf>>,
 }
 
 /// Result of a bilateral handshake including both network node info
