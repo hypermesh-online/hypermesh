@@ -1,0 +1,33 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F1 + F4 + F7 — Resolution Report (delivered as P1: the mirror invariant)
+
+- **Findings:** [F1 block injection](2026-07-06T04-06-05Z-F1-block-injection.audit), [F4 sync skips validation](2026-07-06T04-06-05Z-F4-sync-skips-validation.audit), [F7 chain graft](2026-07-06T04-06-05Z-F7-chain-graft.audit) — unified under one invariant.
+- **Status:** RESOLVED — implemented + independently QA-verified (PASS).
+- **Phase:** P1 (the spine). **Branch:** `feat/p1-mirror-invariant` (off main 45f7221a). **Date:** 2026-07-12.
+
+## The unifying invariant (owner's mirror model)
+Not a consensus blockchain — hosts MIRROR content-addressed Assets, each signed + validated by the mirroring host. **Every mirrored Asset must be (1) CONTENT-VALID: `BLAKE3(data) == asset_hash`, and (2) SIGNED-TO-CONTENT: the proof is bound to that `asset_hash`.** Fail either → reject. This unifies F1 (unauth block accept), F4 (sync skips validation), F7 (chain graft), and the "block-signing" work.
+
+## The key design decision — NO per-entry signatures needed
+`Block::calculate_hash` (block.rs:349-361) already commits to `index || previous_hash || (asset_hash || proof_hash)*` per entry. So binding is achieved by writing the content hash INTO the proof's committed material:
+- `bind_proof_to_asset(asset_hash, proof)` (block.rs) sets `state_proof.space_proof.file_hash = hex(asset_hash)`, derives `proof_hash = BLAKE3(serialize(bound_proof))`.
+- Moving a proof to a different `asset_hash` forces changed `file_hash → proof_hash → block hash` — requires a BLAKE3 collision. Plus a direct receive-side check `content_binding_ok`: `file_hash == hex(asset_hash)`.
+- Sufficiency: existing `(asset_hash, proof_hash)` block-hash commitment + F2 signer-binding (WHO vouches) + this content-binding (bound to WHAT) = mirror unforgeable without breaking BLAKE3 or FALCON. Per-entry sigs would be redundant. **Preserves the no-wipe property** (only the VALUE of file_hash/proof_hash changes at construction; `calculate_hash` algorithm unchanged — fixture `calculate_hash_is_byte_stable_for_fixed_block` passes).
+
+## Changes
+- **F4 content-validity gate:** `retrieval/client_assembly/fetching.rs:96-104` rejects a fetched shard if `BLAKE3(data) != shard_hash` (fallback to next location; forged shard never stored/reconstructed). `pipeline.rs verify_fetched_shards` re-checks before RS decode (defense in depth). `shard_transport.rs:435-444` already rejected on receive.
+- **F1 signed-to-content + gate:** all production entry builders → `new_bound` (mutations.rs 5 builders + genesis + sharing/inbox, transfer/mod, gateway/{scope_bridge,transfer_coordinator}, ipc/handlers/auth, messaging/store — several had synthetic proof_hash that the new check correctly rejects). `content_binding_ok` enforced at add_block, parse_and_verify_block (block_handlers.rs:107), insert_received_block (mutations.rs:148) + orphan drain. `TAG_BLOCK_ANNOUNCE` added to the `needs_auth` gate (peer_connection.rs:121-131).
+- **F7 accept-a-mirror (hard-reject, zero-trust):** `insert_received_block` rewritten — foreign block-1 HARD-rejected (removed cross-genesis warn-insert graft, mutations.rs:167-178); missing-predecessor blocks BUFFERED as orphans (chain.rs orphans map) then linked + re-verified on predecessor arrival. Cross-genesis join now uses the honest `adopt_genesis` flow.
+- **Housekeeping:** deleted dead duplicate `lib/src/address.rs` (byte-identical, not in module tree, zero refs).
+- **Fixed pre-existing broken test** `two_node_send_shard`: `shard_id` now `BLAKE3(shard_data)` — it now validates the content-validity work.
+
+## Verification (QA PASS, independent agent)
+- Forged REJECTED: bad content (`test_reconstruct_rejects_forged_shard`), unbound proof (`test_insert_received_block_rejects_unbound_proof`), foreign block-1 (`test_insert_received_block_rejects_foreign_block_one`, chain untouched).
+- Honest ACCEPTED: `test_insert_received_block_buffers_orphan_then_links`, network_sync_e2e 3/3.
+- No wipe: `calculate_hash_is_byte_stable_for_fixed_block` passes.
+- No regressions: blockmatrix lib 1827/0, trustchain proof_of_state 33/0, bilateral_e2e 3/3, network_sync_e2e 3/3, two_node_shard_exchange 2/2. No tests weakened (QA verified each change is a legitimate invariant consequence). F2 + P2 intact. Scope: blockmatrix + deleted lib/address.rs only.
+
+## Residual / follow-on (non-blocking, tracked)
+1. **Sync-fetch proof re-validation:** the announce path fully validates `proof_hash==BLAKE3(state_proof)` + `state_proof.validate()`; the reflector sync-fetch path does not (only verify_hash + content_binding_ok). A malicious reflector could serve a block with an invalid state_proof that still has `file_hash==hex(asset_hash)`. Proof-VALIDITY gap, NOT mirror-binding (cross-asset replay still blocked). FIX: move those two checks into `insert_received_block` for path symmetry. Fits P5 or a quick follow-up.
+2. **Orphan-buffer bound:** the orphans HashMap is unbounded; add an LRU/size cap/TTL to prevent memory flooding by an authenticated peer.

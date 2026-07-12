@@ -54,6 +54,32 @@ pub enum StoragePointer {
     Genesis,
 }
 
+/// Bind a state proof to a specific asset hash and compute its proof hash.
+///
+/// This is the **signed-to-content** half of the mirror invariant (P1). The
+/// asset's content hash is written into `SpaceProof.file_hash` (as lowercase
+/// hex) so the proof can no longer be detached from its content and replayed
+/// against a *different* asset. Because `proof_hash = BLAKE3(serialize(proof))`
+/// covers `file_hash`, and the block hash commits to `(asset_hash, proof_hash)`,
+/// moving a proof to another asset would require a BLAKE3 collision.
+///
+/// Returns `(bound_proof, proof_hash)`. The caller stores both in the entry.
+///
+/// Note: this does NOT change `Block::calculate_hash` — it only changes the
+/// *value* of `file_hash` (and therefore `proof_hash`) at construction time,
+/// exactly as the device-auth proof-derivation change did. A fixed `Block`
+/// value re-hashes byte-identically.
+pub fn bind_proof_to_asset(
+    asset_hash: &[u8; 32],
+    state_proof: &StateProof,
+) -> (StateProof, [u8; 32]) {
+    let mut bound = state_proof.clone();
+    bound.space_proof.file_hash = hex::encode(asset_hash);
+    let proof_bytes = serde_json::to_vec(&bound).unwrap_or_default();
+    let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+    (bound, proof_hash)
+}
+
 /// A single asset entry within a block.
 ///
 /// Each entry is self-contained: content hash, proof, and storage pointer.
@@ -74,6 +100,39 @@ pub struct BlockAssetEntry {
 
     /// Asset registration metadata (category, network scope, etc.)
     pub registration: AssetRegistration,
+}
+
+impl BlockAssetEntry {
+    /// Construct an entry with its proof cryptographically bound to `asset_hash`.
+    ///
+    /// This is the sanctioned way to build an entry: it guarantees the
+    /// signed-to-content half of the mirror invariant holds by construction —
+    /// `state_proof.space_proof.file_hash == hex(asset_hash)` and
+    /// `proof_hash == BLAKE3(serialize(bound_proof))`.
+    pub fn new_bound(
+        asset_hash: [u8; 32],
+        state_proof: &StateProof,
+        storage_pointer: StoragePointer,
+        registration: AssetRegistration,
+    ) -> Self {
+        let (bound_proof, proof_hash) = bind_proof_to_asset(&asset_hash, state_proof);
+        Self {
+            asset_hash,
+            proof_hash,
+            state_proof: bound_proof,
+            storage_pointer,
+            registration,
+        }
+    }
+
+    /// Verify the **signed-to-content** binding: the proof references THIS
+    /// entry's `asset_hash` via `SpaceProof.file_hash`.
+    ///
+    /// A mirror whose proof is not bound to its content is rejected — a valid
+    /// proof for asset A cannot be replayed inside an entry claiming asset B.
+    pub fn content_binding_ok(&self) -> bool {
+        self.state_proof.space_proof.file_hash == hex::encode(self.asset_hash)
+    }
 }
 
 /// Lightweight block header for chain integrity verification.
@@ -184,16 +243,17 @@ impl Block {
         };
 
         let state_proof = Self::build_genesis_proof(node_coordinate, device_node_id);
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
-        let genesis_entry = BlockAssetEntry {
-            asset_hash: content_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Genesis,
-            registration: genesis_reg,
-        };
+        // Bind the genesis proof to the genesis asset's content hash so the
+        // signed-to-content invariant holds from block 0 (P1). `new_bound`
+        // sets `space_proof.file_hash = hex(content_hash)` and derives
+        // `proof_hash` over the bound proof.
+        let genesis_entry = BlockAssetEntry::new_bound(
+            content_hash,
+            &state_proof,
+            StoragePointer::Genesis,
+            genesis_reg,
+        );
 
         Block::new(
             0,

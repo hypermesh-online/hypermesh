@@ -545,6 +545,61 @@ mod tests {
         );
     }
 
+    /// FORGED MIRROR (a): a fetched shard whose data does NOT match its claimed
+    /// content hash is REJECTED at reconstruct — a corrupt/forged shard never
+    /// reaches the Reed-Solomon decoder (mirror invariant #1, F4).
+    #[tokio::test]
+    async fn test_reconstruct_rejects_forged_shard() {
+        let assembler = ClientAssembler::new(4);
+        let plan = create_test_plan();
+        assembler.initialize(plan).await.expect("test: init plan");
+
+        {
+            let mut fetched = assembler.fetched_shards.write().await;
+            // Insert enough shards to clear the min_shards_required threshold
+            // (10 data shards for the test plan). Shards 0..9 are honest; shard 5
+            // is FORGED (data does not hash to its claimed _hash).
+            for i in 0..10usize {
+                let (data, hash) = if i == 5 {
+                    // FORGED: claimed _hash != BLAKE3(data)
+                    (vec![9u8, 9, 9, 9], [0xAAu8; 32])
+                } else {
+                    let d = vec![i as u8, 2, 3, 4];
+                    let h = *blake3::hash(&d).as_bytes();
+                    (d, h)
+                };
+                fetched.insert(
+                    i,
+                    FetchedShard {
+                        _hash: hash,
+                        data,
+                        _source: MatrixCoordinate::new(i as i64, 0, 0).expect("test: coord"),
+                        _fetch_time_ms: 0,
+                    },
+                );
+            }
+
+            let mut progress = assembler.progress.write().await;
+            progress.fetched_shards = 10;
+            progress.percentage = 1.0;
+        }
+
+        let result = assembler
+            .reconstruct_with_pipeline(&crate::assets::pipeline::orchestrator::DecryptionKey::Aes(
+                crate::assets::pipeline::encryption::AesKey {
+                    key: vec![0u8; 32],
+                    nonce: vec![0u8; 12],
+                },
+            ))
+            .await;
+
+        assert!(result.is_err(), "forged shard must be rejected at reconstruct");
+        assert!(
+            result.unwrap_err().to_string().contains("content-hash mismatch"),
+            "error should cite the content-hash mismatch",
+        );
+    }
+
     /// 5.1 Test: Retrieval with fallback when some locations are unreachable.
     ///
     /// Sets up a shard with two locations — one unreachable, one reachable.

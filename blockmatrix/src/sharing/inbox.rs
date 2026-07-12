@@ -248,21 +248,18 @@ impl InboxStore {
             .await
             .map_err(|e| anyhow::anyhow!("state proof generation: {e}"))?;
 
-        // Compute hashes (following mutations.rs pattern)
+        // Bind the proof to the content hash (signed-to-content invariant, P1).
         let asset_hash = registration.content_hash;
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
         // Store serialized invite JSON in the path field (same as DNS pattern)
-        let entry = BlockAssetEntry {
+        let entry = BlockAssetEntry::new_bound(
             asset_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Local {
+            &state_proof,
+            StoragePointer::Local {
                 path: invite_json,
             },
             registration,
-        };
+        );
 
         match chain.add_block(vec![entry]).await {
             Ok(block) => {

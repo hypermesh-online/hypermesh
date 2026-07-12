@@ -98,12 +98,12 @@ pub(crate) async fn run_peer_message_loop(
 
 /// Route a single message payload to the appropriate handler.
 ///
-/// Asset-level operations (shard send/fetch, sync, block-fetch) are
-/// gated on the sender being in the [`AuthenticatedPeers`] map AND
-/// belonging to the same network. Block announcements are NOT gated —
-/// they are validated by BLAKE3 content integrity, per-entry proof_hash,
-/// and state_proof.validate(). Gossip and unknown tags are logged
-/// but not gated.
+/// Asset-level operations (shard send/fetch, sync, block-fetch) AND block
+/// announcements are gated on the sender being in the [`AuthenticatedPeers`]
+/// map AND belonging to the same network. Announced blocks are ADDITIONALLY
+/// validated by BLAKE3 content integrity, per-entry proof_hash, signed-to-
+/// content binding, and state_proof.validate(). Gossip and unknown tags are
+/// logged but not gated.
 pub(crate) async fn dispatch_message(
     data: &[u8],
     stream: &mut stoq::Stream,
@@ -115,12 +115,16 @@ pub(crate) async fn dispatch_message(
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
     // Gate asset-level operations on peer authentication + network scope.
-    // Block announcements are NOT gated here — blocks are validated by
-    // BLAKE3 content integrity + per-entry proof_hash + state_proof.validate().
-    // Only shard access (asset-level) and sync operations need PoS gating.
+    // Block announcements ARE gated here (defense-in-depth, P1): although each
+    // block is independently validated by BLAKE3 content integrity, per-entry
+    // proof_hash, signed-to-content binding, and state_proof.validate(), the
+    // announcing peer must also be authenticated for the network scope — a
+    // mirror is only accepted from a peer that passed the bilateral PoS
+    // handshake. Shard access and sync operations remain gated as before.
     let needs_auth = matches!(
         tag,
         TAG_SHARD_SEND | TAG_SHARD_FETCH
+            | TAG_BLOCK_ANNOUNCE
             | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
             | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
             | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK

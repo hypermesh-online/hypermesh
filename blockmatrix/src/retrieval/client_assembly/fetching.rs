@@ -88,6 +88,21 @@ impl ClientAssembler {
 
             match transport.fetch_shard(&node_id, &content_hash).await {
                 Ok(data) => {
+                    // Content-validity gate (mirror invariant #1, F4): the
+                    // received shard MUST hash to its claimed content address.
+                    // A forged/corrupt shard (data != claimed hash) is rejected
+                    // and treated as a fetch failure so fallback locations are
+                    // tried — never stored, never fed to reconstruction.
+                    let computed = *blake3::hash(&data).as_bytes();
+                    if computed != shard_hash {
+                        last_error = Some(anyhow::anyhow!(
+                            "shard content-hash mismatch: expected {}, got {}",
+                            hex::encode(shard_hash),
+                            hex::encode(computed),
+                        ));
+                        continue;
+                    }
+
                     let fetch_time = fetch_start.elapsed().as_millis() as u64;
 
                     let fetched = FetchedShard {

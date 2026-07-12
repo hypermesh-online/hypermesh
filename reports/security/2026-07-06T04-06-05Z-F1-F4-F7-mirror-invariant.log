@@ -1,0 +1,31 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F1/F4/F7 / P1 — Remediation Log
+
+## Reframe (owner, mirror model)
+F1+F4+F7+block-signing unified under ONE invariant: every mirrored Asset must be content-valid (BLAKE3(data)==asset_hash) AND signed-to-content (proof bound to asset_hash). "Insert foreign block into my chain" -> "accept-a-mirror".
+
+## Design (before delegation)
+Verified: calculate_hash already commits to (asset_hash, proof_hash) per entry -> binding via file_hash-in-proof needs NO per-entry signatures and preserves the no-wipe property.
+
+## Implementation (Developer agent, isolated worktree off main 45f7221a)
+- bind_proof_to_asset / new_bound / content_binding_ok (block.rs); enforced at add_block + parse_and_verify_block + insert_received_block + orphan drain.
+- Content-validity gate at fetch (fetching.rs) + reconstruct (pipeline.rs); shard receive already had it.
+- TAG_BLOCK_ANNOUNCE gated (peer_connection.rs).
+- accept-a-mirror F7 refactor: hard-reject foreign block-1, buffer orphans, drain+re-verify (mutations.rs + chain.rs orphans map).
+- Deleted dead lib/src/address.rs. Fixed two_node_send_shard test (content-valid shard_id).
+- Regression tests added: forged-shard, unbound-proof, foreign-block-1, orphan-buffer-then-link, calculate_hash-stable.
+
+## Self-check (orchestrator)
+- Scope clean: blockmatrix + deleted lib/address.rs; no standalone gateway/hypermesh-ffi/engauge. blockmatrix/src/gateway/* is the in-scope module. F2 + P2 untouched.
+
+## QA verification (QA agent) — VERDICT: PASS
+- Signed-to-content REAL: no production path skips content_binding_ok (all raw BlockAssetEntry{} sites are #[cfg(test)]); the no-per-entry-sig argument holds.
+- Content-validity REAL: forged shard rejected at fetch+reconstruct+transport; [0u8;32] sentinel can't be abused on a real fetch.
+- F7: foreign block-1 hard-rejected (chain untouched); orphans buffered then linked+re-verified.
+- calculate_hash byte-identical (fixture) -> no wipe, back-compatible.
+- No regressions: blockmatrix lib 1827/0, trustchain proof_of_state 33/0, e2e bilateral 3/3 + network_sync 3/3 + two_node_shard 2/2. No tests weakened (each change verified legitimate).
+- TWO non-blocking hardening notes (tracked as task #22): sync-fetch proof re-validation gap; unbounded orphan buffer.
+
+## Result
+Commit <FILLED ON COMMIT>, branch feat/p1-mirror-invariant. 18 files (17 blockmatrix + deleted lib/address.rs) + report/log. Every mirrored Asset must be content-valid AND signed-to-content; nothing enters a chain without authenticated, verified linkage.

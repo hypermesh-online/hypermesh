@@ -63,6 +63,14 @@ pub struct NodeBlockchain {
     /// Block headers for lightweight chain verification.
     /// Stores headers for blocks we don't have full data for.
     pub(crate) headers: Arc<RwLock<HashMap<u64, BlockHeader>>>,
+
+    /// Orphan buffer: received blocks whose predecessor is not (yet) known.
+    ///
+    /// Zero-trust (P1/F7): a received block is NEVER spliced into the chain
+    /// on a missing or non-matching predecessor. Instead it waits here, keyed
+    /// by its own `previous_hash`, until a verified predecessor with that hash
+    /// is inserted — at which point the orphan is drained and linked.
+    pub(crate) orphans: Arc<RwLock<HashMap<String, Block>>>,
 }
 
 impl NodeBlockchain {
@@ -112,6 +120,7 @@ impl NodeBlockchain {
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
+            orphans: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -203,6 +212,7 @@ impl NodeBlockchain {
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
+            orphans: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
