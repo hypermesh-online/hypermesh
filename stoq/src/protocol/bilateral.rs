@@ -29,6 +29,37 @@ use tracing::{debug, info};
 
 use crate::transport::connection::Stream;
 
+/// STOQ bilateral-handshake protocol version (semver).
+///
+/// P6: stamped into Msg1/Msg2 and enforced on the MAJOR component only.
+/// Peers with a different major version speak an incompatible wire dialect and
+/// are rejected during the handshake (before any application data). Minor/patch
+/// differences are compatible — additive, backward-safe changes.
+pub const STOQ_PROTOCOL_VERSION: &str = "1.0.0";
+
+/// Parse the major-version component of a semver string.
+///
+/// Mirrors `blockmatrix::ipc::protocol::major_version`. Returns `None` for
+/// unparseable input.
+fn major_version(version: &str) -> Option<u64> {
+    let core = version.split('-').next().unwrap_or(version);
+    core.split('.').next()?.parse::<u64>().ok()
+}
+
+/// Whether a peer's advertised protocol version is compatible with ours.
+///
+/// Backward-compat rule (P6): an EMPTY peer version (a pre-P6 node that omits
+/// the `#[serde(default)]` field) is always accepted — old peers keep working.
+/// Otherwise the MAJOR component must match [`STOQ_PROTOCOL_VERSION`]. This
+/// mirrors `blockmatrix::ipc::protocol::protocol_versions_compatible` but adds
+/// the empty-string escape hatch for forward-compatibility with v0 peers.
+fn peer_version_compatible(peer_version: &str) -> bool {
+    if peer_version.is_empty() {
+        return true;
+    }
+    major_version(peer_version) == major_version(STOQ_PROTOCOL_VERSION)
+}
+
 /// Metadata returned after a successful bilateral handshake.
 #[derive(Debug, Clone)]
 pub struct HandshakeResult {
@@ -56,6 +87,11 @@ struct Msg1 {
     falcon_pubkey: String, // hex
     nonce: String,         // hex, 32 bytes
     coordinate: (i64, i64, i64),
+    /// P6: STOQ bilateral-protocol version (semver). `#[serde(default)]` yields
+    /// an empty string for pre-P6 peers that omit it, which is treated as
+    /// compatible so old nodes still handshake.
+    #[serde(default)]
+    protocol_version: String,
     /// Optional key rotation chain: JSON-serialized KeyRotationEntry items.
     /// Present when the node has rotated keys since genesis.
     /// The peer verifies this chain to confirm identity continuity.
@@ -73,6 +109,9 @@ struct Msg2 {
     coordinate: (i64, i64, i64),
     proof_bytes: String,  // hex
     signature: String,    // hex — FALCON sig over BLAKE3(nonce_a || proof)
+    /// P6: STOQ bilateral-protocol version (semver). See [`Msg1`].
+    #[serde(default)]
+    protocol_version: String,
     /// Optional key rotation chain: JSON-serialized KeyRotationEntry items.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     rotation_chain: Vec<String>,
@@ -130,6 +169,7 @@ async fn do_initiate(
         falcon_pubkey: hex::encode(signer.public_key_bytes()),
         nonce: hex::encode(&nonce_a),
         coordinate: local_coordinate,
+        protocol_version: STOQ_PROTOCOL_VERSION.to_string(),
         rotation_chain: signer.rotation_chain(),
     };
     let msg1_bytes = serde_json::to_vec(&msg1)?;
@@ -139,6 +179,17 @@ async fn do_initiate(
     // --- Receive Msg 2 from responder ---
     let msg2_bytes = stream.read_msg().await?;
     let msg2: Msg2 = serde_json::from_slice(&msg2_bytes)?;
+
+    // P6: protocol-version negotiation. Reject a peer whose MAJOR version
+    // differs from ours (incompatible wire dialect) BEFORE trusting anything
+    // it sent. Empty (pre-P6 peer) is treated as compatible.
+    if !peer_version_compatible(&msg2.protocol_version) {
+        return Err(anyhow!(
+            "STOQ protocol version mismatch: peer '{}' incompatible with '{}'",
+            msg2.protocol_version,
+            STOQ_PROTOCOL_VERSION,
+        ));
+    }
 
     // Verify peer identity binding
     let peer_pubkey = verify_identity_binding(&msg2.node_id, &msg2.falcon_pubkey)?;
@@ -213,6 +264,17 @@ pub async fn accept_handshake(
     let msg1_bytes = stream.read_msg().await?;
     let msg1: Msg1 = serde_json::from_slice(&msg1_bytes)?;
 
+    // P6: protocol-version negotiation (responder side). Reject an initiator
+    // with an incompatible MAJOR version before doing any further work. Empty
+    // (pre-P6 initiator) is treated as compatible.
+    if !peer_version_compatible(&msg1.protocol_version) {
+        return Err(anyhow!(
+            "STOQ protocol version mismatch: peer '{}' incompatible with '{}'",
+            msg1.protocol_version,
+            STOQ_PROTOCOL_VERSION,
+        ));
+    }
+
     // Verify initiator identity binding
     let peer_pubkey = verify_identity_binding(&msg1.node_id, &msg1.falcon_pubkey)?;
 
@@ -238,6 +300,7 @@ pub async fn accept_handshake(
         coordinate: local_coordinate,
         proof_bytes: hex::encode(&our_proof),
         signature: hex::encode(&our_signature),
+        protocol_version: STOQ_PROTOCOL_VERSION.to_string(),
         rotation_chain: signer.rotation_chain(),
     };
     let msg2_bytes = serde_json::to_vec(&msg2)?;
@@ -500,6 +563,7 @@ mod tests {
             falcon_pubkey: "def".to_string(),
             nonce: "012".to_string(),
             coordinate: (1, 2, 3),
+            protocol_version: STOQ_PROTOCOL_VERSION.to_string(),
             rotation_chain: Vec::new(),
         };
         let json = serde_json::to_string(&msg).expect("test: serialize Msg1");
@@ -528,11 +592,57 @@ mod tests {
             coordinate: (0, 0, 0),
             proof_bytes: "pb".to_string(),
             signature: "sig".to_string(),
+            protocol_version: STOQ_PROTOCOL_VERSION.to_string(),
             rotation_chain: chain.clone(),
         };
         let json = serde_json::to_string(&msg).expect("test: serialize Msg2");
         assert!(json.contains("rotation_chain"), "Non-empty chain should be serialized");
         let back: Msg2 = serde_json::from_str(&json).expect("test: deserialize Msg2");
         assert_eq!(back.rotation_chain, chain);
+    }
+
+    // -- P6 protocol-version negotiation tests -----------------------------
+
+    #[test]
+    fn test_version_same_major_compatible() {
+        // Exact and minor/patch-different but same-major → compatible.
+        assert!(peer_version_compatible(STOQ_PROTOCOL_VERSION));
+        assert!(peer_version_compatible("1.4.2"));
+        assert!(peer_version_compatible("1.0.0-rc1"));
+    }
+
+    #[test]
+    fn test_version_different_major_rejected() {
+        assert!(!peer_version_compatible("2.0.0"));
+        assert!(!peer_version_compatible("0.9.0"));
+    }
+
+    #[test]
+    fn test_version_empty_is_backward_compatible() {
+        // A pre-P6 peer omits the field → serde default "" → accepted.
+        assert!(
+            peer_version_compatible(""),
+            "old peers omitting protocol_version must still handshake"
+        );
+    }
+
+    #[test]
+    fn test_msg1_defaults_protocol_version_for_old_peer() {
+        // Old node's Msg1 (no protocol_version) deserializes with "" default.
+        let json = r#"{"node_id":"abc","falcon_pubkey":"def","nonce":"012","coordinate":[1,2,3]}"#;
+        let msg: Msg1 = serde_json::from_str(json).expect("test: deserialize Msg1");
+        assert_eq!(msg.protocol_version, "");
+        assert!(peer_version_compatible(&msg.protocol_version));
+    }
+
+    #[test]
+    fn test_msg1_carries_protocol_version_when_present() {
+        let json = r#"{"node_id":"a","falcon_pubkey":"b","nonce":"c","coordinate":[0,0,0],"protocol_version":"2.3.4"}"#;
+        let msg: Msg1 = serde_json::from_str(json).expect("test: deserialize Msg1");
+        assert_eq!(msg.protocol_version, "2.3.4");
+        assert!(
+            !peer_version_compatible(&msg.protocol_version),
+            "major 2 must be rejected against our major 1"
+        );
     }
 }

@@ -855,6 +855,7 @@ async fn start_network(
             let rp_analytics = engauge_analytics.clone();
             let rp_index = shard_location_index.clone();
             let rp_transport = shard_transport.clone();
+            let rp_network = network_clone.clone();
             let rp_local_node_id = nid.to_string();
             tokio::spawn(async move {
                 let mut interval =
@@ -864,6 +865,17 @@ async fn start_network(
                 interval.tick().await;
                 loop {
                     interval.tick().await;
+
+                    // P6: reclaim stale provider hints on the same cadence the
+                    // DNS cache is swept, so the location index does not keep
+                    // handing out peers that have gone offline.
+                    let reclaimed = rp_index.cleanup_expired().await;
+                    if reclaimed > 0 {
+                        debug!(
+                            "replication-poll: reclaimed {reclaimed} expired provider hint(s)"
+                        );
+                    }
+
                     let signals = match rp_analytics.lock() {
                         Ok(guard) => engauge::ReplicationTrigger::new(
                             engauge::ReplicationConfig::default(),
@@ -879,14 +891,38 @@ async fn start_network(
                     if signals.is_empty() {
                         continue;
                     }
+
+                    // Snapshot connected-peer coordinates once per cycle so the
+                    // DispersionAdvisor can rank fetch sources by matrix
+                    // topology instead of taking candidates[0] blindly.
+                    let peer_coords: std::collections::HashMap<
+                        String,
+                        hypermesh_lib::MatrixPosition,
+                    > = rp_network
+                        .get_connected_nodes()
+                        .await
+                        .into_iter()
+                        .map(|n| {
+                            (
+                                n.node_id,
+                                hypermesh_lib::MatrixPosition {
+                                    x: n.coordinate.x as f64,
+                                    y: n.coordinate.y as f64,
+                                    z: n.coordinate.z as f64,
+                                },
+                            )
+                        })
+                        .collect();
+
                     for signal in signals.iter().filter(|s| s.urgency > 0.5) {
                         // Find peers known to provide this shard.
                         let providers = rp_index.get_providers(&signal.shard_id).await;
                         // Skip if we are the only known provider (cannot
                         // self-replicate) or no providers at all.
-                        let candidates: Vec<&String> = providers
+                        let candidates: Vec<String> = providers
                             .iter()
                             .filter(|id| id.as_str() != rp_local_node_id.as_str())
+                            .cloned()
                             .collect();
                         if candidates.is_empty() {
                             debug!(
@@ -895,9 +931,20 @@ async fn start_network(
                             );
                             continue;
                         }
-                        // Pick the first candidate (alpha policy — refine
-                        // with engauge dispersion in a later sprint).
-                        let target_node_id = candidates[0].clone();
+
+                        // P6 (step 3): dispersion-aware source selection.
+                        // Ask the DispersionAdvisor where the swarm WANTS new
+                        // replicas (k-means over consumer demand, anti-affinity
+                        // to existing provider positions), then pick the
+                        // candidate provider nearest a recommended placement.
+                        // This spreads fetches toward under-served demand
+                        // clusters instead of always hammering candidates[0].
+                        let target_node_id = select_dispersion_source(
+                            &rp_analytics,
+                            &signal.shard_id,
+                            &candidates,
+                            &peer_coords,
+                        );
                         let target_id = hypermesh_lib::NodeId::from_public_key(
                             target_node_id.as_bytes(),
                         );
@@ -907,11 +954,39 @@ async fn start_network(
                             .await
                         {
                             Ok(_data) => {
+                                // P6 (step 2): CLOSE THE FEEDBACK LOOP. The
+                                // local node just became a provider of this
+                                // shard — register it in the shared index so
+                                // the provider count grows, then report that
+                                // count back to SwarmAnalytics via
+                                // set_replica_count. Next cycle
+                                // ReplicationTrigger::check sees
+                                // needed <= replicas and STOPS → convergence.
+                                // Without this hook the replica count stayed 0
+                                // forever and the loop never converged.
+                                rp_index
+                                    .register_provider(
+                                        &rp_local_node_id,
+                                        &[signal.shard_id],
+                                    )
+                                    .await;
+                                let replica_count = rp_index
+                                    .get_providers(&signal.shard_id)
+                                    .await
+                                    .len()
+                                    as u32;
+                                if let Ok(mut guard) = rp_analytics.lock() {
+                                    guard.set_replica_count(
+                                        signal.shard_id,
+                                        replica_count,
+                                    );
+                                }
                                 info!(
-                                    "replication-poll: fetched extra replica of {} from {} (urgency {:.2})",
+                                    "replication-poll: fetched extra replica of {} from {} (urgency {:.2}, replicas now {})",
                                     hex::encode(&signal.shard_id.0[..4]),
                                     &target_node_id[..8.min(target_node_id.len())],
                                     signal.urgency,
+                                    replica_count,
                                 );
                             }
                             Err(e) => {
@@ -960,6 +1035,68 @@ async fn start_network(
         #[cfg(feature = "intelligence")]
         engauge_analytics,
     })
+}
+
+/// P6 (step 3): pick which provider to fetch a replica from using the
+/// engauge [`DispersionAdvisor`] instead of always taking `candidates[0]`.
+///
+/// The advisor runs k-means over the shard's consumer demand map (with
+/// anti-affinity to positions already holding replicas) and returns the
+/// matrix positions where the swarm most wants NEW replicas. We then select
+/// the candidate provider whose coordinate is closest to a recommended
+/// placement — pulling the copy toward under-served demand. When we lack
+/// coordinates or demand data (advisor returns nothing), we fall back to a
+/// stable deterministic pick (lexicographically smallest node id) so behavior
+/// is reproducible rather than arbitrary hash ordering.
+#[cfg(feature = "intelligence")]
+fn select_dispersion_source(
+    analytics: &std::sync::Mutex<engauge::SwarmAnalytics>,
+    shard_id: &hypermesh_lib::ContentHash,
+    candidates: &[String],
+    peer_coords: &std::collections::HashMap<String, hypermesh_lib::MatrixPosition>,
+) -> String {
+    debug_assert!(!candidates.is_empty(), "caller guarantees non-empty candidates");
+
+    // Recommend placements from live analytics (k-means over demand).
+    let recommendations = match analytics.lock() {
+        Ok(guard) => {
+            let advisor = engauge::DispersionAdvisor::new();
+            advisor.recommend_placement(shard_id, &guard, candidates.len().max(1))
+        }
+        Err(_) => Vec::new(),
+    };
+
+    // If we have both recommended placements and candidate coordinates, pick
+    // the candidate nearest to any recommended placement.
+    if !recommendations.is_empty() {
+        let mut best: Option<(String, f64)> = None;
+        for cand in candidates {
+            let Some(pos) = peer_coords.get(cand) else { continue };
+            let nearest = recommendations
+                .iter()
+                .map(|r| {
+                    let dx = r.x - pos.x;
+                    let dy = r.y - pos.y;
+                    let dz = r.z - pos.z;
+                    (dx * dx + dy * dy + dz * dz).sqrt()
+                })
+                .fold(f64::INFINITY, f64::min);
+            match &best {
+                Some((_, d)) if *d <= nearest => {}
+                _ => best = Some((cand.clone(), nearest)),
+            }
+        }
+        if let Some((node_id, _)) = best {
+            return node_id;
+        }
+    }
+
+    // Fallback: deterministic (smallest node id), never arbitrary.
+    candidates
+        .iter()
+        .min()
+        .cloned()
+        .unwrap_or_else(|| candidates[0].clone())
 }
 
 /// Register a DNS name for this node on the local blockchain.

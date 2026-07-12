@@ -57,10 +57,36 @@ async fn handle_shard_fetch(
         }));
     }
 
-    // 2. Try network fetch from connected peers
+    // 2. Try network fetch from connected peers.
+    //
+    // P6: consult the ShardLocationIndex FIRST — it is a DNS-style location
+    // cache populated by TAG_SHARD_ANNOUNCE, so known providers are a directed
+    // hint instead of a blind broadcast. We order the connected peers so that
+    // indexed providers come first, then fall back to a bounded scan of the
+    // rest on a miss (peer offline, stale hint, or empty index).
     if let Some(ref network) = state.network {
         let peers = network.get_connected_nodes().await;
-        for peer in peers.iter().take(6) {
+
+        // Provider node_ids known to hold this shard (non-expired). Empty when
+        // the index is unwired (Private mode / test fixtures) or on a miss.
+        let known_providers: Vec<String> = match state.shard_location_index {
+            Some(ref index) => index.get_providers(&content_hash).await,
+            None => Vec::new(),
+        };
+
+        // Partition connected peers: indexed providers first (directed fetch),
+        // then everyone else (fallback scan) — dedup preserved by node_id.
+        let mut ordered: Vec<&_> = peers
+            .iter()
+            .filter(|p| known_providers.iter().any(|id| id == &p.node_id))
+            .collect();
+        ordered.extend(
+            peers
+                .iter()
+                .filter(|p| !known_providers.iter().any(|id| id == &p.node_id)),
+        );
+
+        for peer in ordered.into_iter().take(6) {
             if let Some(ref conn) = peer.connection {
                 match fetch_shard_from_peer(conn, &content_hash).await {
                     Ok(data) if !data.is_empty() => {

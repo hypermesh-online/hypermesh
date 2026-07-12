@@ -589,19 +589,31 @@ impl IntelligenceLayer {
 
     /// Check whether any tracked shards need additional replicas.
     ///
-    /// Creates a [`engauge::ReplicationTrigger`] and evaluates it against
-    /// the current [`engauge::SwarmAnalytics`] state (when the `intelligence`
-    /// feature is enabled). Returns an empty vec when the feature is off.
+    /// P6: evaluates a [`engauge::ReplicationTrigger`] against the LIVE
+    /// [`engauge::SwarmAnalytics`] that the feed loop populates — the SAME
+    /// `Arc<Mutex<SwarmAnalytics>>` created in `connect.rs` and fed with real
+    /// demand every 10s. The former stub built a fresh empty instance here,
+    /// which always returned `[]` (the analytics it checked was never the one
+    /// receiving demand). Passing the shared handle in closes that gap so the
+    /// reconciler sees real desired-vs-actual and its signals drive the
+    /// `set_replica_count` feedback loop that lets replication converge.
+    ///
+    /// Returns an empty vec when the feature is off.
     #[cfg(feature = "intelligence")]
-    pub fn check_replication_needs(&self) -> Vec<engauge::ReplicationSignal> {
-        use engauge::{ReplicationConfig, ReplicationTrigger, SwarmAnalytics};
+    pub fn check_replication_needs(
+        &self,
+        analytics: &std::sync::Mutex<engauge::SwarmAnalytics>,
+    ) -> Vec<engauge::ReplicationSignal> {
+        use engauge::{ReplicationConfig, ReplicationTrigger};
 
-        // If we have an EngaugeBridge with analytics, use it.
-        // For now, create a default trigger against a fresh analytics instance
-        // (wired analytics will come from the bridge in production).
         let trigger = ReplicationTrigger::new(ReplicationConfig::default());
-        let analytics = SwarmAnalytics::new();
-        let signals = trigger.check(&analytics);
+        let signals = match analytics.lock() {
+            Ok(guard) => trigger.check(&guard),
+            Err(e) => {
+                warn!("check_replication_needs: analytics lock poisoned: {e}");
+                Vec::new()
+            }
+        };
         if !signals.is_empty() {
             info!(
                 count = signals.len(),
