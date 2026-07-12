@@ -1,0 +1,43 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F2 — Resolution Report
+
+- **Finding:** [F2 audit](2026-07-06T04-06-05Z-F2-handshake-bypass.audit)
+- **Status:** RESOLVED — implemented + independently QA-verified (PASS)
+- **Branch:** `security/f2-handshake-signer-binding` (off the F3 branch)
+- **Date:** 2026-07-06
+
+## What was fixed
+The bilateral PoS handshake now cryptographically binds every peer's StateProof to the peer's authenticated identity, closing the impersonation/Sybil hole. Three defects fixed; the honest two-node handshake still succeeds (verified).
+
+## Changes (5 files)
+
+### Defect 1 — signer↔identity binding (the core)
+Enforced at BOTH bilateral.rs call sites, keeping the `StateProofProvider` trait signature STABLE (STOQ still depends only on lib, not trustchain).
+- New helper `extract_signer_pubkey(proof_bytes)` (`stoq/src/protocol/bilateral.rs:305-314`) decodes ONLY the `signer_pubkey: Vec<u8>` field from the JSON `WireSignedProof` via a local `WireSignerView` (avoids a trustchain dep).
+- Accept side (`accept_handshake`, `bilateral.rs:269-272`) and initiate side (`do_initiate`, `bilateral.rs:166-169`): after `validate_proof`, assert `extract_signer_pubkey(proof) == peer_pubkey` (the key `verify_identity_binding` proved equals `BLAKE3⁻¹(node_id)`). On mismatch → reject `"proof signer does not match peer identity"`.
+- Chain now complete: `node_id ⟵ BLAKE3 ⟵ peer_pubkey == proof signer`.
+- Convenience API `WireSignedProof::signer_pubkey_bytes()`/`signer_matches()` (`trustchain/…/mod.rs:311-334`, tested; the handshake uses the STOQ-side decoder since STOQ can't depend on trustchain — two synced decoders reading the same field).
+
+### Defect 2 — deleted legacy unsigned-proof fallback
+`trustchain/src/proof_of_state/mod.rs` `validate_proof`: deleted the `Err(_)` arm that accepted a raw bincode `StateProof` ("cryptographic verification skipped"). Now returns `Err` on any non-WireSignedProof. **Default-reject, no migration flag** — the only production proof producer already emits signed WireSignedProofs, so no window is needed, consistent with the zero-trust directive.
+
+### Defect 3 — deleted duplicate legacy validator
+`blockmatrix/src/network/stoq_integration.rs`: deleted `validate_peer_pos_token`, `generate_pos_token`, and their exclusive callers `connect_to_node`/`exchange_node_info`/`handle_incoming_connection` (the `MatrixStoqIntegration` unsigned-PoS path). QA independently confirmed all deleted callers were dead/test-only and that the LIVE handshake path (`NetworkManager::exchange_node_info` → `stoq::initiate_handshake_on_stream`; `message_handlers::handle_incoming_connection` → `stoq::accept_handshake`) is INTACT — the name-collision was navigated correctly. Removed the 2 tests exercising the deleted path.
+
+## Threshold decision — DEFERRED to Track B Phase 1
+The plan called for `validate_with_requirements(&StateRequirements::production())` on the handshake. Actual numbers: `production()` requires stake 50000 = **50 CPU cores** (stake formula is `num_cpus*1000`); the live trust.hypermesh.online node (2-8 vCPUs) produces 2000-8000 and would FAIL, breaking the live handshake. Even `default()` (5000) needs 5 cores. **Chose (c): keep bare `validate()` on the handshake**; defer numeric-threshold tightening to Track B Phase 1, which also replaces the placeholder `cpu*1000` stake formula with a real device-authenticated measure. Gating on core count ≠ economic stake and would reject legitimate small nodes.
+
+## Security property (QA-confirmed)
+The binding stops IMPERSONATION ("cannot sign a proof as someone else"). An attacker who makes `signer == peer_pubkey` must use their OWN real identity/key — self-owned fake-stake is closed by F3 (no test proofs) + Phase 1 (device-authenticated proofs + thresholds), correctly out of F2 scope.
+
+## Verification (QA PASS)
+- Honest two-node handshake: `bilateral_handshake_e2e_with_falcon` PASSES.
+- Attack blocked: new `bilateral_handshake_rejects_mismatched_proof_signer` (`blockmatrix/tests/bilateral_e2e.rs`) PASSES; `bilateral_handshake_rejects_forged_identity` still passes.
+- Legacy rejection: `test_proof_provider_rejects_legacy_unsigned_proof` PASSES.
+- Builds clean: trustchain, stoq, blockmatrix --bin hypermesh.
+- Tests: trustchain proof_of_state 33 / trustchain lib 371 / stoq bilateral 8 / stoq lib 239 / bilateral_e2e 3 / matrix_stoq_integration 4 — all pass, 0 fail.
+
+## Residual risk
+- Numeric thresholds NOT yet enforced on the handshake (deferred — see above). Until Phase 1, a peer with a real device but self-declared low stake still passes structural `validate()`. Impersonation is closed; self-owned lies are Phase-1 territory.
+- Two synced signer_pubkey decoders (STOQ-side `WireSignerView` + trustchain-side helper) — keep in sync if the wire format changes.

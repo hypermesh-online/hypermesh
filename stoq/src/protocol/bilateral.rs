@@ -152,9 +152,20 @@ async fn do_initiate(
         &peer_pubkey, &nonce_a, &peer_proof_bytes, &peer_signature,
     )?;
 
-    // Validate peer's state proof
+    // Validate peer's state proof (FALCON signature + inner four-proof)
     if !proof_provider.validate_proof(&peer_proof_bytes).await? {
         return Err(anyhow!("Peer state proof validation failed"));
+    }
+
+    // F2 signer↔identity binding: the key that SIGNED the state proof MUST be
+    // the same FALCON key that authenticated the peer's handshake identity.
+    // Without this, an attacker signs a self-made proof with a throwaway key
+    // (carried inside the proof), it verifies against its own key, and any
+    // peer joins as trusted at zero cost (unlimited Sybils). Reject a proof
+    // whose signer does not match the authenticated peer identity.
+    let proof_signer = extract_signer_pubkey(&peer_proof_bytes)?;
+    if proof_signer != peer_pubkey {
+        return Err(anyhow!("proof signer does not match peer identity"));
     }
 
     // Extract peer's challenge nonce
@@ -246,9 +257,18 @@ pub async fn accept_handshake(
         &peer_pubkey, &nonce_b, &peer_proof_bytes, &peer_signature,
     )?;
 
-    // Validate initiator's state proof
+    // Validate initiator's state proof (FALCON signature + inner four-proof)
     if !proof_provider.validate_proof(&peer_proof_bytes).await? {
         return Err(anyhow!("Peer state proof validation failed"));
+    }
+
+    // F2 signer↔identity binding: the key that SIGNED the state proof MUST be
+    // the same FALCON key that authenticated the initiator's handshake identity
+    // (verify_identity_binding already proved BLAKE3(peer_pubkey) == node_id).
+    // Reject a proof whose signer does not match the authenticated identity.
+    let proof_signer = extract_signer_pubkey(&peer_proof_bytes)?;
+    if proof_signer != peer_pubkey {
+        return Err(anyhow!("proof signer does not match peer identity"));
     }
 
     info!(
@@ -271,6 +291,26 @@ fn generate_nonce() -> [u8; 32] {
     let mut nonce = [0u8; 32];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
     nonce
+}
+
+/// Extract the FALCON signer public key from a `WireSignedProof` payload.
+///
+/// STOQ deliberately does NOT depend on trustchain, so we decode only the
+/// `signer_pubkey` field structurally (serde ignores the other fields). The
+/// wire format is the JSON serialization of trustchain's `WireSignedProof`,
+/// where `signer_pubkey: Vec<u8>` is the raw FALCON-1024 public key.
+///
+/// Used to enforce the F2 signer↔identity binding: the proof's signer must
+/// equal the peer's authenticated handshake key.
+fn extract_signer_pubkey(proof_bytes: &[u8]) -> Result<Vec<u8>> {
+    #[derive(Deserialize)]
+    struct WireSignerView {
+        signer_pubkey: Vec<u8>,
+    }
+    let view: WireSignerView = serde_json::from_slice(proof_bytes).map_err(|e| {
+        anyhow!("Cannot extract proof signer key (not a signed WireSignedProof): {e}")
+    })?;
+    Ok(view.signer_pubkey)
 }
 
 /// Verify BLAKE3(falcon_pubkey) == declared node_id.
