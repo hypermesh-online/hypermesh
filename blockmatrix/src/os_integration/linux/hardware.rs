@@ -290,4 +290,149 @@ impl LinuxAbstraction {
             .count()
             .into()
     }
+
+    // ===== Device-unique identity readers (device-auth invariant) =====
+
+    /// Read `/etc/machine-id`, falling back to `/var/lib/dbus/machine-id`.
+    ///
+    /// The machine-id is a 128-bit hex string unique to the installed OS.
+    /// It survives reboots but is regenerated on reinstall — a stable,
+    /// widely-present device-binding source.
+    pub(super) fn read_machine_id(&self) -> Option<String> {
+        for path in ["/etc/machine-id", "/var/lib/dbus/machine-id"] {
+            if let Ok(content) = fs::read_to_string(path) {
+                let id = content.trim().to_string();
+                if !id.is_empty() {
+                    return Some(id);
+                }
+            }
+        }
+        None
+    }
+
+    /// Read DMI/SMBIOS identifiers. Each is independently optional because
+    /// these are typically root-readable only (mode 0400). We degrade
+    /// gracefully — a non-root run simply contributes fewer sources.
+    pub(super) fn read_dmi_identifiers(
+        &self,
+    ) -> (Option<String>, Option<String>, Option<String>) {
+        let read_dmi = |field: &str| -> Option<String> {
+            let path = format!("/sys/class/dmi/id/{field}");
+            fs::read_to_string(&path).ok().and_then(|s| {
+                let v = s.trim().to_string();
+                // Filter out well-known placeholder junk from OEM firmware.
+                if v.is_empty()
+                    || v.eq_ignore_ascii_case("None")
+                    || v.eq_ignore_ascii_case("To Be Filled By O.E.M.")
+                    || v.eq_ignore_ascii_case("Default string")
+                    || v.chars().all(|c| c == '0' || c == '-')
+                {
+                    None
+                } else {
+                    Some(v)
+                }
+            })
+        };
+        (
+            read_dmi("product_uuid"),
+            read_dmi("board_serial"),
+            read_dmi("product_serial"),
+        )
+    }
+
+    /// Serial of the disk backing the largest mounted `/dev/*` filesystem.
+    ///
+    /// Resolves the block device for the largest mount, walks to its parent
+    /// disk (stripping partition suffixes), and reads
+    /// `/sys/block/<disk>/device/serial`.
+    pub(super) fn read_primary_disk_serial(&self) -> Option<String> {
+        let devices = self.detect_storage_devices().ok()?;
+        let largest = devices.iter().max_by_key(|d| d.total_bytes)?;
+        let base = Self::block_base_name(&largest.device)?;
+        Self::read_disk_serial_for(&base)
+    }
+
+    /// Strip `/dev/` prefix and partition suffix to get the parent disk name.
+    ///
+    /// `/dev/nvme0n1p2` -> `nvme0n1`, `/dev/sda3` -> `sda`,
+    /// `/dev/mmcblk0p1` -> `mmcblk0`.
+    fn block_base_name(device: &str) -> Option<String> {
+        let name = device.strip_prefix("/dev/")?;
+        // nvme/mmcblk use `p<N>` partition suffix; sd*/vd*/hd* use trailing digits.
+        if name.starts_with("nvme") || name.starts_with("mmcblk") {
+            // Cut at the `p<digits>` partition marker if present.
+            if let Some(idx) = name.rfind('p') {
+                if name[idx + 1..].chars().all(|c| c.is_ascii_digit())
+                    && !name[idx + 1..].is_empty()
+                {
+                    return Some(name[..idx].to_string());
+                }
+            }
+            Some(name.to_string())
+        } else {
+            Some(name.trim_end_matches(|c: char| c.is_ascii_digit()).to_string())
+        }
+    }
+
+    /// Read `/sys/block/<disk>/device/serial`, falling back to WWID.
+    fn read_disk_serial_for(disk: &str) -> Option<String> {
+        for field in ["device/serial", "device/wwid", "wwid"] {
+            let path = format!("/sys/block/{disk}/{field}");
+            if let Ok(content) = fs::read_to_string(&path) {
+                let serial = content.trim().to_string();
+                if !serial.is_empty() {
+                    return Some(serial);
+                }
+            }
+        }
+        None
+    }
+
+    /// Enumerate `/sys/class/net/*` and pick the primary interface.
+    ///
+    /// Selection priority: (1) non-loopback with carrier up, (2) any
+    /// non-loopback, (3) loopback as last resort. Replaces the historic
+    /// hardcoded loopback `::1` network asset — a real MAC is a device-unique
+    /// fingerprint component.
+    pub(super) fn read_primary_nic(&self) -> Option<NicInfo> {
+        let mut candidates: Vec<NicInfo> = Vec::new();
+        let entries = fs::read_dir("/sys/class/net").ok()?;
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let base = entry.path();
+            let mac = fs::read_to_string(base.join("address"))
+                .ok()
+                .map(|s| s.trim().to_string())
+                .unwrap_or_default();
+            if mac.is_empty() {
+                continue;
+            }
+            let is_loopback = name == "lo" || mac == "00:00:00:00:00:00";
+            let carrier = fs::read_to_string(base.join("carrier"))
+                .ok()
+                .map(|s| s.trim() == "1")
+                .unwrap_or(false);
+            candidates.push(NicInfo {
+                name,
+                mac,
+                carrier,
+                is_loopback,
+            });
+        }
+
+        // (1) non-loopback with carrier up
+        if let Some(nic) = candidates
+            .iter()
+            .find(|n| !n.is_loopback && n.carrier)
+            .cloned()
+        {
+            return Some(nic);
+        }
+        // (2) any non-loopback (stable MAC even if link is down)
+        if let Some(nic) = candidates.iter().find(|n| !n.is_loopback).cloned() {
+            return Some(nic);
+        }
+        // (3) loopback last resort
+        candidates.into_iter().next()
+    }
 }

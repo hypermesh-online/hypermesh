@@ -126,6 +126,33 @@ impl MatrixCoordinate {
             .saturating_add(dy.saturating_mul(dy))
             .saturating_add(dz.saturating_mul(dz))
     }
+
+    /// Deterministically derive a matrix cell from a device node ID.
+    ///
+    /// Device-auth invariant: the node's cell is DERIVED from its identity,
+    /// not freely self-declared. `device_node_id` is the canonical node ID
+    /// (`BLAKE3(falcon_pubkey)` hex). We hash it with a domain separator and
+    /// map three 16-bit windows of the digest into signed `i16` axes.
+    ///
+    /// The coordinate space matches [`hypermesh_lib::AssetAddress`], which
+    /// encodes matrix coords as `i16` big-endian (bytes 4-9). Producing
+    /// coords in `i16` range guarantees every asset this node hosts gets a
+    /// valid `AssetAddress` under its derived cell prefix.
+    pub fn derive_cell(device_node_id: &str) -> MatrixCoordinate {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"hypermesh-matrix-cell-v1");
+        hasher.update(device_node_id.as_bytes());
+        let digest = hasher.finalize();
+        let bytes = digest.as_bytes();
+
+        let x = i16::from_be_bytes([bytes[0], bytes[1]]) as i64;
+        let y = i16::from_be_bytes([bytes[2], bytes[3]]) as i64;
+        let z = i16::from_be_bytes([bytes[4], bytes[5]]) as i64;
+
+        // i16 range is always inside MatrixCoordinate bounds; new() cannot
+        // fail here, but fall back to origin defensively rather than panic.
+        MatrixCoordinate::new(x, y, z).unwrap_or_else(|_| MatrixCoordinate::origin())
+    }
 }
 
 #[cfg(test)]

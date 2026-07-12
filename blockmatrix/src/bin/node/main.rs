@@ -65,14 +65,44 @@ async fn main() -> Result<()> {
     // --- Merge config file with CLI flags (CLI wins) ---
     merge_config_into_cli(&mut cli);
 
-    let coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
-    let nid = node_id(&coord);
-
     let data_dir = if cli.data_dir.starts_with('~') {
         let home = dirs::home_dir().context("could not determine home directory")?;
         home.join(&cli.data_dir[2..])
     } else {
         std::path::PathBuf::from(&cli.data_dir)
+    };
+
+    // Device-auth invariant: the data-dir key (`nid`) is a coordinate-derived
+    // alias kept for the migration window so existing persisted state is
+    // still found. The IDENTITY and the matrix cell are separate concerns:
+    //   - identity  = BLAKE3(falcon_pubkey), loaded from the data dir
+    //   - cell      = derive_cell(identity), unless CLI coords override
+    let coord_override = cli.coord_x != 0 || cli.coord_y != 0 || cli.coord_z != 0;
+    let cli_coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
+    let nid = node_id(&cli_coord);
+
+    // Resolve the device identity from the (coord-aliased) data dir so the
+    // genesis proofs collapse to one canonical node ID.
+    let identity_dir = data_dir.join(&nid).join("identity");
+    let device_node_id =
+        blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?.node_id;
+
+    let coord = if coord_override {
+        info!(
+            "Matrix cell OVERRIDE via CLI: ({}, {}, {})",
+            cli_coord.x, cli_coord.y, cli_coord.z
+        );
+        cli_coord
+    } else {
+        let derived = MatrixCoordinate::derive_cell(&device_node_id);
+        info!(
+            "Matrix cell DERIVED from device identity {}...: ({}, {}, {})",
+            &device_node_id[..16.min(device_node_id.len())],
+            derived.x,
+            derived.y,
+            derived.z
+        );
+        derived
     };
 
     let metadata_path = data_dir
@@ -82,9 +112,10 @@ async fn main() -> Result<()> {
     let has_persisted_state = metadata_path.exists();
 
     let (boot, persistence) = if has_persisted_state {
-        bootstrap::resume_node(&data_dir, &nid, coord).await?
+        bootstrap::resume_node(&data_dir, &nid, coord, cli.require_hardware_auth).await?
     } else {
-        bootstrap::fresh_boot(&data_dir, &nid, coord).await?
+        bootstrap::fresh_boot(&data_dir, &nid, coord, &device_node_id, cli.require_hardware_auth)
+            .await?
     };
 
     let persistence = std::sync::Arc::new(persistence);

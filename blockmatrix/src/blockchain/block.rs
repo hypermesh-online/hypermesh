@@ -141,21 +141,49 @@ impl Block {
         block
     }
 
-    /// Create the genesis block for a node.
+    /// Create the genesis block for a node (coordinate-only path).
     ///
     /// Genesis entries use `StoragePointer::Genesis` and a hardware-assessed
-    /// StateProof (self-authorized — sovereignty from boot).
+    /// StateProof (self-authorized — sovereignty from boot). The device
+    /// fingerprint is captured UNCONDITIONALLY from the OS; the genesis node
+    /// ID is `genesis_<device_fingerprint_short>` when no canonical FALCON
+    /// identity is supplied.
+    ///
+    /// Prefer [`Block::genesis_with_identity`] on the real boot path so the
+    /// collapsed `BLAKE3(falcon_pubkey)` node ID flows into every proof.
     ///
     /// Per R1: hardware assessed, not self-reported.
     /// Per section 8.2: "Usage IS verification."
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
+        Self::build_genesis_block(node_coordinate, None)
+    }
+
+    /// Create the genesis block bound to a canonical device identity.
+    ///
+    /// `device_node_id` is the collapsed canonical node ID
+    /// (`BLAKE3(falcon_pubkey)` hex). It becomes `PoStake.stake_holder_id`,
+    /// `PoSpace.node_id`, and `PoWork.owner_id`, collapsing the three
+    /// historical node IDs into one. The device fingerprint (from the OS) is
+    /// folded into all four proofs; the genesis label is
+    /// `genesis_<device_node_id>`.
+    pub fn genesis_with_identity(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: &str,
+    ) -> Self {
+        Self::build_genesis_block(node_coordinate, Some(device_node_id))
+    }
+
+    fn build_genesis_block(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: Option<&str>,
+    ) -> Self {
         let genesis_reg = AssetRegistration::genesis(node_coordinate);
         let content_hash = {
             let serialized = genesis_reg.to_string();
             *blake3::hash(serialized.as_bytes()).as_bytes()
         };
 
-        let state_proof = Self::build_genesis_proof(node_coordinate);
+        let state_proof = Self::build_genesis_proof(node_coordinate, device_node_id);
         let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
@@ -176,20 +204,36 @@ impl Block {
 
     /// Build a StateProof for the genesis block from real hardware.
     ///
-    /// Attempts OS hardware detection; falls back to safe defaults that
-    /// still satisfy `StateRequirements::default()` for R13-compliant devices.
-    fn build_genesis_proof(coordinate: MatrixCoordinate) -> StateProof {
-        let node_id = format!(
-            "genesis_({},{},{})",
-            coordinate.x, coordinate.y, coordinate.z
-        );
+    /// Attempts OS hardware detection (which also captures the device
+    /// fingerprint); falls back to safe defaults that still satisfy
+    /// `StateRequirements::default()` for R13-compliant devices. The genesis
+    /// node ID is the canonical device node ID when supplied, otherwise
+    /// `genesis_<fingerprint_short>` (still device-bound, not coord-derived).
+    fn build_genesis_proof(
+        coordinate: MatrixCoordinate,
+        device_node_id: Option<&str>,
+    ) -> StateProof {
         match crate::create_os_abstraction() {
             Ok(os) => {
+                let node_id = device_node_id.map(|s| s.to_string()).unwrap_or_else(|| {
+                    let fp = os.device_fingerprint();
+                    format!("genesis_{}", &fp.hex()[..16.min(fp.hex().len())])
+                });
                 let hw = HardwareAssessment::from_os(os.as_ref(), &node_id, coordinate);
                 generate_genesis_proof(&hw)
             }
             Err(_) => {
-                // Fallback: use num_cpus and conservative estimates
+                // Fallback: no OS access — synthesize an empty (zero-source)
+                // fingerprint. Capture still "happens" (records zero sources);
+                // enforcement gates elsewhere refuse to trust it.
+                let device_fingerprint =
+                    crate::os_integration::DeviceFingerprint::compose(Default::default());
+                let node_id = device_node_id.map(|s| s.to_string()).unwrap_or_else(|| {
+                    format!(
+                        "genesis_({},{},{})",
+                        coordinate.x, coordinate.y, coordinate.z
+                    )
+                });
                 let hw = HardwareAssessment {
                     cpu_cores: num_cpus::get() as u32,
                     cpu_mhz: 1000,
@@ -198,6 +242,8 @@ impl Block {
                     storage_available_bytes: 25 * 1024 * 1024 * 1024,
                     node_id,
                     coordinate,
+                    device_fingerprint,
+                    disk_serial: None,
                 };
                 generate_genesis_proof(&hw)
             }
@@ -284,20 +330,31 @@ impl Block {
         self.entries.len()
     }
 
-    /// Check if this block belongs to the specified node.
+    /// Check if this block's recorded matrix cell matches the given coordinate.
     ///
-    /// Checks the first entry's PoSpace proof `node_id` which encodes
-    /// the node coordinate as `"(x,y,z)"`.
+    /// Device-auth invariant: under device-bound genesis, `PoSpace.node_id`
+    /// is the DEVICE identity (not the coordinate). The cell is a DERIVED
+    /// attribute recorded inside `PoSpace.storage_path` as `#cell=(x,y,z)`
+    /// (see `genesis_proof::build_space_proof`). This method checks that
+    /// derived cell.
+    ///
+    /// It also accepts the legacy encoding (`PoSpace.node_id == "(x,y,z)"`)
+    /// so blocks produced before the device-auth binding still validate —
+    /// keeping the change reversible and back-compatible.
     pub fn belongs_to_node(&self, node_coordinate: &MatrixCoordinate) -> bool {
-        if let Some(first) = self.entries.first() {
-            let coord_str = format!(
-                "({},{},{})",
-                node_coordinate.x, node_coordinate.y, node_coordinate.z
-            );
-            first.state_proof.space_proof.node_id == coord_str
-        } else {
-            false
-        }
+        let Some(first) = self.entries.first() else {
+            return false;
+        };
+        let coord_str = format!(
+            "({},{},{})",
+            node_coordinate.x, node_coordinate.y, node_coordinate.z
+        );
+        let space = &first.state_proof.space_proof;
+        // Preferred: derived cell recorded in storage_path (`#cell=(x,y,z)`).
+        let cell_marker = format!("#cell={coord_str}");
+        space.storage_path.contains(&cell_marker)
+            // Legacy: coordinate stored directly as the PoSpace node_id.
+            || space.node_id == coord_str
     }
 }
 
@@ -343,6 +400,81 @@ mod tests {
         assert!(genesis.is_genesis());
         assert!(genesis.verify_hash());
         assert_eq!(genesis.asset_count(), 1);
+    }
+
+    /// HASH-SAFETY FIXTURE (device-auth invariant / P2).
+    ///
+    /// `Block::calculate_hash` commits ONLY to
+    /// `index || previous_hash || (asset_hash || proof_hash)*`. The
+    /// device-auth change alters PROOF DERIVATION, which changes the
+    /// `state_proof` content and therefore `proof_hash` for FRESH genesis
+    /// blocks — but the HASHING ALGORITHM is unchanged, so a fixed `Block`
+    /// value re-hashes byte-identically before and after.
+    ///
+    /// This pins the algorithm to a known-answer digest. If any future edit
+    /// changes what `calculate_hash` commits to (field order, added fields,
+    /// hash function), this test fails loudly — proving old persisted blocks
+    /// still deserialize and re-hash identically (no block wipe, reversible).
+    #[test]
+    fn calculate_hash_is_byte_stable_for_fixed_block() {
+        // Fully fixed inputs — no SystemTime, no nonce, no randomness.
+        let entry = BlockAssetEntry {
+            asset_hash: [0x11u8; 32],
+            proof_hash: [0x22u8; 32],
+            state_proof: StateProof::default(),
+            storage_pointer: StoragePointer::Genesis,
+            registration: AssetRegistration::genesis(
+                MatrixCoordinate::new(0, 0, 0).expect("test: valid coord"),
+            ),
+        };
+        let previous_hash =
+            "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+
+        // Compute the expected digest exactly as `calculate_hash` must:
+        // index(LE) || previous_hash bytes || (asset_hash || proof_hash).
+        let expected = {
+            let mut h = Hasher::new();
+            h.update(&7u64.to_le_bytes());
+            h.update(previous_hash.as_bytes());
+            h.update(&[0x11u8; 32]);
+            h.update(&[0x22u8; 32]);
+            format!("{}", h.finalize())
+        };
+
+        let block = Block {
+            index: 7,
+            previous_hash: previous_hash.clone(),
+            hash: String::new(),
+            entries: vec![entry],
+        };
+
+        // (1) The algorithm output must equal the independently-derived
+        //     digest — pins field order + hash function.
+        assert_eq!(
+            block.calculate_hash(),
+            expected,
+            "calculate_hash algorithm changed — device-auth hash-safety broken"
+        );
+
+        // (2) The digest must NOT depend on state_proof/registration content
+        //     (only on asset_hash || proof_hash). This is precisely what makes
+        //     the device-auth proof-derivation change hash-safe: a fresh
+        //     genesis with different proof content re-hashes to the same block
+        //     hash as long as asset_hash + proof_hash are held fixed.
+        let mut block_other_proof = block.clone();
+        block_other_proof.entries[0].state_proof = StateProof::new_for_testing();
+        block_other_proof.entries[0].registration = AssetRegistration::genesis(
+            MatrixCoordinate::new(9, 9, 9).expect("test: valid coord"),
+        );
+        assert_eq!(
+            block.calculate_hash(),
+            block_other_proof.calculate_hash(),
+            "calculate_hash must ignore state_proof/registration content \
+             (commits only to asset_hash || proof_hash)"
+        );
+
+        // (3) Deterministic across calls — no hidden state.
+        assert_eq!(block.calculate_hash(), block.calculate_hash());
     }
 
     #[test]

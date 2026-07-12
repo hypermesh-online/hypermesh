@@ -94,6 +94,58 @@ pub trait OsAbstraction: Send + Sync {
     /// - BSD: Check for bpf(4) support
     /// - macOS: Check for BPF support
     fn is_ebpf_supported(&self) -> bool;
+
+    /// Device-Unique Identity Methods (device-auth invariant)
+    ///
+    /// These read machine-unique identifiers used to authenticate the
+    /// physical device inside the four-proof State Proof. They are NOT
+    /// addresses — assets get IPv6 addresses, devices do not. Default
+    /// implementations return `None`/empty so non-Linux platforms compile;
+    /// Linux overrides them with real `/sys` + `/etc` readers.
+
+    /// Read the OS machine identifier.
+    /// - Linux: `/etc/machine-id`, fallback `/var/lib/dbus/machine-id`
+    fn machine_id(&self) -> Option<String> {
+        None
+    }
+
+    /// Read DMI/SMBIOS hardware identifiers (product UUID, board serial,
+    /// product serial). These are often root-only; callers must degrade.
+    /// - Linux: `/sys/class/dmi/id/{product_uuid,board_serial,product_serial}`
+    fn dmi_identifiers(&self) -> (Option<String>, Option<String>, Option<String>) {
+        (None, None, None)
+    }
+
+    /// Serial number of the disk backing the largest mounted filesystem.
+    /// - Linux: `/sys/block/<dev>/device/serial`
+    fn primary_disk_serial(&self) -> Option<String> {
+        None
+    }
+
+    /// Enumerate NICs and select the primary (non-loopback, carrier-up).
+    /// - Linux: `/sys/class/net/*/{address,carrier}`
+    fn primary_nic(&self) -> Option<NicInfo> {
+        None
+    }
+
+    /// Compose the full device fingerprint from all available identifiers.
+    ///
+    /// This is the single hook the genesis path calls to authenticate the
+    /// device. It is tolerant of missing components (many are root-only) and
+    /// records how many independent sources contributed via
+    /// `DeviceFingerprint::source_count`.
+    fn device_fingerprint(&self) -> DeviceFingerprint {
+        let (product_uuid, board_serial, product_serial) = self.dmi_identifiers();
+        let ids = DeviceIdentifiers {
+            machine_id: self.machine_id(),
+            product_uuid,
+            board_serial,
+            product_serial,
+            primary_disk_serial: self.primary_disk_serial(),
+            primary_mac: self.primary_nic().map(|n| n.mac),
+        };
+        DeviceFingerprint::compose(ids)
+    }
 }
 
 /// Factory function to create appropriate OS abstraction for current platform

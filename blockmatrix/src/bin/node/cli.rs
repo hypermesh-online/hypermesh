@@ -18,17 +18,36 @@ pub struct Cli {
     #[clap(short, long)]
     pub debug: bool,
 
-    /// Node X coordinate in matrix
+    /// Matrix X coordinate OVERRIDE (joined-network placement).
+    ///
+    /// Device-auth invariant: a node's cell is DERIVED from its device
+    /// identity by default (`MatrixCoordinate::derive_cell`). These flags are
+    /// a validated override for joining a specific network position — NOT a
+    /// free self-declaration. Leave at 0 (the default) to use the derived
+    /// cell; set all three non-default to override.
     #[clap(short = 'x', long, default_value = "0")]
     pub coord_x: i64,
 
-    /// Node Y coordinate in matrix
+    /// Matrix Y coordinate OVERRIDE (see `--coord-x`).
     #[clap(short = 'y', long, default_value = "0")]
     pub coord_y: i64,
 
-    /// Node Z coordinate in matrix
+    /// Matrix Z coordinate OVERRIDE (see `--coord-x`).
     #[clap(short = 'z', long, default_value = "0")]
     pub coord_z: i64,
+
+    /// Require validated hardware authentication (device-auth invariant).
+    ///
+    /// When set: (1) the composed device fingerprint must draw on at least
+    /// two independent hardware sources or startup fails closed, and (2) the
+    /// continuity gate hard-fails startup if the live device fingerprint does
+    /// not match the one recorded in the genesis block — this is what rejects
+    /// a copied identity directory run on a different machine.
+    ///
+    /// The device fingerprint is ALWAYS captured and recorded at genesis
+    /// regardless of this flag; only enforcement is gated.
+    #[clap(long)]
+    pub require_hardware_auth: bool,
 
     /// Initial privacy mode
     #[clap(short, long, default_value = "private")]
