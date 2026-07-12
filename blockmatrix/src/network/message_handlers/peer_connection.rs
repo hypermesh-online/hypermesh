@@ -146,6 +146,17 @@ pub(crate) async fn dispatch_message(
             // Record shard fetch demand for engauge swarm intelligence.
             if tag == TAG_SHARD_FETCH {
                 record_shard_demand(&data, peer_node_id, ctx).await;
+
+                // F6: per-asset shard-fetch authorization. Beyond the coarse
+                // same-network membership gate above, bind the fetch to (a)
+                // the requester's PoS proof (verify_shard_proof_binding) and
+                // (b) the shard belonging to an asset registered on our
+                // chain (blockchain.authorizes_shard). A peer that passed
+                // handshake but has no proof-of-state stake, or requests a
+                // shard for an asset not on a shared chain, is refused.
+                if !authorize_shard_fetch(&data, peer_node_id, ctx).await {
+                    return;
+                }
             }
             handle_shard_dispatch(&data, stream, ctx).await;
         }
@@ -223,6 +234,84 @@ pub(crate) async fn dispatch_message(
         _ => {
             warn!("Unknown message tag 0x{:02x} from peer {}", tag, short_id);
         }
+    }
+}
+
+/// F6 per-asset shard-fetch authorization.
+///
+/// `data` is a raw SHARD_FETCH message: `tag(1) + shard_id(32)`. Returns
+/// `true` only when BOTH hold:
+///   1. the requester carries a bound PoS proof for our network
+///      (`verify_shard_proof_binding`), and
+///   2. the requested shard belongs to an asset registered on our chain
+///      (`blockchain.authorizes_shard`).
+///
+/// A `false` result causes the caller to drop the request silently (the
+/// requester already logged the reason). SHARD_SEND (peers pushing shards
+/// to us, integrity-checked by BLAKE3 in the store) is NOT gated here.
+async fn authorize_shard_fetch(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) -> bool {
+    // Parse shard_id: tag(1) + shard_id(32).
+    if data.len() < 33 {
+        debug!("F6: malformed SHARD_FETCH ({} bytes) — refused", data.len());
+        return false;
+    }
+    let mut shard_id = [0u8; 32];
+    shard_id.copy_from_slice(&data[1..33]);
+
+    // (1) Requester-side proof binding.
+    if !peer_auth::verify_shard_proof_binding(
+        &ctx.authenticated_peers,
+        peer_node_id,
+        &ctx.network_id,
+    )
+    .await
+    {
+        return false;
+    }
+
+    // (2) Asset-level anchor: the shard must belong to a registered asset
+    // on our chain. This binds the fetch to the asset's on-chain,
+    // content-bound StateProof rather than to coarse membership.
+    if !ctx.blockchain.authorizes_shard(&shard_id).await {
+        let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+        warn!(
+            "F6: shard {} not authorized for {} (no registered asset on our chain)",
+            hex::encode(&shard_id[..8]),
+            short_id,
+        );
+        return false;
+    }
+
+    true
+}
+
+/// Mirror an authenticated peer into the kernel eBPF fast-path maps (P5).
+///
+/// Extracts the peer's IPv6 source address from the connection endpoint and
+/// writes `pos_header_map[src].validated=1` + `policy_map[src].requires_pos=1`
+/// via the shared orchestrator. This makes the kernel gate key on the SAME
+/// source the userspace bilateral-PoS handshake authorized. IPv4-mapped
+/// addresses are converted to their IPv6 form. No-op when no orchestrator is
+/// present or no XDP program is attached (userspace-only tier unchanged).
+fn mirror_peer_auth_to_kernel(ctx: &PeerContext, connection: &stoq::Connection) {
+    let Some(ref ebpf) = ctx.ebpf else {
+        return;
+    };
+    let addr = connection.endpoint().to_socket_addr();
+    let ipv6 = match addr {
+        std::net::SocketAddr::V6(v6) => *v6.ip(),
+        std::net::SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
+    };
+    let src_ip = ipv6.octets();
+    // HyperMesh peers sign with FALCON-1024 (algorithm indicator 0x01).
+    if let Err(e) =
+        ebpf.set_peer_pos_validated(src_ip, true, hypermesh_ebpf::ALG_FALCON_1024)
+    {
+        debug!("eBPF peer-auth mirror skipped: {e}");
     }
 }
 
@@ -382,6 +471,15 @@ async fn handle_handshake_connection(
         result.peer_proof.len(),
         result.peer_pubkey.len(),
     );
+
+    // P5 unification: mirror this authenticated peer into the kernel
+    // fast-path maps, keyed on the SAME IPv6 source P1 just authorized.
+    // Writes pos_header_map[src].validated=1 + policy_map[src].requires_pos=1
+    // so the XDP gate admits this source's HyperMesh traffic. No-op unless
+    // an XDP program is attached (graceful degradation).
+    if let Some(ref ctx) = peer_ctx {
+        mirror_peer_auth_to_kernel(ctx, &connection);
+    }
 
     // Request CA certificate in background (Phase 2 bootstrap)
     spawn_acceptor_ca_enrollment(cert_manager, signer.node_id().to_string());

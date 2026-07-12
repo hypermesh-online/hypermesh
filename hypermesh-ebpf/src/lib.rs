@@ -145,6 +145,18 @@ impl From<MatrixPosition> for MatrixPositionKey {
     }
 }
 
+/// Encode a `MatrixPosition` as the raw 12-byte wire form (3x f32 LE) used
+/// as the `routing_map` key and carried in the on-wire MATRIX extension
+/// header. The f64 coordinates are narrowed to f32 to match the header
+/// layout exactly (the kernel keys on these raw bytes to avoid float math).
+pub fn matrix_position_to_wire_bytes(pos: &MatrixPosition) -> [u8; 12] {
+    let mut buf = [0u8; 12];
+    buf[0..4].copy_from_slice(&(pos.x as f32).to_le_bytes());
+    buf[4..8].copy_from_slice(&(pos.y as f32).to_le_bytes());
+    buf[8..12].copy_from_slice(&(pos.z as f32).to_le_bytes());
+    buf
+}
+
 // -----------------------------------------------------------------------
 // HyperMeshEbpf - the unified orchestrator
 // -----------------------------------------------------------------------
@@ -256,6 +268,53 @@ impl HyperMeshEbpf {
 
         self.policy_manager.set_policy(key, policy);
         tracing::debug!("Privacy tier set for network: ebpf_u8={}", ebpf_tier);
+
+        // Push the updated policy set into the kernel `policy_map` so the
+        // per-source gate reflects the network's privacy tier. No-op when
+        // the XDP program is not attached (userspace-only tier).
+        if let Some(ref xdp) = self.xdp_manager {
+            xdp.sync_policies_to_bpf()
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    /// Mark an authenticated peer's source address as PoS-validated in the
+    /// kernel maps.
+    ///
+    /// P5 unification: call this from the SAME event that registers an
+    /// authenticated peer in userspace (`register_authenticated_peer`).
+    /// It writes:
+    ///   - `pos_header_map[src_ip].validated = 1` (the kernel fast-path
+    ///     admits this source's HyperMesh traffic), and
+    ///   - `policy_map[src_ip].requires_pos = 1` (so the gate is armed for
+    ///     that source),
+    /// keyed on the SAME IPv6 source address P1 authenticated. Removing a
+    /// peer (`valid = false`) marks the source invalid. No-op (graceful)
+    /// when the XDP program is not attached.
+    ///
+    /// `algorithm` is the signing algorithm indicator (0x01 FALCON, 0x02
+    /// Ed25519, 0x03 ECDSA); HyperMesh peers use FALCON-1024.
+    pub fn set_peer_pos_validated(
+        &self,
+        src_ip: [u8; 16],
+        valid: bool,
+        algorithm: u8,
+    ) -> Result<(), EbpfError> {
+        if let Some(ref xdp) = self.xdp_manager {
+            xdp.update_pos_header_map(src_ip, valid, algorithm, 0)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
+            // Arm the per-source policy: authenticated peers require PoS.
+            let policy = ValidationPolicy::for_privacy_tier(3);
+            xdp.update_policy_for_source(src_ip, &policy)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
+        } else {
+            tracing::debug!(
+                "No XDP manager attached; peer PoS validation ({}) not synced to kernel",
+                valid
+            );
+        }
         Ok(())
     }
 
@@ -283,20 +342,43 @@ impl HyperMeshEbpf {
             next_hop.z
         );
 
-        // When kernel-attach is enabled, also prepare the BPF map update
-        #[cfg(feature = "kernel-attach")]
-        {
-            tracing::debug!(
-                "Routing rule for ({},{},{}) prepared for BPF forwarding map sync",
-                dest.x,
-                dest.y,
-                dest.z
-            );
-            // BPF map key: MatrixPositionKey as 3x i64 LE bytes (24 bytes)
-            // BPF map value: next_hop MatrixPosition as 3x f64 LE bytes (24 bytes)
-            // Actual map write happens during next sync_to_kernel() cycle
+        // P5 step 6: mirror the routing rule into the kernel `routing_map`
+        // so the XDP_TX delegation branch can forward matching packets. The
+        // key is the raw 12-byte matrix position (3x f32 LE), matching the
+        // on-wire MATRIX extension header exactly. `egress_ifindex` is left
+        // 0 here (skeleton) — the concrete next-hop ifindex is resolved by
+        // the ShardLocationIndex feed (see `set_matrix_route_active`), and
+        // the live cross-device rewrite is deferred to P8. No-op when the
+        // XDP program is not attached.
+        if let Some(ref xdp) = self.xdp_manager {
+            let pos_bytes = matrix_position_to_wire_bytes(&dest);
+            xdp.update_routing_map(pos_bytes, 0, true)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
         }
 
+        Ok(())
+    }
+
+    /// Activate (or deactivate) a kernel forwarding rule for a matrix
+    /// position with a concrete egress interface.
+    ///
+    /// P5 step 6: this is the entry point the `ShardLocationIndex` feed
+    /// uses to install next-hop forwarding — when the swarm provider index
+    /// learns that shards for a destination live behind interface
+    /// `egress_ifindex`, it activates the `routing_map` entry so the XDP
+    /// program delegates matching traffic via XDP_TX. No-op (graceful) when
+    /// the XDP program is not attached.
+    pub fn set_matrix_route_active(
+        &self,
+        dest: MatrixPosition,
+        egress_ifindex: u32,
+        active: bool,
+    ) -> Result<(), EbpfError> {
+        if let Some(ref xdp) = self.xdp_manager {
+            let pos_bytes = matrix_position_to_wire_bytes(&dest);
+            xdp.update_routing_map(pos_bytes, egress_ifindex, active)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
+        }
         Ok(())
     }
 
@@ -318,48 +400,33 @@ impl HyperMeshEbpf {
             metadata.shard_count
         );
 
-        #[cfg(feature = "kernel-attach")]
-        {
-            tracing::debug!(
-                "Asset hash {} registered, BPF asset_hash_map entry prepared",
-                hex::encode(&hash.0[..8])
-            );
-            // BPF map key: asset hash [u8; 32]
-            // BPF map value: shard_index u32 LE + shard_count u32 LE (8 bytes)
-            // Actual map write happens during next sync_to_kernel() cycle
+        // P5 unification: mirror the userspace registration straight into
+        // the kernel `asset_hash_map`, keyed by the SAME 32-byte content
+        // hash the userspace gate uses. `registered=true` because this
+        // asset is on the blockchain by the time it is registered here.
+        // No-op (graceful) when the XDP program is not attached.
+        if let Some(ref xdp) = self.xdp_manager {
+            xdp.update_asset_hash_map(hash.0, metadata.shard_count, true)
+                .map_err(|e| EbpfError::Xdp(e.to_string()))?;
         }
 
         Ok(())
     }
 
-    /// Set PoS validation status for a content hash.
+    /// Set PoS validation status for a CONTENT hash (userspace cache).
     ///
-    /// Stores the hash -> validation status for userspace lookups.
-    /// In production with kernel-attach, this also updates the BPF
-    /// `pos_header_map` -- the `last_validated` field is set to the
-    /// current value of `bpf_ktime_get_ns()` (kernel monotonic clock),
-    /// which the XDP program uses for TTL enforcement when
-    /// `pos_config_map.validation_ttl_ns > 0`.
+    /// This is the content-addressed userspace validation cache, keyed by
+    /// the 32-byte BLAKE3 content hash. It is distinct from the kernel
+    /// `pos_header_map`, which is keyed by the peer's 16-byte IPv6 SOURCE
+    /// address — to mirror an authenticated peer into the kernel PoS gate,
+    /// use [`Self::set_peer_pos_validated`] (source-keyed), not this method.
     pub fn set_pos_validation(&self, hash: ContentHash, valid: bool) -> Result<(), EbpfError> {
         self.pos_validations.write().insert(hash.0, valid);
-
-        tracing::debug!("PoS validation status set: valid={}", valid);
-
-        #[cfg(feature = "kernel-attach")]
-        {
-            tracing::debug!(
-                "PoS validation for {} synced, BPF pos_header_map entry prepared \
-                 (last_validated = current bpf_ktime_get_ns())",
-                hex::encode(&hash.0[..8])
-            );
-            // BPF map key: source IPv6 address [u8; 16]
-            // BPF map value: struct pos_validation {
-            //   algorithm: u8, difficulty: u32, validated: u8,
-            //   last_validated: u64  <-- set to bpf_ktime_get_ns() at write time
-            // }
-            // Actual map write happens during next sync_to_kernel() cycle
-        }
-
+        tracing::debug!(
+            "PoS content-validation cached for {}: valid={}",
+            hex::encode(&hash.0[..8]),
+            valid
+        );
         Ok(())
     }
 
@@ -910,5 +977,109 @@ mod tests {
         };
         let result = ebpf.set_kernel_pos_config(&cfg);
         assert!(result.is_ok());
+    }
+
+    // -------------------------------------------------------------------
+    // P5 map-population wiring tests (userspace-verifiable, no kernel).
+    //
+    // Without an attached XDP program these are graceful no-ops returning
+    // Ok — proving the userspace-only tier is unaffected (graceful
+    // degradation). The kernel DROP == userspace-reject behaviour is
+    // deferred to P8 (real load on trust.hypermesh.online).
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn test_set_peer_pos_validated_no_xdp_is_noop() {
+        let ebpf = HyperMeshEbpf::default();
+        let src_ip = [0x20u8; 16]; // IPv6 global unicast prefix
+        // valid=true, algorithm=FALCON — no XDP attached → graceful Ok.
+        assert!(ebpf
+            .set_peer_pos_validated(src_ip, true, ALG_FALCON_1024)
+            .is_ok());
+        // Removing a peer (valid=false) is likewise a graceful no-op.
+        assert!(ebpf
+            .set_peer_pos_validated(src_ip, false, ALG_FALCON_1024)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_set_matrix_route_active_no_xdp_is_noop() {
+        let ebpf = HyperMeshEbpf::default();
+        let dest = MatrixPosition {
+            x: 3.0,
+            y: 4.0,
+            z: 5.0,
+        };
+        assert!(ebpf.set_matrix_route_active(dest, 2, true).is_ok());
+        assert!(ebpf.set_matrix_route_active(dest, 2, false).is_ok());
+    }
+
+    #[test]
+    fn test_matrix_position_wire_bytes_layout() {
+        // The routing_map key is the raw 12-byte (3x f32 LE) position,
+        // exactly as carried in the on-wire MATRIX extension header.
+        let pos = MatrixPosition {
+            x: 1.5,
+            y: -2.0,
+            z: 3.25,
+        };
+        let bytes = matrix_position_to_wire_bytes(&pos);
+        assert_eq!(bytes.len(), 12);
+        assert_eq!(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]), 1.5);
+        assert_eq!(f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), -2.0);
+        assert_eq!(f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 3.25);
+    }
+
+    #[test]
+    fn test_register_asset_hash_no_xdp_still_stores_userspace() {
+        // register_asset_hash pushes to the kernel asset_hash_map when the
+        // XDP program is attached, but MUST still populate the userspace
+        // HashMap when it is not (graceful degradation).
+        let ebpf = HyperMeshEbpf::default();
+        let hash = ContentHash::from_bytes([0x77u8; 32]);
+        let metadata = ShardMetadata {
+            shard_index: 2,
+            shard_count: 14,
+            position: MatrixPosition {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+        };
+        assert!(ebpf.register_asset_hash(hash, metadata).is_ok());
+        assert_eq!(ebpf.asset_hash_count(), 1);
+        assert!(ebpf.get_asset_hash(&hash).is_some());
+    }
+
+    // -------------------------------------------------------------------
+    // DEFERRED TO P8 (kernel runtime verification on trust.hypermesh.online)
+    // -------------------------------------------------------------------
+
+    /// P8 checklist — verify the kernel DROP mirrors the userspace reject.
+    ///
+    /// This CANNOT run here: loading/attaching an XDP program needs root +
+    /// a writable bpffs, and injecting crafted IPv6/QUIC frames to observe
+    /// XDP_DROP needs a real (or veth) NIC. On the remote:
+    ///
+    ///   1. `mount -t bpf bpf /sys/fs/bpf` (if not already mounted).
+    ///   2. Ship `target/bpf/hypermesh_xdp.o` alongside the binary (the
+    ///      musl deploy build must include it; `attach()` looks in
+    ///      `/sys/fs/bpf/hypermesh_xdp` then `target/bpf/hypermesh_xdp.o`).
+    ///   3. Run the node as root (or with CAP_BPF+CAP_NET_ADMIN) so
+    ///      `XdpManager::attach()` succeeds instead of falling back.
+    ///   4. Authenticate a peer; confirm `pos_header_map[src].validated=1`
+    ///      and `policy_map[src].requires_pos=1` (`bpftool map dump`).
+    ///   5. Inject a HyperMesh QUIC frame from an UNvalidated source →
+    ///      expect `stats_map.packets_dropped` to increment (XDP_DROP),
+    ///      matching the userspace `validate_packet` → Drop decision.
+    ///   6. Register an asset; confirm `asset_hash_map[hash].registered=1`
+    ///      and that a frame referencing an unregistered asset is dropped.
+    ///   7. Activate a `routing_map` entry; confirm a matrix-routed frame
+    ///      returns XDP_TX (packets_redirected increments).
+    #[test]
+    #[ignore = "P8: requires root + bpffs + real NIC to load/attach XDP and observe kernel DROP; verified on trust.hypermesh.online, not in this sandbox"]
+    fn p8_kernel_drop_equals_userspace_reject() {
+        // Intentionally empty — the assertion is the checklist above,
+        // executed manually/scripted on the remote in P8.
     }
 }

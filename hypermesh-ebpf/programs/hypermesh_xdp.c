@@ -17,6 +17,7 @@
 
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
+#include <linux/in.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/udp.h>
@@ -105,11 +106,19 @@ struct {
     __type(value, __u32);
 } filter_map SEC(".maps");
 
-/* Policy enforcement map - keyed by connection, value is policy flags */
+/*
+ * Policy enforcement map - keyed by the 16-byte IPv6 source address.
+ *
+ * P5 unification: keyed on the SAME fact P1's userspace gate authenticates
+ * (the peer's source address), so `register_authenticated_peer(peer_ipv6)`
+ * can populate `requires_pos=1` for exactly the peers userspace authorized.
+ * A full 4-tuple key was unpopulatable from P1 events (userspace does not
+ * know the ephemeral src/dst ports of future connections at auth time).
+ */
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 65536);
-    __type(key, struct conn_key);
+    __type(key, __u8[16]);
     __type(value, struct policy_value);
 } policy_map SEC(".maps");
 
@@ -145,11 +154,14 @@ struct {
  * (FALCON-1024, Ed25519, ECDSA signatures) MUST remain in userspace
  * because the BPF instruction set has no asymmetric crypto helpers.
  *
- * Layout (24 bytes, matches Rust KernelPosConfig serialization):
+ * Layout (32 bytes, NATURAL alignment — u64 fields are 8-byte aligned;
+ * matches Rust KernelPosConfig::to_bytes):
  *   [0..4]   min_difficulty       (u32 LE)
- *   [4..12]  max_timestamp_skew_ns(u64 LE)
- *   [12..20] validation_ttl_ns    (u64 LE)
- *   [20..24] enabled              (u32 LE, 1=enforce, 0=pass-through)
+ *   [4..8]   (padding)
+ *   [8..16]  max_timestamp_skew_ns(u64 LE)
+ *   [16..24] validation_ttl_ns    (u64 LE)
+ *   [24..28] enabled              (u32 LE, 1=enforce, 0=pass-through)
+ *   [28..32] (padding)
  */
 struct pos_config {
     __u32 min_difficulty;        /* Minimum leading zero bits required */
@@ -164,6 +176,39 @@ struct {
     __type(key, __u32);
     __type(value, struct pos_config);
 } pos_config_map SEC(".maps");
+
+/*
+ * Matrix-topology forwarding map (P5, step 6 — XDP_TX delegation path).
+ *
+ * Keyed by a discretized destination matrix coordinate (3x i64 LE = 24
+ * bytes, matching Rust `MatrixPositionKey`).  The value carries the
+ * egress ifindex the packet should be transmitted on and an `active`
+ * flag.  Populated from userspace by `set_routing_rule` / the
+ * `ShardLocationIndex` provider map (see swarm_provider.rs).
+ *
+ * The key is the raw 12-byte matrix position (3x f32, exactly as it
+ * appears on the wire in the MATRIX extension header).  Keying on the
+ * raw bytes avoids float->int conversion in the kernel (the BPF target
+ * has no soft-float builtins); userspace writes the identical 12 bytes.
+ *
+ * NOTE (deferred to P8): plain `XDP_TX` re-transmits on the SAME ifindex
+ * after an L2 rewrite; forwarding to a DIFFERENT next-hop device requires
+ * `bpf_redirect(ifindex, 0)` plus a source/dest MAC rewrite, which needs a
+ * populated neighbour table only available at runtime with root.  This map
+ * + the branch below are the skeleton; live next-hop rewrite is verified on
+ * the remote (P8).
+ */
+struct route_value {
+    __u32 egress_ifindex; /* Interface index to forward on */
+    __u32 active;         /* 1=forward via XDP_TX/redirect, 0=inactive */
+};
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 65536);
+    __type(key, __u8[12]); /* raw matrix position (3x f32) */
+    __type(value, struct route_value);
+} routing_map SEC(".maps");
 
 /* ============================================================
  * HyperMesh extension header definitions
@@ -462,9 +507,12 @@ int hypermesh_xdp_filter(struct xdp_md *ctx)
 
         /* Verify HyperMesh magic bytes */
         if (bpf_ntohs(hdr.magic) == HMESH_HDR_MAGIC) {
-            /* Found HyperMesh header - look up policy for this connection */
+            /* Found HyperMesh header - look up policy for this SOURCE.
+             * policy_map is keyed by the 16-byte IPv6 source address so
+             * `requires_pos=1` is set by userspace for exactly the peers
+             * it authenticated (P1 mirror). */
             struct policy_value *policy;
-            policy = bpf_map_lookup_elem(&policy_map, &conn);
+            policy = bpf_map_lookup_elem(&policy_map, conn.src_ip);
 
             if (policy) {
                 policy_checked = 1;
@@ -562,6 +610,45 @@ int hypermesh_xdp_filter(struct xdp_md *ctx)
     if (policy_checked && !policy_passed) {
         stats->packets_dropped++;
         return XDP_DROP;
+    }
+
+    /* --------------------------------------------------------
+     * Matrix-topology forwarding (XDP_TX delegation, P5 step 6)
+     *
+     * If the packet carries a MATRIX routing extension header whose
+     * destination coordinate resolves to an active routing_map entry,
+     * this node is a relay: hand the packet back out toward the next
+     * hop instead of terminating it locally.
+     *
+     * Skeleton scope (this build): parse the destination coordinate,
+     * look it up, and — when active — return XDP_TX (retransmit on the
+     * ingress ifindex).  Cross-device next-hop rewrite via
+     * bpf_redirect(egress_ifindex, 0) + L2 MAC rewrite is DEFERRED to
+     * P8 (needs a runtime neighbour table + root).  egress_ifindex is
+     * carried in the map today so the P8 change is a one-line swap.
+     * -------------------------------------------------------- */
+    if (payload + sizeof(struct hmesh_header) <= data_end) {
+        struct hmesh_header rhdr = {};
+        __builtin_memcpy(&rhdr, payload, sizeof(struct hmesh_header));
+        if (bpf_ntohs(rhdr.magic) == HMESH_HDR_MAGIC &&
+            rhdr.type == HMESH_HDR_MATRIX) {
+            void *rext = payload + sizeof(struct hmesh_header);
+            if (rext + sizeof(struct hmesh_matrix_header) <= data_end) {
+                struct hmesh_matrix_header rmh = {};
+                __builtin_memcpy(&rmh, rext,
+                                 sizeof(struct hmesh_matrix_header));
+                /* Key the routing_map on the raw 12-byte position (3x f32)
+                 * exactly as carried on the wire — no float math in-kernel. */
+                struct route_value *rv =
+                    bpf_map_lookup_elem(&routing_map, rmh.position);
+                if (rv && rv->active) {
+                    stats->packets_redirected++;
+                    /* P8: replace with L2 rewrite + bpf_redirect(
+                     *   rv->egress_ifindex, 0) for true next-hop delivery. */
+                    return XDP_TX;
+                }
+            }
+        }
     }
 
     /* --------------------------------------------------------

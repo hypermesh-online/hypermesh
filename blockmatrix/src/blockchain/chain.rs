@@ -298,6 +298,34 @@ impl NodeBlockchain {
         self.hash_index.read().await.contains_key(hash)
     }
 
+    /// Per-asset shard authorization anchor (F6).
+    ///
+    /// Returns `true` if the given `shard_id` is a shard of an asset
+    /// registered on THIS chain — i.e., some block entry's
+    /// `StoragePointer::Sharded` lists `shard_id` among its
+    /// `shard_hashes`. Because every entry carries a validated, content-
+    /// bound `StateProof`, a positive answer means the shard belongs to an
+    /// asset whose registration this node has verified. Serving a shard is
+    /// then bound to the asset's on-chain proof, not merely to coarse
+    /// network membership.
+    ///
+    /// This is the authorization anchor; the requester's PoS authentication
+    /// is enforced separately (see `peer_auth::verify_shard_access`).
+    pub async fn authorizes_shard(&self, shard_id: &[u8; 32]) -> bool {
+        use super::block::StoragePointer;
+        let blocks = self.blocks.read().await;
+        for block in blocks.values() {
+            for entry in &block.entries {
+                if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
+                    if shard_hashes.iter().any(|h| h == shard_id) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Get the last N blocks.
     pub async fn get_recent_blocks(&self, count: usize) -> Vec<Block> {
         let chain = self.get_chain().await;
@@ -988,5 +1016,56 @@ mod tests {
         let (start, end) = chain.get_participation_range().await;
         assert_eq!(start, 0);
         assert_eq!(end, 5);
+    }
+
+    // ── F6: per-asset shard authorization anchor ────────────────────────
+
+    /// Build an entry whose asset is stored as `Sharded` with the given
+    /// shard hashes, so `authorizes_shard` can find those shards.
+    fn sharded_entry(coord: MatrixCoordinate, shard_hashes: Vec<[u8; 32]>) -> BlockAssetEntry {
+        let reg = AssetRegistration::genesis(coord);
+        let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let state_proof = StateProof::default();
+        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+        BlockAssetEntry {
+            asset_hash: content_hash,
+            proof_hash,
+            state_proof,
+            storage_pointer: StoragePointer::Sharded {
+                shard_hashes,
+                placements: vec![coord],
+            },
+            registration: reg,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_authorizes_shard_registered_and_unregistered() {
+        let coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: head");
+
+        let known_shard = [0x11u8; 32];
+        let other_shard = [0x22u8; 32];
+        let entry = sharded_entry(coord, vec![known_shard, other_shard]);
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+        chain.insert_block(block).await.expect("test: insert");
+
+        // Shards belonging to a registered sharded asset are authorized.
+        assert!(chain.authorizes_shard(&known_shard).await);
+        assert!(chain.authorizes_shard(&other_shard).await);
+
+        // An unknown shard (no registered asset) is NOT authorized.
+        assert!(!chain.authorizes_shard(&[0xFFu8; 32]).await);
+    }
+
+    #[tokio::test]
+    async fn test_authorizes_shard_ignores_non_sharded_assets() {
+        // Genesis + a Local-pointer asset carry no shard hashes, so no
+        // shard is authorized by them.
+        let coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        assert!(!chain.authorizes_shard(&[0x33u8; 32]).await);
     }
 }

@@ -1,0 +1,33 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F6 — Resolution Report (delivered as part of P5: eBPF kernel gate)
+
+- **Finding:** [F6 shard authz](2026-07-06T04-06-05Z-F6-shard-authz.audit)
+- **Status:** RESOLVED (userspace enforcement) — kernel fast-path mirror BUILT, kernel-runtime verification deferred to P8
+- **Phase:** P5. **Branch:** `feat/p5-ebpf-kernel-gate` (off main ae0a0503). **Date:** 2026-07-12
+- **QA:** PASS (independent agent) — one latent non-blocking defect (pos_config byte layout) found + FIXED at the gate.
+
+## What was fixed
+Shard fetch (`TAG_SHARD_FETCH`) was gated only on coarse same-network membership (`verify_peer_access`) with a self-asserted `network_id` — any authenticated same-network peer could fetch any shard by hash. F6 adds real per-asset PoS authorization.
+
+- `peer_connection.rs:145-160`: `TAG_SHARD_FETCH` now requires `verify_peer_access` AND `authorize_shard_fetch`.
+- `authorize_shard_fetch` (`peer_connection.rs:252`) requires BOTH:
+  1. `verify_shard_proof_binding` (`peer_auth.rs:189`) — authenticated + same network + fresh + carries a **non-empty bound PoS proof** (not just membership).
+  2. `NodeBlockchain::authorizes_shard(shard_id)` (`chain.rs:314`) — the shard must appear in a `StoragePointer::Sharded` entry's `shard_hashes` on OUR chain (a positive content-hash allowlist bound to the asset's content-bound StateProof).
+- No bypass (QA-verified): unregistered shard → false; authenticated-but-no-proof peer → refused; shard not on our chain → refused; malformed (<33B) request → refused. `SHARD_SEND` unaffected (BLAKE3-integrity in the store).
+
+## Kernel fast-path (the mirror — P5's larger goal)
+The kernel XDP gatekeeper (built but disconnected) is now unified with userspace: the same events that authorize a peer/asset in userspace also populate the kernel BPF maps, so a valid-PoS drop-gate can run at the NIC. `register_authenticated_peer` → `pos_header_map[src_ip].validated=1` + `policy_map[src_ip].requires_pos=1`; `register_asset` → `asset_hash_map[content_hash].registered=1`. The kernel `policy_map` was re-keyed from the 4-tuple to the 16-byte IPv6 source so it keys on the exact fact userspace authenticates. **The actual kernel DROP == userspace reject verification is deferred to P8** (this env is non-root/no-bpffs; encoded as the `#[ignore]`d `p8_kernel_drop_equals_userspace_reject` with a 7-step checklist).
+
+## Also in P5 (the sync-fetch symmetry, P1 follow-up #22.1)
+Moved `proof_hash == BLAKE3(serialize(state_proof))` + `state_proof.validate()` into `insert_received_block` so the reflector sync-fetch path (previously hash-only) gets the same full validation the announce path does. P1's `content_binding_ok` preserved, not weakened.
+
+## Defect found + fixed at the QA gate
+QA verified 4/5 kernel map serializers match the C structs byte-for-byte (via `_Static_assert` for the BPF target) and caught the 5th: `KernelPosConfig::to_bytes` produced a 24-byte packed layout, but the C `struct pos_config` (non-packed) is 32 bytes with the u64 fields 8-byte-aligned. Latent (unreachable today — `set_kernel_pos_config` needs `&mut self`, node shares the orchestrator as `Arc` so only `&self`). FIXED: Rust `to_bytes`/`from_bytes` → 32-byte natural layout, C doc comment corrected, aya writer value type `[u8;24]`→`[u8;32]`. This is the same bug class P5 correctly fixed for `policy_map`.
+
+## Verification (QA PASS)
+Both build configs clean; valid BPF ELF (5 maps). Graceful degradation GUARANTEED by the type system (shared `Arc` can't call `attach_xdp` → `xdp_manager` stays None → all kernel writes no-op → non-eBPF node identical to pre-P5). F6 rejects unauthorized fetch (real allowlist). Sync-fetch validates proofs. Tests: ebpf 168, blockmatrix blockchain+network 395, security::ebpf 20 — 0 failures, 0 weakened. P1/P2/F2 intact. Scope: hypermesh-ebpf/ + blockmatrix/ only.
+
+## Deferred to P8 (expected, not defects)
+- Kernel DROP == userspace reject runtime verification (needs root + bpffs + real NIC).
+- XDP_TX cross-device next-hop rewrite (`bpf_redirect` + L2 MAC from a runtime neighbour table); the `routing_map` + XDP_TX branch skeleton is present and byte-correct.

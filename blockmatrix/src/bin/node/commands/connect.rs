@@ -562,6 +562,21 @@ async fn start_network(
         std::sync::Mutex::new(engauge::MetricsIngestionPipeline::with_defaults()),
     );
 
+    // P5: construct the shared eBPF orchestrator once. It is used both by
+    // the PeerContext (to mirror peer authentication into the kernel
+    // fast-path maps) AND by the engauge routing-intelligence feedback loop
+    // below. When the orchestrator cannot be created the node runs in the
+    // userspace-only tier (graceful degradation) — every kernel-map write
+    // downstream is a no-op unless an XDP program is actually attached.
+    let ebpf_orchestrator: Option<std::sync::Arc<hypermesh_ebpf::HyperMeshEbpf>> =
+        match hypermesh_ebpf::HyperMeshEbpf::new(hypermesh_ebpf::EbpfConfig::default()) {
+            Ok(e) => Some(std::sync::Arc::new(e)),
+            Err(err) => {
+                warn!("eBPF orchestrator unavailable, kernel gate + feedback disabled: {err}");
+                None
+            }
+        };
+
     let peer_ctx = std::sync::Arc::new(blockmatrix::network::PeerContext {
         blockchain: bootstrap.blockchain().clone(),
         shard_store: shard_store.clone(),
@@ -603,6 +618,9 @@ async fn start_network(
         // TransferCoordinator here once a STOQ-backed TransferTransport
         // is configured (Phase G.2 deliverable on the daemon side).
         transfer_coordinator: None,
+        // P5: share the eBPF orchestrator so peer authentication mirrors
+        // into the kernel maps (no-op unless an XDP program is attached).
+        ebpf: ebpf_orchestrator.clone(),
     });
 
     let network_clone = std::sync::Arc::new(network_manager);
@@ -728,17 +746,11 @@ async fn start_network(
         });
         info!("engauge intelligence bridge started (periodic_feed=10s)");
 
-        // --- Phase E.1: Construct eBPF feedback adapter for the routing
-        // intelligence feed. The adapter pushes congestion-derived privacy
-        // actions and routing rules from engauge into HyperMeshEbpf.
-        let ebpf_for_feedback: Option<std::sync::Arc<hypermesh_ebpf::HyperMeshEbpf>> =
-            match hypermesh_ebpf::HyperMeshEbpf::new(hypermesh_ebpf::EbpfConfig::default()) {
-                Ok(e) => Some(std::sync::Arc::new(e)),
-                Err(err) => {
-                    warn!("eBPF orchestrator unavailable, feedback loop disabled: {err}");
-                    None
-                }
-            };
+        // --- Phase E.1: eBPF feedback adapter for the routing intelligence
+        // feed. Reuses the SAME orchestrator shared with the PeerContext
+        // (P5) so kernel-map state is consistent between the peer-auth
+        // mirror and the congestion-derived routing feed.
+        let ebpf_for_feedback = ebpf_orchestrator.clone();
         if ebpf_for_feedback.is_some() {
             info!("eBPF feedback adapter ready for engauge routing intelligence");
         }
