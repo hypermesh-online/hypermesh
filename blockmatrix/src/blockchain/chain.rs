@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
@@ -70,8 +71,27 @@ pub struct NodeBlockchain {
     /// on a missing or non-matching predecessor. Instead it waits here, keyed
     /// by its own `previous_hash`, until a verified predecessor with that hash
     /// is inserted — at which point the orphan is drained and linked.
-    pub(crate) orphans: Arc<RwLock<HashMap<String, Block>>>,
+    ///
+    /// P6 (task #22.2): the buffer is BOUNDED. Each entry carries its arrival
+    /// [`Instant`]; on insert we first evict entries older than
+    /// [`ORPHAN_TTL`], then — if still at [`MAX_ORPHANS`] — evict the oldest
+    /// remaining entry. Without this an authenticated peer could flood
+    /// distinct-`previous_hash` orphans (each a fresh key) and grow this map
+    /// without limit. Eviction only ever drops UNLINKED orphans; the
+    /// buffer-then-link drain and its `content_binding_ok` re-verification are
+    /// untouched (P1 invariant preserved).
+    pub(crate) orphans: Arc<RwLock<HashMap<String, (Block, Instant)>>>,
 }
+
+/// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
+/// oldest orphan is evicted on each new insert — bounds a distinct-prev-hash
+/// flood from an authenticated peer.
+pub(crate) const MAX_ORPHANS: usize = 1024;
+
+/// Time-to-live for a buffered orphan (P6 task #22.2). An orphan whose
+/// predecessor never arrives is reclaimed after this window instead of
+/// lingering forever.
+pub(crate) const ORPHAN_TTL: std::time::Duration = std::time::Duration::from_secs(120);
 
 impl NodeBlockchain {
     /// Create a new blockchain for a node.
@@ -219,6 +239,14 @@ impl NodeBlockchain {
     /// Get the node's matrix coordinate.
     pub fn node_coordinate(&self) -> &MatrixCoordinate {
         &self.node_coordinate
+    }
+
+    /// Number of blocks currently buffered as orphans (P6 task #22.2).
+    ///
+    /// Used to assert the orphan buffer stays bounded under a
+    /// distinct-`previous_hash` flood.
+    pub async fn orphan_count(&self) -> usize {
+        self.orphans.read().await.len()
     }
 
     /// Get a block by index.
