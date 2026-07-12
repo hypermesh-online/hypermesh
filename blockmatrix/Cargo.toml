@@ -1,6 +1,6 @@
 [package]
 name = "blockmatrix"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 license = "MIT OR Apache-2.0"
@@ -50,6 +50,11 @@ harness = false
 [dependencies]
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }
+
+# Substrate (link/carrier/address floor). blockmatrix consumes base's ONE
+# canonical address/cell derivation and its interface selection. base depends
+# only on hypermesh-lib; STOQ does NOT depend on base (values are injected).
+base = { path = "../base" }
 
 # Core dependencies
 tokio = { workspace = true }

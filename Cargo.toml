@@ -16,6 +16,17 @@ members = [
 ]
 resolver = "2"
 
+# Coherent workspace-wide package metadata. Members inherit these with
+# `version.workspace = true` etc., eliminating the version skew (engauge/caesar
+# were 1.0.0 while every other crate was 0.1.0). The IPC protocol version
+# (`IPC_PROTOCOL_VERSION = env!("CARGO_PKG_VERSION")`) now resolves coherently to
+# this single value across the whole daemon.
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+authors = ["HyperMesh Team"]
+license = "MIT OR Apache-2.0"
+
 # Unified dependency management for workspace
 [workspace.dependencies]
 # Core async runtime
