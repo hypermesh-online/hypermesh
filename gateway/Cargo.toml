@@ -10,6 +10,11 @@ hypermesh-lib = { workspace = true }
 # STOQ transport (for STOQ bridge)
 stoq = { path = "../stoq" }
 
+# TrustChain — FALCON-1024 node identity (NodeSigner) + TrustChainProofProvider
+# (StateProofProvider) for the full-STOQ-PoS gateway mode (F8). Depends only on
+# stoq/lib, so no dependency cycle (trustchain does not depend on gateway).
+trustchain = { path = "../trustchain" }
+
 # Engauge for SSE metrics streaming (MetricsPublisher + SseFrameBridge)
 engauge = { path = "../engauge" }
 

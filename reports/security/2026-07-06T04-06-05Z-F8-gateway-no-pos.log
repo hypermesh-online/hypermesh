@@ -1,0 +1,21 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F8 / P4 — Remediation Log
+
+## Implementation (dev agent, isolated worktree — after the shared-tree collision recovery)
+- StoqAuthMode enum (HttpProxy default | FullStoqPos); string parse; requires_pos().
+- FullStoqPos: perform_pos_handshake on accept, drop on failure. Wired NodeSigner + StateProofProvider into StoqBridge (new trustchain dep).
+- Fixed pre-existing remote_proxy.rs RemoteDashboardProxy Debug compile error (manual impl).
+
+## Recovery
+- P4 was cleanly file-isolated (all gateway/), so salvaged directly from the mixed working tree onto feat/p4-configurable-gateway; held in a stash during P3 recovery, then restored.
+
+## Self-QA (orchestrator; caught a real regression)
+- Two-mode logic verified: FullStoqPos rejects un-handshaked (stoq_listener.rs:92-100); HttpProxy skips.
+- cargo test -p gateway: 5 integration tests FAILED on rustls "Could not automatically determine the process-level CryptoProvider."
+- Root cause: P4's trustchain dep transitively enabled aws-lc-rs; gateway already had ring (via quinn) → dual backend → rustls can't auto-pick. Confirmed P4-introduced (trustchain absent from gateway Cargo.toml on F2 base). Binary already installs a provider (main.rs:86); the test harness did not.
+- Fix: ensure_crypto_provider() Once-guarded ring::default_provider().install_default() in TestClient::new. Test scaffolding, not logic.
+- Re-run: full gateway suite green — lib 221/0, integration 7/0, stoq_auth_mode 3/0, all others 0-fail.
+
+## Result
+Commit 4a9c3e94, branch feat/p4-configurable-gateway. 9 files (gateway + F8 report). The gateway no longer accepts un-authenticated STOQ connections in FullStoqPos mode; HttpProxy preserves backwards compat.
