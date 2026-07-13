@@ -436,7 +436,7 @@ static __always_inline int validate_matrix_position(__u8 position[12])
  * Main XDP program
  * ============================================================ */
 
-SEC("xdp/hypermesh_filter")
+SEC("xdp/hypermesh_xdp_filter")
 int hypermesh_xdp_filter(struct xdp_md *ctx)
 {
     void *data     = (void *)(long)ctx->data;

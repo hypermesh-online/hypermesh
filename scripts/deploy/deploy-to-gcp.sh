@@ -74,10 +74,17 @@ if [ -f "$REPO_ROOT/target/bpf/hypermesh_xdp.o" ]; then
     $SCP "$REPO_ROOT/target/bpf/hypermesh_xdp.o" "$REMOTE_USER@$HOST:/tmp/hypermesh_xdp.o"
     $SSH "$REMOTE_USER@$HOST" bash -s <<'REMOTE'
 set -euo pipefail
+# Reference copy under /usr/local/lib/hypermesh (documentation / manual attach).
 sudo install -d -m 755 /usr/local/lib/hypermesh
 sudo install -m 644 /tmp/hypermesh_xdp.o /usr/local/lib/hypermesh/hypermesh_xdp.o
+# Loader copy: the node (blockmatrix.service, WorkingDirectory=/var/lib/hypermesh/blockmatrix)
+# searches for "target/bpf/hypermesh_xdp.o" relative to its CWD. Install there so the
+# XDP program is actually found and the kernel gate attaches instead of degrading to
+# userspace-only. Owned by hypermesh:hypermesh to match the service user.
+sudo install -d -o hypermesh -g hypermesh -m 755 /var/lib/hypermesh/blockmatrix/target/bpf
+sudo install -o hypermesh -g hypermesh -m 644 /tmp/hypermesh_xdp.o /var/lib/hypermesh/blockmatrix/target/bpf/hypermesh_xdp.o
 rm -f /tmp/hypermesh_xdp.o
-echo "XDP kernel object installed."
+echo "XDP kernel object installed (reference + loader search path)."
 REMOTE
 else
     echo "WARNING: target/bpf/hypermesh_xdp.o not found — kernel eBPF gate will fall back to userspace-only."
