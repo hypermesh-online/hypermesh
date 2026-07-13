@@ -1,0 +1,33 @@
+# Written by Richard Christopher, Copyright 2026 HyperMesh Foundation
+[Unit]
+Description=HyperMesh TrustChain CA (STOQ — node-to-node certificates)
+Documentation=https://github.com/hypermesh-online/core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# F9: production-clean CA (no StateProof::new_for_testing). Issues node-to-node
+# certificates over STOQ (issue_certificate / validate_certificate / resolve_dns
+# / crl/lookup) at the configured api.port.
+# Config loaded via TrustChainConfig::load(); TRUSTCHAIN_CONFIG points it at the
+# stoq-specific file (api.port=8445, distinct from the http3 CA on 8444).
+ExecStart=/usr/local/bin/trustchain-stoq-server
+WorkingDirectory=/var/lib/hypermesh/trustchain
+Restart=on-failure
+RestartSec=5
+User=hypermesh
+Group=hypermesh
+LimitNOFILE=65536
+Environment=RUST_LOG=info
+Environment=TRUSTCHAIN_CONFIG=/etc/hypermesh/trustchain-stoq.toml
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hypermesh/trustchain /var/log/hypermesh
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

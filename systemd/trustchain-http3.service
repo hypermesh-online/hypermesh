@@ -1,0 +1,32 @@
+# Written by Richard Christopher, Copyright 2026 HyperMesh Foundation
+[Unit]
+Description=HyperMesh TrustChain CA (HTTP/3 — clearnet / gateway access points)
+Documentation=https://github.com/hypermesh-online/core
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# F9: production-clean CA (no StateProof::new_for_testing). Serves clearnet /
+# gateway bootstrap over HTTP/3 at the configured api.port (8444).
+# Config is loaded via TrustChainConfig::load(); TRUSTCHAIN_CONFIG points it at
+# the http3-specific file (api.port=8444, matches the gateway's trustchain_addr).
+ExecStart=/usr/local/bin/trustchain-http3-server
+WorkingDirectory=/var/lib/hypermesh/trustchain
+Restart=on-failure
+RestartSec=5
+User=hypermesh
+Group=hypermesh
+LimitNOFILE=65536
+Environment=RUST_LOG=info
+Environment=TRUSTCHAIN_CONFIG=/etc/hypermesh/trustchain-http3.toml
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/hypermesh/trustchain /var/log/hypermesh
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

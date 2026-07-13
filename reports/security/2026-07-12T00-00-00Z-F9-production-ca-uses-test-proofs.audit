@@ -1,0 +1,64 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F9 — Production TrustChain CA runs the test-proof dev binary
+
+- **Severity**: HIGH (live production)
+- **Exploitability**: Local-to-remote; the deployed CA auto-issues certificates backed by fabricated State Proofs.
+- **Discovered**: 2026-07-12, during P8 (remote cutover) build of the musl deploy artifact set.
+
+## Finding
+
+`trust.hypermesh.online`'s `trustchain.service` runs:
+
+    ExecStart=/usr/local/bin/trustchain_ca --production --bind [::1]:8444
+
+The `trustchain_ca` binary (`trustchain/src/bin/trustchain_ca.rs`) calls
+`StateProof::new_for_testing()` in its **runtime** (non-`#[cfg(test)]`) path at
+three sites — lines 395, 398 (the `allow_self_signed` auto-issue branch) and 558.
+`StateProof::new_for_testing()` fabricates a four-proof State Proof that passes
+structural checks without authenticating any real device or work.
+
+F3 (2026-07-06) correctly recognised this: it gave the binary
+`required-features = ["localhost-testing"]` and documented it as a
+"local-only dev CA tool … excluded from default (release) builds"
+(`trustchain/Cargo.toml:160-167`). **But the deployment was never updated** —
+the live production CA is still this dev binary (deployed Mar 6). So on the
+production network a CA is minting certificates whose PoS backing is a test stub.
+
+This is the exact class F3 closed (test proofs leaking into a real trust path),
+surfaced at the deployment layer rather than the code layer.
+
+## Root cause
+
+Deployment binary list (`scripts/deploy/deploy-to-gcp.sh:43`) and the systemd
+unit predate F3. The code was gated; the running service was not migrated.
+
+## Production-clean alternatives (verified: zero `new_for_testing`)
+
+- `trustchain-stoq-server` (`src/bin/trustchain-stoq-server.rs`) — STOQ CA:
+  exposes `issue_certificate` / `validate_certificate` / `resolve_dns` /
+  `crl/lookup`; config-driven bind (`tc_config.api.port`). **Recommended prod CA.**
+- `trustchain-http3-server` — HTTP/3 CA over STOQ transport, config-driven bind.
+- `trustchain-bootstrap` — one-shot CA bootstrap, no test proofs.
+
+## Fix (DECIDED with user 2026-07-12 — dual-CA split)
+
+The user chose a two-CA architecture that maps onto the Gateway roles:
+- **`trustchain-http3-server`** serves **gateway / clearnet access points**
+  (HTTP/3 at :8444) — backwards-compatible bootstrap for non-HyperMesh clients.
+- **`trustchain-stoq-server`** handles **node-to-node certificate** issuance over
+  STOQ (internal PQ-secured path), on a distinct port.
+
+Steps:
+1. Split `trustchain.service` into `trustchain-http3.service` (clearnet CA, :8444)
+   and `trustchain-stoq.service` (node-to-node CA). Retire the `trustchain_ca` unit.
+2. Remove `trustchain_ca` from the deploy binary list; keep it a local dev tool only.
+3. Deploy scope (user-decided): ALL running + enabled services get fresh
+   device-auth musl binaries — node + gateway + both CAs + caesar + catalog
+   (engauge stays disabled).
+4. Re-verify each deployed CA issues certs backed by real device-authenticated
+   State Proofs (P1/P2), not `new_for_testing()`.
+
+Residual risk until fixed: any cert issued by the live CA carries a fabricated
+PoS backing; combined with P1/P2 enforcement elsewhere, such certs should now
+fail device-auth, but the CA itself must not be the dev tool in production.
