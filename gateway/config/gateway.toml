@@ -24,6 +24,12 @@ key_path = "/etc/hypermesh/certs/server.key"
 
 log_level = "info"
 
+# Max concurrent STOQ bridge connections. stoq_listen_addr is intentionally
+# omitted (Option -> None) so the gateway's own STOQ listener is disabled:
+# port 8444 is owned by trustchain-http3.service (the gateway CONNECTS there via
+# trustchain_addr). The gateway serves clearnet over HTTP/3 on 8443.
+stoq_max_connections = 100
+
 [pool]
 max_connections = 10
 idle_timeout = { secs = 300, nanos = 0 }
