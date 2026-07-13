@@ -77,8 +77,10 @@ fn compile_ebpf_programs() {
 
         println!("cargo:rerun-if-changed={}", path.display());
 
+        // `-g` emits BTF, which aya 0.12 (aya-obj 0.2.1) REQUIRES to parse the
+        // object — without it, load fails with "no BTF parsed for object".
         let status = Command::new("clang")
-            .args(["-O2", "-target", "bpf", "-c"])
+            .args(["-O2", "-g", "-target", "bpf", "-c"])
             .arg(&path)
             .arg("-o")
             .arg(&output)

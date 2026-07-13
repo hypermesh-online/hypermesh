@@ -436,7 +436,11 @@ static __always_inline int validate_matrix_position(__u8 position[12])
  * Main XDP program
  * ============================================================ */
 
-SEC("xdp/hypermesh_xdp_filter")
+/* aya 0.12 (aya-obj 0.2.1) parses the piece after "xdp/" as an ATTACH TYPE and
+ * accepts only cpumap/devmap/none — a program name there is rejected as an
+ * invalid section. Use bare SEC("xdp"); aya derives the program name from the
+ * C function name (hypermesh_xdp_filter), which is what manager.rs:235 loads. */
+SEC("xdp")
 int hypermesh_xdp_filter(struct xdp_md *ctx)
 {
     void *data     = (void *)(long)ctx->data;
