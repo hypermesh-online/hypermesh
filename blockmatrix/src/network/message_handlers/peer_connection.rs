@@ -26,9 +26,10 @@ use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_GOSSIP,
-    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE,
-    TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK,
-    TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
+    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_LOCATE, TAG_SHARD_SEND,
+    TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
+    TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE,
+    TAG_TRANSFER_ROLLBACK,
 };
 use super::transfer_handlers::{
     handle_transfer_lock, handle_transfer_register_ack, handle_transfer_register_req,
@@ -37,8 +38,8 @@ use super::transfer_handlers::{
 use super::sync_and_reflection::{
     handle_block_fetch_request, handle_direct_message, handle_dns_query,
     handle_dns_resolve_request, handle_key_rotation, handle_shard_announce,
-    handle_shard_dispatch, handle_share_invite, handle_sync_message, handle_transfer_message,
-    record_shard_demand, register_peer_as_reflector,
+    handle_shard_dispatch, handle_shard_locate, handle_share_invite, handle_sync_message,
+    handle_transfer_message, record_shard_demand, register_peer_as_reflector,
 };
 
 // ── Peer message loop ────────────────────────────────────────────────
@@ -171,6 +172,12 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SHARD_ANNOUNCE => {
             handle_shard_announce(data, peer_node_id, ctx).await;
+        }
+        TAG_SHARD_LOCATE => {
+            // A2 upstream tracker fallback: answer "who has content_hash X?"
+            // from our own live-mirror index + local store. This is a LOCATE
+            // query (returns provider node_ids), not a data fetch.
+            handle_shard_locate(&data, stream, peer_node_id, ctx).await;
         }
         TAG_SHARE_INVITE => {
             handle_share_invite(data, peer_node_id, ctx).await;

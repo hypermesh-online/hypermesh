@@ -34,6 +34,7 @@ use crate::matrix::MatrixCoordinate;
 pub mod client_assembly;
 pub mod fallback;
 pub mod instruction_generator;
+pub mod location_resolver;
 pub mod shard_map;
 pub mod streaming;
 pub mod transmission;
@@ -42,6 +43,10 @@ pub mod transmission;
 pub use client_assembly::{AssemblyProgress, AssemblyStats, ClientAssembler};
 pub use fallback::{FallbackManager, FallbackStrategy, ReplicaSelector};
 pub use instruction_generator::{GeneratorConfig, InstructionGenerator};
+pub use location_resolver::{
+    coordinate_to_node_id, coordinate_to_node_id_hex, merge_upstream, resolve_shard_locations,
+    ProviderSource, ResolvedProvider,
+};
 pub use shard_map::{CompleteShardMap, ShardLocation, ShardMapEntry};
 pub use transmission::{CompressionFormat, InstructionTransmitter, TransmissionStats};
 
