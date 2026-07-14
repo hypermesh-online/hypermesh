@@ -8,8 +8,8 @@
 //! BlockMatrix is a CONFIGURATOR -- it sets policies and routing rules,
 //! but does not implement eBPF programs directly.
 
-use super::{config::EBPFConfig, error::Result, NetworkPacket, ProcessContext, SystemCall};
-use hypermesh_ebpf::{EbpfConfig, HyperMeshEbpf, PacketDecision, ShardMetadata};
+use super::{config::EBPFConfig, error::Result, ProcessContext, SystemCall};
+use hypermesh_ebpf::{EbpfConfig, HyperMeshEbpf, ShardMetadata};
 use hypermesh_lib::{ContentHash, NetworkId, PrivacyMode};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -226,21 +226,6 @@ impl EBPFSecurityManager {
 
         info!("eBPF security programs unloaded");
         Ok(())
-    }
-
-    /// Process network packet through eBPF validation.
-    ///
-    /// Synthesizes a byte representation of the packet metadata and delegates
-    /// validation to the hypermesh-ebpf XDP pipeline.
-    pub async fn process_packet(&self, packet: &NetworkPacket) -> Result<bool> {
-        let repr = format!(
-            "{}:{}->{}:{}",
-            packet.src_addr, packet.src_port, packet.dst_addr, packet.dst_port
-        );
-        let decision = self.ebpf.read().validate_packet(repr.as_bytes());
-        let allowed = matches!(decision, PacketDecision::Pass);
-        debug!("Packet validation: {:?} -> allowed={}", decision, allowed);
-        Ok(allowed)
     }
 
     /// Trace a system call against the deny list.

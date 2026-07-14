@@ -7,7 +7,7 @@
 use crate::security::{
     ebpf::EBPFSecurityManager,
     monitoring::SecurityMonitor,
-    types::{HyperMeshSecurity, NetworkPacket, ProcessContext, SystemCall},
+    types::{HyperMeshSecurity, ProcessContext, SystemCall},
     SecurityConfig, SecurityError, SecurityManager,
 };
 use std::time::SystemTime;
@@ -64,7 +64,7 @@ async fn test_ebpf_security_manager() {
         .await
         .expect("test: create EBPFSecurityManager");
 
-    // Test loading default programs
+    // Test loading default programs (XDP attach to loopback / userspace fallback)
     ebpf_manager
         .load_default_programs()
         .await
@@ -73,27 +73,6 @@ async fn test_ebpf_security_manager() {
     // Test program listing
     let programs = ebpf_manager.list_programs().await;
     assert!(!programs.is_empty());
-
-    // Test network traffic analysis via process_packet
-    let packet = NetworkPacket {
-        src_addr: "192.168.1.100".to_string(),
-        dst_addr: "10.0.0.1".to_string(),
-        src_port: 12345,
-        dst_port: 80,
-        protocol: "tcp".to_string(),
-        payload_size: 1500,
-        flags: vec!["SYN".to_string()],
-        timestamp: SystemTime::now(),
-    };
-
-    // process_packet should not error regardless of XDP filter decision.
-    // With XDP attached, the string-serialized packet may be dropped by the
-    // XDP pipeline (it expects raw packet bytes, not metadata strings), so
-    // we only assert the call succeeds without error.
-    let _allowed = ebpf_manager
-        .process_packet(&packet)
-        .await
-        .expect("test: process packet should not error");
 }
 
 #[tokio::test]
