@@ -1,0 +1,40 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F9 — Remediation log
+
+2026-07-12 — Discovered during P8 deploy-artifact build: `cargo build --release
+--target musl -p trustchain --bin trustchain_ca` failed with
+`target trustchain_ca requires the features: localhost-testing`. Traced to
+`trustchain/Cargo.toml:167` (`required-features = ["localhost-testing"]`) and 3
+runtime `StateProof::new_for_testing()` calls in `trustchain_ca.rs` (395, 398, 558).
+Confirmed the live remote runs `trustchain_ca --production` as `trustchain.service`.
+
+2026-07-12 — Verified production-clean alternatives: `grep -c new_for_testing` = 0
+for `trustchain-stoq-server`, `trustchain-http3-server`, `trustchain-bootstrap`.
+
+2026-07-12 — Decision (user): dual-CA split — http3-server = clearnet/gateway CA
+(8444), stoq-server = node-to-node CA (8445). Deploy scope = all running+enabled.
+
+2026-07-12 — Config work: found `.api.port` maps to the `[api]` section; the stale
+`production.toml` has none → would default to port 8080 + TLS-off +
+`StateRequirements::localhost_testing()` (an F9-class regression). Also confirmed
+`production.toml`'s table layout does not deserialize into the current
+`TrustChainConfig` (all fields required, no serde defaults). Generated both CA
+configs by serializing `TrustChainConfig::production()` with `[api]` port/TLS
+overrides; round-tripped through `TrustChainConfig::load()` to confirm each yields
+the intended port and production State bar.
+
+2026-07-12 — Committed `452c01aa` (config + systemd + deploy + F9 audit),
+`2d9932e1` (gateway unit/config fixes surfaced during cutover). Pushed to main.
+
+2026-07-12 — Deployed via `deploy-to-gcp.sh trust.hypermesh.online`.
+Wiped `/var/lib/hypermesh/blockmatrix/node_*`; node re-genesised under device auth
+(identity 79fbf386, device-derived cell (-20569,-2663,-2085), genesis 7063a170,
+fingerprint 7f3a2f18; device continuity OK on restart, 2 sources).
+All 6 services `active`. Live check: http3 CA on 8444, stoq CA on 8445, TLS on,
+production State bar; no `trustchain_ca` process. F9 RESOLVED.
+
+Verification commands (live):
+  systemctl is-active trustchain-http3 trustchain-stoq blockmatrix gateway caesar catalog
+    → active active active active active active
+  ps aux | grep trustchain-*-server   → both prod CAs; no trustchain_ca

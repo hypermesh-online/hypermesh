@@ -216,6 +216,17 @@ pub struct PeerContext {
     /// Alpha-default inert: when `None`, handlers fall back to the
     /// G.1 log-only behaviour and drop the messages.
     pub transfer_coordinator: Option<Arc<crate::gateway::TransferCoordinator>>,
+    /// P5 unification — optional eBPF orchestrator for mirroring peer
+    /// authentication into the kernel fast-path maps.
+    ///
+    /// When `Some`, a successful bilateral PoS handshake ALSO writes the
+    /// peer's IPv6 source into the kernel `pos_header_map` (validated=1)
+    /// and `policy_map` (requires_pos=1) via
+    /// [`hypermesh_ebpf::HyperMeshEbpf::set_peer_pos_validated`], so the
+    /// kernel gate keys on the SAME source P1's userspace gate authorized.
+    /// When `None` (or when the XDP program is not attached), the node runs
+    /// in the userspace-only tier unchanged — graceful degradation.
+    pub ebpf: Option<Arc<hypermesh_ebpf::HyperMeshEbpf>>,
 }
 
 /// Result of a bilateral handshake including both network node info
@@ -540,6 +551,59 @@ impl NetworkManager {
     /// Get all connected nodes
     pub async fn get_connected_nodes(&self) -> Vec<NetworkNode> {
         self.nodes.read().await.values().cloned().collect()
+    }
+
+    /// Send a tag-prefixed payload to a single connected peer by node ID.
+    ///
+    /// Looks up the peer's live STOQ connection in the `nodes` map (keyed by
+    /// the raw string `node_id`), opens a fresh unidirectional stream, and
+    /// sends `[tag] ++ payload` — the exact framing used by
+    /// [`shard_transport::StoqShardTransport::send_shard`] and
+    /// [`consumer_provider::broadcast_announcement`].
+    ///
+    /// This is the by-`node_id` complement to `broadcast_announcement`
+    /// (which fans out to many connections): it delivers a single tagged
+    /// message to one already-connected peer. It does NOT auto-dial — the
+    /// recipient must be a currently-connected peer. Callers degrade
+    /// gracefully on `Err` (e.g. `share.send` still returns the created,
+    /// signed invite when delivery is not possible).
+    ///
+    /// Errors when the peer is not in the connected set, has no cached
+    /// connection, the connection is inactive, or the stream send fails.
+    pub async fn send_tagged_to_peer(
+        &self,
+        node_id: &str,
+        tag: u8,
+        payload: &[u8],
+    ) -> Result<()> {
+        let connection = {
+            let nodes = self.nodes.read().await;
+            let node = nodes
+                .get(node_id)
+                .ok_or_else(|| anyhow!("peer {node_id} is not connected"))?;
+            node.connection
+                .clone()
+                .ok_or_else(|| anyhow!("no live connection for peer {node_id}"))?
+        };
+
+        if !connection.is_active() {
+            return Err(anyhow!("connection to peer {node_id} is not active"));
+        }
+
+        let mut framed = Vec::with_capacity(1 + payload.len());
+        framed.push(tag);
+        framed.extend_from_slice(payload);
+
+        let mut stream = connection
+            .open_stream()
+            .await
+            .map_err(|e| anyhow!("failed to open stream to peer {node_id}: {e}"))?;
+        stream
+            .send(&framed)
+            .await
+            .map_err(|e| anyhow!("failed to send tagged message to peer {node_id}: {e}"))?;
+
+        Ok(())
     }
 
     /// Returns the matrix coordinates of all currently connected peers.

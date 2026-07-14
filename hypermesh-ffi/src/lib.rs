@@ -13,6 +13,7 @@
 
 mod api;
 mod error_state;
+mod ffi_util;
 mod handle;
 
 pub use api::*;

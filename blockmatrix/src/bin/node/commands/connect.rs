@@ -113,9 +113,24 @@ pub async fn run_connect(
     let privacy_mode = bootstrap.privacy_mode().await;
     let has_bootstrap_peers = !cli.bootstrap.is_empty();
 
+    // P3 (F5): a single shared InboxStore for received share invitations. The
+    // SAME Arc is handed to the network `PeerContext` (so TAG_SHARE_INVITE
+    // deliveries land here) and to the daemon state (so `share.inbox` /
+    // `share.accept` read the same store).
+    let share_inbox_store = std::sync::Arc::new(
+        blockmatrix::sharing::inbox::InboxStore::new(Some(data_dir.join(nid).join("inbox"))),
+    );
+
     if privacy_mode != PrivacyMode::PRIVATE || has_bootstrap_peers {
         let result = start_network(
-            cli, coord, nid, data_dir, bootstrap, privacy_mode, has_bootstrap_peers,
+            cli,
+            coord,
+            nid,
+            data_dir,
+            bootstrap,
+            privacy_mode,
+            has_bootstrap_peers,
+            share_inbox_store.clone(),
         )
         .await?;
         network_ref = Some(result.network);
@@ -221,6 +236,9 @@ pub async fn run_connect(
         // responses ("status":"alpha","note":"catalog registry not
         // wired").
         catalog_registry: None,
+        // P3 (F5): share the SAME inbox Arc the network PeerContext uses so
+        // TAG_SHARE_INVITE deliveries are visible to `share.inbox`/`accept`.
+        inbox_store: Some(share_inbox_store.clone()),
     });
 
     // Phase I.1: rebuild the cross-chain receipt index from any
@@ -372,6 +390,7 @@ struct NetworkStartResult {
 
 /// Initialize STOQ transport, network manager, and all background loops.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 async fn start_network(
     cli: &Cli,
     coord: MatrixCoordinate,
@@ -380,6 +399,7 @@ async fn start_network(
     bootstrap: &NodeBootstrap,
     privacy_mode: PrivacyMode,
     has_bootstrap_peers: bool,
+    share_inbox_store: std::sync::Arc<blockmatrix::sharing::inbox::InboxStore>,
 ) -> Result<NetworkStartResult> {
     info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
@@ -388,6 +408,24 @@ async fn start_network(
         bind_address: std::net::Ipv6Addr::UNSPECIFIED,
         ..stoq::TransportConfig::default()
     };
+
+    // Substrate selects the real, carrier-aware outbound interface (R16) and
+    // injects it into STOQ (STOQ does not depend on base — injection only).
+    // Falls back to STOQ's own auto-detection if selection fails.
+    use base::Substrate as _;
+    let substrate = base::DefaultSubstrate::new();
+    match substrate.active_interface().await {
+        Ok(iface) => {
+            info!("Substrate selected outbound interface: {}", iface.name);
+            stoq_config.interface = Some(iface.name);
+        }
+        Err(e) => {
+            warn!(
+                "Substrate interface selection failed ({e}); \
+                 STOQ will auto-detect the interface"
+            );
+        }
+    }
 
     let network_type = if privacy_mode == PrivacyMode::ANONYMOUS {
         stoq_config.enable_falcon_crypto = false;
@@ -542,6 +580,21 @@ async fn start_network(
         std::sync::Mutex::new(engauge::MetricsIngestionPipeline::with_defaults()),
     );
 
+    // P5: construct the shared eBPF orchestrator once. It is used both by
+    // the PeerContext (to mirror peer authentication into the kernel
+    // fast-path maps) AND by the engauge routing-intelligence feedback loop
+    // below. When the orchestrator cannot be created the node runs in the
+    // userspace-only tier (graceful degradation) — every kernel-map write
+    // downstream is a no-op unless an XDP program is actually attached.
+    let ebpf_orchestrator: Option<std::sync::Arc<hypermesh_ebpf::HyperMeshEbpf>> =
+        match hypermesh_ebpf::HyperMeshEbpf::new(hypermesh_ebpf::EbpfConfig::default()) {
+            Ok(e) => Some(std::sync::Arc::new(e)),
+            Err(err) => {
+                warn!("eBPF orchestrator unavailable, kernel gate + feedback disabled: {err}");
+                None
+            }
+        };
+
     let peer_ctx = std::sync::Arc::new(blockmatrix::network::PeerContext {
         blockchain: bootstrap.blockchain().clone(),
         shard_store: shard_store.clone(),
@@ -566,11 +619,7 @@ async fn start_network(
             blockmatrix::dns::DnsPopularityTracker::new(),
         )),
         shard_location_index: Some(shard_location_index.clone()),
-        inbox_store: Some(std::sync::Arc::new(
-            blockmatrix::sharing::inbox::InboxStore::new(
-                Some(data_dir.join(nid).join("inbox")),
-            ),
-        )),
+        inbox_store: Some(share_inbox_store.clone()),
         message_store: Some(std::sync::Arc::new(
             blockmatrix::messaging::store::MessageStore::new(
                 Some(data_dir.join(nid).join("messages")),
@@ -587,6 +636,9 @@ async fn start_network(
         // TransferCoordinator here once a STOQ-backed TransferTransport
         // is configured (Phase G.2 deliverable on the daemon side).
         transfer_coordinator: None,
+        // P5: share the eBPF orchestrator so peer authentication mirrors
+        // into the kernel maps (no-op unless an XDP program is attached).
+        ebpf: ebpf_orchestrator.clone(),
     });
 
     let network_clone = std::sync::Arc::new(network_manager);
@@ -712,17 +764,11 @@ async fn start_network(
         });
         info!("engauge intelligence bridge started (periodic_feed=10s)");
 
-        // --- Phase E.1: Construct eBPF feedback adapter for the routing
-        // intelligence feed. The adapter pushes congestion-derived privacy
-        // actions and routing rules from engauge into HyperMeshEbpf.
-        let ebpf_for_feedback: Option<std::sync::Arc<hypermesh_ebpf::HyperMeshEbpf>> =
-            match hypermesh_ebpf::HyperMeshEbpf::new(hypermesh_ebpf::EbpfConfig::default()) {
-                Ok(e) => Some(std::sync::Arc::new(e)),
-                Err(err) => {
-                    warn!("eBPF orchestrator unavailable, feedback loop disabled: {err}");
-                    None
-                }
-            };
+        // --- Phase E.1: eBPF feedback adapter for the routing intelligence
+        // feed. Reuses the SAME orchestrator shared with the PeerContext
+        // (P5) so kernel-map state is consistent between the peer-auth
+        // mirror and the congestion-derived routing feed.
+        let ebpf_for_feedback = ebpf_orchestrator.clone();
         if ebpf_for_feedback.is_some() {
             info!("eBPF feedback adapter ready for engauge routing intelligence");
         }
@@ -827,6 +873,7 @@ async fn start_network(
             let rp_analytics = engauge_analytics.clone();
             let rp_index = shard_location_index.clone();
             let rp_transport = shard_transport.clone();
+            let rp_network = network_clone.clone();
             let rp_local_node_id = nid.to_string();
             tokio::spawn(async move {
                 let mut interval =
@@ -836,6 +883,17 @@ async fn start_network(
                 interval.tick().await;
                 loop {
                     interval.tick().await;
+
+                    // P6: reclaim stale provider hints on the same cadence the
+                    // DNS cache is swept, so the location index does not keep
+                    // handing out peers that have gone offline.
+                    let reclaimed = rp_index.cleanup_expired().await;
+                    if reclaimed > 0 {
+                        debug!(
+                            "replication-poll: reclaimed {reclaimed} expired provider hint(s)"
+                        );
+                    }
+
                     let signals = match rp_analytics.lock() {
                         Ok(guard) => engauge::ReplicationTrigger::new(
                             engauge::ReplicationConfig::default(),
@@ -851,14 +909,38 @@ async fn start_network(
                     if signals.is_empty() {
                         continue;
                     }
+
+                    // Snapshot connected-peer coordinates once per cycle so the
+                    // DispersionAdvisor can rank fetch sources by matrix
+                    // topology instead of taking candidates[0] blindly.
+                    let peer_coords: std::collections::HashMap<
+                        String,
+                        hypermesh_lib::MatrixPosition,
+                    > = rp_network
+                        .get_connected_nodes()
+                        .await
+                        .into_iter()
+                        .map(|n| {
+                            (
+                                n.node_id,
+                                hypermesh_lib::MatrixPosition {
+                                    x: n.coordinate.x as f64,
+                                    y: n.coordinate.y as f64,
+                                    z: n.coordinate.z as f64,
+                                },
+                            )
+                        })
+                        .collect();
+
                     for signal in signals.iter().filter(|s| s.urgency > 0.5) {
                         // Find peers known to provide this shard.
                         let providers = rp_index.get_providers(&signal.shard_id).await;
                         // Skip if we are the only known provider (cannot
                         // self-replicate) or no providers at all.
-                        let candidates: Vec<&String> = providers
+                        let candidates: Vec<String> = providers
                             .iter()
                             .filter(|id| id.as_str() != rp_local_node_id.as_str())
+                            .cloned()
                             .collect();
                         if candidates.is_empty() {
                             debug!(
@@ -867,9 +949,20 @@ async fn start_network(
                             );
                             continue;
                         }
-                        // Pick the first candidate (alpha policy — refine
-                        // with engauge dispersion in a later sprint).
-                        let target_node_id = candidates[0].clone();
+
+                        // P6 (step 3): dispersion-aware source selection.
+                        // Ask the DispersionAdvisor where the swarm WANTS new
+                        // replicas (k-means over consumer demand, anti-affinity
+                        // to existing provider positions), then pick the
+                        // candidate provider nearest a recommended placement.
+                        // This spreads fetches toward under-served demand
+                        // clusters instead of always hammering candidates[0].
+                        let target_node_id = select_dispersion_source(
+                            &rp_analytics,
+                            &signal.shard_id,
+                            &candidates,
+                            &peer_coords,
+                        );
                         let target_id = hypermesh_lib::NodeId::from_public_key(
                             target_node_id.as_bytes(),
                         );
@@ -879,11 +972,39 @@ async fn start_network(
                             .await
                         {
                             Ok(_data) => {
+                                // P6 (step 2): CLOSE THE FEEDBACK LOOP. The
+                                // local node just became a provider of this
+                                // shard — register it in the shared index so
+                                // the provider count grows, then report that
+                                // count back to SwarmAnalytics via
+                                // set_replica_count. Next cycle
+                                // ReplicationTrigger::check sees
+                                // needed <= replicas and STOPS → convergence.
+                                // Without this hook the replica count stayed 0
+                                // forever and the loop never converged.
+                                rp_index
+                                    .register_provider(
+                                        &rp_local_node_id,
+                                        &[signal.shard_id],
+                                    )
+                                    .await;
+                                let replica_count = rp_index
+                                    .get_providers(&signal.shard_id)
+                                    .await
+                                    .len()
+                                    as u32;
+                                if let Ok(mut guard) = rp_analytics.lock() {
+                                    guard.set_replica_count(
+                                        signal.shard_id,
+                                        replica_count,
+                                    );
+                                }
                                 info!(
-                                    "replication-poll: fetched extra replica of {} from {} (urgency {:.2})",
+                                    "replication-poll: fetched extra replica of {} from {} (urgency {:.2}, replicas now {})",
                                     hex::encode(&signal.shard_id.0[..4]),
                                     &target_node_id[..8.min(target_node_id.len())],
                                     signal.urgency,
+                                    replica_count,
                                 );
                             }
                             Err(e) => {
@@ -932,6 +1053,68 @@ async fn start_network(
         #[cfg(feature = "intelligence")]
         engauge_analytics,
     })
+}
+
+/// P6 (step 3): pick which provider to fetch a replica from using the
+/// engauge [`DispersionAdvisor`] instead of always taking `candidates[0]`.
+///
+/// The advisor runs k-means over the shard's consumer demand map (with
+/// anti-affinity to positions already holding replicas) and returns the
+/// matrix positions where the swarm most wants NEW replicas. We then select
+/// the candidate provider whose coordinate is closest to a recommended
+/// placement — pulling the copy toward under-served demand. When we lack
+/// coordinates or demand data (advisor returns nothing), we fall back to a
+/// stable deterministic pick (lexicographically smallest node id) so behavior
+/// is reproducible rather than arbitrary hash ordering.
+#[cfg(feature = "intelligence")]
+fn select_dispersion_source(
+    analytics: &std::sync::Mutex<engauge::SwarmAnalytics>,
+    shard_id: &hypermesh_lib::ContentHash,
+    candidates: &[String],
+    peer_coords: &std::collections::HashMap<String, hypermesh_lib::MatrixPosition>,
+) -> String {
+    debug_assert!(!candidates.is_empty(), "caller guarantees non-empty candidates");
+
+    // Recommend placements from live analytics (k-means over demand).
+    let recommendations = match analytics.lock() {
+        Ok(guard) => {
+            let advisor = engauge::DispersionAdvisor::new();
+            advisor.recommend_placement(shard_id, &guard, candidates.len().max(1))
+        }
+        Err(_) => Vec::new(),
+    };
+
+    // If we have both recommended placements and candidate coordinates, pick
+    // the candidate nearest to any recommended placement.
+    if !recommendations.is_empty() {
+        let mut best: Option<(String, f64)> = None;
+        for cand in candidates {
+            let Some(pos) = peer_coords.get(cand) else { continue };
+            let nearest = recommendations
+                .iter()
+                .map(|r| {
+                    let dx = r.x - pos.x;
+                    let dy = r.y - pos.y;
+                    let dz = r.z - pos.z;
+                    (dx * dx + dy * dy + dz * dz).sqrt()
+                })
+                .fold(f64::INFINITY, f64::min);
+            match &best {
+                Some((_, d)) if *d <= nearest => {}
+                _ => best = Some((cand.clone(), nearest)),
+            }
+        }
+        if let Some((node_id, _)) = best {
+            return node_id;
+        }
+    }
+
+    // Fallback: deterministic (smallest node id), never arbitrary.
+    candidates
+        .iter()
+        .min()
+        .cloned()
+        .unwrap_or_else(|| candidates[0].clone())
 }
 
 /// Register a DNS name for this node on the local blockchain.

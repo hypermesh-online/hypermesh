@@ -160,6 +160,22 @@ impl OsAbstraction for LinuxAbstraction {
     fn is_ebpf_supported(&self) -> bool {
         self.kernel_supports_ebpf() && self.check_bpf_fs()
     }
+
+    fn machine_id(&self) -> Option<String> {
+        self.read_machine_id()
+    }
+
+    fn dmi_identifiers(&self) -> (Option<String>, Option<String>, Option<String>) {
+        self.read_dmi_identifiers()
+    }
+
+    fn primary_disk_serial(&self) -> Option<String> {
+        self.read_primary_disk_serial()
+    }
+
+    fn primary_nic(&self) -> Option<NicInfo> {
+        self.read_primary_nic()
+    }
 }
 
 #[cfg(test)]

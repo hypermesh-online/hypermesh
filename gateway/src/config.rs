@@ -8,6 +8,66 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Authentication mode for the gateway's STOQ listener (security finding F8).
+///
+/// The gateway can operate the STOQ port in two distinct modes:
+///
+/// * [`StoqAuthMode::HttpProxy`] — the listener acts as a plain reverse
+///   proxy for backwards compatibility. Incoming STOQ connections are
+///   accepted and forwarded WITHOUT requiring a bilateral Proof-of-State
+///   handshake. This is correct when the gateway is fronting a
+///   clearnet/HTTP endpoint (there is no HyperMesh asset to authenticate
+///   against). **Default**, to preserve existing deployments.
+///
+/// * [`StoqAuthMode::FullStoqPos`] — the listener is a decentralized port
+///   onto a HyperMesh asset. Every incoming connection MUST complete a
+///   bilateral PoS handshake (FALCON-1024 identity binding + four-proof
+///   state proof validation, inheriting the F2 signer↔identity binding)
+///   before any bytes are handled. Connections that fail to handshake are
+///   dropped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum StoqAuthMode {
+    /// Plain reverse-proxy passthrough — no PoS handshake required.
+    HttpProxy,
+    /// Decentralized HyperMesh port — bilateral PoS handshake required.
+    FullStoqPos,
+}
+
+impl Default for StoqAuthMode {
+    fn default() -> Self {
+        // Backwards-compatible default: today's listener accepts without a
+        // handshake, which is passthrough/HTTP-proxy behavior. Opt in to
+        // FullStoqPos explicitly.
+        Self::HttpProxy
+    }
+}
+
+impl StoqAuthMode {
+    /// Parse a mode from a case-insensitive string. Accepts several
+    /// spellings for ergonomics in config files and env vars.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().replace('_', "-").as_str() {
+            "http-proxy" | "http" | "proxy" | "passthrough" => Some(Self::HttpProxy),
+            "full-stoq-pos" | "stoq-pos" | "stoq" | "pos" | "full" => Some(Self::FullStoqPos),
+            _ => None,
+        }
+    }
+
+    /// Stable string form (matches the kebab-case serde representation).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::HttpProxy => "http-proxy",
+            Self::FullStoqPos => "full-stoq-pos",
+        }
+    }
+
+    /// True when this mode requires a completed bilateral PoS handshake.
+    pub fn requires_pos_handshake(self) -> bool {
+        matches!(self, Self::FullStoqPos)
+    }
+}
+
 /// Source of TLS certificates for the gateway's QUIC endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CertificateSource {
@@ -85,6 +145,16 @@ pub struct GatewayConfig {
 
     /// Maximum concurrent STOQ connections through the bridge.
     pub stoq_max_connections: u32,
+
+    /// STOQ listener authentication mode (security finding F8).
+    ///
+    /// [`StoqAuthMode::HttpProxy`] (default) accepts connections without a
+    /// PoS handshake for reverse-proxy backwards compatibility.
+    /// [`StoqAuthMode::FullStoqPos`] requires a completed bilateral PoS
+    /// handshake on every connection. `#[serde(default)]` keeps older TOML
+    /// files (which omit this field) parseable.
+    #[serde(default)]
+    pub stoq_auth_mode: StoqAuthMode,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +243,7 @@ impl Default for GatewayConfig {
                     .expect("hardcoded default STOQ listen addr is valid"),
             ),
             stoq_max_connections: 100,
+            stoq_auth_mode: StoqAuthMode::default(),
         }
     }
 }
@@ -319,6 +390,10 @@ impl GatewayConfig {
         if let Ok(max) = std::env::var("STOQ_MAX_CONNECTIONS") {
             self.stoq_max_connections = max.parse()?;
         }
+        if let Ok(mode) = std::env::var("STOQ_AUTH_MODE") {
+            self.stoq_auth_mode = StoqAuthMode::parse(&mode)
+                .with_context(|| format!("invalid STOQ_AUTH_MODE: {mode:?}"))?;
+        }
         Ok(())
     }
 
@@ -397,6 +472,11 @@ impl GatewayConfig {
             config.stoq_max_connections = max.parse()?;
         }
 
+        if let Ok(mode) = std::env::var("STOQ_AUTH_MODE") {
+            config.stoq_auth_mode = StoqAuthMode::parse(&mode)
+                .with_context(|| format!("invalid STOQ_AUTH_MODE: {mode:?}"))?;
+        }
+
         Ok(config)
     }
 
@@ -421,6 +501,140 @@ mod tests {
         assert_eq!(config.listen_addr.port(), 8443);
         assert_eq!(config.stoq_max_connections, 100);
         assert_eq!(config.log_level, "info");
+    }
+
+    #[test]
+    fn default_stoq_auth_mode_is_http_proxy() {
+        // Backwards-compatible default preserves existing passthrough behavior.
+        let config = GatewayConfig::default();
+        assert_eq!(config.stoq_auth_mode, StoqAuthMode::HttpProxy);
+        assert!(!config.stoq_auth_mode.requires_pos_handshake());
+    }
+
+    #[test]
+    fn stoq_auth_mode_parse_variants() {
+        assert_eq!(StoqAuthMode::parse("http-proxy"), Some(StoqAuthMode::HttpProxy));
+        assert_eq!(StoqAuthMode::parse("HTTP_PROXY"), Some(StoqAuthMode::HttpProxy));
+        assert_eq!(StoqAuthMode::parse("passthrough"), Some(StoqAuthMode::HttpProxy));
+        assert_eq!(
+            StoqAuthMode::parse("full-stoq-pos"),
+            Some(StoqAuthMode::FullStoqPos),
+        );
+        assert_eq!(StoqAuthMode::parse("stoq"), Some(StoqAuthMode::FullStoqPos));
+        assert_eq!(StoqAuthMode::parse("pos"), Some(StoqAuthMode::FullStoqPos));
+        assert_eq!(StoqAuthMode::parse("garbage"), None);
+    }
+
+    #[test]
+    fn stoq_auth_mode_as_str_round_trip() {
+        for m in [StoqAuthMode::HttpProxy, StoqAuthMode::FullStoqPos] {
+            assert_eq!(StoqAuthMode::parse(m.as_str()), Some(m));
+        }
+        assert!(StoqAuthMode::FullStoqPos.requires_pos_handshake());
+        assert!(!StoqAuthMode::HttpProxy.requires_pos_handshake());
+    }
+
+    #[test]
+    fn stoq_auth_mode_serde_round_trip() {
+        let mode = StoqAuthMode::FullStoqPos;
+        let json = serde_json::to_string(&mode).expect("test: serialize");
+        assert_eq!(json, "\"full-stoq-pos\"");
+        let back: StoqAuthMode = serde_json::from_str(&json).expect("test: deserialize");
+        assert_eq!(back, mode);
+    }
+
+    #[test]
+    fn from_file_without_stoq_auth_mode_defaults_to_http_proxy() {
+        // Older config files omit stoq_auth_mode; #[serde(default)] must
+        // keep them parseable and default to HttpProxy.
+        let dir = tempfile::tempdir().expect("test: create temp dir");
+        let file_path = dir.path().join("legacy-gateway.toml");
+        let toml_content = r#"
+listen_addr = "[::]:8443"
+trustchain_addr = "[::1]:8444"
+blockmatrix_addr = "[::1]:9292"
+caesar_addr = "[::1]:9294"
+catalog_addr = "[::1]:9295"
+engauge_addr = "[::1]:9296"
+trustchain_server_name = "tc"
+blockmatrix_server_name = "bm"
+caesar_server_name = "cs"
+catalog_server_name = "cat"
+engauge_server_name = "eng"
+cert_path = "certs/server.crt"
+key_path = "certs/server.key"
+log_level = "info"
+stoq_max_connections = 100
+
+[pool]
+max_connections = 10
+idle_timeout = { secs = 300, nanos = 0 }
+connect_timeout = { secs = 10, nanos = 0 }
+keep_alive_interval = { secs = 30, nanos = 0 }
+
+[retry]
+max_attempts = 3
+base_delay = { secs = 0, nanos = 100000000 }
+max_delay = { secs = 5, nanos = 0 }
+multiplier = 2.0
+
+[cors]
+allowed_origins = ["http://localhost:5173"]
+allowed_methods = ["GET"]
+allowed_headers = ["Content-Type"]
+allow_credentials = true
+max_age = 3600
+"#;
+        std::fs::write(&file_path, toml_content).expect("test: write config");
+        let config = GatewayConfig::from_file(&file_path).expect("test: parse legacy config");
+        assert_eq!(config.stoq_auth_mode, StoqAuthMode::HttpProxy);
+    }
+
+    #[test]
+    fn from_file_parses_full_stoq_pos_mode() {
+        let dir = tempfile::tempdir().expect("test: create temp dir");
+        let file_path = dir.path().join("secure-gateway.toml");
+        let toml_content = r#"
+listen_addr = "[::]:8443"
+trustchain_addr = "[::1]:8444"
+blockmatrix_addr = "[::1]:9292"
+caesar_addr = "[::1]:9294"
+catalog_addr = "[::1]:9295"
+engauge_addr = "[::1]:9296"
+trustchain_server_name = "tc"
+blockmatrix_server_name = "bm"
+caesar_server_name = "cs"
+catalog_server_name = "cat"
+engauge_server_name = "eng"
+cert_path = "certs/server.crt"
+key_path = "certs/server.key"
+log_level = "info"
+stoq_max_connections = 100
+stoq_auth_mode = "full-stoq-pos"
+
+[pool]
+max_connections = 10
+idle_timeout = { secs = 300, nanos = 0 }
+connect_timeout = { secs = 10, nanos = 0 }
+keep_alive_interval = { secs = 30, nanos = 0 }
+
+[retry]
+max_attempts = 3
+base_delay = { secs = 0, nanos = 100000000 }
+max_delay = { secs = 5, nanos = 0 }
+multiplier = 2.0
+
+[cors]
+allowed_origins = ["http://localhost:5173"]
+allowed_methods = ["GET"]
+allowed_headers = ["Content-Type"]
+allow_credentials = true
+max_age = 3600
+"#;
+        std::fs::write(&file_path, toml_content).expect("test: write config");
+        let config = GatewayConfig::from_file(&file_path).expect("test: parse secure config");
+        assert_eq!(config.stoq_auth_mode, StoqAuthMode::FullStoqPos);
+        assert!(config.stoq_auth_mode.requires_pos_handshake());
     }
 
     #[test]

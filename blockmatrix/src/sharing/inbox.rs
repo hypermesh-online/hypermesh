@@ -238,25 +238,29 @@ impl InboxStore {
             AssetCategory::BaseSystem(BaseSystemType::Invitation),
         );
 
-        // Compute hashes (following mutations.rs pattern)
+        // Add the block to the blockchain
+        let chain = blockchain.read().await;
+
+        // Generate a REAL PoS proof from this node's own identity, derived
+        // deterministically from its matrix coordinate (R1: hardware-assessed).
+        let node_id = crate::bootstrap::node_id(chain.node_coordinate());
+        let state_proof = StateProof::generate_from_network(&node_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("state proof generation: {e}"))?;
+
+        // Bind the proof to the content hash (signed-to-content invariant, P1).
         let asset_hash = registration.content_hash;
-        let state_proof = StateProof::new_for_testing();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
         // Store serialized invite JSON in the path field (same as DNS pattern)
-        let entry = BlockAssetEntry {
+        let entry = BlockAssetEntry::new_bound(
             asset_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Local {
+            &state_proof,
+            StoragePointer::Local {
                 path: invite_json,
             },
             registration,
-        };
+        );
 
-        // Add the block to the blockchain
-        let chain = blockchain.read().await;
         match chain.add_block(vec![entry]).await {
             Ok(block) => {
                 info!(

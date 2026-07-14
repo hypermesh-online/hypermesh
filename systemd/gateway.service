@@ -1,9 +1,12 @@
 [Unit]
 Description=HyperMesh HTTP/3 Gateway
 Documentation=https://github.com/hypermesh-online/core
-After=network-online.target trustchain.service
+# F9: the single trustchain.service was retired for the dual-CA split. The
+# gateway bridges to the CA at [::1]:8444 (gateway.toml trustchain_addr), now
+# served by trustchain-http3.service.
+After=network-online.target trustchain-http3.service
 Wants=network-online.target
-Requires=trustchain.service
+Requires=trustchain-http3.service
 
 [Service]
 Type=simple

@@ -268,12 +268,18 @@ impl ScopeBridge {
         };
 
         let asset_hash = *blake3::hash(entry_bytes).as_bytes();
-        let proof_hash = *blake3::hash(
-            format!("transfer-{}-proof-{}", label, transfer_id).as_bytes(),
-        )
-        .as_bytes();
 
-        let state_proof = StateProof::new_for_testing();
+        // Generate a REAL PoS proof from this node's own identity, derived
+        // deterministically from its matrix coordinate (R1: hardware-assessed).
+        let node_id = crate::bootstrap::node_id(bc.node_coordinate());
+        let state_proof = StateProof::generate_from_network(&node_id)
+            .await
+            .map_err(|e| GatewayError::ProofValidationFailed {
+                scope: "blockchain".to_string(),
+                reason: format!(
+                    "state proof generation for transfer {transfer_id}: {e}"
+                ),
+            })?;
         let registration = crate::assets::core::AssetRegistration::from_asset_data(
             &crate::assets::core::asset_id::AssetData {
                 config: Vec::new(),
@@ -286,15 +292,15 @@ impl ScopeBridge {
             ),
         );
 
-        let block_entry = BlockAssetEntry {
+        // Bind the proof to the content hash (signed-to-content invariant, P1).
+        let block_entry = BlockAssetEntry::new_bound(
             asset_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Local {
+            &state_proof,
+            StoragePointer::Local {
                 path: String::from_utf8_lossy(entry_bytes).to_string(),
             },
             registration,
-        };
+        );
 
         bc.add_block(vec![block_entry]).await.map_err(|e| {
             GatewayError::ProofValidationFailed {

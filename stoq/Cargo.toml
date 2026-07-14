@@ -1,6 +1,6 @@
 [package]
 name = "stoq"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "STOQ Protocol - Pure QUIC over IPv6 Transport (Transport Layer Only)"

@@ -318,6 +318,7 @@ mod tests {
             revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
             light_sync_manager: None,
             catalog_registry: None,
+            inbox_store: None,
         })
     }
 
@@ -428,6 +429,7 @@ mod tests {
             revocation_registry: Arc::new(crate::auth::RevocationRegistry::new()),
             light_sync_manager: None,
             catalog_registry: None,
+            inbox_store: None,
         });
 
         let mut handler = RequestHandler::new();

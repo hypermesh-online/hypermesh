@@ -1,6 +1,6 @@
 [package]
 name = "trustchain"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["Web3 Ecosystem Team"]
 description = "TrustChain - Certificate Authority with Certificate Transparency and DNS resolution"
@@ -117,9 +117,14 @@ proptest = { workspace = true }
 tempfile = { workspace = true }
 tokio-test = { workspace = true }
 serial_test = "3"
+# F3: integration tests/benches in tests/ compile trustchain as an external
+# crate, where the `test` cfg does NOT cross the crate boundary. They opt into
+# `localhost-testing` here so `StateProof::new_for_testing()` is available.
+# Resolver "2" keeps this dev-only — release builds never enable the feature.
+trustchain = { path = ".", features = ["localhost-testing"] }
 
 [features]
-default = ["ca", "ct", "dns", "proof-of-state", "localhost-testing", "http-bootstrap"]
+default = ["ca", "ct", "dns", "proof-of-state", "http-bootstrap"]
 
 # Core features
 ca = []                # Certificate Authority
@@ -156,6 +161,10 @@ path = "src/bin/trustchain-http3-server.rs"
 [[bin]]
 name = "trustchain_ca"
 path = "src/bin/trustchain_ca.rs"
+# F3: local-only dev CA tool. Uses StateProof::new_for_testing() for its
+# `allow_self_signed` auto-issue path, so it is gated behind the testing
+# feature and is excluded from default (release) builds.
+required-features = ["localhost-testing"]
 
 [[bench]]
 name = "certificate_bench"

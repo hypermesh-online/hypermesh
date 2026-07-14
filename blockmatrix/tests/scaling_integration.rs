@@ -25,19 +25,18 @@ use trustchain::proof_of_state::StateProof;
 // ---------------------------------------------------------------------------
 
 /// Build a minimal `BlockAssetEntry` for testing (matches chain.rs unit test pattern).
+///
+/// The proof is bound to the content hash so the entry satisfies the
+/// signed-to-content invariant (P1) enforced on the block-receive path.
 fn test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
     let reg = AssetRegistration::genesis(coord);
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-    let state_proof = StateProof::default();
-    let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
-    let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
-    BlockAssetEntry {
-        asset_hash: content_hash,
-        proof_hash,
-        state_proof,
-        storage_pointer: StoragePointer::Genesis,
-        registration: reg,
-    }
+    BlockAssetEntry::new_bound(
+        content_hash,
+        &StateProof::new_for_testing(),
+        StoragePointer::Genesis,
+        reg,
+    )
 }
 
 /// Create a ContentHash from a single seed byte.

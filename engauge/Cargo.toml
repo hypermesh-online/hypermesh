@@ -1,6 +1,6 @@
 [package]
 name = "engauge"
-version = "1.0.0"
+version.workspace = true
 edition = "2021"
 authors = ["HyperMesh Team"]
 description = "Work tracking, content receipts, and capacity metrics for HyperMesh"
@@ -21,6 +21,9 @@ anyhow = "1.0"
 thiserror = "1.0"
 rand = "0.8"
 bytes = { version = "1.6", features = ["serde"] }
+reed-solomon-erasure = "6.0"
+hex = "0.4"
+serde_bytes = "0.11"
 
 # Server binary dependencies (optional to avoid stoq<->engauge cycle)
 quinn = { version = "0.11", optional = true }

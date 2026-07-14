@@ -1,0 +1,28 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F5 — Resolution Report (delivered as P3: transmission-payload retrieval)
+
+- **Finding:** [F5 audit](2026-07-06T04-06-05Z-F5-kyber-key-in-shard-map.audit)
+- **Status:** RESOLVED — reframed by the owner as the R6 transmission-payload model (TrustChain + NGauge), implemented + self-QA'd
+- **Phase:** P3. **Date:** 2026-07-11
+- **Recovery note:** the dev agent completed the work but died on an org-access infra error before its own QA; the completed diff (1921 lines + `shard_map.rs`) was preserved and re-applied to a clean branch off F2, then verified.
+
+## The model (owner's reframe)
+No file is sent. A **transmission payload** = recipient-wrapped decryption key + hash + address + instructions, sent to an AUTHORIZED recipient over a PoS-authenticated channel; the recipient fetches shards from the mesh, reassembles, validates against the hash, and unpacks. TrustChain owns the auth + per-recipient Kyber key wrap; NGauge owns address resolution + fetch. The raw Kyber secret key NEVER travels in a stored map or stdout.
+
+## What was fixed
+1. **`KeyEnvelope` abstraction** (`sharing/`) over the existing tested `wrap_key_for_recipient`/`unwrap_key` (`sharing/key_wrap.rs`): `KeyEnvelope::wrap_for(&DecryptionKey, recipient_kyber_pubkey)` (second Kyber KEM to the recipient) and `.unwrap_with(secret_key_bytes)`.
+2. **New on-disk `ShardMap`** (`sharing/shard_map.rs`) carries `key_envelope: Option<KeyEnvelope>` (a recipient-wrapped envelope) — **NO `secret_key` field**. Unit test `test_encrypted_map_hides_raw_secret_key` asserts the serialized JSON contains no `secret_key`. `is_cleartext()` supports the public path.
+3. **Wired the stubbed share handlers** (`ipc/handlers/share.rs`): `share.send` unwraps with the owner's own Kyber secret then `wrap_for` the recipient's pubkey; `share.accept` unwraps with the recipient's secret; owner self-fetch (`store.rs:208`) uses `identity.kyber_secret_key_bytes()` — the owner's key comes from its identity, never from the map.
+4. **Public/Anonymous skip encryption** (`orchestrator.rs::process_asset_with_privacy`): `encrypt = privacy_mode.scope == AccessScope::Bounded` — Private encrypts + per-recipient wrap; Public/Anonymous produce content-addressed **cleartext** shards (BLAKE3 integrity + PoS-gated fetch, no key to custody). Resolves the "key must reach everyone" contradiction for torrent-style public assets.
+5. **`DaemonState.inbox_store`** added (`ipc/state.rs:160`) + threaded through the share handlers (the `ipc/handlers/*.rs` +field changes). Test initializers in `j1_release_feed`, `k1/k2_capability` tests updated for the new field.
+
+## How the invariant is preserved
+The decryption key is only ever present as (a) the owner's own identity-held secret, or (b) a recipient-wrapped `KeyEnvelope` that only the named recipient's Kyber secret can open. The on-disk shard map holds locate + integrity data + an optional recipient-wrapped envelope — never a raw secret. Public/Anonymous assets have no key to leak at all.
+
+## Verification (self-QA)
+`cargo build -p blockmatrix --bin hypermesh` clean (exit 0). Static checks confirmed: no `secret_key` field in `ShardMap`; `wrap_for`/`unwrap_with` on the send/accept paths; `process_asset_with_privacy` gates encryption on Bounded scope; `ipc/state.rs` merges cleanly with P2 (P2 left it untouched). Sharing test suite: [pending — recorded in .log].
+
+## Residual / follow-on
+- Register/fetch over the network still needs the live daemon (the transmission-payload FETCH half); the C ABI (P9) documents the same daemon-less-fetch gap. The full NGauge address→location→fetch drive lands with P6.
+- KyberSegmented in the whole-blob reconstruct path — carry-over gap from the original pipeline, not introduced here.

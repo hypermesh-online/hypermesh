@@ -583,10 +583,15 @@ impl TransferCoordinator {
         req: &TransferRegisterRequest,
         reason: impl Into<String>,
     ) -> TransferRegisterAck {
+        // Structurally-INVALID sentinel proof (stake_amount = 0 fails
+        // StakeProof::validate) so a rejection ack can never be mistaken
+        // for an authentic proof, independent of the `accepted` flag.
+        let mut rejected_proof = StateProof::default();
+        rejected_proof.stake_proof.stake_amount = 0;
         TransferRegisterAck {
             transfer_id: req.transfer_id.clone(),
             target_block_hash: String::new(),
-            state_proof: StateProof::default(),
+            state_proof: rejected_proof,
             accepted: false,
             reason: Some(reason.into()),
             acked_at: chrono::Utc::now().timestamp(),
@@ -920,8 +925,6 @@ impl TransferCoordinator {
         state_proof: StateProof,
     ) -> Result<String, GatewayError> {
         let asset_hash = *blake3::hash(entry_bytes).as_bytes();
-        let proof_hash =
-            *blake3::hash(format!("transfer-{label}").as_bytes()).as_bytes();
 
         let registration = crate::assets::core::AssetRegistration::from_asset_data(
             &crate::assets::core::asset_id::AssetData {
@@ -935,15 +938,17 @@ impl TransferCoordinator {
             ),
         );
 
-        let block_entry = BlockAssetEntry {
+        // Bind the proof to the content hash (signed-to-content invariant, P1).
+        // Here the Local payload IS the content (`entry_bytes`) and
+        // `asset_hash == BLAKE3(entry_bytes)`.
+        let block_entry = BlockAssetEntry::new_bound(
             asset_hash,
-            proof_hash,
-            state_proof,
-            storage_pointer: StoragePointer::Local {
+            &state_proof,
+            StoragePointer::Local {
                 path: String::from_utf8_lossy(entry_bytes).to_string(),
             },
             registration,
-        };
+        );
 
         let block = self
             .blockchain

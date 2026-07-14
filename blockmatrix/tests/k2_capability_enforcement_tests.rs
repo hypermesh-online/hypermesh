@@ -89,6 +89,7 @@ async fn build_state(
         revocation_registry: revocation,
         light_sync_manager: None,
             catalog_registry: None,
+            inbox_store: None,
     })
 }
 

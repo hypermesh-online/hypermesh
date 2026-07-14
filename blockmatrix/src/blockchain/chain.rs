@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
@@ -63,7 +64,34 @@ pub struct NodeBlockchain {
     /// Block headers for lightweight chain verification.
     /// Stores headers for blocks we don't have full data for.
     pub(crate) headers: Arc<RwLock<HashMap<u64, BlockHeader>>>,
+
+    /// Orphan buffer: received blocks whose predecessor is not (yet) known.
+    ///
+    /// Zero-trust (P1/F7): a received block is NEVER spliced into the chain
+    /// on a missing or non-matching predecessor. Instead it waits here, keyed
+    /// by its own `previous_hash`, until a verified predecessor with that hash
+    /// is inserted — at which point the orphan is drained and linked.
+    ///
+    /// P6 (task #22.2): the buffer is BOUNDED. Each entry carries its arrival
+    /// [`Instant`]; on insert we first evict entries older than
+    /// [`ORPHAN_TTL`], then — if still at [`MAX_ORPHANS`] — evict the oldest
+    /// remaining entry. Without this an authenticated peer could flood
+    /// distinct-`previous_hash` orphans (each a fresh key) and grow this map
+    /// without limit. Eviction only ever drops UNLINKED orphans; the
+    /// buffer-then-link drain and its `content_binding_ok` re-verification are
+    /// untouched (P1 invariant preserved).
+    pub(crate) orphans: Arc<RwLock<HashMap<String, (Block, Instant)>>>,
 }
+
+/// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
+/// oldest orphan is evicted on each new insert — bounds a distinct-prev-hash
+/// flood from an authenticated peer.
+pub(crate) const MAX_ORPHANS: usize = 1024;
+
+/// Time-to-live for a buffered orphan (P6 task #22.2). An orphan whose
+/// predecessor never arrives is reclaimed after this window instead of
+/// lingering forever.
+pub(crate) const ORPHAN_TTL: std::time::Duration = std::time::Duration::from_secs(120);
 
 impl NodeBlockchain {
     /// Create a new blockchain for a node.
@@ -112,6 +140,7 @@ impl NodeBlockchain {
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
+            orphans: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -203,12 +232,21 @@ impl NodeBlockchain {
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
+            orphans: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
     /// Get the node's matrix coordinate.
     pub fn node_coordinate(&self) -> &MatrixCoordinate {
         &self.node_coordinate
+    }
+
+    /// Number of blocks currently buffered as orphans (P6 task #22.2).
+    ///
+    /// Used to assert the orphan buffer stays bounded under a
+    /// distinct-`previous_hash` flood.
+    pub async fn orphan_count(&self) -> usize {
+        self.orphans.read().await.len()
     }
 
     /// Get a block by index.
@@ -286,6 +324,34 @@ impl NodeBlockchain {
     /// Check if a block exists in this chain.
     pub async fn has_block(&self, hash: &str) -> bool {
         self.hash_index.read().await.contains_key(hash)
+    }
+
+    /// Per-asset shard authorization anchor (F6).
+    ///
+    /// Returns `true` if the given `shard_id` is a shard of an asset
+    /// registered on THIS chain — i.e., some block entry's
+    /// `StoragePointer::Sharded` lists `shard_id` among its
+    /// `shard_hashes`. Because every entry carries a validated, content-
+    /// bound `StateProof`, a positive answer means the shard belongs to an
+    /// asset whose registration this node has verified. Serving a shard is
+    /// then bound to the asset's on-chain proof, not merely to coarse
+    /// network membership.
+    ///
+    /// This is the authorization anchor; the requester's PoS authentication
+    /// is enforced separately (see `peer_auth::verify_shard_access`).
+    pub async fn authorizes_shard(&self, shard_id: &[u8; 32]) -> bool {
+        use super::block::StoragePointer;
+        let blocks = self.blocks.read().await;
+        for block in blocks.values() {
+            for entry in &block.entries {
+                if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
+                    if shard_hashes.iter().any(|h| h == shard_id) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Get the last N blocks.
@@ -978,5 +1044,56 @@ mod tests {
         let (start, end) = chain.get_participation_range().await;
         assert_eq!(start, 0);
         assert_eq!(end, 5);
+    }
+
+    // ── F6: per-asset shard authorization anchor ────────────────────────
+
+    /// Build an entry whose asset is stored as `Sharded` with the given
+    /// shard hashes, so `authorizes_shard` can find those shards.
+    fn sharded_entry(coord: MatrixCoordinate, shard_hashes: Vec<[u8; 32]>) -> BlockAssetEntry {
+        let reg = AssetRegistration::genesis(coord);
+        let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let state_proof = StateProof::default();
+        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
+        BlockAssetEntry {
+            asset_hash: content_hash,
+            proof_hash,
+            state_proof,
+            storage_pointer: StoragePointer::Sharded {
+                shard_hashes,
+                placements: vec![coord],
+            },
+            registration: reg,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_authorizes_shard_registered_and_unregistered() {
+        let coord = MatrixCoordinate::new(8, 8, 8).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: head");
+
+        let known_shard = [0x11u8; 32];
+        let other_shard = [0x22u8; 32];
+        let entry = sharded_entry(coord, vec![known_shard, other_shard]);
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+        chain.insert_block(block).await.expect("test: insert");
+
+        // Shards belonging to a registered sharded asset are authorized.
+        assert!(chain.authorizes_shard(&known_shard).await);
+        assert!(chain.authorizes_shard(&other_shard).await);
+
+        // An unknown shard (no registered asset) is NOT authorized.
+        assert!(!chain.authorizes_shard(&[0xFFu8; 32]).await);
+    }
+
+    #[tokio::test]
+    async fn test_authorizes_shard_ignores_non_sharded_assets() {
+        // Genesis + a Local-pointer asset carry no shard hashes, so no
+        // shard is authorized by them.
+        let coord = MatrixCoordinate::new(9, 9, 9).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        assert!(!chain.authorizes_shard(&[0x33u8; 32]).await);
     }
 }

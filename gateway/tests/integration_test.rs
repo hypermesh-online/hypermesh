@@ -17,8 +17,25 @@ struct TestClient {
     gateway_addr: SocketAddr,
 }
 
+/// Install a single rustls crypto provider for the test process.
+///
+/// P4 added a `trustchain` dependency to the gateway, which transitively
+/// enables the `aws-lc-rs` rustls backend alongside the pre-existing `ring`
+/// backend (via quinn). With two providers compiled in, rustls can no longer
+/// auto-select one, so every TLS-using test must install a default explicitly
+/// (the gateway binary already does this in `main.rs`). Idempotent via `Once`;
+/// `ring` is chosen to match the binary.
+fn ensure_crypto_provider() {
+    use std::sync::Once;
+    static INIT: Once = Once::new();
+    INIT.call_once(|| {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 impl TestClient {
     async fn new(gateway_addr: SocketAddr) -> Result<Self> {
+        ensure_crypto_provider();
         // Create client configuration
         let mut roots = rustls::RootCertStore::empty();
         for cert in rustls_native_certs::load_native_certs().certs {

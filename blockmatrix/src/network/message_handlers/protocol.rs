@@ -86,3 +86,30 @@ pub(crate) const TAG_DNS_QUERY: u8 = 0x50;
 /// DNS response (rich): records + chain metadata + foundation-grant
 /// flag for cross-node conflict resolution.
 pub(crate) const TAG_DNS_RESPONSE: u8 = 0x51;
+
+// ── Phase A2: shard-locate (upstream tracker fallback) ────────────────
+//
+// The torrent/DNS mirror model resolves shard locations in two layers:
+// live mirrors (`ShardLocationIndex`, populated by `TAG_SHARD_ANNOUNCE`)
+// and canonical matrix-placement. When BOTH miss among directly-connected
+// peers, a node asks an UPSTREAM peer "who has content_hash X?" — the shard
+// analog of the DNS upstream fallback (`dns/resolver.rs` upstream hop).
+//
+// This is a LOCATE query (returns provider node_ids), NOT a data fetch
+// (`TAG_SHARD_FETCH`, 0x02, transfers the shard bytes). Every peer is its
+// own mini-tracker of its `ShardLocationIndex`, so the request is a single
+// bounded, timeout-guarded upstream hop mirroring the shard-announce wire
+// pattern (tag + count + fixed/length-prefixed payload).
+
+/// Shard-locate request: `[TAG_SHARD_LOCATE][content_hash(32)]`. Asks the
+/// receiving peer which providers it knows for `content_hash` (from its own
+/// `ShardLocationIndex`, plus itself if it holds the shard locally).
+pub(crate) const TAG_SHARD_LOCATE: u8 = 0x52;
+/// Shard-locate response:
+/// `[TAG_SHARD_LOCATE_RESPONSE][count(4 LE)][node_id_len(2 LE) + node_id_utf8]...`.
+/// Provider node_ids the responding peer knows for the queried content hash.
+/// Documented here alongside the request tag for the full wire protocol; the
+/// authoritative codec + this constant live in `network::swarm_provider`, so the
+/// dispatch layer only matches the request tag (responses are read by the caller).
+#[allow(dead_code)]
+pub(crate) const TAG_SHARD_LOCATE_RESPONSE: u8 = 0x53;

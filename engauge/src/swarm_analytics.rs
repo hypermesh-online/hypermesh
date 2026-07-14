@@ -1135,4 +1135,114 @@ mod tests {
             other => unreachable!("test: expected UrgentReplicate, got {:?}", other),
         }
     }
+
+    // -- P6 convergence tests (the replication loop must STOP) -------------
+
+    /// The reconciler feedback loop MUST converge: given steady demand on a
+    /// shard, driving the actuator (fetch a replica → `set_replica_count` to
+    /// the new provider count) each cycle must make `ReplicationTrigger::check`
+    /// see `needed <= replicas` and STOP emitting a signal. Without the
+    /// `set_replica_count` feedback hook (the never-called convergence gap),
+    /// the replica count stays at 0 and the trigger fires forever.
+    ///
+    /// This is the pure-logic mirror of the E.2 actuator loop in
+    /// `blockmatrix/src/bin/node/commands/connect.rs`.
+    #[test]
+    fn replication_loop_converges_then_stops() {
+        let mut analytics = SwarmAnalytics::new();
+        let shard = test_hash(0x77);
+        let node = test_node("hot-consumer");
+
+        // Steady demand: 350 requests. With the default trigger
+        // (requests_per_replica_threshold = 100), `needed` = ceil(350/100) = 4.
+        for i in 0..350 {
+            analytics.record_request(shard, node, test_pos(0.0, 0.0, 0.0), i);
+        }
+
+        let trigger = ReplicationTrigger::new(ReplicationConfig::default());
+
+        // Simulate the actuator: each cycle, if a signal fires, "fetch" one
+        // more replica (the local node becomes a provider) and feed the new
+        // provider count back via set_replica_count. Track the trajectory.
+        let mut provider_count: u32 = 0;
+        analytics.set_replica_count(shard, provider_count);
+
+        let mut trajectory = vec![provider_count];
+        let mut converged_at = None;
+        for cycle in 0..20 {
+            let signals = trigger.check(&analytics);
+            if signals.is_empty() {
+                converged_at = Some(cycle);
+                break;
+            }
+            // Actuator fetched one replica this cycle → provider count grows.
+            provider_count += 1;
+            // THE feedback hook: report the new provider count back.
+            analytics.set_replica_count(shard, provider_count);
+            trajectory.push(provider_count);
+        }
+
+        // 1. The count RISES (monotonic non-decreasing, strictly up while
+        //    under-replicated).
+        assert!(
+            trajectory.windows(2).all(|w| w[1] >= w[0]),
+            "replica count must rise monotonically, got {trajectory:?}"
+        );
+        assert!(
+            *trajectory.last().expect("test: trajectory non-empty") > trajectory[0],
+            "replica count must actually increase, got {trajectory:?}"
+        );
+
+        // 2. It STOPS (converges) — the trigger stops firing once replicas
+        //    meet demand. needed = ceil(350/100) = 4 (>= min_replicas 3).
+        let cycles = converged_at.expect("loop must converge (trigger must stop firing)");
+        assert!(cycles > 0, "should take at least one cycle to converge");
+        assert_eq!(
+            analytics.get_replica_count(&shard),
+            4,
+            "converged replica count must equal demand-derived `needed` (ceil(350/100)=4)"
+        );
+
+        // 3. Once converged, further checks stay quiet (stable fixed point).
+        assert!(
+            trigger.check(&analytics).is_empty(),
+            "converged loop must not re-fire — stable fixed point"
+        );
+    }
+
+    /// Convergence must also STOP at `min_replicas` for lightly-loaded shards
+    /// (below the per-replica threshold), never over-replicating.
+    #[test]
+    fn replication_loop_converges_at_min_replicas() {
+        let mut analytics = SwarmAnalytics::new();
+        let shard = test_hash(0x78);
+        let node = test_node("light-consumer");
+
+        // Low demand: 50 requests => needed = max(ceil(50/100), min=3) = 3.
+        for i in 0..50 {
+            analytics.record_request(shard, node, test_pos(0.0, 0.0, 0.0), i);
+        }
+
+        let trigger = ReplicationTrigger::new(ReplicationConfig::default());
+        let mut provider_count = 0u32;
+        analytics.set_replica_count(shard, provider_count);
+
+        let mut converged = false;
+        for _ in 0..10 {
+            let signals = trigger.check(&analytics);
+            if signals.is_empty() {
+                converged = true;
+                break;
+            }
+            provider_count += 1;
+            analytics.set_replica_count(shard, provider_count);
+        }
+
+        assert!(converged, "light-load loop must converge");
+        assert_eq!(
+            analytics.get_replica_count(&shard),
+            3,
+            "must converge at min_replicas (3), not over-replicate"
+        );
+    }
 }

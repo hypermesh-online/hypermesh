@@ -6,8 +6,9 @@
 //!
 //! Client-side shard fetching and file reconstruction from retrieval instructions.
 
-mod fetching;
+pub mod fetching;
 mod pipeline;
+pub mod seeding;
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -16,8 +17,11 @@ use tokio::sync::RwLock;
 
 use crate::assets::storage::Hash;
 use crate::matrix::MatrixCoordinate;
+use crate::network::swarm_provider::ShardLocationIndex;
 
 use super::{RetrievalPlan, ShardLocation};
+
+pub use seeding::{ConsumerProviderSeeder, ShardSeeder};
 
 /// Progress of assembly operation
 #[derive(Debug, Clone)]
@@ -115,6 +119,19 @@ pub struct ClientAssembler {
 
     /// Maximum parallel fetches
     pub(crate) max_parallel: usize,
+
+    /// A2: optional live-mirror index. When set, per-shard location selection
+    /// consults the live swarm FIRST (via the shared two-layer resolver) before
+    /// falling back to the plan's canonical matrix placements. `None` in pure
+    /// tests / Private mode — the path degrades to canonical placement only.
+    pub(crate) live_index: Option<Arc<ShardLocationIndex>>,
+
+    /// A2: optional become-provider seeder. When set, every fetched +
+    /// BLAKE3-verified shard is re-announced to the swarm (consumer becomes
+    /// provider, R12), exactly as the live IPC path does. `None` in pure tests
+    /// — the fetch still succeeds and shards are held locally, matching the IPC
+    /// path's "no manager wired" fallback (cache without announce).
+    pub(crate) seeder: Option<Arc<dyn ShardSeeder>>,
 }
 
 impl ClientAssembler {
@@ -140,7 +157,24 @@ impl ClientAssembler {
                 throughput_bps: 0,
             })),
             max_parallel,
+            live_index: None,
+            seeder: None,
         }
+    }
+
+    /// Attach a live-mirror index so per-shard resolution consults the swarm
+    /// first (A2 two-layer resolve). Builder-style; returns `self`.
+    pub fn with_live_index(mut self, index: Arc<ShardLocationIndex>) -> Self {
+        self.live_index = Some(index);
+        self
+    }
+
+    /// Attach a become-provider seeder so verified fetches re-announce to the
+    /// swarm (A2 unification — same become-provider behaviour as the live IPC
+    /// path). Builder-style; returns `self`.
+    pub fn with_seeder(mut self, seeder: Arc<dyn ShardSeeder>) -> Self {
+        self.seeder = Some(seeder);
+        self
     }
 
     /// Initialize with retrieval plan
@@ -542,6 +576,61 @@ mod tests {
         assert!(
             (progress.percentage - 1.0).abs() < f64::EPSILON,
             "Progress should be 100%"
+        );
+    }
+
+    /// FORGED MIRROR (a): a fetched shard whose data does NOT match its claimed
+    /// content hash is REJECTED at reconstruct — a corrupt/forged shard never
+    /// reaches the Reed-Solomon decoder (mirror invariant #1, F4).
+    #[tokio::test]
+    async fn test_reconstruct_rejects_forged_shard() {
+        let assembler = ClientAssembler::new(4);
+        let plan = create_test_plan();
+        assembler.initialize(plan).await.expect("test: init plan");
+
+        {
+            let mut fetched = assembler.fetched_shards.write().await;
+            // Insert enough shards to clear the min_shards_required threshold
+            // (10 data shards for the test plan). Shards 0..9 are honest; shard 5
+            // is FORGED (data does not hash to its claimed _hash).
+            for i in 0..10usize {
+                let (data, hash) = if i == 5 {
+                    // FORGED: claimed _hash != BLAKE3(data)
+                    (vec![9u8, 9, 9, 9], [0xAAu8; 32])
+                } else {
+                    let d = vec![i as u8, 2, 3, 4];
+                    let h = *blake3::hash(&d).as_bytes();
+                    (d, h)
+                };
+                fetched.insert(
+                    i,
+                    FetchedShard {
+                        _hash: hash,
+                        data,
+                        _source: MatrixCoordinate::new(i as i64, 0, 0).expect("test: coord"),
+                        _fetch_time_ms: 0,
+                    },
+                );
+            }
+
+            let mut progress = assembler.progress.write().await;
+            progress.fetched_shards = 10;
+            progress.percentage = 1.0;
+        }
+
+        let result = assembler
+            .reconstruct_with_pipeline(&crate::assets::pipeline::orchestrator::DecryptionKey::Aes(
+                crate::assets::pipeline::encryption::AesKey {
+                    key: vec![0u8; 32],
+                    nonce: vec![0u8; 12],
+                },
+            ))
+            .await;
+
+        assert!(result.is_err(), "forged shard must be rejected at reconstruct");
+        assert!(
+            result.unwrap_err().to_string().contains("content-hash mismatch"),
+            "error should cite the content-hash mismatch",
         );
     }
 

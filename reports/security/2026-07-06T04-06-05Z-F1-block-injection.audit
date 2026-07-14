@@ -1,0 +1,26 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F1 — Unauthenticated/forged block injection (mesh-wide)
+
+- **Severity:** CRITICAL
+- **Exploitability:** live-remote, pre-authorization (TAG_BLOCK_ANNOUNCE is ungated; any live QUIC connection suffices)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+`TAG_BLOCK_ANNOUNCE` (0x03) is deliberately excluded from the `needs_auth` gate, so any peer that merely opens a QUIC connection (granted to any self-signed cert by the bootstrap AcceptAllVerifier) reaches `handle_block_announce` with no PoS handshake required. The attacker crafts a `Block` whose `BlockAssetEntry` carries a raw `StateProof` with fully attacker-chosen fields — `StakeProof{stake_amount:u64::MAX}`, `SpaceProof{total_storage:1<<50, node_id:any}`, arbitrary Work/Time proofs. `parse_and_verify_block` checks only (a) the BLAKE3 block hash (recomputable; the `Block` struct has no author-signature field), (b) `proof_hash == BLAKE3(json(state_proof))` (attacker sets it), and (c) `state_proof.validate()` — four structural, attacker-satisfiable checks with no crypto and no binding to the sender. The block is accepted, inserted, its AAAA DNS entries auto-registered into the local resolver (DNS hijack of arbitrary domains), and in Network scope re-propagated to all peers who accept it identically. The attacker thereby fabricates hardware-capacity/stake assets (defeating R1/R2), hijacks DNS names, and writes forged identity/key-rotation records that the whole swarm gossips as authentic.
+
+## Root cause
+`BlockAssetEntry` stores a raw `StateProof` rather than a FALCON-signed `WireSignedProof` (no signature on the wire to forge); block ingestion is intentionally exempted from the authentication gate; and `StateProof::validate()` is structural, with no binding of the proof's node_id/coordinate to the sending peer's authenticated identity.
+
+## Evidence (file:line)
+- `blockmatrix/src/network/message_handlers/peer_connection.rs:118-128` — `needs_auth` set explicitly EXCLUDES `TAG_BLOCK_ANNOUNCE`; comment: "Block announcements are NOT gated here"
+- `blockmatrix/src/network/message_handlers/block_handlers.rs:49-114` — `parse_and_verify_block` checks only BLAKE3 hash + self-set proof_hash + structural `validate()`
+- `blockmatrix/src/blockchain/block.rs:61-77` — `BlockAssetEntry.state_proof` is a raw `StateProof`; no author-signature field
+- `blockmatrix/src/blockchain/block.rs:115-137,243-255` — `Block` has no author-signature field; hash is BLAKE3 over attacker-controlled content
+- `trustchain/src/proof_of_state/mod.rs:134-139` + `proof.rs:199` — `StateProof::validate()` is four structural checks; `StakeProof::verify_signature` = `!id.is_empty() && amount>0`
+- `blockmatrix/src/blockchain/mutations.rs:118-158` — `insert_received_block` re-checks only hash + linkage (with index==1 cross-genesis bypass)
+- `blockmatrix/src/bin/node/commands/background.rs:115-120` — background sync inserts fetched blocks with ZERO proof validation
+
+## Fix (see .report on resolution)
+Blocks must carry a `WireSignedProof` (FALCON-signed), not a raw `StateProof`. On receipt: verify the FALCON signature, verify `BLAKE3(signer_pubkey) == block author's handshake node_id`, reject any block whose space_proof coordinate is not the authenticated sender's, and call `validate_with_requirements(&StateRequirements::production())`. Gate `TAG_BLOCK_ANNOUNCE`.

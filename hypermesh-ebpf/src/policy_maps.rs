@@ -201,44 +201,33 @@ impl PolicyManager {
         buf
     }
 
-    /// Update eBPF maps with current policies using aya.
+    /// Validate that every stored policy serializes to the kernel wire
+    /// format, returning the number of policies that are ready to sync.
     ///
-    /// Iterates all stored policies, serializes each to the BPF map value
-    /// format, and (when pinned maps are available) writes them to the
-    /// kernel BPF hash map at `/sys/fs/bpf/policy_map`.
+    /// The ACTUAL kernel `policy_map` write is performed by
+    /// [`crate::xdp::XdpManager::sync_policies_to_bpf`], which owns the
+    /// loaded `aya::Bpf` handle and reads these same policies. The
+    /// `PolicyManager` deliberately does NOT hold a BPF handle (it is
+    /// shared, `Clone`, and lives independent of any attach lifecycle), so
+    /// the real map write lives with the handle. This method is retained
+    /// for API compatibility and byte-format validation.
     #[cfg(feature = "kernel-attach")]
     pub fn sync_to_kernel(&self) -> anyhow::Result<()> {
         let policies = self.policies.read();
         let count = policies.len();
-
-        tracing::info!("Syncing {} policies to kernel BPF maps", count);
-
-        // In a fully wired system, we would:
-        // 1. Open the pinned BPF map at /sys/fs/bpf/policy_map
-        // 2. Iterate our policies and write each one
-        // 3. Remove stale entries
-        //
-        // The map write format matches the C struct:
-        //   key:   conn_key { src_ip[16], dst_ip[16], src_port: u16, dst_port: u16 }
-        //   value: policy_value { requires_pos: u32, validate_asset_hash: u32,
-        //                         check_matrix_routing: u32, privacy_tier: u32,
-        //                         max_packet_size: u32, rate_limit_per_sec: u32,
-        //                         _reserved: [u8; 8] }
-        //
-        // For now, we serialize policies to the byte format that matches
-        // the BPF map schema, validating the format is correct.
-
-        for (conn_id, policy) in policies.iter() {
-            let policy_bytes = Self::serialize_policy_for_bpf(policy);
-            tracing::debug!(
-                "Would sync connection {} policy ({} bytes) to BPF policy_map",
-                conn_id,
-                policy_bytes.len()
-            );
+        for policy in policies.values() {
+            // Validate serialization; a wrong length here would corrupt the
+            // kernel map, so fail loudly rather than write bad bytes.
+            let bytes = Self::serialize_policy_for_bpf(policy);
+            if bytes.len() != 32 {
+                anyhow::bail!(
+                    "policy serialized to {} bytes, expected 32",
+                    bytes.len()
+                );
+            }
         }
-
-        tracing::info!(
-            "Policy sync complete: {} entries prepared for BPF map",
+        tracing::debug!(
+            "Validated {} policies for kernel sync (write performed by XdpManager::sync_policies_to_bpf)",
             count
         );
         Ok(())
@@ -246,7 +235,7 @@ impl PolicyManager {
 
     #[cfg(not(feature = "kernel-attach"))]
     pub fn sync_to_kernel(&self) -> anyhow::Result<()> {
-        tracing::warn!("kernel-attach feature not enabled, policies not synced to kernel");
+        tracing::debug!("kernel-attach not enabled; policies validated for userspace-only enforcement");
         Ok(())
     }
 }

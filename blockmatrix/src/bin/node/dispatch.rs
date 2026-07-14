@@ -88,10 +88,10 @@ pub(crate) async fn dispatch_command(
             }
         }
         Some(Commands::Store { path }) => {
-            dispatch_store(path).await?;
+            dispatch_store(path, bootstrap, data_dir, nid).await?;
         }
         Some(Commands::Fetch { asset_id, output }) => {
-            dispatch_fetch(asset_id, output).await?;
+            dispatch_fetch(asset_id, output, data_dir, nid).await?;
         }
         Some(Commands::Dns { action }) => {
             dispatch_dns(action, bootstrap, data_dir, nid).await?;
@@ -299,7 +299,17 @@ async fn dispatch_update(channel: String, version: Option<String>, json: bool) {
     }
 }
 
-async fn dispatch_store(path: std::path::PathBuf) -> Result<()> {
+async fn dispatch_store(
+    path: std::path::PathBuf,
+    bootstrap: &NodeBootstrap,
+    data_dir: &std::path::Path,
+    nid: &str,
+) -> Result<()> {
+    // Standalone (no-daemon) store uses the node's own identity keystore for
+    // self-custody and honours the current privacy mode for the encryption
+    // stage (Private → encrypted, Public/Anonymous → cleartext shards).
+    let identity_dir = data_dir.join(nid).join("identity");
+    let privacy_mode = bootstrap.privacy_mode().await;
     let client = ipc::IpcClient::new();
     if client.is_daemon_running().await {
         let path_str = path.display().to_string();
@@ -313,11 +323,11 @@ async fn dispatch_store(path: std::path::PathBuf) -> Result<()> {
             ),
             Err(e) => {
                 warn!("IPC store failed ({e}), falling back to standalone");
-                run_store(path, None).await?;
+                run_store(path, None, &identity_dir, privacy_mode).await?;
             }
         }
     } else {
-        run_store(path, None).await?;
+        run_store(path, None, &identity_dir, privacy_mode).await?;
     }
     Ok(())
 }
@@ -325,7 +335,12 @@ async fn dispatch_store(path: std::path::PathBuf) -> Result<()> {
 async fn dispatch_fetch(
     asset_id: String,
     output: Option<std::path::PathBuf>,
+    data_dir: &std::path::Path,
+    nid: &str,
 ) -> Result<()> {
+    // Standalone fetch loads the node identity to unwrap the self-custodied
+    // decryption key for encrypted assets; cleartext assets need no key.
+    let identity_dir = data_dir.join(nid).join("identity");
     let client = ipc::IpcClient::new();
     if client.is_daemon_running().await {
         match client
@@ -344,11 +359,11 @@ async fn dispatch_fetch(
             ),
             Err(e) => {
                 warn!("IPC fetch failed ({e}), falling back to standalone");
-                run_fetch(asset_id, output).await?;
+                run_fetch(asset_id, output, &identity_dir).await?;
             }
         }
     } else {
-        run_fetch(asset_id, output).await?;
+        run_fetch(asset_id, output, &identity_dir).await?;
     }
     Ok(())
 }

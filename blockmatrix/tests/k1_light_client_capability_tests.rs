@@ -96,6 +96,7 @@ async fn build_state_with_issuer(
         revocation_registry: Arc::new(RevocationRegistry::new()),
         light_sync_manager: None,
             catalog_registry: None,
+            inbox_store: None,
     })
 }
 

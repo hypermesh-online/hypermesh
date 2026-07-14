@@ -48,6 +48,21 @@ fn compile_ebpf_programs() {
         }
     };
 
+    // Collect candidate include dirs that actually exist. Debian ships
+    // arch headers under /usr/include/x86_64-linux-gnu; Arch/Fedora put
+    // everything under /usr/include. Only pass dirs that exist so clang
+    // does not warn about missing search paths.
+    let candidate_includes = [
+        "/usr/include",
+        "/usr/include/bpf",
+        "/usr/include/x86_64-linux-gnu",
+    ];
+    let include_args: Vec<String> = candidate_includes
+        .iter()
+        .filter(|d| Path::new(d).exists())
+        .map(|d| format!("-I{d}"))
+        .collect();
+
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().map_or(true, |e| e != "c") {
@@ -62,17 +77,15 @@ fn compile_ebpf_programs() {
 
         println!("cargo:rerun-if-changed={}", path.display());
 
+        // `-g` emits BTF, which aya 0.12 (aya-obj 0.2.1) REQUIRES to parse the
+        // object — without it, load fails with "no BTF parsed for object".
         let status = Command::new("clang")
-            .args(["-O2", "-target", "bpf", "-c"])
+            .args(["-O2", "-g", "-target", "bpf", "-c"])
             .arg(&path)
             .arg("-o")
             .arg(&output)
-            .args([
-                "-I/usr/include",
-                "-I/usr/include/bpf",
-                "-I/usr/include/x86_64-linux-gnu",
-                "-D__TARGET_ARCH_x86",
-            ])
+            .args(&include_args)
+            .arg("-D__TARGET_ARCH_x86")
             .status();
 
         match status {

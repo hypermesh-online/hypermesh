@@ -16,8 +16,6 @@ pub use hypermesh_ebpf::{
     AfXdpManager,
     AfXdpSocket,
     AfXdpStats,
-    AssetHashHeader,
-    AssetHashValidator,
     // Hooks
     CertificateValidator,
     // Capabilities
@@ -32,18 +30,12 @@ pub use hypermesh_ebpf::{
     // Metrics
     HyperMeshMetrics,
     HyperMeshMetricsCollector,
-    MatrixRoutingHeader,
     PacketDecision,
     PacketValidator,
     PassThroughValidator,
     // Policy
     PolicyManager,
-    PrivacyTierHeader,
     ProgramType,
-    // Headers
-    ProofOfStateHeader,
-    // Validators
-    ProofOfStateValidator,
     RingConfig,
     ShardMetadata,
     TransportMetrics,
@@ -56,6 +48,15 @@ pub use hypermesh_ebpf::{
     XdpManager,
     XdpStats,
 };
+
+// NOTE: the HyperMesh EXT_* extension-header types
+// (`ProofOfStateHeader`/`AssetHashHeader`/`MatrixRoutingHeader`/`PrivacyTierHeader`)
+// and their structural validators (`ProofOfStateValidator`/`AssetHashValidator`)
+// are intentionally NOT re-exported here: STOQ frames are encrypted QUIC (F10), so
+// these plaintext wire headers were never emitted or parsed on the STOQ datapath.
+// STOQ's own PoS extension validation goes through `StoqPosExtensionValidator`
+// (see `pos_extension_validator.rs`) via the `ExtensionValidator` trait, which is
+// still re-exported above.
 
 // -----------------------------------------------------------------------
 // STOQ Validation Hook Implementations

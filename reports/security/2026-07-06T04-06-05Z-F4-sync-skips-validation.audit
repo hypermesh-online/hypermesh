@@ -1,0 +1,24 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F4 — Background sync inserts fetched blocks with ZERO proof validation
+
+- **Severity:** HIGH
+- **Exploitability:** requires-config (victim in multi-node/sync config; attacker must be a registered reflector)
+- **Verdict:** CONFIRMED (adversarially verified)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+The node has two block-receive paths with asymmetric rigor. The announce/push path validates every entry's StateProof before insertion, but the background sync-pull loop calls `blockchain.insert_received_block(block)` directly on every fetched block. `insert_received_block` only checks the BLAKE3 self-hash and previous_hash linkage — it never invokes the `state_proof_validator` at all (that gate lives only in `add_block`). The only check on fetched blocks in the pull driver is `block.verify_hash()` (BLAKE3 self-consistency). So a malicious reflector the victim syncs from can return blocks whose entry StateProofs are entirely empty or garbage (stake 0, empty ids) — proofs that would fail even the weak structural announce gate — and they land in the victim's chain, corrupting its state. Every peer that clears the (trivially-bypassable, see F2) handshake is auto-registered as a reflector the victim pulls from, so the bar to becoming a poisoned sync source is low in the alpha bootstrap phase.
+
+## Root cause
+`insert_received_block`, used by the sync-pull loop, omits the state-proof validation that the `add_block`/announce path enforces — an asymmetry between the two receive paths leaves the sync path with no proof validation whatsoever.
+
+## Evidence (file:line)
+- `blockmatrix/src/bin/node/commands/background.rs:115-120` — sync-pull loop calls `insert_received_block(block)` directly, no state-proof validation
+- `blockmatrix/src/blockchain/mutations.rs:118-158` — `insert_received_block` checks only `verify_hash()` + previous_hash linkage; never calls the `state_proof_validator`
+- `blockmatrix/src/blockchain/mutations.rs:24-72` — `add_block` DOES validate every entry via `state_proof_validator.validate` (:33-39); the missing check
+- `blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs:355-360` — the only check on fetched blocks in the pull path is `block.verify_hash()`
+- `blockmatrix/src/network/message_handlers/block_handlers.rs:96-110` — announce path DOES validate proof_hash + `state_proof.validate()`, proving the asymmetry
+
+## Fix (see .report on resolution)
+Add the per-entry `state_proof_validator.validate` loop (extracted from `add_block` mutations.rs:33-39) INSIDE `insert_received_block` before `insert_block`. One fix covers BOTH the sync path and the announce path. Post-F1, this per-entry validation is the signed-proof verification.

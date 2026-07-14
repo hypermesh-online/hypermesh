@@ -12,8 +12,9 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
+use crate::config::StoqAuthMode;
 use crate::stoq_bridge::StoqBridge;
 
 /// Metadata extracted from an incoming STOQ connection.
@@ -76,11 +77,31 @@ impl StoqListener {
                     info!(
                         connection_id = %info.connection_id,
                         remote = %info.remote_addr,
+                        auth_mode = self.bridge.auth_mode().as_str(),
                         "STOQ connection accepted"
                     );
 
                     let handler = handler.clone();
+                    let bridge = Arc::clone(&self.bridge);
+
                     tokio::spawn(async move {
+                        // F8: in full-STOQ-PoS mode, a completed bilateral PoS
+                        // handshake is required BEFORE the handler runs. In
+                        // HTTP-proxy mode the handshake is skipped and the
+                        // request is proxied directly (backwards compatible).
+                        if bridge.auth_mode() == StoqAuthMode::FullStoqPos {
+                            let conn_id = conn.id();
+                            if let Err(e) = bridge.perform_pos_handshake(&conn).await {
+                                warn!(
+                                    connection_id = %conn_id,
+                                    error = %e,
+                                    "rejecting un-authenticated STOQ connection (full-stoq-pos mode)"
+                                );
+                                bridge.drop_connection(&conn_id);
+                                return;
+                            }
+                        }
+
                         if let Err(e) = handler(info).await {
                             error!("STOQ connection handler error: {}", e);
                         }

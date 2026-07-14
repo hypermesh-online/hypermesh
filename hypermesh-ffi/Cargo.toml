@@ -1,6 +1,6 @@
 [package]
 name = "hypermesh-ffi"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 description = "C FFI bindings for HyperMesh SDK"
 license = "BSL-1.1"
@@ -11,10 +11,27 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 hypermesh-sdk = { path = "../hypermesh-sdk" }
+# Direct (daemon-less) C ABI over the SAME validated Rust paths:
+# - hypermesh-lib: AssetAddress + BLAKE3 content-hash mirror invariant
+# - trustchain: FALCON-1024 identity, cert primitives, PoS-signed proof verify
+hypermesh-lib = { workspace = true }
+trustchain = { path = "../trustchain" }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+blake3 = { workspace = true }
+anyhow = { workspace = true }
+# PoS-proof publish seam: FALCON-1024 size constants + wire-proof nonce.
+pqcrypto-falcon = { workspace = true }
+rand = { workspace = true }
 libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.27"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Tests build genuine proofs via `StateProof::new_for_testing()`, which is
+# gated behind trustchain's `localhost-testing` feature. Enabling it here
+# (dev-only) keeps it out of the production cdylib/staticlib.
+trustchain = { path = "../trustchain", features = ["localhost-testing"] }

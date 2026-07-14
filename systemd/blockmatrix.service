@@ -1,9 +1,9 @@
 [Unit]
 Description=HyperMesh Block-MATRIX Node
 Documentation=https://github.com/hypermesh-online/core
-After=network-online.target trustchain.service
+After=network-online.target trustchain-stoq.service
 Wants=network-online.target
-Requires=trustchain.service
+Requires=trustchain-stoq.service
 
 [Service]
 Type=simple
@@ -16,10 +16,18 @@ Group=hypermesh
 LimitNOFILE=65536
 Environment=RUST_LOG=info
 
+# eBPF kernel gate (default security feature): the node loads/attaches its XDP
+# program (hypermesh_xdp.o) so the kernel DROP mirrors the userspace PoS reject.
+# XDP attach needs CAP_BPF + CAP_NET_ADMIN; granted as ambient caps to the
+# otherwise-unprivileged hypermesh user (NOT full root). If the kernel/NIC does
+# not support attach, the loader degrades gracefully to the userspace-only gate.
+AmbientCapabilities=CAP_BPF CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN
+
 # Security hardening
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/hypermesh/blockmatrix /var/log/hypermesh
+ReadWritePaths=/var/lib/hypermesh/blockmatrix /var/log/hypermesh /sys/fs/bpf
 PrivateTmp=true
 NoNewPrivileges=true
 

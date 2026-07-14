@@ -144,17 +144,21 @@ async fn record_session_audit(
         AssetCategory::BaseSystem(BaseSystemType::Identity),
     );
 
-    let proof_hash = *blake3::hash(b"session-audit-proof-v1").as_bytes();
-
     let payload_str = String::from_utf8_lossy(&entry_bytes).to_string();
 
-    let entry = BlockAssetEntry {
+    // Generate a REAL PoS proof from this node's own identity
+    // (R1: hardware-assessed, not self-reported).
+    let state_proof = StateProof::generate_from_network(&state.node_id)
+        .await
+        .map_err(|e| format!("session-audit proof generation: {e}"))?;
+
+    // Bind the proof to the content hash (signed-to-content invariant, P1).
+    let entry = BlockAssetEntry::new_bound(
         asset_hash,
-        proof_hash,
-        state_proof: StateProof::new_for_testing(),
-        storage_pointer: StoragePointer::Local { path: payload_str },
+        &state_proof,
+        StoragePointer::Local { path: payload_str },
         registration,
-    };
+    );
 
     state
         .blockchain

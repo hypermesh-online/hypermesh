@@ -1,0 +1,89 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F10 — The XDP eBPF gate parses a wire header that does not exist
+
+- **Severity**: MEDIUM (correctness / dead-code security control; not an exploitable hole — it fails safe to XDP_PASS)
+- **Discovered**: 2026-07-13, investigating why the XDP program would not pass the kernel verifier during P8.
+
+## Finding
+
+`hypermesh-ebpf/programs/hypermesh_xdp.c` inspects the UDP payload immediately
+after the UDP header and expects a plaintext HyperMesh header:
+`struct hmesh_header { u16 magic(0x484D); u8 type; u8 length; }` (`:221-232`),
+then PoS / asset-hash / matrix extension headers keyed off it (`:742-896`).
+
+Three independent facts make this parsing inert against real traffic:
+
+1. **The magic prefix is never produced.** A whole-tree grep for `0x484D` /
+   `HMESH_HDR_MAGIC` / `hmesh_header` across `stoq/`, `blockmatrix/`, and
+   `hypermesh-ebpf/src/` returns ZERO Rust hits. No code serializes a 4-byte
+   `HM`-magic header onto any packet. STOQ's real extension typing is a QUIC
+   varint in the private range `0xfe0000xx` (`stoq/src/protocol/mod.rs:57-76`).
+
+2. **The bytes there are encrypted.** STOQ is standard QUIC over rustls/TLS 1.3
+   (quinn — `stoq/src/transport/manager/constructors.rs:204-205`,
+   `connection.rs:155`). The bytes at `data+eth+ip6+udp` are the QUIC header +
+   AEAD ciphertext. XDP runs at the NIC before QUIC decryption, so any HyperMesh
+   metadata (STOQ frames, or JSON blocks via `stoq_transport.rs:76-97`) is
+   physically unreadable in the kernel.
+
+3. **Even the userspace layout disagrees with the C layout.** The authoritative
+   Rust headers (`hypermesh-ebpf/src/hypermesh_headers.rs`: `ProofOfStateHeader`
+   88B no-magic, `AssetHashHeader` 72B u32 shard fields, `MatrixRoutingHeader`
+   3×u16 BE) are parsed at OFFSET 0 with NO magic by the userspace validator
+   (`hypermesh-ebpf/src/xdp/validation.rs:44-140`) — a different field set, size,
+   and byte order than the C `hmesh_*` structs. Three incompatible "HyperMesh
+   header" definitions exist for one concept.
+
+## Net effect
+
+For genuine STOQ packets: eth/ipv6/udp parse fine, but the `magic == 0x484D`
+check (`:747`) tests encrypted QUIC bytes and effectively never matches, so the
+entire PoS / asset / matrix validation block and the matrix XDP_TX path are
+skipped and the packet falls through to `XDP_PASS`. The IP/port/queue-based
+`filter_map` DROP/REDIRECT and AF_XDP paths still work (they don't use the
+phantom header), but **the PoS/asset/matrix "kernel gate" is dead code** — it
+never fires on real traffic. It fails SAFE (pass, not silently-authorize), so it
+is not an exploitable authorization bypass; it is a security control that does
+nothing.
+
+This also explains the P8 verifier struggle: the `data_end - data` length feeding
+the (dead) header-parse accounting was the last thing blocking load — effort
+spent making a mismatched design load.
+
+## Correct design (for the resolution)
+
+XDP cannot inspect encrypted-QUIC content. A kernel gate over STOQ can only
+legitimately act on what is visible in cleartext on the wire: L2/L3/L4 —
+i.e. drop/allow by **source IPv6 + UDP port + a PoS-authenticated-peer allowlist
+map** populated from userspace AFTER the bilateral PoS handshake completes
+(the userspace layer already knows which peers passed PoS). Content-level
+validation (content-hash, signed-to-content, four-proof) MUST stay in userspace
+after QUIC decryption — which is exactly where P1 already enforces it. The kernel
+layer's honest job is coarse DDoS/allowlist filtering keyed on the authenticated
+peer's address, not deep packet parsing.
+
+## Deeper architectural framing (project owner, 2026-07-13)
+
+The eBPF gate's premise is wrong at a level beyond the header mismatch. The
+intended architecture factors into TWO cooperating pieces that must work
+cohesively end-to-end:
+- **NGauge** (crate dir `engauge/`, a typo for NGauge) owns the internal
+  HyperMesh **routing instructions** (WHERE to fetch/place — instruction-based
+  retrieval maps, matrix routing) AND the **sharding**.
+- **blockmatrix** owns the **decryption + unpacking**, AFTER NGauge's sharding.
+
+The kernel/XDP layer sits between two layers that own the actual work — it has
+neither NGauge's routing instructions nor blockmatrix's decrypted content. So the
+correct eBPF role can only be settled by first understanding this NGauge↔
+blockmatrix contract (what's on the wire between them, what's encrypted, where the
+routing metadata lives). Resolution deferred pending that end-to-end map
+(investigation in progress 2026-07-13); options A/B below are provisional.
+
+A. Reframe the XDP gate to an IP/port + PoS-authenticated-peer allowlist drop
+   (delete the phantom `hmesh_header` parsing); the userspace P1 gate remains the
+   content authority. Fixes the verifier issue as a side effect (no length math).
+B. Ship userspace-only enforcement (current live state); mark the XDP kernel
+   gate as not-yet-real and track the reframe as future work.
+C. (pending the NGauge↔blockmatrix map) whatever role, if any, is legitimately
+   visible at the wire layer in the real sharded-transmission flow.

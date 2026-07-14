@@ -16,6 +16,32 @@ export interface CrateStatus {
 
 export const crateStatuses: CrateStatus[] = [
   {
+    "id": "base",
+    "name": "Substrate",
+    "description": "Sovereign addressing and link/carrier management beneath the kernel",
+    "phase": "planning",
+    "features": {
+      "working": [],
+      "inDevelopment": [],
+      "planned": [
+        "Substrate.a — sovereign addressing: NodeId → fd48:4d00::/32 derivation (R15)",
+        "Substrate.a — address verification (peer recomputes from Falcon pubkey)",
+        "Substrate.a — reachability discovery via STOQ reflector extension",
+        "Substrate.b — rtnetlink interface enumeration (replaces hardcoded guess, R16)",
+        "Substrate.b — carrier/link-state monitoring",
+        "Substrate.b — lease-free address assignment (no DHCP)",
+        "Substrate.b — link-flap self-healing + QUIC connection-migration signal",
+        "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback)",
+        "rtnetlink_linux backend (Phase 1/2)",
+        "sysfs_fallback backend (read-only degraded tier)",
+        "radio_mesh backend — Substrate.c device-to-device (roadmap R&D)",
+        "windows backend — future cross-platform (roadmap)",
+        "Inject derived bind_address/public_ipv6/ebpf_interface into STOQ at node binary"
+      ]
+    },
+    "completion": 0
+  },
+  {
     "id": "block-matrix",
     "name": "Block-MATRIX",
     "description": "3D mesh topology, matrix-aware distributed computing, and asset pipeline",
@@ -574,6 +600,14 @@ export const crateStatuses: CrateStatus[] = [
         "Config API (hypermesh_config_show, config_get)",
         "C header file (include/hypermesh.h with extern C guards)",
         "NULL-safe — all functions handle NULL client gracefully",
+        "Direct Identity ABI (hypermesh_identity_generate/load/free/node_id/public_key/kyber_public_key/sign)",
+        "Direct signature verify (hypermesh_verify_signature — stateless FALCON-1024)",
+        "Direct PoS proof verify (hypermesh_signed_proof_verify — WireSignedProof envelope, preserves PoS gate)",
+        "Direct AssetAddress ABI (new/to_ipv6/from_ipv6/fingerprint/coords/shard_index/is_hypermesh)",
+        "Direct content-hash mirror invariant (hypermesh_compute_content_hash/hypermesh_verify_content_hash — BLAKE3, R4)",
+        "cbindgen-generated header (build.rs + cbindgen.toml regenerate include/hypermesh.h)",
+        "catch_unwind at every direct-ABI boundary; opaque handles with matching free fns",
+        "C smoke test (tests/smoke.c + run_smoke.sh) links staticlib and exercises the direct ABI",
         "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
         "TrustChain API (hypermesh_trustchain_certificates, issue, validate, revoke, dns_zones)",
         "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
@@ -893,11 +927,11 @@ export const crateStatuses: CrateStatus[] = [
         "Single Gateway entry — UI paths match multi-service reverse-proxy architecture (M.1+M.1.5)",
         "TrustChain module — 9 sub-routes wired to real daemon X.509 data (M.2 + M.2.5)",
         "STOQ module — 4 sub-routes wired (M.3), polling gaps closed for chainValidation/topologyNeighbors/caesarTransactions, useDashboardList/useDashboardInfo hooks added",
-        "Catalog deps + search + system check-update — UI wires (M.4) consuming real daemon handlers (M.4.5a/b/c)"
+        "Catalog deps + search + system check-update — UI wires (M.4) consuming real daemon handlers (M.4.5a/b/c)",
+        "Test harness restored — tsc clean, vitest green, Playwright enumerable, legacy EnhancedCertificate chain retired (M.5)"
       ],
       "inDevelopment": [
         "Storybook stories — 3 existing, ~25 needed for full coverage",
-        "Unit test coverage — trustchain has tests, other modules need Vitest tests",
         "Tauri desktop bundle — release.yml `desktop` matrix wired but continue-on-error (C.3.5: real icons, sidecar binary, platform polish)"
       ],
       "planned": [
@@ -907,6 +941,6 @@ export const crateStatuses: CrateStatus[] = [
         "Windows named-pipe IPC for daemon ping (C.3.5 — currently Unix-socket only)"
       ]
     },
-    "completion": 89
+    "completion": 91
   }
 ];

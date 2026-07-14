@@ -1,0 +1,26 @@
+<!-- Written by Richard Christopher, Copyright 2026 HyperMesh Foundation -->
+
+# F7 — Cross-genesis graft + missing-predecessor insertion (local index-DoS)
+
+- **Severity:** MEDIUM
+- **Exploitability:** live-remote (unauthenticated: block ingestion is ungated)
+- **Verdict:** CONFIRMED (adversarially verified; original "overwrite" claim refuted → corrected to index-DoS)
+- **Audit date:** 2026-07-05
+
+## Attack narrative
+`insert_received_block` special-cases `block.index==1`: if the received block's `previous_hash` does not match our genesis it warns and inserts anyway ("cross-genesis sync"), and when the predecessor is absent it inserts regardless ("gap-fill later"). Because `TAG_BLOCK_ANNOUNCE` is ungated (F1) and block validation is only structural, an unauthenticated peer can send a self-authored block `index==1` whose `previous_hash` points at the attacker's own genesis (or garbage) and have it accepted onto a fresh chain, and can announce a high-index block with no local predecessor and have it stored at a chosen index.
+
+Correction to the original claim: `insert_block` rejects if the index already exists and device-scope rejects `index <= our_height`, so this cannot OVERWRITE an existing block — it can only OCCUPY an empty slot. Occupying a future index is nonetheless a permanent local DoS on that index: once occupied, the legitimate future block at that index is rejected by the same `contains_key` check, poisoning the node's local chain view. Device scope is local-only, so blast radius is one victim node's local state per injection.
+
+## Root cause
+Chain-linkage validation contains deliberate bypasses (`index==1` cross-genesis graft, missing-predecessor fall-through insert) that let foreign/orphan blocks enter without genesis linkage, on top of the ungated, structurally-validated block ingestion path.
+
+## Evidence (file:line)
+- `blockmatrix/src/blockchain/mutations.rs:136-142` — `index==1` cross-genesis warn+insert despite genesis-linkage mismatch
+- `blockmatrix/src/blockchain/mutations.rs:154` — missing-predecessor fall-through insert ("gap-fill later")
+- `blockmatrix/src/blockchain/chain.rs:444-446` — `insert_block` rejects existing index (refutes "overwrite"; enables permanent index-DoS instead)
+- `blockmatrix/src/blockchain/chain.rs:451-454` — head-advance on any higher index with no ancestry check
+- `blockmatrix/src/network/message_handlers/block_handlers.rs:123` — device scope accepts any index > our_height
+
+## Fix (DECIDED: maximal security / zero-trust) (see .report on resolution)
+Do NOT insert `index==1` blocks that fail genesis linkage (remove the warn-insert at 136-142). Buffer blocks whose predecessor is absent as orphans pending the real predecessor; validate on connect, rather than inserting immediately. Gate head-advance (chain.rs:451-454) on verified contiguous ancestry. Nothing enters the chain without authenticated, verified linkage. Any future federation/join case goes through an explicit authenticated join token, never an open warn-insert.

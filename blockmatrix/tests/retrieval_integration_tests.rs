@@ -443,3 +443,259 @@ async fn test_replica_selection() -> Result<()> {
     println!("\n✅ Replica selection test PASSED\n");
     Ok(())
 }
+
+// ── Phase A2: two-layer resolve + upstream fallback + become-provider ──
+
+use blockmatrix::network::consumer_provider::ConsumerProviderManager;
+use blockmatrix::network::shard_store::ShardStore;
+use blockmatrix::network::shard_transport::MockShardTransport;
+use blockmatrix::network::swarm_provider::{
+    build_shard_locate_response, parse_shard_locate_response, ShardLocationIndex,
+};
+use blockmatrix::retrieval::client_assembly::fetching::node_id_from_coordinate;
+use blockmatrix::retrieval::client_assembly::seeding::ConsumerProviderSeeder;
+use blockmatrix::retrieval::location_resolver::{
+    coordinate_to_node_id_hex, merge_upstream, resolve_shard_locations, ProviderSource,
+};
+use hypermesh_lib::ContentHash;
+
+/// A2 Part 1: the two-layer resolve returns BOTH the live-mirror providers
+/// (freshest-first) AND the canonical matrix-placement providers, in that
+/// order, de-duplicated.
+#[tokio::test]
+async fn test_a2_two_layer_resolve_merges_live_and_canonical() {
+    let index = ShardLocationIndex::new();
+    let content_hash = ContentHash([0x5Au8; 32]);
+
+    // Live-mirror layer: two peers currently announcing the shard.
+    index.register_provider("live-peer-alpha", &[content_hash]).await;
+    index.register_provider("live-peer-beta", &[content_hash]).await;
+
+    // Canonical-placement layer: two matrix cells where the shard is placed.
+    let placements = [
+        MatrixCoordinate::new(3, 1, 0).unwrap(),
+        MatrixCoordinate::new(4, 1, 0).unwrap(),
+    ];
+
+    let resolved =
+        resolve_shard_locations(&content_hash, Some(&index), &placements).await;
+
+    // Both layers are present: 2 live mirrors + 2 canonical placements.
+    assert_eq!(resolved.len(), 4, "resolve must carry BOTH location layers");
+
+    // Live mirrors come first.
+    assert!(matches!(resolved[0].source, ProviderSource::LiveMirror));
+    assert!(matches!(resolved[1].source, ProviderSource::LiveMirror));
+    // Canonical placements follow, tagged with their coordinate.
+    assert!(matches!(
+        resolved[2].source,
+        ProviderSource::CanonicalPlacement { .. }
+    ));
+    assert!(matches!(
+        resolved[3].source,
+        ProviderSource::CanonicalPlacement { .. }
+    ));
+
+    // Canonical node_ids reconcile coordinate → owning node id.
+    assert_eq!(resolved[2].node_id, coordinate_to_node_id_hex(&placements[0]));
+    assert_eq!(resolved[3].node_id, coordinate_to_node_id_hex(&placements[1]));
+
+    println!("\n✅ A2 two-layer resolve (live + canonical) PASSED\n");
+}
+
+/// A2 Part 2: the upstream tracker fallback fires when the local layers miss,
+/// merging upstream-returned providers (that connected peers did NOT know)
+/// into the resolve. Exercises the shard-locate wire codec end to end plus the
+/// `merge_upstream` reconciliation.
+#[tokio::test]
+async fn test_a2_upstream_fallback_merges_new_providers() {
+    let index = ShardLocationIndex::new();
+    let content_hash = ContentHash([0x6Bu8; 32]);
+
+    // Local layers MISS: no live mirrors, no canonical placements.
+    let mut resolved = resolve_shard_locations(&content_hash, Some(&index), &[]).await;
+    assert!(
+        resolved.is_empty(),
+        "both local layers must miss to trigger upstream fallback",
+    );
+
+    // Simulate an upstream tracker's shard-locate RESPONSE naming a provider
+    // that we did not know locally, via the real wire codec.
+    let upstream_wire =
+        build_shard_locate_response(&["upstream-only-provider".to_string()]);
+    let upstream_ids = parse_shard_locate_response(&upstream_wire);
+    assert_eq!(upstream_ids, vec!["upstream-only-provider".to_string()]);
+
+    // Fold the upstream answer into the (empty) resolve — the fallback fires.
+    merge_upstream(&mut resolved, &upstream_ids);
+
+    assert_eq!(resolved.len(), 1, "upstream fallback must add the new provider");
+    assert_eq!(resolved[0].node_id, "upstream-only-provider");
+    assert!(matches!(resolved[0].source, ProviderSource::UpstreamTracker));
+
+    println!("\n✅ A2 upstream tracker fallback PASSED\n");
+}
+
+/// A2 Part 3: a fetched shard triggers the consumer-becomes-provider
+/// re-announce (become-provider) on the unified client-assembly path — the
+/// path that PREVIOUSLY skipped this. The `ClientAssembler` is wired with the
+/// SAME `ConsumerProviderManager`-backed seeder the live IPC path uses.
+#[tokio::test]
+async fn test_a2_fetch_triggers_become_provider_reannounce() {
+    use blockmatrix::assets::pipeline::{Asset, AssetPipeline, PipelineInputMetadata};
+    use std::sync::Arc;
+
+    let original = b"A2 become-provider on the unified fetch path ".repeat(64);
+    let asset = Asset {
+        id: "a2-seed".to_string(),
+        data: original.clone(),
+        metadata: PipelineInputMetadata {
+            name: "a2.bin".to_string(),
+            content_type: "application/octet-stream".to_string(),
+            size: original.len(),
+            created_at: 1234567890,
+            custom: std::collections::HashMap::new(),
+        },
+    };
+
+    let pipeline = AssetPipeline::default().expect("test: pipeline");
+    let processed = pipeline.process_asset(asset).await.expect("test: process");
+
+    // Build a retrieval plan + pre-populate a mock transport at canonical cells.
+    let mut shard_map = CompleteShardMap::new();
+    let transport = MockShardTransport::new();
+    let mut shard_hashes: Vec<ContentHash> = Vec::new();
+
+    for (i, shard) in processed.shards.iter().enumerate() {
+        let shard_hash = *blake3::hash(&shard.data).as_bytes();
+        shard_hashes.push(ContentHash(shard_hash));
+        let pos = MatrixCoordinate::new(i as i64, 0, 0).unwrap();
+        shard_map.add_entry(ShardMapEntry::new(shard_hash, vec![ShardLocation::new(pos, 1.0)]));
+        transport
+            .insert_shard(
+                &node_id_from_coordinate(&pos),
+                &ContentHash(shard_hash),
+                shard.data.clone(),
+            )
+            .await;
+    }
+
+    let data_shards = processed.shards.iter().filter(|s| !s.metadata.is_parity).count();
+    let parity_shards = processed.shards.iter().filter(|s| s.metadata.is_parity).count();
+    let metadata = RetrievalMetadata {
+        erasure_coding: (data_shards, parity_shards),
+        compression: "brotli".to_string(),
+        encryption: "kyber-1024".to_string(),
+        content_type: "application/octet-stream".to_string(),
+        created_at: 1234567890,
+        encrypted_blob_size: processed.stats.encryption.encrypted_size,
+    };
+    let mut plan = RetrievalPlan::new([0xA2u8; 32], shard_map, metadata);
+    plan.original_size = original.len();
+
+    // Shared swarm state: the SAME index + store the seeder registers into.
+    let store = Arc::new(ShardStore::new());
+    let index = Arc::new(ShardLocationIndex::new());
+    let manager = Arc::new(ConsumerProviderManager::new(
+        store.clone(),
+        index.clone(),
+        "a2-local-node".to_string(),
+    ));
+    // No peer connections in the test — seed still registers us as a provider.
+    let seeder = Arc::new(ConsumerProviderSeeder::new(manager, Vec::new()));
+
+    let assembler = ClientAssembler::new(4)
+        .with_live_index(index.clone())
+        .with_seeder(seeder);
+    assembler.initialize(plan).await.expect("test: init");
+
+    let reconstructed = assembler
+        .retrieve_asset(&transport, &processed.decryption_key)
+        .await
+        .expect("test: retrieve should succeed");
+    assert_eq!(reconstructed, original, "unified fetch must reconstruct");
+
+    // BECOME-PROVIDER: every fetched shard registered the local node as a
+    // provider in the shared index (this is what the old path skipped).
+    for ch in &shard_hashes {
+        let providers = index.get_providers(ch).await;
+        assert!(
+            providers.contains(&"a2-local-node".to_string()),
+            "fetched shard must trigger become-provider re-announce",
+        );
+        // And the shard was seeded into the shared store (we are now a host).
+        assert!(store.has(ch).await, "fetched shard must be seeded locally");
+    }
+
+    println!("\n✅ A2 fetch triggers become-provider re-announce PASSED\n");
+}
+
+/// A2 P1 invariant preserved: a forged shard (data does NOT hash to its claimed
+/// content address) is REJECTED at the content gate on the unified fetch path,
+/// so it is never stored, never reconstructed, and — critically — never
+/// re-announced (a node cannot become a provider for a shard it never validly
+/// held).
+#[tokio::test]
+async fn test_a2_forged_shard_rejected_never_reannounced() {
+    use std::sync::Arc;
+
+    let content_hash = ContentHash([0x9Fu8; 32]);
+    // Claimed hash for a shard whose bytes will NOT match.
+    let honest_data = vec![1u8, 2, 3, 4, 5];
+    let claimed_hash = *blake3::hash(&honest_data).as_bytes();
+
+    let mut shard_map = CompleteShardMap::new();
+    let pos = MatrixCoordinate::new(0, 0, 0).unwrap();
+    shard_map.add_entry(ShardMapEntry::new(claimed_hash, vec![ShardLocation::new(pos, 1.0)]));
+
+    // Transport serves FORGED bytes under the claimed hash's node/id.
+    let transport = MockShardTransport::new();
+    transport
+        .insert_shard(
+            &node_id_from_coordinate(&pos),
+            &ContentHash(claimed_hash),
+            vec![0xDE, 0xAD, 0xBE, 0xEF], // forged: hashes to something else
+        )
+        .await;
+
+    let metadata = RetrievalMetadata {
+        erasure_coding: (1, 0),
+        compression: "none".to_string(),
+        encryption: "none".to_string(),
+        content_type: "application/octet-stream".to_string(),
+        created_at: 0,
+        encrypted_blob_size: 0,
+    };
+    let plan = RetrievalPlan::new(content_hash.0, shard_map, metadata);
+
+    let store = Arc::new(ShardStore::new());
+    let index = Arc::new(ShardLocationIndex::new());
+    let manager = Arc::new(ConsumerProviderManager::new(
+        store.clone(),
+        index.clone(),
+        "a2-forge-node".to_string(),
+    ));
+    let seeder = Arc::new(ConsumerProviderSeeder::new(manager, Vec::new()));
+
+    let assembler = ClientAssembler::new(1)
+        .with_live_index(index.clone())
+        .with_seeder(seeder);
+    assembler.initialize(plan).await.expect("test: init");
+
+    // Fetch must FAIL: the only location serves a forged shard.
+    let result = assembler.fetch_shards_via_transport(&transport).await;
+    assert!(result.is_err(), "forged shard must fail the fetch (content gate)");
+
+    // And it must NOT have been seeded / re-announced.
+    let providers = index.get_providers(&ContentHash(claimed_hash)).await;
+    assert!(
+        providers.is_empty(),
+        "a forged shard must never trigger become-provider",
+    );
+    assert!(
+        !store.has(&ContentHash(claimed_hash)).await,
+        "a forged shard must never be seeded into the store",
+    );
+
+    println!("\n✅ A2 forged-shard rejection (P1 gate preserved) PASSED\n");
+}

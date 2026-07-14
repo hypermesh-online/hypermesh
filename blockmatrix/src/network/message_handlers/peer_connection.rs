@@ -26,9 +26,10 @@ use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_GOSSIP,
-    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE,
-    TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK,
-    TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
+    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_LOCATE, TAG_SHARD_SEND,
+    TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
+    TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE,
+    TAG_TRANSFER_ROLLBACK,
 };
 use super::transfer_handlers::{
     handle_transfer_lock, handle_transfer_register_ack, handle_transfer_register_req,
@@ -37,8 +38,8 @@ use super::transfer_handlers::{
 use super::sync_and_reflection::{
     handle_block_fetch_request, handle_direct_message, handle_dns_query,
     handle_dns_resolve_request, handle_key_rotation, handle_shard_announce,
-    handle_shard_dispatch, handle_share_invite, handle_sync_message, handle_transfer_message,
-    record_shard_demand, register_peer_as_reflector,
+    handle_shard_dispatch, handle_shard_locate, handle_share_invite, handle_sync_message,
+    handle_transfer_message, record_shard_demand, register_peer_as_reflector,
 };
 
 // ── Peer message loop ────────────────────────────────────────────────
@@ -98,12 +99,12 @@ pub(crate) async fn run_peer_message_loop(
 
 /// Route a single message payload to the appropriate handler.
 ///
-/// Asset-level operations (shard send/fetch, sync, block-fetch) are
-/// gated on the sender being in the [`AuthenticatedPeers`] map AND
-/// belonging to the same network. Block announcements are NOT gated —
-/// they are validated by BLAKE3 content integrity, per-entry proof_hash,
-/// and state_proof.validate(). Gossip and unknown tags are logged
-/// but not gated.
+/// Asset-level operations (shard send/fetch, sync, block-fetch) AND block
+/// announcements are gated on the sender being in the [`AuthenticatedPeers`]
+/// map AND belonging to the same network. Announced blocks are ADDITIONALLY
+/// validated by BLAKE3 content integrity, per-entry proof_hash, signed-to-
+/// content binding, and state_proof.validate(). Gossip and unknown tags are
+/// logged but not gated.
 pub(crate) async fn dispatch_message(
     data: &[u8],
     stream: &mut stoq::Stream,
@@ -115,12 +116,16 @@ pub(crate) async fn dispatch_message(
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
     // Gate asset-level operations on peer authentication + network scope.
-    // Block announcements are NOT gated here — blocks are validated by
-    // BLAKE3 content integrity + per-entry proof_hash + state_proof.validate().
-    // Only shard access (asset-level) and sync operations need PoS gating.
+    // Block announcements ARE gated here (defense-in-depth, P1): although each
+    // block is independently validated by BLAKE3 content integrity, per-entry
+    // proof_hash, signed-to-content binding, and state_proof.validate(), the
+    // announcing peer must also be authenticated for the network scope — a
+    // mirror is only accepted from a peer that passed the bilateral PoS
+    // handshake. Shard access and sync operations remain gated as before.
     let needs_auth = matches!(
         tag,
         TAG_SHARD_SEND | TAG_SHARD_FETCH
+            | TAG_BLOCK_ANNOUNCE
             | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
             | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
             | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
@@ -142,6 +147,17 @@ pub(crate) async fn dispatch_message(
             // Record shard fetch demand for engauge swarm intelligence.
             if tag == TAG_SHARD_FETCH {
                 record_shard_demand(&data, peer_node_id, ctx).await;
+
+                // F6: per-asset shard-fetch authorization. Beyond the coarse
+                // same-network membership gate above, bind the fetch to (a)
+                // the requester's PoS proof (verify_shard_proof_binding) and
+                // (b) the shard belonging to an asset registered on our
+                // chain (blockchain.authorizes_shard). A peer that passed
+                // handshake but has no proof-of-state stake, or requests a
+                // shard for an asset not on a shared chain, is refused.
+                if !authorize_shard_fetch(&data, peer_node_id, ctx).await {
+                    return;
+                }
             }
             handle_shard_dispatch(&data, stream, ctx).await;
         }
@@ -156,6 +172,12 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SHARD_ANNOUNCE => {
             handle_shard_announce(data, peer_node_id, ctx).await;
+        }
+        TAG_SHARD_LOCATE => {
+            // A2 upstream tracker fallback: answer "who has content_hash X?"
+            // from our own live-mirror index + local store. This is a LOCATE
+            // query (returns provider node_ids), not a data fetch.
+            handle_shard_locate(&data, stream, peer_node_id, ctx).await;
         }
         TAG_SHARE_INVITE => {
             handle_share_invite(data, peer_node_id, ctx).await;
@@ -219,6 +241,84 @@ pub(crate) async fn dispatch_message(
         _ => {
             warn!("Unknown message tag 0x{:02x} from peer {}", tag, short_id);
         }
+    }
+}
+
+/// F6 per-asset shard-fetch authorization.
+///
+/// `data` is a raw SHARD_FETCH message: `tag(1) + shard_id(32)`. Returns
+/// `true` only when BOTH hold:
+///   1. the requester carries a bound PoS proof for our network
+///      (`verify_shard_proof_binding`), and
+///   2. the requested shard belongs to an asset registered on our chain
+///      (`blockchain.authorizes_shard`).
+///
+/// A `false` result causes the caller to drop the request silently (the
+/// requester already logged the reason). SHARD_SEND (peers pushing shards
+/// to us, integrity-checked by BLAKE3 in the store) is NOT gated here.
+async fn authorize_shard_fetch(
+    data: &[u8],
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) -> bool {
+    // Parse shard_id: tag(1) + shard_id(32).
+    if data.len() < 33 {
+        debug!("F6: malformed SHARD_FETCH ({} bytes) — refused", data.len());
+        return false;
+    }
+    let mut shard_id = [0u8; 32];
+    shard_id.copy_from_slice(&data[1..33]);
+
+    // (1) Requester-side proof binding.
+    if !peer_auth::verify_shard_proof_binding(
+        &ctx.authenticated_peers,
+        peer_node_id,
+        &ctx.network_id,
+    )
+    .await
+    {
+        return false;
+    }
+
+    // (2) Asset-level anchor: the shard must belong to a registered asset
+    // on our chain. This binds the fetch to the asset's on-chain,
+    // content-bound StateProof rather than to coarse membership.
+    if !ctx.blockchain.authorizes_shard(&shard_id).await {
+        let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+        warn!(
+            "F6: shard {} not authorized for {} (no registered asset on our chain)",
+            hex::encode(&shard_id[..8]),
+            short_id,
+        );
+        return false;
+    }
+
+    true
+}
+
+/// Mirror an authenticated peer into the kernel eBPF fast-path maps (P5).
+///
+/// Extracts the peer's IPv6 source address from the connection endpoint and
+/// writes `pos_header_map[src].validated=1` + `policy_map[src].requires_pos=1`
+/// via the shared orchestrator. This makes the kernel gate key on the SAME
+/// source the userspace bilateral-PoS handshake authorized. IPv4-mapped
+/// addresses are converted to their IPv6 form. No-op when no orchestrator is
+/// present or no XDP program is attached (userspace-only tier unchanged).
+fn mirror_peer_auth_to_kernel(ctx: &PeerContext, connection: &stoq::Connection) {
+    let Some(ref ebpf) = ctx.ebpf else {
+        return;
+    };
+    let addr = connection.endpoint().to_socket_addr();
+    let ipv6 = match addr {
+        std::net::SocketAddr::V6(v6) => *v6.ip(),
+        std::net::SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
+    };
+    let src_ip = ipv6.octets();
+    // HyperMesh peers sign with FALCON-1024 (algorithm indicator 0x01).
+    if let Err(e) =
+        ebpf.set_peer_pos_validated(src_ip, true, hypermesh_ebpf::ALG_FALCON_1024)
+    {
+        debug!("eBPF peer-auth mirror skipped: {e}");
     }
 }
 
@@ -378,6 +478,15 @@ async fn handle_handshake_connection(
         result.peer_proof.len(),
         result.peer_pubkey.len(),
     );
+
+    // P5 unification: mirror this authenticated peer into the kernel
+    // fast-path maps, keyed on the SAME IPv6 source P1 just authorized.
+    // Writes pos_header_map[src].validated=1 + policy_map[src].requires_pos=1
+    // so the XDP gate admits this source's HyperMesh traffic. No-op unless
+    // an XDP program is attached (graceful degradation).
+    if let Some(ref ctx) = peer_ctx {
+        mirror_peer_auth_to_kernel(ctx, &connection);
+    }
 
     // Request CA certificate in background (Phase 2 bootstrap)
     spawn_acceptor_ca_enrollment(cert_manager, signer.node_id().to_string());

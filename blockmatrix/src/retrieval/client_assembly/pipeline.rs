@@ -75,6 +75,12 @@ impl ClientAssembler {
             ));
         }
 
+        // Content-validity gate (mirror invariant #1, F4): before reconstructing,
+        // every fetched shard whose expected hash is known MUST hash to it.
+        // This is the assertion the primitive at build time (`blake3::hash`)
+        // was only computing for bookkeeping — here it REJECTS on mismatch.
+        Self::verify_fetched_shards(&fetched)?;
+
         let pipeline_shards = self.build_pipeline_shards(&fetched, plan);
 
         let encrypted_blob = Self::reconstruct_shards(&pipeline_shards, &plan.metadata)?;
@@ -120,6 +126,38 @@ impl ClientAssembler {
 
         shards.sort_by_key(|s| s.metadata.index);
         shards
+    }
+
+    /// Content-validity assertion over fetched shards (mirror invariant #1).
+    ///
+    /// For every fetched shard whose expected content hash is known
+    /// (`FetchedShard._hash != [0u8; 32]`, the "unspecified" sentinel used only
+    /// by internal reassembly-unit tests that pre-place trusted shards),
+    /// `BLAKE3(data)` MUST equal that hash. On mismatch, reconstruction is
+    /// REJECTED — a forged shard never reaches the Reed-Solomon decoder.
+    ///
+    /// The authoritative gate is at the fetch boundary (`fetching.rs`), which
+    /// checks against the signed/committed shard map; this is defense-in-depth
+    /// for any path that populates the expected hash.
+    fn verify_fetched_shards(
+        fetched: &HashMap<usize, FetchedShard>,
+    ) -> Result<()> {
+        const UNSPECIFIED: [u8; 32] = [0u8; 32];
+        for (&idx, shard) in fetched.iter() {
+            if shard._hash == UNSPECIFIED {
+                continue;
+            }
+            let computed = *blake3::hash(&shard.data).as_bytes();
+            if computed != shard._hash {
+                return Err(anyhow::anyhow!(
+                    "shard {idx} content-hash mismatch: expected {}, got {} — \
+                     rejecting forged shard before reconstruction",
+                    hex::encode(shard._hash),
+                    hex::encode(computed),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Stage 1: Reed-Solomon reconstruct encrypted blob from shards.
