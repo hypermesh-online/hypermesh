@@ -6,8 +6,9 @@
 //!
 //! Client-side shard fetching and file reconstruction from retrieval instructions.
 
-mod fetching;
+pub mod fetching;
 mod pipeline;
+pub mod seeding;
 
 use anyhow::Result;
 use std::collections::HashMap;
@@ -16,8 +17,11 @@ use tokio::sync::RwLock;
 
 use crate::assets::storage::Hash;
 use crate::matrix::MatrixCoordinate;
+use crate::network::swarm_provider::ShardLocationIndex;
 
 use super::{RetrievalPlan, ShardLocation};
+
+pub use seeding::{ConsumerProviderSeeder, ShardSeeder};
 
 /// Progress of assembly operation
 #[derive(Debug, Clone)]
@@ -115,6 +119,19 @@ pub struct ClientAssembler {
 
     /// Maximum parallel fetches
     pub(crate) max_parallel: usize,
+
+    /// A2: optional live-mirror index. When set, per-shard location selection
+    /// consults the live swarm FIRST (via the shared two-layer resolver) before
+    /// falling back to the plan's canonical matrix placements. `None` in pure
+    /// tests / Private mode — the path degrades to canonical placement only.
+    pub(crate) live_index: Option<Arc<ShardLocationIndex>>,
+
+    /// A2: optional become-provider seeder. When set, every fetched +
+    /// BLAKE3-verified shard is re-announced to the swarm (consumer becomes
+    /// provider, R12), exactly as the live IPC path does. `None` in pure tests
+    /// — the fetch still succeeds and shards are held locally, matching the IPC
+    /// path's "no manager wired" fallback (cache without announce).
+    pub(crate) seeder: Option<Arc<dyn ShardSeeder>>,
 }
 
 impl ClientAssembler {
@@ -140,7 +157,24 @@ impl ClientAssembler {
                 throughput_bps: 0,
             })),
             max_parallel,
+            live_index: None,
+            seeder: None,
         }
+    }
+
+    /// Attach a live-mirror index so per-shard resolution consults the swarm
+    /// first (A2 two-layer resolve). Builder-style; returns `self`.
+    pub fn with_live_index(mut self, index: Arc<ShardLocationIndex>) -> Self {
+        self.live_index = Some(index);
+        self
+    }
+
+    /// Attach a become-provider seeder so verified fetches re-announce to the
+    /// swarm (A2 unification — same become-provider behaviour as the live IPC
+    /// path). Builder-style; returns `self`.
+    pub fn with_seeder(mut self, seeder: Arc<dyn ShardSeeder>) -> Self {
+        self.seeder = Some(seeder);
+        self
     }
 
     /// Initialize with retrieval plan

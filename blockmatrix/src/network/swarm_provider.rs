@@ -206,6 +206,97 @@ pub fn build_shard_announce_payload(shard_ids: &[ContentHash]) -> Vec<u8> {
     buf
 }
 
+// ── Phase A2: shard-locate wire codec (upstream tracker fallback) ──────
+//
+// A LOCATE query returns provider node_ids for a content hash WITHOUT
+// transferring the shard bytes (that is `TAG_SHARD_FETCH`). It is the shard
+// analog of the DNS upstream query, letting a node ask a peer "who has X?"
+// when its own local store, live-mirror index, and canonical placement all
+// miss among directly-connected peers.
+
+/// Tag byte for a shard-locate request. Must match
+/// `message_handlers::protocol::TAG_SHARD_LOCATE`.
+pub const TAG_SHARD_LOCATE: u8 = 0x52;
+/// Tag byte for a shard-locate response. Must match
+/// `message_handlers::protocol::TAG_SHARD_LOCATE_RESPONSE`.
+pub const TAG_SHARD_LOCATE_RESPONSE: u8 = 0x53;
+
+/// Build a shard-locate request payload: `tag(1) + content_hash(32)`.
+pub fn build_shard_locate_request(content_hash: &ContentHash) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(33);
+    buf.push(TAG_SHARD_LOCATE);
+    buf.extend_from_slice(&content_hash.0);
+    buf
+}
+
+/// Parse a shard-locate request, returning the queried content hash.
+///
+/// Returns `None` if the payload is malformed (wrong tag or too short).
+pub fn parse_shard_locate_request(data: &[u8]) -> Option<ContentHash> {
+    if data.len() < 33 || data[0] != TAG_SHARD_LOCATE {
+        return None;
+    }
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&data[1..33]);
+    Some(ContentHash(hash))
+}
+
+/// Build a shard-locate response payload:
+/// `tag(1) + count(4 LE) + [node_id_len(2 LE) + node_id_utf8]...`.
+///
+/// Node ids are length-prefixed UTF-8 (they are variable-length hex
+/// strings). Ids longer than `u16::MAX` bytes are skipped defensively —
+/// real node ids are 64 hex chars, so this never trips in practice.
+pub fn build_shard_locate_response(node_ids: &[String]) -> Vec<u8> {
+    let usable: Vec<&String> = node_ids
+        .iter()
+        .filter(|id| id.len() <= u16::MAX as usize)
+        .collect();
+    let count = usable.len() as u32;
+    let mut buf = Vec::with_capacity(5 + usable.iter().map(|id| 2 + id.len()).sum::<usize>());
+    buf.push(TAG_SHARD_LOCATE_RESPONSE);
+    buf.extend_from_slice(&count.to_le_bytes());
+    for id in usable {
+        buf.extend_from_slice(&(id.len() as u16).to_le_bytes());
+        buf.extend_from_slice(id.as_bytes());
+    }
+    buf
+}
+
+/// Parse a shard-locate response into its provider node_ids.
+///
+/// Returns an empty vec on malformed input (wrong tag, truncated length
+/// prefix, or invalid UTF-8) rather than erroring — a missing/garbled
+/// upstream answer is treated the same as "upstream knows nobody".
+pub fn parse_shard_locate_response(data: &[u8]) -> Vec<String> {
+    if data.len() < 5 || data[0] != TAG_SHARD_LOCATE_RESPONSE {
+        return Vec::new();
+    }
+    // Cap `count` to what the buffer could possibly contain (each provider is a
+    // 2-byte length prefix + >=1 byte), so an untrusted upstream peer cannot make
+    // us pre-allocate ~103 GB from a crafted 5-byte response. Mirrors the guard
+    // `handle_shard_announce` already applies before its `with_capacity`.
+    let claimed = u32::from_le_bytes([data[1], data[2], data[3], data[4]]) as usize;
+    let count = claimed.min(data.len().saturating_sub(5) / 3);
+    let mut out = Vec::with_capacity(count);
+    let mut off = 5usize;
+    for _ in 0..count {
+        if off + 2 > data.len() {
+            break;
+        }
+        let len = u16::from_le_bytes([data[off], data[off + 1]]) as usize;
+        off += 2;
+        if off + len > data.len() {
+            break;
+        }
+        if let Ok(s) = std::str::from_utf8(&data[off..off + len]) {
+            out.push(s.to_string());
+        }
+        off += len;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,5 +511,66 @@ mod tests {
             h.copy_from_slice(&payload[offset..offset + 32]);
             assert_eq!(ContentHash(h), shards[i]);
         }
+    }
+
+    // -- A2 shard-locate codec tests ---------------------------------------
+
+    #[test]
+    fn test_shard_locate_request_roundtrip() {
+        let ch = hash(0x9A);
+        let req = build_shard_locate_request(&ch);
+        assert_eq!(req.len(), 33);
+        assert_eq!(req[0], TAG_SHARD_LOCATE);
+        assert_eq!(parse_shard_locate_request(&req), Some(ch));
+    }
+
+    #[test]
+    fn test_shard_locate_request_rejects_malformed() {
+        // Too short.
+        assert_eq!(parse_shard_locate_request(&[TAG_SHARD_LOCATE, 0x01]), None);
+        // Wrong tag.
+        let mut wrong = build_shard_locate_request(&hash(0x01));
+        wrong[0] = 0xFF;
+        assert_eq!(parse_shard_locate_request(&wrong), None);
+    }
+
+    #[test]
+    fn test_shard_locate_response_roundtrip() {
+        let ids = vec![
+            "9f4fc6ed4ba7".to_string(),
+            "deadbeefcafe0011".to_string(),
+        ];
+        let resp = build_shard_locate_response(&ids);
+        assert_eq!(resp[0], TAG_SHARD_LOCATE_RESPONSE);
+        let parsed = parse_shard_locate_response(&resp);
+        assert_eq!(parsed, ids);
+    }
+
+    #[test]
+    fn test_shard_locate_response_empty() {
+        let resp = build_shard_locate_response(&[]);
+        assert_eq!(resp.len(), 5);
+        assert!(parse_shard_locate_response(&resp).is_empty());
+    }
+
+    #[test]
+    fn test_shard_locate_response_truncated_is_lenient() {
+        // A count claiming 2 ids but with the second truncated yields only
+        // the intact first id (garbled upstream answer == fewer providers).
+        let mut resp = build_shard_locate_response(&["abc".to_string()]);
+        // Bump count to 2 without adding the second id.
+        resp[1] = 2;
+        let parsed = parse_shard_locate_response(&resp);
+        assert_eq!(parsed, vec!["abc".to_string()]);
+    }
+
+    #[test]
+    fn test_shard_locate_response_rejects_oversized_count_no_alloc() {
+        // A malicious upstream answers with a 5-byte response claiming u32::MAX
+        // providers. `count` must be capped to what the buffer can hold so we do
+        // NOT pre-allocate ~103 GB (a remote SIGABRT). Empty buffer → 0 count.
+        let resp = [TAG_SHARD_LOCATE_RESPONSE, 0xFF, 0xFF, 0xFF, 0xFF];
+        let parsed = parse_shard_locate_response(&resp);
+        assert!(parsed.is_empty());
     }
 }

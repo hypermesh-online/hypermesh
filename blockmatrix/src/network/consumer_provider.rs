@@ -10,13 +10,17 @@
 //! replication. See `papers/HYPERMESH.md` R12 for the protocol requirement.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use hypermesh_lib::ContentHash;
 use tracing::{debug, info, warn};
 
 use crate::network::shard_dedup::DedupPolicy;
 use crate::network::shard_store::ShardStore;
-use crate::network::swarm_provider::{build_shard_announce_payload, ShardLocationIndex};
+use crate::network::swarm_provider::{
+    build_shard_announce_payload, build_shard_locate_request, parse_shard_locate_response,
+    ShardLocationIndex,
+};
 
 /// Result of processing fetched shards through the consumer-becomes-provider pipeline.
 #[derive(Debug, Clone)]
@@ -203,6 +207,63 @@ pub async fn broadcast_announcement(
         payload.len(),
     );
     sent
+}
+
+/// Default per-hop timeout for an upstream shard-locate query. Bounds a slow or
+/// silent upstream so the fetch path fails over promptly instead of hanging.
+pub const SHARD_LOCATE_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Query a single upstream peer "who has `content_hash`?" (A2 upstream tracker
+/// fallback).
+///
+/// This is the shard analog of the DNS upstream hop (`dns/resolver.rs`
+/// `trustchain_client` fallback): when a node's local store, live-mirror index,
+/// AND directly-connected peers all miss, it asks an UPSTREAM peer for provider
+/// node_ids to widen the resolve. A single bounded, timeout-guarded hop over
+/// STOQ mirroring the shard-announce wire pattern (`TAG_SHARD_LOCATE`).
+///
+/// Returns the provider node_ids the upstream knows (possibly empty). On any
+/// transport error or timeout, returns an empty list — a failed upstream is
+/// treated as "upstream knows nobody", never a hard error.
+pub async fn locate_shard_upstream(
+    upstream: &Arc<stoq::Connection>,
+    content_hash: &ContentHash,
+    timeout: Duration,
+) -> Vec<String> {
+    if !upstream.is_active() {
+        return Vec::new();
+    }
+
+    let query = build_shard_locate_request(content_hash);
+
+    let result = tokio::time::timeout(timeout, async {
+        let mut stream = upstream
+            .open_stream()
+            .await
+            .map_err(|e| format!("open stream: {e}"))?;
+        stream
+            .send(&query)
+            .await
+            .map_err(|e| format!("send locate: {e}"))?;
+        let resp = stream
+            .receive()
+            .await
+            .map_err(|e| format!("receive locate: {e}"))?;
+        Ok::<Vec<u8>, String>(resp.to_vec())
+    })
+    .await;
+
+    match result {
+        Ok(Ok(bytes)) => parse_shard_locate_response(&bytes),
+        Ok(Err(e)) => {
+            debug!("Upstream shard-locate failed: {e}");
+            Vec::new()
+        }
+        Err(_) => {
+            debug!("Upstream shard-locate timed out after {:?}", timeout);
+            Vec::new()
+        }
+    }
 }
 
 #[cfg(test)]

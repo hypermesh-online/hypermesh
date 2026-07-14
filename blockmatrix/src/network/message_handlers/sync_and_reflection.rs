@@ -101,6 +101,67 @@ pub(super) async fn handle_shard_announce(
     }
 }
 
+// ── Shard-locate handler (A2 upstream tracker fallback) ──────────────
+
+/// Handle a shard-locate request (tag 0x52).
+///
+/// Wire format: `[TAG_SHARD_LOCATE][content_hash(32)]`.
+///
+/// This peer acts as a mini-tracker: it answers with the provider node_ids it
+/// knows for `content_hash` — from its own `ShardLocationIndex` (live mirrors
+/// it has learned via `TAG_SHARD_ANNOUNCE`) plus ITSELF when it holds the shard
+/// locally. This is the shard analog of the DNS upstream query
+/// (`dns/resolver.rs` upstream fallback): a node whose local store + connected
+/// peers all miss asks an upstream peer "who has X?".
+///
+/// The response is `[TAG_SHARD_LOCATE_RESPONSE][count][len+node_id]...`. An
+/// empty list is still meaningful — it tells the asker this peer knows no
+/// provider, so they can move on.
+pub(super) async fn handle_shard_locate(
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    ctx: &PeerContext,
+) {
+    use crate::network::swarm_provider::{
+        build_shard_locate_response, parse_shard_locate_request,
+    };
+
+    let short = &peer_node_id[..8.min(peer_node_id.len())];
+
+    let content_hash = match parse_shard_locate_request(data) {
+        Some(h) => h,
+        None => {
+            debug!("Malformed shard-locate request from {}", short);
+            return;
+        }
+    };
+
+    // Providers known to THIS peer from its live-mirror index.
+    let mut providers: Vec<String> = match ctx.shard_location_index {
+        Some(ref index) => index.get_providers(&content_hash).await,
+        None => Vec::new(),
+    };
+
+    // If we hold the shard ourselves, advertise our own node id — we are a
+    // provider too ("hosts ARE mirrors ARE trackers").
+    if ctx.shard_store.has(&content_hash).await && !providers.contains(&ctx.node_id) {
+        providers.push(ctx.node_id.clone());
+    }
+
+    debug!(
+        "Shard-locate from {}: {} provider(s) for {}",
+        short,
+        providers.len(),
+        hex::encode(&content_hash.0[..8]),
+    );
+
+    let response = build_shard_locate_response(&providers);
+    if let Err(e) = stream.send(&response).await {
+        debug!("Failed to send shard-locate response to {}: {}", short, e);
+    }
+}
+
 // ── Key rotation handler ────────────────────────────────────────────
 
 /// Handle a key rotation announcement (tag 0x08).
