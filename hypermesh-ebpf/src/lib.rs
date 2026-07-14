@@ -17,19 +17,17 @@
 //! ## Modules
 //!
 //! - `capabilities` - System capability detection (XDP, AF_XDP, kernel version)
-//! - `xdp` - Unified XDP program management and packet validation
+//! - `xdp` - Unified XDP program management and the allowlist datapath
 //! - `af_xdp` - AF_XDP zero-copy socket management
 //! - `loader` - eBPF program compiler and kernel loader
 //! - `hooks` - Validation hook traits for STOQ/blockmatrix to implement
 //! - `policy_maps` - eBPF policy map management
-//! - `hypermesh_headers` - PoS/Asset/Routing/Privacy header definitions
-//! - `validation` - PoS and asset hash validators
+//! - `validation` - signing-algorithm indicator constants
 //! - `metrics` - Unified intelligence + transport metrics
 
 pub mod af_xdp;
 pub mod capabilities;
 pub mod hooks;
-pub mod hypermesh_headers;
 pub mod loader;
 pub mod metrics;
 pub mod policy_maps;
@@ -49,10 +47,6 @@ pub use hooks::{
     CertificateValidator, ExtensionValidator, PacketValidator, PassThroughValidator,
     ValidationHooks,
 };
-pub use hypermesh_headers::{
-    AssetHashHeader, MatrixCoordinate, MatrixRoutingHeader, PrivacyTierHeader, ProofOfStateHeader,
-    EXT_ASSET_HASH, EXT_MATRIX_ROUTING, EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE,
-};
 pub use loader::{EbpfLoader, ProgramType};
 pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
 pub use policy_maps::{PolicyManager, ValidationPolicy};
@@ -60,10 +54,7 @@ pub use queue_balancer::{
     FlowHashBalancer, LeastLoadedBalancer, MultiQueueManager, PacketHint, QueueBalancer,
     QueueMetrics, RoundRobinBalancer,
 };
-pub use validation::{
-    AssetHashValidator, FastValidationResult, ProofOfStateValidator, ALG_ECDSA, ALG_ED25519,
-    ALG_FALCON_1024,
-};
+pub use validation::{ALG_ECDSA, ALG_ED25519, ALG_FALCON_1024};
 pub use xdp::{
     FilterAction, KernelPosConfig, OffloadPolicy, PacketDecision, XdpAttachMode, XdpFilterConfig,
     XdpManager, XdpStats,
@@ -455,38 +446,6 @@ impl HyperMeshEbpf {
     }
 
     // -------------------------------------------------------------------
-    // Packet processing
-    // -------------------------------------------------------------------
-
-    /// Validate a packet and return a decision (three execution paths)
-    pub fn validate_packet(&self, packet: &[u8]) -> PacketDecision {
-        if let Some(ref xdp) = self.xdp_manager {
-            xdp.validate_packet(0, packet)
-        } else {
-            // No XDP manager attached, pass everything
-            PacketDecision::Pass
-        }
-    }
-
-    /// Validate a Proof of State header
-    pub fn validate_pos_header(&self, header: &ProofOfStateHeader) -> bool {
-        if let Some(ref xdp) = self.xdp_manager {
-            let valid = xdp.validate_proof_of_state(header);
-            self.metrics_collector.record_pos_validation(valid);
-            valid
-        } else {
-            header.validate_timestamps()
-        }
-    }
-
-    /// Validate an asset hash header
-    pub fn validate_asset_hash(&self, header: &AssetHashHeader) -> bool {
-        let valid = header.validate_shard_indices();
-        self.metrics_collector.record_asset_validation(valid, false);
-        valid
-    }
-
-    // -------------------------------------------------------------------
     // Transport (called by STOQ)
     // -------------------------------------------------------------------
 
@@ -655,81 +614,6 @@ mod tests {
     fn test_default_creation() {
         let ebpf = HyperMeshEbpf::default();
         assert!(!ebpf.capabilities().kernel_version.is_empty());
-    }
-
-    #[test]
-    fn test_packet_validation_without_xdp() {
-        let ebpf = HyperMeshEbpf::default();
-        let decision = ebpf.validate_packet(&[0u8; 100]);
-        assert_eq!(decision, PacketDecision::Pass);
-    }
-
-    /// Build valid `who`: FALCON-1024 algorithm + 8 non-zero prefix bytes.
-    fn test_valid_who() -> [u8; 32] {
-        let mut who = [0xABu8; 32];
-        who[0] = ALG_FALCON_1024;
-        who
-    }
-
-    /// Build valid `what`: first byte zero (8 leading zero bits).
-    fn test_valid_what() -> [u8; 32] {
-        let mut what = [0xFFu8; 32];
-        what[0] = 0x00;
-        what
-    }
-
-    /// Build valid `where_`: IPv6 global unicast prefix.
-    fn test_valid_where() -> [u8; 16] {
-        let mut w = [0x01u8; 16];
-        w[0] = 0x20;
-        w
-    }
-
-    #[test]
-    fn test_pos_header_validation() {
-        let ebpf = HyperMeshEbpf::default();
-
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("test: get system time")
-            .as_micros() as u64;
-
-        let valid = ProofOfStateHeader {
-            who: test_valid_who(),
-            what: test_valid_what(),
-            when: now,
-            where_: test_valid_where(),
-        };
-        assert!(ebpf.validate_pos_header(&valid));
-
-        let future = ProofOfStateHeader {
-            who: test_valid_who(),
-            what: test_valid_what(),
-            when: now + 10 * 60 * 1_000_000,
-            where_: test_valid_where(),
-        };
-        assert!(!ebpf.validate_pos_header(&future));
-    }
-
-    #[test]
-    fn test_asset_hash_validation() {
-        let ebpf = HyperMeshEbpf::default();
-
-        let valid_header = AssetHashHeader {
-            asset_id: [1u8; 32],
-            hash: [2u8; 32],
-            shard_count: 10,
-            shard_index: 5,
-        };
-        assert!(ebpf.validate_asset_hash(&valid_header));
-
-        let invalid_header = AssetHashHeader {
-            asset_id: [1u8; 32],
-            hash: [2u8; 32],
-            shard_count: 10,
-            shard_index: 10, // >= shard_count
-        };
-        assert!(!ebpf.validate_asset_hash(&invalid_header));
     }
 
     #[test]

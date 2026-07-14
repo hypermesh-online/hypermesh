@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use crate::capabilities::NicCapabilities;
 use crate::policy_maps::PolicyManager;
-use crate::validation::ProofOfStateValidator;
 
 #[cfg(feature = "kernel-attach")]
 use super::validation::{
@@ -62,8 +61,6 @@ pub struct XdpManager {
     available: bool,
     /// Policy manager for validation decisions
     pub(super) policy_manager: PolicyManager,
-    /// Proof of State fast validator
-    pub(super) pos_validator: ProofOfStateValidator,
     /// Hardware offload policy
     pub(crate) offload_policy: OffloadPolicy,
     /// Loaded BPF handle (only present when kernel-attach feature enabled).
@@ -93,7 +90,6 @@ impl XdpManager {
             stats: Arc::new(RwLock::new(XdpStats::default())),
             available,
             policy_manager,
-            pos_validator: ProofOfStateValidator::default(),
             offload_policy: OffloadPolicy::Disabled,
             #[cfg(feature = "kernel-attach")]
             bpf: Arc::new(parking_lot::Mutex::new(None)),
