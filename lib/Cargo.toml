@@ -18,6 +18,8 @@ rust_decimal = { workspace = true }
 blake3 = { workspace = true }
 postcard = { workspace = true }
 async-trait = { workspace = true }
+serde_bytes = { workspace = true }
+hex = { workspace = true }
 
 [features]
 test-utils = []

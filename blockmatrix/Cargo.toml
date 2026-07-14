@@ -89,8 +89,11 @@ stoq = { path = "../stoq" }
 # node with no root/bpffs still runs unchanged in the userspace-only tier.
 hypermesh-ebpf = { path = "../hypermesh-ebpf", features = ["kernel-attach", "ebpf-loader"] }
 
-# Engauge Intelligence Layer (optional — routing + swarm analytics)
-engauge = { path = "../engauge", optional = true }
+# Engauge / NGauge (MANDATORY — sharding authority + routing/swarm analytics).
+# The Reed-Solomon sharding engine lives here (core, always needed). The
+# `intelligence` feature separately gates the routing/swarm ANALYTICS surface,
+# but the crate itself is always linked.
+engauge = { path = "../engauge" }
 
 # Caesar EVP (optional — economic layer)
 caesar = { path = "../caesar", optional = true }
@@ -196,7 +199,7 @@ tempfile = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 ctor = "0.2"  # Test initialization functions
-engauge = { path = "../engauge" }
+# engauge is now a MANDATORY dependency (sharding authority) — no dev-dep needed.
 # F3: unit and integration tests use trustchain's `StateProof::new_for_testing()`,
 # which is only available with the `localhost-testing` feature (the `test` cfg
 # does not cross the trustchain crate boundary). Enabling it here scopes the
@@ -210,7 +213,9 @@ proof-of-state = []
 assets = []
 multi-node = []
 future-tests = []
-intelligence = ["dep:engauge"]
+# engauge is always linked (sharding authority); this feature now only gates
+# the routing/swarm ANALYTICS surface that consumes engauge's intelligence APIs.
+intelligence = []
 caesar = ["dep:caesar"]
 
 # Explicit example entries for gated examples (require future-tests feature)
