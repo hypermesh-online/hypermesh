@@ -108,4 +108,8 @@ pub(crate) const TAG_SHARD_LOCATE: u8 = 0x52;
 /// Shard-locate response:
 /// `[TAG_SHARD_LOCATE_RESPONSE][count(4 LE)][node_id_len(2 LE) + node_id_utf8]...`.
 /// Provider node_ids the responding peer knows for the queried content hash.
+/// Documented here alongside the request tag for the full wire protocol; the
+/// authoritative codec + this constant live in `network::swarm_provider`, so the
+/// dispatch layer only matches the request tag (responses are read by the caller).
+#[allow(dead_code)]
 pub(crate) const TAG_SHARD_LOCATE_RESPONSE: u8 = 0x53;
