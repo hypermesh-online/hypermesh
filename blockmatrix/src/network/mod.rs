@@ -553,6 +553,59 @@ impl NetworkManager {
         self.nodes.read().await.values().cloned().collect()
     }
 
+    /// Send a tag-prefixed payload to a single connected peer by node ID.
+    ///
+    /// Looks up the peer's live STOQ connection in the `nodes` map (keyed by
+    /// the raw string `node_id`), opens a fresh unidirectional stream, and
+    /// sends `[tag] ++ payload` — the exact framing used by
+    /// [`shard_transport::StoqShardTransport::send_shard`] and
+    /// [`consumer_provider::broadcast_announcement`].
+    ///
+    /// This is the by-`node_id` complement to `broadcast_announcement`
+    /// (which fans out to many connections): it delivers a single tagged
+    /// message to one already-connected peer. It does NOT auto-dial — the
+    /// recipient must be a currently-connected peer. Callers degrade
+    /// gracefully on `Err` (e.g. `share.send` still returns the created,
+    /// signed invite when delivery is not possible).
+    ///
+    /// Errors when the peer is not in the connected set, has no cached
+    /// connection, the connection is inactive, or the stream send fails.
+    pub async fn send_tagged_to_peer(
+        &self,
+        node_id: &str,
+        tag: u8,
+        payload: &[u8],
+    ) -> Result<()> {
+        let connection = {
+            let nodes = self.nodes.read().await;
+            let node = nodes
+                .get(node_id)
+                .ok_or_else(|| anyhow!("peer {node_id} is not connected"))?;
+            node.connection
+                .clone()
+                .ok_or_else(|| anyhow!("no live connection for peer {node_id}"))?
+        };
+
+        if !connection.is_active() {
+            return Err(anyhow!("connection to peer {node_id} is not active"));
+        }
+
+        let mut framed = Vec::with_capacity(1 + payload.len());
+        framed.push(tag);
+        framed.extend_from_slice(payload);
+
+        let mut stream = connection
+            .open_stream()
+            .await
+            .map_err(|e| anyhow!("failed to open stream to peer {node_id}: {e}"))?;
+        stream
+            .send(&framed)
+            .await
+            .map_err(|e| anyhow!("failed to send tagged message to peer {node_id}: {e}"))?;
+
+        Ok(())
+    }
+
     /// Returns the matrix coordinates of all currently connected peers.
     /// Used by BlockPropagator to determine propagation targets.
     pub async fn get_connected_coordinates(&self) -> Vec<MatrixCoordinate> {
