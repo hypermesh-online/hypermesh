@@ -6,6 +6,8 @@
 //!
 //! # Modules
 //!
+//! - [`sharding`] -- Reed-Solomon erasure-coding engine (R5, R14). NGauge is
+//!   the sharding authority; blockmatrix calls this to shard/reconstruct blobs.
 //! - [`receipt`] -- BLAKE3-hashed content receipts proving work was done.
 //! - [`metrics`] -- Per-node activity metrics and scoring for Governor data feed.
 //! - [`compliance`] -- Self-sovereign KYC attestation (hash-only, no PII).
@@ -33,6 +35,7 @@ pub mod node_metrics;
 pub mod organic_detection;
 pub mod receipt;
 pub mod routing_intel;
+pub mod sharding;
 pub mod streaming;
 pub mod swarm_analytics;
 pub mod throttle;
@@ -63,6 +66,7 @@ pub use routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, PathAdvisor, PathPolicyRecommendation,
     RoutingAdvisor, RoutingIntelFeed, RoutingIntelligence, RoutingUpdate, TensorWeightModifier,
 };
+pub use sharding::{Sharder, ShardingConfig};
 pub use streaming::{
     MetricsFrame, MetricsPayload, MetricsPublisher, MetricsSubscriber, RegionalAggregator,
 };
