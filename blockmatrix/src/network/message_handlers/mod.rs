@@ -41,3 +41,10 @@ pub(crate) use peer_connection::{
 
 // DNS network fallback used by the DNS resolver.
 pub use message_utils::{distributed_dns_resolve, resolve_from_network};
+
+// Share-invite parse/store core (F5 wire delivery) — the pure parse-and-store
+// path shared between the receiver dispatch and the `share.send` loopback test.
+// Only surfaced to the crate for the loopback framing test; the production
+// receiver reaches it directly within `sync_and_reflection`.
+#[cfg(test)]
+pub(crate) use sync_and_reflection::parse_and_store_share_invite;

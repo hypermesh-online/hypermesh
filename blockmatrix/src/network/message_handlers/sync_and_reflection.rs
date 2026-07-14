@@ -617,6 +617,32 @@ pub(super) async fn register_peer_as_reflector(
 
 // ── Share invite handler ────────────────────────────────────────────
 
+/// Parse a `[TAG_SHARE_INVITE] ++ serde_json(ShareInvite)` wire payload and
+/// store the invite in `inbox`.
+///
+/// This is the pure parse-and-store core of [`handle_share_invite`], split out
+/// so it can be exercised in a loopback test that feeds the exact bytes
+/// `share.send` frames straight back into the receiver path — with no
+/// `PeerContext` required. `data` includes the leading tag byte.
+///
+/// Returns `Ok(invite_id)` when the invite was parsed and stored, or an error
+/// when the payload is malformed or the inbox rejects it. Signature
+/// verification is deferred to the recipient's accept flow (which looks up the
+/// sender's FALCON pubkey from the blockchain).
+pub(crate) async fn parse_and_store_share_invite(
+    data: &[u8],
+    inbox: &crate::sharing::inbox::InboxStore,
+) -> anyhow::Result<String> {
+    if data.len() < 2 {
+        anyhow::bail!("share invite payload too short");
+    }
+    let invite_json = &data[1..]; // skip tag byte
+    let invite = serde_json::from_slice::<crate::sharing::invite::ShareInvite>(invite_json)?;
+    let invite_id = invite.invite_id.clone();
+    inbox.add(invite).await?;
+    Ok(invite_id)
+}
+
 /// Handle a received share invite (tag 0x05).
 ///
 /// Deserializes the invite from JSON (after the tag byte) and stores
@@ -628,38 +654,32 @@ pub(super) async fn handle_share_invite(
     peer_node_id: &str,
     ctx: &PeerContext,
 ) {
-    if data.len() < 2 {
-        return;
+    // Peek the invite for a log line before storing (best-effort).
+    if let Ok(invite) =
+        serde_json::from_slice::<crate::sharing::invite::ShareInvite>(&data[1.min(data.len())..])
+    {
+        let sender_display = invite.sender_name.as_deref().unwrap_or_else(|| {
+            &invite.sender_node_id[..8.min(invite.sender_node_id.len())]
+        });
+        info!(
+            "Received share invite {} from {} for asset {} ({})",
+            &invite.invite_id,
+            sender_display,
+            &invite.asset_id[..8.min(invite.asset_id.len())],
+            invite.asset_name,
+        );
     }
-    let invite_json = &data[1..]; // skip tag byte
-    match serde_json::from_slice::<crate::sharing::invite::ShareInvite>(invite_json) {
-        Ok(invite) => {
-            let sender_display = invite
-                .sender_name
-                .as_deref()
-                .unwrap_or_else(|| {
-                    &invite.sender_node_id[..8.min(invite.sender_node_id.len())]
-                });
-            info!(
-                "Received share invite {} from {} for asset {} ({})",
-                &invite.invite_id,
-                sender_display,
-                &invite.asset_id[..8.min(invite.asset_id.len())],
-                invite.asset_name,
-            );
-            if let Some(ref inbox) = ctx.inbox_store {
-                if let Err(e) = inbox.add(invite).await {
-                    warn!("Failed to store share invite: {e}");
-                }
-            }
-        }
-        Err(e) => {
-            debug!(
-                "Invalid share invite from {}: {}",
-                &peer_node_id[..8.min(peer_node_id.len())],
-                e,
-            );
-        }
+
+    let inbox = match ctx.inbox_store.as_ref() {
+        Some(inbox) => inbox,
+        None => return,
+    };
+    if let Err(e) = parse_and_store_share_invite(data, inbox).await {
+        debug!(
+            "Invalid or unstorable share invite from {}: {}",
+            &peer_node_id[..8.min(peer_node_id.len())],
+            e,
+        );
     }
 }
 
