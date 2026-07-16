@@ -24,9 +24,17 @@ impl StoqTransport {
         // Uses the pre-created AF_XDP socket stored during transport init.
         // If the socket is not kernel-backed, send() returns Err and we
         // gracefully fall through to the standard QUIC path below.
+        //
+        // On this raw AF_XDP path STOQ owns the UDP payload bytes, so the
+        // HyperMesh cleartext extension header is physically prepended AHEAD of
+        // the payload (papers/HYPERMESH.md §5.1). This makes `magic == 0x484D`
+        // land at the UDP-payload offset the XDP program reads at wire speed.
         if let Some(ref socket) = self.af_xdp_socket {
-            if socket.send(data).await.is_ok() {
-                self.metrics.record_bytes_sent(data.len());
+            let mut framed =
+                self.protocol_handler.hypermesh_pos_prefix(data);
+            framed.extend_from_slice(data);
+            if socket.send(&framed).await.is_ok() {
+                self.metrics.record_bytes_sent(framed.len());
                 self.performance_stats.read().record_zero_copy();
                 return Ok(());
             }

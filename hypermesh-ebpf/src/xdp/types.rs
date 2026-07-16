@@ -164,13 +164,16 @@ impl Default for OffloadPolicy {
     }
 }
 
-/// XDP program statistics aggregated from kernel maps
+/// XDP program statistics aggregated from kernel maps.
+///
+/// Byte-length telemetry is intentionally omitted: the kernel cannot see the
+/// QUIC-encrypted payload, so a `bytes_processed` counter would always be zero
+/// and misleading. Only packet-decision counters are surfaced.
 #[derive(Debug, Default, Clone)]
 pub struct XdpStats {
     pub packets_passed: u64,
     pub packets_dropped: u64,
     pub packets_redirected: u64,
-    pub bytes_processed: u64,
 }
 
 /// XDP filter configuration
