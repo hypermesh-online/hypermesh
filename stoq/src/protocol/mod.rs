@@ -44,9 +44,17 @@ pub use pos_integration::{
 
 use crate::extensions::{PacketShard, PacketToken, StoqProtocolExtension};
 use crate::transport::falcon::FalconSignature;
+use hypermesh_ebpf::{encode_pos_extension, WirePosHeader};
 
 /// STOQ protocol version for QUIC ALPN
 pub const STOQ_ALPN: &[u8] = b"stoq/1.0";
+
+/// Default PoW difficulty (leading zero bits) carried in the HyperMesh
+/// on-wire PoS header. Matches the kernel `KernelPosConfig` default so the
+/// XDP program's `min_difficulty` structural check and the emitted header
+/// agree. The field is carried on the wire but the kernel derives difficulty
+/// from the work hash's leading zeros, not this field.
+pub const KERNEL_POS_DIFFICULTY: u32 = 8;
 
 /// Custom QUIC frame type identifiers (in the private use range)
 /// Range 0xfe000000 - 0xffffffff is reserved for private use
@@ -309,11 +317,42 @@ impl StoqProtocolHandler {
         }
     }
 
-    /// Apply STOQ extensions to outgoing data
+    /// Build the HyperMesh Proof-of-State extension header as a CLEARTEXT
+    /// prefix for `data` (papers/HYPERMESH.md §5.1-5.7).
+    ///
+    /// Produces the exact 44-byte on-wire sequence the kernel XDP program
+    /// parses: a 4-byte common header `[magic 0x484D BE][type=0x01][len=40]`
+    /// followed by the 40-byte [`WirePosHeader`] (algorithm@0, difficulty@4,
+    /// hash@8). The `hash` is the packet's BLAKE3 work hash — the PoS token
+    /// the node already computes on the send path — and the algorithm is
+    /// FALCON-1024 (the HyperMesh default). This byte sequence is
+    /// byte-identical to the C `struct hmesh_header` + `struct hmesh_pos_header`.
+    ///
+    /// This is the prefix that must lead the UDP payload so XDP sees
+    /// `magic == 0x484D` at wire speed. On the AF_XDP raw-send path it is
+    /// physically prepended ahead of the encrypted body (see
+    /// `StoqTransport::send`); it is also emitted as the leading extension
+    /// blob by [`apply_extensions`].
+    pub fn hypermesh_pos_prefix(&self, data: &[u8]) -> Vec<u8> {
+        // The per-packet BLAKE3 token is the node's work hash for this packet.
+        let token = self.extensions.tokenize_packet(data);
+        let pos = WirePosHeader::from_pos_hash(token.hash, KERNEL_POS_DIFFICULTY);
+        encode_pos_extension(&pos)
+    }
+
+    /// Apply STOQ extensions to outgoing data.
+    ///
+    /// The returned frames lead with the HyperMesh cleartext extension header
+    /// (§5.1) so it is emitted ahead of STOQ's own token/shard frames, then
+    /// the STOQ token frame, then any shard frames.
     pub fn apply_extensions(&self, data: &[u8]) -> Result<Vec<Bytes>> {
         let mut frames = Vec::new();
 
         if self.extensions_enabled {
+            // HyperMesh cleartext extension header FIRST (§5.1). On the AF_XDP
+            // raw path this rides as the plaintext prefix ahead of the payload.
+            frames.push(Bytes::from(self.hypermesh_pos_prefix(data)));
+
             // Add tokenization
             let token = self.extensions.tokenize_packet(data);
             frames.push(self.encode_token_frame(&token)?);
@@ -362,6 +401,53 @@ mod tests {
     use super::*;
     use crate::extensions::DefaultStoqExtensions;
     use crate::protocol::frames;
+    use hypermesh_ebpf::{WireExtHeader, WIRE_HDR_MAGIC, WIRE_HDR_POS, WIRE_HDR_POS_ALG_FALCON};
+
+    #[test]
+    fn test_hypermesh_pos_prefix_matches_c_wire_layout() {
+        // The emit side (apply_extensions / hypermesh_pos_prefix) must produce
+        // the EXACT 44-byte on-wire sequence the C XDP program parses:
+        //   [magic 0x484D BE][type 0x01][len 40] + hmesh_pos_header(40).
+        // This is the load-bearing byte-identity contract.
+        let extensions = Arc::new(DefaultStoqExtensions::new());
+        let handler = StoqProtocolHandler::new(extensions.clone(), None, 1400);
+
+        let data = b"hypermesh packet payload";
+        let prefix = handler.hypermesh_pos_prefix(data);
+        assert_eq!(prefix.len(), 44, "4-byte common header + 40-byte PoS payload");
+
+        // Common header at offset 0: magic in network byte order (0x48 0x4D).
+        assert_eq!(prefix[0], 0x48);
+        assert_eq!(prefix[1], 0x4D);
+        assert_eq!(u16::from_be_bytes([prefix[0], prefix[1]]), WIRE_HDR_MAGIC);
+        assert_eq!(prefix[2], WIRE_HDR_POS);
+        assert_eq!(prefix[3], 40);
+
+        // PoS payload at offset 4: algorithm @0 (=FALCON), hash @8..40.
+        assert_eq!(prefix[4], WIRE_HDR_POS_ALG_FALCON);
+        // The carried work hash equals the packet's own BLAKE3 token hash.
+        let token = extensions.tokenize_packet(data);
+        assert_eq!(&prefix[12..44], &token.hash);
+
+        // The common header parses back through the eBPF crate's C-offset reader.
+        let common = WireExtHeader::from_bytes(&prefix[0..4]).expect("test: common header");
+        assert_eq!(common.ext_type, WIRE_HDR_POS);
+        assert_eq!(common.length, 40);
+    }
+
+    #[test]
+    fn test_apply_extensions_leads_with_hypermesh_header() {
+        let extensions = Arc::new(DefaultStoqExtensions::new());
+        let handler = StoqProtocolHandler::new(extensions.clone(), None, 1400);
+
+        let data = b"lead frame is the hypermesh header";
+        let frames = handler.apply_extensions(data).expect("test: apply_extensions");
+        assert!(!frames.is_empty());
+        // The FIRST frame is the HyperMesh cleartext extension header.
+        let lead = &frames[0];
+        assert_eq!(u16::from_be_bytes([lead[0], lead[1]]), WIRE_HDR_MAGIC);
+        assert_eq!(lead[2], WIRE_HDR_POS);
+    }
 
     #[test]
     fn test_token_frame_encoding() {

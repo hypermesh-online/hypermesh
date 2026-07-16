@@ -28,6 +28,7 @@
 pub mod af_xdp;
 pub mod capabilities;
 pub mod hooks;
+pub mod hypermesh_headers;
 pub mod loader;
 pub mod metrics;
 pub mod policy_maps;
@@ -47,6 +48,12 @@ pub use hooks::{
     CertificateValidator, ExtensionValidator, PacketValidator, PassThroughValidator,
     ValidationHooks,
 };
+pub use hypermesh_headers::{
+    encode_pos_extension, AssetHashHeader, MatrixCoordinate, MatrixRoutingHeader, PrivacyTierHeader,
+    ProofOfStateHeader, WireExtHeader, WirePosHeader, EXT_ASSET_HASH, EXT_MATRIX_ROUTING,
+    EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE, WIRE_HDR_ASSET, WIRE_HDR_MAGIC, WIRE_HDR_MATRIX,
+    WIRE_HDR_POS, WIRE_HDR_POS_ALG_FALCON, WIRE_HDR_PRIVACY,
+};
 pub use loader::{EbpfLoader, ProgramType};
 pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
 pub use policy_maps::{PolicyManager, ValidationPolicy};
@@ -54,7 +61,10 @@ pub use queue_balancer::{
     FlowHashBalancer, LeastLoadedBalancer, MultiQueueManager, PacketHint, QueueBalancer,
     QueueMetrics, RoundRobinBalancer,
 };
-pub use validation::{ALG_ECDSA, ALG_ED25519, ALG_FALCON_1024};
+pub use validation::{
+    AssetHashValidator, FastValidationResult, ProofOfStateValidator, ALG_ECDSA, ALG_ED25519,
+    ALG_FALCON_1024,
+};
 pub use xdp::{
     FilterAction, KernelPosConfig, OffloadPolicy, PacketDecision, XdpAttachMode, XdpFilterConfig,
     XdpManager, XdpStats,
@@ -443,6 +453,45 @@ impl HyperMeshEbpf {
             );
         }
         Ok(())
+    }
+
+    // -------------------------------------------------------------------
+    // Packet processing (userspace §5.4 pre-validation companion)
+    // -------------------------------------------------------------------
+
+    /// Validate a packet and return a decision (three execution paths).
+    ///
+    /// Delegates to the `XdpManager` userspace validation path, which parses
+    /// the HyperMesh extension header (now emitted by STOQ on the send path)
+    /// and runs the structural four-proof / asset / matrix checks. Falls back
+    /// to `Pass` when no XDP manager is attached.
+    pub fn validate_packet(&self, packet: &[u8]) -> PacketDecision {
+        if let Some(ref xdp) = self.xdp_manager {
+            xdp.validate_packet(0, packet)
+        } else {
+            PacketDecision::Pass
+        }
+    }
+
+    /// Validate a Proof of State extension header (userspace four-proof
+    /// structural pre-validation). Records the outcome in metrics.
+    pub fn validate_pos_header(&self, header: &ProofOfStateHeader) -> bool {
+        if let Some(ref xdp) = self.xdp_manager {
+            let valid = xdp.validate_proof_of_state(header);
+            self.metrics_collector.record_pos_validation(valid);
+            valid
+        } else {
+            let valid = header.validate_timestamps();
+            self.metrics_collector.record_pos_validation(valid);
+            valid
+        }
+    }
+
+    /// Validate an asset hash extension header (structural shard-index check).
+    pub fn validate_asset_hash(&self, header: &AssetHashHeader) -> bool {
+        let valid = header.validate_shard_indices();
+        self.metrics_collector.record_asset_validation(valid, false);
+        valid
     }
 
     // -------------------------------------------------------------------

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use crate::capabilities::NicCapabilities;
 use crate::policy_maps::PolicyManager;
+use crate::validation::ProofOfStateValidator;
 
 #[cfg(feature = "kernel-attach")]
 use super::validation::{
@@ -61,6 +62,13 @@ pub struct XdpManager {
     available: bool,
     /// Policy manager for validation decisions
     pub(super) policy_manager: PolicyManager,
+    /// Structural four-proof pre-validator for the userspace PoS path.
+    ///
+    /// Used by the packet-validation methods in `validation.rs` (the
+    /// documented §5.4 userspace pre-validation). Kernel-attach does the
+    /// same structural checks in-kernel; this drives the userspace fallback
+    /// and the deep-validation companion.
+    pub(super) pos_validator: ProofOfStateValidator,
     /// Hardware offload policy
     pub(crate) offload_policy: OffloadPolicy,
     /// Loaded BPF handle (only present when kernel-attach feature enabled).
@@ -90,6 +98,7 @@ impl XdpManager {
             stats: Arc::new(RwLock::new(XdpStats::default())),
             available,
             policy_manager,
+            pos_validator: ProofOfStateValidator::default(),
             offload_policy: OffloadPolicy::Disabled,
             #[cfg(feature = "kernel-attach")]
             bpf: Arc::new(parking_lot::Mutex::new(None)),
@@ -357,6 +366,10 @@ impl XdpManager {
             if let Some(ref mut bpf) = *guard {
                 use aya::maps::PerCpuArray;
 
+                // The kernel `struct xdp_stats` is still 4x u64 on the wire,
+                // but `bytes_processed` (values[3]) is intentionally never
+                // written in-kernel (the kernel cannot see the encrypted QUIC
+                // payload), so it is not aggregated or surfaced.
                 if let Some(map) = bpf.map_mut("stats_map") {
                     if let Ok(stats_array) = PerCpuArray::<_, [u64; 4]>::try_from(map) {
                         if let Ok(per_cpu_values) = stats_array.get(&0, 0) {
@@ -365,7 +378,6 @@ impl XdpManager {
                                 aggregated.packets_passed += values[0];
                                 aggregated.packets_dropped += values[1];
                                 aggregated.packets_redirected += values[2];
-                                aggregated.bytes_processed += values[3];
                             }
                             *self.stats.write() = aggregated;
                         }
