@@ -41,6 +41,11 @@ fn shard_maps_dir() -> Result<std::path::PathBuf> {
 /// to self-custody the decryption key). `privacy_mode` gates encryption:
 /// Private → encrypted + self-wrapped key envelope; Public/Anonymous →
 /// content-addressed cleartext shards (no key on disk).
+// NOTE (A6.1): on-chain shard registration (the `StoragePointer::Sharded`
+// block entry that makes `authorizes_shard` return true) is a DAEMON-PATH
+// concern, handled in `ipc::handlers::store::handle_store`. This standalone CLI
+// passes `dist_ctx = None` and never networks, so it deliberately does not
+// register — leaving it as a local-only ingest path.
 pub async fn run_store(
     path: std::path::PathBuf,
     dist_ctx: Option<&ShardDistributionCtx>,
