@@ -43,13 +43,20 @@ items = [
     "RemoteProxyManager — per-session registry with register/get/close/reap_inactive lifecycle",
     "ForwardedRequest/ForwardedResponse — minimal HTTP envelope shape forwarded over the STOQ stream",
     "StoqStreamForwarder trait — abstracts STOQ stream open/write/read for the proxy; MockStreamForwarder ships for tests, production wiring binds Connection::open_stream from gateway's NetworkManager handle",
+    # Phase P4/F8 — configurable gateway auth mode
+    "StoqAuthMode { HttpProxy (default) | FullStoqPos } — config + CLI + env parse; HttpProxy is a plain reverse proxy (no PoS, backwards-compatible), FullStoqPos requires a bilateral PoS handshake per connection",
+    "FullStoqPos handshake enforcement — StoqListener runs StoqBridge::perform_pos_handshake on accept and DROPS un-authenticated connections; StoqBridge::new_full_stoq_pos requires a NodeSigner + StateProofProvider (inherits the F2 signer↔identity binding)",
+    "NodeSigner + StateProofProvider wired into StoqBridge — gateway depends on trustchain for FALCON-1024 identity + TrustChainProofProvider (path dep, no cycle: trustchain does not depend on gateway)",
+    # Phase F9/P8 — dual-CA integration
+    "Dual-CA integration — gateway connects to the clearnet CA at trust_chain_addr=[::1]:8444 (trustchain-http3.service); systemd unit requires trustchain-http3.service (the single trustchain.service was retired in the F9 split)",
+    "Gateway's own STOQ listener disabled by default — stoq_listen_addr omitted (Option→None) so port 8444 is left to trustchain-http3; gateway serves clearnet over HTTP/3 on 8443, with stoq_max_connections bounding the STOQ bridge",
 ]
 
 [features.in_development]
 items = [
     # Production STOQ wiring for RemoteDashboardProxy: bind StoqStreamForwarder to NetworkManager
     "Production StoqStreamForwarder — wire MockStreamForwarder replacement that opens a real STOQ stream via Connection::open_stream and round-trips request bytes; depends on gateway-side NetworkManager handle reaching remote_proxy",
-    "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
+    "HTTP/3 bootstrap-token validation — token issued via HTTP/3 is still NOT cross-validated at the STOQ layer; FullStoqPos now enforces a real bilateral PoS handshake per connection, but the HTTP/3-issued bootstrap token is not yet bound to that handshake",
     "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
     "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
     "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + G.2 chain-scan recovery + PeerContext wire dispatch landed in blockmatrix (5/5 g1_transfer + 4/4 g2_transfer tests pass); gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase I)",

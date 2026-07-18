@@ -53,6 +53,17 @@ items = [
     "CRL revocation auto-propagates to federation — CertificateStore.revoke_certificate calls CrlDistributor.propagate_to_federation when set_federation() context attached, alpha-default unchanged otherwise",
     "Cross-CA cert validation — FederationManager.is_federation_signed verifies FALCON-1024 cert blob against any Full/Conditional peer's public key, rejects unknown signers and Untrusted peers",
     "STOQ TAG_CRL_REQUEST/RESPONSE wire constants (0x33/0x34) and trustchain/crl/lookup STOQ API path — CrlLookupHandler exposes is_revoked + reason for federation peers",
+    # Phase F2 — handshake signer binding (zero-trust hardening)
+    "Unsigned-proof fallback REMOVED — TrustChainProofProvider::validate_proof default-rejects any proof that is not a FALCON-signed WireSignedProof (the legacy raw-StateProof downgrade path is deleted, no structural-only accept)",
+    "Signer↔identity binding — WireSignedProof::signer_matches / signer_pubkey_bytes let the bilateral handshake enforce that the proof signer is the same FALCON key that authenticated the peer identity (BLAKE3(pubkey)==node_id), closing the self-signed-proof Sybil vector",
+    # Phase F3 — test proofs excluded from release
+    "localhost-testing removed from default features — release builds cannot enter StateProof::new_for_testing into real blocks; the feature is dev/test-only via resolver-2 dev-dependency scoping",
+    "trustchain_ca gated behind required-features=[\"localhost-testing\"] — the self-signed auto-issue dev CA is excluded from release builds",
+    # Phase F9 — dual-CA production split (deployed + verified live on trust.hypermesh.online)
+    "Dual-CA production split — trustchain-http3-server ([::1]:8444, gateway/clearnet CA) + trustchain-stoq-server ([::1]:8445, node-to-node CA), two production-clean binaries (zero new_for_testing), each loading a production State-bar [api] config; the production CA no longer runs the test-proof binary",
+    # Phase P2 — device-authentication invariant
+    "Device fingerprint folded into all four genesis proofs — DeviceFingerprint (machine-id/DMI/disk-serial/MAC via OsAbstraction) contributes to PoSpace/PoStake/PoWork/PoTime; three node-ids collapsed to one (BLAKE3(falcon_pubkey))",
+    "Real PoTime clock witness — perform_ntp_sync returns a genuine wall-vs-monotonic drift reading with an epoch-window sanity check, not a hardcoded constant",
 ]
 
 [features.in_development]
@@ -70,6 +81,9 @@ items = [
     # DECENTRALIZATION: Single-node only
     "Byzantine detection — ByzantineDetector monitors local node only",
     "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
+    # PROOF DEPTH: authenticity is at the envelope, inner proofs are structural
+    "Inner four-proof depth — StakeProof/SpaceProof/WorkProof/TimeProof ::validate() is STRUCTURAL (non-empty holder id, positive stake, age/epoch bounds), NOT signature/threshold-verifying; cryptographic authenticity is only the FALCON-1024 WireSignedProof envelope over the serialized StateProof. Deep per-proof threshold checks (real stake/storage/compute attestation) not yet enforced on hot paths",
+    "Device-continuity enforcement is opt-in — verify_device_continuity rejects a copied identity on a different machine only under --require-hardware-auth (defaults off)",
 ]
 
 [features.planned]

@@ -40,6 +40,8 @@ items = [
     "PosValidationState connection gate",
     "PathSelector recommendation polling",
     "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch",
+    "Protocol-version negotiation (P6) — Msg1/Msg2 carry a protocol_version field (serde default STOQ_PROTOCOL_VERSION=1.0.0); peer_version_compatible rejects a major-version mismatch BEFORE any trust/application data, minor/patch tolerated, old peers omitting the field still handshake; mirrors blockmatrix::ipc::protocol version rules",
+    "0x484D PoS extension-header emission (A4-CORRECT) — protocol layer prepends the plaintext WirePosHeader prefix (via hypermesh_ebpf::encode_pos_extension, magic 0x484D BE + WirePosHeader::from_pos_hash) ahead of the payload so XDP can PoS-classify at wire speed on the AF_XDP raw-send path; offset-pinned byte-identity tests vs the C hmesh_* structs",
 ]
 
 [features.in_development]

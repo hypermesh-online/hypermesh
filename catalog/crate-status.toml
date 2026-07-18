@@ -30,6 +30,10 @@ items = [
     "Policy rule evaluation (CertificateIssuer)",
     "foundation.dns_grant/v1 typedef hosted",
     "release.feed/v1 typedef hosted (Phase J.1 — foundation-signed release announcements: version, channel, per-target binary hashes, release notes URL, FALCON-1024 signature)",
+    # Phase M.4 — registry dependency graph + provider seam
+    "Registry dependency resolution — CatalogRegistry::resolve_dependencies runs a cycle-safe BFS producing DependencyGraph { direct, transitive, missing } with honest missing-tracking (unregistered hashes surfaced, no fabricated graph)",
+    "Embedded typedef-reference scanner — schema_scanner::scan_schema_for_typedef_refs regex-scans a typedef schema body for 64-hex BLAKE3 refs that resolve to registered typedefs, unioning implicit deps with declared ones",
+    "CatalogProvider trait + blockmatrix adapter — CatalogRegistryAdapter/wire_catalog_registry expose the registry to blockmatrix via a dyn-safe provider (resolves the catalog→blockmatrix dependency cycle); catalog.dependencies IPC handler is backed by the real BFS when a registry is present, honest alpha-inert when absent",
 ]
 
 [features.in_development]
