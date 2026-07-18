@@ -340,6 +340,14 @@ pub async fn run_connect(
         }
     }
 
+    // Close the STOQ transport FIRST so the accept loop + every per-peer
+    // message loop unpark from quinn and return, dropping their connections
+    // and the driver. Without this, a node with active peers hangs until the
+    // QUIC idle-timeout (~30s) instead of exiting promptly.
+    if let Some(network) = daemon_state.network.as_ref() {
+        network.shutdown().await;
+    }
+
     if let Some(server) = ipc_server {
         server.shutdown();
     }

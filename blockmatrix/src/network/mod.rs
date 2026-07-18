@@ -342,6 +342,18 @@ impl NetworkManager {
     // Discovery methods (start_discovery, join_network, etc.) are in
     // peer_discovery.rs as a separate impl block.
 
+    /// Gracefully shut down the network layer.
+    ///
+    /// Delegates to [`stoq::StoqTransport::shutdown`], which closes every active
+    /// connection and the quinn endpoint. Closing the endpoint makes the
+    /// `accept_connections` accept loop and every per-peer
+    /// `run_peer_message_loop` return an error and break, dropping their
+    /// `Arc<Connection>`s and the connection driver so the runtime can tear
+    /// down promptly instead of parking on quinn's idle timeout.
+    pub async fn shutdown(&self) {
+        self.transport.shutdown().await;
+    }
+
     /// Connect to a specific peer.
     ///
     /// When `peer_ctx` is `Some`, a persistent message loop is spawned for the
