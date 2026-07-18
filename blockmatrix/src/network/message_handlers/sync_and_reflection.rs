@@ -26,7 +26,11 @@ pub(super) async fn handle_shard_dispatch(
     stream: &mut stoq::Stream,
     ctx: &PeerContext,
 ) {
-    match shard_transport::handle_shard_message(data, &ctx.shard_store).await {
+    // A6.6: pass the serving node's chain so a SHARD_FETCH hit is answered
+    // with an ENVELOPE carrying the shard's on-chain registration — the
+    // fetcher re-anchors it on its own chain (torrent share-compute model).
+    match shard_transport::handle_shard_message(data, &ctx.shard_store, Some(&ctx.blockchain)).await
+    {
         Ok(Some(response_data)) => {
             if let Err(e) = stream.send(&response_data).await {
                 warn!("Failed to send shard response: {}", e);

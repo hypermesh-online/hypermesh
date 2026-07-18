@@ -16,7 +16,94 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use super::shard_store::ShardStore;
+use crate::blockchain::block::BlockAssetEntry;
+use crate::blockchain::node_chain::NodeBlockchain;
 use crate::transport::error::TransportError;
+
+/// Frame an enveloped SHARD_FETCH response (A6.6): a self-describing envelope
+/// carrying the shard bytes plus (optionally) the ONE asset registration that
+/// authorizes the shard, so the fetcher can re-anchor it on its own chain.
+///
+/// Wire format: `shard_len(4, u32 BE) + shard_data + registration_json(rest)`.
+/// The trailing registration bytes are empty when no on-chain registration
+/// covers this shard. An OLD server sends bare shard bytes (no length prefix);
+/// the client disambiguates by content-addressing (BLAKE3 of the framed shard
+/// must equal the requested id), so no version flag is needed on the wire.
+fn frame_shard_response(shard_data: &[u8], registration_json: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(4 + shard_data.len() + registration_json.len());
+    out.extend_from_slice(&(shard_data.len() as u32).to_be_bytes());
+    out.extend_from_slice(shard_data);
+    out.extend_from_slice(registration_json);
+    out
+}
+
+/// Build the enveloped serve response for a stored shard: look up the shard's
+/// on-chain registration (when a blockchain handle is present) and attach it.
+///
+/// The registration is the content-bound `BlockAssetEntry` returned by
+/// [`NodeBlockchain::registration_for_shard`]. When absent (no handle, or no
+/// on-chain asset lists this shard), the shard is still served — the trailing
+/// registration segment is simply empty (the fetcher caches it but does not
+/// become an authoritative mirror, matching the pre-A6.6 behavior).
+async fn build_enveloped_response(
+    shard_id: &ContentHash,
+    shard_data: &[u8],
+    blockchain: Option<&NodeBlockchain>,
+) -> Vec<u8> {
+    let registration_json = match blockchain {
+        Some(chain) => match chain.registration_for_shard(&shard_id.0).await {
+            Some(entry) => serde_json::to_vec(&entry).unwrap_or_default(),
+            None => Vec::new(),
+        },
+        None => Vec::new(),
+    };
+    frame_shard_response(shard_data, &registration_json)
+}
+
+/// Parse an enveloped (or legacy bare) SHARD_FETCH response.
+///
+/// Disambiguation is content-addressed and needs no wire version flag: try the
+/// enveloped shape first (`len(4) + shard + registration_json`), accept it ONLY
+/// when the framed shard BLAKE3-hashes to the requested `shard_id`; otherwise
+/// treat the WHOLE response as bare shard bytes (old server). Either way the
+/// caller re-verifies the returned shard against `shard_id` — this parse never
+/// weakens that gate, it only recovers the optional trailing registration.
+///
+/// Returns `(shard_bytes, Some(entry))` when an enveloped registration parsed,
+/// `(shard_bytes, None)` for enveloped-without-registration or the bare
+/// fallback. An empty `response` (shard not found) yields `(vec![], None)`.
+pub fn parse_shard_response(
+    response: &[u8],
+    shard_id: &ContentHash,
+) -> (Vec<u8>, Option<BlockAssetEntry>) {
+    if response.is_empty() {
+        return (Vec::new(), None);
+    }
+
+    // Attempt the enveloped shape: 4-byte BE length prefix, then that many
+    // shard bytes, then the (possibly empty) registration JSON.
+    if response.len() >= 4 {
+        let len = u32::from_be_bytes([response[0], response[1], response[2], response[3]]) as usize;
+        if 4 + len <= response.len() {
+            let shard = &response[4..4 + len];
+            // Content-address gate: only trust the enveloped framing when the
+            // extracted shard actually hashes to the id we asked for.
+            if blake3::hash(shard).as_bytes() == &shard_id.0 {
+                let reg_bytes = &response[4 + len..];
+                let registration = if reg_bytes.is_empty() {
+                    None
+                } else {
+                    serde_json::from_slice::<BlockAssetEntry>(reg_bytes).ok()
+                };
+                return (shard.to_vec(), registration);
+            }
+        }
+    }
+
+    // Legacy bare response: the whole payload is the shard (old server). The
+    // caller's BLAKE3 gate validates it; we carry no registration.
+    (response.to_vec(), None)
+}
 
 /// Abstraction for shard-level network operations.
 ///
@@ -322,9 +409,15 @@ impl ShardTransport for MockShardTransport {
 ///
 /// Returns `Ok(None)` for SHARD_SEND (no reply), `Ok(Some(bytes))` for
 /// SHARD_FETCH (response data to send back).
+///
+/// A6.6: `blockchain` is the serving node's chain. On a SHARD_FETCH hit the
+/// response is an ENVELOPE (`len(4)+shard+registration_json`) so the fetcher
+/// can re-anchor the shard's registration on its own chain. Pass `None` to
+/// serve legacy bare shard bytes (no registration).
 pub async fn handle_shard_message(
     data: &[u8],
     store: &ShardStore,
+    blockchain: Option<&NodeBlockchain>,
 ) -> Result<Option<Vec<u8>>, TransportError> {
     if data.is_empty() {
         return Err(TransportError::Protocol("empty shard message".into()));
@@ -378,7 +471,11 @@ pub async fn handle_shard_message(
             match store.get(&shard_id).await {
                 Some(shard_data) => {
                     tracing::debug!("Serving shard {} to peer", hex::encode(shard_id_bytes));
-                    Ok(Some(shard_data))
+                    // A6.6: attach the shard's on-chain registration (when
+                    // present) so the fetcher can re-anchor it on its own chain.
+                    let enveloped =
+                        build_enveloped_response(&shard_id, &shard_data, blockchain).await;
+                    Ok(Some(enveloped))
                 }
                 None => {
                     // Empty response indicates shard not found
@@ -563,5 +660,137 @@ mod tests {
             .expect("test: fetch pre-populated shard");
 
         assert_eq!(fetched, data);
+    }
+
+    // ── A6.6: enveloped SHARD_FETCH response framing + parse ─────────────
+
+    fn sample_registration(shard_id: [u8; 32]) -> BlockAssetEntry {
+        use crate::assets::core::AssetRegistration;
+        use crate::blockchain::block::StoragePointer;
+        use crate::matrix::coordinate::MatrixCoordinate;
+        use trustchain::proof_of_state::StateProof;
+
+        let coord = MatrixCoordinate::new(3, 3, 3).expect("test: coord");
+        let reg = AssetRegistration::genesis(coord);
+        let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        BlockAssetEntry::new_bound(
+            asset_hash,
+            &StateProof::new_for_testing(),
+            StoragePointer::Sharded {
+                shard_hashes: vec![shard_id],
+                placements: vec![coord],
+            },
+            reg,
+        )
+    }
+
+    /// Round-trip: an enveloped response with a registration parses back to the
+    /// exact shard bytes + the exact registration entry.
+    #[test]
+    fn parse_recovers_enveloped_shard_and_registration() {
+        let shard_data: Vec<u8> = (0..777).map(|i| (i % 256) as u8).collect();
+        let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
+        let entry = sample_registration(shard_id.0);
+        let reg_json = serde_json::to_vec(&entry).expect("test: serialize entry");
+
+        let framed = frame_shard_response(&shard_data, &reg_json);
+        let (got_shard, got_reg) = parse_shard_response(&framed, &shard_id);
+
+        assert_eq!(got_shard, shard_data, "shard bytes must round-trip");
+        assert_eq!(
+            got_reg.expect("test: registration recovered"),
+            entry,
+            "registration entry must round-trip exactly",
+        );
+    }
+
+    /// An enveloped response with NO registration (empty trailing segment)
+    /// parses to the shard and `None`.
+    #[test]
+    fn parse_recovers_enveloped_shard_without_registration() {
+        let shard_data = vec![0xAB; 300];
+        let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
+
+        let framed = frame_shard_response(&shard_data, &[]);
+        let (got_shard, got_reg) = parse_shard_response(&framed, &shard_id);
+
+        assert_eq!(got_shard, shard_data);
+        assert!(got_reg.is_none(), "no trailing bytes → no registration");
+    }
+
+    /// BACKWARDS-COMPAT: a BARE response (old server, no length prefix) is
+    /// treated as raw shard bytes with no registration — the content-address
+    /// gate disambiguates it from the enveloped shape.
+    #[test]
+    fn parse_falls_back_to_bare_response() {
+        // Bare shard bytes: exactly what the legacy `handle_incoming_shard_stream`
+        // serve path sends (`stream.send(&shard_data)`).
+        let shard_data = vec![0xCD; 64];
+        let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
+
+        let (got_shard, got_reg) = parse_shard_response(&shard_data, &shard_id);
+
+        assert_eq!(got_shard, shard_data, "bare bytes returned as the shard");
+        assert!(got_reg.is_none(), "bare response carries no registration");
+    }
+
+    /// A bare response whose leading 4 bytes HAPPEN to look like a length prefix
+    /// still falls back to bare, because the framed-shard content-address gate
+    /// fails (the framed slice does not hash to the requested id).
+    #[test]
+    fn parse_bare_response_with_prefixlike_bytes_falls_back() {
+        // 40 bytes; the first 4 read as a large BE length (0x01020304) that is
+        // NOT <= remaining, so the envelope branch is skipped and we fall back.
+        let mut shard_data = vec![0x01u8, 0x02, 0x03, 0x04];
+        shard_data.extend_from_slice(&[0x55u8; 36]);
+        let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
+
+        let (got_shard, got_reg) = parse_shard_response(&shard_data, &shard_id);
+        assert_eq!(got_shard, shard_data);
+        assert!(got_reg.is_none());
+    }
+
+    /// An empty response (shard not found) yields empty bytes + no registration.
+    #[test]
+    fn parse_empty_response_is_not_found() {
+        let shard_id = ContentHash([0x11u8; 32]);
+        let (got_shard, got_reg) = parse_shard_response(&[], &shard_id);
+        assert!(got_shard.is_empty());
+        assert!(got_reg.is_none());
+    }
+
+    /// The enveloped serve path (`build_enveloped_response`) with a blockchain
+    /// that HAS the registration produces bytes the client parses back to the
+    /// registration; with `None` blockchain it produces a registration-less
+    /// envelope. End-to-end frame↔parse symmetry across the serve+fetch split.
+    #[tokio::test]
+    async fn serve_envelope_round_trips_through_parse() {
+        use crate::blockchain::node_chain::NodeBlockchain;
+        use crate::matrix::coordinate::MatrixCoordinate;
+
+        let coord = MatrixCoordinate::new(4, 4, 4).expect("test: coord");
+        let chain = NodeBlockchain::new(coord);
+
+        // Register a sharded asset on the chain so registration_for_shard hits.
+        let shard_data = vec![0x7Au8; 200];
+        let shard_id = ContentHash(*blake3::hash(&shard_data).as_bytes());
+        let entry = sample_registration(shard_id.0);
+        // new_for_testing proof passes add_block's validate().
+        chain
+            .add_block(vec![entry.clone()])
+            .await
+            .expect("test: register sharded asset");
+
+        // Serve WITH chain → envelope carries the registration.
+        let served = build_enveloped_response(&shard_id, &shard_data, Some(&chain)).await;
+        let (got_shard, got_reg) = parse_shard_response(&served, &shard_id);
+        assert_eq!(got_shard, shard_data);
+        assert!(got_reg.is_some(), "serve-with-chain must attach a registration");
+
+        // Serve WITHOUT chain → registration-less envelope.
+        let served_none = build_enveloped_response(&shard_id, &shard_data, None).await;
+        let (got_shard2, got_reg2) = parse_shard_response(&served_none, &shard_id);
+        assert_eq!(got_shard2, shard_data);
+        assert!(got_reg2.is_none(), "serve-without-chain carries no registration");
     }
 }

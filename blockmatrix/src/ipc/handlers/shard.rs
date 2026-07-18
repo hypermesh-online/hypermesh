@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use crate::blockchain::block::BlockAssetEntry;
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{RpcError, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
@@ -153,7 +154,7 @@ async fn try_fetch_from_ordered_peers(
             continue;
         };
         match fetch_shard_from_peer(conn, content_hash).await {
-            Ok(data) if !data.is_empty() => {
+            Ok((data, registration)) if !data.is_empty() => {
                 // BLAKE3 content gate (mirror invariant #1): the fetched shard
                 // MUST hash to its claimed content address before we return,
                 // seed, or re-announce it.
@@ -166,8 +167,12 @@ async fn try_fetch_from_ordered_peers(
                     continue;
                 }
 
+                // A6.6: the serving peer may have attached the shard's ONE
+                // on-chain registration. `seed_fetched_shard` re-validates it
+                // (zero-trust) and, if it covers THIS shard, re-anchors it on
+                // OUR chain so we become an authoritative mirror.
                 let announce_targets =
-                    seed_fetched_shard(state, network, content_hash, &data).await;
+                    seed_fetched_shard(state, network, content_hash, &data, registration).await;
 
                 return Ok(Some(serde_json::json!({
                     "source": "network",
@@ -199,14 +204,31 @@ async fn try_fetch_from_ordered_peers(
 ///
 /// Returns the number of peers the announcement reached (0 when the shard is
 /// not on-chain-authorized, no manager is wired, or there are no peers).
+///
+/// A6.6: `registration` is the shard's ONE on-chain registration as delivered
+/// by the serving peer (or `None` for a bare / old-peer response). Before
+/// re-announcing, this re-validates the delivered entry (zero-trust) and, when
+/// it covers THIS shard, re-anchors it as a FRESH block on our own chain via
+/// [`revalidate_and_register`] — which is what flips
+/// [`reannounce_authorized`] to true so we legitimately become a mirror.
 async fn seed_fetched_shard(
     state: &DaemonState,
     network: &Arc<crate::network::NetworkManager>,
     content_hash: &ContentHash,
     data: &[u8],
+    registration: Option<BlockAssetEntry>,
 ) -> usize {
     // Always cache locally so repeat fetches hit the local store.
     state.shard_store.store(*content_hash, data.to_vec()).await;
+
+    // A6.6: if the serving peer attached this shard's registration, re-validate
+    // it and — when it legitimately covers this shard — write a fresh block onto
+    // OUR chain so `authorizes_shard(content_hash)` becomes true. On any failed
+    // check we log and skip registration (cache-only), preserving the pre-A6.6
+    // behavior for bare / old-peer responses.
+    if let Some(entry) = registration {
+        revalidate_and_register(state, content_hash, entry).await;
+    }
 
     // P1 signed-to-content gate on the become-provider path: only advertise as
     // a provider for shards of assets registered + content-bound on our chain.
@@ -251,6 +273,89 @@ async fn reannounce_authorized(state: &DaemonState, content_hash: &ContentHash) 
     state.blockchain.authorizes_shard(&content_hash.0).await
 }
 
+/// A6.6 SECURITY-LOAD-BEARING: re-validate a peer-delivered registration and,
+/// when it legitimately covers the fetched shard, re-anchor it as a FRESH block
+/// on OUR chain. This is the torrent share-compute step: a node that TOUCHED a
+/// vector (fetched a shard) re-derives that ONE asset's authorization onto its
+/// own head — no whole-chain replication, no trust in the serving peer.
+///
+/// The delivered `entry` is NOT trusted. We independently check:
+///  1. `entry.content_binding_ok()` — the state proof is bound to the entry's
+///     own `asset_hash` (signed-to-content; a valid proof for asset A cannot be
+///     replayed inside an entry claiming asset B).
+///  2. the entry's `StoragePointer::Sharded.shard_hashes` CONTAINS the
+///     `content_hash` of the shard we actually fetched — the registration MUST
+///     be FOR this shard. A registration that does not cover it is rejected.
+///  3. (delegated) `add_block` re-runs `content_binding_ok` AND
+///     `state_proof.validate()` on every entry — the four-proof StateProof must
+///     pass its own structural/temporal validation, and the fresh block must
+///     link to our head. We rely on that as the final authority.
+///
+/// On ANY failed check we log and return `false` WITHOUT registering (the shard
+/// stays cache-only, exactly as for a bare / old-peer response). Returns `true`
+/// only when the shard is authorized on our chain afterward.
+async fn revalidate_and_register(
+    state: &DaemonState,
+    content_hash: &ContentHash,
+    entry: BlockAssetEntry,
+) -> bool {
+    use crate::blockchain::block::StoragePointer;
+
+    // Already authorized (e.g. we published it, or a prior fetch registered it).
+    // Nothing to do — do NOT append a duplicate block.
+    if state.blockchain.authorizes_shard(&content_hash.0).await {
+        return true;
+    }
+
+    // (1) Signed-to-content: the proof must be bound to the entry's asset_hash.
+    if !entry.content_binding_ok() {
+        tracing::warn!(
+            "A6.6: delivered registration for shard {} is not content-bound — NOT registered",
+            hex::encode(&content_hash.0[..8]),
+        );
+        return false;
+    }
+
+    // (2) The registration must actually COVER the shard we fetched: its
+    // Sharded pointer must list this content hash. Reject registrations that
+    // do not cover the shard (a peer must not register us for an asset whose
+    // shard we never validated).
+    let covers_shard = matches!(
+        &entry.storage_pointer,
+        StoragePointer::Sharded { shard_hashes, .. }
+            if shard_hashes.iter().any(|h| h == &content_hash.0)
+    );
+    if !covers_shard {
+        tracing::warn!(
+            "A6.6: delivered registration does not cover fetched shard {} — NOT registered",
+            hex::encode(&content_hash.0[..8]),
+        );
+        return false;
+    }
+
+    // (3) Re-anchor on OUR head. `add_block` re-runs content_binding_ok +
+    // state_proof.validate() and enforces hash linkage; a fresh block is linked
+    // to our current head (NOT A's block spliced in). This makes
+    // `authorizes_shard(content_hash)` true for the shard we actually hold.
+    match state.blockchain.add_block(vec![entry]).await {
+        Ok(block) => {
+            tracing::info!(
+                "A6.6: re-anchored registration for shard {} on our chain (block #{})",
+                hex::encode(&content_hash.0[..8]),
+                block.index,
+            );
+            true
+        }
+        Err(e) => {
+            tracing::warn!(
+                "A6.6: add_block rejected delivered registration for shard {} — NOT a mirror: {e}",
+                hex::encode(&content_hash.0[..8]),
+            );
+            false
+        }
+    }
+}
+
 /// Query a bounded set of upstream peers "who has `content_hash`?" and return
 /// the merged provider node_ids they know that we did NOT already have.
 ///
@@ -290,10 +395,18 @@ async fn query_upstream_trackers(
 }
 
 /// Fetch a shard from a connected peer using the SHARD_FETCH wire protocol.
+///
+/// A6.6: the response is a self-describing envelope
+/// (`shard_len(4)+shard+registration_json`) — the serving node attaches the
+/// shard's ONE on-chain registration so we can re-anchor it on our own chain.
+/// [`shard_transport::parse_shard_response`] recovers `(shard_bytes,
+/// Option<registration>)` and transparently falls back to bare shard bytes
+/// when talking to an OLD server (no length prefix). Returns the shard bytes
+/// plus the optional registration entry.
 async fn fetch_shard_from_peer(
     conn: &Arc<stoq::Connection>,
     shard_id: &ContentHash,
-) -> Result<Vec<u8>, String> {
+) -> Result<(Vec<u8>, Option<BlockAssetEntry>), String> {
     let mut stream = conn
         .open_stream()
         .await
@@ -314,7 +427,9 @@ async fn fetch_shard_from_peer(
         .await
         .map_err(|e| format!("receive shard: {e}"))?;
 
-    Ok(response.to_vec())
+    Ok(crate::network::shard_transport::parse_shard_response(
+        &response, shard_id,
+    ))
 }
 
 #[cfg(test)]
@@ -428,6 +543,129 @@ mod tests {
         assert!(
             !reannounce_authorized(&state, &ContentHash(orphan_shard)).await,
             "a shard not content-bound on our chain must NOT be re-announced",
+        );
+    }
+
+    // ── A6.6: peer-delivered registration re-validation + re-anchor ──────
+
+    /// Build a delivered registration entry EXACTLY as a serving node's chain
+    /// would carry it: a content-bound `StoragePointer::Sharded` entry listing
+    /// `covered_shards`, with a valid (add_block-passing) StateProof. This
+    /// mirrors `store.rs::register_sharded_asset_onchain` (`new_bound`) so the
+    /// signed-to-content binding holds and `add_block`'s `state_proof.validate()`
+    /// passes.
+    fn delivered_registration(
+        coord: crate::matrix::coordinate::MatrixCoordinate,
+        covered_shards: Vec<[u8; 32]>,
+    ) -> BlockAssetEntry {
+        use crate::assets::core::AssetRegistration;
+        use crate::blockchain::block::StoragePointer;
+        use trustchain::proof_of_state::StateProof;
+
+        let reg = AssetRegistration::genesis(coord);
+        let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        BlockAssetEntry::new_bound(
+            asset_hash,
+            &StateProof::new_for_testing(),
+            StoragePointer::Sharded {
+                shard_hashes: covered_shards,
+                placements: vec![coord],
+            },
+            reg,
+        )
+    }
+
+    /// A6.6 POSITIVE: a delivered, content-bound registration that COVERS the
+    /// fetched shard is re-anchored on our chain — `authorizes_shard` flips to
+    /// true (we legitimately become a mirror). This is the exact re-seed gate
+    /// the E2E `announce_targets>0` path depends on.
+    #[tokio::test]
+    async fn test_revalidate_and_register_accepts_covering_registration() {
+        let state = crate::ipc::handlers::tests::test_state().await;
+        let shard_id = [0x42u8; 32];
+        let content_hash = ContentHash(shard_id);
+
+        // Not authorized before delivery.
+        assert!(
+            !state.blockchain.authorizes_shard(&shard_id).await,
+            "precondition: shard must not be authorized before delivery",
+        );
+
+        // Deliver a registration whose Sharded pointer LISTS this shard.
+        let entry = delivered_registration(state.coordinate, vec![shard_id]);
+        let registered = revalidate_and_register(&state, &content_hash, entry).await;
+
+        assert!(registered, "a covering, content-bound registration must register");
+        assert!(
+            state.blockchain.authorizes_shard(&shard_id).await,
+            "after re-anchoring the delivered registration, the shard must be authorized on OUR chain",
+        );
+    }
+
+    /// A6.6 NEGATIVE (the security assertion): a delivered registration whose
+    /// `shard_hashes` does NOT contain the fetched shard is REJECTED —
+    /// `authorizes_shard` stays false. A serving peer must not be able to
+    /// register us as a mirror for an asset whose shard we never validated.
+    #[tokio::test]
+    async fn test_revalidate_and_register_rejects_non_covering_registration() {
+        let state = crate::ipc::handlers::tests::test_state().await;
+        let fetched_shard = [0x42u8; 32];
+        let content_hash = ContentHash(fetched_shard);
+
+        // The registration covers a DIFFERENT shard, not the one we fetched.
+        let other_shard = [0x99u8; 32];
+        let entry = delivered_registration(state.coordinate, vec![other_shard]);
+        let registered = revalidate_and_register(&state, &content_hash, entry).await;
+
+        assert!(
+            !registered,
+            "a registration that does not cover the fetched shard must be rejected",
+        );
+        assert!(
+            !state.blockchain.authorizes_shard(&fetched_shard).await,
+            "authorizes_shard must stay FALSE for a shard the registration does not cover",
+        );
+        // And the non-covered shard is not authorized either (nothing was written).
+        assert!(
+            !state.blockchain.authorizes_shard(&other_shard).await,
+            "no block should have been appended for a rejected registration",
+        );
+    }
+
+    /// A6.6: a delivered registration whose proof is NOT content-bound (the
+    /// signed-to-content half is broken) is rejected before any chain write.
+    #[tokio::test]
+    async fn test_revalidate_and_register_rejects_unbound_proof() {
+        use crate::assets::core::AssetRegistration;
+        use crate::blockchain::block::StoragePointer;
+        use trustchain::proof_of_state::StateProof;
+
+        let state = crate::ipc::handlers::tests::test_state().await;
+        let shard_id = [0x42u8; 32];
+        let content_hash = ContentHash(shard_id);
+
+        // Hand-build an entry whose state_proof.file_hash does NOT equal
+        // hex(asset_hash) — content_binding_ok() is false. (new_bound would fix
+        // this, so we bypass it deliberately to exercise the guard.)
+        let reg = AssetRegistration::genesis(state.coordinate);
+        let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let unbound = BlockAssetEntry {
+            asset_hash,
+            proof_hash: [0u8; 32],
+            state_proof: StateProof::new_for_testing(), // file_hash != hex(asset_hash)
+            storage_pointer: StoragePointer::Sharded {
+                shard_hashes: vec![shard_id],
+                placements: vec![state.coordinate],
+            },
+            registration: reg,
+        };
+        assert!(!unbound.content_binding_ok(), "test setup: entry must be unbound");
+
+        let registered = revalidate_and_register(&state, &content_hash, unbound).await;
+        assert!(!registered, "an unbound-proof registration must be rejected");
+        assert!(
+            !state.blockchain.authorizes_shard(&shard_id).await,
+            "no block should have been appended for an unbound registration",
         );
     }
 }
