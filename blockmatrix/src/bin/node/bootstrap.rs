@@ -180,9 +180,24 @@ pub(crate) async fn resume_node(
 
     info!("Loaded {} blocks from disk", blocks.len());
 
+    // H3: load this node's FALCON identity so the reconstructed chain can sign
+    // locally-produced blocks' proof envelopes (single local-write chokepoint).
+    let identity_dir = data_dir.join(nid).join("identity");
+    let falcon_identity: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> =
+        std::sync::Arc::new(
+            blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)
+                .context("failed to load FALCON identity for block signing")?,
+        );
+
+    // H3: attach the signer so `add_block` FALCON-signs produced proofs.
+    // Block-accept validation uses `default()` StateRequirements — PoStake is
+    // AUTHORIZATION (to whom an asset belongs), not a numeric magnitude, so the
+    // hardening is the FALCON signature + signer↔owner binding, not a raised
+    // stake floor.
     let blockchain = std::sync::Arc::new(
         NodeBlockchain::from_blocks(coord, blocks)
-            .map_err(|e| anyhow::anyhow!("failed to reconstruct blockchain: {}", e))?,
+            .map_err(|e| anyhow::anyhow!("failed to reconstruct blockchain: {}", e))?
+            .with_signer(falcon_identity),
     );
 
     let cert_path = data_dir.join(nid).join("certificate.json");
@@ -216,11 +231,27 @@ pub(crate) async fn fresh_boot(
     // Fail closed on insufficient hardware sources when enforcement is on.
     enforce_min_sources(require_hardware_auth)?;
 
+    // H3: load this node's FALCON identity up front so the fresh chain can
+    // FALCON-sign locally-produced block proof envelopes (single local-write
+    // signing chokepoint). `FalconIdentity` is not `Clone`, so the downstream
+    // hardware-asset registration re-loads it (idempotent `load_or_create`
+    // reads the same persisted keys).
+    let signing_identity_dir = data_dir.join(nid).join("identity");
+    let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> =
+        std::sync::Arc::new(blockmatrix::identity::FalconIdentity::load_or_create(
+            &signing_identity_dir,
+        )?);
+
     // Genesis bound to the canonical device identity (collapses the three
     // historical node IDs into `device_node_id`). The device fingerprint is
-    // captured inside the genesis proofs unconditionally.
-    let bootstrap =
-        NodeBootstrap::initialize_with_identity(coord, device_node_id).await?;
+    // captured inside the genesis proofs unconditionally. H3: attach the signer
+    // so `add_block` signs produced proofs.
+    let bootstrap = NodeBootstrap::initialize_with_identity_and_signer(
+        coord,
+        device_node_id,
+        signer,
+    )
+    .await?;
 
     if let Some(fp) = recorded_fp_of(bootstrap.genesis_block()) {
         info!(

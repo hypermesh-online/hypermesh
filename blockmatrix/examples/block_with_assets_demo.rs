@@ -33,6 +33,7 @@ fn make_entry(reg: AssetRegistration, proof: &StateProof) -> BlockAssetEntry {
         asset_hash,
         proof_hash,
         state_proof: proof.clone(),
+        signed_proof: None,
         storage_pointer: StoragePointer::Genesis,
         registration: reg,
     }

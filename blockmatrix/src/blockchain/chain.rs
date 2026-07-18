@@ -81,6 +81,18 @@ pub struct NodeBlockchain {
     /// buffer-then-link drain and its `content_binding_ok` re-verification are
     /// untouched (P1 invariant preserved).
     pub(crate) orphans: Arc<RwLock<HashMap<String, (Block, Instant)>>>,
+
+    /// H3: node signer used to attach a FALCON-1024 `signed_proof` envelope to
+    /// every entry of a LOCALLY-produced block (`add_block`).
+    ///
+    /// Threaded in by the live daemon (via [`with_signer`](Self::with_signer))
+    /// so produced blocks carry a verifiable, identity-bound envelope to peers.
+    /// `None` for dev/test/library chains that never publish to the network —
+    /// they produce unsigned entries, which is fine because such chains are not
+    /// the untrusted-remote accept path. The remote path
+    /// (`insert_received_block`) verifies whatever envelope the producer
+    /// attached; it does not use this signer.
+    pub(crate) signer: Option<Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -108,6 +120,16 @@ impl NodeBlockchain {
     /// `previous_hash` (taken from the in-memory head) won't match the on-disk
     /// genesis on restart.
     pub fn from_genesis(node_coordinate: MatrixCoordinate, genesis: Block) -> Self {
+        Self::from_genesis_with_service(node_coordinate, genesis, ValidationService::new())
+    }
+
+    /// Shared body for [`from_genesis`](Self::from_genesis): seed the chain
+    /// with an externally-built genesis and the supplied state-proof validator.
+    fn from_genesis_with_service(
+        node_coordinate: MatrixCoordinate,
+        genesis: Block,
+        state_proof_validator: ValidationService,
+    ) -> Self {
         assert!(
             genesis.is_genesis(),
             "from_genesis requires a genesis block (index 0, zero previous_hash)"
@@ -136,12 +158,27 @@ impl NodeBlockchain {
             hash_index: Arc::new(RwLock::new(hash_index)),
             head: Arc::new(RwLock::new(Some(genesis))),
             validator: ChainValidator::new(),
-            state_proof_validator: Arc::new(ValidationService::new()),
+            state_proof_validator: Arc::new(state_proof_validator),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
             orphans: Arc::new(RwLock::new(HashMap::new())),
+            signer: None,
         }
+    }
+
+    /// H3: attach a node signer so locally-produced blocks (`add_block`) carry
+    /// a FALCON-1024 `signed_proof` envelope bound to this node's identity.
+    ///
+    /// Builder form — the live daemon calls this right after constructing the
+    /// chain (`from_genesis`/`from_blocks`) with its `FalconIdentity`. Chains
+    /// without a signer produce unsigned entries.
+    pub fn with_signer(
+        mut self,
+        signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>,
+    ) -> Self {
+        self.signer = Some(signer);
+        self
     }
 
     /// Create a new blockchain with custom state proof requirements.
@@ -164,7 +201,17 @@ impl NodeBlockchain {
     /// (previous_hash linkage) and rebuilds all indices.
     pub fn from_blocks(
         node_coordinate: MatrixCoordinate,
+        blocks: Vec<Block>,
+    ) -> Result<Self, String> {
+        Self::from_blocks_with_service(node_coordinate, blocks, ValidationService::new())
+    }
+
+    /// Shared body for [`from_blocks`](Self::from_blocks): rebuild the chain
+    /// from persisted blocks with the supplied state-proof validator.
+    fn from_blocks_with_service(
+        node_coordinate: MatrixCoordinate,
         mut blocks: Vec<Block>,
+        state_proof_validator: ValidationService,
     ) -> Result<Self, String> {
         if blocks.is_empty() {
             return Err("Cannot create blockchain from empty block list".to_string());
@@ -228,11 +275,12 @@ impl NodeBlockchain {
             hash_index: Arc::new(RwLock::new(hash_index)),
             head: Arc::new(RwLock::new(head)),
             validator: ChainValidator::new(),
-            state_proof_validator: Arc::new(ValidationService::new()),
+            state_proof_validator: Arc::new(state_proof_validator),
             stats: Arc::new(RwLock::new(stats)),
             genesis_auth: Arc::new(RwLock::new(None)),
             headers: Arc::new(RwLock::new(HashMap::new())),
             orphans: Arc::new(RwLock::new(HashMap::new())),
+            signer: None,
         })
     }
 
@@ -575,6 +623,7 @@ mod tests {
             asset_hash: content_hash,
             proof_hash,
             state_proof,
+            signed_proof: None,
             storage_pointer: StoragePointer::Genesis,
             registration: reg,
         }
@@ -1092,6 +1141,7 @@ mod tests {
             asset_hash: content_hash,
             proof_hash,
             state_proof,
+            signed_proof: None,
             storage_pointer: StoragePointer::Sharded {
                 shard_hashes,
                 placements: vec![coord],

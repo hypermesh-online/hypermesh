@@ -36,7 +36,7 @@ use std::fmt;
 use crate::assets::core::AssetRegistration;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::proof_of_state::genesis_proof::{generate_genesis_proof, HardwareAssessment};
-use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::{StateProof, WireSignedProof};
 
 /// Where the actual asset data lives (the block only stores a pointer).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -95,6 +95,35 @@ pub struct BlockAssetEntry {
     /// The full state proof (PoStake/PoTime/PoSpace/PoWork)
     pub state_proof: StateProof,
 
+    /// FALCON-1024 signed envelope over the (JSON-serialized) `state_proof`.
+    ///
+    /// H3 (block-accept PoS hardening): the bare `state_proof` above carries no
+    /// signature, so block-accept could only validate it STRUCTURALLY. This
+    /// envelope binds the proof to the producing node's FALCON-1024 identity key
+    /// (`WireSignedProof.signer_pubkey`) with a detached signature over
+    /// `BLAKE3(proof_bytes || nonce)` — the SAME recipe the STOQ handshake uses
+    /// (`TrustChainProofProvider::generate_proof`). `insert_received_block`
+    /// FALCON-verifies it and binds `BLAKE3(signer_pubkey)` to the entry's
+    /// claimed author before running structural validation.
+    ///
+    /// `Option<..>` + `#[serde(default)]`: on the JSON wire path old blocks
+    /// (produced before H3) deserialize as `None`; the compat flag on the
+    /// accept path decides whether a `None`/legacy entry is tolerated during a
+    /// one-release migration. Populated at the single local-write chokepoint
+    /// (`NodeBlockchain::add_block`) when the chain has a signer; produced
+    /// blocks then carry it to peers over the wire.
+    ///
+    /// NOTE (bincode on-disk): `#[serde(default)]` only rescues self-describing
+    /// formats (JSON). The persisted on-disk format is bincode (non
+    /// self-describing, positional) — so old V1 payloads written before this
+    /// field existed cannot be read after this schema change regardless of
+    /// `#[serde(default)]`. That is the documented wipe-on-block-format-change
+    /// situation (CLAUDE.md); we do NOT destructively migrate persisted data
+    /// here, and this field is EXCLUDED from `calculate_hash` so it never
+    /// changes an existing block's canonical hash.
+    #[serde(default)]
+    pub signed_proof: Option<WireSignedProof>,
+
     /// Where the actual data lives
     pub storage_pointer: StoragePointer,
 
@@ -120,6 +149,7 @@ impl BlockAssetEntry {
             asset_hash,
             proof_hash,
             state_proof: bound_proof,
+            signed_proof: None,
             storage_pointer,
             registration,
         }
@@ -132,6 +162,95 @@ impl BlockAssetEntry {
     /// proof for asset A cannot be replayed inside an entry claiming asset B.
     pub fn content_binding_ok(&self) -> bool {
         self.state_proof.space_proof.file_hash == hex::encode(self.asset_hash)
+    }
+
+    /// Attach a FALCON-1024 signed envelope over this entry's `state_proof`.
+    ///
+    /// H3: this is the single local-write signing step. It serializes the
+    /// **bound** `state_proof` (whose `space_proof.file_hash` already equals
+    /// `hex(asset_hash)`) exactly as `TrustChainProofProvider::generate_proof`
+    /// does, signs `BLAKE3(proof_bytes || nonce)` with the node's FALCON key,
+    /// and stores the resulting [`WireSignedProof`] in `signed_proof`.
+    ///
+    /// The envelope covers the proof bytes (not the block hash), so it does NOT
+    /// perturb `Block::calculate_hash` (which excludes both `state_proof` and
+    /// `signed_proof`). A caller signs at construction so the produced block
+    /// carries the envelope to peers.
+    pub fn sign_proof(
+        &mut self,
+        signer: &(dyn hypermesh_lib::NodeSigner + Send + Sync),
+    ) -> Result<(), String> {
+        let proof_bytes = serde_json::to_vec(&self.state_proof)
+            .map_err(|e| format!("failed to serialize state_proof for signing: {e}"))?;
+
+        let mut nonce = [0u8; 32];
+        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
+
+        let mut hasher = Hasher::new();
+        hasher.update(&proof_bytes);
+        hasher.update(&nonce);
+        let digest = hasher.finalize();
+
+        let signature = signer
+            .sign(digest.as_bytes())
+            .map_err(|e| format!("FALCON signing failed: {e}"))?;
+
+        self.signed_proof = Some(WireSignedProof {
+            proof_bytes,
+            signature,
+            signer_pubkey: signer.public_key_bytes().to_vec(),
+            nonce,
+        });
+        Ok(())
+    }
+
+    /// FALCON-verify the attached `signed_proof` and confirm it wraps THIS
+    /// entry's `state_proof`.
+    ///
+    /// H3 accept-path verify. Returns `Ok(signer_pubkey)` when:
+    /// 1. `signed_proof` is present,
+    /// 2. its `proof_bytes` equal the JSON serialization of `self.state_proof`
+    ///    (the envelope signs the proof we actually carry — no bait-and-switch),
+    /// 3. the FALCON-1024 detached signature over `BLAKE3(proof_bytes || nonce)`
+    ///    verifies against the embedded `signer_pubkey`.
+    ///
+    /// The caller then binds `BLAKE3(signer_pubkey)` to the entry's claimed
+    /// author/owner. `Err` on any failure; `Ok(None)` never — absence is an
+    /// error here (the accept path decides legacy tolerance separately).
+    pub fn verify_signed_proof(&self) -> Result<Vec<u8>, String> {
+        let wire = self
+            .signed_proof
+            .as_ref()
+            .ok_or_else(|| "entry has no signed_proof envelope".to_string())?;
+
+        // (1) The envelope must wrap the proof this entry actually carries.
+        let expected = serde_json::to_vec(&self.state_proof)
+            .map_err(|e| format!("failed to serialize state_proof: {e}"))?;
+        if wire.proof_bytes != expected {
+            return Err(
+                "signed_proof envelope does not wrap this entry's state_proof".to_string(),
+            );
+        }
+
+        // (2) FALCON-1024 detached signature over BLAKE3(proof_bytes || nonce).
+        let mut hasher = Hasher::new();
+        hasher.update(&wire.proof_bytes);
+        hasher.update(&wire.nonce);
+        let digest = hasher.finalize();
+
+        // FALCON verify via the `NodeSigner` trait method on the concrete
+        // identity type (single source of truth for FALCON-1024 verification).
+        let ok = <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::verify_signature(
+            &wire.signer_pubkey,
+            digest.as_bytes(),
+            &wire.signature,
+        )
+        .map_err(|e| format!("FALCON verification error: {e}"))?;
+        if !ok {
+            return Err("FALCON signature verification failed on signed_proof".to_string());
+        }
+
+        Ok(wire.signer_pubkey.clone())
     }
 }
 
@@ -446,6 +565,7 @@ mod tests {
             asset_hash: content_hash,
             proof_hash,
             state_proof,
+            signed_proof: None,
             storage_pointer: StoragePointer::Genesis,
             registration: reg,
         }
@@ -482,6 +602,7 @@ mod tests {
             asset_hash: [0x11u8; 32],
             proof_hash: [0x22u8; 32],
             state_proof: StateProof::default(),
+            signed_proof: None,
             storage_pointer: StoragePointer::Genesis,
             registration: AssetRegistration::genesis(
                 MatrixCoordinate::new(0, 0, 0).expect("test: valid coord"),
@@ -535,6 +656,24 @@ mod tests {
 
         // (3) Deterministic across calls — no hidden state.
         assert_eq!(block.calculate_hash(), block.calculate_hash());
+
+        // (4) H3: the FALCON `signed_proof` envelope is EXCLUDED from
+        //     calculate_hash. Attaching a signed_proof to an entry must NOT
+        //     change the block hash — otherwise adding this field would have
+        //     rewritten every existing block's canonical hash (chain wipe).
+        let mut block_signed = block.clone();
+        block_signed.entries[0].signed_proof = Some(WireSignedProof {
+            proof_bytes: b"any-proof-bytes".to_vec(),
+            signature: vec![0xAB; 64],
+            signer_pubkey: vec![0xCD; 128],
+            nonce: [0x33u8; 32],
+        });
+        assert_eq!(
+            block.calculate_hash(),
+            block_signed.calculate_hash(),
+            "calculate_hash must ignore signed_proof (H3 envelope excluded — \
+             no existing block hash may change when the field is added)"
+        );
     }
 
     #[test]
