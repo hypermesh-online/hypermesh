@@ -17,13 +17,14 @@ items = [
     "Node resume path (load persisted genesis/blocks/cert from disk)",
     "BLAKE3 content hashing for blocks",
     # Asset pipeline (real crypto, real erasure coding — LOCAL ONLY)
-    "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(Reed-Solomon 10+4)->store locally",
+    "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(engauge/NGauge Sharder, RS 10+4)->store locally",
+    "Sharding authority is NGauge (A1) — blockmatrix pipeline CONSUMES engauge::Sharder/ShardingConfig; Shard/ShardMetadata/ShardingStats live in hypermesh-lib (no dependency cycle)",
     "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
     "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
     "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
     "Random-access byte range reconstruction — reconstruct only segments covering requested range",
     "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
-    "Adaptive erasure coding (R14 — RS parameters scale with asset size)",
+    "Adaptive erasure coding (R14 — RS parameters scale with asset size), engine now provided by engauge::Sharder",
     "Store command: file -> pipeline -> local shard files + shard map",
     "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
     # Asset adapters (data structures and trait impls, no network validation)
@@ -121,7 +122,7 @@ items = [
     "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
     "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
     "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
-    "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync data messages, network-ID scoping, per-entry proof_hash validation (block announces are ungated)",
+    "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync/block-announce/transfer/CA messages, network-ID scoping, per-entry proof_hash validation (P1/F1: TAG_BLOCK_ANNOUNCE now in the needs_auth allowlist — a mirror is only accepted from a bilaterally-PoS-authenticated peer)",
     "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
     "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
     "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
@@ -212,7 +213,7 @@ items = [
     "StoqTransferTransport — production daemon TransferTransport wrapping NetworkManager + Weak<TransferCoordinator>; broadcast_lock/release/rollback fanout over STOQ unidirectional streams, send_register_request opens a stream to a specific peer and awaits oneshot ack delivered by wire handler via PeerContext.transfer_coordinator.deliver_register_ack",
     # Phase J.1 — upgrade migration substrate
     "Release feed subscription — foundation-signed release.feed/v1 catalog asset, FALCON-1024 verification, latest-by-channel cache (alpha-default inert until foundation pubkey configured)",
-    "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (binary swap deferred to follow-up sub-step)",
+    "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (P7: real atomic binary swap — stage to temp, fsync, chmod +x, std::fs::rename over target, schedule_restart only on success)",
     "IPC protocol_version field — major mismatch returns helpful error (-32100 PROTOCOL_VERSION_MISMATCH); minor forward-compat; old clients without field still accepted",
     "Block format V2 magic reservation (BLOCK_MAGIC_V2 = HMB\\x02) + format_migrations registry — future format changes have a migration path; migrate_v1_to_v2 currently identity since V2 schema == V1",
     "hypermesh update CLI command + status banner — `hypermesh status` surfaces \"Update available\" line; `hypermesh update [--channel] [--version]` invokes system.apply_update through IPC",
@@ -226,6 +227,34 @@ items = [
     "Method-to-capability registry — explicit ViewOnly/Wallet/AssetWrite/Admin mapping for 50+ IPC methods, fail-closed Admin default for unknown",
     "RpcRequest.capability_token optional field — backward-compat with pre-K.2 clients (None bypasses enforcement when issuer not configured); RpcRequest::new_with_token() helper for SDKs",
     "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure",
+    # P5/F6 — eBPF kernel gate + PoS-authenticated shard fetch
+    "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); handshake-only peers with no stake are refused",
+    # P6 — NGauge reconciler convergence + TTL cache + version negotiation
+    "Replication convergence actuator — post-fetch set_replica_count(shard, provider_count) so ReplicationTrigger sees needed<=replicas next cycle and STOPS (swarm-emergent convergence), closing the R12 replication loop",
+    "DispersionAdvisor anti-affinity placement — extra-replica fetch consults engauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
+    "TTL shard-location cache — provider records age like dns::cache (DEFAULT_PROVIDER_TTL 300s, is_expired sweep); expired providers are not handed out as fetch sources",
+    "STOQ protocol-version negotiation — handshake carries protocol_version, major mismatch rejected BEFORE trust is granted, old peers without the field still accepted (serde default)",
+    "Orphan-buffer bound — MAX_ORPHANS + 120s TTL sweep on the buffer-then-link path prevents distinct-prev-hash orphan floods from exhausting memory",
+    # P7 — substrate extraction
+    "Matrix coordinate derivation delegates to base substrate — coordinate.rs calls base derive_cell/derive_address (fd48:4d00::/32), one canonical BLAKE3 construction shared across the workspace",
+    # A1 — sharding authority moved into NGauge (engauge)
+    "A1 sharding-engine move — Reed-Solomon engine (Sharder/ShardingConfig) now lives in engauge/NGauge; blockmatrix pipeline calls it via a re-export shim (assets/pipeline/sharding.rs), byte-identical round-trip seam-tested",
+    # A2 — two-layer mirror retrieval
+    "Two-layer mirror retrieval — client-assembly fetch resolves live mirrors FIRST then the plan's canonical matrix placements (location_resolver), with a TAG_SHARD_LOCATE upstream-tracker fallback when connected peers miss",
+    "Unified seed-on-fetch — client-assembly and IPC fetch paths share ONE become-provider seeder; a fetched shard is re-announced only AFTER the BLAKE3 content-validity gate passes (mirror invariant #1)",
+    # A3 — share.send wire delivery
+    "share.send wire delivery — NetworkManager::send_tagged_to_peer frames [TAG_SHARE_INVITE]++invite_wire to the recipient over STOQ; receiver inbox + share.accept round-trip complete; delivered flag + graceful created_undelivered on failure",
+    # A4 / A4-CORRECT — eBPF PoS substrate + peer-auth→kernel mirror
+    "Peer-auth→kernel mirror hook — mirror_peer_auth_to_kernel() calls set_peer_pos_validated(peer_ipv6, ALG_FALCON_1024) on every completed bilateral handshake, keying the kernel eBPF PoS-peer allowlist on the SAME peers userspace trusts (P5 unification / A4)",
+    # A4-MIRROR (#33) — per-shard mirror invariant on every live path
+    "Live re-announce gate — seed_fetched_shard → reannounce_authorized → blockchain.authorizes_shard: a fetched shard is only re-announced when it is content-bound on THIS node's chain; the ungated ClientAssembler seeder is doc-guarded as unwired-to-production",
+    "Per-shard MIRROR INVARIANT complete on every live path — content-valid (BLAKE3) on every RECEIVE + signed-to-content (authorizes_shard) on every SERVE / RE-ANNOUNCE / BLOCK-ACCEPT",
+    # A6.1 — on-chain shard registration at publish
+    "On-chain shard registration at publish — IPC store handler writes a content-bound StoragePointer::Sharded BlockAssetEntry via add_block, so authorizes_shard(content_hash) returns true; store result surfaces registered_block + shard_hashes (unblocks the serve + re-seed gates)",
+    # A6.6 — interest-scoped asset registration delivered on fetch
+    "Interest-scoped registration on fetch — a served SHARD_FETCH response envelope (shard_len(4)+shard_data+registration_json, content-hash-disambiguated) carries that ONE asset's BlockAssetEntry (NodeBlockchain::registration_for_shard); the fetcher re-validates (content_binding_ok + shard-coverage + state_proof.validate) and re-anchors a FRESH block on ITS OWN chain, becoming a mirror WITHOUT syncing the server's chain (revalidate_and_register)",
+    # A6.4 — gated multi-node mirror E2E
+    "3-node subprocess mirror E2E (gated) — tests/a6_mirror_e2e.rs (#[ignore], HM_RUN_SUBPROCESS_HARNESS=1): A publishes → B fetches + becomes mirror (announce_targets>0) → C fetches from mirror B",
 ]
 
 [features.in_development]

@@ -2,27 +2,28 @@
 id = "base"
 name = "Substrate"
 description = "Sovereign addressing and link/carrier management beneath the kernel"
-phase = "planning"
+phase = "alpha"
 
 [features.working]
-items = []
+items = [
+    "Sovereign address derivation — NodeId → matrix cell + fd48:4d00::/32 (derive_cell + derive_address, one canonical BLAKE3 construction; blockmatrix MatrixCoordinate::derive_cell delegates here)",
+    "Address verifiability — address is a pure function of NodeId, any peer recomputes it (no DHCP, no lease); unit-tested byte-identical to the legacy blockmatrix cell construction",
+    "sysfs interface enumeration + carrier-state reading (read-only, default-on degraded tier, R16)",
+    "DefaultSubstrate::active_interface() — carrier→up→non-loopback→loopback selection (R16 graceful degradation)",
+    "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback), best available backend chosen at runtime",
+    "Node binary integration — node constructs base::DefaultSubstrate and injects active_interface() into STOQ TransportConfig; base has no upward dep, STOQ does not depend on base",
+]
 
 [features.in_development]
-items = []
+items = [
+    "rtnetlink backend (Substrate.b) — real netlink enumerate/carrier/assign_address, verified musl-clean, but feature-gated `rtnetlink-backend` (OFF by default)",
+    "Lease-free address assignment — implemented in the rtnetlink backend only (feature-off); sysfs tier returns Unsupported",
+]
 
 [features.planned]
 items = [
-    "Substrate.a — sovereign addressing: NodeId → fd48:4d00::/32 derivation (R15)",
-    "Substrate.a — address verification (peer recomputes from Falcon pubkey)",
-    "Substrate.a — reachability discovery via STOQ reflector extension",
-    "Substrate.b — rtnetlink interface enumeration (replaces hardcoded guess, R16)",
-    "Substrate.b — carrier/link-state monitoring",
-    "Substrate.b — lease-free address assignment (no DHCP)",
-    "Substrate.b — link-flap self-healing + QUIC connection-migration signal",
-    "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback)",
-    "rtnetlink_linux backend (Phase 1/2)",
-    "sysfs_fallback backend (read-only degraded tier)",
-    "radio_mesh backend — Substrate.c device-to-device (roadmap R&D)",
-    "windows backend — future cross-platform (roadmap)",
-    "Inject derived bind_address/public_ipv6/ebpf_interface into STOQ at node binary",
+    "Substrate.b — link-flap self-healing + QUIC connection-migration signal (watch_links currently returns an empty stream)",
+    "Substrate.a — reachability discovery via STOQ reflector extension (detect_reachability returns Unsupported; reachability() falls back to Unknown)",
+    "radio_mesh backend — Substrate.c device-to-device (R&D stub, returns Unsupported)",
+    "windows backend — future cross-platform (stub, returns Unsupported)",
 ]

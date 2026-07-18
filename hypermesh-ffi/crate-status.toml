@@ -30,6 +30,11 @@ items = [
     "cbindgen-generated header (build.rs + cbindgen.toml regenerate include/hypermesh.h)",
     "catch_unwind at every direct-ABI boundary; opaque handles with matching free fns",
     "C smoke test (tests/smoke.c + run_smoke.sh) links staticlib and exercises the direct ABI",
+    # Phase P9.2 — in-process publish/verify PoS seam (byte-level FALCON, no secret across the boundary)
+    "hypermesh_publish (identity, bytes, len) — emits BLAKE3[32] content address AND a serialized WireSignedProof whose FALCON-1024 signature is over BLAKE3(proof_bytes||nonce), byte-identical to TrustChainProofProvider::generate_proof (NOT a signature over the raw asset bytes); reuses NodeSigner::sign + compute_blake3_hash, no reimplemented crypto",
+    "hypermesh_verify_proof (wire_proof, len) — verify-only, mirrors TrustChainProofProvider::validate_proof; holds no key and cannot mint a valid proof",
+    "hypermesh_falcon_signature_max_len() = 1280 (PQClean FALCON-1024 authoritative sig length) for caller buffer sizing",
+    "SECURITY-CRITICAL FALCON seam — the FALCON secret key lives only inside the opaque hypermesh_identity_t handle and NEVER crosses the C ABI boundary; publishing requires the handle, verification is keyless",
     # Per-service FFI functions (route through IPC daemon)
     "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
     "TrustChain API (hypermesh_trustchain_certificates, issue, validate, revoke, dns_zones)",

@@ -6,6 +6,9 @@ phase = "alpha"
 
 [features.working]
 items = [
+    # Sharding authority (A1 — NGauge now OWNS the erasure-coding engine)
+    "Reed-Solomon sharding engine (engauge::Sharder — encode/decode k-of-n via reed-solomon-erasure, last-shard length trailer, per-shard BLAKE3 integrity hash; byte-identical to the old blockmatrix impl; blockmatrix consumes it at its shard seam via pub use engauge::sharding::Sharder)",
+    "Adaptive ShardingConfig (adaptive_for_size delegates to lib ErasureCodingParams::for_asset_size — R14 RS param scaling; engauge is now a MANDATORY blockmatrix dependency, intelligence feature gates only the analytics surface)",
     # Data structures and local computation (real logic, tested)
     "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
     "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
@@ -36,6 +39,8 @@ items = [
     "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
     "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
     "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
+    "Reconciler convergence closed (P6) — set_replica_count feedback hook (was the never-called gap) drives actual→desired replica convergence: after each fetch the actuator reports provider count back, ReplicationTrigger sees needed<=replicas and STOPS firing (swarm-emergent stable fixed point, verified by convergence tests)",
+    "DispersionAdvisor (P6) — anti-affinity placement recommends where new replicas go instead of naive candidates[0]",
     "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full",
 ]
 

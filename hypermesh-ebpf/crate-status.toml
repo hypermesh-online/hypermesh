@@ -9,11 +9,13 @@ items = [
     # eBPF framework (real kernel interaction, real syscalls)
     "HyperMeshEbpf orchestrator API — capability detection, state management, graceful degradation (Full eBPF+AF_XDP -> eBPF only -> userspace)",
     "AF_XDP zero-copy I/O — 4-ring UMEM buffers, frame allocator, batch send/receive via syscalls",
-    "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with extension header parsing (magic 0x484D)",
+    "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with plaintext 0x484D ('HM') extension-header parse (papers §5.1-5.7). IPv4-SAFE BY CONSTRUCTION: every non-HyperMesh / non-port-9292 / no-0x484D / bounds-fail path returns XDP_PASS, never DROP (permanent gateway-outage fix)",
+    "eBPF PoS-peer connection allowlist (A4) — kernel policy_map[src_ip].requires_pos (derived from privacy tier: Anonymous=0, Private/Public=1) gated against pos_header_map[src_ip].validated; a Private/Public source not yet PoS-validated is XDP_DROP, all else PASS; allowlist populated live by mirror_peer_auth_to_kernel on bilateral PoS handshake success",
+    "0x484D PoS substrate restored + wired (A4-CORRECT, reverses the A4/F10 'phantom' deletion) — hypermesh_headers.rs WirePosHeader/AssetHashHeader/MatrixRoutingHeader structs, STOQ emits the plaintext 0x484D + WirePosHeader prefix on the send path (offset-pinned byte-identity tests vs the C hmesh_* structs), two-tier validation (kernel pre-validate algorithm/difficulty + userspace FALCON deep-verify feeding pos_header_map/policy_map back via set_peer_pos_validated), verifier-safe per-flow conntrack",
     "AF_XDP kernel integration — xsk_map redirect, UMEM mmap lifecycle",
     "BPF map policy enforcement — 32-byte LE serialization and sync_to_kernel",
     "PacketDecision three-path routing — Pass (local), Redirect (AF_XDP->STOQ), Forward (XDP_TX), Drop",
-    "Validation hooks — STOQ (certificate, packet) + BlockMatrix (extension) registered",
+    "Validation hooks — STOQ (certificate, packet) registered (A3: dead BlockMatrixExtensionValidator with 0 callers + 6 dead stoq header/validator re-exports were grep-verified dead and pruned)",
     "Asset hash verification (BLAKE3) and blockchain registry validation",
     "Privacy tier eBPF enforcement with per-policy flag control",
     "Orchestrator state storage — routing rules, asset hashes, PoS validation state",
@@ -24,14 +26,16 @@ items = [
     "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
     "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
     "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format",
-    "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
-    "Cross-platform compile — Linux-only deps (aya/aya-log/libbpf-sys/libc) target-gated via [target.'cfg(target_os = \"linux\")'.dependencies] in Cargo.toml; non-Linux gets userspace-only no-op stubs that satisfy HyperMeshEbpf API surface (set_routing_rule, set_privacy_tier, metrics() return Ok with no-op). All aya usage in source is already #[cfg(feature = \"kernel-attach\")] gated. Verified: cargo tree shows aya/libbpf-sys absent from macOS/Windows dep trees, present only on Linux.",
+    "Kernel-attach BPF map writes for PoS validation cache — update_pos_header_map does a real aya HashMap<[u8;16],[u8;24]> insert under `kernel-attach` (validated + algorithm + difficulty + last_validated via CLOCK_MONOTONIC), no-op otherwise; makes the XDP `now - last_validated > ttl` comparison meaningful",
+    "Engauge → eBPF feedback impl (live) — blockmatrix EbpfFeedbackAdapter calls set_routing_rule()/set_privacy_tier() on HyperMeshEbpf; PoS handshake success drives set_peer_pos_validated (ALG_FALCON_1024) via blockmatrix mirror_peer_auth_to_kernel, writing pos_header_map.validated=1 + policy_map.requires_pos=1",
+    "libbpf-sys dead dep removed — it was declared but never referenced (loader is aya, pure Rust); it only broke the musl static-pie deploy build (vendored-C UAPI conflict). Removal unblocks `cargo build --target x86_64-unknown-linux-musl`; the aya XDP kernel gate is unaffected",
+    "Cross-platform compile — Linux-only deps (aya/aya-log/libc) target-gated via [target.'cfg(target_os = \"linux\")'.dependencies] in Cargo.toml; non-Linux gets userspace-only no-op stubs that satisfy HyperMeshEbpf API surface (set_routing_rule, set_privacy_tier, metrics() return Ok with no-op). All aya usage in source is #[cfg(feature = \"kernel-attach\")] gated. Verified: cargo tree shows aya absent from macOS/Windows dep trees, present only on Linux.",
 ]
 
 [features.in_development]
 items = [
     "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
-    "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)",
+    "Datapath caveat — the 0x484D header is only kernel-visible on the AF_XDP raw path; production sends via Quinn QUIC (encrypted, kernel-invisible), so header-on-wire is deferred (not deployed to gateway until settled)",
 ]
 
 [features.planned]

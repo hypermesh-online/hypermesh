@@ -19,27 +19,28 @@ export const crateStatuses: CrateStatus[] = [
     "id": "base",
     "name": "Substrate",
     "description": "Sovereign addressing and link/carrier management beneath the kernel",
-    "phase": "planning",
+    "phase": "alpha",
     "features": {
-      "working": [],
-      "inDevelopment": [],
+      "working": [
+        "Sovereign address derivation — NodeId → matrix cell + fd48:4d00::/32 (derive_cell + derive_address, one canonical BLAKE3 construction; blockmatrix MatrixCoordinate::derive_cell delegates here)",
+        "Address verifiability — address is a pure function of NodeId, any peer recomputes it (no DHCP, no lease); unit-tested byte-identical to the legacy blockmatrix cell construction",
+        "sysfs interface enumeration + carrier-state reading (read-only, default-on degraded tier, R16)",
+        "DefaultSubstrate::active_interface() — carrier→up→non-loopback→loopback selection (R16 graceful degradation)",
+        "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback), best available backend chosen at runtime",
+        "Node binary integration — node constructs base::DefaultSubstrate and injects active_interface() into STOQ TransportConfig; base has no upward dep, STOQ does not depend on base"
+      ],
+      "inDevelopment": [
+        "rtnetlink backend (Substrate.b) — real netlink enumerate/carrier/assign_address, verified musl-clean, but feature-gated `rtnetlink-backend` (OFF by default)",
+        "Lease-free address assignment — implemented in the rtnetlink backend only (feature-off); sysfs tier returns Unsupported"
+      ],
       "planned": [
-        "Substrate.a — sovereign addressing: NodeId → fd48:4d00::/32 derivation (R15)",
-        "Substrate.a — address verification (peer recomputes from Falcon pubkey)",
-        "Substrate.a — reachability discovery via STOQ reflector extension",
-        "Substrate.b — rtnetlink interface enumeration (replaces hardcoded guess, R16)",
-        "Substrate.b — carrier/link-state monitoring",
-        "Substrate.b — lease-free address assignment (no DHCP)",
-        "Substrate.b — link-flap self-healing + QUIC connection-migration signal",
-        "SubstrateAdapter registry — capability-tier selection (netlink → sysfs → fallback)",
-        "rtnetlink_linux backend (Phase 1/2)",
-        "sysfs_fallback backend (read-only degraded tier)",
-        "radio_mesh backend — Substrate.c device-to-device (roadmap R&D)",
-        "windows backend — future cross-platform (roadmap)",
-        "Inject derived bind_address/public_ipv6/ebpf_interface into STOQ at node binary"
+        "Substrate.b — link-flap self-healing + QUIC connection-migration signal (watch_links currently returns an empty stream)",
+        "Substrate.a — reachability discovery via STOQ reflector extension (detect_reachability returns Unsupported; reachability() falls back to Unknown)",
+        "radio_mesh backend — Substrate.c device-to-device (R&D stub, returns Unsupported)",
+        "windows backend — future cross-platform (stub, returns Unsupported)"
       ]
     },
-    "completion": 0
+    "completion": 50
   },
   {
     "id": "block-matrix",
@@ -56,13 +57,14 @@ export const crateStatuses: CrateStatus[] = [
         "NodeBlockchain::from_blocks() chain reconstruction with integrity validation",
         "Node resume path (load persisted genesis/blocks/cert from disk)",
         "BLAKE3 content hashing for blocks",
-        "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(Reed-Solomon 10+4)->store locally",
+        "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(engauge/NGauge Sharder, RS 10+4)->store locally",
+        "Sharding authority is NGauge (A1) — blockmatrix pipeline CONSUMES engauge::Sharder/ShardingConfig; Shard/ShardMetadata/ShardingStats live in hypermesh-lib (no dependency cycle)",
         "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
         "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
         "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
         "Random-access byte range reconstruction — reconstruct only segments covering requested range",
         "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
-        "Adaptive erasure coding (R14 — RS parameters scale with asset size)",
+        "Adaptive erasure coding (R14 — RS parameters scale with asset size), engine now provided by engauge::Sharder",
         "Store command: file -> pipeline -> local shard files + shard map",
         "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
         "Asset adapters (CPU/GPU/Memory/Storage/Network/Container) — struct definitions and local operations",
@@ -142,7 +144,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
         "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
         "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
-        "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync data messages, network-ID scoping, per-entry proof_hash validation (block announces are ungated)",
+        "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync/block-announce/transfer/CA messages, network-ID scoping, per-entry proof_hash validation (P1/F1: TAG_BLOCK_ANNOUNCE now in the needs_auth allowlist — a mirror is only accepted from a bilaterally-PoS-authenticated peer)",
         "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
         "IPC store handler — full pipeline (Compress→Encrypt→Shard→Distribute) with network distribution via shard transport",
         "ShardStore disk persistence — shards persisted to disk, loaded on restart, survives node restart",
@@ -221,7 +223,7 @@ export const crateStatuses: CrateStatus[] = [
         "20-node real-subprocess multi-host harness — scripts/run-matrix-harness.sh orchestrator spawns N hypermesh subprocesses, blockmatrix/tests/i1_multihost_harness.rs covers 3 in-process scenarios (DNS grant attestation, concurrent receipt convergence, validator rebuild from chain) plus subprocess-driver smoke check (ignored unless HM_RUN_SUBPROCESS_HARNESS=1)",
         "StoqTransferTransport — production daemon TransferTransport wrapping NetworkManager + Weak<TransferCoordinator>; broadcast_lock/release/rollback fanout over STOQ unidirectional streams, send_register_request opens a stream to a specific peer and awaits oneshot ack delivered by wire handler via PeerContext.transfer_coordinator.deliver_register_ack",
         "Release feed subscription — foundation-signed release.feed/v1 catalog asset, FALCON-1024 verification, latest-by-channel cache (alpha-default inert until foundation pubkey configured)",
-        "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (binary swap deferred to follow-up sub-step)",
+        "system.check_update + system.apply_update IPC — daemon surfaces available version with release notes URL, opt-in apply (P7: real atomic binary swap — stage to temp, fsync, chmod +x, std::fs::rename over target, schedule_restart only on success)",
         "IPC protocol_version field — major mismatch returns helpful error (-32100 PROTOCOL_VERSION_MISMATCH); minor forward-compat; old clients without field still accepted",
         "Block format V2 magic reservation (BLOCK_MAGIC_V2 = HMB\\\\x02) + format_migrations registry — future format changes have a migration path; migrate_v1_to_v2 currently identity since V2 schema == V1",
         "hypermesh update CLI command + status banner — `hypermesh status` surfaces \\\"Update available\\\" line; `hypermesh update [--channel] [--version]` invokes system.apply_update through IPC",
@@ -232,7 +234,24 @@ export const crateStatuses: CrateStatus[] = [
         "Capability-token IPC middleware — enforces required scope per method via fail-closed registry; CAPABILITY_DENIED (-32004) on missing/expired/revoked/insufficient-scope; alpha-default skips when capability_token_issuer is None",
         "Method-to-capability registry — explicit ViewOnly/Wallet/AssetWrite/Admin mapping for 50+ IPC methods, fail-closed Admin default for unknown",
         "RpcRequest.capability_token optional field — backward-compat with pre-K.2 clients (None bypasses enforcement when issuer not configured); RpcRequest::new_with_token() helper for SDKs",
-        "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure"
+        "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure",
+        "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); handshake-only peers with no stake are refused",
+        "Replication convergence actuator — post-fetch set_replica_count(shard, provider_count) so ReplicationTrigger sees needed<=replicas next cycle and STOPS (swarm-emergent convergence), closing the R12 replication loop",
+        "DispersionAdvisor anti-affinity placement — extra-replica fetch consults engauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
+        "TTL shard-location cache — provider records age like dns::cache (DEFAULT_PROVIDER_TTL 300s, is_expired sweep); expired providers are not handed out as fetch sources",
+        "STOQ protocol-version negotiation — handshake carries protocol_version, major mismatch rejected BEFORE trust is granted, old peers without the field still accepted (serde default)",
+        "Orphan-buffer bound — MAX_ORPHANS + 120s TTL sweep on the buffer-then-link path prevents distinct-prev-hash orphan floods from exhausting memory",
+        "Matrix coordinate derivation delegates to base substrate — coordinate.rs calls base derive_cell/derive_address (fd48:4d00::/32), one canonical BLAKE3 construction shared across the workspace",
+        "A1 sharding-engine move — Reed-Solomon engine (Sharder/ShardingConfig) now lives in engauge/NGauge; blockmatrix pipeline calls it via a re-export shim (assets/pipeline/sharding.rs), byte-identical round-trip seam-tested",
+        "Two-layer mirror retrieval — client-assembly fetch resolves live mirrors FIRST then the plan's canonical matrix placements (location_resolver), with a TAG_SHARD_LOCATE upstream-tracker fallback when connected peers miss",
+        "Unified seed-on-fetch — client-assembly and IPC fetch paths share ONE become-provider seeder; a fetched shard is re-announced only AFTER the BLAKE3 content-validity gate passes (mirror invariant #1)",
+        "share.send wire delivery — NetworkManager::send_tagged_to_peer frames [TAG_SHARE_INVITE]++invite_wire to the recipient over STOQ; receiver inbox + share.accept round-trip complete; delivered flag + graceful created_undelivered on failure",
+        "Peer-auth→kernel mirror hook — mirror_peer_auth_to_kernel() calls set_peer_pos_validated(peer_ipv6, ALG_FALCON_1024) on every completed bilateral handshake, keying the kernel eBPF PoS-peer allowlist on the SAME peers userspace trusts (P5 unification / A4)",
+        "Live re-announce gate — seed_fetched_shard → reannounce_authorized → blockchain.authorizes_shard: a fetched shard is only re-announced when it is content-bound on THIS node's chain; the ungated ClientAssembler seeder is doc-guarded as unwired-to-production",
+        "Per-shard MIRROR INVARIANT complete on every live path — content-valid (BLAKE3) on every RECEIVE + signed-to-content (authorizes_shard) on every SERVE / RE-ANNOUNCE / BLOCK-ACCEPT",
+        "On-chain shard registration at publish — IPC store handler writes a content-bound StoragePointer::Sharded BlockAssetEntry via add_block, so authorizes_shard(content_hash) returns true; store result surfaces registered_block + shard_hashes (unblocks the serve + re-seed gates)",
+        "Interest-scoped registration on fetch — a served SHARD_FETCH response envelope (shard_len(4)+shard_data+registration_json, content-hash-disambiguated) carries that ONE asset's BlockAssetEntry (NodeBlockchain::registration_for_shard); the fetcher re-validates (content_binding_ok + shard-coverage + state_proof.validate) and re-anchors a FRESH block on ITS OWN chain, becoming a mirror WITHOUT syncing the server's chain (revalidate_and_register)",
+        "3-node subprocess mirror E2E (gated) — tests/a6_mirror_e2e.rs (#[ignore], HM_RUN_SUBPROCESS_HARNESS=1): A publishes → B fetches + becomes mirror (announce_targets>0) → C fetches from mirror B"
       ],
       "inDevelopment": [
         "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
@@ -246,7 +265,7 @@ export const crateStatuses: CrateStatus[] = [
         "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)"
       ]
     },
-    "completion": 96
+    "completion": 97
   },
   {
     "id": "caesar",
@@ -349,7 +368,10 @@ export const crateStatuses: CrateStatus[] = [
         "TrustChain certificate validation (real expiry/revocation)",
         "Policy rule evaluation (CertificateIssuer)",
         "foundation.dns_grant/v1 typedef hosted",
-        "release.feed/v1 typedef hosted (Phase J.1 — foundation-signed release announcements: version, channel, per-target binary hashes, release notes URL, FALCON-1024 signature)"
+        "release.feed/v1 typedef hosted (Phase J.1 — foundation-signed release announcements: version, channel, per-target binary hashes, release notes URL, FALCON-1024 signature)",
+        "Registry dependency resolution — CatalogRegistry::resolve_dependencies runs a cycle-safe BFS producing DependencyGraph { direct, transitive, missing } with honest missing-tracking (unregistered hashes surfaced, no fabricated graph)",
+        "Embedded typedef-reference scanner — schema_scanner::scan_schema_for_typedef_refs regex-scans a typedef schema body for 64-hex BLAKE3 refs that resolve to registered typedefs, unioning implicit deps with declared ones",
+        "CatalogProvider trait + blockmatrix adapter — CatalogRegistryAdapter/wire_catalog_registry expose the registry to blockmatrix via a dyn-safe provider (resolves the catalog→blockmatrix dependency cycle); catalog.dependencies IPC handler is backed by the real BFS when a registry is present, honest alpha-inert when absent"
       ],
       "inDevelopment": [
         "Caesar contribution reward integration — CatalogRewardAdapter exists but no real Caesar EVP connection",
@@ -359,7 +381,7 @@ export const crateStatuses: CrateStatus[] = [
       ],
       "planned": []
     },
-    "completion": 85
+    "completion": 87
   },
   {
     "id": "desktop",
@@ -408,6 +430,8 @@ export const crateStatuses: CrateStatus[] = [
     "phase": "alpha",
     "features": {
       "working": [
+        "Reed-Solomon sharding engine (engauge::Sharder — encode/decode k-of-n via reed-solomon-erasure, last-shard length trailer, per-shard BLAKE3 integrity hash; byte-identical to the old blockmatrix impl; blockmatrix consumes it at its shard seam via pub use engauge::sharding::Sharder)",
+        "Adaptive ShardingConfig (adaptive_for_size delegates to lib ErasureCodingParams::for_asset_size — R14 RS param scaling; engauge is now a MANDATORY blockmatrix dependency, intelligence feature gates only the analytics surface)",
         "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
         "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
         "KYC compliance checker (self-sovereign attestation structure, tier-based levels)",
@@ -437,6 +461,8 @@ export const crateStatuses: CrateStatus[] = [
         "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
         "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
         "ReplicationTrigger consumed by blockmatrix swarm coordinator — engauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
+        "Reconciler convergence closed (P6) — set_replica_count feedback hook (was the never-called gap) drives actual→desired replica convergence: after each fetch the actuator reports provider count back, ReplicationTrigger sees needed<=replicas and STOPS firing (swarm-emergent stable fixed point, verified by convergence tests)",
+        "DispersionAdvisor (P6) — anti-affinity placement recommends where new replicas go instead of naive candidates[0]",
         "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full"
       ],
       "inDevelopment": [
@@ -486,11 +512,16 @@ export const crateStatuses: CrateStatus[] = [
         "Three remote-dashboard modes — DashboardServeMode::TrustProxy / PrivateDomain / SelfHosted (parses --dashboard-mode CLI flag)",
         "RemoteProxyManager — per-session registry with register/get/close/reap_inactive lifecycle",
         "ForwardedRequest/ForwardedResponse — minimal HTTP envelope shape forwarded over the STOQ stream",
-        "StoqStreamForwarder trait — abstracts STOQ stream open/write/read for the proxy; MockStreamForwarder ships for tests, production wiring binds Connection::open_stream from gateway's NetworkManager handle"
+        "StoqStreamForwarder trait — abstracts STOQ stream open/write/read for the proxy; MockStreamForwarder ships for tests, production wiring binds Connection::open_stream from gateway's NetworkManager handle",
+        "StoqAuthMode { HttpProxy (default) | FullStoqPos } — config + CLI + env parse; HttpProxy is a plain reverse proxy (no PoS, backwards-compatible), FullStoqPos requires a bilateral PoS handshake per connection",
+        "FullStoqPos handshake enforcement — StoqListener runs StoqBridge::perform_pos_handshake on accept and DROPS un-authenticated connections; StoqBridge::new_full_stoq_pos requires a NodeSigner + StateProofProvider (inherits the F2 signer↔identity binding)",
+        "NodeSigner + StateProofProvider wired into StoqBridge — gateway depends on trustchain for FALCON-1024 identity + TrustChainProofProvider (path dep, no cycle: trustchain does not depend on gateway)",
+        "Dual-CA integration — gateway connects to the clearnet CA at trust_chain_addr=[::1]:8444 (trustchain-http3.service); systemd unit requires trustchain-http3.service (the single trustchain.service was retired in the F9 split)",
+        "Gateway's own STOQ listener disabled by default — stoq_listen_addr omitted (Option→None) so port 8444 is left to trustchain-http3; gateway serves clearnet over HTTP/3 on 8443, with stoq_max_connections bounding the STOQ bridge"
       ],
       "inDevelopment": [
         "Production StoqStreamForwarder — wire MockStreamForwarder replacement that opens a real STOQ stream via Connection::open_stream and round-trips request bytes; depends on gateway-side NetworkManager handle reaching remote_proxy",
-        "STOQ handshake token validation — bootstrap token generated via HTTP/3 but NOT validated during STOQ bilateral handshake (must-have)",
+        "HTTP/3 bootstrap-token validation — token issued via HTTP/3 is still NOT cross-validated at the STOQ layer; FullStoqPos now enforces a real bilateral PoS handshake per connection, but the HTTP/3-issued bootstrap token is not yet bound to that handshake",
         "Cross-scope routing — ScopeRouter exists but Device/Network scope bridging not functional (Network scope not implemented)",
         "Federation bridge — trust level structs exist but no real cross-network STOQ relay (no federated peers)",
         "Cross-scope transfer proxy — Phase G.1 wire protocol + coordinator + G.2 chain-scan recovery + PeerContext wire dispatch landed in blockmatrix (5/5 g1_transfer + 4/4 g2_transfer tests pass); gateway-side cross-network proxying still pending (e2e routing of TAG_TRANSFER_* through GatewayManager scoped to Phase I)",
@@ -502,7 +533,7 @@ export const crateStatuses: CrateStatus[] = [
         "Bootstrap token flow — HTTP/3 side issues tokens but validation path beyond self-serve PoS handshake not implemented"
       ]
     },
-    "completion": 78
+    "completion": 80
   },
   {
     "id": "hypermesh",
@@ -523,11 +554,14 @@ export const crateStatuses: CrateStatus[] = [
         "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
         "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
         "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
-        "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control"
+        "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control; kernel+userspace policy unified and shard fetch is PoS-authenticated (eBPF kernel gate)",
+        "Workspace version unification — [workspace.package] version = 1.0.0, all 13 members inherit version.workspace (P7 fixed the prior engauge/caesar 1.0.0-vs-0.1.0 skew)",
+        "One-click installer — scripts/install/hypermesh-install.sh (P7)"
       ],
       "inDevelopment": [
-        "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
+        "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector); dual-CA split (http3:8444 / stoq:8445) deployed and verified live (F9)",
         "Network MVP — bilateral handshake + block sync verified E2E local-to-GCP (trust.hypermesh.online), network_id metadata exchange, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution, stale cert auto-recovery.",
+        "Mirror/sharding architecture correction (A-series) — Reed-Solomon sharding moved into NGauge, two-layer mirror retrieval + upstream tracker, per-shard mirror invariant on live paths, on-chain shard registration at publish + interest-scoped registration on fetch, 3-node mirror flow proven E2E",
         "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)"
       ],
       "planned": [
@@ -539,7 +573,7 @@ export const crateStatuses: CrateStatus[] = [
         "Real partition/chaos testing framework"
       ]
     },
-    "completion": 59
+    "completion": 60
   },
   {
     "id": "hypermesh-ebpf",
@@ -550,11 +584,13 @@ export const crateStatuses: CrateStatus[] = [
       "working": [
         "HyperMeshEbpf orchestrator API — capability detection, state management, graceful degradation (Full eBPF+AF_XDP -> eBPF only -> userspace)",
         "AF_XDP zero-copy I/O — 4-ring UMEM buffers, frame allocator, batch send/receive via syscalls",
-        "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with extension header parsing (magic 0x484D)",
+        "C kernel XDP programs — counter, kprobe, tracepoint, HyperMesh XDP with plaintext 0x484D ('HM') extension-header parse (papers §5.1-5.7). IPv4-SAFE BY CONSTRUCTION: every non-HyperMesh / non-port-9292 / no-0x484D / bounds-fail path returns XDP_PASS, never DROP (permanent gateway-outage fix)",
+        "eBPF PoS-peer connection allowlist (A4) — kernel policy_map[src_ip].requires_pos (derived from privacy tier: Anonymous=0, Private/Public=1) gated against pos_header_map[src_ip].validated; a Private/Public source not yet PoS-validated is XDP_DROP, all else PASS; allowlist populated live by mirror_peer_auth_to_kernel on bilateral PoS handshake success",
+        "0x484D PoS substrate restored + wired (A4-CORRECT, reverses the A4/F10 'phantom' deletion) — hypermesh_headers.rs WirePosHeader/AssetHashHeader/MatrixRoutingHeader structs, STOQ emits the plaintext 0x484D + WirePosHeader prefix on the send path (offset-pinned byte-identity tests vs the C hmesh_* structs), two-tier validation (kernel pre-validate algorithm/difficulty + userspace FALCON deep-verify feeding pos_header_map/policy_map back via set_peer_pos_validated), verifier-safe per-flow conntrack",
         "AF_XDP kernel integration — xsk_map redirect, UMEM mmap lifecycle",
         "BPF map policy enforcement — 32-byte LE serialization and sync_to_kernel",
         "PacketDecision three-path routing — Pass (local), Redirect (AF_XDP->STOQ), Forward (XDP_TX), Drop",
-        "Validation hooks — STOQ (certificate, packet) + BlockMatrix (extension) registered",
+        "Validation hooks — STOQ (certificate, packet) registered (A3: dead BlockMatrixExtensionValidator with 0 callers + 6 dead stoq header/validator re-exports were grep-verified dead and pruned)",
         "Asset hash verification (BLAKE3) and blockchain registry validation",
         "Privacy tier eBPF enforcement with per-policy flag control",
         "Orchestrator state storage — routing rules, asset hashes, PoS validation state",
@@ -565,18 +601,20 @@ export const crateStatuses: CrateStatus[] = [
         "PoS structural pre-validation — timestamp freshness, algorithm indicator, PoW difficulty, IPv6/matrix position checks (full crypto deferred to userspace TrustChain by design)",
         "Matrix routing path validation — source/destination parsing, loop detection, coordinate bounds checking",
         "KernelPosConfig — configurable difficulty, timestamp skew, validation TTL, serialization to BPF map format",
-        "Engauge → eBPF feedback impl — EbpfPolicyFeedback trait defined in engauge, needs concrete impl calling set_routing_rule()/set_privacy_tier() on HyperMeshEbpf",
-        "Cross-platform compile — Linux-only deps (aya/aya-log/libbpf-sys/libc) target-gated via [target.'cfg(target_os = \\\"linux\\\")'.dependencies] in Cargo.toml; non-Linux gets userspace-only no-op stubs that satisfy HyperMeshEbpf API surface (set_routing_rule, set_privacy_tier, metrics() return Ok with no-op). All aya usage in source is already #[cfg(feature = \\\"kernel-attach\\\")] gated. Verified: cargo tree shows aya/libbpf-sys absent from macOS/Windows dep trees, present only on Linux."
+        "Kernel-attach BPF map writes for PoS validation cache — update_pos_header_map does a real aya HashMap<[u8;16],[u8;24]> insert under `kernel-attach` (validated + algorithm + difficulty + last_validated via CLOCK_MONOTONIC), no-op otherwise; makes the XDP `now - last_validated > ttl` comparison meaningful",
+        "Engauge → eBPF feedback impl (live) — blockmatrix EbpfFeedbackAdapter calls set_routing_rule()/set_privacy_tier() on HyperMeshEbpf; PoS handshake success drives set_peer_pos_validated (ALG_FALCON_1024) via blockmatrix mirror_peer_auth_to_kernel, writing pos_header_map.validated=1 + policy_map.requires_pos=1",
+        "libbpf-sys dead dep removed — it was declared but never referenced (loader is aya, pure Rust); it only broke the musl static-pie deploy build (vendored-C UAPI conflict). Removal unblocks `cargo build --target x86_64-unknown-linux-musl`; the aya XDP kernel gate is unaffected",
+        "Cross-platform compile — Linux-only deps (aya/aya-log/libc) target-gated via [target.'cfg(target_os = \\\"linux\\\")'.dependencies] in Cargo.toml; non-Linux gets userspace-only no-op stubs that satisfy HyperMeshEbpf API surface (set_routing_rule, set_privacy_tier, metrics() return Ok with no-op). All aya usage in source is #[cfg(feature = \\\"kernel-attach\\\")] gated. Verified: cargo tree shows aya absent from macOS/Windows dep trees, present only on Linux."
       ],
       "inDevelopment": [
         "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
-        "Kernel-attach BPF map writes for PoS validation cache (pos_header_map last_validated field)"
+        "Datapath caveat — the 0x484D header is only kernel-visible on the AF_XDP raw path; production sends via Quinn QUIC (encrypted, kernel-invisible), so header-on-wire is deferred (not deployed to gateway until settled)"
       ],
       "planned": [
         "Production multi-node eBPF policy distribution"
       ]
     },
-    "completion": 86
+    "completion": 88
   },
   {
     "id": "hypermesh-ffi",
@@ -608,6 +646,10 @@ export const crateStatuses: CrateStatus[] = [
         "cbindgen-generated header (build.rs + cbindgen.toml regenerate include/hypermesh.h)",
         "catch_unwind at every direct-ABI boundary; opaque handles with matching free fns",
         "C smoke test (tests/smoke.c + run_smoke.sh) links staticlib and exercises the direct ABI",
+        "hypermesh_publish (identity, bytes, len) — emits BLAKE3[32] content address AND a serialized WireSignedProof whose FALCON-1024 signature is over BLAKE3(proof_bytes||nonce), byte-identical to TrustChainProofProvider::generate_proof (NOT a signature over the raw asset bytes); reuses NodeSigner::sign + compute_blake3_hash, no reimplemented crypto",
+        "hypermesh_verify_proof (wire_proof, len) — verify-only, mirrors TrustChainProofProvider::validate_proof; holds no key and cannot mint a valid proof",
+        "hypermesh_falcon_signature_max_len() = 1280 (PQClean FALCON-1024 authoritative sig length) for caller buffer sizing",
+        "SECURITY-CRITICAL FALCON seam — the FALCON secret key lives only inside the opaque hypermesh_identity_t handle and NEVER crosses the C ABI boundary; publishing requires the handle, verification is keyless",
         "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
         "TrustChain API (hypermesh_trustchain_certificates, issue, validate, revoke, dns_zones)",
         "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
@@ -645,6 +687,7 @@ export const crateStatuses: CrateStatus[] = [
         "Transmission asset type in SystemAssetKind (R10)",
         "SystemAssetKind::Identity and KeyRotation variants for MFA identity lifecycle (§6.2)",
         "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
+        "Shard, ShardMetadata, ShardingStats, ShardingError types (A1 — moved here from blockmatrix as part of the sharding→NGauge move; live in lib so consumers avoid an engauge dependency cycle, serde layout unchanged; Shard::calculate_hash/verify are BLAKE3 integrity helpers)",
         "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
         "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash)",
         "ShardCommitment type (R12 — BLAKE3(sorted placements) compute/verify API)",
@@ -778,7 +821,9 @@ export const crateStatuses: CrateStatus[] = [
         "Engauge→path scheduler feedback",
         "PosValidationState connection gate",
         "PathSelector recommendation polling",
-        "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch"
+        "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch",
+        "Protocol-version negotiation (P6) — Msg1/Msg2 carry a protocol_version field (serde default STOQ_PROTOCOL_VERSION=1.0.0); peer_version_compatible rejects a major-version mismatch BEFORE any trust/application data, minor/patch tolerated, old peers omitting the field still handshake; mirrors blockmatrix::ipc::protocol version rules",
+        "0x484D PoS extension-header emission (A4-CORRECT) — protocol layer prepends the plaintext WirePosHeader prefix (via hypermesh_ebpf::encode_pos_extension, magic 0x484D BE + WirePosHeader::from_pos_hash) ahead of the payload so XDP can PoS-classify at wire speed on the AF_XDP raw-send path; offset-pinned byte-identity tests vs the C hmesh_* structs"
       ],
       "inDevelopment": [
         "Bilateral handshake protocol — 3-message challenge-response, verified local two-node and local-to-GCP (trust.hypermesh.online), handshake metadata exchange for network_id",
@@ -790,7 +835,7 @@ export const crateStatuses: CrateStatus[] = [
         "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)"
       ]
     },
-    "completion": 87
+    "completion": 88
   },
   {
     "id": "trustchain",
@@ -838,7 +883,14 @@ export const crateStatuses: CrateStatus[] = [
         "OCSP HTTP/3 endpoint with federation fallback — POST /api/v1/trustchain/ocsp serves real OcspResponder; on local Unknown, falls back to FederationOcspTransport peer queries when attached",
         "CRL revocation auto-propagates to federation — CertificateStore.revoke_certificate calls CrlDistributor.propagate_to_federation when set_federation() context attached, alpha-default unchanged otherwise",
         "Cross-CA cert validation — FederationManager.is_federation_signed verifies FALCON-1024 cert blob against any Full/Conditional peer's public key, rejects unknown signers and Untrusted peers",
-        "STOQ TAG_CRL_REQUEST/RESPONSE wire constants (0x33/0x34) and trustchain/crl/lookup STOQ API path — CrlLookupHandler exposes is_revoked + reason for federation peers"
+        "STOQ TAG_CRL_REQUEST/RESPONSE wire constants (0x33/0x34) and trustchain/crl/lookup STOQ API path — CrlLookupHandler exposes is_revoked + reason for federation peers",
+        "Unsigned-proof fallback REMOVED — TrustChainProofProvider::validate_proof default-rejects any proof that is not a FALCON-signed WireSignedProof (the legacy raw-StateProof downgrade path is deleted, no structural-only accept)",
+        "Signer↔identity binding — WireSignedProof::signer_matches / signer_pubkey_bytes let the bilateral handshake enforce that the proof signer is the same FALCON key that authenticated the peer identity (BLAKE3(pubkey)==node_id), closing the self-signed-proof Sybil vector",
+        "localhost-testing removed from default features — release builds cannot enter StateProof::new_for_testing into real blocks; the feature is dev/test-only via resolver-2 dev-dependency scoping",
+        "trustchain_ca gated behind required-features=[\\\"localhost-testing\\\"] — the self-signed auto-issue dev CA is excluded from release builds",
+        "Dual-CA production split — trustchain-http3-server ([::1]:8444, gateway/clearnet CA) + trustchain-stoq-server ([::1]:8445, node-to-node CA), two production-clean binaries (zero new_for_testing), each loading a production State-bar [api] config; the production CA no longer runs the test-proof binary",
+        "Device fingerprint folded into all four genesis proofs — DeviceFingerprint (machine-id/DMI/disk-serial/MAC via OsAbstraction) contributes to PoSpace/PoStake/PoWork/PoTime; three node-ids collapsed to one (BLAKE3(falcon_pubkey))",
+        "Real PoTime clock witness — perform_ntp_sync returns a genuine wall-vs-monotonic drift reading with an epoch-window sanity check, not a hardcoded constant"
       ],
       "inDevelopment": [
         "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
@@ -849,7 +901,9 @@ export const crateStatuses: CrateStatus[] = [
         "STOQ-based API server — binds [::1]:8444, handler-to-cert-store wiring not fully verified",
         "HTTP/3 handlers — exist but real cert operation flow not tested end-to-end",
         "Byzantine detection — ByzantineDetector monitors local node only",
-        "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS"
+        "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
+        "Inner four-proof depth — StakeProof/SpaceProof/WorkProof/TimeProof ::validate() is STRUCTURAL (non-empty holder id, positive stake, age/epoch bounds), NOT signature/threshold-verifying; cryptographic authenticity is only the FALCON-1024 WireSignedProof envelope over the serialized StateProof. Deep per-proof threshold checks (real stake/storage/compute attestation) not yet enforced on hot paths",
+        "Device-continuity enforcement is opt-in — verify_device_continuity rejects a copied identity on a different machine only under --require-hardware-auth (defaults off)"
       ],
       "planned": [
         "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
@@ -861,7 +915,7 @@ export const crateStatuses: CrateStatus[] = [
         "Identity distribution — key rotation entries propagated to peers via block sync, rotation alerts for theft detection (§6.2.4)"
       ]
     },
-    "completion": 71
+    "completion": 72
   },
   {
     "id": "ui",

@@ -22,6 +22,7 @@ items = [
     "Transmission asset type in SystemAssetKind (R10)",
     "SystemAssetKind::Identity and KeyRotation variants for MFA identity lifecycle (§6.2)",
     "ErasureCodingParams with adaptive shard sizing (R14 — for_asset_size scales RS parameters)",
+    "Shard, ShardMetadata, ShardingStats, ShardingError types (A1 — moved here from blockmatrix as part of the sharding→NGauge move; live in lib so consumers avoid an engauge dependency cycle, serde layout unchanged; Shard::calculate_hash/verify are BLAKE3 integrity helpers)",
     "HardwareCapabilities with minimum spec enforcement (R1/R13 — meets_minimum_spec validation)",
     "BLAKE3 validation helpers (validate_blake3_hash, compute_blake3_hash)",
     "ShardCommitment type (R12 — BLAKE3(sorted placements) compute/verify API)",

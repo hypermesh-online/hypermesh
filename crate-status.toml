@@ -18,13 +18,16 @@ items = [
     "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
     "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
     "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
-    "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control",
+    "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control; kernel+userspace policy unified and shard fetch is PoS-authenticated (eBPF kernel gate)",
+    "Workspace version unification — [workspace.package] version = 1.0.0, all 13 members inherit version.workspace (P7 fixed the prior engauge/caesar 1.0.0-vs-0.1.0 skew)",
+    "One-click installer — scripts/install/hypermesh-install.sh (P7)",
 ]
 
 [features.in_development]
 items = [
-    "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector)",
+    "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector); dual-CA split (http3:8444 / stoq:8445) deployed and verified live (F9)",
     "Network MVP — bilateral handshake + block sync verified E2E local-to-GCP (trust.hypermesh.online), network_id metadata exchange, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution, stale cert auto-recovery.",
+    "Mirror/sharding architecture correction (A-series) — Reed-Solomon sharding moved into NGauge, two-layer mirror retrieval + upstream tracker, per-shard mirror invariant on live paths, on-chain shard registration at publish + interest-scoped registration on fetch, 3-node mirror flow proven E2E",
     "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)",
 ]
 
