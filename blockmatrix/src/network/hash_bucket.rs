@@ -146,6 +146,7 @@ mod tests {
             asset_hash: content_hash,
             proof_hash,
             state_proof,
+            signed_proof: None,
             storage_pointer: pointer,
             registration: reg,
         }

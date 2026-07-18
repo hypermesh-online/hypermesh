@@ -653,6 +653,7 @@ mod tests {
             asset_hash,
             proof_hash: [0u8; 32],
             state_proof: StateProof::new_for_testing(), // file_hash != hex(asset_hash)
+            signed_proof: None,
             storage_pointer: StoragePointer::Sharded {
                 shard_hashes: vec![shard_id],
                 placements: vec![state.coordinate],

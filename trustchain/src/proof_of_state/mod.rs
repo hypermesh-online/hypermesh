@@ -296,7 +296,7 @@ impl StateProofContext {
 /// signature, the signer's public key, and a replay-prevention nonce. It is
 /// the on-the-wire format so that every proof exchanged during bilateral
 /// handshakes is cryptographically bound to the signing node.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WireSignedProof {
     /// JSON-serialized `StateProof`
     pub proof_bytes: Vec<u8>,

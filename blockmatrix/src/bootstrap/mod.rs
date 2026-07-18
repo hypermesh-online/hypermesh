@@ -257,7 +257,7 @@ impl NodeBootstrap {
     /// 3. DNS with localhost → ::1
     /// 4. Default to Private mode (no network)
     pub async fn initialize(node_coordinate: MatrixCoordinate) -> Result<Self> {
-        Self::initialize_inner(node_coordinate, None).await
+        Self::initialize_inner(node_coordinate, None, None).await
     }
 
     /// Initialize a new node whose genesis is bound to a canonical device
@@ -270,12 +270,24 @@ impl NodeBootstrap {
         node_coordinate: MatrixCoordinate,
         device_node_id: &str,
     ) -> Result<Self> {
-        Self::initialize_inner(node_coordinate, Some(device_node_id)).await
+        Self::initialize_inner(node_coordinate, Some(device_node_id), None).await
+    }
+
+    /// H3 variant of [`initialize_with_identity`](Self::initialize_with_identity)
+    /// that also attaches a node signer so the fresh chain FALCON-signs the
+    /// proof envelope of every locally-produced block.
+    pub async fn initialize_with_identity_and_signer(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: &str,
+        signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>,
+    ) -> Result<Self> {
+        Self::initialize_inner(node_coordinate, Some(device_node_id), Some(signer)).await
     }
 
     async fn initialize_inner(
         node_coordinate: MatrixCoordinate,
         device_node_id: Option<&str>,
+        signer: Option<Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>>,
     ) -> Result<Self> {
         info!(
             "Initializing node at ({}, {}, {}) with self-sufficient bootstrap",
@@ -296,10 +308,18 @@ impl NodeBootstrap {
         //    SystemTime + nonce), so the two genesis blocks would have
         //    different hashes. Block 1 would chain off the in-memory genesis
         //    while disk holds the persisted one, breaking restart replay.
-        let blockchain = Arc::new(NodeBlockchain::from_genesis(
-            node_coordinate,
-            genesis_block.clone(),
-        ));
+        //
+        //    Block-accept validation uses `default()` StateRequirements.
+        //    PoStake is AUTHORIZATION (to whom an asset belongs), not a numeric
+        //    magnitude, so the hardening is H3's FALCON signature + signer↔owner
+        //    binding — not a raised stake floor.
+        let mut chain = NodeBlockchain::from_genesis(node_coordinate, genesis_block.clone());
+        // H3: attach the signer (when supplied) so `add_block` FALCON-signs the
+        // proof envelope of every locally-produced block.
+        if let Some(s) = signer {
+            chain = chain.with_signer(s);
+        }
+        let blockchain = Arc::new(chain);
 
         // 3. Self-sign certificate for localhost
         let localhost_cert = Self::generate_fresh_certificate()?;

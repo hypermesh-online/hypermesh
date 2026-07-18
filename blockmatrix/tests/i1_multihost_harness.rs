@@ -227,6 +227,7 @@ async fn scenario_c_validator_rebuild_from_blocks_recovers_state() {
         asset_hash: [0u8; 32],
         proof_hash: [0u8; 32],
         state_proof: trustchain::proof_of_state::StateProof::new_for_testing(),
+        signed_proof: None,
         storage_pointer: StoragePointer::Local { path: receipt_json },
         registration: blockmatrix::assets::core::AssetRegistration::genesis(coord),
     };
@@ -241,6 +242,7 @@ async fn scenario_c_validator_rebuild_from_blocks_recovers_state() {
         asset_hash: [1u8; 32],
         proof_hash: [1u8; 32],
         state_proof: trustchain::proof_of_state::StateProof::new_for_testing(),
+        signed_proof: None,
         storage_pointer: StoragePointer::Local {
             path: "{\"random\":\"json\",\"completed_at\":0}".to_string(),
         },

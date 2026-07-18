@@ -15,6 +15,31 @@ use crate::assets::core::AssetRegistration;
 use crate::proof_of_state::validation_service::StateProofValidationService;
 use trustchain::proof_of_state::StateProof;
 
+/// H3 one-release migration flag: tolerate a received entry that carries NO
+/// `signed_proof` envelope (legacy pre-H3 block) instead of rejecting it.
+///
+/// Default is REJECT-UNSIGNED — the secure end state. Set
+/// `HYPERMESH_ACCEPT_UNSIGNED_BLOCKS=1` for a single migration release to let
+/// legacy `None` entries through (they still pass the existing structural
+/// checks). A PRESENT-but-INVALID or MIS-BOUND envelope is ALWAYS rejected,
+/// flag or not — the flag only governs absence.
+fn accept_unsigned_blocks() -> bool {
+    std::env::var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+/// H3 accept-path binding: the FALCON key that signed the envelope must be the
+/// SAME identity the entry claims as author. The collapsed-identity model sets
+/// `stake_proof.stake_holder_id = BLAKE3(falcon_pubkey)` hex (== node_id), so
+/// we bind `hex(BLAKE3(signer_pubkey))` to that claimed WHO. A valid signature
+/// from key K over a proof claiming a DIFFERENT author is rejected — otherwise
+/// any node could sign a proof asserting someone else's stake.
+fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
+    let derived = blake3::hash(signer_pubkey).to_hex().to_string();
+    entry.state_proof.stake_proof.stake_holder_id == derived
+}
+
 impl NodeBlockchain {
     /// Add a new block containing the given entries.
     ///
@@ -23,7 +48,7 @@ impl NodeBlockchain {
     /// validated, and inserted.
     pub async fn add_block(
         &self,
-        entries: Vec<BlockAssetEntry>,
+        mut entries: Vec<BlockAssetEntry>,
     ) -> Result<Block, String> {
         if entries.is_empty() {
             return Err("Cannot add block with zero entries".to_string());
@@ -43,6 +68,21 @@ impl NodeBlockchain {
                 .map_err(|e| {
                     format!("State proof validation failed for entry {i}: {e}")
                 })?;
+        }
+
+        // 1b. H3 — single local-write signing chokepoint. When this chain has a
+        //     node signer (live daemon), attach a FALCON-1024 `signed_proof`
+        //     envelope to EVERY entry over its (already content-bound)
+        //     `state_proof`. Produced blocks then carry an identity-bound,
+        //     verifiable envelope to peers; `insert_received_block` on the
+        //     remote node FALCON-verifies it. Chains without a signer
+        //     (dev/test/library) leave `signed_proof = None`.
+        if let Some(signer) = self.signer.as_ref() {
+            for (i, entry) in entries.iter_mut().enumerate() {
+                entry.sign_proof(signer.as_ref()).map_err(|e| {
+                    format!("Failed to FALCON-sign proof for entry {i}: {e}")
+                })?;
+            }
         }
 
         let head = self.head.read().await;
@@ -192,6 +232,51 @@ impl NodeBlockchain {
                     "Block {} entry {i} state proof validation failed — mirror rejected",
                     block.index,
                 ));
+            }
+
+            // (d) H3 — FALCON-in-block PoS verification (the untrusted-remote
+            // path). Previously block-accept was STRUCTURAL only because the
+            // entry carried no signature. Now every received entry MUST carry a
+            // `signed_proof` envelope that:
+            //   1. wraps THIS entry's state_proof (no bait-and-switch),
+            //   2. verifies under FALCON-1024 against its embedded pubkey,
+            //   3. is signed by the SAME identity the proof claims as author
+            //      (BLAKE3(signer_pubkey) == stake_holder_id).
+            // Absent envelope → rejected UNLESS the one-release compat flag is
+            // set (legacy migration). Present-but-invalid/mis-bound → ALWAYS
+            // rejected.
+            match &entry.signed_proof {
+                Some(_) => {
+                    let signer_pubkey = entry.verify_signed_proof().map_err(|e| {
+                        format!(
+                            "Block {} entry {i} signed_proof invalid — mirror rejected: {e}",
+                            block.index,
+                        )
+                    })?;
+                    if !signer_binds_to_author(&signer_pubkey, entry) {
+                        return Err(format!(
+                            "Block {} entry {i} signed_proof signer does not match \
+                             claimed author (BLAKE3(pubkey) != stake_holder_id) \
+                             — mirror rejected",
+                            block.index,
+                        ));
+                    }
+                }
+                None => {
+                    if !accept_unsigned_blocks() {
+                        return Err(format!(
+                            "Block {} entry {i} has no FALCON signed_proof envelope \
+                             — mirror rejected (set HYPERMESH_ACCEPT_UNSIGNED_BLOCKS=1 \
+                             for one-release legacy migration)",
+                            block.index,
+                        ));
+                    }
+                    tracing::warn!(
+                        "Block {} entry {i}: accepting UNSIGNED legacy entry \
+                         (HYPERMESH_ACCEPT_UNSIGNED_BLOCKS set) — H3 migration only",
+                        block.index,
+                    );
+                }
             }
         }
 
@@ -477,6 +562,25 @@ mod tests {
         )
     }
 
+    /// H3 test helper: a fully valid RECEIVED entry — content-bound, proof
+    /// author = signer identity, and FALCON `signed_proof` attached. This is
+    /// what an honest peer produces via `add_block` with a signer. The proof's
+    /// `stake_holder_id` is set to the signer's `node_id` (BLAKE3(pubkey)) so
+    /// the accept-path author binding holds.
+    fn signed_test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
+        use hypermesh_lib::NodeSigner;
+        let id = trustchain::identity::FalconIdentity::generate();
+        let reg = AssetRegistration::genesis(coord);
+        let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let mut proof = StateProof::new_for_testing();
+        // Bind WHO to the signer identity so BLAKE3(pubkey) == stake_holder_id.
+        proof.stake_proof.stake_holder_id = id.node_id().to_string();
+        let mut entry =
+            BlockAssetEntry::new_bound(content_hash, &proof, StoragePointer::Genesis, reg);
+        entry.sign_proof(&id).expect("test: sign proof");
+        entry
+    }
+
     fn test_proof() -> StateProof {
         StateProof::new_for_testing()
     }
@@ -606,7 +710,9 @@ mod tests {
         let chain = NodeBlockchain::new(coord);
 
         let genesis = chain.get_head().await.expect("test: genesis");
-        let entry = test_entry(coord);
+        // H3: a received block must carry a FALCON signed_proof bound to its
+        // author, so use a signed entry.
+        let entry = signed_test_entry(coord);
         let block = Block::new(1, vec![entry], genesis.hash.clone());
 
         chain
@@ -653,6 +759,7 @@ mod tests {
             asset_hash: asset_b,
             proof_hash,
             state_proof: proof_for_a, // file_hash == hex([0xAA;32]) != asset_b
+            signed_proof: None,
             storage_pointer: StoragePointer::Genesis,
             registration: reg,
         };
@@ -734,8 +841,11 @@ mod tests {
         let coord = MatrixCoordinate::new(21, 21, 21).expect("test: valid coordinate");
         let chain = NodeBlockchain::new(coord);
 
-        // A block-1 that references a FOREIGN genesis (not ours).
-        let entry = test_entry(coord);
+        // A block-1 that references a FOREIGN genesis (not ours). H3: sign the
+        // entry so it passes the per-entry FALCON gate and the rejection is
+        // proven to come from the LINKAGE check (predecessor mismatch), not the
+        // signed_proof check.
+        let entry = signed_test_entry(coord);
         let foreign_prev =
             "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string();
         let block = Block::new(1, vec![entry], foreign_prev);
@@ -759,8 +869,8 @@ mod tests {
         let genesis = chain.get_head().await.expect("test: genesis");
 
         // Build a valid, content-bound chain: genesis -> block1 -> block2.
-        let block1 = Block::new(1, vec![test_entry(coord)], genesis.hash.clone());
-        let block2 = Block::new(2, vec![test_entry(coord)], block1.hash.clone());
+        let block1 = Block::new(1, vec![signed_test_entry(coord)], genesis.hash.clone());
+        let block2 = Block::new(2, vec![signed_test_entry(coord)], block1.hash.clone());
 
         // Deliver block2 FIRST — predecessor (block1) unknown → orphan buffered.
         chain
@@ -804,10 +914,15 @@ mod tests {
         // otherwise valid (content-bound, correct hash) so it passes the
         // per-entry gate and reaches the orphan-buffering branch.
         let flood = MAX_ORPHANS + 500;
+        // One signed entry, reused across the flood: FALCON keygen is expensive
+        // and this test exercises orphan buffering, not per-block signing. The
+        // entry is identical across blocks; only previous_hash differs.
+        let flood_entry = signed_test_entry(coord);
         for i in 0..flood {
             // Unique 64-hex previous_hash per block → distinct orphan keys.
             let fake_prev = format!("{i:064x}");
-            let orphan = Block::new(9_000_000 + i as u64, vec![test_entry(coord)], fake_prev);
+            let orphan =
+                Block::new(9_000_000 + i as u64, vec![flood_entry.clone()], fake_prev);
             chain
                 .insert_received_block(orphan)
                 .await
@@ -825,8 +940,8 @@ mod tests {
         // Buffer-then-link STILL works: deliver a valid block2 (orphan), then
         // its verified predecessor block1 → block2 gets drained and linked.
         let genesis = chain.get_head().await.expect("test: genesis");
-        let block1 = Block::new(1, vec![test_entry(coord)], genesis.hash.clone());
-        let block2 = Block::new(2, vec![test_entry(coord)], block1.hash.clone());
+        let block1 = Block::new(1, vec![signed_test_entry(coord)], genesis.hash.clone());
+        let block2 = Block::new(2, vec![signed_test_entry(coord)], block1.hash.clone());
 
         chain
             .insert_received_block(block2.clone())
@@ -862,17 +977,20 @@ mod tests {
         // The very first orphan we insert (oldest) must be the first evicted
         // once the buffer overflows.
         let oldest_prev = format!("{:064x}", 0xAAAA_u64);
-        let oldest = Block::new(8_000_000, vec![test_entry(coord)], oldest_prev.clone());
+        let oldest = Block::new(8_000_000, vec![signed_test_entry(coord)], oldest_prev.clone());
         chain
             .insert_received_block(oldest)
             .await
             .expect("test: buffered");
 
         // Fill to capacity with distinct keys; the (MAX+1)th insert must evict
-        // the oldest.
+        // the oldest. Reuse one signed entry (FALCON keygen is expensive; this
+        // test exercises capacity eviction, not per-block signing).
+        let fill_entry = signed_test_entry(coord);
         for i in 0..MAX_ORPHANS {
             let fake_prev = format!("{:064x}", 0x1_0000_u64 + i as u64);
-            let orphan = Block::new(8_100_000 + i as u64, vec![test_entry(coord)], fake_prev);
+            let orphan =
+                Block::new(8_100_000 + i as u64, vec![fill_entry.clone()], fake_prev);
             chain
                 .insert_received_block(orphan)
                 .await
@@ -889,5 +1007,135 @@ mod tests {
         // We reconstruct a block whose hash the evicted orphan pointed to; since
         // it's gone, the chain height stays 0 for that lineage.
         assert_eq!(chain.get_height().await, 0, "no lineage grafted");
+    }
+
+    // ===================================================================
+    // H3 — FALCON-in-block PoS block-accept hardening
+    // ===================================================================
+
+    /// H3 (a): a received block whose entry carries a VALID FALCON
+    /// `signed_proof` bound to the claimed author is ACCEPTED.
+    #[tokio::test]
+    async fn test_h3_received_signed_block_accepted() {
+        let coord = MatrixCoordinate::new(40, 40, 40).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        let entry = signed_test_entry(coord);
+        // Sanity: the envelope verifies and binds to its author.
+        let pubkey = entry.verify_signed_proof().expect("test: envelope verifies");
+        assert_eq!(
+            blake3::hash(&pubkey).to_hex().to_string(),
+            entry.state_proof.stake_proof.stake_holder_id,
+            "test setup: signer must bind to claimed author",
+        );
+
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+        chain
+            .insert_received_block(block)
+            .await
+            .expect("test: signed, author-bound block must be accepted");
+        assert_eq!(chain.get_height().await, 1, "block accepted onto chain");
+    }
+
+    /// H3 (b) part 1: a received block whose entry has NO `signed_proof`
+    /// envelope is REJECTED by default (reject-unsigned end state).
+    #[tokio::test]
+    async fn test_h3_received_unsigned_block_rejected() {
+        let coord = MatrixCoordinate::new(41, 41, 41).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        // `test_entry` is content-bound + valid but carries NO signed_proof.
+        let block = Block::new(1, vec![test_entry(coord)], genesis.hash.clone());
+        let result = chain.insert_received_block(block).await;
+        assert!(result.is_err(), "unsigned block must be rejected");
+        assert!(
+            result.unwrap_err().contains("no FALCON signed_proof"),
+            "error should cite the missing signed_proof envelope",
+        );
+        assert_eq!(chain.get_height().await, 0, "chain untouched");
+    }
+
+    /// H3 (b) part 2: a received block whose `signed_proof` signature is
+    /// INVALID (tampered) is REJECTED.
+    #[tokio::test]
+    async fn test_h3_received_invalid_signature_rejected() {
+        let coord = MatrixCoordinate::new(42, 42, 42).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        let mut entry = signed_test_entry(coord);
+        // Corrupt the FALCON signature bytes — verification must now fail.
+        if let Some(wire) = entry.signed_proof.as_mut() {
+            for b in wire.signature.iter_mut().take(8) {
+                *b ^= 0xFF;
+            }
+        }
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+        let result = chain.insert_received_block(block).await;
+        assert!(result.is_err(), "invalid signature must be rejected");
+        assert!(
+            result.unwrap_err().contains("signed_proof invalid"),
+            "error should cite the invalid signed_proof",
+        );
+        assert_eq!(chain.get_height().await, 0, "chain untouched");
+    }
+
+    /// H3 (b) part 3: a received block whose `signed_proof` is signed by a
+    /// DIFFERENT identity than the one the proof claims as author (mis-bound)
+    /// is REJECTED — a node may not sign a proof asserting someone else's
+    /// stake, even with a valid signature.
+    #[tokio::test]
+    async fn test_h3_received_misbound_signer_rejected() {
+        use hypermesh_lib::NodeSigner;
+
+        let coord = MatrixCoordinate::new(43, 43, 43).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        // Author claims identity A, but a DIFFERENT identity B signs.
+        let id_a = trustchain::identity::FalconIdentity::generate();
+        let id_b = trustchain::identity::FalconIdentity::generate();
+        let reg = AssetRegistration::genesis(coord);
+        let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
+        let mut proof = StateProof::new_for_testing();
+        proof.stake_proof.stake_holder_id = id_a.node_id().to_string(); // claims A
+        let mut entry =
+            BlockAssetEntry::new_bound(content_hash, &proof, StoragePointer::Genesis, reg);
+        entry.sign_proof(&id_b).expect("test: sign with B"); // but B signs
+
+        // The signature itself is valid (B really signed), so verify_signed_proof
+        // succeeds; the accept path must reject on the author binding.
+        assert!(entry.verify_signed_proof().is_ok(), "B's signature is valid");
+
+        let block = Block::new(1, vec![entry], genesis.hash.clone());
+        let result = chain.insert_received_block(block).await;
+        assert!(result.is_err(), "mis-bound signer must be rejected");
+        assert!(
+            result.unwrap_err().contains("claimed author"),
+            "error should cite the author-binding violation",
+        );
+        assert_eq!(chain.get_height().await, 0, "chain untouched");
+    }
+
+    /// H3: the one-release compat flag lets a legacy UNSIGNED entry through.
+    /// Guarded so it does not race other tests on the shared env var — it sets
+    /// and clears the flag within its own scope. (Serial via a process-wide
+    /// mutex is overkill for a single flag test; we simply set/remove around
+    /// the single call.)
+    #[tokio::test]
+    async fn test_h3_compat_flag_accepts_unsigned() {
+        let coord = MatrixCoordinate::new(44, 44, 44).expect("test: valid coordinate");
+        let chain = NodeBlockchain::new(coord);
+        let genesis = chain.get_head().await.expect("test: genesis");
+
+        std::env::set_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS", "1");
+        let block = Block::new(1, vec![test_entry(coord)], genesis.hash.clone());
+        let result = chain.insert_received_block(block).await;
+        std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
+
+        result.expect("test: compat flag must accept a legacy unsigned block");
+        assert_eq!(chain.get_height().await, 1, "legacy block accepted under flag");
     }
 }
