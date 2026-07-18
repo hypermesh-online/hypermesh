@@ -354,6 +354,38 @@ impl NodeBlockchain {
         false
     }
 
+    /// Return the content-bound registration entry that authorizes `shard_id`.
+    ///
+    /// A6.6: when this node SERVES a shard, it also serves that ONE asset's
+    /// registration so the fetcher can re-anchor it on its own chain (torrent
+    /// model: nodes that touched the vector share-compute the registration —
+    /// no whole-chain replication). This scans the same `Sharded` entries as
+    /// [`authorizes_shard`] and returns a CLONE of the first entry whose
+    /// `shard_hashes` lists `shard_id`. The clone carries `asset_hash`, the
+    /// content-bound `state_proof`, and the `StoragePointer::Sharded`
+    /// (shard_hashes + placements) — everything the fetcher needs to
+    /// independently re-validate and register the same asset.
+    ///
+    /// Returns `None` when no on-chain asset lists this shard (the serve path
+    /// then omits the registration and falls back to bare shard bytes).
+    pub async fn registration_for_shard(
+        &self,
+        shard_id: &[u8; 32],
+    ) -> Option<super::block::BlockAssetEntry> {
+        use super::block::StoragePointer;
+        let blocks = self.blocks.read().await;
+        for block in blocks.values() {
+            for entry in &block.entries {
+                if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
+                    if shard_hashes.iter().any(|h| h == shard_id) {
+                        return Some(entry.clone());
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Get the last N blocks.
     pub async fn get_recent_blocks(&self, count: usize) -> Vec<Block> {
         let chain = self.get_chain().await;
