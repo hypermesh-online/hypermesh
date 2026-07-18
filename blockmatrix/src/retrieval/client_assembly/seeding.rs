@@ -36,6 +36,12 @@ pub trait ShardSeeder: Send + Sync {
     /// Seed a verified shard: store it, register self as provider, and
     /// re-announce to the swarm. Returns the number of peers the announcement
     /// reached (0 when there is nothing to broadcast to).
+    ///
+    /// This trait performs NO authorization and trusts the caller. Production
+    /// callers MUST gate on `blockchain.authorizes_shard(content_hash)` — the
+    /// signed-to-content half of the mirror invariant — BEFORE invoking `seed`,
+    /// exactly as the live IPC path does in
+    /// `ipc/handlers/shard.rs::seed_fetched_shard` (`reannounce_authorized`).
     async fn seed(&self, content_hash: ContentHash, data: Vec<u8>) -> usize;
 }
 
@@ -53,6 +59,10 @@ pub struct ConsumerProviderSeeder {
 impl ConsumerProviderSeeder {
     /// Create a seeder from the shared manager and the current connected-peer
     /// connection set to broadcast announcements to.
+    ///
+    /// Test/deferred-only pending the #33 gate: this constructor MUST NOT be
+    /// wired to a production assembler until `seed` is gated on
+    /// `blockchain.authorizes_shard(content_hash)` (see `seed` below).
     pub fn new(
         manager: Arc<ConsumerProviderManager>,
         connections: Vec<Arc<stoq::Connection>>,
@@ -66,6 +76,12 @@ impl ConsumerProviderSeeder {
 
 #[async_trait]
 impl ShardSeeder for ConsumerProviderSeeder {
+    // SECURITY TODO(#33): this seeder re-announces WITHOUT an authorizes_shard
+    // gate. It is currently UNWIRED to production (only tests construct it).
+    // Before wiring it onto a production ClientAssembler via with_seeder(), it
+    // MUST be gated on blockchain.authorizes_shard(content_hash) — mirror
+    // ipc/handlers/shard.rs::seed_fetched_shard (reannounce_authorized). Until
+    // then, do NOT wire it live.
     async fn seed(&self, content_hash: ContentHash, data: Vec<u8>) -> usize {
         let result = self
             .manager
