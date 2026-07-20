@@ -7,7 +7,7 @@
 //! Structural validation only — cryptographic verification lives in TrustChain.
 
 use crate::error::HypermeshError;
-use crate::proof::{ProofOfState, SpaceProof, StakeProof, TimeProof, Validatable, WorkProof};
+use crate::proof::{SpaceProof, StakeProof, StateProof, TimeProof, Validatable, WorkProof};
 use crate::types::{AssetId, ContentHash, MatrixPosition, NetworkId, NodeId, PrivacyMode};
 
 // ---------------------------------------------------------------------------
@@ -164,40 +164,29 @@ impl NetworkId {
 
 impl Validatable for SpaceProof {
     fn validate(&self) -> Result<(), HypermeshError> {
-        if self.stored_bytes > self.committed_bytes {
+        // WHERE: stored must not exceed advertised capacity; node bound.
+        // total_storage is descriptive capacity, NOT gated against a minimum.
+        if self.total_size > self.total_storage {
             return Err(HypermeshError::Validation(format!(
-                "SpaceProof: stored_bytes ({}) > committed_bytes ({})",
-                self.stored_bytes, self.committed_bytes
+                "SpaceProof: total_size ({}) > total_storage ({})",
+                self.total_size, self.total_storage
             )));
         }
-        if self.committed_bytes == 0 {
+        if self.node_id.is_empty() {
             return Err(HypermeshError::Validation(
-                "SpaceProof: committed_bytes is zero".into(),
+                "SpaceProof: node_id is empty".into(),
             ));
         }
-        self.node_id.validate().map_err(|e| {
-            HypermeshError::Validation(format!("SpaceProof: invalid node_id: {}", e))
-        })?;
-        self.matrix_position.validate().map_err(|e| {
-            HypermeshError::Validation(format!("SpaceProof: invalid matrix_position: {}", e))
-        })?;
         Ok(())
     }
 }
 
 impl Validatable for StakeProof {
     fn validate(&self) -> Result<(), HypermeshError> {
-        if self.stake_amount == 0 {
+        // WHO / AUTHORIZATION: identity binding, never a magnitude.
+        if self.stake_holder_id.is_empty() {
             return Err(HypermeshError::Validation(
-                "StakeProof: stake_amount is zero".into(),
-            ));
-        }
-        self.node_id.validate().map_err(|e| {
-            HypermeshError::Validation(format!("StakeProof: invalid node_id: {}", e))
-        })?;
-        if self.signature.is_empty() {
-            return Err(HypermeshError::Validation(
-                "StakeProof: signature is empty".into(),
+                "StakeProof: stake_holder_id (identity) is empty".into(),
             ));
         }
         Ok(())
@@ -206,14 +195,17 @@ impl Validatable for StakeProof {
 
 impl Validatable for WorkProof {
     fn validate(&self) -> Result<(), HypermeshError> {
-        if self.compute_units == 0 {
+        // WHAT: the hash of the work done (never a capacity number).
+        if self.owner_id.is_empty() {
             return Err(HypermeshError::Validation(
-                "WorkProof: compute_units is zero".into(),
+                "WorkProof: owner_id is empty".into(),
             ));
         }
-        self.node_id.validate().map_err(|e| {
-            HypermeshError::Validation(format!("WorkProof: invalid node_id: {}", e))
-        })?;
+        if self.work_hash == [0u8; 32] {
+            return Err(HypermeshError::Validation(
+                "WorkProof: work_hash is zero (no work hashed)".into(),
+            ));
+        }
         Ok(())
     }
 }
@@ -229,19 +221,19 @@ impl Validatable for TimeProof {
     }
 }
 
-impl Validatable for ProofOfState {
+impl Validatable for StateProof {
     fn validate(&self) -> Result<(), HypermeshError> {
-        self.space.validate().map_err(|e| {
-            HypermeshError::Validation(format!("ProofOfState: space proof invalid: {}", e))
+        self.space_proof.validate().map_err(|e| {
+            HypermeshError::Validation(format!("StateProof: space proof invalid: {}", e))
         })?;
-        self.stake.validate().map_err(|e| {
-            HypermeshError::Validation(format!("ProofOfState: stake proof invalid: {}", e))
+        self.stake_proof.validate().map_err(|e| {
+            HypermeshError::Validation(format!("StateProof: stake proof invalid: {}", e))
         })?;
-        self.work.validate().map_err(|e| {
-            HypermeshError::Validation(format!("ProofOfState: work proof invalid: {}", e))
+        self.work_proof.validate().map_err(|e| {
+            HypermeshError::Validation(format!("StateProof: work proof invalid: {}", e))
         })?;
-        self.time.validate().map_err(|e| {
-            HypermeshError::Validation(format!("ProofOfState: time proof invalid: {}", e))
+        self.time_proof.validate().map_err(|e| {
+            HypermeshError::Validation(format!("StateProof: time proof invalid: {}", e))
         })?;
         Ok(())
     }
@@ -254,52 +246,26 @@ impl Validatable for ProofOfState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof::WorkCategory;
-    use crate::types::{ContentHash, MatrixPosition, NodeId};
+    use crate::types::{MatrixPosition, NodeId};
     use std::time::Duration;
 
     fn valid_space() -> SpaceProof {
-        SpaceProof {
-            node_id: NodeId::from_public_key(b"node-alpha"),
-            matrix_position: MatrixPosition {
-                x: 1.0,
-                y: 2.0,
-                z: 3.0,
-            },
-            stored_bytes: 1024,
-            committed_bytes: 4096,
-            content_hash: ContentHash::from_bytes([0xAB; 32]),
-            timestamp_ms: 1700000000000,
-        }
+        let mut p = SpaceProof::new("node-alpha".to_string(), "/hypermesh/a".to_string(), 4096);
+        p.total_size = 1024;
+        p.file_hash = "abcd".to_string();
+        p
     }
 
     fn valid_stake() -> StakeProof {
-        StakeProof {
-            node_id: NodeId::from_public_key(b"node-alpha"),
-            asset_id: Some(AssetId::from("asset-001")),
-            stake_amount: 500,
-            signature: vec![0xDE, 0xAD],
-            timestamp_ms: 1700000000000,
-        }
+        StakeProof::new("holder-alpha".to_string(), "node-alpha".to_string())
     }
 
     fn valid_work() -> WorkProof {
-        WorkProof {
-            node_id: NodeId::from_public_key(b"node-alpha"),
-            compute_units: 42,
-            work_category: WorkCategory::Compute,
-            challenge_proof: vec![0xCA, 0xFE],
-            timestamp_ms: 1700000000000,
-        }
+        WorkProof::from_work("node-alpha".to_string(), "wl-1".to_string(), b"work")
     }
 
     fn valid_time() -> TimeProof {
-        TimeProof {
-            time_offset: Duration::from_millis(150),
-            nonce: 99,
-            proof_hash: vec![0xBE, 0xEF],
-            timestamp_ms: 1700000000000,
-        }
+        TimeProof::new(Duration::from_millis(150))
     }
 
     // --- NodeId ---
@@ -392,19 +358,20 @@ mod tests {
     }
 
     #[test]
-    fn space_proof_stored_exceeds_committed() {
+    fn space_proof_stored_exceeds_capacity() {
         let mut sp = valid_space();
-        sp.stored_bytes = 9999;
-        sp.committed_bytes = 100;
+        sp.total_size = 9999;
+        sp.total_storage = 100;
         assert!(sp.validate().is_err());
     }
 
     #[test]
-    fn space_proof_zero_committed() {
+    fn space_proof_tiny_capacity_is_ok() {
+        // Capacity is descriptive, never gated against a minimum.
         let mut sp = valid_space();
-        sp.committed_bytes = 0;
-        sp.stored_bytes = 0;
-        assert!(sp.validate().is_err());
+        sp.total_storage = 1;
+        sp.total_size = 0;
+        assert!(sp.validate().is_ok());
     }
 
     #[test]
@@ -413,16 +380,10 @@ mod tests {
     }
 
     #[test]
-    fn stake_proof_zero_amount() {
+    fn stake_proof_empty_identity_invalid() {
+        // Authorization requires a bound identity (WHO), not a magnitude.
         let mut sp = valid_stake();
-        sp.stake_amount = 0;
-        assert!(sp.validate().is_err());
-    }
-
-    #[test]
-    fn stake_proof_empty_signature() {
-        let mut sp = valid_stake();
-        sp.signature = vec![];
+        sp.stake_holder_id = String::new();
         assert!(sp.validate().is_err());
     }
 
@@ -432,9 +393,9 @@ mod tests {
     }
 
     #[test]
-    fn work_proof_zero_units() {
+    fn work_proof_zero_hash_invalid() {
         let mut wp = valid_work();
-        wp.compute_units = 0;
+        wp.work_hash = [0u8; 32];
         assert!(wp.validate().is_err());
     }
 
@@ -451,17 +412,17 @@ mod tests {
     }
 
     #[test]
-    fn proof_of_state_valid() {
-        let pos = ProofOfState::new(valid_space(), valid_stake(), valid_work(), valid_time());
-        assert!(pos.validate().is_ok());
+    fn state_proof_valid() {
+        let pos = StateProof::new(valid_stake(), valid_time(), valid_space(), valid_work());
+        assert!(Validatable::validate(&pos).is_ok());
     }
 
     #[test]
-    fn proof_of_state_invalid_component() {
+    fn state_proof_invalid_component() {
         let mut bad_stake = valid_stake();
-        bad_stake.stake_amount = 0;
-        let pos = ProofOfState::new(valid_space(), bad_stake, valid_work(), valid_time());
-        assert!(pos.validate().is_err());
+        bad_stake.stake_holder_id = String::new();
+        let pos = StateProof::new(bad_stake, valid_time(), valid_space(), valid_work());
+        assert!(Validatable::validate(&pos).is_err());
     }
 
     // --- Free-standing validation helpers ---

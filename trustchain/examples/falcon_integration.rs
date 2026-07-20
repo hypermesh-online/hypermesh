@@ -10,6 +10,7 @@
 use anyhow::{anyhow, Result};
 use tracing::{info, Level};
 
+use trustchain::proof_of_state::StateProofOps;
 use trustchain::{
     CAConfig, CertificateRequest, StateProof, PQCAlgorithm, PostQuantumCrypto,
     SecurityIntegratedCA, SecurityIntegrationConfig,

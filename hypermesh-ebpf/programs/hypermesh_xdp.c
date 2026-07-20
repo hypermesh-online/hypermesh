@@ -17,7 +17,7 @@
 //   never inspected in-kernel.
 //
 //   Two-tier PoS (§5.4): the kernel performs FAST structural pre-validation
-//   (algorithm indicator + PoW difficulty + cache/TTL), and userspace performs
+//   (algorithm indicator + cache/TTL), and userspace performs
 //   deep FALCON-1024 verification (TrustChain), feeding the result back into
 //   pos_header_map / policy_map via set_peer_pos_validated.
 //
@@ -108,7 +108,7 @@ struct policy_value {
  * the kernel via `set_peer_pos_validated` -> `update_pos_header_map`. */
 struct pos_validation {
     __u8  algorithm;      /* 0x01=FALCON, 0x02=Ed25519, 0x03=ECDSA */
-    __u32 difficulty;     /* Required difficulty (leading zero bits) */
+    __u32 reserved;       /* Reserved, must be zero (alignment; see below) */
     __u8  validated;      /* 1=passed validation, 0=pending */
     __u64 last_validated; /* Timestamp of last validation (ns) */
 };
@@ -134,17 +134,17 @@ struct route_value {
 
 /* Kernel-side PoS pre-validation configuration (index 0 of pos_config_map).
  *
- * Layout matches Rust `KernelPosConfig::to_bytes` (32 bytes, natural
+ * Layout matches Rust `KernelPosConfig::to_bytes` (24 bytes, natural
  * alignment; u64 fields are 8-byte aligned):
- *   [0..4]   min_difficulty       (u32 LE)
- *   [4..8]   (padding)
- *   [8..16]  max_timestamp_skew_ns(u64 LE)
- *   [16..24] validation_ttl_ns    (u64 LE)
- *   [24..28] enabled              (u32 LE, 1=enforce, 0=pass-through)
- *   [28..32] (padding)
+ *   [0..8]   max_timestamp_skew_ns(u64 LE)
+ *   [8..16]  validation_ttl_ns    (u64 LE)
+ *   [16..20] enabled              (u32 LE, 1=enforce, 0=pass-through)
+ *   [20..24] (padding)
+ *
+ * There is deliberately no difficulty field: PoWork is a content-hash match,
+ * not a mining contest, so the kernel has no difficulty target to enforce.
  */
 struct pos_config {
-    __u32 min_difficulty;        /* Minimum leading zero bits required */
     __u64 max_timestamp_skew_ns; /* Max clock skew (nanoseconds) */
     __u64 validation_ttl_ns;     /* How long a cached validation is valid */
     __u32 enabled;               /* 1=enforce kernel checks, 0=pass-through */
@@ -266,15 +266,19 @@ struct hmesh_header {
  * layout is:
  *   [0]     algorithm  (u8)
  *   [1..4]  (padding)
- *   [4..8]  difficulty (u32)
+ *   [4..8]  reserved   (u32, must be zero)
  *   [8..40] hash[32]
  * sizeof == 40. Rust `WirePosHeader::to_bytes` produces these exact 40 bytes
- * (see hypermesh_headers.rs). The kernel reads `algorithm` @0 and `hash` @8;
- * `difficulty` is carried but not consulted in-kernel. */
+ * (see hypermesh_headers.rs). The kernel reads `algorithm` @0 and `hash` @8.
+ *
+ * `reserved` formerly carried a PoW difficulty target. It does not any more:
+ * PoWork is the HASH OF THE WORK DONE, not a mining contest. The word is kept
+ * at zero so `hash` stays 8-byte aligned and the 40-byte wire layout is
+ * unchanged. */
 struct hmesh_pos_header {
     __u8  algorithm;   /* 0x01=FALCON, 0x02=Ed25519, 0x03=ECDSA */
-    __u32 difficulty;  /* Required difficulty (leading zero bits) */
-    __u8  hash[32];    /* Work hash (first 32 bytes of proof) */
+    __u32 reserved;    /* Reserved, must be zero (was: PoW difficulty) */
+    __u8  hash[32];    /* Work hash (BLAKE3 content hash of the work) */
 };
 
 /* Asset identification and integrity header */
@@ -294,36 +298,6 @@ struct hmesh_matrix_header {
 /* ============================================================
  * Inline helpers
  * ============================================================ */
-
-/*
- * count_leading_zero_bits_kernel - Count leading zero bits in a byte array.
- *
- * Walks up to 32 bytes (bounded for the BPF verifier). For each fully
- * zero byte, adds 8.  For the first non-zero byte, uses a binary-search
- * approach to count the leading zeros within that byte, then stops.
- */
-static __always_inline __u32 count_leading_zero_bits_kernel(__u8 *hash, __u32 len)
-{
-    __u32 total = 0;
-    __u32 max = len < 32 ? len : 32; /* BPF verifier bound */
-
-    /* Explicit bound for BPF verifier - max 32 iterations */
-    for (__u32 i = 0; i < 32; i++) {
-        if (i >= max)
-            break;
-        __u8 byte = hash[i];
-        if (byte == 0) {
-            total += 8;
-            continue;
-        }
-        /* Count leading zeros in non-zero byte using binary search */
-        if (!(byte & 0xF0)) { total += 4; byte <<= 4; }
-        if (!(byte & 0xC0)) { total += 2; byte <<= 2; }
-        if (!(byte & 0x80)) { total += 1; }
-        break;
-    }
-    return total;
-}
 
 /*
  * validate_pos_algorithm - Check that the algorithm indicator byte is
@@ -368,8 +342,10 @@ static __always_inline int validate_pos_for_source(__u8 src_ip[16])
  * back to the cache-based lookup:
  *
  *   1. Algorithm indicator must be a known value (0x01/0x02/0x03)
- *   2. PoW hash must meet minimum difficulty (leading zero bits)
- *   3. Cached validation entry must not be stale (TTL check)
+ *   2. Cached validation entry must not be stale (TTL check)
+ *
+ * There is NO difficulty/work threshold: PoWork is a content-hash match,
+ * verified against the payload in userspace, not a mining contest.
  *
  * Asymmetric crypto verification (FALCON-1024 lattice signatures,
  * Ed25519 curve arithmetic, ECDSA point operations) is intentionally
@@ -405,15 +381,10 @@ static __always_inline int validate_pos_enhanced(
         if (!validate_pos_algorithm(pos_hdr->algorithm))
             return 0;
 
-        /* Check 2: PoW difficulty must meet the configured minimum.
-         * This catches trivially weak proofs (e.g., no work done)
-         * before they reach the expensive userspace crypto path. */
-        if (cfg->min_difficulty > 0) {
-            __u32 lz = count_leading_zero_bits_kernel(
-                pos_hdr->hash, 32);
-            if (lz < cfg->min_difficulty)
-                return 0;
-        }
+        /* NOTE: there is deliberately NO difficulty check here. PoWork is the
+         * HASH OF THE WORK DONE (a content-hash match), not a mining contest,
+         * so there is no leading-zero threshold to enforce in-kernel. The
+         * work hash's CONTENT is verified in userspace against the payload. */
     }
 
     /* ---------- Cache lookup with TTL enforcement ---------- */
@@ -628,7 +599,7 @@ int hypermesh_xdp_filter(struct xdp_md *ctx)
 
                 /* --- PoS validation (two-tier §5.4) ---
                  * When a PoS extension header is present, run kernel-side
-                 * structural checks (algorithm, difficulty) PLUS the cache
+                 * structural checks (algorithm) PLUS the cache
                  * lookup with TTL. When absent, do a cache-only check.
                  * Deep FALCON-1024 verification stays in userspace. */
                 if (policy->requires_pos) {

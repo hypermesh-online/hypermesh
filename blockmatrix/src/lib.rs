@@ -349,7 +349,7 @@ pub mod test_utils;
 mod tests {
     use super::*;
     use crate::proof_of_state::proof_of_state_integration::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use std::time::Duration;
 
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_state_proof_creation() {
         // Test Proof of State Four-Proof System integration
-        let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
+        let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id".to_string());
 
         let space_proof = SpaceProof::new(
             "test-node".to_string(),
@@ -418,14 +418,7 @@ mod tests {
             1024 * 1024, // 1MB
         );
 
-        let work_proof = WorkProof::new(
-            "owner-1".to_string(),
-            "workload-1".to_string(),
-            12345,
-            100,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
+        let work_proof = WorkProof::new("owner-1".to_string(), "workload-1".to_string(), *blake3::hash(format!("{}:{}", "owner-1".to_string(), "workload-1".to_string()).as_bytes()).as_bytes());
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 

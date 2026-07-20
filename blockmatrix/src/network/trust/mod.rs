@@ -244,21 +244,14 @@ pub struct NetworkConfig {
     /// DNS name to register for Public mode
     pub dns_name: Option<String>,
     /// Proof of State for Public mode
-    pub proof_of_state: Option<ProofOfState>,
+    pub proof_of_state: Option<StateProof>,
 }
 
-/// Proof of State for blockchain registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofOfState {
-    /// Proof of Space (WHERE)
-    pub proof_of_space: Vec<u8>,
-    /// Proof of Stake (WHO)
-    pub proof_of_stake: Vec<u8>,
-    /// Proof of Work (WHAT/HOW)
-    pub proof_of_work: Vec<u8>,
-    /// Proof of Time (WHEN)
-    pub proof_of_time: Vec<u8>,
-}
+// Proof of State for blockchain registration is the canonical
+// `hypermesh_lib::proof::StateProof`. This module previously carried an
+// opaque-bytes duplicate; it has been removed so there is exactly ONE
+// four-proof type set in the workspace.
+pub use hypermesh_lib::proof::StateProof;
 
 /// STOQ transport abstraction
 #[derive(Clone)]
@@ -372,7 +365,7 @@ pub async fn request_federation_membership(
 /// Request blockchain certificate from trust.hypermesh.online
 pub async fn request_blockchain_certificate(
     _stoq: &Arc<StoqTransport>,
-    _proof: &ProofOfState,
+    _proof: &StateProof,
 ) -> Result<Certificate> {
     // Placeholder implementation
     // In production, would submit proof to trust.hypermesh.online

@@ -156,18 +156,20 @@ pub struct DurationConfig {
 }
 
 /// State proof requirements for access (bilateral Proof of State)
+///
+/// CANONICAL MODEL: there is NO `minimum_stake` — PoStake is authorization
+/// (WHO), never a magnitude. The `require_stake_proof` flag asks for the
+/// authorization proof to be present; it never gates on an amount.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StateRequirements {
     /// Require Proof of Space
     pub require_space_proof: bool,
-    /// Require Proof of Stake
+    /// Require Proof of Stake (authorization presence, not an amount)
     pub require_stake_proof: bool,
     /// Require Proof of Work
     pub require_work_proof: bool,
     /// Require Proof of Time
     pub require_time_proof: bool,
-    /// Minimum stake amount required
-    pub minimum_stake: u64,
     /// Maximum time offset allowed
     pub max_time_offset: Duration,
 }
@@ -328,7 +330,6 @@ impl Default for StateRequirements {
             require_stake_proof: true,
             require_work_proof: true,
             require_time_proof: true,
-            minimum_stake: 1000,
             max_time_offset: Duration::from_secs(30),
         }
     }

@@ -103,9 +103,9 @@ impl ProofValidation {
     }
 
     /// Validate a state proof and return the validation result.
-    /// Convenience wrapper around `StateProof::verify_all()`.
+    /// Convenience wrapper around [`verify_all_proofs`].
     pub fn validate_proof(proof: &StateProof) -> ProofValidation {
-        match proof.verify_all() {
+        match verify_all_proofs(proof) {
             Ok(validation) => validation,
             Err(_) => ProofValidation::new(false, false, false, false),
         }
@@ -143,13 +143,17 @@ impl ProofValidation {
     }
 }
 
-impl StateProof {
-    /// Validate all four proofs with detailed error reporting
-    pub fn verify_all(&self) -> Result<ProofValidation> {
+/// Validate all four proofs of `proof` with detailed error reporting.
+///
+/// Exposed to callers through the `StateProofOps::verify_all` extension trait
+/// (the `StateProof` type itself is owned by `hypermesh_lib`).
+pub fn verify_all_proofs(proof: &StateProof) -> Result<ProofValidation> {
+    {
+        let this = proof;
         let mut validation = ProofValidation::new(true, true, true, true);
 
         // Validate PoSpace (WHERE)
-        if !self.space_proof.validate() {
+        if !this.space_proof.validate() {
             validation.space_valid = false;
             validation.all_valid = false;
             validation.add_error(
@@ -159,32 +163,27 @@ impl StateProof {
             );
         }
 
-        // Additional PoSpace checks
-        if self.space_proof.total_storage == 0 {
-            validation.space_valid = false;
-            validation.all_valid = false;
-            validation.add_error(
-                ProofType::Space,
-                "Total storage is zero".to_string(),
-                ErrorCode::MissingField,
-            );
-        }
+        // CANONICAL MODEL: PoSpace answers WHERE (location). Storage capacity is
+        // a descriptive asset attribute — it is NEVER a proof field and NEVER
+        // gates admission, so there is no `total_storage` minimum here. The
+        // self-consistency check below (stored <= advertised) is an internal
+        // coherence check on the proof, not a capacity threshold.
 
-        if self.space_proof.total_size > self.space_proof.total_storage {
+        if this.space_proof.total_size > this.space_proof.total_storage {
             validation.space_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Space,
                 format!(
                     "Storage size {} exceeds capacity {}",
-                    self.space_proof.total_size, self.space_proof.total_storage
+                    this.space_proof.total_size, this.space_proof.total_storage
                 ),
                 ErrorCode::StorageCommitmentInvalid,
             );
         }
 
         // Validate PoStake (WHO)
-        if !self.stake_proof.validate() {
+        if !this.stake_proof.validate() {
             validation.stake_valid = false;
             validation.all_valid = false;
             validation.add_error(
@@ -194,19 +193,20 @@ impl StateProof {
             );
         }
 
-        // Additional PoStake checks
-        if self.stake_proof.stake_amount == 0 {
+        // Additional PoStake checks: authorization requires a bound identity
+        // (WHO). No magnitude — PoStake is never an amount.
+        if this.stake_proof.stake_holder_id.is_empty() {
             validation.stake_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Stake,
-                "Stake amount is zero".to_string(),
+                "Stake authorization has no bound identity".to_string(),
                 ErrorCode::InsufficientStake,
             );
         }
 
         // Check stake age (not too old)
-        if let Ok(elapsed) = self.stake_proof.stake_timestamp.elapsed() {
+        if let Ok(elapsed) = this.stake_proof.stake_timestamp.elapsed() {
             if elapsed > Duration::from_secs(60 * 60 * 24 * 30) {
                 // 30 days max
                 validation.stake_valid = false;
@@ -220,7 +220,7 @@ impl StateProof {
         }
 
         // Validate PoWork (WHAT/HOW)
-        if !self.work_proof.validate() {
+        if !this.work_proof.validate() {
             validation.work_valid = false;
             validation.all_valid = false;
             validation.add_error(
@@ -230,19 +230,20 @@ impl StateProof {
             );
         }
 
-        // Additional PoWork checks
-        if self.work_proof.computational_power == 0 {
+        // Additional PoWork checks: WHAT requires a real (non-zero) work hash.
+        // No compute magnitude — capacity is a descriptive attribute.
+        if this.work_proof.work_hash == [0u8; 32] {
             validation.work_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Work,
-                "Computational power is zero".to_string(),
+                "Work proof has zero work hash (no work performed)".to_string(),
                 ErrorCode::InsufficientWork,
             );
         }
 
         // Validate PoTime (WHEN)
-        if !self.time_proof.validate() {
+        if !this.time_proof.validate() {
             validation.time_valid = false;
             validation.all_valid = false;
             validation.add_error(
@@ -253,14 +254,14 @@ impl StateProof {
         }
 
         // Additional PoTime checks
-        if self.time_proof.network_time_offset > Duration::from_secs(300) {
+        if this.time_proof.network_time_offset > Duration::from_secs(300) {
             validation.time_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Time,
                 format!(
                     "Time offset too large: {:?} > 5 minutes",
-                    self.time_proof.network_time_offset
+                    this.time_proof.network_time_offset
                 ),
                 ErrorCode::TimeOffsetExceeded,
             );
@@ -274,70 +275,47 @@ impl StateProof {
 
         Ok(validation)
     }
+}
 
-    /// Validate with specific minimum requirements
-    pub fn verify_with_requirements(
-        &self,
-        min_stake: u64,
-        max_time_offset: Duration,
-        min_storage: u64,
-        min_compute: u64,
-    ) -> Result<ProofValidation> {
-        let mut validation = self.verify_all()?;
+/// Validate `proof` against a WHEN-freshness bound.
+///
+/// CANONICAL MODEL: proofs answer WHO (authorization) / WHAT (work hash) /
+/// WHERE (location) / WHEN (time), never a magnitude. There is no minimum
+/// storage / stake / compute gate — the only bound here is the temporal
+/// freshness of the WHEN proof.
+///
+/// Exposed through the `StateProofOps::verify_with_requirements` extension
+/// trait (the `StateProof` type is owned by `hypermesh_lib`).
+pub fn verify_proof_with_requirements(
+    proof: &StateProof,
+    max_time_offset: Duration,
+) -> Result<ProofValidation> {
+    {
+        let this = proof;
+        let mut validation = verify_all_proofs(this)?;
 
-        // Check minimum stake
-        if self.stake_proof.stake_amount < min_stake {
+        // WHO must be authorized (identity bound). No amount check.
+        if this.stake_proof.stake_holder_id.is_empty() {
             validation.stake_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Stake,
-                format!(
-                    "Stake {} below minimum {}",
-                    self.stake_proof.stake_amount, min_stake
-                ),
+                "Stake authorization has no bound identity".to_string(),
                 ErrorCode::InsufficientStake,
             );
         }
 
-        // Check time offset
-        if self.time_proof.network_time_offset > max_time_offset {
+        // Check time offset (WHEN freshness — a temporal bound, not a magnitude).
+        if this.time_proof.network_time_offset > max_time_offset {
             validation.time_valid = false;
             validation.all_valid = false;
             validation.add_error(
                 ProofType::Time,
                 format!(
                     "Time offset {:?} exceeds maximum {:?}",
-                    self.time_proof.network_time_offset, max_time_offset
+                    this.time_proof.network_time_offset, max_time_offset
                 ),
                 ErrorCode::TimeOffsetExceeded,
-            );
-        }
-
-        // Check minimum storage
-        if self.space_proof.total_storage < min_storage {
-            validation.space_valid = false;
-            validation.all_valid = false;
-            validation.add_error(
-                ProofType::Space,
-                format!(
-                    "Storage {} below minimum {}",
-                    self.space_proof.total_storage, min_storage
-                ),
-                ErrorCode::StorageCommitmentInvalid,
-            );
-        }
-
-        // Check minimum compute
-        if self.work_proof.computational_power < min_compute {
-            validation.work_valid = false;
-            validation.all_valid = false;
-            validation.add_error(
-                ProofType::Work,
-                format!(
-                    "Compute power {} below minimum {}",
-                    self.work_proof.computational_power, min_compute
-                ),
-                ErrorCode::InsufficientWork,
             );
         }
 
@@ -354,6 +332,7 @@ impl StateProof {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proof_of_state::StateProofOps;
 
     #[test]
     fn test_proof_validation_all_valid() {
@@ -371,8 +350,10 @@ mod tests {
 
     #[test]
     fn test_proof_validation_invalid_space() {
+        // CANONICAL MODEL: PoSpace answers WHERE. A space proof is invalid when
+        // it has no bound LOCATION — never because of a capacity magnitude.
         let mut proof = StateProof::new_for_testing();
-        proof.space_proof.total_storage = 0; // Invalid
+        proof.space_proof.node_id = String::new();
 
         let validation = proof.verify_all().expect("test: expected success");
 
@@ -386,8 +367,9 @@ mod tests {
 
     #[test]
     fn test_proof_validation_invalid_stake() {
+        // PoStake is authorization: a malformed proof has NO bound identity.
         let mut proof = StateProof::new_for_testing();
-        proof.stake_proof.stake_amount = 0; // Invalid
+        proof.stake_proof.stake_holder_id = String::new();
 
         let validation = proof.verify_all().expect("test: expected success");
 
@@ -403,14 +385,9 @@ mod tests {
     fn test_proof_validation_with_requirements() {
         let proof = StateProof::new_for_testing();
 
-        // Should pass with reasonable requirements
+        // Should pass with a reasonable time-freshness bound (no magnitude gate).
         let validation = proof
-            .verify_with_requirements(
-                5000,                    // min_stake
-                Duration::from_secs(60), // max_time_offset
-                10 * 1024 * 1024,        // min_storage (10MB)
-                100,                     // min_compute
-            )
+            .verify_with_requirements(Duration::from_secs(60)) // max_time_offset
             .expect("test: expected success");
 
         assert!(validation.all_valid);
@@ -418,16 +395,13 @@ mod tests {
 
     #[test]
     fn test_proof_validation_fails_requirements() {
-        let proof = StateProof::new_for_testing();
+        let mut proof = StateProof::new_for_testing();
+        // Push the WHEN proof out of the freshness window so the temporal bound
+        // rejects it — rejection is on time freshness, never on a magnitude.
+        proof.time_proof.network_time_offset = Duration::from_secs(600);
 
-        // Should fail with excessive requirements
         let validation = proof
-            .verify_with_requirements(
-                1_000_000,                 // min_stake (too high)
-                Duration::from_millis(1),  // max_time_offset (too strict)
-                1024 * 1024 * 1024 * 1024, // min_storage (1TB - too high)
-                1_000_000,                 // min_compute (too high)
-            )
+            .verify_with_requirements(Duration::from_millis(1)) // max_time_offset (too strict)
             .expect("test: expected success");
 
         assert!(!validation.all_valid);
@@ -435,10 +409,29 @@ mod tests {
     }
 
     #[test]
+    fn test_zero_capacity_space_proof_is_admitted() {
+        // CANONICAL MODEL: capacity is a DESCRIPTIVE asset attribute — it is
+        // never a proof field that gates admission. A node advertising zero
+        // spare capacity still answers WHERE, so its proof must validate.
+        let mut proof = StateProof::new_for_testing();
+        proof.space_proof.total_storage = 0;
+        proof.space_proof.total_size = 0;
+
+        let validation = proof.verify_all().expect("test: expected success");
+
+        assert!(
+            validation.space_valid,
+            "zero capacity must not fail PoSpace — capacity is never a gate"
+        );
+        assert!(validation.all_valid);
+    }
+
+    #[test]
     fn test_validation_error_summary() {
         let mut proof = StateProof::new_for_testing();
-        proof.stake_proof.stake_amount = 0;
-        proof.space_proof.total_storage = 0;
+        // WHO unbound (authorization missing) and WHERE unbound (no location).
+        proof.stake_proof.stake_holder_id = String::new();
+        proof.space_proof.node_id = String::new();
 
         let validation = proof.verify_all().expect("test: expected success");
         let summary = validation.error_summary();

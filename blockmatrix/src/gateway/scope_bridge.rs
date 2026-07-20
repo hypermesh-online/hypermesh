@@ -30,6 +30,7 @@ use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::blockchain::NodeBlockchain;
 use crate::network::shard_transport::ShardTransport;
 use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::StateProofOps;
 
 // ---------------------------------------------------------------------------
 // Bridge message types

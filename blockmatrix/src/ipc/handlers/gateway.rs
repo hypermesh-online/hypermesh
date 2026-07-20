@@ -13,6 +13,7 @@ use crate::gateway::GatewayManager;
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Parse a scope string ("device" or "network") into a `BlockchainScope`.
 fn parse_scope(s: &str) -> Result<BlockchainScope, RpcError> {

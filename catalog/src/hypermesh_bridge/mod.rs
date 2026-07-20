@@ -44,13 +44,14 @@ pub struct HyperMeshAssetRegistry {
     _config: BridgeConfig,
 }
 
-/// Bridge configuration for HyperMesh integration
+/// Bridge configuration for HyperMesh integration.
+///
+/// CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude — there is
+/// no minimum-stake config for asset operations.
 #[derive(Debug, Clone)]
 pub struct BridgeConfig {
     /// Enable state proof validation for all operations
     pub _enable_state_proof: bool,
-    /// Minimum stake required for asset operations
-    pub _minimum_stake: u64,
     /// Default privacy level for new assets
     pub _default_privacy: PrivacyMode,
     /// Enable zero-copy optimizations
@@ -63,7 +64,6 @@ impl Default for BridgeConfig {
     fn default() -> Self {
         Self {
             _enable_state_proof: true,
-            _minimum_stake: 1000,
             _default_privacy: PrivacyMode::PRIVATE,
             _enable_zero_copy: true,
             _catalog_cache_size: 10000,

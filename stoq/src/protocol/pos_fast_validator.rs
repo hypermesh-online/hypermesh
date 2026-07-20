@@ -23,14 +23,10 @@ use hypermesh_lib::{AccessScope, PrivacyMode};
 /// Configuration for the fast pre-validation stage.
 #[derive(Debug, Clone)]
 pub struct FastValidationConfig {
-    /// Minimum PoW difficulty to accept (default: 8).
-    pub min_difficulty: u32,
     /// Maximum clock skew tolerance in seconds (default: 60).
     pub max_clock_skew_secs: u64,
     /// Maximum token age in seconds (default: 86400 = 24h).
     pub max_token_age_secs: u64,
-    /// Minimum required stake amount (default: 1).
-    pub min_stake_amount: u64,
     /// Maximum serialized token size in bytes (default: 65536).
     pub max_token_size_bytes: usize,
     /// TTL for cached validation results in seconds (default: 60).
@@ -42,10 +38,8 @@ pub struct FastValidationConfig {
 impl Default for FastValidationConfig {
     fn default() -> Self {
         Self {
-            min_difficulty: 8,
             max_clock_skew_secs: 60,
             max_token_age_secs: 86400,
-            min_stake_amount: 1,
             max_token_size_bytes: 65536,
             fast_cache_ttl_secs: 60,
             rate_limit_per_sec: 10_000,
@@ -79,8 +73,8 @@ pub struct FastValidatorStats {
 
 /// Two-stage PoS validator: fast structural pre-check then full crypto.
 ///
-/// The fast stage runs cheap checks (difficulty, timestamp, size, rate limit,
-/// stake amount) and maintains a result cache so repeated tokens skip the
+/// The fast stage runs cheap checks (timestamp, size, rate limit,
+/// authorization binding) and maintains a result cache so repeated tokens skip the
 /// expensive full validation. Privacy-tier routing selects which proofs to
 /// verify: Anonymous skips all, Private checks a subset, Public runs full.
 pub struct PosFastValidator {
@@ -112,7 +106,7 @@ impl PosFastValidator {
 
     /// Run structural pre-checks only (no crypto).
     ///
-    /// Order: cache -> rate limit -> size -> difficulty -> timestamp -> stake.
+    /// Order: cache -> rate limit -> size -> timestamp -> authorization.
     pub fn fast_validate(&self, token: &PosToken) -> FastValidationResult {
         self.validation_count.fetch_add(1, Ordering::Relaxed);
 
@@ -141,28 +135,21 @@ impl PosFastValidator {
             return FastValidationResult::Rejected(reason);
         }
 
-        // 4. Difficulty
-        if token.proof_of_work.difficulty < self.config.min_difficulty {
-            self.rejection_count.fetch_add(1, Ordering::Relaxed);
-            return FastValidationResult::Rejected(format!(
-                "Difficulty {} below minimum {}",
-                token.proof_of_work.difficulty, self.config.min_difficulty,
-            ));
-        }
-
-        // 5. Timestamp checks
-        if let Some(reason) = self.check_timestamp(&token.proof_of_time.timestamp) {
+        // 4. Timestamp checks
+        if let Some(reason) = self.check_timestamp(&token.proof.time_proof.time_verification_timestamp) {
             self.rejection_count.fetch_add(1, Ordering::Relaxed);
             return FastValidationResult::Rejected(reason);
         }
 
-        // 6. Stake amount
-        if token.proof_of_stake.stake_amount < self.config.min_stake_amount {
+        // 5. Authorization binding (PoStake = WHO, not a magnitude): the token
+        //    must carry a bound owner/grantee identity. Admission is
+        //    authorized-or-not; the FALCON signature over that identity is
+        //    verified in the full validation stage.
+        if token.proof.stake_proof.stake_holder_id.is_empty() || token.issuer_pubkey.is_empty() {
             self.rejection_count.fetch_add(1, Ordering::Relaxed);
-            return FastValidationResult::Rejected(format!(
-                "Stake {} below minimum {}",
-                token.proof_of_stake.stake_amount, self.config.min_stake_amount,
-            ));
+            return FastValidationResult::Rejected(
+                "PoStake missing authorized identity binding".to_string(),
+            );
         }
 
         FastValidationResult::PassToFull
@@ -201,7 +188,7 @@ impl PosFastValidator {
     /// Privacy-tier-aware full validation.
     ///
     /// - **Anonymous**: skip all validation, return valid immediately.
-    /// - **Private**: check stake amount and timestamp only.
+    /// - **Private**: check authorization binding and timestamp only.
     /// - **Public**: full 4-proof validation via the underlying validator.
     pub fn validate_for_tier(
         &self,
@@ -220,28 +207,29 @@ impl PosFastValidator {
             });
         }
 
-        // Private: subset checks (stake + timestamp only)
+        // Private: subset checks (authorization binding + timestamp only)
         if privacy_mode.scope == AccessScope::Bounded && privacy_mode.tracked {
             let mut errors = Vec::new();
 
-            if token.proof_of_stake.stake_amount == 0 {
-                errors.push("Stake amount is zero".to_string());
+            if token.proof.stake_proof.stake_holder_id.is_empty() || token.issuer_pubkey.is_empty()
+            {
+                errors.push("PoStake missing authorized identity binding".to_string());
             }
 
             let now = SystemTime::now();
             let max_skew = Duration::from_secs(self.config.max_clock_skew_secs);
             let max_age = Duration::from_secs(self.config.max_token_age_secs);
 
-            if token.proof_of_time.timestamp > now + max_skew {
+            if token.proof.time_proof.time_verification_timestamp > now + max_skew {
                 errors.push("Timestamp is in the future".to_string());
             }
-            if let Ok(age) = now.duration_since(token.proof_of_time.timestamp) {
+            if let Ok(age) = now.duration_since(token.proof.time_proof.time_verification_timestamp) {
                 if age > max_age {
                     errors.push("Timestamp is too old".to_string());
                 }
             }
 
-            debug!("Private mode: subset validation (stake + timestamp)");
+            debug!("Private mode: subset validation (authorization + timestamp)");
             return Ok(ValidationResult {
                 is_valid: errors.is_empty(),
                 errors,
@@ -360,86 +348,25 @@ impl PosFastValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork};
+
+    use crate::protocol::pos_validator::test_support::{canonical_test_proof, signed_test_token};
 
     /// Helper: create a valid test token that passes all fast checks.
     fn create_valid_token() -> PosToken {
-        PosToken {
-            id: vec![1, 2, 3, 4],
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (1, 2, 3),
-                capacity: 1024 * 1024,
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: vec![9, 10, 11, 12],
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: vec![21, 22, 23, 24],
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-            issuer_pubkey: Some(vec![25, 26, 27, 28]),
-        }
+        PosToken::for_identity(
+            vec![1, 2, 3, 4],
+            vec![25, 26, 27, 28],
+            canonical_test_proof(),
+            (1, 2, 3),
+            1,
+            vec![17, 18, 19, 20],
+            Duration::from_secs(3600),
+        )
     }
 
     /// Create a properly FALCON-1024-signed token for tests that reach full validation.
     fn create_falcon_signed_token() -> PosToken {
-        use pqcrypto_falcon::falcon1024;
-        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
-        use sha2::{Digest, Sha256};
-
-        let (pk, sk) = falcon1024::keypair();
-        let pubkey_bytes = pk.as_bytes().to_vec();
-
-        let mut token = PosToken {
-            id: vec![1, 2, 3, 4],
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (1, 2, 3),
-                capacity: 1024 * 1024,
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: pubkey_bytes.clone(),
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: Vec::new(),
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-            issuer_pubkey: Some(pubkey_bytes),
-        };
-
-        // Sign the canonical token data
-        let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token_data = validator.serialize_token_for_signing(&token);
-        let mut hasher = Sha256::new();
-        hasher.update(&token_data);
-        let message_hash: [u8; 32] = hasher.finalize().into();
-        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
-            .expect("test: reconstruct secret key");
-        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
-        token.signature = sig.as_bytes().to_vec();
-
-        token
+        signed_test_token(vec![1, 2, 3, 4], (1, 2, 3), 1, vec![17, 18, 19, 20])
     }
 
     fn make_validator() -> PosFastValidator {
@@ -448,25 +375,27 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_check_difficulty_pass() {
+    fn test_fast_check_authorized_pass() {
         let v = make_validator();
         let token = create_valid_token();
         let result = v.fast_validate(&token);
         assert!(
             matches!(result, FastValidationResult::PassToFull),
-            "Token with difficulty 10 should pass (min 8)"
+            "Token with a bound authorized identity should pass to full validation"
         );
     }
 
     #[test]
-    fn test_fast_check_difficulty_fail() {
+    fn test_fast_check_missing_authorization_fail() {
         let v = make_validator();
         let mut token = create_valid_token();
-        token.proof_of_work.difficulty = 2; // Below min of 8
+        // Remove the authorized identity binding (PoStake = WHO). Admission is
+        // authorized-or-not — never a magnitude threshold.
+        token.proof.stake_proof.stake_holder_id.clear();
         let result = v.fast_validate(&token);
         assert!(
-            matches!(result, FastValidationResult::Rejected(ref r) if r.contains("Difficulty")),
-            "Token with difficulty 2 should be rejected"
+            matches!(result, FastValidationResult::Rejected(ref r) if r.contains("identity")),
+            "Token missing its authorized identity binding should be rejected"
         );
     }
 
@@ -475,7 +404,7 @@ mod tests {
         let v = make_validator();
         let mut token = create_valid_token();
         // 5 minutes in the future, beyond 60s max skew
-        token.proof_of_time.timestamp = SystemTime::now() + Duration::from_secs(300);
+        token.proof.time_proof.time_verification_timestamp = SystemTime::now() + Duration::from_secs(300);
         let result = v.fast_validate(&token);
         assert!(
             matches!(result, FastValidationResult::Rejected(ref r) if r.contains("future")),
@@ -488,7 +417,7 @@ mod tests {
         let v = make_validator();
         let mut token = create_valid_token();
         // 2 days old, beyond 24h max age
-        token.proof_of_time.timestamp = SystemTime::now() - Duration::from_secs(172_800);
+        token.proof.time_proof.time_verification_timestamp = SystemTime::now() - Duration::from_secs(172_800);
         let result = v.fast_validate(&token);
         assert!(
             matches!(result, FastValidationResult::Rejected(ref r) if r.contains("old")),
@@ -514,14 +443,14 @@ mod tests {
     }
 
     #[test]
-    fn test_fast_check_stake_too_low() {
+    fn test_fast_check_missing_authorization() {
         let v = make_validator();
         let mut token = create_valid_token();
-        token.proof_of_stake.stake_amount = 0;
+        token.proof.stake_proof.stake_holder_id = String::new();
         let result = v.fast_validate(&token);
         assert!(
-            matches!(result, FastValidationResult::Rejected(ref r) if r.contains("Stake")),
-            "Zero stake should be rejected"
+            matches!(result, FastValidationResult::Rejected(ref r) if r.contains("authorized")),
+            "Missing authorization binding should be rejected"
         );
     }
 
@@ -628,18 +557,19 @@ mod tests {
         // Valid token should pass private subset checks
         assert!(result.is_valid, "Valid token should pass private checks");
 
-        // Now test with zero stake (should fail)
+        // Now test with a missing authorization binding (should fail).
         let mut bad_token = create_valid_token();
-        bad_token.proof_of_stake.stake_amount = 0;
-        // Need to update config to allow difficulty 10 >= min 8
-        // but stake 0 should fail at fast_validate before reaching tier check
-        // Actually for the full validate path, stake 0 is also caught at fast stage.
-        // Let's test validate_for_tier directly for subset check:
+        bad_token.proof.stake_proof.stake_holder_id = String::new();
+        // A missing identity binding is caught at the fast stage before the tier
+        // check, so exercise validate_for_tier directly for the subset check.
         let result2 = v
             .validate_for_tier(&bad_token, &PrivacyMode::PRIVATE)
             .expect("test: private subset should return result");
-        assert!(!result2.is_valid, "Zero-stake should fail private checks");
-        assert!(result2.errors.iter().any(|e| e.contains("zero")));
+        assert!(
+            !result2.is_valid,
+            "Missing authorization should fail private checks"
+        );
+        assert!(result2.errors.iter().any(|e| e.contains("authorized")));
     }
 
     #[test]

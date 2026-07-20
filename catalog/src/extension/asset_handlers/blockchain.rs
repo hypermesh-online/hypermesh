@@ -222,16 +222,20 @@ impl AssetExtensionHandler for BlockchainHandler {
             return Ok(false);
         }
 
-        if proof.stake_proof.stake_amount == 0 {
-            tracing::warn!("Blockchain asset {}: stake amount is zero", id);
+        if proof.stake_proof.stake_holder_id.is_empty() {
+            tracing::warn!("Blockchain asset {}: authorization has no bound identity", id);
             return Ok(false);
         }
-        if proof.space_proof.total_storage == 0 {
-            tracing::warn!("Blockchain asset {}: space commitment is zero", id);
+        // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+        // location; capacity is descriptive and never gates admission.
+        if proof.space_proof.node_id.is_empty()
+            && proof.space_proof.storage_path.is_empty()
+        {
+            tracing::warn!("blockchain asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }
-        if proof.work_proof.computational_power == 0 {
-            tracing::warn!("Blockchain asset {}: computational power is zero", id);
+        if proof.work_proof.work_hash == [0u8; 32] {
+            tracing::warn!("Blockchain asset {}: work hash is zero (no work performed)", id);
             return Ok(false);
         }
 

@@ -289,17 +289,15 @@ impl PrivacyManager {
     ) -> AssetResult<StateProofRequirementConfig> {
         let mut merged = user_requirements.clone();
 
+        // CANONICAL MODEL: privacy tier selects WHICH proofs are required (a
+        // binary presence choice), never a stake/difficulty magnitude.
         if *privacy_level == PrivacyMode::PRIVATE {
             merged.require_proof_of_work = false;
-            merged.minimum_stake = 0;
         } else if *privacy_level == PrivacyMode::PUBLIC {
             merged.require_proof_of_space = true;
             merged.require_proof_of_stake = true;
             merged.require_proof_of_work = true;
             merged.require_proof_of_time = true;
-            merged.minimum_stake = merged.minimum_stake.max(1000);
-        } else {
-            merged.minimum_stake = merged.minimum_stake.max(100);
         }
 
         Ok(merged)

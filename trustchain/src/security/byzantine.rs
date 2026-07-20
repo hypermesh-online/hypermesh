@@ -297,10 +297,13 @@ impl ByzantineDetector {
         &self,
         stake_proof: &StakeProof,
     ) -> TrustChainResult<Option<ByzantineViolation>> {
-        // Check stake signature validity
-        if !stake_proof.verify_signature() {
+        // CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude.
+        // Byzantine check = a MISSING identity binding (the authorization is
+        // malformed). There is NO stake-amount falsification heuristic because
+        // there is no amount.
+        if !stake_proof.is_structurally_valid() {
             warn!(
-                "Invalid stake signature detected for: {}",
+                "Malformed stake authorization detected for: {}",
                 stake_proof.stake_holder_id
             );
 
@@ -316,15 +319,6 @@ impl ByzantineDetector {
             return Ok(Some(ByzantineViolation::InvalidStakeSignature {
                 stake_holder_id: stake_proof.stake_holder_id.clone(),
             }));
-        }
-
-        // Check for unrealistic stake amounts (potential falsification)
-        if stake_proof.stake_amount > 1_000_000_000 {
-            // 1B tokens seems unrealistic
-            warn!(
-                "Suspicious stake amount detected: {} for node {}",
-                stake_proof.stake_amount, stake_proof.stake_holder_id
-            );
         }
 
         Ok(None)
@@ -394,14 +388,11 @@ impl ByzantineDetector {
             }));
         }
 
-        // Check for unrealistic storage claims
-        if space_proof.total_storage > 100 * 1024 * 1024 * 1024 * 1024 {
-            // 100TB seems excessive
-            warn!(
-                "Unrealistic storage claim: {} bytes for node {}",
-                space_proof.total_storage, space_proof.node_id
-            );
-        }
+        // CANONICAL MODEL: there is NO upper capacity bound. Capacity is a
+        // descriptive asset attribute, never a proof field — a large claim is
+        // not by itself Byzantine. The falsification check above (stored bytes
+        // exceeding advertised capacity) is a self-consistency check on the
+        // proof, which is the only thing PoSpace can be wrong about.
 
         Ok(None)
     }
@@ -411,12 +402,13 @@ impl ByzantineDetector {
         &self,
         work_proof: &WorkProof,
     ) -> TrustChainResult<Option<ByzantineViolation>> {
-        // Check for work cheating (unrealistic computational claims)
-        if work_proof.computational_power > 1_000_000 {
-            // 1M units seems excessive
+        // CANONICAL MODEL: PoWork is the HASH of work done, never a capacity
+        // claim. Work cheating = presenting a proof with NO real work hashed
+        // (a zero work_hash), i.e. claiming work that was never performed.
+        if work_proof.work_hash == [0u8; 32] {
             warn!(
-                "Suspicious computational power claim: {} for node {}",
-                work_proof.computational_power, work_proof.owner_id
+                "Work proof with zero work hash (no work performed) for node {}",
+                work_proof.owner_id
             );
 
             // Update pattern tracking
@@ -429,17 +421,9 @@ impl ByzantineDetector {
             }
 
             return Ok(Some(ByzantineViolation::WorkCheating {
-                claimed_power: work_proof.computational_power,
-                actual_power: 0, // Would need actual measurement
+                claimed_power: 0,
+                actual_power: 0,
             }));
-        }
-
-        // Check for work challenges validity
-        if work_proof.work_challenges.is_empty() {
-            warn!(
-                "Missing work challenges for proof: {}",
-                work_proof.workload_id
-            );
         }
 
         Ok(None)
@@ -666,9 +650,10 @@ mod tests {
     async fn test_invalid_stake_proof() {
         let detector = ByzantineDetector::new(0.1).await.expect("test: async operation"); // Low threshold for testing
 
-        // Create invalid stake proof
+        // Create an invalid authorization: unbind the identity (WHO). PoStake
+        // is authorization, not an amount, so a malformed proof = empty id.
         let mut state_proof = StateProof::default_for_testing();
-        state_proof.stake_proof.stake_amount = 0; // Invalid stake amount
+        state_proof.stake_proof.stake_holder_id = String::new();
 
         let result = detector
             .detect_byzantine_behavior(&state_proof, "test_operation")

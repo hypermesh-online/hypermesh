@@ -311,14 +311,6 @@ fn test_config_builder_pattern() {
     assert_eq!(config.trustchain_cert_path, Some("cert.pem".to_string()));
 }
 
-#[test]
-fn test_config_min_stake_for_publish() {
-    let config = CatalogExtensionConfig::default();
-    // Default min_state_proofs is 2, so min_stake = 100 * 2 = 200
-    let min_stake = config.min_stake_for_publish();
-    assert_eq!(min_stake, 200);
-}
-
 // ===========================================================================
 // Legacy tests (gated behind future-tests feature)
 // ===========================================================================

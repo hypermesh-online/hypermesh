@@ -4,156 +4,118 @@
 
 //! Gate 2: Asset System Integration Test
 //!
-//! Verifies the complete asset management system is working correctly
-//! with all required components from Phase 2.
-//!
-//! Gated: function signature mismatches with current API.
-#![cfg(feature = "future-tests")]
+//! Verifies the asset management system and the CANONICAL four-proof model:
+//! PoStake = authorization (WHO), PoSpace = location (WHERE), PoWork = the
+//! hash of work done (WHAT), PoTime = temporal (WHEN). No proof carries a
+//! magnitude, and no magnitude gates admission.
 
+use blockmatrix::assets::adapters::AdapterRegistry;
 use blockmatrix::assets::core::{
-    AssetManager, AssetRegistration, AssetState, AssetStatus, AssetType, StateRequirements,
-    PrivacyMode,
-};
-
-use blockmatrix::assets::adapters::{
-    AdapterRegistry, ContainerAssetAdapter, CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter,
-    NetworkAssetAdapter, StorageAssetAdapter,
-};
-
-use blockmatrix::proof_of_state::proof_of_state_integration::{
-    StateProof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    AssetType, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
 };
 
 use std::time::Duration;
 
+/// Build a canonical four-proof state proof.
+///
+/// Every field answers a question; none expresses a magnitude that gates.
+/// `total_storage` is supplied only because capacity is a DESCRIPTIVE
+/// attribute of the node — it is never an admission criterion.
+fn canonical_state_proof() -> StateProof {
+    // PoStake: WHO — binds an authorized identity. No stake amount exists.
+    let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id-123".to_string());
+
+    // PoSpace: WHERE — binds a node and a storage path.
+    let mut space_proof = SpaceProof::new(
+        "test-node-001".to_string(),
+        "/test/storage/path".to_string(),
+        10 * 1024 * 1024,
+    );
+    space_proof.file_hash =
+        "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
+
+    // PoWork: WHAT — the hash of the work actually done. No difficulty target,
+    // no nonce, no mining.
+    let work_proof = WorkProof::from_work(
+        "test-owner".to_string(),
+        "workload-gate2-test".to_string(),
+        b"gate2-work-material",
+    );
+
+    // PoTime: WHEN — temporal freshness.
+    let time_proof = TimeProof::new(Duration::from_secs(1));
+
+    StateProof::new(stake_proof, time_proof, space_proof, work_proof)
+}
+
 #[tokio::test]
-async fn test_gate2_asset_system_complete() {
-    println!("\n==== GATE 2 VALIDATION: Asset System Complete ====\n");
-
-    // 1. Verify Asset Manager Creation
-    println!("✓ Testing Asset Manager initialization...");
-    let manager = AssetManager::new();
-    let stats = manager.get_asset_statistics().await;
-    assert_eq!(stats.total_assets, 0);
-    println!("  ✅ Asset Manager created successfully");
-
-    // 2. Verify Adapter Registry with ALL required adapters
-    println!("\n✓ Testing Adapter Registry with all adapters...");
+async fn test_gate2_adapter_registry_complete() {
     let registry = AdapterRegistry::new().await;
 
-    // Verify all 6 required adapters exist
-    assert!(registry.get_adapter(&AssetType::Cpu).is_some());
-    assert!(registry.get_adapter(&AssetType::Gpu).is_some());
-    assert!(registry.get_adapter(&AssetType::Memory).is_some());
-    assert!(registry.get_adapter(&AssetType::Storage).is_some());
-    assert!(registry.get_adapter(&AssetType::Network).is_some());
-    assert!(registry.get_adapter(&AssetType::Container).is_some());
-
-    let all_adapters = registry.get_all_adapters();
-    assert!(all_adapters.len() >= 6); // May have Economic adapter too
-    println!("  ✅ All {} asset adapters registered", all_adapters.len());
-
-    // 3. Register adapters with manager
-    println!("\n✓ Registering adapters with Asset Manager...");
-    for (asset_type, adapter) in registry.get_all_adapters() {
-        manager
-            .register_adapter(asset_type.clone(), adapter)
-            .await
-            .unwrap();
-        println!("  ✅ Registered {:?} adapter", asset_type);
-    }
-
-    // 4. Test Privacy Levels
-    println!("\n✓ Testing Privacy Allocation Types...");
-    let privacy_levels = vec![
-        PrivacyMode::ANONYMOUS,
-        PrivacyMode::PRIVATE,
-        PrivacyMode::PUBLIC,
-    ];
-
-    for level in &privacy_levels {
-        println!("  ✅ Privacy level {:?} available", level);
-    }
-
-    // 5. Test State Proof Creation
-    println!("\n✓ Testing Proof of State Four-Proof System...");
-
-    let stake_proof = StakeProof::new("test-holder".to_string(), "holder-id-123".to_string(), 1000);
-    println!("  ✅ PoStake created (WHO)");
-
-    let mut space_proof = SpaceProof::new(
-        1024 * 1024 * 10, // 10MB
-        "/test/storage/path".to_string(),
-    );
-    space_proof.node_id = "test-node-001".to_string();
-    println!("  ✅ PoSpace created (WHERE)");
-
-    let work_proof = WorkProof::new(
-        200,
-        "workload-gate2-test".to_string(),
-        54321,
-        "test-owner".to_string(),
-        WorkloadType::Compute,
-        WorkState::Completed,
-    );
-    println!("  ✅ PoWork created (WHAT/HOW)");
-
-    let time_proof = TimeProof::new(Duration::from_secs(30));
-    println!("  ✅ PoTime created (WHEN)");
-
-    let state_proof = StateProof::new(stake_proof, space_proof, work_proof, time_proof);
-
-    assert!(state_proof.validate());
-    println!("  ✅ State Proof validated successfully");
-
-    // 6. Verify Asset Types
-    println!("\n✓ Testing all Asset Types...");
-    let asset_types = vec![
+    for asset_type in [
         AssetType::Cpu,
         AssetType::Gpu,
         AssetType::Memory,
         AssetType::Storage,
         AssetType::Network,
         AssetType::Container,
-    ];
-
-    for asset_type in &asset_types {
-        println!("  ✅ Asset type {:?} defined", asset_type);
+    ] {
+        assert!(
+            registry.get_adapter(&asset_type).is_some(),
+            "adapter for {asset_type:?} must be registered"
+        );
     }
 
-    // 7. Final statistics check
-    let final_stats = manager.get_asset_statistics().await;
-    println!("\n✓ Final Asset System Statistics:");
-    println!("  - Total assets: {}", final_stats.total_assets);
-    println!("  - CPU assets: {}", final_stats.cpu_assets);
-    println!("  - GPU assets: {}", final_stats.gpu_assets);
-    println!("  - Memory assets: {}", final_stats.memory_assets);
-    println!("  - Storage assets: {}", final_stats.storage_assets);
-    println!("  - Available assets: {}", final_stats.available_assets);
-
-    println!("\n========================================");
-    println!("✅ GATE 2 PASSED: Asset System Complete");
-    println!("========================================");
-    println!("\nAsset System Features Validated:");
-    println!("  ✓ Universal AssetRegistration system");
-    println!("  ✓ AssetAdapter pattern (all 6 adapters)");
-    println!("  ✓ Privacy-aware allocation (5 levels)");
-    println!("  ✓ Proof of State Four-Proof state proof");
-    println!("  ✓ Asset Manager with statistics");
-    println!("  ✓ Adapter Registry functional");
-    println!("  ⚠️  Remote proxy/NAT deferred to Phase 3");
+    assert!(registry.get_all_adapters().len() >= 6);
 }
 
 #[test]
-fn test_asset_adapter_trait_pattern() {
-    println!("\n✓ Testing AssetAdapter trait pattern...");
+fn test_gate2_canonical_four_proof_validates() {
+    let proof = canonical_state_proof();
 
-    // The fact that this compiles proves the trait pattern is working
-    use blockmatrix::assets::core::AssetAdapter;
+    assert!(
+        !proof.stake_proof.stake_holder_id.is_empty(),
+        "PoStake must bind an identity (WHO)"
+    );
+    assert!(
+        !proof.space_proof.node_id.is_empty() && !proof.space_proof.storage_path.is_empty(),
+        "PoSpace must bind a location (WHERE)"
+    );
+    assert!(
+        proof.work_proof.work_hash != [0u8; 32],
+        "PoWork must carry a real work hash (WHAT)"
+    );
 
-    fn verify_adapter_trait<T: AssetAdapter + ?Sized>(_adapter: &T) {
-        // Trait exists and is implemented
+    assert!(proof.validate(), "canonical four-proof must validate");
+}
+
+/// A zero-capacity proof — a freshly-provisioned node storing nothing — must
+/// still be ADMITTED through the adapter path. Capacity is descriptive and
+/// must NEVER gate admission.
+#[tokio::test]
+async fn test_gate2_zero_capacity_is_admitted_by_adapters() {
+    let mut proof = canonical_state_proof();
+    proof.space_proof.total_size = 0;
+    proof.space_proof.total_storage = 0;
+
+    let registry = AdapterRegistry::new().await;
+
+    for asset_type in [
+        AssetType::Storage,
+        AssetType::Network,
+        AssetType::Container,
+    ] {
+        let adapter = registry
+            .get_adapter(&asset_type)
+            .expect("test: adapter must exist");
+        let admitted = adapter
+            .validate_state_proof(&proof)
+            .await
+            .expect("test: adapter validation should not error");
+        assert!(
+            admitted,
+            "{asset_type:?} adapter must ADMIT a zero-capacity, location-bound \
+             proof — capacity is descriptive and must never gate admission"
+        );
     }
-
-    println!("  ✅ AssetAdapter trait pattern validated");
 }

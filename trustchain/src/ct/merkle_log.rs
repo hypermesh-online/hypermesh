@@ -16,6 +16,7 @@ use tracing::debug;
 
 use super::LogEntry;
 use crate::errors::{CTError, Result as TrustChainResult};
+use crate::proof_of_state::StateProofOps;
 
 /// Simplified merkle tree-based CT log
 pub struct MerkleLog {

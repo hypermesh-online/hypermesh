@@ -155,25 +155,22 @@ fn create_node(name: &str, id: [u8; 32]) -> PeerIdentity {
     }
 }
 
+/// Build a canonical four-proof set for the example.
+///
+/// CANONICAL MODEL: PoStake is AUTHORIZATION (a bound identity, never an
+/// amount); PoWork is the BLAKE3 HASH of the work done (never a compute
+/// magnitude); PoSpace is WHERE (capacity is descriptive only); PoTime is WHEN.
 fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> StateProof {
     use std::time::{Duration, SystemTime};
-    use trustchain::proof_of_state::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
-    };
+    use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
 
     StateProof {
         stake_proof: StakeProof {
             stake_holder: stake_holder.to_string(),
             stake_holder_id: stake_holder_id.to_string(),
-            stake_amount: 1000,
             stake_timestamp: SystemTime::now(),
         },
-        time_proof: TimeProof {
-            network_time_offset: Duration::from_millis(5),
-            time_verification_timestamp: SystemTime::now(),
-            nonce: 42,
-            proof_hash: vec![5, 6, 7, 8],
-        },
+        time_proof: TimeProof::new(Duration::from_millis(5)),
         space_proof: SpaceProof {
             node_id: stake_holder_id.to_string(),
             storage_path: "/data/storage".to_string(),
@@ -182,16 +179,11 @@ fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> StateProof {
             file_hash: "abc123".to_string(),
             proof_timestamp: SystemTime::now(),
         },
-        work_proof: WorkProof {
-            owner_id: stake_holder.to_string(),
-            workload_id: "work-123".to_string(),
-            pid: 1234,
-            computational_power: 100,
-            workload_type: WorkloadType::Compute,
-            work_state: WorkState::Completed,
-            work_challenges: vec!["challenge1".to_string()],
-            proof_timestamp: SystemTime::now(),
-        },
+        work_proof: WorkProof::from_work(
+            stake_holder.to_string(),
+            "work-123".to_string(),
+            b"the title-transfer work that was actually done",
+        ),
     }
 }
 

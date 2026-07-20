@@ -93,26 +93,21 @@ impl AssetAdapter for StorageAssetAdapter {
             });
         }
 
-        // Storage-specific validation - CRITICAL PoSpace validation
-        // PoSpace: MOST IMPORTANT for storage - validate actual storage commitment
-        if proof.space_proof.total_size == 0 {
+        // PoSpace is WHERE (location), never how-much. Require the proof be
+        // bound to a location; capacity is descriptive and never gates.
+        if proof.space_proof.node_id.is_empty() || proof.space_proof.storage_path.is_empty() {
             return Ok(false);
         }
 
-        // Verify storage location and network position
-        if proof.space_proof.storage_path.is_empty() {
+        // PoStake: CANONICAL MODEL — authorization (WHO), require a bound
+        // identity, never a stake magnitude.
+        if proof.stake_proof.stake_holder_id.is_empty() {
             return Ok(false);
         }
 
-        // PoStake: Validate storage access stake
-        if proof.stake_proof.stake_amount < 75 {
-            // Moderate minimum for storage
-            return Ok(false);
-        }
-
-        // PoWork: Validate computational work for storage management
-        if proof.work_proof.computational_power < 14 {
-            // Medium difficulty for storage
+        // PoWork: CANONICAL MODEL — HASH of work done (WHAT), require work was
+        // hashed, never a capacity magnitude.
+        if proof.work_proof.work_hash == [0u8; 32] {
             return Ok(false);
         }
 

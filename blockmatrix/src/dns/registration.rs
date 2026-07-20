@@ -565,7 +565,7 @@ fn extract_parent(domain_name: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::proof_of_state::proof_of_state_integration::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use crate::dns::{DnsRecordData, DnsRecordType};
     use std::net::Ipv6Addr;
@@ -582,17 +582,10 @@ mod tests {
     }
 
     fn create_test_proof() -> StateProof {
-        let stake = StakeProof::new("holder".to_string(), "holder-id".to_string(), 1000);
+        let stake = StakeProof::new("holder".to_string(), "holder-id".to_string());
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
-        let work = WorkProof::new(
-            "owner".to_string(),
-            "workload".to_string(),
-            12345,
-            100,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
+        let work = WorkProof::new("owner".to_string(), "workload".to_string(), *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes()).as_bytes());
 
         StateProof::new(stake, time, space, work)
     }

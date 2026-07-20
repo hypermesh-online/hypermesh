@@ -379,7 +379,7 @@ mod tests {
     use super::*;
     use crate::assets::core::asset_id::AssetType;
     use crate::proof_of_state::proof::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use crate::test_utils::test_asset_id;
     use std::time::Duration;
@@ -416,20 +416,9 @@ mod tests {
             1024, // 1KB allocation
         );
 
-        let stake_proof = StakeProof::new(
-            "test-authority".to_string(),
-            "test-node-id".to_string(),
-            1000,
-        );
+        let stake_proof = StakeProof::new("test-authority".to_string(), "test-node-id".to_string());
 
-        let work_proof = WorkProof::new(
-            "test-owner".to_string(),
-            "test-workload".to_string(),
-            12345,
-            100, // computational_power
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
+        let work_proof = WorkProof::new("test-owner".to_string(), "test-workload".to_string(), *blake3::hash(format!("{}:{}", "test-owner".to_string(), "test-workload".to_string()).as_bytes()).as_bytes());
 
         let time_proof = TimeProof::new(Duration::from_secs(1));
 

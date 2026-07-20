@@ -640,7 +640,7 @@ mod tests {
         let chain = NodeBlockchain::new(coord);
 
         let mut bad_proof = StateProof::new_for_testing();
-        bad_proof.stake_proof.stake_amount = 0;
+        bad_proof.stake_proof.stake_holder_id = String::new(); // CANONICAL: empty identity invalidates PoStake (authorization, not amount)
 
         let result = chain
             .add_block_with_data(b"should fail".to_vec(), &bad_proof)
@@ -814,7 +814,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let mut bad_proof = StateProof::new_for_testing();
-        bad_proof.stake_proof.stake_amount = 0; // invalidates stake_proof
+        bad_proof.stake_proof.stake_holder_id = String::new(); // CANONICAL: empty identity invalidates PoStake (authorization, not amount)
         let entry = BlockAssetEntry::new_bound(
             asset_hash,
             &bad_proof,

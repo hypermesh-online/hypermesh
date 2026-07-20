@@ -231,16 +231,20 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         }
 
         // Verify non-trivial proof values for VM assets
-        if proof.stake_proof.stake_amount == 0 {
-            tracing::warn!("VM asset {}: stake amount is zero", id);
+        if proof.stake_proof.stake_holder_id.is_empty() {
+            tracing::warn!("VM asset {}: authorization has no bound identity", id);
             return Ok(false);
         }
-        if proof.space_proof.total_storage == 0 {
-            tracing::warn!("VM asset {}: space commitment is zero", id);
+        // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+        // location; capacity is descriptive and never gates admission.
+        if proof.space_proof.node_id.is_empty()
+            && proof.space_proof.storage_path.is_empty()
+        {
+            tracing::warn!("virtual_machine asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }
-        if proof.work_proof.computational_power == 0 {
-            tracing::warn!("VM asset {}: computational power is zero", id);
+        if proof.work_proof.work_hash == [0u8; 32] {
+            tracing::warn!("VM asset {}: work hash is zero (no work performed)", id);
             return Ok(false);
         }
 

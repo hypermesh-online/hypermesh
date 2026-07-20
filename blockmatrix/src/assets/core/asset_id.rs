@@ -319,7 +319,14 @@ impl From<hypermesh_lib::SystemAssetKind> for BaseSystemType {
 /// BlockMatrix's domain-specific asset registration record. Unlike hypermesh_lib::AssetId
 /// (simple String wrapper), this is content-addressed with a cryptographic hash,
 /// network scope, asset category, and creation timestamp for blockchain registration.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+///
+/// CANONICAL MODEL: the `authorization` set (owners + grants) rides alongside the
+/// identity fields but is NOT part of the asset's identity. Two registrations for
+/// the same content/scope/category/time are the SAME asset regardless of who owns
+/// or is granted access — so `Hash`/`Eq`/`PartialEq` and the content hash EXCLUDE
+/// `authorization`. Authorization is mutable metadata (owners change, grants are
+/// added/revoked) that must never re-key the asset in the 84 HashMap sites.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetRegistration {
     /// Content-based hash (derived from asset data, not UUID)
     pub content_hash: [u8; 32],
@@ -332,7 +339,35 @@ pub struct AssetRegistration {
 
     /// Creation timestamp
     pub creation_timestamp: SystemTime,
+
+    /// Authorization state (owners = distribution right, grants = access/mirror
+    /// rights). EXCLUDED from identity (`Hash`/`Eq`/content hash) — see type docs.
+    pub authorization: crate::assets::core::authz::AuthorizationSet,
 }
+
+// Identity of an AssetRegistration is (content_hash, network_scope, category,
+// creation_timestamp) — the SAME set the derived impls covered before
+// `authorization` was added. `authorization` is deliberately excluded so that
+// mutating owners/grants never re-keys the asset in any of the 84 HashMap sites.
+impl std::hash::Hash for AssetRegistration {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.content_hash.hash(state);
+        self.network_scope.hash(state);
+        self.category.hash(state);
+        self.creation_timestamp.hash(state);
+    }
+}
+
+impl PartialEq for AssetRegistration {
+    fn eq(&self, other: &Self) -> bool {
+        self.content_hash == other.content_hash
+            && self.network_scope == other.network_scope
+            && self.category == other.category
+            && self.creation_timestamp == other.creation_timestamp
+    }
+}
+
+impl Eq for AssetRegistration {}
 
 impl AssetRegistration {
     /// Create new asset ID from asset data (content-based)
@@ -348,6 +383,7 @@ impl AssetRegistration {
             network_scope,
             category,
             creation_timestamp: SystemTime::now(),
+            authorization: crate::assets::core::authz::AuthorizationSet::default(),
         }
     }
 
@@ -385,6 +421,7 @@ impl AssetRegistration {
             network_scope: NetworkScope::Global,
             category: AssetCategory::BaseSystem(base_type),
             creation_timestamp: SystemTime::now(),
+            authorization: crate::assets::core::authz::AuthorizationSet::default(),
         }
     }
 
@@ -395,6 +432,7 @@ impl AssetRegistration {
             network_scope: NetworkScope::Global,
             category: AssetCategory::BaseSystem(BaseSystemType::Container),
             creation_timestamp: SystemTime::now(),
+            authorization: crate::assets::core::authz::AuthorizationSet::default(),
         }
     }
 
@@ -609,6 +647,7 @@ impl AssetRegistration {
             network_scope,
             category,
             creation_timestamp: SystemTime::now(),
+            authorization: crate::assets::core::authz::AuthorizationSet::default(),
         })
     }
 
@@ -653,6 +692,22 @@ impl AssetRegistration {
             }),
             AssetCategory::Application(_) => None,
         }
+    }
+
+    /// Attach a single owner (distribution right) to this registration and
+    /// return it. Chainable at construction sites (e.g. genesis self-ownership).
+    pub fn with_owner(mut self, identity_id: impl Into<String>) -> Self {
+        self.authorization = crate::assets::core::authz::AuthorizationSet::with_owner(identity_id);
+        self
+    }
+
+    /// Set the full authorization set (owners + grants) and return self.
+    pub fn with_authorization(
+        mut self,
+        authorization: crate::assets::core::authz::AuthorizationSet,
+    ) -> Self {
+        self.authorization = authorization;
+        self
     }
 }
 

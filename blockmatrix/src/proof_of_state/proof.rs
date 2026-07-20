@@ -23,7 +23,4 @@ pub use super::{
     StakeProof,
     TimeProof,
     WorkProof,
-    WorkState,
-    // Additional types from TrustChain
-    WorkloadType,
 };

@@ -73,6 +73,28 @@ pub trait AssetAdapter: Send + Sync {
 
     /// Get adapter capabilities
     fn get_capabilities(&self) -> AdapterCapabilities;
+
+    /// Authorize `actor` to perform `action` on `asset`.
+    ///
+    /// CANONICAL MODEL: authorization is owner (distribution right) + grants
+    /// (access/mirror rights), never a stake magnitude. The default applies the
+    /// generic owner/grant decision ([`default_authorize`]); adapters may
+    /// override for asset-type-specific policy but none currently need to.
+    async fn authorize(
+        &self,
+        asset: &AssetRegistration,
+        actor: &str,
+        action: super::authz::GrantScope,
+    ) -> super::authz::AuthDecision {
+        super::authz::default_authorize(asset, actor, action)
+    }
+
+    /// Descriptive capacity of the resource this adapter fronts (CPU cores,
+    /// storage bytes, …). This is an attribute, NOT a proof and NEVER a gate.
+    /// Defaults to `None` (adapter advertises no capacity profile).
+    fn capacity_profile(&self) -> Option<super::authz::CapacityProfile> {
+        None
+    }
 }
 
 /// Asset allocation request with state proof
@@ -436,10 +458,11 @@ pub struct AdapterCapabilities {
 }
 
 /// Economic requirements for asset allocation
+///
+/// Billing/budgeting only. Carries NO stake magnitude: PoStake is authorization
+/// (WHO) and is never expressed as an amount.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EconomicRequirements {
-    /// Minimum stake required
-    pub min_stake: Option<u64>,
     /// Maximum cost per hour
     pub max_cost_per_hour: Option<u64>,
     /// Preferred payment method

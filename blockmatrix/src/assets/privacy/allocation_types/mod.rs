@@ -185,9 +185,6 @@ pub struct AllocationTypeConstraints {
     /// Maximum resource allocation percentage
     pub max_resource_allocation: f32,
 
-    /// Required minimum stake for this type
-    pub required_minimum_stake: u64,
-
     /// Access restrictions
     pub access_restrictions: AccessRestrictions,
 
@@ -279,7 +276,6 @@ impl Default for AllocationTypeConstraints {
             max_duration: Some(Duration::from_secs(24 * 60 * 60)), // 24 hours
             max_concurrent_per_user: 10,
             max_resource_allocation: 1.0, // 100%
-            required_minimum_stake: 0,
             access_restrictions: AccessRestrictions::default(),
             network_restrictions: NetworkRestrictions::default(),
         }

@@ -30,11 +30,10 @@ async fn test_hypermesh_bridge_creation() -> Result<()> {
 
     // Configure bridge
     let bridge_config = BridgeConfig {
-        enable_state_proof: false, // Disable for testing
-        minimum_stake: 0,
-        default_privacy: PrivacyMode::PRIVATE,
-        enable_zero_copy: true,
-        catalog_cache_size: 1000,
+        _enable_state_proof: false, // Disable for testing
+        _default_privacy: PrivacyMode::PRIVATE,
+        _enable_zero_copy: true,
+        _catalog_cache_size: 1000,
     };
 
     // Create HyperMesh-integrated registry
@@ -66,11 +65,10 @@ async fn test_publish_and_search_through_hypermesh() -> Result<()> {
 
     // Configure bridge for zero-copy performance
     let bridge_config = BridgeConfig {
-        enable_state_proof: false,
-        minimum_stake: 0,
-        default_privacy: PrivacyMode::PRIVATE,
-        enable_zero_copy: true,
-        catalog_cache_size: 1000,
+        _enable_state_proof: false,
+        _default_privacy: PrivacyMode::PRIVATE,
+        _enable_zero_copy: true,
+        _catalog_cache_size: 1000,
     };
 
     // Create registry
@@ -124,11 +122,10 @@ async fn test_performance_without_network_calls() -> Result<()> {
 
     // Configure for maximum performance
     let bridge_config = BridgeConfig {
-        enable_state_proof: false, // Skip for performance test
-        minimum_stake: 0,
-        default_privacy: PrivacyMode::PRIVATE,
-        enable_zero_copy: true,
-        catalog_cache_size: 10000,
+        _enable_state_proof: false, // Skip for performance test
+        _default_privacy: PrivacyMode::PRIVATE,
+        _enable_zero_copy: true,
+        _catalog_cache_size: 10000,
     };
 
     let registry = Arc::new(HyperMeshAssetRegistry::new(asset_manager, bridge_config).await?);

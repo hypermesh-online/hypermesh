@@ -73,11 +73,16 @@ pub struct MatrixPositionValidator {
     /// State proof requirements for matrix positions
     requirements: StateRequirements,
 
+    /// Production mode: require the storage commitment to reference the claimed
+    /// matrix position (a WHERE/location binding, not a capacity magnitude).
+    production_mode: bool,
+
     /// Enable verbose logging
     verbose: bool,
 }
 
 use std::collections::HashMap;
+use trustchain::proof_of_state::StateProofOps;
 
 impl MatrixPositionValidator {
     /// Create new validator with production requirements
@@ -86,6 +91,7 @@ impl MatrixPositionValidator {
             blockchain,
             positions: Arc::new(RwLock::new(HashMap::new())),
             requirements: production_matrix_requirements(),
+            production_mode: true,
             verbose: false,
         }
     }
@@ -96,6 +102,7 @@ impl MatrixPositionValidator {
             blockchain,
             positions: Arc::new(RwLock::new(HashMap::new())),
             requirements: StateRequirements::localhost_testing(),
+            production_mode: false,
             verbose: true,
         }
     }
@@ -292,34 +299,31 @@ impl MatrixPositionValidator {
         Ok(validation)
     }
 
-    /// Validate space proof for matrix position
+    /// Validate space proof for matrix position (PoSpace = WHERE / location).
+    ///
+    /// CANONICAL MODEL: PoSpace answers WHERE via a location commitment bound to
+    /// the claimed matrix position — never a storage-capacity magnitude. A claim
+    /// requires a present commitment that references the position, not a minimum
+    /// byte count.
     async fn validate_space_for_position(
         &self,
         coordinate: &MatrixCoordinate,
         space_proof: &SpaceProof,
     ) -> bool {
-        // Validate that node has committed storage for this position
-        // Position-specific storage requirements based on coordinate
-        let required_storage = self.calculate_required_storage(coordinate);
-
-        if space_proof.total_storage < required_storage {
+        // WHERE: a location commitment must be present (bound node + hash).
+        if space_proof.node_id.is_empty() || space_proof.file_hash.is_empty() {
             if self.verbose {
                 warn!(
-                    "Insufficient storage for position ({},{},{}): {} < {}",
-                    coordinate.x,
-                    coordinate.y,
-                    coordinate.z,
-                    space_proof.total_storage,
-                    required_storage
+                    "No storage location commitment for position ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z
                 );
             }
             return false;
         }
 
-        // For testing, allow file_hash without position hash
-        // In production, require file_hash to include position reference
-        if self.requirements.minimum_stake > 1000 {
-            // Production mode check
+        // In production, require the commitment to reference the claimed
+        // position (a location binding, not a capacity threshold).
+        if self.production_mode {
             let position_hash = self.hash_position(coordinate);
             if !space_proof.file_hash.contains(&position_hash[0..8]) {
                 if self.verbose {
@@ -341,18 +345,14 @@ impl MatrixPositionValidator {
         coordinate: &MatrixCoordinate,
         stake_proof: &StakeProof,
     ) -> bool {
-        // Calculate required stake based on position desirability
-        let required_stake = self.calculate_required_stake(coordinate);
-
-        if stake_proof.stake_amount < required_stake {
+        // CANONICAL MODEL: PoStake is authorization (WHO) — a position claim
+        // requires a bound identity, never a stake magnitude. Position
+        // desirability does not raise a stake "price".
+        if stake_proof.stake_holder_id.is_empty() {
             if self.verbose {
                 warn!(
-                    "Insufficient stake for position ({},{},{}): {} < {}",
-                    coordinate.x,
-                    coordinate.y,
-                    coordinate.z,
-                    stake_proof.stake_amount,
-                    required_stake
+                    "No authorizing identity for position claim ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z,
                 );
             }
             return false;
@@ -381,27 +381,23 @@ impl MatrixPositionValidator {
         coordinate: &MatrixCoordinate,
         work_proof: &WorkProof,
     ) -> bool {
-        // Calculate required computational power for position
-        let required_compute = self.calculate_required_compute(coordinate);
-
-        if work_proof.computational_power < required_compute {
+        // CANONICAL MODEL: PoWork is the HASH of work done (WHAT), never a
+        // capacity magnitude. A position claim requires that work was actually
+        // hashed (non-zero work hash) — capacity is descriptive, never gated.
+        if work_proof.work_hash == [0u8; 32] {
             if self.verbose {
                 warn!(
-                    "Insufficient compute for position ({},{},{}): {} < {}",
-                    coordinate.x,
-                    coordinate.y,
-                    coordinate.z,
-                    work_proof.computational_power,
-                    required_compute
+                    "No work hash for position claim ({},{},{})",
+                    coordinate.x, coordinate.y, coordinate.z,
                 );
             }
             return false;
         }
 
         // For testing, allow workload_id without position hash
-        // In production, require workload_id to include position reference
-        if self.requirements.minimum_stake > 1000 {
-            // Production mode check
+        // In production, require workload_id to reference the claimed position
+        // (a location binding on the work, not a compute magnitude).
+        if self.production_mode {
             let position_hash = self.hash_position(coordinate);
             if !work_proof.workload_id.contains(&position_hash[0..8]) {
                 if self.verbose {
@@ -450,59 +446,8 @@ impl MatrixPositionValidator {
         true
     }
 
-    /// Calculate required storage for a matrix position
-    fn calculate_required_storage(&self, coordinate: &MatrixCoordinate) -> u64 {
-        // Central positions require more storage
-        let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
-
-        if distance_from_origin < 10.0 {
-            100 * 1024 * 1024 * 1024 // 100GB for central positions
-        } else if distance_from_origin < 100.0 {
-            10 * 1024 * 1024 * 1024 // 10GB for mid-range
-        } else {
-            1024 * 1024 * 1024 // 1GB for edge positions
-        }
-    }
-
-    /// Calculate required stake for a matrix position
-    fn calculate_required_stake(&self, coordinate: &MatrixCoordinate) -> u64 {
-        // In testing mode, use lower requirements
-        if self.requirements.minimum_stake < 1000 {
-            return 100; // Test mode minimum
-        }
-
-        // Central positions require higher stake
-        let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
-
-        if distance_from_origin < 10.0 {
-            100000 // High stake for central positions
-        } else if distance_from_origin < 100.0 {
-            10000 // Medium stake for mid-range
-        } else {
-            1000 // Low stake for edge positions
-        }
-    }
-
-    /// Calculate required compute for a matrix position
-    fn calculate_required_compute(&self, coordinate: &MatrixCoordinate) -> u64 {
-        // In testing mode, use lower requirements
-        if self.requirements.minimum_stake < 1000 {
-            return 10; // Test mode minimum
-        }
-
-        // Central positions require more compute
-        let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
-
-        if distance_from_origin < 10.0 {
-            10000 // High compute for central positions
-        } else if distance_from_origin < 100.0 {
-            1000 // Medium compute for mid-range
-        } else {
-            100 // Low compute for edge positions
-        }
-    }
-
     /// Calculate VDF delay for a matrix position
+
     fn calculate_vdf_delay(&self, coordinate: &MatrixCoordinate) -> u64 {
         // Central positions require longer VDF
         let distance_from_origin = coordinate.euclidean_distance(&MatrixCoordinate::origin());
@@ -582,12 +527,13 @@ impl MatrixPositionValidator {
     }
 }
 
-/// Production requirements for matrix position claims
+/// Production requirements for matrix position claims.
+///
+/// CANONICAL MODEL: proofs answer WHO/WHAT/WHERE/WHEN, never a magnitude. The
+/// only quantitative bound is the WHEN-freshness (`max_time_offset`); position
+/// binding (WHERE) is enforced by the validator's `production_mode` flag.
 fn production_matrix_requirements() -> StateRequirements {
     StateRequirements {
-        minimum_stake: 10000,
-        minimum_storage: 10 * 1024 * 1024 * 1024, // 10GB minimum
-        minimum_compute: 1000,
         max_time_offset: Duration::from_secs(60),
     }
 }

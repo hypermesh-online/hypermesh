@@ -357,12 +357,10 @@ async fn test_invalid_state_requirements() -> Result<()> {
         subject_type: None,
     };
 
-    // Invalid requirements (extremely strict)
+    // Invalid requirements (extremely strict). Proofs carry no magnitude, so
+    // strictness comes only from the WHEN-freshness bound (max_time_offset).
     let state_requirements = StateRequirements {
-        minimum_stake: 1_000_000_000,               // Unrealistically high stake
-        max_time_offset: Duration::from_millis(1),  // Impossibly short time sync
-        minimum_storage: 1024 * 1024 * 1024 * 1024, // 1 TB minimum
-        minimum_compute: 1_000_000,                 // Unrealistically high compute
+        max_time_offset: Duration::from_millis(1), // Impossibly short time sync
     };
 
     let result = hypermesh_client

@@ -204,12 +204,16 @@ impl AssetExtensionHandler for LibraryHandler {
         }
 
         // Library assets require non-trivial stake (economic commitment)
-        if proof.stake_proof.stake_amount == 0 {
-            tracing::warn!("Library asset {}: stake amount is zero", id);
+        if proof.stake_proof.stake_holder_id.is_empty() {
+            tracing::warn!("Library asset {}: authorization has no bound identity", id);
             return Ok(false);
         }
-        if proof.space_proof.total_storage == 0 {
-            tracing::warn!("Library asset {}: space commitment is zero", id);
+        // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+        // location; capacity is descriptive and never gates admission.
+        if proof.space_proof.node_id.is_empty()
+            && proof.space_proof.storage_path.is_empty()
+        {
+            tracing::warn!("library asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }
 

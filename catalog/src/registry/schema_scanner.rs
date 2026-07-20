@@ -109,7 +109,7 @@ mod tests {
     use crate::registry::catalog_registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
     use blockmatrix::assets::StateProof;
     use blockmatrix::proof_of_state::proof_of_state_integration::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use hypermesh_lib::PrivacyMode;
     use serde_json::json;
@@ -118,23 +118,15 @@ mod tests {
     fn permissive_policy() -> TrustPolicy {
         TrustPolicy {
             require_state_proof: false,
-            minimum_stake: 0,
             allowed_publishers: Vec::new(),
             require_certificate: false,
         }
     }
 
     fn test_state_proof() -> StateProof {
-        let stake = StakeProof::new("t".to_string(), "t".to_string(), 0);
+        let stake = StakeProof::new("t".to_string(), "t".to_string());
         let space = SpaceProof::new("t".to_string(), "/t".to_string(), 0);
-        let work = WorkProof::new(
-            "t".to_string(),
-            "t".to_string(),
-            0,
-            0,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
+        let work = WorkProof::from_work("t".to_string(), "t".to_string(), b"t");
         let time = TimeProof::new(Duration::from_secs(0));
         StateProof::new(stake, time, space, work)
     }

@@ -133,7 +133,10 @@ dns = []               # DNS resolution
 proof-of-state = []    # Proof of State validation integration
 
 # Testing and development
-localhost-testing = []
+# Test-proof factories. The canonical `StateProof` lives in `hypermesh-lib`, so
+# its `new_for_testing` constructor is gated by that crate's `test-utils`
+# feature; enabling `localhost-testing` here must turn it on downstream.
+localhost-testing = ["hypermesh-lib/test-utils"]
 http-bootstrap = ["dep:reqwest"]  # Only needed by trustchain-bootstrap binary
 production-ready = ["proof-of-state"]
 

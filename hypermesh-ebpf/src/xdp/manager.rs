@@ -533,7 +533,6 @@ impl XdpManager {
         src_ip: [u8; 16],
         validated: bool,
         algorithm: u8,
-        difficulty: u32,
     ) -> Result<()> {
         #[cfg(feature = "kernel-attach")]
         {
@@ -548,9 +547,8 @@ impl XdpManager {
                             // bpf_ktime_get_ns() directly, so we approximate
                             // with CLOCK_MONOTONIC which shares the same base.
                             let now_ns = monotonic_now_ns();
-                            let value = pos_validation_to_bytes(
-                                algorithm, difficulty, validated, now_ns,
-                            );
+                            let value =
+                                pos_validation_to_bytes(algorithm, validated, now_ns);
                             m.insert(&src_ip, &value, 0).map_err(|e| {
                                 anyhow!("Failed to write pos_header_map: {}", e)
                             })?;
@@ -639,15 +637,14 @@ impl XdpManager {
                 use aya::maps::Array;
 
                 if let Some(map) = bpf.map_mut("pos_config_map") {
-                    match Array::<_, [u8; 32]>::try_from(map) {
+                    match Array::<_, [u8; KernelPosConfig::SIZE]>::try_from(map) {
                         Ok(mut array) => {
                             let bytes = config.to_bytes();
                             array
                                 .set(0, &bytes, 0)
                                 .map_err(|e| anyhow!("Failed to write pos_config_map: {}", e))?;
                             tracing::info!(
-                                "Kernel PoS config synced: difficulty={}, ttl={}ns, enabled={}",
-                                config.min_difficulty,
+                                "Kernel PoS config synced: ttl={}ns, enabled={}",
                                 config.validation_ttl_ns,
                                 config.enabled
                             );
@@ -664,8 +661,7 @@ impl XdpManager {
         {
             tracing::debug!(
                 "kernel-attach not enabled; kernel PoS config stored locally \
-                 (difficulty={}, ttl={}ns, enabled={})",
-                config.min_difficulty,
+                 (ttl={}ns, enabled={})",
                 config.validation_ttl_ns,
                 config.enabled
             );

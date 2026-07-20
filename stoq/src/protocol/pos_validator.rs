@@ -14,133 +14,92 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, info};
 
+use hypermesh_lib::proof::StateProof;
+
 pub use super::falcon_trustchain::{FalconTrustChainClient, TrustChainClient};
 
-/// Backward compatibility alias for old test API
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofData<T = ()> {
-    pub storage_commitment: Vec<u8>,
-    pub location: String,
-    pub size_bytes: u64,
-    pub content_hash: Vec<u8>,
-    pub stake_amount: u64,
-    pub owner_pubkey: Vec<u8>,
-    pub lock_period_blocks: u64,
-    pub delegation_proof: Vec<u8>,
-    pub computation_hash: Vec<u8>,
-    pub difficulty_target: u64,
-    pub resource_type: String,
-    pub nonce: u64,
-    pub timestamp: SystemTime,
-    pub vdf_proof: Vec<u8>,
-    pub chain_height: u64,
-    pub previous_block: Vec<u8>,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl Default for ProofData {
-    fn default() -> Self {
-        Self {
-            storage_commitment: Vec::new(),
-            location: String::new(),
-            size_bytes: 0,
-            content_hash: Vec::new(),
-            stake_amount: 0,
-            owner_pubkey: Vec::new(),
-            lock_period_blocks: 0,
-            delegation_proof: Vec::new(),
-            computation_hash: Vec::new(),
-            difficulty_target: 0,
-            resource_type: String::new(),
-            nonce: 0,
-            timestamp: SystemTime::UNIX_EPOCH,
-            vdf_proof: Vec::new(),
-            chain_height: 0,
-            previous_block: Vec::new(),
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
-
-/// Proof of State token structure
+/// Proof of State token carried on the STOQ wire.
+///
+/// CANONICAL MODEL: the four proofs are **not** redefined here. The single
+/// source of truth for `StakeProof` / `WorkProof` / `SpaceProof` / `TimeProof`
+/// and their composite `StateProof` is `hypermesh_lib::proof`. This token wraps
+/// that canonical proof with the transport-level bindings STOQ needs
+/// (matrix position, chain continuity, signature, expiry).
+///
+/// - **PoStake = WHO / authorization.** `issuer_pubkey` is the FALCON-1024
+///   identity binding; `proof.stake_proof.stake_holder_id` is its BLAKE3 hex.
+///   There is no stake amount anywhere in this type.
+/// - **PoWork = the hash of the work done** (`proof.work_proof.work_hash`).
+///   There is no difficulty target and no leading-zero requirement.
+/// - **PoSpace = WHERE.** Capacity is a descriptive attribute, never a gate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PosToken {
     /// Token identifier
     pub id: Vec<u8>,
 
-    /// Proof of Space - WHERE (storage location and commitment)
-    pub proof_of_space: ProofOfSpace,
+    /// The canonical four-proof set (WHO / WHAT / WHERE / WHEN).
+    pub proof: StateProof,
 
-    /// Proof of Stake - WHO (ownership and access rights)
-    pub proof_of_stake: ProofOfStake,
+    /// Matrix position (x, y, z) this token is bound to in the Block-MATRIX
+    /// topology — the transport-level expression of WHERE.
+    pub matrix_position: (u32, u32, u32),
 
-    /// Proof of Work - WHAT/HOW (computational resources)
-    pub proof_of_work: ProofOfWork,
+    /// Sequence number for wire ordering (transport-level WHEN).
+    pub sequence: u64,
 
-    /// Proof of Time - WHEN (temporal ordering)
-    pub proof_of_time: ProofOfTime,
+    /// Previous token hash for chain continuity (transport-level WHEN).
+    pub prev_hash: Vec<u8>,
+
+    /// FALCON-1024 public key of the authorized identity (PoStake = WHO).
+    pub issuer_pubkey: Vec<u8>,
 
     /// Token signature (from issuer)
     pub signature: Vec<u8>,
 
-    /// Token expiry time
+    /// Token expiry time — how long the authorization is valid.
     pub expires_at: SystemTime,
-
-    /// Backward compatibility: issuer public key
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuer_pubkey: Option<Vec<u8>>,
 }
 
-/// Proof of Space component
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofOfSpace {
-    /// Storage commitment hash
-    pub commitment_hash: Vec<u8>,
+impl PosToken {
+    /// BLAKE3 hex of the issuer public key — the identity that
+    /// `proof.stake_proof.stake_holder_id` must be bound to.
+    pub fn issuer_identity(&self) -> String {
+        blake3::hash(&self.issuer_pubkey).to_hex().to_string()
+    }
 
-    /// Matrix position (x, y, z) in Block-MATRIX topology
-    pub matrix_position: (u32, u32, u32),
+    /// True iff the authorization identity (WHO) is bound to the issuer key.
+    pub fn identity_is_bound(&self) -> bool {
+        !self.issuer_pubkey.is_empty()
+            && self.proof.stake_proof.stake_holder_id == self.issuer_identity()
+    }
 
-    /// Storage capacity in bytes
-    pub capacity: u64,
-}
+    /// Build a token whose PoStake authorization is bound to `issuer_pubkey`.
+    ///
+    /// Overwrites `proof.stake_proof.stake_holder_id` with the BLAKE3 hex of the
+    /// issuer key so that WHO is always the identity that signs the token. The
+    /// `signature` field is left empty for the caller to fill in.
+    pub fn for_identity(
+        id: Vec<u8>,
+        issuer_pubkey: Vec<u8>,
+        mut proof: StateProof,
+        matrix_position: (u32, u32, u32),
+        sequence: u64,
+        prev_hash: Vec<u8>,
+        valid_for: Duration,
+    ) -> Self {
+        proof.stake_proof.stake_holder_id = blake3::hash(&issuer_pubkey).to_hex().to_string();
 
-/// Proof of Stake component
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofOfStake {
-    /// Stake owner public key
-    pub owner_pubkey: Vec<u8>,
-
-    /// Economic stake amount
-    pub stake_amount: u64,
-
-    /// Stake duration
-    pub staked_until: SystemTime,
-}
-
-/// Proof of Work component
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofOfWork {
-    /// Work difficulty target
-    pub difficulty: u32,
-
-    /// Work nonce
-    pub nonce: u64,
-
-    /// Work hash
-    pub work_hash: Vec<u8>,
-}
-
-/// Proof of Time component
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProofOfTime {
-    /// Timestamp of creation
-    pub timestamp: SystemTime,
-
-    /// Sequence number for ordering
-    pub sequence: u64,
-
-    /// Previous block hash for chain continuity
-    pub prev_hash: Vec<u8>,
+        Self {
+            id,
+            proof,
+            matrix_position,
+            sequence,
+            prev_hash,
+            issuer_pubkey,
+            signature: Vec::new(),
+            expires_at: SystemTime::now() + valid_for,
+        }
+    }
 }
 
 /// Validation result
@@ -261,34 +220,39 @@ impl PosTokenValidator {
             errors.push("Token has expired".to_string());
         }
 
-        // 2. Validate Proof of Space
-        if !self.validate_proof_of_space(&token.proof_of_space) {
+        // 2. Validate the canonical four-proof set (WHERE / WHO / WHAT / WHEN).
+        //    Structural validity only — no magnitude anywhere: no minimum
+        //    stake, no difficulty target, no capacity floor.
+        if !token.proof.space_proof.is_structurally_valid() {
             errors.push("Invalid Proof of Space".to_string());
         }
-
-        // 3. Validate Proof of Stake
-        if !self.validate_proof_of_stake(&token.proof_of_stake) {
+        if !token.proof.stake_proof.is_structurally_valid() {
             errors.push("Invalid Proof of Stake".to_string());
         }
-
-        // 4. Validate Proof of Work
-        if !self.validate_proof_of_work(&token.proof_of_work) {
+        if !token.proof.work_proof.is_structurally_valid() {
             errors.push("Invalid Proof of Work".to_string());
         }
-
-        // 5. Validate Proof of Time
-        if !self.validate_proof_of_time(&token.proof_of_time) {
+        if !token.proof.time_proof.is_structurally_valid() {
             errors.push("Invalid Proof of Time".to_string());
         }
 
-        // 6. Verify FALCON-1024 signature
+        // 3. PoStake is an AUTHORIZATION binding: the identity claimed by the
+        //    proof must be the BLAKE3 of the FALCON key that signed the token.
+        if !token.identity_is_bound() {
+            errors.push("PoStake identity not bound to issuer key".to_string());
+        }
+
+        // 4. Transport bindings: WHERE must name a matrix cell, and WHEN must
+        //    carry chain continuity past genesis.
+        if !self.validate_transport_bindings(token) {
+            errors.push("Invalid transport binding (matrix position / continuity)".to_string());
+        }
+
+        // 5. Verify FALCON-1024 signature
         // Use TrustChain client if available, otherwise verify directly with
         // pqcrypto_falcon using the public key embedded in the token.
         let token_data = self.serialize_token_for_signing(token);
-        let signer_pubkey = token
-            .issuer_pubkey
-            .as_deref()
-            .unwrap_or(&token.proof_of_stake.owner_pubkey);
+        let signer_pubkey = token.issuer_pubkey.as_slice();
 
         let sig_result = if let Some(ref client) = self.trustchain_client {
             client.verify_signature(signer_pubkey, &token_data, &token.signature)
@@ -344,89 +308,20 @@ impl PosTokenValidator {
         })
     }
 
-    /// Validate Proof of Space component
-    fn validate_proof_of_space(&self, pos: &ProofOfSpace) -> bool {
-        // Check commitment hash is not empty
-        if pos.commitment_hash.is_empty() {
-            return false;
-        }
-
-        // Check matrix position is valid (non-zero)
-        if pos.matrix_position == (0, 0, 0) {
-            return false;
-        }
-
-        // Check capacity is reasonable (at least 1KB, at most 1PB)
-        if pos.capacity < 1024 || pos.capacity > 1024_u64.pow(5) {
-            return false;
-        }
-
-        true
-    }
-
-    /// Validate Proof of Stake component
-    fn validate_proof_of_stake(&self, pos: &ProofOfStake) -> bool {
-        // Check owner pubkey is not empty
-        if pos.owner_pubkey.is_empty() {
-            return false;
-        }
-
-        // Check stake amount is non-zero
-        if pos.stake_amount == 0 {
-            return false;
-        }
-
-        // Check stake hasn't expired
-        if pos.staked_until <= SystemTime::now() {
-            return false;
-        }
-
-        true
-    }
-
-    /// Validate Proof of Work component
+    /// Validate the transport-level bindings carried alongside the canonical
+    /// proof set.
     ///
-    /// Verifies that the work hash has at least `difficulty` leading zero bits,
-    /// matching the same algorithm used by `hypermesh_ebpf::validation::count_leading_zero_bits`.
-    fn validate_proof_of_work(&self, pow: &ProofOfWork) -> bool {
-        // Check work hash is not empty
-        if pow.work_hash.is_empty() {
+    /// These are STOQ wire concerns, not proof magnitudes: WHERE must name a
+    /// bound matrix cell, and WHEN must carry chain continuity past genesis.
+    /// There is no capacity, difficulty, or stake threshold anywhere here.
+    fn validate_transport_bindings(&self, token: &PosToken) -> bool {
+        // WHERE: matrix position must be bound (non-zero location).
+        if token.matrix_position == (0, 0, 0) {
             return false;
         }
 
-        // Difficulty must be non-zero
-        if pow.difficulty == 0 {
-            return false;
-        }
-
-        // Count leading zero bits in the work hash and verify against difficulty
-        let leading_zeros = count_leading_zero_bits(&pow.work_hash);
-        if leading_zeros < pow.difficulty {
-            debug!(
-                "PoW failed: hash has {} leading zero bits, need {}",
-                leading_zeros, pow.difficulty
-            );
-            return false;
-        }
-
-        true
-    }
-
-    /// Validate Proof of Time component
-    fn validate_proof_of_time(&self, pot: &ProofOfTime) -> bool {
-        // Check timestamp is not in the future
-        if pot.timestamp > SystemTime::now() + Duration::from_secs(60) {
-            // Allow 1 minute clock skew
-            return false;
-        }
-
-        // Check timestamp is not too old (max 24 hours)
-        if pot.timestamp < SystemTime::now() - Duration::from_secs(86400) {
-            return false;
-        }
-
-        // Check previous hash is not empty (except for genesis)
-        if pot.sequence > 0 && pot.prev_hash.is_empty() {
+        // WHEN: past genesis, chain continuity must be present.
+        if token.sequence > 0 && token.prev_hash.is_empty() {
             return false;
         }
 
@@ -447,10 +342,11 @@ impl PosTokenValidator {
         };
 
         write_field(&token.id);
-        write_field(&token.proof_of_space.commitment_hash);
-        write_field(&token.proof_of_stake.owner_pubkey);
-        write_field(&token.proof_of_work.work_hash);
-        write_field(&token.proof_of_time.prev_hash);
+        write_field(token.proof.space_proof.file_hash.as_bytes());
+        write_field(token.proof.stake_proof.stake_holder_id.as_bytes());
+        write_field(&token.proof.work_proof.work_hash);
+        write_field(&token.issuer_pubkey);
+        write_field(&token.prev_hash);
 
         buf
     }
@@ -525,23 +421,6 @@ fn verify_falcon_signature(pubkey: &[u8], data: &[u8], signature: &[u8]) -> Resu
     }
 }
 
-/// Count leading zero bits in a byte slice.
-///
-/// Mirrors the algorithm in `hypermesh_ebpf::validation::count_leading_zero_bits`.
-/// A hash with N leading zero bits meets difficulty N.
-fn count_leading_zero_bits(data: &[u8]) -> u32 {
-    let mut count: u32 = 0;
-    for &byte in data {
-        if byte == 0 {
-            count += 8;
-        } else {
-            count += byte.leading_zeros();
-            break;
-        }
-    }
-    count
-}
-
 /// Validation statistics
 #[derive(Debug)]
 pub struct ValidationStats {
@@ -553,91 +432,148 @@ pub struct ValidationStats {
     pub cache_size: usize,
 }
 
+
+/// Test-only helpers shared by the PoS test modules across this crate.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::{PosToken, PosTokenValidator};
+    use hypermesh_lib::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
+    use std::time::Duration;
+
+    /// Build a canonical four-proof set.
+    ///
+    /// CANONICAL MODEL: authorization (WHO) is an identity binding with NO
+    /// amount; WHAT is the BLAKE3 hash of the work performed; WHERE is a
+    /// location (capacity is descriptive only, never a gate); WHEN is a time.
+    pub(crate) fn canonical_test_proof() -> StateProof {
+        let mut space = SpaceProof::new(
+            "test-node-001".to_string(),
+            "hypermesh://test-node-001/store".to_string(),
+            1024 * 1024 * 1024,
+        );
+        space.file_hash = "a1b2c3d4e5f6".to_string();
+
+        StateProof::new(
+            StakeProof::new("test-owner".to_string(), "unbound".to_string()),
+            TimeProof::new(Duration::from_secs(1)),
+            space,
+            WorkProof::from_work(
+                "test-owner".to_string(),
+                "test-workload".to_string(),
+                b"the work that was actually done",
+            ),
+        )
+    }
+
+    /// Build a token whose PoStake identity is bound to a fresh FALCON-1024 key
+    /// and whose signature genuinely verifies. Verification is mandatory, so
+    /// tests that expect admission must present a real signature.
+    pub(crate) fn signed_test_token(
+        id: Vec<u8>,
+        matrix_position: (u32, u32, u32),
+        sequence: u64,
+        prev_hash: Vec<u8>,
+    ) -> PosToken {
+        use pqcrypto_falcon::falcon1024;
+        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
+        use sha2::{Digest, Sha256};
+
+        let (pk, sk) = falcon1024::keypair();
+        let mut token = PosToken::for_identity(
+            id,
+            pk.as_bytes().to_vec(),
+            canonical_test_proof(),
+            matrix_position,
+            sequence,
+            prev_hash,
+            Duration::from_secs(3600),
+        );
+
+        let validator = PosTokenValidator::new(Duration::from_secs(300));
+        let data = validator.serialize_token_for_signing(&token);
+        // The verifier signs over SHA-256(data) — match that convention.
+        let digest: [u8; 32] = Sha256::digest(&data).into();
+        let sk = falcon1024::SecretKey::from_bytes(sk.as_bytes())
+            .expect("test: reconstruct secret key");
+        token.signature = falcon1024::detached_sign(&digest, &sk).as_bytes().to_vec();
+        token
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hypermesh_lib::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
+
+    use super::test_support::{canonical_test_proof, signed_test_token};
 
     /// Create an unsigned test token with valid structural fields but a bogus signature.
     fn create_unsigned_test_token() -> PosToken {
-        PosToken {
-            id: vec![1, 2, 3, 4],
-            issuer_pubkey: Some(vec![20, 21, 22, 23]),
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (1, 2, 3),
-                capacity: 1024 * 1024, // 1MB
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: vec![9, 10, 11, 12],
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: vec![21, 22, 23, 24],
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-        }
+        let mut token = PosToken::for_identity(
+            vec![1, 2, 3, 4],
+            vec![20, 21, 22, 23],
+            canonical_test_proof(),
+            (1, 2, 3),
+            1,
+            vec![17, 18, 19, 20],
+            Duration::from_secs(300),
+        );
+        token.signature = vec![21, 22, 23, 24];
+        token
     }
 
     /// Create a properly FALCON-1024-signed test token.
     fn create_signed_test_token() -> PosToken {
+        signed_test_token(vec![1, 2, 3, 4], (1, 2, 3), 1, vec![17, 18, 19, 20])
+    }
+
+    #[test]
+    fn test_postake_is_authorization_not_amount() {
+        // CANONICAL MODEL: PoStake carries NO magnitude. The whole of WHO is
+        // the identity binding between the proof and the signing FALCON key.
+        let token = create_signed_test_token();
+        assert!(token.identity_is_bound());
+        assert_eq!(
+            token.proof.stake_proof.stake_holder_id,
+            token.issuer_identity()
+        );
+    }
+
+    #[test]
+    fn test_zero_capacity_token_is_admitted() {
+        // Capacity is a descriptive attribute, never an admission gate.
         use pqcrypto_falcon::falcon1024;
-        use pqcrypto_traits::sign::{PublicKey, SecretKey};
+        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
         use sha2::{Digest, Sha256};
 
-        let (pk, sk) = falcon1024::keypair();
-        let pubkey_bytes = pk.as_bytes().to_vec();
-
-        let mut token = PosToken {
-            id: vec![1, 2, 3, 4],
-            issuer_pubkey: Some(pubkey_bytes.clone()),
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (1, 2, 3),
-                capacity: 1024 * 1024,
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: pubkey_bytes,
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: Vec::new(), // placeholder, signed below
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-        };
-
-        // Build the canonical token data and sign it
         let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token_data = validator.serialize_token_for_signing(&token);
 
-        let mut hasher = Sha256::new();
-        hasher.update(&token_data);
-        let message_hash: [u8; 32] = hasher.finalize().into();
+        let (pk, sk) = falcon1024::keypair();
+        let mut proof = canonical_test_proof();
+        proof.space_proof.total_storage = 0;
+        proof.space_proof.total_size = 0;
 
-        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
+        let mut token = PosToken::for_identity(
+            vec![9, 9, 9, 9],
+            pk.as_bytes().to_vec(),
+            proof,
+            (1, 2, 3),
+            1,
+            vec![17, 18, 19, 20],
+            Duration::from_secs(3600),
+        );
+        let data = validator.serialize_token_for_signing(&token);
+        let digest: [u8; 32] = Sha256::digest(&data).into();
+        let sk = falcon1024::SecretKey::from_bytes(sk.as_bytes())
             .expect("test: reconstruct secret key");
-        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
-        token.signature = pqcrypto_traits::sign::DetachedSignature::as_bytes(&sig).to_vec();
+        token.signature = falcon1024::detached_sign(&digest, &sk).as_bytes().to_vec();
 
-        token
+        let result = validator.validate_token(&token).expect("test: validation");
+        assert!(
+            result.is_valid,
+            "zero capacity must not gate admission; errors: {:?}",
+            result.errors
+        );
     }
 
     #[test]

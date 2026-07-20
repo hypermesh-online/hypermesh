@@ -115,6 +115,96 @@ impl AdapterRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assets::core::StateProof;
+
+    /// Build a proof that stores ZERO bytes and advertises ZERO capacity, but
+    /// answers every canonical question: WHO (bound stake_holder_id), WHERE
+    /// (bound node_id + storage_path), WHAT (real work_hash), WHEN (fresh).
+    ///
+    /// This is the shape of a freshly-provisioned node. The identity is
+    /// deliberately NOT the `test_stake_holder`/`test_node_001` pair that the
+    /// CPU and Memory adapters short-circuit as a test proof, so this exercises
+    /// the real validation path rather than the bypass.
+    fn zero_capacity_bound_proof() -> StateProof {
+        let mut proof = StateProof::new_for_testing();
+        proof.space_proof.total_size = 0;
+        proof.space_proof.total_storage = 0;
+        proof.space_proof.node_id = "fresh_node_zero_bytes".to_string();
+        proof.space_proof.storage_path = "/hypermesh/fresh".to_string();
+        proof.stake_proof.stake_holder_id = "authorized_holder".to_string();
+        proof
+    }
+
+    /// INVERSE GUARD (adapter path).
+    ///
+    /// CANONICAL MODEL: PoSpace is WHERE (location), never how-much. Capacity
+    /// is a DESCRIPTIVE attribute and must NEVER gate admission. Gating on
+    /// `total_size == 0` denies admission to every freshly-provisioned node.
+    ///
+    /// The lib-layer guard (`test_zero_capacity_space_proof_is_admitted`) only
+    /// exercises `verify_all()` and therefore never reaches adapter code — which
+    /// is exactly how seven `total_size == 0` gates survived in the adapters.
+    /// This test runs through the real `AssetAdapter::validate_state_proof`
+    /// implementations and FAILS if any capacity gate is reintroduced there.
+    #[tokio::test]
+    async fn test_zero_capacity_proof_is_admitted_through_adapter_path() {
+        let proof = zero_capacity_bound_proof();
+
+        let storage = StorageAssetAdapter::new().await;
+        assert!(
+            storage
+                .validate_state_proof(&proof)
+                .await
+                .expect("test: storage adapter validation should not error"),
+            "storage adapter must ADMIT a zero-capacity, location-bound proof — \
+             capacity is descriptive and must never gate admission"
+        );
+
+        let network = NetworkAssetAdapter::new().await;
+        assert!(
+            network
+                .validate_state_proof(&proof)
+                .await
+                .expect("test: network adapter validation should not error"),
+            "network adapter must ADMIT a zero-capacity, location-bound proof — \
+             capacity is descriptive and must never gate admission"
+        );
+
+        let container = ContainerAssetAdapter::new().await;
+        assert!(
+            container
+                .validate_state_proof(&proof)
+                .await
+                .expect("test: container adapter validation should not error"),
+            "container adapter must ADMIT a zero-capacity, location-bound proof — \
+             capacity is descriptive and must never gate admission"
+        );
+    }
+
+    /// The positive half of the invariant: PoSpace must still be REJECTED when
+    /// it is unbound (answers no WHERE). Location binding is the correct gate;
+    /// magnitude never is.
+    #[tokio::test]
+    async fn test_unbound_location_proof_is_rejected_through_adapter_path() {
+        let mut proof = zero_capacity_bound_proof();
+        proof.space_proof.node_id = String::new();
+        proof.space_proof.storage_path = String::new();
+
+        let storage = StorageAssetAdapter::new().await;
+
+        // Rejection may surface on either channel: `lib`'s structural
+        // `validate()` rejects an unbound proof first (returning `Err`), and
+        // the adapter's own WHERE-binding check returns `Ok(false)`. Both are
+        // rejections — what must never happen is admission.
+        let admitted = storage
+            .validate_state_proof(&proof)
+            .await
+            .unwrap_or(false);
+        assert!(
+            !admitted,
+            "storage adapter must REJECT a proof that binds no location"
+        );
+    }
 
     #[tokio::test]
     async fn test_adapter_registry_creation() {

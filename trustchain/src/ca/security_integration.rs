@@ -19,6 +19,7 @@ use crate::security::monitoring::{
     StateProofValidationStatus, LiveCertificateOperation, OperationState,
 };
 use crate::security::{SecurityMonitor, SecurityValidationResult};
+use crate::proof_of_state::StateProofOps;
 
 /// Security-integrated Certificate Authority wrapper
 pub struct SecurityIntegratedCA {

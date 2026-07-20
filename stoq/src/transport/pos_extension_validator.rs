@@ -67,18 +67,19 @@ impl ExtensionValidator for StoqPosExtensionValidator {
             }
         };
 
-        // Verify ALL four proofs are present (not zero-length / empty)
-        if token.proof_of_space.commitment_hash.is_empty() {
-            anyhow::bail!("PoS token missing PoSpace commitment");
+        // Verify ALL four canonical proofs are present. Presence checks only —
+        // no magnitude: no capacity floor, no difficulty target, no stake amount.
+        if token.proof.space_proof.node_id.is_empty() {
+            anyhow::bail!("PoS token missing PoSpace location (WHERE)");
         }
-        if token.proof_of_stake.owner_pubkey.is_empty() {
-            anyhow::bail!("PoS token missing PoStake owner public key");
+        if token.proof.stake_proof.stake_holder_id.is_empty() || token.issuer_pubkey.is_empty() {
+            anyhow::bail!("PoS token missing PoStake authorization identity (WHO)");
         }
-        if token.proof_of_work.work_hash.is_empty() {
-            anyhow::bail!("PoS token missing PoWork hash");
+        if token.proof.work_proof.work_hash == [0u8; 32] {
+            anyhow::bail!("PoS token missing PoWork hash (WHAT)");
         }
-        if token.proof_of_time.prev_hash.is_empty() {
-            anyhow::bail!("PoS token missing PoTime prev_hash");
+        if token.sequence > 0 && token.prev_hash.is_empty() {
+            anyhow::bail!("PoS token missing chain continuity (WHEN)");
         }
         if token.signature.is_empty() {
             anyhow::bail!("PoS token missing signature — binary pass/fail");
@@ -116,38 +117,13 @@ impl ExtensionValidator for StoqPosExtensionValidator {
 mod tests {
     use super::*;
     use crate::protocol::pos_fast_validator::FastValidationConfig;
-    use crate::protocol::pos_validator::{
-        PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
-    };
+    use crate::protocol::pos_validator::PosTokenValidator;
     use std::time::{Duration, SystemTime};
 
+    use crate::protocol::pos_validator::test_support::signed_test_token;
+
     fn make_test_token() -> PosToken {
-        PosToken {
-            id: vec![1, 2, 3, 4],
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (1, 2, 3),
-                capacity: 1024 * 1024,
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: vec![9, 10, 11, 12],
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: vec![21, 22, 23, 24],
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-            issuer_pubkey: Some(vec![25, 26, 27, 28]),
-        }
+        signed_test_token(vec![1, 2, 3, 4], (1, 2, 3), 1, vec![17, 18, 19, 20])
     }
 
     fn make_ext_validator() -> StoqPosExtensionValidator {
@@ -201,10 +177,15 @@ mod tests {
     async fn test_extension_validator_rejected_token() {
         let v = make_ext_validator();
         let mut token = make_test_token();
-        token.proof_of_work.difficulty = 1; // Below minimum
+        // Strip the authorized identity binding (PoStake = WHO). Rejection is
+        // on missing authorization, never on a magnitude/difficulty threshold.
+        token.proof.stake_proof.stake_holder_id.clear();
         let data = bincode::serialize(&token).expect("test: serialize token");
 
         let result = v.validate(STOQ_POS_EXTENSION_TYPE, &data).await;
-        assert!(result.is_err(), "Low-difficulty token should be rejected");
+        assert!(
+            result.is_err(),
+            "Token missing its authorized identity should be rejected"
+        );
     }
 }

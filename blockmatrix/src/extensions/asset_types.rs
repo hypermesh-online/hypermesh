@@ -215,15 +215,17 @@ pub struct SharingResult {
 }
 
 /// State proof requirements for assets (bilateral Proof of State)
+///
+/// CANONICAL MODEL: PoStake is authorization (WHO), PoWork is the HASH of work
+/// done (WHAT), PoSpace is location (WHERE) — none is a magnitude. There is
+/// therefore NO `min_stake_amount`, NO `min_work_difficulty` and NO
+/// `min_space_commitment`. These flags ask only that a proof be PRESENT.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateRequirements {
     pub require_proof_of_space: bool,
     pub require_proof_of_stake: bool,
     pub require_proof_of_work: bool,
     pub require_proof_of_time: bool,
-    pub min_space_commitment: Option<u64>,
-    pub min_stake_amount: Option<u64>,
-    pub min_work_difficulty: Option<u32>,
     pub time_window: Option<Duration>,
 }
 
@@ -234,9 +236,6 @@ impl Default for StateRequirements {
             require_proof_of_stake: true,
             require_proof_of_work: true,
             require_proof_of_time: true,
-            min_space_commitment: Some(1024 * 1024),
-            min_stake_amount: Some(100),
-            min_work_difficulty: Some(4),
             time_window: Some(Duration::from_secs(300)),
         }
     }

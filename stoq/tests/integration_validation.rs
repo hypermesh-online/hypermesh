@@ -8,9 +8,8 @@ use anyhow::Result;
 use std::net::Ipv6Addr;
 use std::time::{Duration, SystemTime};
 use stoq::api::service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata};
-use stoq::protocol::pos_validator::{
-    PosToken, PosTokenValidator, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
-};
+use stoq::protocol::pos_validator::{PosToken, PosTokenValidator};
+use hypermesh_lib::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
 use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 
 #[tokio::test]
@@ -40,32 +39,15 @@ async fn test_full_integration() -> Result<()> {
     let validator = PosTokenValidator::new(Duration::from_secs(300));
 
     // Create test token with all four proofs
-    let token = PosToken {
-        id: vec![1, 2, 3, 4],
-        issuer_pubkey: Some(vec![5, 6, 7, 8]),
-        signature: vec![9, 10, 11, 12],
-        expires_at: SystemTime::now() + Duration::from_secs(3600),
-        proof_of_space: ProofOfSpace {
-            commitment_hash: vec![1, 0, 0, 0],
-            matrix_position: (10, 20, 5),
-            capacity: 1024 * 1024 * 100, // 100MB
-        },
-        proof_of_stake: ProofOfStake {
-            owner_pubkey: vec![3, 0, 0, 0],
-            stake_amount: 1000,
-            staked_until: SystemTime::now() + Duration::from_secs(86400),
-        },
-        proof_of_work: ProofOfWork {
-            difficulty: 1000000,
-            nonce: 42,
-            work_hash: vec![5, 0, 0, 0],
-        },
-        proof_of_time: ProofOfTime {
-            timestamp: SystemTime::now(),
-            sequence: 1000,
-            prev_hash: vec![7, 0, 0, 0],
-        },
-    };
+    let token = PosToken::for_identity(
+        vec![1, 2, 3, 4],
+        vec![5, 6, 7, 8],
+        canonical_test_proof(),
+        (10, 20, 5),
+        1000,
+        vec![7, 0, 0, 0],
+        Duration::from_secs(3600),
+    );
 
     // Validate token
     let result = validator.validate_token(&token)?;
@@ -111,32 +93,15 @@ fn test_pos_validation_overhead() {
     // Performance test: Ensure PoS validation adds minimal overhead
     let validator = PosTokenValidator::new(Duration::from_secs(300));
 
-    let token = PosToken {
-        id: vec![1, 2, 3, 4],
-        issuer_pubkey: Some(vec![5, 6, 7, 8]),
-        signature: vec![9, 10, 11, 12],
-        expires_at: SystemTime::now() + Duration::from_secs(3600),
-        proof_of_space: ProofOfSpace {
-            commitment_hash: vec![1, 0, 0, 0],
-            matrix_position: (10, 20, 5),
-            capacity: 1024 * 1024 * 100,
-        },
-        proof_of_stake: ProofOfStake {
-            owner_pubkey: vec![3, 0, 0, 0],
-            stake_amount: 1000,
-            staked_until: SystemTime::now() + Duration::from_secs(86400),
-        },
-        proof_of_work: ProofOfWork {
-            difficulty: 1000000,
-            nonce: 42,
-            work_hash: vec![5, 0, 0, 0],
-        },
-        proof_of_time: ProofOfTime {
-            timestamp: SystemTime::now(),
-            sequence: 1000,
-            prev_hash: vec![7, 0, 0, 0],
-        },
-    };
+    let token = PosToken::for_identity(
+        vec![1, 2, 3, 4],
+        vec![5, 6, 7, 8],
+        canonical_test_proof(),
+        (10, 20, 5),
+        1000,
+        vec![7, 0, 0, 0],
+        Duration::from_secs(3600),
+    );
 
     let start = std::time::Instant::now();
     for _ in 0..100 {
@@ -149,4 +114,29 @@ fn test_pos_validation_overhead() {
 
     // Should be under 10ms per validation (relaxed for real crypto)
     assert!(per_validation < Duration::from_millis(10));
+}
+
+/// Build a canonical four-proof set for tests.
+///
+/// CANONICAL MODEL: authorization (WHO) is an identity binding with NO amount;
+/// WHAT is the BLAKE3 hash of the work performed; WHERE is a location (capacity
+/// is descriptive only, never a gate); WHEN is a time.
+fn canonical_test_proof() -> StateProof {
+    let mut space = SpaceProof::new(
+        "test-node-001".to_string(),
+        "hypermesh://test-node-001/store".to_string(),
+        1024 * 1024 * 1024,
+    );
+    space.file_hash = "a1b2c3d4e5f6".to_string();
+
+    StateProof::new(
+        StakeProof::new("test-owner".to_string(), "unbound".to_string()),
+        TimeProof::new(Duration::from_secs(1)),
+        space,
+        WorkProof::from_work(
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            b"the work that was actually done",
+        ),
+    )
 }

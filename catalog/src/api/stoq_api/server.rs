@@ -284,7 +284,7 @@ mod tests {
         use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
         use crate::registry::asset_type::AssetTypeDefinition;
         use blockmatrix::proof_of_state::proof_of_state_integration::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use blockmatrix::assets::StateProof;
         use hypermesh_lib::PrivacyMode;
@@ -297,12 +297,9 @@ mod tests {
 
         // Register a type
         let schema = serde_json::json!({ "type": "object" });
-        let stake = StakeProof::new("h".into(), "i".into(), 1000);
+        let stake = StakeProof::new("h".into(), "i".into());
         let space = SpaceProof::new("n".into(), "/t".into(), 1024);
-        let work = WorkProof::new(
-            "o".into(), "w".into(), 12345, 100,
-            WorkloadType::Compute, WorkState::Completed,
-        );
+        let work = WorkProof::from_work("o".into(), "w".into(), b"work");
         let time = TimeProof::new(std::time::Duration::from_secs(10));
         let proof = StateProof::new(stake, time, space, work);
         let type_def = AssetTypeDefinition::new("GpuCompute".to_string(), schema, proof);
@@ -345,7 +342,7 @@ mod tests {
         use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
         use crate::registry::asset_type::AssetTypeDefinition;
         use blockmatrix::proof_of_state::proof_of_state_integration::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use blockmatrix::assets::StateProof;
         use hypermesh_lib::PrivacyMode;
@@ -357,12 +354,9 @@ mod tests {
         );
 
         let schema = serde_json::json!({ "type": "object" });
-        let stake = StakeProof::new("h".into(), "i".into(), 1000);
+        let stake = StakeProof::new("h".into(), "i".into());
         let space = SpaceProof::new("n".into(), "/t".into(), 1024);
-        let work = WorkProof::new(
-            "o".into(), "w".into(), 12345, 100,
-            WorkloadType::Compute, WorkState::Completed,
-        );
+        let work = WorkProof::from_work("o".into(), "w".into(), b"work");
         let time = TimeProof::new(std::time::Duration::from_secs(10));
         let proof = StateProof::new(stake, time, space, work);
         let type_def = AssetTypeDefinition::new("MyPackage".to_string(), schema, proof);
@@ -608,7 +602,6 @@ mod tests {
             PrivacyMode::PUBLIC,
             TrustPolicy {
                 require_state_proof: false,
-                minimum_stake: 0,
                 allowed_publishers: Vec::new(),
                 require_certificate: false,
             },

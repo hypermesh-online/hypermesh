@@ -499,56 +499,14 @@ pub struct IntegrationStats {
 
 #[cfg(test)]
 mod tests {
-    use super::super::pos_validator::{ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork};
     use super::*;
 
+    use crate::protocol::pos_validator::test_support::signed_test_token;
+
+    /// Public-tier admission requires a genuinely verifiable signature —
+    /// verification is mandatory and there is no degraded fallback.
     fn create_test_pos_token() -> PosToken {
-        use pqcrypto_falcon::falcon1024;
-        use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
-        use sha2::{Digest, Sha256};
-
-        let (pk, sk) = falcon1024::keypair();
-        let pubkey_bytes = pk.as_bytes().to_vec();
-
-        let mut token = PosToken {
-            id: vec![1, 2, 3, 4],
-            proof_of_space: ProofOfSpace {
-                commitment_hash: vec![5, 6, 7, 8],
-                matrix_position: (10, 20, 30),
-                capacity: 1024 * 1024,
-            },
-            proof_of_stake: ProofOfStake {
-                owner_pubkey: pubkey_bytes.clone(),
-                stake_amount: 1000,
-                staked_until: SystemTime::now() + Duration::from_secs(3600),
-            },
-            proof_of_work: ProofOfWork {
-                difficulty: 10,
-                nonce: 12345,
-                work_hash: vec![0, 0, 0x0F, 0xFF],
-            },
-            proof_of_time: ProofOfTime {
-                timestamp: SystemTime::now(),
-                sequence: 1,
-                prev_hash: vec![17, 18, 19, 20],
-            },
-            signature: Vec::new(),
-            expires_at: SystemTime::now() + Duration::from_secs(300),
-            issuer_pubkey: Some(pubkey_bytes),
-        };
-
-        // Sign the canonical token data
-        let validator = PosTokenValidator::new(Duration::from_secs(300));
-        let token_data = validator.serialize_token_for_signing(&token);
-        let mut hasher = Sha256::new();
-        hasher.update(&token_data);
-        let message_hash: [u8; 32] = hasher.finalize().into();
-        let sk_obj = falcon1024::SecretKey::from_bytes(sk.as_bytes())
-            .expect("test: reconstruct secret key");
-        let sig = falcon1024::detached_sign(&message_hash, &sk_obj);
-        token.signature = sig.as_bytes().to_vec();
-
-        token
+        signed_test_token(vec![1, 2, 3, 4], (10, 20, 30), 1, vec![17, 18, 19, 20])
     }
 
     #[tokio::test]

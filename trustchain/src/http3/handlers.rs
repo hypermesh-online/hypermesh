@@ -21,6 +21,7 @@ use crate::ca::{CertificateRequest, CertificateStatus, IssuedCertificate, TrustC
 use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::security::SecurityMonitor;
+use crate::proof_of_state::StateProofOps;
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -865,8 +866,8 @@ mod tests {
         let json = serde_json::to_vec(&req).expect("test: serialize state proof validate request");
         let decoded: StateProofValidateRequest =
             serde_json::from_slice(&json).expect("test: deserialize state proof validate request");
-        // Default StakeProof uses stake_amount = 1000
-        assert_eq!(decoded.proof.stake_proof.stake_amount, 1000);
+        // Default StakeProof binds a default identity (authorization, no amount).
+        assert_eq!(decoded.proof.stake_proof.stake_holder_id, "test-001");
     }
 
     #[test]

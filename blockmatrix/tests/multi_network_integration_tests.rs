@@ -171,15 +171,12 @@ fn create_test_node() -> PeerIdentity {
 
 fn create_test_proof() -> StateProof {
     use std::time::{Duration, SystemTime};
-    use trustchain::proof_of_state::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
-    };
+    use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
 
     StateProof {
         stake_proof: StakeProof {
             stake_holder: "test-node".to_string(),
             stake_holder_id: "test-node-1".to_string(),
-            stake_amount: 1000,
             stake_timestamp: SystemTime::now(),
         },
         time_proof: TimeProof {
@@ -199,11 +196,7 @@ fn create_test_proof() -> StateProof {
         work_proof: WorkProof {
             owner_id: "test-owner".to_string(),
             workload_id: "work-123".to_string(),
-            pid: 1234,
-            computational_power: 100,
-            workload_type: WorkloadType::Compute,
-            work_state: WorkState::Completed,
-            work_challenges: vec!["challenge1".to_string()],
+            work_hash: [7u8; 32],
             proof_timestamp: SystemTime::now(),
         },
     }

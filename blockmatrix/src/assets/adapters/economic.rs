@@ -32,8 +32,6 @@ use tokio::sync::RwLock;
 pub struct EconomicRequirements {
     /// Minimum token balance required
     pub min_balance: Decimal,
-    /// Required stake amount for validation
-    pub stake_requirement: Decimal,
     /// Cross-chain bridge network support
     pub bridge_networks: Vec<String>,
     /// Economic privacy level
@@ -102,19 +100,18 @@ pub struct EconomicLimits {
     pub max_transaction: Decimal,
     /// Daily transaction volume limit
     pub daily_limit: Decimal,
-    /// Maximum stake amount
-    pub max_stake: Decimal,
     /// Cross-chain operation limits
     pub cross_chain_limit: u64,
 }
 
 /// State proof requirements for economic operations
+///
+/// CANONICAL MODEL: there is NO stake-amount minimum — PoStake is authorization
+/// (WHO), never a magnitude.
 #[derive(Clone, Debug)]
 struct StateRequirements {
     /// Require full four-proof validation
     pub require_full_state_proof: bool,
-    /// Minimum stake for validation participation
-    pub min_validation_stake: Decimal,
     /// Economic proof validation timeout
     pub validation_timeout: std::time::Duration,
 }
@@ -146,7 +143,6 @@ impl EconomicAssetAdapter {
             },
             state_requirements: StateRequirements {
                 require_full_state_proof: true,
-                min_validation_stake: Decimal::new(1000, 0), // 1000 tokens minimum
                 validation_timeout: std::time::Duration::from_secs(30),
             },
         }
@@ -159,28 +155,29 @@ impl EconomicAssetAdapter {
     ) -> AssetResult<()> {
         // Validate that economic operations meet state proof requirements
         if self.state_requirements.require_full_state_proof {
-            // Check stake proof for economic validation rights
-            let stake_amount = Decimal::from(proof.stake_proof.stake_amount);
-            if stake_amount < self.state_requirements.min_validation_stake {
+            // PoStake: CANONICAL MODEL — authorization (WHO), require a bound
+            // identity for economic validation rights, never a stake magnitude.
+            if proof.stake_proof.stake_holder_id.is_empty() {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: format!(
-                        "Insufficient economic validation stake: {} < required {}",
-                        stake_amount, self.state_requirements.min_validation_stake
-                    ),
+                    reason: "Economic operation carries no authorizing identity".to_string(),
                 });
             }
 
-            // Validate space proof for economic asset storage
-            if proof.space_proof.total_storage == 0 {
+            // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+            // location; capacity is descriptive and never gates admission.
+            if proof.space_proof.node_id.is_empty()
+                && proof.space_proof.storage_path.is_empty()
+            {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: "Economic assets require storage space commitment".to_string(),
+                    reason: "Economic operation has no bound location (WHERE)".to_string(),
                 });
             }
 
-            // Validate work proof for transaction processing capability
-            if proof.work_proof.computational_power < 50 {
+            // PoWork: CANONICAL MODEL — HASH of work done (WHAT), require work
+            // was hashed, never a capacity magnitude.
+            if proof.work_proof.work_hash == [0u8; 32] {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: "Insufficient computational power for economic operations".to_string(),
+                    reason: "Economic operation carries no work hash".to_string(),
                 });
             }
 
@@ -242,10 +239,8 @@ impl AssetAdapter for EconomicAssetAdapter {
 
         // Create economic asset state
         let usage = EconomicUsage {
-            balance: requirements
-                .min_stake
-                .map(Decimal::from)
-                .unwrap_or(Decimal::ZERO),
+            // Opening balance. Allocation carries no stake magnitude.
+            balance: Decimal::ZERO,
             staked_amount: Decimal::ZERO,
             pending_rewards: Decimal::ZERO,
             tx_volume_24h: Decimal::ZERO,
@@ -255,7 +250,6 @@ impl AssetAdapter for EconomicAssetAdapter {
         let limits = EconomicLimits {
             max_transaction: Decimal::new(100000, 0), // 100k tokens default
             daily_limit: Decimal::new(1000000, 0),    // 1M tokens daily
-            max_stake: Decimal::new(10000000, 0),     // 10M tokens max stake
             cross_chain_limit: 1000,                  // 1000 cross-chain ops daily
         };
 
@@ -314,7 +308,6 @@ impl AssetAdapter for EconomicAssetAdapter {
                     require_stake_proof: true,
                     require_work_proof: true,
                     require_time_proof: true,
-                    minimum_stake: 0,
                     max_time_offset: std::time::Duration::from_secs(60),
                 },
             },
@@ -491,17 +484,16 @@ impl AssetAdapter for EconomicAssetAdapter {
         &self,
         proof: &crate::proof_of_state::proof::StateProof,
     ) -> AssetResult<bool> {
-        // Delegate to existing state proof validation with economic thresholds
-        // Check if proof meets economic asset requirements
-
-        // Validate stake amount meets minimum threshold for economic operations
-        if proof.stake_proof.stake_amount < 1000 {
+        // CANONICAL MODEL: PoStake is authorization (WHO). Require a bound
+        // identity, never a stake magnitude.
+        if proof.stake_proof.stake_holder_id.is_empty() {
             return Ok(false);
         }
 
-        // Validate work proof exists (detailed validation would check internal fields)
-        // Since WorkProof structure may vary, just check it exists for now
-        // TODO: Add proper work proof validation based on actual WorkProof structure
+        // PoWork is the HASH of work done (WHAT). Require work was hashed.
+        if proof.work_proof.work_hash == [0u8; 32] {
+            return Ok(false);
+        }
 
         // All economic requirements met
         Ok(true)

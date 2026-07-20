@@ -10,7 +10,7 @@
 //! CRITICAL: Networks are IMMUTABLE once created. Network types CANNOT transition.
 //! Only independent connect/disconnect operations are allowed.
 
-use super::trust::ProofOfState;
+use super::trust::StateProof;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for joining a network
@@ -26,7 +26,7 @@ pub struct NetworkConfig {
     pub dns_name: Option<String>,
 
     /// Proof of State for public network
-    pub proof_of_state: Option<ProofOfState>,
+    pub proof_of_state: Option<StateProof>,
 
     /// Custom STOQ port
     pub stoq_port: Option<u16>,
@@ -73,7 +73,7 @@ impl NetworkConfig {
     }
 
     /// Create configuration for public network
-    pub fn public(dns_name: String, proof: ProofOfState) -> Self {
+    pub fn public(dns_name: String, proof: StateProof) -> Self {
         Self {
             peer_addresses: vec![],
             federation_gateway: None,
@@ -265,12 +265,7 @@ mod tests {
             peer_addresses: vec![],
             federation_gateway: None,
             dns_name: None,
-            proof_of_state: Some(ProofOfState {
-                proof_of_space: vec![1],
-                proof_of_stake: vec![2],
-                proof_of_work: vec![3],
-                proof_of_time: vec![4],
-            }),
+            proof_of_state: Some(StateProof::default()),
             stoq_port: None,
             metadata: std::collections::HashMap::new(),
         };

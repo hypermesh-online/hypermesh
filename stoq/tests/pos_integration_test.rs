@@ -11,41 +11,49 @@ use anyhow::Result;
 use hypermesh_lib::PrivacyMode;
 use std::time::{Duration, SystemTime};
 use stoq::protocol::{
-    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake, ProofOfTime,
-    ProofOfWork, StoqPosIntegration,
+    MatrixPosition, MatrixPositionExt, PosToken, SpaceProof, StakeProof, StateProof,
+    StoqPosIntegration, TimeProof, WorkProof,
 };
 use stoq::transport::certificate_strategy::NetworkType;
 
 /// Create test PoS token
 fn create_test_pos_token() -> PosToken {
-    PosToken {
-        id: vec![1, 2, 3, 4],
-        proof_of_space: ProofOfSpace {
-            commitment_hash: vec![5, 6, 7, 8],
-            matrix_position: (10, 20, 30),
-            capacity: 1024 * 1024,
-        },
-        proof_of_stake: ProofOfStake {
-            owner_pubkey: vec![9, 10, 11, 12],
-            stake_amount: 1000,
-            staked_until: SystemTime::now() + Duration::from_secs(3600),
-        },
-        proof_of_work: ProofOfWork {
-            // 2 zero bytes = 16 leading zero bits, meeting difficulty 10
-            difficulty: 10,
-            nonce: 12345,
-            work_hash: vec![0, 0, 0x0F, 0xFF],
-        },
-        proof_of_time: ProofOfTime {
-            timestamp: SystemTime::now(),
-            sequence: 1,
-            prev_hash: vec![17, 18, 19, 20],
-        },
-        signature: vec![21, 22, 23, 24],
-        expires_at: SystemTime::now() + Duration::from_secs(300),
-        issuer_pubkey: Some(vec![25, 26, 27, 28]),
-    }
+    PosToken::for_identity(
+        vec![1, 2, 3, 4],
+        vec![25, 26, 27, 28],
+        canonical_test_proof(),
+        (10, 20, 30),
+        1,
+        vec![17, 18, 19, 20],
+        Duration::from_secs(3600),
+    )
 }
+
+/// Build a canonical four-proof set for tests.
+///
+/// CANONICAL MODEL: authorization (WHO) is an identity binding with NO amount;
+/// WHAT is the BLAKE3 hash of the work performed; WHERE is a location (capacity
+/// is descriptive only, never a gate); WHEN is a time.
+fn canonical_test_proof() -> StateProof {
+    let mut space = SpaceProof::new(
+        "test-node-001".to_string(),
+        "hypermesh://test-node-001/store".to_string(),
+        1024 * 1024 * 1024,
+    );
+    space.file_hash = "a1b2c3d4e5f6".to_string();
+
+    StateProof::new(
+        StakeProof::new("test-owner".to_string(), "unbound".to_string()),
+        TimeProof::new(Duration::from_secs(1)),
+        space,
+        WorkProof::from_work(
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            b"the work that was actually done",
+        ),
+    )
+}
+
 
 #[tokio::test]
 async fn test_anonymous_network_validation() -> Result<()> {

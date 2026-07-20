@@ -49,16 +49,20 @@ impl AssetAdapter for GpuAssetAdapter {
             });
         }
 
-        // GPU-specific validation
-        if proof.space_proof.total_size == 0 {
+        // PoSpace is WHERE (location), never how-much. Require the proof be
+        // bound to a location; capacity is descriptive and never gates.
+        if proof.space_proof.node_id.is_empty() || proof.space_proof.storage_path.is_empty() {
             return Ok(false);
         }
 
-        if proof.stake_proof.stake_amount < 200 {
+        // CANONICAL MODEL: PoStake is authorization (WHO) — require a bound
+        // identity, never a stake magnitude.
+        if proof.stake_proof.stake_holder_id.is_empty() {
             return Ok(false);
         }
 
-        if proof.work_proof.computational_power < 20 {
+        // PoWork is the HASH of work done (WHAT) — require work was hashed.
+        if proof.work_proof.work_hash == [0u8; 32] {
             return Ok(false);
         }
 

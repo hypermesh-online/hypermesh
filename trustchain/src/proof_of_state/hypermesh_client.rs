@@ -123,11 +123,17 @@ pub enum CertificateType {
     IntermediateCA,
 }
 
-/// Four-proof validation request for complex operations
+/// Four-proof validation request for complex operations.
+///
+/// The proof set is the canonical [`hypermesh_lib::proof::StateProof`] — the
+/// single source of truth for the four-proof model (WHERE/WHO/WHAT/WHEN). It
+/// carries authorization (StakeProof = FALCON identity binding, no magnitude),
+/// a work hash (WorkProof = BLAKE3 of work done, no difficulty), a location
+/// (SpaceProof = WHERE, capacity is descriptive), and a timestamp (TimeProof).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FourProofValidationRequest {
-    /// Proof set to validate
-    pub proof_set: FourProofSet,
+    /// Canonical four-proof set to validate.
+    pub proof_set: hypermesh_lib::proof::StateProof,
     /// Operation being validated
     pub operation: String,
     /// Asset or resource identifier
@@ -136,47 +142,6 @@ pub struct FourProofValidationRequest {
     pub node_id: String,
     /// Request timestamp
     pub timestamp: SystemTime,
-}
-
-/// Complete four-proof set for validation
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FourProofSet {
-    /// WHERE: Storage location and network position
-    pub space_proof: SpaceProofData,
-    /// WHO: Ownership and access rights
-    pub stake_proof: StakeProofData,
-    /// WHAT/HOW: Computational work and processing
-    pub work_proof: WorkProofData,
-    /// WHEN: Temporal ordering and timing
-    pub time_proof: TimeProofData,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SpaceProofData {
-    pub storage_commitment: u64,
-    pub network_position: String,
-    pub allocation_proof: Vec<u8>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StakeProofData {
-    pub stake_amount: u64,
-    pub authority_level: u64,
-    pub access_permissions: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorkProofData {
-    pub computational_proof: Vec<u8>,
-    pub difficulty_target: u32,
-    pub operation_signature: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TimeProofData {
-    pub block_timestamp: u64,
-    pub sequence_number: u64,
-    pub temporal_proof: Vec<u8>,
 }
 
 /// State proof validation result from HyperMesh
@@ -339,10 +304,10 @@ impl HyperMeshStateProofClient {
         Ok(result)
     }
 
-    /// Validate four-proof set for complex operations
+    /// Validate the canonical four-proof set for complex operations
     pub async fn validate_four_proofs(
         &self,
-        proof_set: &FourProofSet,
+        proof_set: &hypermesh_lib::proof::StateProof,
         operation: &str,
         asset_id: &str,
         node_id: &str,
@@ -508,10 +473,10 @@ pub trait StateProofValidationService {
         requirements: &StateRequirements,
     ) -> Result<StateProofValidationResult>;
 
-    /// Validate four-proof set for complex operations
+    /// Validate the canonical four-proof set for complex operations
     async fn validate_four_proofs(
         &self,
-        proof_set: &FourProofSet,
+        proof_set: &hypermesh_lib::proof::StateProof,
         operation: &str,
         asset_id: &str,
         node_id: &str,
@@ -530,7 +495,7 @@ impl StateProofValidationService for HyperMeshStateProofClient {
 
     async fn validate_four_proofs(
         &self,
-        proof_set: &FourProofSet,
+        proof_set: &hypermesh_lib::proof::StateProof,
         operation: &str,
         asset_id: &str,
         node_id: &str,
@@ -570,31 +535,32 @@ mod tests {
 
     #[test]
     fn test_four_proof_set_creation() {
-        let proof_set = FourProofSet {
-            space_proof: SpaceProofData {
-                storage_commitment: 1024,
-                network_position: "hypermesh://proxy/test".to_string(),
-                allocation_proof: vec![1, 2, 3, 4],
-            },
-            stake_proof: StakeProofData {
-                stake_amount: 5000,
-                authority_level: 100,
-                access_permissions: vec!["read".to_string(), "write".to_string()],
-            },
-            work_proof: WorkProofData {
-                computational_proof: vec![5, 6, 7, 8],
-                difficulty_target: 16,
-                operation_signature: "test-operation".to_string(),
-            },
-            time_proof: TimeProofData {
-                block_timestamp: 1000,
-                sequence_number: 1,
-                temporal_proof: vec![9, 10, 11, 12],
-            },
-        };
+        use hypermesh_lib::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
+        use std::time::Duration;
 
-        assert_eq!(proof_set.space_proof.storage_commitment, 1024);
-        assert_eq!(proof_set.stake_proof.stake_amount, 5000);
+        // Canonical four-proof set: authorization (WHO) + work hash (WHAT) +
+        // location (WHERE) + time (WHEN). No stake magnitude, no difficulty.
+        let proof_set = StateProof::new(
+            StakeProof::new("test-owner".to_string(), "owner-identity-id".to_string()),
+            TimeProof::new(Duration::from_secs(0)),
+            SpaceProof::new(
+                "test-node".to_string(),
+                "hypermesh://proxy/test".to_string(),
+                1024,
+            ),
+            WorkProof::from_work(
+                "test-owner".to_string(),
+                "test-operation".to_string(),
+                b"the registration work",
+            ));
+
+        // PoStake answers WHO via a bound identity — never a magnitude.
+        assert!(proof_set.stake_proof.is_structurally_valid());
+        assert_eq!(proof_set.stake_proof.stake_holder_id, "owner-identity-id");
+        // PoWork answers WHAT via a non-zero content hash — never a difficulty.
+        assert!(proof_set.work_proof.is_structurally_valid());
+        // PoSpace answers WHERE via a bound location — capacity is descriptive.
+        assert!(proof_set.space_proof.is_structurally_valid());
     }
 }
 

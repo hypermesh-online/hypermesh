@@ -31,10 +31,12 @@ pub mod metrics_bridge;
 pub mod metrics_frame;
 
 // Re-exports for backward compatibility
-pub use pos_validator::{
-    PosToken, PosTokenValidator, ProofData, ProofOfSpace, ProofOfStake, ProofOfTime, ProofOfWork,
-    TrustChainClient, ValidationResult,
-};
+pub use pos_validator::{PosToken, PosTokenValidator, TrustChainClient, ValidationResult};
+
+// The four proofs and their composite are canonical in `hypermesh_lib`; STOQ
+// re-exports them so downstream code has one place to import from and there is
+// exactly ONE definition in the workspace.
+pub use hypermesh_lib::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
 
 // Re-export integration types
 pub use pos_integration::{
@@ -48,13 +50,6 @@ use hypermesh_ebpf::{encode_pos_extension, WirePosHeader};
 
 /// STOQ protocol version for QUIC ALPN
 pub const STOQ_ALPN: &[u8] = b"stoq/1.0";
-
-/// Default PoW difficulty (leading zero bits) carried in the HyperMesh
-/// on-wire PoS header. Matches the kernel `KernelPosConfig` default so the
-/// XDP program's `min_difficulty` structural check and the emitted header
-/// agree. The field is carried on the wire but the kernel derives difficulty
-/// from the work hash's leading zeros, not this field.
-pub const KERNEL_POS_DIFFICULTY: u32 = 8;
 
 /// Custom QUIC frame type identifiers (in the private use range)
 /// Range 0xfe000000 - 0xffffffff is reserved for private use
@@ -322,11 +317,15 @@ impl StoqProtocolHandler {
     ///
     /// Produces the exact 44-byte on-wire sequence the kernel XDP program
     /// parses: a 4-byte common header `[magic 0x484D BE][type=0x01][len=40]`
-    /// followed by the 40-byte [`WirePosHeader`] (algorithm@0, difficulty@4,
+    /// followed by the 40-byte [`WirePosHeader`] (algorithm@0, reserved@4 = 0,
     /// hash@8). The `hash` is the packet's BLAKE3 work hash — the PoS token
     /// the node already computes on the send path — and the algorithm is
     /// FALCON-1024 (the HyperMesh default). This byte sequence is
     /// byte-identical to the C `struct hmesh_header` + `struct hmesh_pos_header`.
+    ///
+    /// No difficulty is emitted: PoWork is the HASH of the work done (a
+    /// content-hash match), not a mining contest, so there is no difficulty
+    /// target to advertise or satisfy.
     ///
     /// This is the prefix that must lead the UDP payload so XDP sees
     /// `magic == 0x484D` at wire speed. On the AF_XDP raw-send path it is
@@ -336,7 +335,7 @@ impl StoqProtocolHandler {
     pub fn hypermesh_pos_prefix(&self, data: &[u8]) -> Vec<u8> {
         // The per-packet BLAKE3 token is the node's work hash for this packet.
         let token = self.extensions.tokenize_packet(data);
-        let pos = WirePosHeader::from_pos_hash(token.hash, KERNEL_POS_DIFFICULTY);
+        let pos = WirePosHeader::from_pos_hash(token.hash);
         encode_pos_extension(&pos)
     }
 

@@ -14,20 +14,13 @@
 
 use blockmatrix::assets::StateProof;
 use blockmatrix::proof_of_state::proof_of_state_integration::{
-    SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 
 fn create_test_proof() -> StateProof {
-    let stake = StakeProof::new("test-holder".into(), "test-id".into(), 1000);
+    let stake = StakeProof::new("test-holder".into(), "test-id".into());
     let space = SpaceProof::new("test-node".into(), "/test".into(), 1024);
-    let work = WorkProof::new(
-        "test-owner".into(),
-        "test-workload".into(),
-        12345,
-        100,
-        WorkloadType::Compute,
-        WorkState::Completed,
-    );
+    let work = WorkProof::new("test-owner".into(), "test-workload".into(), [7u8; 32]);
     let time = TimeProof::new(std::time::Duration::from_secs(10));
     StateProof::new(stake, time, space, work)
 }

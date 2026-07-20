@@ -2,39 +2,30 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Individual Proof Implementations
+//! Proof generation + validation logic for the four-proof Proof of State.
 //!
-//! Based on Proof of State reference implementation from /home/persist/repos/personal/Proof of State/src/mods/proof.rs
-//! Adapted for TrustChain certificate operations with IPv6-only networking
+//! The proof DATA TYPES are canonical in `hypermesh_lib::proof` (single source
+//! of truth). This module re-exports them and attaches TrustChain's real
+//! generation (hardware assessment, NTP-style clock witness) and structural
+//! validation via the local [`Proof`] trait.
+//!
+//! CANONICAL MODEL (asset-pos-model-canonical):
+//! - PoStake = WHO / AUTHORIZATION (identity binding), NO stake amount.
+//! - PoWork = WHAT (BLAKE3 hash of the work done), NOT resource capacity.
+//! - Capacity is a descriptive attribute, never a proof and never a gate.
 
 use anyhow::{anyhow, Result};
-use hypermesh_lib::ProofType;
-use rand::Rng;
-use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-/// Helper functions for real proof generation
-/// Query node stake based on real hardware resources
-async fn query_node_stake(node_id: &str) -> Result<u64> {
-    // Validate node ID format
-    if node_id.is_empty() || node_id == "test_node_001" {
-        return Err(anyhow!("Invalid node ID for production use"));
-    }
+// Canonical proof data types live in hypermesh_lib.
+pub use hypermesh_lib::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 
-    // Stake is derived from real hardware: CPU cores * 1000
-    // R1: hardware assessed, not self-reported
-    let cpu_count = num_cpus::get() as u64;
-    Ok(cpu_count * 1000)
-}
+// ---------------------------------------------------------------------------
+// Hardware / clock assessment helpers (R1: assessed, not self-reported)
+// ---------------------------------------------------------------------------
 
 /// Verify the system clock is real and monotonic, returning a genuine
 /// wall-vs-monotonic drift reading (not a hardcoded constant).
-///
-/// PoTime (WHEN) must reflect a real clock. We (1) sanity-check the wall
-/// clock falls in a plausible epoch window, and (2) measure the observed
-/// drift between two monotonic samples taken around a wall-clock read, plus
-/// the sub-second wall remainder as a freshness witness. The result is a
-/// bounded, non-zero, machine-specific duration rather than a constant.
 async fn perform_ntp_sync() -> Result<Duration> {
     let mono_start = std::time::Instant::now();
     let wall = SystemTime::now()
@@ -50,23 +41,19 @@ async fn perform_ntp_sync() -> Result<Duration> {
         ));
     }
 
-    // Real monotonic elapsed around the wall read + sub-second wall remainder.
-    // Bounded well under the 5-minute validation ceiling.
     let mono_elapsed = mono_start.elapsed();
     let offset = mono_elapsed + Duration::from_nanos(wall.subsec_nanos() as u64);
     Ok(offset.min(Duration::from_secs(1)))
 }
 
-/// Query real system storage capacity via `df`
+/// Query real system storage capacity via `df`.
 async fn query_system_storage() -> Result<(u64, u64)> {
-    // Use `df` to get real filesystem stats (portable across Unix)
     match std::process::Command::new("df")
         .args(["--block-size=1", "--output=size,avail", "/"])
         .output()
     {
         Ok(output) if output.status.success() => {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            // Skip header line, parse first data line
             if let Some(line) = stdout.lines().nth(1) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {
@@ -77,7 +64,6 @@ async fn query_system_storage() -> Result<(u64, u64)> {
                     }
                 }
             }
-            // Fallback if parsing failed
             Err(anyhow!("Failed to parse df output"))
         }
         Ok(output) => Err(anyhow!(
@@ -88,642 +74,181 @@ async fn query_system_storage() -> Result<(u64, u64)> {
     }
 }
 
-/// Generate storage commitment hash (BLAKE3)
+/// Generate storage commitment hash (BLAKE3).
 async fn generate_storage_commitment(storage_path: &str) -> Result<String> {
-    // Generate cryptographic commitment to storage
     let mut hasher = blake3::Hasher::new();
     hasher.update(storage_path.as_bytes());
-
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_err(|e| anyhow!("System time error: {e}"))?
         .as_secs();
     hasher.update(&timestamp.to_le_bytes());
-
     Ok(hasher.finalize().to_hex().to_string())
 }
 
-/// Query system computational power
-async fn query_system_compute_power() -> Result<u64> {
-    // Query actual system compute resources
-    let cpu_count = num_cpus::get() as u64;
-
-    // Basic compute power metric (can be enhanced)
-    let compute_power = cpu_count * 1000; // 1000 units per CPU core
-
-    Ok(compute_power)
-}
-
-/// Generate actual work challenges (BLAKE3)
-async fn generate_work_challenges() -> Result<Vec<String>> {
-    let mut challenges = Vec::new();
-
-    // Generate cryptographic challenges
-    for i in 0..3 {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&(i as u32).to_le_bytes());
-
-        let timestamp_nanos = SystemTime::now()
+/// Compute the BLAKE3 hash of the registration work performed for `node_id`.
+///
+/// PoWork is the HASH of the work done — here, the deterministic work of
+/// binding this node to a fresh set of registration challenges. Capacity is
+/// never encoded into this value.
+async fn compute_work_hash(node_id: &str, workload_id: &str) -> Result<[u8; 32]> {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(node_id.as_bytes());
+    hasher.update(workload_id.as_bytes());
+    // Fold in fresh challenge material so the work hash is not a constant.
+    for i in 0u32..3 {
+        let mut ch = blake3::Hasher::new();
+        ch.update(&i.to_le_bytes());
+        let nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_err(|e| anyhow!("System time error: {e}"))?
             .as_nanos();
-        hasher.update(&timestamp_nanos.to_le_bytes());
-        hasher.update(&rand::thread_rng().gen::<u64>().to_le_bytes());
-
-        challenges.push(hasher.finalize().to_hex().to_string());
+        ch.update(&nanos.to_le_bytes());
+        hasher.update(ch.finalize().as_bytes());
     }
-
-    Ok(challenges)
+    Ok(*hasher.finalize().as_bytes())
 }
 
-/// Proof trait for validation
+// ---------------------------------------------------------------------------
+// Proof trait + validation (local trait on canonical types)
+// ---------------------------------------------------------------------------
+
+/// Structural validation trait for individual proofs.
 pub trait Proof {
+    /// Binary pass/fail structural validation.
     fn validate(&self) -> bool;
-}
-
-/// StakeProof - WHO owns/validates (economic security)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StakeProof {
-    /// Entity owning the asset (e.g., CA, CT log, DNS server)
-    pub stake_holder: String,
-    /// ID of the validating node (BLAKE3 hex of FALCON pubkey)
-    pub stake_holder_id: String,
-    /// Economic stake amount
-    pub stake_amount: u64,
-    /// When stake was created
-    pub stake_timestamp: SystemTime,
-}
-
-impl StakeProof {
-    /// Returns the canonical proof type discriminant from hypermesh_lib
-    pub fn proof_type() -> ProofType {
-        ProofType::Stake
-    }
-
-    pub fn new(stake_holder: String, stake_holder_id: String, stake_amount: u64) -> Self {
-        Self {
-            stake_holder,
-            stake_holder_id,
-            stake_amount,
-            stake_timestamp: SystemTime::now(),
-        }
-    }
-
-    /// Generate real stake proof from network state (replaces security bypass)
-    pub async fn generate_from_network(node_id: &str) -> Result<Self> {
-        // Query actual stake from HyperMesh network
-        let stake_amount = query_node_stake(node_id).await?;
-
-        // Validate minimum stake requirements
-        if stake_amount < 1000 {
-            return Err(anyhow!("Insufficient stake: {stake_amount} < 1000"));
-        }
-
-        // Generate cryptographic proof of stake ownership
-        let stake_holder = format!("hypermesh_node_{node_id}");
-
-        Ok(Self {
-            stake_holder,
-            stake_holder_id: node_id.to_string(),
-            stake_amount,
-            stake_timestamp: SystemTime::now(),
-        })
-    }
-
-    #[cfg(test)]
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> Self {
-        Self {
-            stake_holder: "localhost_test".to_string(),
-            stake_holder_id: "test_node_001".to_string(),
-            stake_amount: 1000,
-            stake_timestamp: SystemTime::now(),
-        }
-    }
-
-    /// Check structural validity of the stake proof fields.
-    ///
-    /// This method validates that the proof has a non-empty holder ID and
-    /// positive stake amount. It does NOT perform cryptographic signature
-    /// verification -- that happens at the `WireSignedProof` envelope level
-    /// in `TrustChainProofProvider`, where the entire `StateProof` (including
-    /// this `StakeProof`) is covered by a FALCON-1024 detached signature.
-    pub fn verify_signature(&self) -> bool {
-        !self.stake_holder_id.is_empty() && self.stake_amount > 0
-    }
-
-    pub fn sign(&self) -> String {
-        let mut hasher = blake3::Hasher::new();
-
-        let timestamp = self
-            .stake_timestamp
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        hasher.update(
-            format!(
-                "{}-{}-{}",
-                self.stake_holder_id, self.stake_amount, timestamp
-            )
-            .as_bytes(),
-        );
-        hasher.finalize().to_hex().to_string()
-    }
 }
 
 impl Proof for StakeProof {
     fn validate(&self) -> bool {
-        // Validate stake amount
-        if self.stake_amount == 0 {
+        // WHO / AUTHORIZATION: identity binding present. NO magnitude check.
+        if !self.is_structurally_valid() {
             return false;
         }
-
-        // Validate stake age (not too old)
+        // Reject stale authorizations (older than 30 days).
         if let Ok(elapsed) = self.stake_timestamp.elapsed() {
             if elapsed > Duration::from_secs(60 * 60 * 24 * 30) {
-                // 30 days max
                 return false;
             }
         }
-
-        // Validate signature
-        self.verify_signature()
-    }
-}
-
-impl PartialEq for StakeProof {
-    fn eq(&self, other: &Self) -> bool {
-        self.stake_holder == other.stake_holder
-            && self.stake_holder_id == other.stake_holder_id
-            && self.stake_amount == other.stake_amount
-            && self.stake_timestamp == other.stake_timestamp
-    }
-}
-
-impl Default for StakeProof {
-    fn default() -> Self {
-        Self {
-            stake_holder: "test".to_string(),
-            stake_holder_id: "test-001".to_string(),
-            stake_amount: 1000,
-            stake_timestamp: SystemTime::now(),
-        }
-    }
-}
-
-/// TimeProof - WHEN it occurred (temporal ordering)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TimeProof {
-    /// Network time synchronization offset
-    pub network_time_offset: Duration,
-    /// When proof was created
-    pub time_verification_timestamp: SystemTime,
-    /// Prevent replay attacks
-    pub nonce: u64,
-    /// Cryptographic proof hash
-    pub proof_hash: Vec<u8>,
-}
-
-impl TimeProof {
-    /// Returns the canonical proof type discriminant from hypermesh_lib
-    pub fn proof_type() -> ProofType {
-        ProofType::Time
-    }
-
-    pub fn new(network_time_offset: Duration) -> Self {
-        let time_verification_timestamp = SystemTime::now();
-        let nonce = rand::thread_rng().gen::<u64>();
-
-        // Generate cryptographic proof hash (BLAKE3)
-        let proof_hash = {
-            let mut hasher = blake3::Hasher::new();
-            hasher.update(&network_time_offset.as_micros().to_le_bytes());
-
-            let timestamp_micros = time_verification_timestamp
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .map(|d| d.as_micros())
-                .unwrap_or(0);
-            hasher.update(&timestamp_micros.to_le_bytes());
-            hasher.update(&nonce.to_le_bytes());
-            hasher.finalize().as_bytes().to_vec()
-        };
-
-        Self {
-            network_time_offset,
-            time_verification_timestamp,
-            nonce,
-            proof_hash,
-        }
-    }
-
-    /// Generate time proof with network synchronization (replaces security bypass)
-    pub async fn generate_with_ntp_sync() -> Result<Self> {
-        // Perform actual NTP synchronization
-        let network_time_offset = perform_ntp_sync().await?;
-
-        // Validate time offset is within acceptable bounds
-        if network_time_offset > Duration::from_secs(300) {
-            return Err(anyhow!(
-                "Time offset too large: {network_time_offset:?} > 5 minutes"
-            ));
-        }
-
-        Ok(Self::new(network_time_offset))
-    }
-
-    #[cfg(test)]
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> Self {
-        Self::new(Duration::from_secs(0))
-    }
-
-    /// Serialize for network transmission
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-
-        // Serialize network_time_offset
-        bytes.extend_from_slice(&self.network_time_offset.as_micros().to_le_bytes());
-
-        // Serialize time_verification_timestamp
-        let timestamp_micros = self
-            .time_verification_timestamp
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_micros())
-            .unwrap_or(0);
-        bytes.extend_from_slice(&timestamp_micros.to_le_bytes());
-
-        // Serialize nonce
-        bytes.extend_from_slice(&self.nonce.to_le_bytes());
-
-        // Serialize proof_hash
-        bytes.extend_from_slice(&self.proof_hash);
-
-        bytes
-    }
-
-    /// Deserialize from network transmission
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        if data.len() < 40 {
-            // Minimum size check
-            return Err(anyhow!("Invalid data length for TimeProof"));
-        }
-
-        // Deserialize network_time_offset (bytes 0-15)
-        let network_time_offset_bytes: [u8; 16] = data[0..16]
-            .try_into()
-            .map_err(|_| anyhow!("Invalid network_time_offset slice"))?;
-        let network_time_offset =
-            Duration::from_micros(u128::from_le_bytes(network_time_offset_bytes) as u64);
-
-        // Deserialize timestamp (bytes 16-31)
-        let timestamp_bytes: [u8; 16] = data[16..32]
-            .try_into()
-            .map_err(|_| anyhow!("Invalid timestamp slice"))?;
-        let timestamp_micros = u128::from_le_bytes(timestamp_bytes) as u64;
-        let time_verification_timestamp =
-            SystemTime::UNIX_EPOCH + Duration::from_micros(timestamp_micros);
-
-        // Deserialize nonce (bytes 32-39)
-        let nonce_bytes: [u8; 8] = data[32..40]
-            .try_into()
-            .map_err(|_| anyhow!("Invalid nonce slice"))?;
-        let nonce = u64::from_le_bytes(nonce_bytes);
-
-        // Deserialize proof_hash (remaining bytes)
-        let proof_hash = data[40..].to_vec();
-
-        Ok(Self {
-            network_time_offset,
-            time_verification_timestamp,
-            nonce,
-            proof_hash,
-        })
+        true
     }
 }
 
 impl Proof for TimeProof {
     fn validate(&self) -> bool {
-        // Validate proof hash (BLAKE3)
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&self.network_time_offset.as_micros().to_le_bytes());
-
-        let timestamp_micros = self
-            .time_verification_timestamp
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_micros())
-            .unwrap_or(0);
-        hasher.update(&timestamp_micros.to_le_bytes());
-        hasher.update(&self.nonce.to_le_bytes());
-
-        let expected_hash = hasher.finalize().as_bytes().to_vec();
-        expected_hash == self.proof_hash
-    }
-}
-
-impl PartialEq for TimeProof {
-    fn eq(&self, other: &Self) -> bool {
-        // Compare timestamps at microsecond precision (serialization granularity)
-        let self_micros = self
-            .time_verification_timestamp
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_micros())
-            .unwrap_or(0);
-        let other_micros = other
-            .time_verification_timestamp
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_micros())
-            .unwrap_or(0);
-
-        self.network_time_offset == other.network_time_offset
-            && self_micros == other_micros
-            && self.nonce == other.nonce
-            && self.proof_hash == other.proof_hash
-    }
-}
-
-impl Default for TimeProof {
-    fn default() -> Self {
-        Self::new(Duration::from_secs(0))
-    }
-}
-
-/// SpaceProof - WHERE it's stored (storage commitment)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SpaceProof {
-    /// Node providing storage
-    pub node_id: String,
-    /// Storage location path (IPv6 network path)
-    pub storage_path: String,
-    /// Bytes actually stored
-    pub total_size: u64,
-    /// Total storage capacity
-    pub total_storage: u64,
-    /// Content integrity hash
-    pub file_hash: String,
-    /// When proof was created
-    pub proof_timestamp: SystemTime,
-}
-
-impl SpaceProof {
-    /// Returns the canonical proof type discriminant from hypermesh_lib
-    pub fn proof_type() -> ProofType {
-        ProofType::Space
-    }
-
-    pub fn new(node_id: String, storage_path: String, total_storage: u64) -> Self {
-        Self {
-            node_id,
-            storage_path,
-            total_size: 0,
-            total_storage,
-            file_hash: String::new(),
-            proof_timestamp: SystemTime::now(),
-        }
-    }
-
-    /// Generate space proof from actual system storage (replaces security bypass)
-    pub async fn generate_from_system(node_id: &str) -> Result<Self> {
-        // Query actual system storage
-        let (total_storage, available_storage) = query_system_storage().await?;
-
-        // Validate minimum storage requirements
-        if total_storage < 1024 * 1024 * 1024 {
-            // 1GB minimum
-            return Err(anyhow!("Insufficient storage: {total_storage} < 1GB"));
-        }
-
-        // Generate storage commitment with actual file hash
-        let storage_path = format!("/hypermesh/storage/{node_id}");
-        let file_hash = generate_storage_commitment(&storage_path).await?;
-
-        Ok(Self {
-            node_id: node_id.to_string(),
-            storage_path,
-            total_size: total_storage - available_storage,
-            total_storage,
-            file_hash,
-            proof_timestamp: SystemTime::now(),
-        })
-    }
-
-    #[cfg(test)]
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> Self {
-        Self {
-            node_id: "localhost_node".to_string(),
-            storage_path: "/tmp/trustchain_test".to_string(),
-            total_size: 1024,
-            total_storage: 1024 * 1024,
-            file_hash: "test_hash".to_string(),
-            proof_timestamp: SystemTime::now(),
-        }
+        self.is_structurally_valid()
     }
 }
 
 impl Proof for SpaceProof {
     fn validate(&self) -> bool {
-        // Validate storage capacity
-        if self.total_storage == 0 {
-            return false;
-        }
-
-        // Validate size doesn't exceed capacity
-        if self.total_size > self.total_storage {
-            return false;
-        }
-
-        // Validate node ID is not empty
-        !self.node_id.is_empty()
-    }
-}
-
-impl PartialEq for SpaceProof {
-    fn eq(&self, other: &Self) -> bool {
-        self.node_id == other.node_id
-            && self.storage_path == other.storage_path
-            && self.total_size == other.total_size
-            && self.total_storage == other.total_storage
-            && self.file_hash == other.file_hash
-    }
-}
-
-impl Default for SpaceProof {
-    fn default() -> Self {
-        Self::new(
-            "test-node".to_string(),
-            "/tmp/test".to_string(),
-            1024 * 1024 * 1024, // 1GB
-        )
-    }
-}
-
-/// WorkProof - WHAT computational work (resource proof)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorkProof {
-    /// Entity requesting work
-    pub owner_id: String,
-    /// Unique work identifier
-    pub workload_id: String,
-    /// Process ID for work
-    pub pid: u64,
-    /// CPU/GPU resources used
-    pub computational_power: u64,
-    /// Type of computation
-    pub workload_type: WorkloadType,
-    /// Current work status
-    pub work_state: WorkState,
-    /// Work challenges for validation
-    pub work_challenges: Vec<String>,
-    /// When proof was created
-    pub proof_timestamp: SystemTime,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum WorkloadType {
-    /// Certificate generation/validation
-    Certificate,
-    /// CT log operations
-    CertificateTransparency,
-    /// DNS resolution
-    DnsResolution,
-    /// General computation
-    Compute,
-    /// Network operations
-    Network,
-    /// Storage operations
-    Storage,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum WorkState {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-}
-
-impl WorkProof {
-    /// Returns the canonical proof type discriminant from hypermesh_lib
-    pub fn proof_type() -> ProofType {
-        ProofType::Work
-    }
-
-    pub fn new(
-        owner_id: String,
-        workload_id: String,
-        pid: u64,
-        computational_power: u64,
-        workload_type: WorkloadType,
-        work_state: WorkState,
-    ) -> Self {
-        Self {
-            owner_id,
-            workload_id,
-            pid,
-            computational_power,
-            workload_type,
-            work_state,
-            work_challenges: Vec::new(),
-            proof_timestamp: SystemTime::now(),
-        }
-    }
-
-    /// Generate work proof from actual computation (replaces security bypass)
-    pub async fn generate_from_computation(node_id: &str) -> Result<Self> {
-        // Query actual computational resources
-        let computational_power = query_system_compute_power().await?;
-
-        // Validate minimum compute requirements
-        if computational_power < 100 {
-            return Err(anyhow!(
-                "Insufficient compute power: {computational_power} < 100"
-            ));
-        }
-
-        // Generate real work challenges
-        let work_challenges = generate_work_challenges().await?;
-
-        // Create workload with actual system PID
-        let pid = std::process::id() as u64;
-        let workload_id = uuid::Uuid::new_v4().to_string();
-
-        Ok(Self {
-            owner_id: node_id.to_string(),
-            workload_id,
-            pid,
-            computational_power,
-            workload_type: WorkloadType::Certificate,
-            work_state: WorkState::Running,
-            work_challenges,
-            proof_timestamp: SystemTime::now(),
-        })
-    }
-
-    #[cfg(test)]
-    #[allow(clippy::should_implement_trait)]
-    pub fn default() -> Self {
-        Self {
-            owner_id: "localhost_test".to_string(),
-            workload_id: "test_work_001".to_string(),
-            pid: 1000,
-            computational_power: 100,
-            workload_type: WorkloadType::Certificate,
-            work_state: WorkState::Completed,
-            work_challenges: vec!["test_challenge".to_string()],
-            proof_timestamp: SystemTime::now(),
-        }
-    }
-
-    /// Unwrap the proof (return self)
-    // STUB: Phase 3
-    pub fn unwrap(self) -> Self {
-        self
+        // WHERE: node bound and stored ≤ capacity. Capacity is descriptive,
+        // never gated against a minimum.
+        self.is_structurally_valid()
     }
 }
 
 impl Proof for WorkProof {
     fn validate(&self) -> bool {
-        // Validate computational power
-        if self.computational_power == 0 {
-            return false;
-        }
-
-        // Validate work is not pending indefinitely
-        if matches!(self.work_state, WorkState::Pending) {
-            if let Ok(elapsed) = self.proof_timestamp.elapsed() {
-                if elapsed > Duration::from_secs(60 * 10) {
-                    // 10 minutes max pending
-                    return false;
-                }
-            }
-        }
-
-        // Validate owner ID is not empty
-        !self.owner_id.is_empty()
+        // WHAT: owner bound and a real (non-zero) work hash present.
+        self.is_structurally_valid()
     }
 }
 
-impl PartialEq for WorkProof {
-    fn eq(&self, other: &Self) -> bool {
-        self.owner_id == other.owner_id
-            && self.workload_id == other.workload_id
-            && self.pid == other.pid
-            && self.computational_power == other.computational_power
+// ---------------------------------------------------------------------------
+// Generation extension trait (TrustChain attaches to canonical lib types)
+// ---------------------------------------------------------------------------
+
+/// Real generation of the four proofs from assessed hardware / clock state.
+///
+/// These are free functions rather than inherent methods because the proof
+/// types are owned by `hypermesh_lib`. `StateProof::generate_from_network`
+/// drives them.
+/// Generate an authorization (stake) proof binding this node's identity.
+///
+/// This is WHO/authorization — a FALCON identity binding — NOT an economic
+/// magnitude. The only precondition is a usable node identity.
+pub async fn generate_stake_from_network(node_id: &str) -> Result<StakeProof> {
+    if node_id.is_empty() {
+        return Err(anyhow!("Cannot authorize an empty node identity"));
     }
+    let stake_holder = format!("hypermesh_node_{node_id}");
+    Ok(StakeProof::new(stake_holder, node_id.to_string()))
 }
 
-impl Default for WorkProof {
-    fn default() -> Self {
-        Self::new(
-            "test-owner".to_string(),
-            "test-workload".to_string(),
-            1234, // pid
-            1000, // computational_power
-            WorkloadType::Certificate,
-            WorkState::Pending,
-        )
+/// Generate a time proof with a real clock witness.
+pub async fn generate_time_with_ntp_sync() -> Result<TimeProof> {
+    let network_time_offset = perform_ntp_sync().await?;
+    if network_time_offset > Duration::from_secs(300) {
+        return Err(anyhow!(
+            "Time offset too large: {network_time_offset:?} > 5 minutes"
+        ));
     }
+    Ok(TimeProof::new(network_time_offset))
+}
+
+/// Generate a space proof from assessed system storage.
+///
+/// CANONICAL MODEL: PoSpace answers WHERE (location). The assessed capacity is
+/// recorded descriptively — it is NOT gated against a minimum here. Device
+/// minimum-spec (R13) is an assessment-layer concern, not a proof-generation
+/// gate; the proof just binds this node to its storage location.
+pub async fn generate_space_from_system(node_id: &str) -> Result<SpaceProof> {
+    let (total_storage, available_storage) = query_system_storage().await?;
+    let storage_path = format!("/hypermesh/storage/{node_id}");
+    let file_hash = generate_storage_commitment(&storage_path).await?;
+    let mut proof = SpaceProof::new(node_id.to_string(), storage_path, total_storage);
+    proof.total_size = total_storage - available_storage;
+    proof.file_hash = file_hash;
+    Ok(proof)
+}
+
+/// Generate a work proof as the BLAKE3 hash of the registration work done.
+pub async fn generate_work_from_computation(node_id: &str) -> Result<WorkProof> {
+    let workload_id = uuid::Uuid::new_v4().to_string();
+    let work_hash = compute_work_hash(node_id, &workload_id).await?;
+    Ok(WorkProof::new(node_id.to_string(), workload_id, work_hash))
+}
+
+// ---------------------------------------------------------------------------
+// Test-proof factories (only in test / localhost-testing builds)
+// ---------------------------------------------------------------------------
+
+/// Build a valid test `StakeProof` (authorization, no magnitude).
+#[cfg(any(test, feature = "localhost-testing"))]
+pub fn test_stake_proof() -> StakeProof {
+    StakeProof::new("test_stake_holder".to_string(), "test_node_001".to_string())
+}
+
+/// Build a valid test `SpaceProof`.
+#[cfg(any(test, feature = "localhost-testing"))]
+pub fn test_space_proof() -> SpaceProof {
+    let mut p = SpaceProof::new(
+        "test_node_001".to_string(),
+        "test_storage_path".to_string(),
+        100 * 1024 * 1024 * 1024,
+    );
+    p.total_size = 50 * 1024 * 1024 * 1024;
+    p.file_hash =
+        "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
+    p
+}
+
+/// Build a valid test `WorkProof` (hash-centric).
+#[cfg(any(test, feature = "localhost-testing"))]
+pub fn test_work_proof() -> WorkProof {
+    WorkProof::from_work(
+        "test_owner".to_string(),
+        "test_workload_001".to_string(),
+        b"test-work-material",
+    )
+}
+
+/// Build a valid test `TimeProof`.
+#[cfg(any(test, feature = "localhost-testing"))]
+pub fn test_time_proof() -> TimeProof {
+    TimeProof::new(Duration::from_secs(1))
 }
 
 #[cfg(test)]
@@ -732,41 +257,48 @@ mod tests {
 
     #[test]
     fn test_stake_proof_validation() {
-        let stake_proof = StakeProof::default();
-        assert!(stake_proof.validate());
+        assert!(Proof::validate(&test_stake_proof()));
+    }
+
+    #[test]
+    fn test_stake_proof_is_authorization_not_amount() {
+        // No magnitude anywhere — a bound identity is the whole proof.
+        let p = test_stake_proof();
+        assert!(p.is_structurally_valid());
+        assert!(!p.stake_holder_id.is_empty());
     }
 
     #[test]
     fn test_time_proof_validation() {
-        let time_proof = TimeProof::default();
-        assert!(time_proof.validate());
-    }
-
-    #[test]
-    fn test_time_proof_serialization() {
-        let time_proof = TimeProof::default();
-        let bytes = time_proof.to_bytes();
-        let deserialized = TimeProof::from_bytes(&bytes).expect("test: expected success");
-
-        assert_eq!(time_proof, deserialized);
+        assert!(Proof::validate(&test_time_proof()));
     }
 
     #[test]
     fn test_space_proof_validation() {
-        let space_proof = SpaceProof::default();
-        assert!(space_proof.validate());
+        assert!(Proof::validate(&test_space_proof()));
     }
 
     #[test]
     fn test_work_proof_validation() {
-        let work_proof = WorkProof::default();
-        assert!(work_proof.validate());
+        assert!(Proof::validate(&test_work_proof()));
     }
 
     #[test]
-    fn test_stake_proof_signature() {
-        let stake_proof = StakeProof::default();
-        let signature = stake_proof.sign();
-        assert!(!signature.is_empty());
+    fn test_work_proof_is_hash_centric() {
+        let p = test_work_proof();
+        assert_eq!(p.work_hash, *blake3::hash(b"test-work-material").as_bytes());
+    }
+
+    #[tokio::test]
+    async fn test_generate_stake_binds_identity() {
+        let p = generate_stake_from_network("node-xyz")
+            .await
+            .expect("test: stake gen");
+        assert_eq!(p.stake_holder_id, "node-xyz");
+    }
+
+    #[tokio::test]
+    async fn test_generate_stake_rejects_empty_identity() {
+        assert!(generate_stake_from_network("").await.is_err());
     }
 }

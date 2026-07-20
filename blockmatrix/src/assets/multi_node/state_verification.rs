@@ -23,21 +23,19 @@ use tokio::sync::RwLock;
 
 use crate::assets::core::{
     AssetError, AssetResult, StateProof, SpaceProof, StakeProof, TimeProof, WorkProof,
-    WorkState, WorkloadType,
 };
 
 use super::PeerIdentity;
 
 /// Configuration for bilateral state verification.
 ///
-/// Controls timeouts and resource thresholds for proof validation.
-/// no agreement thresholds, no quorum sizes, no Byzantine factors.
+/// Controls timeouts for proof validation. CANONICAL MODEL: no minimum storage
+/// commitment, no agreement thresholds, no quorum sizes, no Byzantine factors —
+/// PoSpace is WHERE (location), never a capacity magnitude.
 #[derive(Clone, Debug)]
 pub struct StateVerificationConfig {
     /// Maximum time offset allowed for proof timestamps
     pub max_time_offset: Duration,
-    /// Minimum storage commitment (bytes) for space proof
-    pub min_storage_commitment: u64,
     /// Maximum number of peers to verify simultaneously
     pub max_concurrent_verifications: usize,
     /// Timeout for a single verification request
@@ -48,7 +46,6 @@ impl Default for StateVerificationConfig {
     fn default() -> Self {
         Self {
             max_time_offset: Duration::from_secs(30),
-            min_storage_commitment: 1024,
             max_concurrent_verifications: 16,
             verification_timeout: Duration::from_secs(10),
         }
@@ -70,11 +67,14 @@ pub struct VerificationResult {
     pub peer_id: PeerIdentity,
 }
 
-/// A state proof presented by a peer for bilateral verification.
+/// A canonical [`StateProof`] presented by a peer, wrapped with the peer
+/// identity, chain head and signature needed for bilateral verification.
 ///
-/// Contains the four Proof of State components: Space, Stake, Work, Time.
+/// This is an ENVELOPE around the canonical four-proof set — it deliberately
+/// does not redefine the proofs. `hypermesh_lib::proof::StateProof` is the
+/// single source of truth for WHO / WHAT / WHERE / WHEN.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StateProof {
+pub struct PeerStateProof {
     /// The peer presenting this proof
     pub peer_id: PeerIdentity,
     /// The full state proof (four sub-proofs)
@@ -181,7 +181,7 @@ impl StateVerificationManager {
 
     /// Verify a peer's state proof bilaterally.
     ///
-    /// This is the core operation: Node A receives a StateProof from Node B
+    /// This is the core operation: Node A receives a PeerStateProof from Node B
     /// and validates all four proof components. Result is binary: authentic or not.
     ///
     /// Per paper Section 8: "When node A needs to verify node B's state,
@@ -189,7 +189,7 @@ impl StateVerificationManager {
     pub async fn verify_peer_state(
         &self,
         peer_id: &PeerIdentity,
-        state_proof: &StateProof,
+        state_proof: &PeerStateProof,
     ) -> AssetResult<VerificationResult> {
         // Verify the peer is known
         {
@@ -243,11 +243,11 @@ impl StateVerificationManager {
     ///
     /// This creates the proof that will be sent when another node
     /// requests bilateral verification.
-    pub async fn build_local_proof(&self, chain_head_hash: [u8; 32]) -> StateProof {
+    pub async fn build_local_proof(&self, chain_head_hash: [u8; 32]) -> PeerStateProof {
         let proof = self.generate_proof().await;
         let signature_input = blake3::hash(&chain_head_hash);
 
-        StateProof {
+        PeerStateProof {
             peer_id: self.node_id.clone(),
             proof,
             chain_head_hash,
@@ -351,7 +351,7 @@ impl StateVerificationManager {
     /// Verify the time proof component is within acceptable range.
     fn verify_time_proof(
         &self,
-        state_proof: &StateProof,
+        state_proof: &PeerStateProof,
     ) -> Result<(), hypermesh_lib::ProofType> {
         let now = SystemTime::now();
         let max_offset = self.config.max_time_offset;
@@ -373,19 +373,25 @@ impl StateVerificationManager {
         Ok(())
     }
 
-    /// Verify the space proof component meets minimum storage commitment.
+    /// Verify the space proof component binds a location (WHERE).
+    ///
+    /// CANONICAL MODEL: PoSpace answers WHERE via a bound location commitment,
+    /// never a storage-capacity magnitude. Admission requires a present
+    /// location (node + storage path / commitment), not a minimum byte count.
     fn verify_space_proof(
         &self,
-        state_proof: &StateProof,
+        state_proof: &PeerStateProof,
     ) -> Result<(), hypermesh_lib::ProofType> {
         let space = &state_proof.proof.space_proof;
-        if space.total_storage < self.config.min_storage_commitment {
+        let has_location = !space.node_id.is_empty()
+            && (!space.storage_path.is_empty() || !space.file_hash.is_empty());
+        if !has_location {
             return Err(hypermesh_lib::ProofType::Space);
         }
         Ok(())
     }
 
-    /// Generate a StateProof for the local node.
+    /// Generate the canonical four-proof [`StateProof`] for the local node.
     async fn generate_proof(&self) -> StateProof {
         let node_hex = hex::encode(&self.node_id.id[..8]);
         let node_full_hex = hex::encode(&self.node_id.id);
@@ -397,7 +403,6 @@ impl StateVerificationManager {
             StakeProof {
                 stake_holder: node_hex.clone(),
                 stake_holder_id: node_full_hex.clone(),
-                stake_amount: 1000,
                 stake_timestamp: now,
             },
             TimeProof {
@@ -416,12 +421,8 @@ impl StateVerificationManager {
             },
             WorkProof {
                 owner_id: node_hex,
+                work_hash: *blake3::hash(b"test-work").as_bytes(),
                 workload_id: format!("verify_{}", nonce),
-                pid: std::process::id() as u64,
-                computational_power: 100,
-                workload_type: WorkloadType::Compute,
-                work_state: WorkState::Completed,
-                work_challenges: vec![],
                 proof_timestamp: now,
             },
         )
@@ -516,13 +517,12 @@ mod tests {
         let manager = StateVerificationManager::new(node, StateVerificationConfig::default());
 
         let unknown_peer = create_test_peer();
-        let proof = StateProof {
+        let proof = PeerStateProof {
             peer_id: unknown_peer.clone(),
             proof: StateProof::new(
                 StakeProof {
                     stake_holder: "test".to_string(),
                     stake_holder_id: "test".to_string(),
-                    stake_amount: 1000,
                     stake_timestamp: SystemTime::now(),
                 },
                 TimeProof {
@@ -541,12 +541,8 @@ mod tests {
                 },
                 WorkProof {
                     owner_id: "test".to_string(),
+                    work_hash: *blake3::hash(b"test-work").as_bytes(),
                     workload_id: "w1".to_string(),
-                    pid: 1,
-                    computational_power: 100,
-                    workload_type: WorkloadType::Compute,
-                    work_state: WorkState::Completed,
-                    work_challenges: vec![],
                     proof_timestamp: SystemTime::now(),
                 },
             ),
@@ -567,13 +563,12 @@ mod tests {
         let peer = create_test_peer();
         manager.add_peer(peer.clone(), test_coordinate()).await;
 
-        let proof = StateProof {
+        let proof = PeerStateProof {
             peer_id: peer.clone(),
             proof: StateProof::new(
                 StakeProof {
                     stake_holder: "test".to_string(),
                     stake_holder_id: "test".to_string(),
-                    stake_amount: 1000,
                     stake_timestamp: SystemTime::now(),
                 },
                 TimeProof {
@@ -592,12 +587,8 @@ mod tests {
                 },
                 WorkProof {
                     owner_id: "test".to_string(),
+                    work_hash: *blake3::hash(b"test-work").as_bytes(),
                     workload_id: "w1".to_string(),
-                    pid: 1,
-                    computational_power: 100,
-                    workload_type: WorkloadType::Compute,
-                    work_state: WorkState::Completed,
-                    work_challenges: vec![],
                     proof_timestamp: SystemTime::now(),
                 },
             ),

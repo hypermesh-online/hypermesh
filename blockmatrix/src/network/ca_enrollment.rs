@@ -20,6 +20,7 @@ use tracing::{info, warn};
 
 use crate::proof_of_state::StateProof;
 use trustchain::ca::{CAConfig, CertificateRequest, TrustChainCA};
+use trustchain::proof_of_state::StateProofOps;
 
 /// Request a CA-signed certificate from the local TrustChain CA.
 ///

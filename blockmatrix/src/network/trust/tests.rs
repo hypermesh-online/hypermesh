@@ -159,12 +159,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_public_bootstrap() {
         let handler = PublicNetworkHandler::new();
-        let proof = ProofOfState {
-            proof_of_space: vec![1, 2, 3],
-            proof_of_stake: vec![4, 5, 6],
-            proof_of_work: vec![7, 8, 9],
-            proof_of_time: vec![10, 11, 12],
-        };
+        let proof = StateProof::default();
 
         let config = NetworkConfig {
             network_type: NetworkType::Public,

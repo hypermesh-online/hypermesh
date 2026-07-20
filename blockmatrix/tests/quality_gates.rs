@@ -29,7 +29,7 @@ use blockmatrix::network::{
     trust::{
         AnonymousNetworkHandler, Certificate, EphemeralKey, FederatedNetworkHandler,
         NetworkConfig as TrustNetworkConfig, NetworkHandler, NetworkType, P2PNetworkHandler,
-        ProofOfState, PublicNetworkHandler,
+        PublicNetworkHandler, StateProof,
     },
 };
 use std::sync::Arc;
@@ -51,14 +51,13 @@ fn create_test_asset() -> AssetRegistration {
     )
 }
 
-/// Helper: Generate test Proof of State
-fn generate_test_proof() -> ProofOfState {
-    ProofOfState {
-        proof_of_space: vec![1, 2, 3, 4, 5],
-        proof_of_stake: vec![6, 7, 8, 9, 10],
-        proof_of_work: vec![11, 12, 13, 14, 15],
-        proof_of_time: vec![16, 17, 18, 19, 20],
-    }
+/// Helper: generate a canonical test Proof of State.
+///
+/// CANONICAL MODEL: WHO is a bound identity (no amount), WHAT is a work hash
+/// (no difficulty), WHERE is a location (capacity is descriptive only), WHEN is
+/// a time. `StateProof::default()` already satisfies all four.
+fn generate_test_proof() -> StateProof {
+    StateProof::default()
 }
 
 // =============================================================================

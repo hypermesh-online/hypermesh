@@ -35,6 +35,7 @@ use crate::gateway::transfer_protocol::{
     TransferRollback,
 };
 use crate::network::PeerContext;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Handle an incoming `TAG_TRANSFER_LOCK` (0x40).
 ///
@@ -124,12 +125,13 @@ pub(super) async fn handle_transfer_register_req(
             );
             // Reply with a non-accepted ack so the source rolls back
             // rather than hanging; never fall back to a fake proof.
-            // The sentinel proof is structurally INVALID by construction
-            // (stake_amount = 0 fails StakeProof::validate), so it can never
-            // be mistaken for an authentic proof even if a future caller
-            // validates it independently of the `accepted` flag.
+            // The sentinel proof is structurally INVALID by construction:
+            // CANONICAL MODEL — PoStake is authorization (WHO), so an EMPTY
+            // `stake_holder_id` (no bound identity) fails
+            // StakeProof::is_structurally_valid and can never be mistaken for
+            // an authentic proof, independent of the `accepted` flag.
             let mut rejected_proof = StateProof::default();
-            rejected_proof.stake_proof.stake_amount = 0;
+            rejected_proof.stake_proof.stake_holder_id = String::new();
             let ack = TransferRegisterAck {
                 transfer_id: req.transfer_id.clone(),
                 target_block_hash: String::new(),

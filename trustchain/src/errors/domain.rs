@@ -155,8 +155,11 @@ pub enum ApiError {
 /// State proof validation specific errors
 #[derive(Debug, Error, Serialize, Deserialize)]
 pub enum StateProofError {
-    #[error("Proof of Stake validation failed: stake {stake} < minimum {minimum}")]
-    ProofOfStakeFailed { stake: u64, minimum: u64 },
+    // CANONICAL MODEL: proofs answer WHO (authorization) / WHAT (work hash) /
+    // WHERE (location) / WHEN (time), never a magnitude. Proof failures name a
+    // missing/invalid binding, never a "below minimum" quantity.
+    #[error("Proof of Stake validation failed: {reason}")]
+    ProofOfStakeFailed { reason: String },
 
     #[error("Proof of Time validation failed: offset {offset:?} > maximum {maximum:?}")]
     ProofOfTimeFailed {
@@ -164,11 +167,11 @@ pub enum StateProofError {
         maximum: std::time::Duration,
     },
 
-    #[error("Proof of Space validation failed: space {space} < minimum {minimum}")]
-    ProofOfSpaceFailed { space: u64, minimum: u64 },
+    #[error("Proof of Space validation failed: {reason}")]
+    ProofOfSpaceFailed { reason: String },
 
-    #[error("Proof of Work validation failed: compute {compute} < minimum {minimum}")]
-    ProofOfWorkFailed { compute: u64, minimum: u64 },
+    #[error("Proof of Work validation failed: {reason}")]
+    ProofOfWorkFailed { reason: String },
 
     #[error("Byzantine fault detected: {validator_id} - {evidence}")]
     ByzantineFault {

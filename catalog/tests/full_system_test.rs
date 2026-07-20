@@ -29,7 +29,7 @@ use catalog::distribution::dht::DhtNodeId;
 
 use blockmatrix::assets::StateProof;
 use blockmatrix::proof_of_state::proof_of_state_integration::{
-    SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 use hypermesh_lib::PrivacyMode;
 
@@ -37,15 +37,12 @@ use hypermesh_lib::PrivacyMode;
 // Helper: construct a valid StateProof for tests
 // ---------------------------------------------------------------------------
 fn test_state_proof() -> StateProof {
-    let stake = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
+    let stake = StakeProof::new("test-holder".to_string(), "test-id".to_string());
     let space = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
     let work = WorkProof::new(
         "test-owner".to_string(),
         "test-workload".to_string(),
-        12345,
-        100,
-        WorkloadType::Compute,
-        WorkState::Completed,
+        [7u8; 32],
     );
     let time = TimeProof::new(Duration::from_secs(10));
     StateProof::new(stake, time, space, work)

@@ -270,23 +270,14 @@ mod tests {
 
     fn create_test_state_proof() -> StateProof {
         use blockmatrix::proof_of_state::proof_of_state_integration::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use std::time::Duration;
 
-        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
-
+        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string());
         let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
-
-        let work_proof = WorkProof::new(
-            "test-owner".to_string(),
-            "test-workload".to_string(),
-            12345,
-            100,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
-
+        let work_proof =
+            WorkProof::from_work("test-owner".to_string(), "test-workload".to_string(), b"work");
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
         StateProof::new(stake_proof, time_proof, space_proof, work_proof)

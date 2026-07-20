@@ -8,6 +8,7 @@
 //! Every crate should import shared types from here, not define their own.
 
 pub mod asset;
+pub mod authz;
 pub mod crypto;
 pub mod economic;
 pub mod encoding;
@@ -27,10 +28,17 @@ pub mod test_utils;
 
 // Re-export commonly used types at crate root
 pub use asset::*;
+pub use authz::{
+    AuthDecision, AuthorizationSet, CapacityDimension, CapacityProfile, Grant, GrantScope,
+    GrantSig, Owner,
+};
 pub use economic::*;
 pub use encoding::{decode, encode, encode_bounded, EncodingError};
 pub use error::HypermeshError;
-pub use proof::{ProofOfState, ProofValidationResult, Validatable};
+pub use proof::{
+    ProofValidationResult, SpaceProof, StakeProof, StateProof, StateRequirements, TimeProof,
+    Validatable, WireSignedProof, WorkProof,
+};
 pub use protocol::*;
 pub use sharding_types::{Shard, ShardMetadata, ShardingError, ShardingStats};
 pub use types::*;

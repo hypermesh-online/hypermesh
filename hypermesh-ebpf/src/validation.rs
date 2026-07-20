@@ -24,15 +24,23 @@
 //!
 //! ### What this layer validates
 //! - **PoTime (WHEN)**: Timestamp freshness (clock skew + max age)
-//! - **PoStake (WHO)**: Algorithm indicator byte + public key prefix density
-//! - **PoWork (WHAT)**: Leading zero bits meet configurable difficulty
+//! - **PoStake (WHO)**: Algorithm indicator byte + identity material present
+//! - **PoWork (WHAT)**: Work hash present (content hash of the work done)
 //! - **PoSpace (WHERE)**: Valid IPv6 prefix or finite matrix coordinates
 //!
 //! ### What this layer does NOT validate
 //! - Cryptographic signature correctness (FALCON-1024/Ed25519/ECDSA)
 //! - Public key authenticity (TrustChain CA chain verification)
-//! - PoW challenge-response correctness (only difficulty prefix)
+//! - Work-hash CONTENT match against the payload (that is
+//!   [`AssetHashValidator`]'s job once the payload is available)
 //! - PoSpace storage commitment proofs (only format validity)
+//!
+//! ### What this layer deliberately does NOT do
+//! PoWork is the **hash of the work done** — a content-hash match — NOT a
+//! mining/difficulty contest. There is no difficulty target, no leading-zero
+//! threshold and no nonce grinding anywhere in this layer. Likewise PoStake is
+//! **authorization** (identity + FALCON signature, verified in TrustChain),
+//! never a count or magnitude threshold.
 
 use crate::hypermesh_headers::*;
 use anyhow::{anyhow, Result};
@@ -43,10 +51,6 @@ use blake3::Hasher;
 pub const ALG_FALCON_1024: u8 = 0x01;
 pub const ALG_ED25519: u8 = 0x02;
 pub const ALG_ECDSA: u8 = 0x03;
-
-/// Minimum number of non-zero bytes required in the public key prefix
-/// (bytes 1..9 of the `who` field) to pass fast pre-validation.
-const MIN_PUBKEY_PREFIX_NONZERO: usize = 8;
 
 /// Result of fast four-proof validation, reporting each proof independently.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,8 +83,6 @@ pub struct ProofOfStateValidator {
     max_clock_skew: u64,
     /// Maximum proof age (microseconds)
     max_proof_age: u64,
-    /// Minimum number of leading zero bits required for PoW difficulty
-    min_pow_leading_zero_bits: u32,
 }
 
 impl Default for ProofOfStateValidator {
@@ -88,7 +90,6 @@ impl Default for ProofOfStateValidator {
         Self {
             max_clock_skew: 5 * 60 * 1_000_000,      // 5 minutes
             max_proof_age: 24 * 60 * 60 * 1_000_000, // 24 hours
-            min_pow_leading_zero_bits: 8,            // first byte must be 0x00
         }
     }
 }
@@ -99,14 +100,7 @@ impl ProofOfStateValidator {
         Self {
             max_clock_skew: max_clock_skew_secs * 1_000_000,
             max_proof_age: max_proof_age_secs * 1_000_000,
-            min_pow_leading_zero_bits: 8,
         }
-    }
-
-    /// Set the minimum number of leading zero bits required for PoW difficulty.
-    pub fn with_pow_difficulty(mut self, leading_zero_bits: u32) -> Self {
-        self.min_pow_leading_zero_bits = leading_zero_bits;
-        self
     }
 
     /// Validate Proof of State header
@@ -153,14 +147,20 @@ impl ProofOfStateValidator {
         Ok(())
     }
 
-    /// Validate Proof of Stake (WHO) - Identity pre-validation.
+    /// Validate Proof of Stake (WHO) - Identity AUTHORIZATION pre-validation.
+    ///
+    /// PoStake answers *who authorized this*, and the answer is binary: the
+    /// claim carries identity material signed by a known algorithm, or it does
+    /// not. It is never a count, a magnitude or a threshold.
     ///
     /// Fast checks performed at the eBPF/XDP layer:
-    /// - Non-zero check
     /// - First byte is a valid algorithm indicator (FALCON-1024, Ed25519, ECDSA)
-    /// - Public key prefix (bytes 1..9) contains at least 8 non-zero bytes
+    /// - Identity material (bytes 1..32) is PRESENT (not absent/all-zero)
     ///
-    /// Deep cryptographic verification happens in TrustChain.
+    /// The actual authorization decision — that this identity's FALCON-1024
+    /// signature verifies and chains to a trusted TrustChain issuer — happens
+    /// in userspace TrustChain. This layer only rejects structurally absent
+    /// identities before they reach that path.
     fn validate_proof_of_stake(&self, who: &[u8; 32]) -> Result<()> {
         if who.iter().all(|&b| b == 0) {
             return Err(anyhow!("Proof of Stake is zero"));
@@ -177,37 +177,35 @@ impl ProofOfStateValidator {
             }
         }
 
-        // Public key prefix (bytes 1..9) must have sufficient non-zero bytes
-        let nonzero_count = who[1..9].iter().filter(|&&b| b != 0).count();
-        if nonzero_count < MIN_PUBKEY_PREFIX_NONZERO {
+        // Identity material must be PRESENT. An algorithm byte with no key
+        // behind it authorizes nothing.
+        if who[1..].iter().all(|&b| b == 0) {
             return Err(anyhow!(
-                "Proof of Stake: public key prefix has only {nonzero_count} non-zero bytes \
-                 in positions 1..9 (minimum {MIN_PUBKEY_PREFIX_NONZERO})"
+                "Proof of Stake: identity material absent \
+                 (algorithm indicator 0x{:02x} with all-zero public key)",
+                who[0]
             ));
         }
 
         Ok(())
     }
 
-    /// Validate Proof of Work (WHAT) - Computational difficulty check.
+    /// Validate Proof of Work (WHAT) - Work-hash presence check.
     ///
-    /// Fast checks performed at the eBPF/XDP layer:
-    /// - Non-zero check (all-zero hash is invalid)
-    /// - Leading zero bits meet the configured difficulty requirement
+    /// PoWork is the **hash of the work done**: a content hash that must match
+    /// the work it claims to describe. It is NOT a mining contest — there is no
+    /// difficulty target, no leading-zero threshold and no nonce grinding.
     ///
-    /// Actual PoW challenge verification happens in the Proof of State layer.
+    /// Fast check performed at the eBPF/XDP layer:
+    /// - The work hash is PRESENT (an all-zero hash describes no work)
+    ///
+    /// The CONTENT match — recomputing BLAKE3 over the payload and comparing —
+    /// requires the payload, so it happens in [`AssetHashValidator::validate`]
+    /// and in the Proof of State layer, not here.
     fn validate_proof_of_work(&self, what: &[u8; 32]) -> Result<()> {
         if what.iter().all(|&b| b == 0) {
-            return Err(anyhow!("Proof of Work is zero"));
-        }
-
-        let leading_zeros = count_leading_zero_bits(what);
-        if leading_zeros < self.min_pow_leading_zero_bits {
             return Err(anyhow!(
-                "Proof of Work: insufficient difficulty -- {} leading zero bits \
-                 (minimum required: {})",
-                leading_zeros,
-                self.min_pow_leading_zero_bits
+                "Proof of Work: work hash absent (all-zero content hash)"
             ));
         }
 
@@ -284,21 +282,6 @@ impl ProofOfStateValidator {
         );
         Ok(())
     }
-}
-
-/// Count the number of leading zero bits in a byte slice.
-fn count_leading_zero_bits(bytes: &[u8]) -> u32 {
-    let mut total = 0u32;
-    for &byte in bytes {
-        if byte == 0 {
-            total += 8;
-        } else {
-            // u8::leading_zeros() counts within the 8-bit value (0..=8).
-            total += byte.leading_zeros();
-            break;
-        }
-    }
-    total
 }
 
 /// Asset Hash validator
@@ -426,18 +409,17 @@ impl AssetHashValidator {
 mod tests {
     use super::*;
 
-    /// Build a valid `who` field: FALCON-1024 indicator + 8 non-zero prefix bytes.
+    /// Build a valid `who` field: FALCON-1024 indicator + present identity.
     fn valid_who() -> [u8; 32] {
         let mut who = [0xABu8; 32];
         who[0] = ALG_FALCON_1024; // 0x01
         who
     }
 
-    /// Build a valid `what` field: first byte 0x00 (8 leading zero bits).
+    /// Build a valid `what` field: a present (non-zero) work hash. Any BLAKE3
+    /// digest qualifies — there is no difficulty prefix to satisfy.
     fn valid_what() -> [u8; 32] {
-        let mut what = [0xFFu8; 32];
-        what[0] = 0x00;
-        what
+        AssetHashValidator::compute_hash(b"hypermesh work")
     }
 
     /// Build a valid `where_` field: IPv6 global unicast prefix 0x20.
@@ -452,15 +434,6 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_micros() as u64)
             .unwrap_or(0)
-    }
-
-    #[test]
-    fn test_count_leading_zero_bits() {
-        assert_eq!(count_leading_zero_bits(&[0x00, 0x00, 0xFF]), 16);
-        assert_eq!(count_leading_zero_bits(&[0x00, 0x01]), 15);
-        assert_eq!(count_leading_zero_bits(&[0x80]), 0);
-        assert_eq!(count_leading_zero_bits(&[0xFF]), 0);
-        assert_eq!(count_leading_zero_bits(&[0x00, 0x80]), 8);
     }
 
     #[test]
@@ -513,7 +486,8 @@ mod tests {
     }
 
     #[test]
-    fn test_stake_insufficient_pubkey_prefix() {
+    fn test_stake_rejects_absent_identity() {
+        // An algorithm indicator with no key behind it authorizes nothing.
         let mut who = [0u8; 32];
         who[0] = ALG_FALCON_1024;
         let validator = ProofOfStateValidator::default();
@@ -522,27 +496,48 @@ mod tests {
             .err()
             .map(|e| format!("{e}"))
             .unwrap_or_default();
-        assert!(err.contains("public key prefix"));
+        assert!(err.contains("identity material absent"));
     }
 
     #[test]
-    fn test_work_difficulty() {
+    fn test_stake_accepts_any_present_identity_no_count_threshold() {
+        // PoStake is AUTHORIZATION, not a magnitude. A single non-zero identity
+        // byte is structurally present and MUST pass this layer — the real
+        // authorization decision is FALCON verification in TrustChain.
         let validator = ProofOfStateValidator::default();
+        let mut sparse = [0u8; 32];
+        sparse[0] = ALG_FALCON_1024;
+        sparse[31] = 0x01; // exactly one non-zero identity byte
+        assert!(
+            validator.validate_proof_of_stake(&sparse).is_ok(),
+            "test: PoStake must not impose a non-zero-byte count threshold"
+        );
+    }
+
+    #[test]
+    fn test_work_requires_present_hash_not_difficulty() {
+        let validator = ProofOfStateValidator::default();
+
+        // A present work hash passes — PoWork is a content hash, so ANY
+        // non-zero digest is structurally valid here.
         assert!(validator.validate_proof_of_work(&valid_what()).is_ok());
+
+        // An absent (all-zero) work hash describes no work.
         assert!(validator.validate_proof_of_work(&[0u8; 32]).is_err());
 
-        let mut weak = [0xFFu8; 32];
-        weak[0] = 0x01; // only 7 leading zero bits
-        assert!(validator.validate_proof_of_work(&weak).is_err());
-
-        let strict = ProofOfStateValidator::default().with_pow_difficulty(16);
-        let mut sixteen = [0xFFu8; 32];
-        sixteen[0] = 0x00;
-        sixteen[1] = 0x00;
-        assert!(strict.validate_proof_of_work(&sixteen).is_ok());
-        let mut eight = [0xFFu8; 32];
-        eight[0] = 0x00;
-        assert!(strict.validate_proof_of_work(&eight).is_err());
+        // Regression guard: there is NO difficulty contest. A hash with zero
+        // leading zero bits is just as valid as one with many.
+        let no_leading_zeros = [0xFFu8; 32];
+        assert!(
+            validator.validate_proof_of_work(&no_leading_zeros).is_ok(),
+            "test: PoWork must not impose a leading-zero difficulty threshold"
+        );
+        let mut many_leading_zeros = [0xFFu8; 32];
+        many_leading_zeros[0] = 0x00;
+        many_leading_zeros[1] = 0x00;
+        assert!(validator
+            .validate_proof_of_work(&many_leading_zeros)
+            .is_ok());
     }
 
     #[test]

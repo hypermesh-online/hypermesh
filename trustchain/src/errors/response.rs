@@ -88,11 +88,9 @@ impl ErrorResponse {
                 "timeout_duration_secs": duration.as_secs()
             })),
             TrustChainError::StateProofValidation(StateProofError::ProofOfStakeFailed {
-                stake,
-                minimum,
+                reason,
             }) => Some(serde_json::json!({
-                "current_stake": stake,
-                "minimum_required": minimum
+                "reason": reason
             })),
             TrustChainError::ApiServer(ApiError::RateLimitExceeded { limit }) => {
                 Some(serde_json::json!({

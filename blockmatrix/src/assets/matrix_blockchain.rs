@@ -326,25 +326,14 @@ impl EntityBlockchain {
             state_proof: StateProof::new(
                 // TODO: Generate real state proofs
                 // Order: StakeProof, TimeProof, SpaceProof, WorkProof
-                crate::proof_of_state::proof::StakeProof::new(
-                    config.network_domain.clone(),
-                    "genesis-node".to_string(),
-                    1000,
-                ),
+                crate::proof_of_state::proof::StakeProof::new(config.network_domain.clone(), "genesis-node".to_string()),
                 crate::proof_of_state::proof::TimeProof::new(Duration::from_secs(0)),
                 crate::proof_of_state::proof::SpaceProof::new(
                     "genesis-node".to_string(),
                     "/genesis".to_string(),
                     0,
                 ),
-                crate::proof_of_state::proof::WorkProof::new(
-                    "genesis-owner".to_string(),
-                    "genesis-workload".to_string(),
-                    0,
-                    1000,
-                    crate::proof_of_state::proof::WorkloadType::Compute,
-                    crate::proof_of_state::proof::WorkState::Completed,
-                ),
+                crate::proof_of_state::proof::WorkProof::new("genesis-owner".to_string(), "genesis-workload".to_string(), *blake3::hash(format!("{}:{}", "genesis-owner".to_string(), "genesis-workload".to_string()).as_bytes()).as_bytes()),
             ),
             hash: [0u8; 32], // Would be calculated
             entity_signature: vec![],

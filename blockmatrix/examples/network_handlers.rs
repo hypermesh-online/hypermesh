@@ -6,7 +6,7 @@
 
 use blockmatrix::network::trust::{
     AnonymousNetworkHandler, FederatedNetworkHandler, NetworkConfig, NetworkHandler, NetworkType,
-    P2PNetworkHandler, ProofOfState, PublicNetworkHandler,
+    P2PNetworkHandler, PublicNetworkHandler, StateProof,
 };
 
 #[tokio::main]
@@ -121,12 +121,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Now with proof
     println!("   Testing with Proof of State:");
-    let proof = ProofOfState {
-        proof_of_space: vec![1, 2, 3],
-        proof_of_stake: vec![4, 5, 6],
-        proof_of_work: vec![7, 8, 9],
-        proof_of_time: vec![10, 11, 12],
-    };
+    let proof = StateProof::default();
 
     let public_config = NetworkConfig {
         network_type: NetworkType::Public,

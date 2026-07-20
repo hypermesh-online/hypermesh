@@ -19,10 +19,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use trustchain::proof_of_state::StateProofOps;
 
 // Submodules
 pub mod adapter;
 pub mod asset_id;
+pub mod authz;
 pub mod privacy;
 pub mod proxy;
 pub mod status;
@@ -39,6 +41,10 @@ pub use asset_id::{
     ApplicationDomain, AssetCategory, AssetData, AssetIdError, AssetRegistration, AssetType,
     BaseSystemType, FederationId, NetworkScope, NodeFingerprint, ProofRequirements, ProofScope,
     RegistryId, ScopeBinding, SecurityError,
+};
+pub use authz::{
+    default_authorize, verify_grant, AuthDecision, AuthorizationSet, CapacityDimension,
+    CapacityProfile, Grant, GrantScope, GrantSig, Owner,
 };
 pub use hypermesh_lib::PrivacyMode;
 pub use privacy::AssetAllocation;
@@ -153,8 +159,11 @@ pub enum AssetError {
 // Import Proof of State Four-Proof validation system
 pub use crate::proof_of_state::proof_of_state_integration::{
     ClientCredentials, StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
-    WorkState, WorkloadType,
 };
+
+// WorkloadType is a DESCRIPTIVE workload label (lib::types), not a proof field.
+// Re-exported here for asset/orchestration consumers (e.g. WorkloadOptimized).
+pub use hypermesh_lib::WorkloadType;
 
 // All state proof types are now imported from Proof of State integration above
 
@@ -171,25 +180,23 @@ pub struct AssetManager {
 }
 
 /// State proof requirements configuration
+///
+/// CANONICAL MODEL: proofs answer WHO / WHAT / WHERE / WHEN, never a magnitude.
+/// There is NO minimum stake / storage / compute gate — the only quantitative
+/// bound is the WHEN proof's freshness (`max_time_offset`).
 #[derive(Clone, Debug)]
 pub struct StateRequirements {
     /// Require all four proofs (default: true)
     pub require_all_proofs: bool,
-    /// Minimum stake amount required
-    pub minimum_stake: u64,
     /// Maximum time offset allowed
     pub max_time_offset: Duration,
-    /// Minimum computational power required
-    pub minimum_compute_power: u64,
 }
 
 impl Default for StateRequirements {
     fn default() -> Self {
         Self {
             require_all_proofs: true,
-            minimum_stake: 1000,
             max_time_offset: Duration::from_secs(30),
-            minimum_compute_power: 100,
         }
     }
 }
@@ -451,13 +458,12 @@ impl AssetManager {
 
         // Check against HyperMesh asset requirements
         if self.state_requirements.require_all_proofs {
-            // All four proofs must be present and valid (enforced by Proof of State)
-            if proof.stake_proof.stake_amount < self.state_requirements.minimum_stake {
+            // CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude.
+            // Require a bound identity (the FALCON identity binding), NOT a stake
+            // amount above a threshold.
+            if proof.stake_proof.stake_holder_id.is_empty() {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: format!(
-                        "Insufficient stake: {} < required {}",
-                        proof.stake_proof.stake_amount, self.state_requirements.minimum_stake
-                    ),
+                    reason: "PoStake carries no bound identity (unauthorized)".to_string(),
                 });
             }
 
@@ -467,18 +473,22 @@ impl AssetManager {
                 });
             }
 
-            if proof.work_proof.computational_power
-                < self.state_requirements.minimum_compute_power
-            {
+            // CANONICAL MODEL: PoWork is the HASH of work done (WHAT), never a
+            // resource-capacity magnitude. Require the work was actually hashed
+            // (non-zero hash) — capacity is descriptive and never gated here.
+            if proof.work_proof.work_hash == [0u8; 32] {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: "Insufficient computational power".to_string(),
+                    reason: "PoWork carries no work hash".to_string(),
                 });
             }
 
-            // Validate storage space commitment (from Proof of State SpaceProof)
-            if proof.space_proof.total_storage == 0 {
+            // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+            // location; capacity is descriptive and never gates admission.
+            if proof.space_proof.node_id.is_empty()
+                && proof.space_proof.storage_path.is_empty()
+            {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: "No storage space committed".to_string(),
+                    reason: "PoSpace has no bound location (WHERE)".to_string(),
                 });
             }
         }
@@ -563,21 +573,15 @@ mod tests {
     #[test]
     fn test_state_proof_validation() {
         // Test Proof of State Four-Proof validation system integration
-        let stake_proof = StakeProof::new(
-            "test-holder".to_string(),
-            "test-holder-id".to_string(),
-            1000,
-        );
+        let stake_proof = StakeProof::new("test-holder".to_string(), "test-holder-id".to_string());
 
         let space_proof = SpaceProof::new("test-node".to_string(), "/test/path".to_string(), 1024);
 
+        // CANONICAL MODEL: PoWork carries the HASH of work done (WHAT).
         let work_proof = WorkProof::new(
-            "test-worker".to_string(),   // owner_id
-            "test-workload".to_string(), // workload_id
-            12345,                       // pid
-            100,                         // computational_power
-            WorkloadType::Compute,       // workload_type
-            WorkState::Completed,        // work_state
+            "test-worker".to_string(),
+            "test-workload".to_string(),
+            *blake3::hash(b"test-work").as_bytes(),
         );
 
         let time_proof = TimeProof::new(Duration::from_secs(10));

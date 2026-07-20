@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
 use trustchain::proof_of_state::{StateProof, StateRequirements};
+use trustchain::proof_of_state::StateProofOps;
 
 /// State proof validator trait (binary pass/fail)
 #[async_trait]
@@ -120,8 +121,8 @@ impl StateAuthenticator for DefaultStateAuthenticator {
 
                     if self.verbose {
                         debug!(
-                            "Pass: Stake proof: {} tokens validated",
-                            state_proof.stake_proof.stake_amount
+                            "Pass: Stake proof: authorized identity {}",
+                            state_proof.stake_proof.stake_holder_id
                         );
                         debug!(
                             "Pass: Time proof: offset {} ms",
@@ -132,8 +133,8 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                             state_proof.space_proof.total_storage / (1024 * 1024 * 1024)
                         );
                         debug!(
-                            "Pass: Work proof: {} compute units",
-                            state_proof.work_proof.computational_power
+                            "Pass: Work proof: hash {}",
+                            hex::encode(&state_proof.work_proof.work_hash[..4])
                         );
                     }
 
@@ -141,12 +142,12 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                 } else {
                     let mut failed_requirements = Vec::new();
 
-                    if state_proof.stake_proof.stake_amount < self.requirements.minimum_stake {
-                        failed_requirements.push(format!(
-                            "Insufficient stake: {} < {}",
-                            state_proof.stake_proof.stake_amount,
-                            self.requirements.minimum_stake
-                        ));
+                    // CANONICAL MODEL: PoStake is authorization (WHO), never a
+                    // magnitude — the failure is "no bound identity", not "too
+                    // little stake".
+                    if state_proof.stake_proof.stake_holder_id.is_empty() {
+                        failed_requirements
+                            .push("PoStake carries no bound identity".to_string());
                     }
 
                     if state_proof.time_proof.network_time_offset
@@ -159,23 +160,22 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                         ));
                     }
 
-                    if state_proof.space_proof.total_storage < self.requirements.minimum_storage
+                    // CANONICAL MODEL: PoSpace is WHERE (location) — a required
+                    // space proof needs a bound location commitment, never a
+                    // minimum storage magnitude.
+                    if state_proof.space_proof.file_hash.is_empty()
+                        && state_proof.space_proof.storage_path.is_empty()
                     {
-                        failed_requirements.push(format!(
-                            "Insufficient storage: {} < {}",
-                            state_proof.space_proof.total_storage,
-                            self.requirements.minimum_storage
-                        ));
+                        failed_requirements
+                            .push("PoSpace carries no bound location".to_string());
                     }
 
-                    if state_proof.work_proof.computational_power
-                        < self.requirements.minimum_compute
-                    {
-                        failed_requirements.push(format!(
-                            "Insufficient compute power: {} < {}",
-                            state_proof.work_proof.computational_power,
-                            self.requirements.minimum_compute
-                        ));
+                    // CANONICAL MODEL: PoWork is the HASH of work done (WHAT),
+                    // never a capacity magnitude — the failure is "no work
+                    // hash", not "too little compute".
+                    if state_proof.work_proof.work_hash == [0u8; 32] {
+                        failed_requirements
+                            .push("PoWork carries no work hash".to_string());
                     }
 
                     warn!(

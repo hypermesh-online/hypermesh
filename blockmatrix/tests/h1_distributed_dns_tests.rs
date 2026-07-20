@@ -21,7 +21,7 @@ use blockmatrix::network::message_handlers::{
     select_canonical, DistributedDnsQuery, DistributedDnsResponse,
 };
 use blockmatrix::proof_of_state::proof_of_state_integration::{
-    SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+    SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 use blockmatrix::proof_of_state::StateProof;
 use hypermesh_lib::NodeSigner;
@@ -30,7 +30,7 @@ use trustchain::FalconIdentity;
 // ── Helpers ────────────────────────────────────────────────────────────
 
 fn test_proof() -> StateProof {
-    let stake = StakeProof::new("test-holder".to_string(), "holder-id".to_string(), 1000);
+    let stake = StakeProof::new("test-holder".to_string(), "holder-id".to_string());
     let time = TimeProof::new(Duration::from_secs(10));
     let space = SpaceProof::new(
         "test-node".to_string(),
@@ -40,10 +40,7 @@ fn test_proof() -> StateProof {
     let work = WorkProof::new(
         "test-owner".to_string(),
         "test-workload".to_string(),
-        12345,
-        100,
-        WorkloadType::Compute,
-        WorkState::Completed,
+        [7u8; 32],
     );
     StateProof::new(stake, time, space, work)
 }

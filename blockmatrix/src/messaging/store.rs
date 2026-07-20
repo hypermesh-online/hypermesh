@@ -23,6 +23,7 @@ use crate::assets::core::AssetRegistration;
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::blockchain::chain::NodeBlockchain;
 use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Blockchain-backed message store.
 ///

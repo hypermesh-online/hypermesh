@@ -24,6 +24,7 @@ use crate::proof_of_state::{
 };
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::StateProofOps;
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.

@@ -14,6 +14,7 @@ use blockmatrix::dns::invitation;
 use blockmatrix::StateProof;
 
 use crate::cli::DomainAction;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Path to persisted domain registrations for a given node.
 fn domain_registrations_path(data_dir: &std::path::Path, node_id: &str) -> std::path::PathBuf {

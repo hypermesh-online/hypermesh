@@ -47,16 +47,15 @@ async fn test_gpu_allocation() {
     // Create a test proof
     let test_proof = StateProof::new_for_testing();
 
-    // Basic verification that the test proof has valid values for GPU validation:
-    // - stake_amount >= 200
-    // - computational_power >= 20
+    // CANONICAL MODEL: PoStake is authorization (WHO), PoWork is the HASH of
+    // work (WHAT). Verify a bound identity and a work hash, never magnitudes.
     assert!(
-        test_proof.stake_proof.stake_amount >= 200,
-        "Stake amount should be >= 200"
+        !test_proof.stake_proof.stake_holder_id.is_empty(),
+        "PoStake must carry a bound identity"
     );
     assert!(
-        test_proof.work_proof.computational_power >= 20,
-        "Computational power should be >= 20"
+        test_proof.work_proof.work_hash != [0u8; 32],
+        "PoWork must carry a work hash"
     );
 
     // The actual adapter allocation test is disabled due to GPU hardware detection

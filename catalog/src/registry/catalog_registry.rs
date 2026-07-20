@@ -76,9 +76,6 @@ pub struct TrustPolicy {
     /// Require Proof of State for registration
     pub require_state_proof: bool,
 
-    /// Minimum stake amount for registration
-    pub minimum_stake: u64,
-
     /// Allowed publishers (empty = allow all)
     pub allowed_publishers: Vec<String>,
 
@@ -90,7 +87,6 @@ impl Default for TrustPolicy {
     fn default() -> Self {
         Self {
             require_state_proof: true,
-            minimum_stake: 1000,
             allowed_publishers: Vec::new(),
             require_certificate: true,
         }
@@ -166,7 +162,6 @@ impl CatalogRegistry {
         // Use a relaxed trust policy for built-in registration
         let builtin_policy = TrustPolicy {
             require_state_proof: false,
-            minimum_stake: 0,
             allowed_publishers: Vec::new(),
             require_certificate: false,
         };
@@ -244,20 +239,15 @@ impl CatalogRegistry {
     /// without requiring callers to construct full proofs during alpha.
     pub fn builtin_state_proof() -> StateProof {
         use blockmatrix::proof_of_state::proof_of_state_integration::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use std::time::Duration;
 
-        let stake = StakeProof::new("builtin".to_string(), "builtin".to_string(), 0);
+        // Authorization (WHO): a bound "builtin" identity, no magnitude.
+        let stake = StakeProof::new("builtin".to_string(), "builtin".to_string());
         let space = SpaceProof::new("builtin".to_string(), "/builtin".to_string(), 0);
-        let work = WorkProof::new(
-            "builtin".to_string(),
-            "builtin".to_string(),
-            0,
-            0,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
+        // WHAT: BLAKE3 hash of the built-in registration work.
+        let work = WorkProof::from_work("builtin".to_string(), "builtin".to_string(), b"builtin");
         let time = TimeProof::new(Duration::from_secs(0));
         StateProof::new(stake, time, space, work)
     }
@@ -635,12 +625,12 @@ impl CatalogRegistry {
             return Err(anyhow::anyhow!("Proof of State validation failed"));
         }
 
-        // Check stake requirement
-        if proof.stake_proof.stake_amount < self.trust_policy.minimum_stake {
+        // CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude.
+        // Registration requires a bound authorization identity, not a stake
+        // amount.
+        if proof.stake_proof.stake_holder_id.is_empty() {
             return Err(anyhow::anyhow!(
-                "Insufficient stake: {} < required {}",
-                proof.stake_proof.stake_amount,
-                self.trust_policy.minimum_stake
+                "Registration requires a bound authorization identity (WHO)"
             ));
         }
 
@@ -827,27 +817,17 @@ mod tests {
     use super::*;
     use crate::registry::asset_type::AssetTypeDefinition;
     use blockmatrix::proof_of_state::proof_of_state_integration::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use serde_json::json;
     use std::time::Duration;
 
     fn create_test_state_proof() -> StateProof {
-        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string(), 1000);
-
+        let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string());
         let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
-
-        let work_proof = WorkProof::new(
-            "test-owner".to_string(),
-            "test-workload".to_string(),
-            12345,
-            100,
-            WorkloadType::Compute,
-            WorkState::Completed,
-        );
-
+        let work_proof =
+            WorkProof::from_work("test-owner".to_string(), "test-workload".to_string(), b"work");
         let time_proof = TimeProof::new(Duration::from_secs(10));
-
         StateProof::new(stake_proof, time_proof, space_proof, work_proof)
     }
 
@@ -1059,7 +1039,6 @@ mod tests {
     fn relaxed_policy() -> TrustPolicy {
         TrustPolicy {
             require_state_proof: false,
-            minimum_stake: 0,
             allowed_publishers: Vec::new(),
             require_certificate: false,
         }

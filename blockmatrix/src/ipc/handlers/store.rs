@@ -21,6 +21,7 @@ use crate::sharing::key_wrap::KeyEnvelope;
 use crate::sharing::shard_map::ShardMap;
 use hypermesh_lib::{ContentHash, NodeEncryptor, PrivacyMode};
 use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Register the `store` IPC method.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {

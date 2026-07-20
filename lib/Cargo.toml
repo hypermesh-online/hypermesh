@@ -16,6 +16,7 @@ chrono = { workspace = true }
 anyhow = { workspace = true }
 rust_decimal = { workspace = true }
 blake3 = { workspace = true }
+bincode = { workspace = true }
 postcard = { workspace = true }
 async-trait = { workspace = true }
 serde_bytes = { workspace = true }
@@ -25,6 +26,8 @@ hex = { workspace = true }
 test-utils = []
 
 [dev-dependencies]
+pqcrypto-falcon = { workspace = true }
+pqcrypto-traits = { workspace = true }
 
 [lib]
 name = "hypermesh_lib"

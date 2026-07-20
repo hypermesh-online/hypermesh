@@ -116,26 +116,22 @@ pub struct LogIndex {
     pub log_index: u32,
 }
 
-/// State proof configuration for BlockMatrix
+/// State proof configuration for BlockMatrix.
+///
+/// CANONICAL MODEL: proofs answer WHO (authorization) / WHAT (work hash) /
+/// WHERE (location) / WHEN (time), never a magnitude. There is no minimum
+/// stake / storage / compute gate — the only quantitative bound is the
+/// temporal freshness of the WHEN proof.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StateProofConfig {
-    /// Minimum stake required for validation
-    pub min_stake: u64,
-    /// Maximum time offset allowed
+    /// Maximum time offset allowed (WHEN freshness bound).
     pub max_time_offset: std::time::Duration,
-    /// Minimum storage capacity
-    pub min_storage: u64,
-    /// Minimum computational power
-    pub min_compute_power: u64,
 }
 
 impl Default for StateProofConfig {
     fn default() -> Self {
         Self {
-            min_stake: 1000,
             max_time_offset: std::time::Duration::from_secs(300),
-            min_storage: 1024 * 1024 * 1024, // 1GB
-            min_compute_power: 100,
         }
     }
 }
@@ -426,8 +422,7 @@ pub mod proof_of_state_integration {
 
     // Re-export proof types
     pub use super::{
-        StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof, WorkState,
-        WorkloadType,
+        StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
     };
 
     pub struct ProofOfStateIntegration;

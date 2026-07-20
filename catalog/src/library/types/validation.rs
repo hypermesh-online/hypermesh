@@ -15,15 +15,15 @@ impl LibraryAssetPackage {
     pub fn to_asset_type_definition(&self) -> Result<AssetTypeDefinition, anyhow::Error> {
         use blockmatrix::assets::StateProof;
         use blockmatrix::proof_of_state::proof_of_state_integration::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use serde_json::json;
         use std::time::Duration;
 
+        // Authorization (WHO): bind the author identity, no magnitude.
         let stake_proof = StakeProof::new(
             self.author().unwrap_or("unknown").to_string(),
             self.id.to_string(),
-            1000,
         );
 
         let space_proof = SpaceProof::new(
@@ -32,13 +32,11 @@ impl LibraryAssetPackage {
             self.size,
         );
 
-        let work_proof = WorkProof::new(
+        // WHAT: BLAKE3 hash of the packaging work for this asset id.
+        let work_proof = WorkProof::from_work(
             self.author().unwrap_or("unknown").to_string(),
             format!("package-{}", self.id),
-            chrono::Utc::now().timestamp() as u64,
-            100,
-            WorkloadType::Compute,
-            WorkState::Completed,
+            self.id.to_string().as_bytes(),
         );
 
         let time_proof = TimeProof::new(Duration::from_secs(

@@ -85,13 +85,16 @@ pub struct ValidationMetrics {
     pub rejected_proofs: u64,
 }
 
-/// Security configuration
+/// Security configuration.
+///
+/// CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude. There is
+/// no minimum-stake threshold — admission keys on a bound identity and fresh
+/// proofs, not on a coin quantity that does not exist.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SecurityConfig {
     pub strict_mode: bool,
     pub require_all_proofs: bool,
     pub enable_misbehavior_detection: bool,
-    pub minimum_stake_threshold: u64,
     pub maximum_time_variance: Duration,
 }
 
@@ -101,7 +104,6 @@ impl Default for SecurityConfig {
             strict_mode: true,
             require_all_proofs: true,
             enable_misbehavior_detection: true,
-            minimum_stake_threshold: 10000, // Production minimum
             maximum_time_variance: Duration::from_secs(30),
         }
     }
@@ -131,7 +133,6 @@ impl StateAuthenticator {
         let mut authenticator = Self::new();
         authenticator.security_config.strict_mode = true;
         authenticator.security_config.require_all_proofs = true;
-        authenticator.security_config.minimum_stake_threshold = 50000;
         authenticator
     }
 }
@@ -259,7 +260,6 @@ impl FourProofValidator {
             strict_mode: true,
             require_all_proofs: true,
             enable_misbehavior_detection: true,
-            minimum_stake_threshold: 100000, // High security threshold
             maximum_time_variance: Duration::from_secs(15), // Strict timing
         };
         validator
@@ -433,29 +433,24 @@ impl ProofOfSpaceValidator {
             return Ok(false);
         }
 
-        // 2. Verify storage commitment is realistic
-        if proof.total_storage == 0 {
-            error!("Space proof: Zero storage commitment");
+        // 2. PoSpace is WHERE. Require a bound LOCATION, not a capacity.
+        //    CANONICAL MODEL: storage capacity is a descriptive asset attribute
+        //    — it is never a proof field and never gates admission, so a node
+        //    advertising zero spare capacity still answers WHERE.
+        if proof.node_id.is_empty() && proof.storage_path.is_empty() {
+            error!("Space proof: no bound location (WHERE)");
             return Ok(false);
         }
 
-        // 3. Check storage size vs. claimed size ratio
+        // 3. Check storage size vs. claimed size ratio (self-consistency:
+        //    stored ≤ capacity). Capacity is descriptive; there is NO upper
+        //    capacity bound — PoSpace is WHERE (location), not a magnitude.
         if proof.total_size > proof.total_storage {
             error!("Space proof: Claimed size exceeds storage capacity");
             return Ok(false);
         }
 
-        // 4. Verify node is not claiming impossible storage amounts
-        const MAX_REASONABLE_STORAGE: u64 = 100 * 1024 * 1024 * 1024 * 1024; // 100TB max per node
-        if proof.total_storage > MAX_REASONABLE_STORAGE {
-            error!(
-                "Space proof: Unrealistic storage claim: {} bytes",
-                proof.total_storage
-            );
-            return Ok(false);
-        }
-
-        // 5. Verify file hash if provided
+        // 4. Verify file hash if provided
         if !proof.file_hash.is_empty() && proof.file_hash.len() < 32 {
             error!("Space proof: Invalid file hash length");
             return Ok(false);
@@ -494,23 +489,17 @@ impl ProofOfSpaceValidator {
     }
 }
 
-/// Production Proof of Stake validator (WHO)
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ProofOfStakeValidator {
-    minimum_stake_requirements: HashMap<String, u64>,
-}
-
-impl Default for ProofOfStakeValidator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// Production Proof of Stake validator (WHO / authorization).
+///
+/// CANONICAL MODEL: PoStake is an authorization (a bound identity), never a
+/// magnitude. There is no per-entity minimum-stake table — admission keys on a
+/// bound FALCON identity and a fresh authorization timestamp.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ProofOfStakeValidator;
 
 impl ProofOfStakeValidator {
     pub fn new() -> Self {
-        Self {
-            minimum_stake_requirements: HashMap::new(),
-        }
+        Self
     }
 
     /// Basic validation (for testing)
@@ -518,76 +507,51 @@ impl ProofOfStakeValidator {
         Ok(proof.validate())
     }
 
-    /// PRODUCTION VALIDATION - Real economic stake verification
+    /// PRODUCTION VALIDATION - Authorization (WHO) verification.
+    ///
+    /// `_config` is retained for signature compatibility; PoStake carries no
+    /// magnitude, so no threshold from config is consulted.
     pub async fn validate_production(
         &mut self,
         proof: &StakeProof,
-        config: &SecurityConfig,
+        _config: &SecurityConfig,
     ) -> Result<bool> {
         info!(
             "PRODUCTION Stake Proof validation for holder: {}",
             proof.stake_holder
         );
 
-        // 1. Basic validation first
-        if !proof.validate() {
+        // CANONICAL MODEL: PoStake is authorization (WHO), never a magnitude.
+        // There is NO minimum-stake threshold and NO MAX_REASONABLE_STAKE
+        // overflow gate — those enforced a coin quantity that does not exist.
+        // Authorization = a bound FALCON identity + fresh (non-stale) timestamp.
+
+        // 1. Basic structural validation (identity bound + not stale).
+        if !Proof::validate(proof) {
             error!("Stake proof failed basic validation");
             return Ok(false);
         }
 
-        // 2. Verify minimum stake threshold
-        if proof.stake_amount < config.minimum_stake_threshold {
-            error!(
-                "Stake proof: Insufficient stake - {} < {} required",
-                proof.stake_amount, config.minimum_stake_threshold
-            );
-            return Ok(false);
-        }
-
-        // 3. Verify stake holder identity is not empty
+        // 2. Verify stake holder identity is not empty (the WHO binding).
         if proof.stake_holder.is_empty() || proof.stake_holder_id.is_empty() {
             error!("Stake proof: Missing stake holder identity");
             return Ok(false);
         }
 
-        // 4. Verify cryptographic signature
-        if !proof.verify_signature() {
-            error!("Stake proof: Signature verification failed");
-            return Ok(false);
-        }
-
-        // 5. Check for reasonable stake amounts (prevent overflow attacks)
-        const MAX_REASONABLE_STAKE: u64 = 1_000_000_000_000; // 1 trillion max
-        if proof.stake_amount > MAX_REASONABLE_STAKE {
-            error!(
-                "Stake proof: Unrealistic stake amount: {}",
-                proof.stake_amount
-            );
-            return Ok(false);
-        }
-
-        // 6. Timestamp validation - stake must not be too old
+        // 3. Timestamp validation - authorization must not be too old.
         if let Ok(elapsed) = proof.stake_timestamp.elapsed() {
             if elapsed > Duration::from_secs(30 * 24 * 60 * 60) {
-                // 30 days max
                 error!(
-                    "Stake proof: Stake timestamp too old ({}s)",
+                    "Stake proof: authorization timestamp too old ({}s)",
                     elapsed.as_secs()
                 );
                 return Ok(false);
             }
         }
 
-        // 7. Generate and verify stake signature hash
-        let expected_signature = proof.sign();
-        if expected_signature.len() < 32 {
-            error!("Stake proof: Invalid signature hash");
-            return Ok(false);
-        }
-
         info!(
-            "Stake proof validation PASSED for holder: {} (stake: {})",
-            proof.stake_holder, proof.stake_amount
+            "Stake proof validation PASSED for holder: {} (id: {})",
+            proof.stake_holder, proof.stake_holder_id
         );
         Ok(true)
     }
@@ -619,29 +583,18 @@ impl ProofOfWorkValidator {
             proof.workload_id
         );
 
-        // Basic validation first
-        if !proof.validate() {
+        // CANONICAL MODEL: PoWork is the HASH of work done, never a capacity
+        // number. There is NO computational_power magnitude gate and no
+        // workload-type classification. WHAT = a bound owner + a real
+        // (non-zero) BLAKE3 work hash.
+        if !Proof::validate(proof) {
             error!("Work proof failed basic validation");
             return Ok(false);
         }
 
-        // Verify computational power is reasonable (not zero or suspiciously high)
-        if proof.computational_power == 0 {
-            error!("Work proof: Zero computational power");
+        if proof.work_hash == [0u8; 32] {
+            error!("Work proof: zero work hash (no work performed)");
             return Ok(false);
-        }
-
-        if proof.computational_power > 1_000_000 {
-            error!(
-                "Work proof: Suspiciously high computational power: {}",
-                proof.computational_power
-            );
-            return Ok(false);
-        }
-
-        // Verify workload type is valid
-        if proof.workload_type != WorkloadType::Certificate {
-            warn!("Work proof: Non-certificate workload type");
         }
 
         info!(

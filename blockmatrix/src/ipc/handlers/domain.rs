@@ -8,6 +8,7 @@ use std::sync::Arc;
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::INVALID_PARAMS;
 use crate::ipc::state::DaemonState;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Register domain-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {

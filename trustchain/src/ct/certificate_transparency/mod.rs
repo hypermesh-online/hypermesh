@@ -14,6 +14,8 @@ pub mod types;
 pub use operations::CertificateTransparencyLog;
 pub use types::*;
 
+use crate::proof_of_state::StateProofOps;
+
 #[cfg(test)]
 mod tests {
     use super::*;

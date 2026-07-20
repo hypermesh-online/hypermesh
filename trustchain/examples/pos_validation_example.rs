@@ -9,6 +9,7 @@
 
 use std::time::Duration;
 use trustchain::proof_of_state::{AssetProofRequirements, AssetValidationContext, StateProof};
+use trustchain::proof_of_state::StateProofOps;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -68,12 +69,12 @@ async fn example_2_minimum_requirements() -> anyhow::Result<()> {
 
     let proof = StateProof::new_for_testing();
 
-    // Validate with specific minimum requirements
+    // Validate with a time-freshness bound only. PoStake is authorization (no
+    // magnitude), PoWork is a work hash (no compute magnitude), and PoSpace is
+    // a location (capacity is descriptive) — so there is no minimum-anything
+    // gate; the only bound is the WHEN proof's freshness.
     let validation = proof.verify_with_requirements(
-        5000,                    // min_stake (5000 tokens)
         Duration::from_secs(60), // max_time_offset (60 seconds)
-        10 * 1024 * 1024,        // min_storage (10 MB)
-        500,                     // min_compute (500 units)
     )?;
 
     println!("Validation result: {}", validation.all_valid);
@@ -94,14 +95,12 @@ async fn example_3_asset_validation() -> anyhow::Result<()> {
 
     let proof = StateProof::new_for_testing();
 
-    // Create asset validation context
+    // Create asset validation context. All four proofs are required to be
+    // present and self-consistent — there are no minimum magnitude gates.
     let context = AssetValidationContext::new(
         "asset_cpu_core_001".to_string(),
         AssetProofRequirements::all(), // All 4 proofs required
-    )
-    .with_min_stake(10000) // 10K token minimum
-    .with_min_storage(50 * 1024 * 1024) // 50 MB minimum
-    .with_min_compute(1000); // 1000 compute units
+    );
 
     // Validate for asset
     let validation = proof.validate_for_asset(&context)?;
@@ -136,9 +135,7 @@ async fn example_4_partial_requirements() -> anyhow::Result<()> {
         false, // require_time (not needed)
     );
 
-    let context = AssetValidationContext::new("asset_storage_001".to_string(), requirements)
-        .with_min_stake(5000)
-        .with_min_storage(100 * 1024 * 1024); // 100 MB
+    let context = AssetValidationContext::new("asset_storage_001".to_string(), requirements);
 
     let validation = proof.validate_for_asset(&context)?;
 

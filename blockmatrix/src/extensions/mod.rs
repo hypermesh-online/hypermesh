@@ -134,6 +134,7 @@ mod tests {
     use super::*;
     use semver::Version;
     use std::collections::HashSet;
+    use std::time::Duration;
 
     #[test]
     fn test_extension_metadata() {
@@ -185,6 +186,8 @@ mod tests {
         assert!(reqs.require_proof_of_stake);
         assert!(reqs.require_proof_of_work);
         assert!(reqs.require_proof_of_time);
-        assert_eq!(reqs.min_space_commitment, Some(1024 * 1024));
+        // Only the WHEN proof carries a quantitative bound. No minimum
+        // stake / storage / compute may exist here.
+        assert_eq!(reqs.time_window, Some(Duration::from_secs(300)));
     }
 }

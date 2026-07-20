@@ -35,111 +35,70 @@ pub use validator::{
 // Re-export hypermesh_client types explicitly, excluding ValidationMetrics
 // (which collides with validator::ValidationMetrics — different struct).
 pub use hypermesh_client::{
-    ByzantineFaultToleranceStatus, CertificateType, FourProofSet, FourProofValidationRequest,
+    ByzantineFaultToleranceStatus, CertificateType, FourProofValidationRequest,
     HyperMeshClientConfig, HyperMeshStateProofClient, PerformanceStatistics,
-    ProofValidationResults, SpaceProofData, StakeProofData, StateProofClientMetrics,
+    ProofValidationResults, StateProofClientMetrics,
     StateProofValidationRequest, StateProofValidationResult, StateProofValidationService,
-    StateProofValidationStatus, TimeProofData, ValidationContext, ValidationDetails,
-    WorkProofData,
+    StateProofValidationStatus, ValidationContext, ValidationDetails,
 };
 
-/// Proof of State Four-Proof Authentication
+// The canonical four-proof composite and its validation bounds live in
+// `hypermesh_lib`. TrustChain re-exports them so
+// `trustchain::proof_of_state::StateProof` keeps resolving for every existing
+// call site, and attaches the generation / crypto LOGIC via `StateProofOps`
+// below. There is exactly ONE `StateProof` type in the workspace.
+pub use hypermesh_lib::proof::{StateProof, StateRequirements};
+
+/// TrustChain's generation + deep-validation logic for the canonical
+/// [`StateProof`].
 ///
-/// Bilateral binary pass/fail authentication. Each proof answers one question:
-/// - WHO owns/validates (PoStake)
-/// - WHEN it occurred (PoTime)
-/// - WHERE it's stored (PoSpace)
-/// - WHAT computational work (PoWork)
-#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
-pub struct StateProof {
-    /// WHO owns/validates (economic security)
-    pub stake_proof: StakeProof,
-    /// WHEN it occurred (temporal ordering)
-    pub time_proof: TimeProof,
-    /// WHERE it's stored (storage commitment)
-    pub space_proof: SpaceProof,
-    /// WHAT computational work (resource proof)
-    pub work_proof: WorkProof,
+/// The TYPE lives in `hypermesh_lib` (single source of truth); the LOGIC that
+/// needs hardware assessment, NTP and FALCON-1024 lives here. Implemented as an
+/// extension trait because `StateProof` is a foreign type to this crate.
+///
+/// Pure-data operations (`new`, `validate`, `validate_with_requirements`,
+/// `to_bytes`, `from_bytes`, `hash`, `new_for_testing`) remain inherent methods
+/// on the lib type and need no import.
+#[async_trait::async_trait]
+pub trait StateProofOps: Sized {
+    /// Generate a real state proof from live node/network state.
+    async fn generate_from_network(node_id: &str) -> Result<Self>;
+
+    /// Validate all four proofs, returning a detailed per-proof report.
+    fn verify_all(&self) -> Result<validation::ProofValidation>;
+
+    /// Comprehensive validation with detailed error reporting.
+    async fn validate_comprehensive(&self) -> Result<bool>;
+
+    /// Validate against a specific asset's proof requirements.
+    fn validate_for_asset(
+        &self,
+        context: &asset_integration::AssetValidationContext,
+    ) -> Result<validation::ProofValidation>;
+
+    /// Validate against a WHEN-freshness bound, returning a detailed report.
+    fn verify_with_requirements(
+        &self,
+        max_time_offset: Duration,
+    ) -> Result<validation::ProofValidation>;
 }
 
-impl StateProof {
-    /// Create a new state proof with all four proofs
-    pub fn new(
-        stake_proof: StakeProof,
-        time_proof: TimeProof,
-        space_proof: SpaceProof,
-        work_proof: WorkProof,
-    ) -> Self {
-        Self {
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof,
-        }
-    }
-
-    /// Generate real state proof from network state
-    pub async fn generate_from_network(node_id: &str) -> Result<Self> {
-        let stake_proof = StakeProof::generate_from_network(node_id).await?;
-        let time_proof = TimeProof::generate_with_ntp_sync().await?;
-        let space_proof = SpaceProof::generate_from_system(node_id).await?;
-        let work_proof = WorkProof::generate_from_computation(node_id).await?;
-
+#[async_trait::async_trait]
+impl StateProofOps for StateProof {
+    async fn generate_from_network(node_id: &str) -> Result<Self> {
         Ok(Self {
-            stake_proof,
-            time_proof,
-            space_proof,
-            work_proof,
+            stake_proof: generate_stake_from_network(node_id).await?,
+            time_proof: generate_time_with_ntp_sync().await?,
+            space_proof: generate_space_from_system(node_id).await?,
+            work_proof: generate_work_from_computation(node_id).await?,
         })
     }
 
-    /// TEST-ONLY: Create a valid test proof
-    #[cfg(test)]
-    pub fn default_for_testing() -> Self {
-        Self::new_for_testing()
+    fn verify_all(&self) -> Result<validation::ProofValidation> {
+        validation::verify_all_proofs(self)
     }
 
-    /// Create a testing proof -- only available in test builds or with localhost-testing feature
-    #[cfg(any(test, feature = "localhost-testing"))]
-    pub fn new_for_testing() -> Self {
-        let mut space_proof = SpaceProof::new(
-            "test_node_001".to_string(),
-            "test_storage_path".to_string(),
-            100 * 1024 * 1024 * 1024, // 100GB total_storage
-        );
-        space_proof.total_size = 50 * 1024 * 1024 * 1024;
-        space_proof.file_hash =
-            "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
-
-        Self {
-            stake_proof: StakeProof::new(
-                "test_stake_holder".to_string(),
-                "test_node_001".to_string(),
-                10000,
-            ),
-            time_proof: TimeProof::new(Duration::from_secs(1)),
-            space_proof,
-            work_proof: WorkProof::new(
-                "test_owner".to_string(),
-                "test_workload_001".to_string(),
-                1234,
-                1000,
-                WorkloadType::Compute,
-                WorkState::Running,
-            ),
-        }
-    }
-
-    /// Validate all four proofs (binary pass/fail)
-    pub fn validate(&self) -> bool {
-        self.stake_proof.validate()
-            && self.time_proof.validate()
-            && self.space_proof.validate()
-            && self.work_proof.validate()
-    }
-
-    /// Comprehensive validation with detailed error reporting
-    pub async fn validate_comprehensive(&self) -> Result<bool> {
+    async fn validate_comprehensive(&self) -> Result<bool> {
         let validation = self.verify_all()?;
 
         if !validation.all_valid {
@@ -152,81 +111,18 @@ impl StateProof {
         Ok(true)
     }
 
-    /// Validate with specific requirements
-    pub fn validate_with_requirements(&self, requirements: &StateRequirements) -> bool {
-        if self.stake_proof.stake_amount < requirements.minimum_stake {
-            return false;
-        }
-        if self.time_proof.network_time_offset > requirements.max_time_offset {
-            return false;
-        }
-        if self.space_proof.total_storage < requirements.minimum_storage {
-            return false;
-        }
-        if self.work_proof.computational_power < requirements.minimum_compute {
-            return false;
-        }
-        self.validate()
+    fn validate_for_asset(
+        &self,
+        context: &asset_integration::AssetValidationContext,
+    ) -> Result<validation::ProofValidation> {
+        asset_integration::validate_proof_for_asset(self, context)
     }
 
-    /// Serialize for network transmission
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        bincode::serialize(self).map_err(|e| anyhow!("Failed to serialize StateProof: {e}"))
-    }
-
-    /// Deserialize from network transmission
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|e| anyhow!("Failed to deserialize StateProof: {e}"))
-    }
-
-    /// Generate cryptographic hash (BLAKE3)
-    pub fn hash(&self) -> Result<[u8; 32]> {
-        let bytes = self.to_bytes()?;
-        Ok(*blake3::hash(&bytes).as_bytes())
-    }
-}
-
-/// Requirements for state proof validation
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StateRequirements {
-    /// Minimum stake amount for validation
-    pub minimum_stake: u64,
-    /// Maximum time offset for synchronization
-    pub max_time_offset: Duration,
-    /// Minimum storage commitment
-    pub minimum_storage: u64,
-    /// Minimum computational power
-    pub minimum_compute: u64,
-}
-
-impl Default for StateRequirements {
-    fn default() -> Self {
-        Self {
-            minimum_stake: 5000,
-            max_time_offset: Duration::from_secs(60),
-            minimum_storage: 1024 * 1024 * 1024, // 1GB
-            minimum_compute: 1000,
-        }
-    }
-}
-
-impl StateRequirements {
-    pub fn production() -> Self {
-        Self {
-            minimum_stake: 50000,
-            max_time_offset: Duration::from_secs(30),
-            minimum_storage: 10 * 1024 * 1024 * 1024, // 10GB
-            minimum_compute: 10000,
-        }
-    }
-
-    pub fn localhost_testing() -> Self {
-        Self {
-            minimum_stake: 100,
-            max_time_offset: Duration::from_secs(300),
-            minimum_storage: 1024 * 1024, // 1MB
-            minimum_compute: 10,
-        }
+    fn verify_with_requirements(
+        &self,
+        max_time_offset: Duration,
+    ) -> Result<validation::ProofValidation> {
+        validation::verify_proof_with_requirements(self, max_time_offset)
     }
 }
 
@@ -290,45 +186,11 @@ impl StateProofContext {
     }
 }
 
-/// Wire format for FALCON-signed state proofs used by `TrustChainProofProvider`.
-///
-/// This envelope wraps a serialized `StateProof` with a FALCON-1024 detached
-/// signature, the signer's public key, and a replay-prevention nonce. It is
-/// the on-the-wire format so that every proof exchanged during bilateral
-/// handshakes is cryptographically bound to the signing node.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WireSignedProof {
-    /// JSON-serialized `StateProof`
-    pub proof_bytes: Vec<u8>,
-    /// FALCON-1024 detached signature over `BLAKE3(proof_bytes || nonce)`
-    pub signature: Vec<u8>,
-    /// Signer's full FALCON-1024 public key
-    pub signer_pubkey: Vec<u8>,
-    /// Random nonce to prevent replay attacks
-    pub nonce: [u8; 32],
-}
-
-impl WireSignedProof {
-    /// Raw FALCON-1024 public key that signed this proof.
-    ///
-    /// The bilateral handshake binds this to the peer's authenticated
-    /// identity key: a proof is only accepted when this key equals the
-    /// FALCON key that satisfied the handshake identity binding
-    /// (`BLAKE3(pubkey) == node_id`). Without this check, an attacker could
-    /// present a self-signed proof carrying its own key and always pass
-    /// signature verification (F2 Sybil vector).
-    pub fn signer_pubkey_bytes(&self) -> &[u8] {
-        &self.signer_pubkey
-    }
-
-    /// Returns true iff this proof was signed by `pubkey` (raw FALCON bytes).
-    ///
-    /// Used by the handshake to enforce signer↔identity binding: the proof
-    /// signer MUST be the same key that authenticated the peer's identity.
-    pub fn signer_matches(&self, pubkey: &[u8]) -> bool {
-        self.signer_pubkey == pubkey
-    }
-}
+// Wire format for FALCON-signed state proofs is canonical in hypermesh_lib.
+// TrustChain re-exports it; `TrustChainProofProvider` produces/consumes it and
+// `SignedStateProof` converts to/from it. The bilateral handshake binds
+// `signer_pubkey` to the peer's authenticated identity key (F2 Sybil defense).
+pub use hypermesh_lib::proof::WireSignedProof;
 
 /// [`StateProofProvider`] implementation backed by TrustChain's `SignedStateProof`.
 ///
@@ -551,8 +413,8 @@ mod tests {
         let deserialized = StateProof::from_bytes(&bytes)?;
 
         assert_eq!(
-            proof.stake_proof.stake_amount,
-            deserialized.stake_proof.stake_amount
+            proof.stake_proof.stake_holder_id,
+            deserialized.stake_proof.stake_holder_id
         );
         Ok(())
     }
@@ -571,17 +433,23 @@ mod tests {
     fn test_new_for_testing_creates_valid_proof() {
         let proof = StateProof::new_for_testing();
 
+        // PoSpace is WHERE (location), never how-much: assert the proof is
+        // bound to a location. Capacity is descriptive and must never gate.
         assert!(
-            proof.space_proof.total_size > 0,
-            "Space proof should have non-zero total_size"
+            !proof.space_proof.node_id.is_empty(),
+            "Space proof (location) must bind a node"
         );
         assert!(
-            proof.stake_proof.stake_amount >= 50,
-            "Stake proof should have sufficient amount for CPU validation"
+            !proof.space_proof.storage_path.is_empty(),
+            "Space proof (location) must bind a storage path"
         );
         assert!(
-            proof.work_proof.computational_power >= 16,
-            "Work proof should have sufficient computational power for CPU"
+            !proof.stake_proof.stake_holder_id.is_empty(),
+            "Stake proof (authorization) must bind an identity"
+        );
+        assert!(
+            proof.work_proof.work_hash != [0u8; 32],
+            "Work proof must carry a real (non-zero) work hash"
         );
         assert!(
             proof.time_proof.nonce > 0,

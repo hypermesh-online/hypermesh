@@ -115,53 +115,60 @@ impl WireExtHeader {
 /// ```c
 /// struct hmesh_pos_header {
 ///     __u8  algorithm;   /* 0x01=FALCON, 0x02=Ed25519, 0x03=ECDSA */
-///     __u32 difficulty;  /* required leading zero bits (kernel-carried) */
-///     __u8  hash[32];    /* work hash (first 32 bytes of proof) */
+///     __u32 reserved;    /* reserved, must be zero */
+///     __u8  hash[32];    /* work hash (BLAKE3 content hash of the work) */
 /// };
 /// ```
 /// Wire layout (40 bytes, little-endian native — memcpy'd in-kernel):
 ///   `[0]`     algorithm  (u8)
 ///   `[1..4]`  padding    (zero)
-///   `[4..8]`  difficulty (u32 LE)
+///   `[4..8]`  reserved   (u32 LE, always zero)
 ///   `[8..40]` hash       (32 bytes)
 ///
-/// The kernel reads `algorithm` @0 and `hash` @8; `difficulty` is carried but
-/// not consulted in-kernel. This is the header STOQ prepends on the send path.
+/// The kernel reads `algorithm` @0 and `hash` @8. This is the header STOQ
+/// prepends on the send path.
+///
+/// `reserved` formerly carried a PoW difficulty target. It no longer does:
+/// **PoWork is the hash of the work done — a content-hash match, not a mining
+/// contest.** The word is pinned to zero so `hash` stays 8-byte aligned and
+/// the 40-byte on-wire layout is unchanged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WirePosHeader {
     /// Signing algorithm indicator (0x01 FALCON / 0x02 Ed25519 / 0x03 ECDSA).
     pub algorithm: u8,
-    /// Required PoW difficulty (leading zero bits). Carried, not kernel-checked.
-    pub difficulty: u32,
-    /// Work hash — the PoS token's 32-byte BLAKE3 digest.
+    /// Work hash — the PoS token's 32-byte BLAKE3 content hash.
     pub hash: [u8; 32],
 }
 
 impl WirePosHeader {
     /// Serialized size matching the C struct's natural alignment.
-    pub const SIZE: usize = 40; // 1 + 3 pad + 4 + 32
+    pub const SIZE: usize = 40; // 1 + 3 pad + 4 reserved + 32
+
+    /// Byte offset of the reserved (always-zero) word in the wire layout.
+    const RESERVED_RANGE: std::ops::Range<usize> = 4..8;
 
     /// Construct from a PoS token's 32-byte work hash (FALCON-1024 default).
-    pub fn from_pos_hash(hash: [u8; 32], difficulty: u32) -> Self {
+    pub fn from_pos_hash(hash: [u8; 32]) -> Self {
         Self {
             algorithm: WIRE_HDR_POS_ALG_FALCON,
-            difficulty,
             hash,
         }
     }
 
-    /// Serialize to the exact 40-byte C layout (algorithm@0, difficulty@4,
+    /// Serialize to the exact 40-byte C layout (algorithm@0, reserved@4 = 0,
     /// hash@8; pad bytes are zero).
     pub fn to_bytes(&self) -> [u8; 40] {
         let mut b = [0u8; 40];
         b[0] = self.algorithm;
-        // b[1..4] padding stays zero.
-        b[4..8].copy_from_slice(&self.difficulty.to_le_bytes());
+        // b[1..4] padding and b[4..8] `reserved` stay zero.
         b[8..40].copy_from_slice(&self.hash);
         b
     }
 
     /// Deserialize from the 40-byte C layout. Returns `None` if too short.
+    ///
+    /// The reserved word at `[4..8]` is ignored on read — nothing in the
+    /// protocol derives meaning from it.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < Self::SIZE {
             return None;
@@ -170,7 +177,6 @@ impl WirePosHeader {
         hash.copy_from_slice(&bytes[8..40]);
         Some(Self {
             algorithm: bytes[0],
-            difficulty: u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
             hash,
         })
     }
@@ -549,13 +555,12 @@ mod tests {
     #[test]
     fn wire_pos_header_matches_c_offsets() {
         // The C struct hmesh_pos_header (natural alignment) places:
-        //   algorithm @0, (pad 1..4), difficulty @4 (LE u32), hash @8..40.
+        //   algorithm @0, (pad 1..4), reserved @4 (LE u32, zero), hash @8..40.
         // sizeof == 40. This test pins the Rust emit to those EXACT offsets —
         // this byte-identity is what lets the kernel memcpy the header and
         // read algorithm@0 / hash@8 correctly.
         let pos = WirePosHeader {
             algorithm: 0x01,
-            difficulty: 0x0A0B0C0D,
             hash: {
                 let mut h = [0u8; 32];
                 for (i, b) in h.iter_mut().enumerate() {
@@ -572,13 +577,28 @@ mod tests {
         assert_eq!(bytes[0], 0x01);
         // 3 pad bytes @ 1..4 must be zero (C compiler-inserted alignment pad)
         assert_eq!(&bytes[1..4], &[0u8, 0u8, 0u8]);
-        // difficulty @ offset 4, little-endian (native memcpy on x86)
+        // reserved @ offset 4..8 must be ZERO — no difficulty is emitted.
         assert_eq!(
             u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
-            0x0A0B0C0D
+            0
         );
         // hash @ offset 8..40
         assert_eq!(&bytes[8..40], &pos.hash);
+    }
+
+    #[test]
+    fn wire_pos_header_emits_no_difficulty() {
+        // Regression guard for the PoW mining-difficulty removal: the emitted
+        // header carries a work HASH and an algorithm, and nothing else. The
+        // reserved word must be zero for every constructible header.
+        for hash_byte in [0x00u8, 0x01, 0x7F, 0xFF] {
+            let bytes = WirePosHeader::from_pos_hash([hash_byte; 32]).to_bytes();
+            assert_eq!(
+                &bytes[WirePosHeader::RESERVED_RANGE],
+                &[0u8; 4],
+                "test: reserved word must never carry a difficulty target"
+            );
+        }
     }
 
     #[test]
@@ -586,12 +606,11 @@ mod tests {
         // Rust to_bytes -> from_bytes is identity; and a fresh from_bytes over
         // the exact C offsets recovers the same fields (the vice-versa
         // direction of the byte-identity contract).
-        let pos = WirePosHeader::from_pos_hash([0x7Au8; 32], 8);
+        let pos = WirePosHeader::from_pos_hash([0x7Au8; 32]);
         let bytes = pos.to_bytes();
         let decoded = WirePosHeader::from_bytes(&bytes).expect("test: from_bytes");
         assert_eq!(decoded, pos);
         assert_eq!(decoded.algorithm, WIRE_HDR_POS_ALG_FALCON);
-        assert_eq!(decoded.difficulty, 8);
         assert_eq!(decoded.hash, [0x7Au8; 32]);
     }
 
@@ -600,7 +619,7 @@ mod tests {
         // Full on-wire PoS extension = 4-byte common header + 40-byte payload.
         // A C reader parses hmesh_header (4) then hmesh_pos_header (40) from
         // exactly these bytes.
-        let pos = WirePosHeader::from_pos_hash([0x11u8; 32], 8);
+        let pos = WirePosHeader::from_pos_hash([0x11u8; 32]);
         let ext = encode_pos_extension(&pos);
         assert_eq!(ext.len(), 44);
 

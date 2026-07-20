@@ -20,6 +20,7 @@ use stoq::StoqApiServer;
 use crate::ca::certificate_store::CertificateStore;
 use crate::ca::TrustChainCA;
 use crate::dns::DnsResolver;
+use crate::proof_of_state::StateProofOps;
 
 /// TrustChain STOQ API configuration
 #[derive(Debug, Clone)]

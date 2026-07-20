@@ -107,14 +107,6 @@ impl CatalogExtensionConfig {
         self
     }
 
-    /// Minimum stake amount required for publishing packages.
-    /// Derived from security.min_state_proofs as a scaling factor.
-    /// Default: 100 tokens (requires non-trivial economic commitment).
-    pub fn min_stake_for_publish(&self) -> u64 {
-        // Base minimum of 100 tokens, scaled by Proof of State requirements
-        100 * self.security.min_state_proofs as u64
-    }
-
     /// Builder pattern for HyperMesh address
     pub fn with_hypermesh_address(mut self, address: String) -> Self {
         self.hypermesh_address = address;

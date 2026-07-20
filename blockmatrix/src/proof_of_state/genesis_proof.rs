@@ -20,10 +20,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::os_integration::{DeviceFingerprint, OsAbstraction};
-use trustchain::proof_of_state::proof::{
-    SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
-};
+use trustchain::proof_of_state::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 use trustchain::proof_of_state::StateProof;
+
+use crate::assets::core::authz::{
+    AuthorizationSet, CapacityDimension, CapacityProfile,
+};
 
 /// Prefix marking a recoverable device-fingerprint binding inside a proof
 /// string field. The continuity gate parses `PoStake.stake_holder` for this
@@ -120,14 +122,16 @@ impl HardwareAssessment {
 
 /// Generate a valid Proof of State for genesis/hardware-registration blocks.
 ///
-/// The proof uses real hardware assessment data and is guaranteed to pass
-/// `StateRequirements::default()` validation when the node meets R13
-/// minimum device spec (2-core 1GHz, 4GB RAM, 50GB storage).
+/// The proof uses real hardware assessment data and answers the four canonical
+/// questions — WHERE (PoSpace, location), WHO (PoStake, authorization), WHAT
+/// (PoWork, work hash), WHEN (PoTime, temporal) — with present, self-consistent
+/// proofs.
 ///
-/// Stake calculation: `cores * cpu_mhz` ensures any 2-core 1GHz machine
-/// produces stake >= 2000 * 1 = 2000. We add memory contribution
-/// (memory_bytes / 1GB) to comfortably exceed the 5000 minimum stake
-/// for any R13-compliant device (2 cores * 1000 MHz + 4096 MB/1024 = 6000).
+/// CANONICAL MODEL: PoStake is an AUTHORIZATION — the self-owner device identity
+/// binding — NOT a magnitude. There is no stake amount and no minimum-stake
+/// threshold; genesis admission requires a bound identity (WHO), not a number.
+/// Hardware capacity figures are descriptive asset attributes (the resource
+/// adapter's `CapacityProfile`), never a proof gate.
 pub fn generate_genesis_proof(hw: &HardwareAssessment) -> StateProof {
     let stake = build_stake_proof(hw);
     let time = build_time_proof();
@@ -137,25 +141,23 @@ pub fn generate_genesis_proof(hw: &HardwareAssessment) -> StateProof {
     StateProof::new(stake, time, space, work)
 }
 
-/// PoStake (WHO): device-bound node identity + hardware-derived economic value.
+/// PoStake (WHO): device-bound node identity — an AUTHORIZATION, never a
+/// magnitude.
+///
+/// CANONICAL MODEL: PoStake answers WHO (identity binding), never "how much".
+/// There is NO stake amount — the hardware capacity figure it used to carry now
+/// lives in the resource adapter's [`CapacityProfile`] (see
+/// [`genesis_capacity_profile`]), which is descriptive and never gated.
 ///
 /// - `stake_holder_id` = the canonical device node ID (`BLAKE3(falcon_pubkey)`
 ///   when available), NOT `genesis_node_{coord}`.
 /// - `stake_holder` carries the RECOVERABLE device-fingerprint binding
 ///   (`device_fp:<hex>`) so the continuity gate can read it back and reject a
 ///   copied identity on a different machine.
-///
-/// stake_amount = (cores * cpu_mhz) + (memory_mb)
-/// For R13 minimum (2 cores, 1000 MHz, 4096 MB): 2000 + 4096 = 6096 > 5000
 fn build_stake_proof(hw: &HardwareAssessment) -> StakeProof {
-    let memory_mb = hw.memory_bytes / (1024 * 1024);
-    let compute_value = (hw.cpu_cores as u64) * (hw.cpu_mhz as u64);
-    let stake_amount = compute_value + memory_mb;
-
     StakeProof::new(
         format!("{}{}", DEVICE_BINDING_PREFIX, hw.device_fingerprint.hex()),
         hw.node_id.clone(),
-        stake_amount,
     )
 }
 
@@ -208,35 +210,58 @@ fn build_time_proof() -> TimeProof {
     TimeProof::new(offset)
 }
 
-/// PoWork (WHAT/HOW): device-bound, CPU-timed computational witness.
+/// PoWork (WHAT): the HASH of work done — a device-bound, CPU-timed BLAKE3
+/// iteration answer.
 ///
-/// `computational_power = cores * cpu_mhz` (measured, not claimed). The
-/// `work_challenges` (previously empty) now carry a CPU-timed BLAKE3
-/// iteration answer bound to the device fingerprint — proof that THIS device
-/// did the work, not a generic capacity number. `owner_id` is the device
-/// node ID.
+/// CANONICAL MODEL: PoWork is the BLAKE3 hash of the work performed (WHAT), NOT
+/// a resource-capacity figure. The `work_hash` is `iterate(BLAKE3,
+/// fingerprint || node_id, N)` — real CPU work bound to THIS physical device
+/// (via the fingerprint), not a generic capacity number. `owner_id` is the
+/// device node ID.
 fn build_work_proof(hw: &HardwareAssessment) -> WorkProof {
-    let computational_power = (hw.cpu_cores as u64) * (hw.cpu_mhz as u64);
-
-    let mut work = WorkProof::new(
+    WorkProof::new(
         hw.node_id.clone(),
         format!("genesis_{}", hw.node_id),
-        std::process::id() as u64,
-        computational_power,
-        WorkloadType::Compute,
-        WorkState::Running,
-    );
-    work.work_challenges = vec![device_work_challenge(hw)];
-    work
+        device_work_hash(hw),
+    )
+}
+
+/// Descriptive hardware capacity of the node, recorded as an adapter
+/// [`CapacityProfile`] rather than as any proof magnitude.
+///
+/// CANONICAL MODEL: capacity is a DESCRIPTIVE asset attribute, never a proof and
+/// never a gate. This is where the historic `cores * cpu_mhz + memory_mb`
+/// hardware figure now lives — as advertised capacity dimensions, not as PoS.
+pub fn genesis_capacity_profile(hw: &HardwareAssessment) -> CapacityProfile {
+    let memory_mb = hw.memory_bytes / (1024 * 1024);
+    let compute_units = (hw.cpu_cores as u64) * (hw.cpu_mhz as u64);
+    CapacityProfile {
+        dimensions: vec![
+            CapacityDimension { name: "cpu_cores".into(), total_units: hw.cpu_cores as u64 },
+            CapacityDimension { name: "cpu_mhz".into(), total_units: hw.cpu_mhz as u64 },
+            CapacityDimension { name: "compute_units".into(), total_units: compute_units },
+            CapacityDimension { name: "memory_mb".into(), total_units: memory_mb },
+            CapacityDimension {
+                name: "storage_bytes".into(),
+                total_units: hw.storage_bytes,
+            },
+        ],
+    }
+}
+
+/// Genesis authorization: the node self-owns its genesis assets (distribution
+/// right), with no grants yet. Owner identity is the device node ID.
+pub fn genesis_authorization(hw: &HardwareAssessment) -> AuthorizationSet {
+    AuthorizationSet::with_owner(hw.node_id.clone())
 }
 
 /// Compute a CPU-timed BLAKE3 iteration answer bound to the device.
 ///
-/// The answer is `iterate(BLAKE3, fingerprint || node_id, N)` recorded with
-/// the elapsed micros. This ties the PoWork proof to the physical device
-/// (via the fingerprint) and shows real CPU work was performed at genesis.
-fn device_work_challenge(hw: &HardwareAssessment) -> String {
-    let start = std::time::Instant::now();
+/// The answer is `iterate(BLAKE3, fingerprint || node_id, N)`. This IS the
+/// PoWork hash (WHAT): it ties the proof to the physical device (via the
+/// fingerprint) and is a real function of N CPU-bound BLAKE3 iterations —
+/// evidence that work was actually performed at genesis, not a capacity claim.
+fn device_work_hash(hw: &HardwareAssessment) -> [u8; 32] {
     let mut acc = {
         let mut h = blake3::Hasher::new();
         h.update(b"hypermesh-powork-challenge-v1");
@@ -247,13 +272,7 @@ fn device_work_challenge(hw: &HardwareAssessment) -> String {
     for _ in 0..WORK_CHALLENGE_ITERATIONS {
         acc = *blake3::hash(&acc).as_bytes();
     }
-    let elapsed_us = start.elapsed().as_micros();
-    format!(
-        "iters={}:us={}:ans={}",
-        WORK_CHALLENGE_ITERATIONS,
-        elapsed_us,
-        blake3::Hash::from(acc).to_hex()
-    )
+    acc
 }
 
 /// Recover the device-fingerprint hex recorded in a genesis `StateProof`.
@@ -363,13 +382,10 @@ mod tests {
         assert!(
             proof.validate_with_requirements(&reqs),
             "R13 minimum device must pass default requirements: \
-             stake={} (min {}), storage={} (min {}), compute={} (min {})",
-            proof.stake_proof.stake_amount,
-            reqs.minimum_stake,
-            proof.space_proof.total_storage,
-            reqs.minimum_storage,
-            proof.work_proof.computational_power,
-            reqs.minimum_compute,
+             identity={} (bound?), location={} (bound?), work_hash_set={}",
+            proof.stake_proof.stake_holder_id,
+            proof.space_proof.storage_path,
+            proof.work_proof.work_hash != [0u8; 32],
         );
     }
 
@@ -427,13 +443,38 @@ mod tests {
     }
 
     #[test]
-    fn work_challenge_is_populated_and_device_bound() {
-        let hw = test_hw(4, 2000, 8, 100);
-        let proof = generate_genesis_proof(&hw);
-        assert_eq!(proof.work_proof.work_challenges.len(), 1);
-        let challenge = &proof.work_proof.work_challenges[0];
-        assert!(challenge.contains("ans="), "challenge must carry an answer");
-        assert!(challenge.contains("iters="), "challenge must record iterations");
+    fn work_hash_is_populated_and_device_bound() {
+        // PoWork is the HASH of work done (WHAT). The genesis work hash is the
+        // BLAKE3 iteration answer bound to the device fingerprint — non-zero,
+        // and DIFFERENT for a different device.
+        let hw_a = test_hw(4, 2000, 8, 100);
+        let proof_a = generate_genesis_proof(&hw_a);
+        assert_ne!(
+            proof_a.work_proof.work_hash, [0u8; 32],
+            "work hash must be populated (real work performed)"
+        );
+
+        let mut hw_b = test_hw(4, 2000, 8, 100);
+        hw_b.device_fingerprint = test_fingerprint("B");
+        let proof_b = generate_genesis_proof(&hw_b);
+        assert_ne!(
+            proof_a.work_proof.work_hash, proof_b.work_proof.work_hash,
+            "work hash must be device-bound (differs by fingerprint)"
+        );
+    }
+
+    #[test]
+    fn genesis_capacity_and_authorization_are_descriptive_and_self_owned() {
+        // Hardware capacity lives in a descriptive CapacityProfile, NOT in any
+        // proof; genesis assets are self-owned (distribution right).
+        let hw = test_hw(2, 1000, 4, 50);
+        let profile = genesis_capacity_profile(&hw);
+        assert_eq!(profile.units("compute_units"), Some(2000));
+        assert_eq!(profile.units("memory_mb"), Some(4096));
+
+        let auth = genesis_authorization(&hw);
+        assert!(auth.is_owner(&hw.node_id), "genesis node must self-own");
+        assert!(auth.grants.is_empty(), "genesis has no grants yet");
     }
 
     #[test]
@@ -460,16 +501,17 @@ mod tests {
     }
 
     #[test]
-    fn stake_formula_meets_minimum() {
-        // Verify the formula: cores * mhz + memory_mb >= 5000
-        // R13 minimum: 2 * 1000 + 4096 = 6096
+    fn stake_is_authorization_not_amount() {
+        // CANONICAL MODEL: PoStake carries a bound identity (WHO), never an
+        // amount. The R13 device is authorized because its identity is bound,
+        // not because a magnitude clears a threshold.
         let hw = test_hw(2, 1000, 4, 50);
         let proof = generate_genesis_proof(&hw);
         assert!(
-            proof.stake_proof.stake_amount >= 5000,
-            "Stake {} must be >= 5000 for R13 minimum device",
-            proof.stake_proof.stake_amount,
+            !proof.stake_proof.stake_holder_id.is_empty(),
+            "PoStake must carry a bound identity (authorization)"
         );
+        assert_eq!(proof.stake_proof.stake_holder_id, hw.node_id);
     }
 
     #[test]

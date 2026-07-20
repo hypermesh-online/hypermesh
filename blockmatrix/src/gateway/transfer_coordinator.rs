@@ -583,11 +583,12 @@ impl TransferCoordinator {
         req: &TransferRegisterRequest,
         reason: impl Into<String>,
     ) -> TransferRegisterAck {
-        // Structurally-INVALID sentinel proof (stake_amount = 0 fails
-        // StakeProof::validate) so a rejection ack can never be mistaken
-        // for an authentic proof, independent of the `accepted` flag.
+        // Structurally-INVALID sentinel proof: CANONICAL MODEL — PoStake is
+        // authorization (WHO), so an EMPTY `stake_holder_id` (no bound
+        // identity) fails StakeProof::is_structurally_valid and can never be
+        // mistaken for an authentic proof, independent of the `accepted` flag.
         let mut rejected_proof = StateProof::default();
-        rejected_proof.stake_proof.stake_amount = 0;
+        rejected_proof.stake_proof.stake_holder_id = String::new();
         TransferRegisterAck {
             transfer_id: req.transfer_id.clone(),
             target_block_hash: String::new(),

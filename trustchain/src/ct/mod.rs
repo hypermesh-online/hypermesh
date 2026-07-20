@@ -21,6 +21,7 @@ use tracing::{debug, error, info, warn};
 use crate::config::CTConfig;
 use crate::proof_of_state::{StateProofContext, StateProof};
 use crate::errors::{CTError, Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::StateProofOps;
 
 pub mod fingerprint_tracker;
 pub mod merkle_log;

@@ -157,33 +157,11 @@ pub struct StateProofRequirementConfig {
     /// Require Proof of Time (PoTm) - WHEN
     pub require_proof_of_time: bool,
 
-    /// Minimum stake amount required (in CAESAR tokens)
-    pub minimum_stake: u64,
-
-    /// Maximum allowed time offset
+    /// Maximum allowed time offset (WHEN freshness bound, not a magnitude).
     pub max_time_offset: Duration,
 
     /// Proof validation frequency
     pub validation_frequency: Duration,
-
-    /// Required proof difficulty levels
-    pub difficulty_requirements: DifficultyRequirements,
-}
-
-/// Proof difficulty requirements
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct DifficultyRequirements {
-    /// PoW difficulty requirement
-    pub work_difficulty: u32,
-
-    /// PoSp space commitment requirement (bytes)
-    pub space_commitment: u64,
-
-    /// PoSt minimum stake multiplier
-    pub stake_multiplier: f32,
-
-    /// PoTm temporal precision requirement
-    pub time_precision_ms: u64,
 }
 
 /// CAESAR reward configuration
@@ -450,26 +428,15 @@ impl Default for AutoRenewalConfig {
 
 impl Default for StateProofRequirementConfig {
     fn default() -> Self {
+        // CANONICAL MODEL: which proofs are required (WHO/WHAT/WHERE/WHEN), plus
+        // a WHEN-freshness bound. No minimum stake, no difficulty, no capacity.
         Self {
             require_proof_of_space: true,
             require_proof_of_stake: true,
             require_proof_of_work: true,
             require_proof_of_time: true,
-            minimum_stake: 1000, // 1000 CAESAR tokens
             max_time_offset: Duration::from_secs(30),
             validation_frequency: Duration::from_secs(5 * 60), // 5 minutes
-            difficulty_requirements: DifficultyRequirements::default(),
-        }
-    }
-}
-
-impl Default for DifficultyRequirements {
-    fn default() -> Self {
-        Self {
-            work_difficulty: 16,             // 16-bit difficulty
-            space_commitment: 1_000_000_000, // 1GB
-            stake_multiplier: 1.0,
-            time_precision_ms: 100,
         }
     }
 }

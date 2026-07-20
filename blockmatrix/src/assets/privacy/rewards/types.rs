@@ -47,7 +47,11 @@ pub struct RewardTier {
     pub advancement_conditions: AdvancementConditions,
 }
 
-/// Requirements to qualify for reward tier
+/// Requirements to qualify for reward tier.
+///
+/// CANONICAL MODEL: PoStake is AUTHORIZATION, never a magnitude, so there is no
+/// `min_stake_amount` here. Tier qualification is based on participation and
+/// proof-success behaviour, not on holding an amount.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TierRequirements {
     /// Minimum total allocation time
@@ -61,9 +65,6 @@ pub struct TierRequirements {
 
     /// Minimum state proof success rate
     pub min_state_proof_success_rate: f32,
-
-    /// Minimum stake amount
-    pub min_stake_amount: u64,
 
     /// Whether authentication is required
     pub require_authentication: bool,

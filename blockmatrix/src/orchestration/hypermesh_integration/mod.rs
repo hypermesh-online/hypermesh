@@ -143,11 +143,17 @@ impl HyperMeshContainerOrchestrator {
             return Err(anyhow!("Invalid state proof for container deployment"));
         }
 
-        if state_proof.space_proof.total_size == 0 {
-            return Err(anyhow!("Space proof required but not provided"));
+        // PoSpace is WHERE (location), never how-much. Require the proof be
+        // bound to a location; capacity is descriptive and never gates.
+        if state_proof.space_proof.node_id.is_empty()
+            || state_proof.space_proof.storage_path.is_empty()
+        {
+            return Err(anyhow!("Space proof required but not bound to a location"));
         }
 
-        if state_proof.stake_proof.stake_amount == 0 {
+        // CANONICAL MODEL: PoStake is authorization (WHO) — require a bound
+        // identity, never a stake amount.
+        if state_proof.stake_proof.stake_holder_id.is_empty() {
             return Err(anyhow!("Stake proof required but not provided"));
         }
 

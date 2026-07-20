@@ -17,7 +17,7 @@ use x509_parser::parse_x509_certificate;
 
 use crate::proof_of_state::{
     StateProofClientMetrics, StateProofContext, StateProofValidationResult,
-    StateProofValidationStatus, FourProofSet, HyperMeshStateProofClient,
+    StateProofValidationStatus, HyperMeshStateProofClient,
 };
 
 use super::certificate_store::CertificateStore as CertStore;
@@ -555,10 +555,11 @@ impl TrustChainCA {
         Ok(())
     }
 
-    /// Validate four-proof set through HyperMesh for complex certificate operations
+    /// Validate the canonical four-proof set through HyperMesh for complex
+    /// certificate operations.
     pub async fn validate_four_proofs(
         &self,
-        proof_set: &FourProofSet,
+        proof_set: &hypermesh_lib::proof::StateProof,
         operation: &str,
         asset_id: &str,
         node_id: &str,

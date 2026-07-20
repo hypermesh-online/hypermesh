@@ -27,7 +27,7 @@ mod tests {
     };
     #[allow(unused_imports)]
     use crate::assets::core::{
-        SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+        SpaceProof, StakeProof, TimeProof, WorkProof,
     };
     use std::collections::HashMap;
     use std::time::Duration;
@@ -61,14 +61,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_cpu_allocation() {
+        // CANONICAL MODEL: PoStake is authorization (WHO) and PoWork is the
+        // HASH of work (WHAT) — assert bound identity + a work hash, never
+        // magnitudes.
         let test_proof = StateProof::new_for_testing();
         assert!(
-            test_proof.stake_proof.stake_amount >= 50,
-            "Stake amount should be >= 50"
+            !test_proof.stake_proof.stake_holder_id.is_empty(),
+            "PoStake must carry a bound identity"
         );
         assert!(
-            test_proof.work_proof.computational_power >= 16,
-            "Computational power should be >= 16"
+            test_proof.work_proof.work_hash != [0u8; 32],
+            "PoWork must carry a work hash"
         );
     }
 

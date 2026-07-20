@@ -31,7 +31,6 @@ impl Default for TierRequirements {
             min_privacy_participation: HashMap::new(),
             min_utilization_rate: 0.0,
             min_state_proof_success_rate: 0.0,
-            min_stake_amount: 0,
             require_authentication: false,
         }
     }

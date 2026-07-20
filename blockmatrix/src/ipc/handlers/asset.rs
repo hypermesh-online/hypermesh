@@ -13,6 +13,7 @@ use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
 use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Register asset-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {

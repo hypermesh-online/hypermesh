@@ -14,7 +14,7 @@ use blockmatrix::assets::core::{
 use blockmatrix::network::{
     isolation::{DefaultIsolationManager, IsolationManager},
     multi_network::{MultiNetworkCoordinator, NetworkConfig},
-    trust::{NetworkType, ProofOfState},
+    trust::{NetworkType, StateProof},
 };
 use std::sync::Arc;
 use tracing::info;
@@ -35,13 +35,8 @@ fn create_test_asset() -> AssetRegistration {
 }
 
 /// Generate test Proof of State
-fn generate_test_proof() -> ProofOfState {
-    ProofOfState {
-        proof_of_space: vec![1, 2, 3, 4, 5],
-        proof_of_stake: vec![6, 7, 8, 9, 10],
-        proof_of_work: vec![11, 12, 13, 14, 15],
-        proof_of_time: vec![16, 17, 18, 19, 20],
-    }
+fn generate_test_proof() -> StateProof {
+    StateProof::default()
 }
 
 #[tokio::main]

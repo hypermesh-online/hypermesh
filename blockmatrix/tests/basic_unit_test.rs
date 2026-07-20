@@ -95,37 +95,40 @@ fn test_privacy_levels_ordering() {
 
 #[test]
 fn test_state_proof_structure() {
+    // CANONICAL MODEL: the four proofs answer WHO (authorization identity) /
+    // WHAT (work hash) / WHERE (location) / WHEN (time). Validation checks that
+    // each binding is PRESENT — never that a number clears a threshold.
     #[derive(Debug)]
     struct StateProof {
-        space_size: u64,
-        stake_amount: u64,
-        work_difficulty: u32,
-        time_duration: Duration,
+        location: String,   // WHERE — bound storage location
+        owner_identity: String, // WHO — authorization identity binding
+        work_hash: [u8; 32],    // WHAT — hash of work done
+        time_fresh: bool,       // WHEN — within the freshness window
     }
 
     impl StateProof {
         fn validate(&self) -> bool {
-            self.space_size > 0
-                && self.stake_amount > 0
-                && self.work_difficulty > 0
-                && self.time_duration > Duration::ZERO
+            !self.location.is_empty()
+                && !self.owner_identity.is_empty()
+                && self.work_hash != [0u8; 32]
+                && self.time_fresh
         }
     }
 
     let valid_proof = StateProof {
-        space_size: 1024 * 1024,
-        stake_amount: 1000,
-        work_difficulty: 10,
-        time_duration: Duration::from_secs(60),
+        location: "/mnt/storage".to_string(),
+        owner_identity: "node-identity".to_string(),
+        work_hash: [1u8; 32],
+        time_fresh: true,
     };
 
     assert!(valid_proof.validate(), "Valid proof should validate");
 
     let invalid_proof = StateProof {
-        space_size: 0, // Invalid
-        stake_amount: 1000,
-        work_difficulty: 10,
-        time_duration: Duration::from_secs(60),
+        location: String::new(), // Invalid: no bound location (WHERE)
+        owner_identity: "node-identity".to_string(),
+        work_hash: [1u8; 32],
+        time_fresh: true,
     };
 
     assert!(

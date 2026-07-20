@@ -21,7 +21,7 @@ use super::isolation::{DefaultIsolationManager, IsolationManager};
 use super::trust::{
     AnonymousNetworkHandler, AssetResponse, FederatedNetworkHandler,
     NetworkConfig as TrustNetworkConfig, NetworkConnection, NetworkHandler, NetworkId, NetworkType,
-    P2PNetworkHandler, ProofOfState, PublicNetworkHandler,
+    P2PNetworkHandler, PublicNetworkHandler, StateProof,
 };
 use crate::assets::core::AssetRegistration;
 
@@ -38,7 +38,7 @@ pub struct NetworkConfig {
     pub dns_name: Option<String>,
 
     /// Proof of State for public network
-    pub proof_of_state: Option<ProofOfState>,
+    pub proof_of_state: Option<StateProof>,
 
     /// Custom STOQ port
     pub stoq_port: Option<u16>,
@@ -75,7 +75,7 @@ impl NetworkConfig {
         }
     }
 
-    pub fn public(dns_name: String, proof: ProofOfState) -> Self {
+    pub fn public(dns_name: String, proof: StateProof) -> Self {
         Self {
             peer_addresses: vec![],
             federation_gateway: None,
@@ -465,12 +465,7 @@ mod tests {
                 NetworkType::Public,
                 NetworkConfig::public(
                     "test.node".to_string(),
-                    ProofOfState {
-                        proof_of_space: vec![1, 2, 3],
-                        proof_of_stake: vec![4, 5, 6],
-                        proof_of_work: vec![7, 8, 9],
-                        proof_of_time: vec![10, 11, 12],
-                    },
+                    StateProof::default(),
                 ),
             )
             .await
@@ -508,12 +503,7 @@ mod tests {
                 NetworkType::Public,
                 NetworkConfig::public(
                     "test.node".to_string(),
-                    ProofOfState {
-                        proof_of_space: vec![1],
-                        proof_of_stake: vec![2],
-                        proof_of_work: vec![3],
-                        proof_of_time: vec![4],
-                    },
+                    StateProof::default(),
                 ),
             )
             .await
@@ -583,12 +573,7 @@ mod tests {
                 NetworkType::Public,
                 NetworkConfig::public(
                     "test.node".to_string(),
-                    ProofOfState {
-                        proof_of_space: vec![1],
-                        proof_of_stake: vec![2],
-                        proof_of_work: vec![3],
-                        proof_of_time: vec![4],
-                    },
+                    StateProof::default(),
                 ),
             )
             .await

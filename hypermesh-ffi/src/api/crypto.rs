@@ -56,6 +56,7 @@ use hypermesh_lib::{compute_blake3_hash, NodeSigner};
 use pqcrypto_falcon::falcon1024;
 use std::os::raw::c_int;
 use trustchain::proof_of_state::{StateProof, WireSignedProof};
+use trustchain::proof_of_state::StateProofOps;
 
 /// Publish an asset payload: compute its content address AND produce a
 /// FALCON-signed [`WireSignedProof`] for this identity.

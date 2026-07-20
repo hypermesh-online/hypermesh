@@ -22,7 +22,7 @@ use tracing::{debug, info, warn};
 
 use super::{
     new_random_network_id, AssetRequest, AssetResponse, Certificate, NetworkConfig,
-    NetworkConnection, NetworkHandler, NetworkType, PeerInfo, ProofOfState, StoqTransport,
+    NetworkConnection, NetworkHandler, NetworkType, PeerInfo, StateProof, StoqTransport,
 };
 
 /// Public network handler - BlockMatrix blockchain-registered certificates
@@ -93,17 +93,14 @@ impl PublicNetworkHandler {
     /// Submit Proof of State to LOCAL BlockMatrix blockchain
     async fn submit_proof_of_state(
         &self,
-        proof: &ProofOfState,
+        proof: &StateProof,
         stoq: &Arc<StoqTransport>,
     ) -> Result<Certificate> {
         info!("Submitting Proof of State to LOCAL BlockMatrix blockchain");
 
-        // Validate all four proofs are present
-        if proof.proof_of_space.is_empty()
-            || proof.proof_of_stake.is_empty()
-            || proof.proof_of_work.is_empty()
-            || proof.proof_of_time.is_empty()
-        {
+        // Validate all four proofs are present and self-consistent.
+        // Binary pass/fail — presence of WHO/WHAT/WHERE/WHEN, never a magnitude.
+        if !proof.is_structurally_valid() {
             return Err(anyhow!("All four proofs required for public network"));
         }
 
@@ -136,7 +133,7 @@ impl PublicNetworkHandler {
     async fn register_on_local_blockchain(
         &self,
         _stoq: &Arc<StoqTransport>,
-        proof: &ProofOfState,
+        proof: &StateProof,
     ) -> Result<Certificate> {
         info!("Registering certificate on LOCAL BlockMatrix blockchain");
 
@@ -147,21 +144,21 @@ impl PublicNetworkHandler {
         // 4. Achieve state proof through 4-proof validation
 
         // Derive key material from PoS proofs using BLAKE3.
-        // Public key = BLAKE3(proof_of_stake || proof_of_space)
-        // Signature  = BLAKE3(subject || public_key || proof_of_work || proof_of_time)
+        // Public key = BLAKE3(WHO identity || WHERE location)
+        // Signature  = BLAKE3(subject || public_key || WHAT hash || WHEN nonce)
         let subject = format!("blockmatrix-node-{}", uuid::Uuid::new_v4());
         let issuer = "blockmatrix-local-blockchain".to_string();
 
         let mut pk_hasher = blake3::Hasher::new();
-        pk_hasher.update(&proof.proof_of_stake);
-        pk_hasher.update(&proof.proof_of_space);
+        pk_hasher.update(proof.stake_proof.stake_holder_id.as_bytes());
+        pk_hasher.update(proof.space_proof.storage_path.as_bytes());
         let public_key = pk_hasher.finalize().as_bytes().to_vec();
 
         let mut sig_hasher = blake3::Hasher::new();
         sig_hasher.update(subject.as_bytes());
         sig_hasher.update(&public_key);
-        sig_hasher.update(&proof.proof_of_work);
-        sig_hasher.update(&proof.proof_of_time);
+        sig_hasher.update(&proof.work_proof.work_hash);
+        sig_hasher.update(&proof.time_proof.nonce.to_le_bytes());
         let signature = sig_hasher.finalize().as_bytes().to_vec();
 
         // Fingerprint = BLAKE3(public_key || subject || issuer)
@@ -457,6 +454,8 @@ impl Default for PublicNetworkHandler {
 mod tests {
     use super::*;
     use crate::network::trust::{PeerId, PeerInfo};
+    use hypermesh_lib::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
+    use std::time::Duration;
 
     #[tokio::test]
     async fn test_public_bootstrap_requires_proof() {
@@ -480,12 +479,24 @@ mod tests {
     #[tokio::test]
     async fn test_public_bootstrap_with_proof() {
         let handler = PublicNetworkHandler::new();
-        let proof = ProofOfState {
-            proof_of_space: vec![1, 2, 3],
-            proof_of_stake: vec![4, 5, 6],
-            proof_of_work: vec![7, 8, 9],
-            proof_of_time: vec![10, 11, 12],
-        };
+        let proof = StateProof::new(
+            StakeProof::new("test-owner".to_string(), "test-owner-identity".to_string()),
+            TimeProof::new(Duration::from_secs(1)),
+            {
+                let mut space = SpaceProof::new(
+                    "test-node-001".to_string(),
+                    "hypermesh://test-node-001/store".to_string(),
+                    1024 * 1024 * 1024,
+                );
+                space.file_hash = "a1b2c3d4e5f6".to_string();
+                space
+            },
+            WorkProof::from_work(
+                "test-owner".to_string(),
+                "test-workload".to_string(),
+                b"the work that was actually done",
+            ),
+        );
 
         let config = NetworkConfig {
             network_type: NetworkType::Public,
@@ -549,12 +560,24 @@ mod tests {
     #[tokio::test]
     async fn test_blake3_certificate_derivation() {
         let handler = PublicNetworkHandler::new();
-        let proof = ProofOfState {
-            proof_of_space: vec![1, 2, 3],
-            proof_of_stake: vec![4, 5, 6],
-            proof_of_work: vec![7, 8, 9],
-            proof_of_time: vec![10, 11, 12],
-        };
+        let proof = StateProof::new(
+            StakeProof::new("test-owner".to_string(), "test-owner-identity".to_string()),
+            TimeProof::new(Duration::from_secs(1)),
+            {
+                let mut space = SpaceProof::new(
+                    "test-node-001".to_string(),
+                    "hypermesh://test-node-001/store".to_string(),
+                    1024 * 1024 * 1024,
+                );
+                space.file_hash = "a1b2c3d4e5f6".to_string();
+                space
+            },
+            WorkProof::from_work(
+                "test-owner".to_string(),
+                "test-workload".to_string(),
+                b"the work that was actually done",
+            ),
+        );
 
         let stoq = StoqTransport::new_for_network(NetworkType::Public)
             .expect("test: create transport");
@@ -565,8 +588,8 @@ mod tests {
 
         // Public key should be BLAKE3(PoStake || PoSpace)
         let mut pk_hasher = blake3::Hasher::new();
-        pk_hasher.update(&proof.proof_of_stake);
-        pk_hasher.update(&proof.proof_of_space);
+        pk_hasher.update(proof.stake_proof.stake_holder_id.as_bytes());
+        pk_hasher.update(proof.space_proof.storage_path.as_bytes());
         let expected_pk = pk_hasher.finalize().as_bytes().to_vec();
         assert_eq!(cert.public_key, expected_pk);
 
@@ -581,13 +604,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_proof_validation() {
-        // Empty proofs should fail
-        let empty_proof = ProofOfState {
-            proof_of_space: vec![],
-            proof_of_stake: vec![],
-            proof_of_work: vec![],
-            proof_of_time: vec![],
-        };
+        // A proof with no bound WHO identity must fail: authorization is
+        // presence-of-identity, never a magnitude.
+        let mut empty_proof = StateProof::default();
+        empty_proof.stake_proof.stake_holder_id = String::new();
 
         let handler = PublicNetworkHandler::new();
         let stoq = StoqTransport::new_for_network(NetworkType::Public).expect("test: expected success");

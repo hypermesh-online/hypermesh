@@ -35,6 +35,7 @@ use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{INTERNAL_ERROR, INVALID_PARAMS, RpcError};
 use crate::ipc::state::DaemonState;
 use trustchain::proof_of_state::StateProof;
+use trustchain::proof_of_state::StateProofOps;
 
 /// JSON-RPC error code: capability denied (token signature valid but
 /// the requested method requires a higher scope).

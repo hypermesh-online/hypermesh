@@ -11,6 +11,7 @@ use blockmatrix::bootstrap::NodeBootstrap;
 use blockmatrix::ipc;
 
 use crate::cli::DashboardAction;
+use trustchain::proof_of_state::StateProofOps;
 
 pub(crate) async fn dispatch_dashboard(
     action: DashboardAction,

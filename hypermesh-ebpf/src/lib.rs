@@ -304,7 +304,7 @@ impl HyperMeshEbpf {
         algorithm: u8,
     ) -> Result<(), EbpfError> {
         if let Some(ref xdp) = self.xdp_manager {
-            xdp.update_pos_header_map(src_ip, valid, algorithm, 0)
+            xdp.update_pos_header_map(src_ip, valid, algorithm)
                 .map_err(|e| EbpfError::Xdp(e.to_string()))?;
             // Arm the per-source policy: authenticated peers require PoS.
             let policy = ValidationPolicy::for_privacy_tier(3);
@@ -434,8 +434,8 @@ impl HyperMeshEbpf {
     /// Set kernel-side PoS validation configuration.
     ///
     /// Configures the non-cryptographic structural checks that the XDP
-    /// program applies at wire speed (algorithm validation, PoW difficulty,
-    /// cache TTL).  Full asymmetric crypto verification remains in userspace.
+    /// program applies at wire speed (algorithm validation, cache TTL).
+    /// Full asymmetric crypto verification remains in userspace.
     ///
     /// Delegates to `XdpManager::set_kernel_pos_config()` when the XDP
     /// manager is attached.  Returns Ok if no XDP manager is present.
@@ -446,8 +446,7 @@ impl HyperMeshEbpf {
         } else {
             tracing::debug!(
                 "No XDP manager attached; kernel PoS config not synced \
-                 (difficulty={}, ttl={}ns, enabled={})",
-                config.min_difficulty,
+                 (ttl={}ns, enabled={})",
                 config.validation_ttl_ns,
                 config.enabled
             );
@@ -903,7 +902,6 @@ mod tests {
     fn test_set_kernel_pos_config_custom_values() {
         let mut ebpf = HyperMeshEbpf::default();
         let cfg = KernelPosConfig {
-            min_difficulty: 16,
             max_timestamp_skew_ns: 10 * 60 * 1_000_000_000,
             validation_ttl_ns: 30 * 60 * 1_000_000_000,
             enabled: false,

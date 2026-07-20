@@ -67,16 +67,17 @@ pub struct ExecutionResult {
     pub output: Option<serde_json::Value>,
 }
 
-// Define StateProofContext locally (Catalog-specific configuration)
+// Define StateProofContext locally (Catalog-specific configuration).
+//
+// CANONICAL MODEL: proofs answer WHO (authorization) / WHAT (work hash) /
+// WHERE (location) / WHEN (time), never a magnitude. There is NO stake amount,
+// NO PoW difficulty, and NO minimum space commitment — only whether state proof
+// enforcement is configured and the WHEN-freshness (timing) tolerance.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StateProofContext {
-    /// Network difficulty for PoW
-    pub network_difficulty: u64,
-    /// Minimum space commitment for PoS
-    pub min_space_commitment: u64,
-    /// Minimum stake amount
-    pub min_stake_amount: u64,
-    /// Time synchronization tolerance (ms)
+    /// Whether state proof enforcement is configured for this catalog.
+    pub state_proof_enforced: bool,
+    /// Time synchronization tolerance (ms) — the WHEN-freshness bound.
     pub time_sync_tolerance_ms: u64,
 }
 pub use api::{CatalogAppState, CatalogStoqApi, CatalogStoqConfig};
@@ -243,11 +244,10 @@ impl Catalog {
         // verify that the state proof context is configured. Heavy proof validation happens
         // in the extension lifecycle (publish_package).
         if package.spec.spec.security.state_proof_required
-            && self.state_proof_context.min_stake_amount == 0
-            && self.state_proof_context.min_space_commitment == 0
+            && !self.state_proof_context.state_proof_enforced
         {
             tracing::warn!(
-                "Package '{}' requires state proof validation but state proof context has zero thresholds",
+                "Package '{}' requires state proof validation but state proof enforcement is not configured",
                 package.spec.metadata.name,
             );
         }
@@ -308,10 +308,9 @@ impl Catalog {
         // log that PoS proofs are enforced at the execution layer.
         if package.spec.spec.security.state_proof_required {
             tracing::info!(
-                "Asset {}: Proof of State validation enforced at execution layer (min_stake={}, min_space={})",
+                "Asset {}: Proof of State validation enforced at execution layer (enforced={})",
                 asset_id,
-                self.state_proof_context.min_stake_amount,
-                self.state_proof_context.min_space_commitment,
+                self.state_proof_context.state_proof_enforced,
             );
         }
 

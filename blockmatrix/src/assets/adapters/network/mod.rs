@@ -24,7 +24,7 @@ mod tests {
     use crate::assets::core::{
         AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
         StateProof, NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, TimeProof,
-        WorkProof, WorkState, WorkloadType,
+        WorkProof,
     };
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
@@ -46,7 +46,6 @@ mod tests {
                 StakeProof {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),
-                    stake_amount: 50,
                     stake_timestamp: SystemTime::now(),
 
                 },
@@ -66,12 +65,8 @@ mod tests {
                 },
                 WorkProof {
                     owner_id: "test-worker".to_string(),
+                    work_hash: *blake3::hash(b"test-work").as_bytes(),
                     workload_id: "test-workload".to_string(),
-                    pid: 12345,
-                    computational_power: 20,
-                    workload_type: WorkloadType::Network,
-                    work_state: WorkState::Completed,
-                    work_challenges: vec!["network_challenge".to_string()],
                     proof_timestamp: SystemTime::now(),
                 },
             ),

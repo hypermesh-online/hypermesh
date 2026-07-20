@@ -18,11 +18,14 @@ use tracing::{debug, info, warn};
 use trustchain::ca::{CAConfig, CertificateRequest, CertificateStatus, TrustChainCA};
 use trustchain::proof_of_state::{
     hypermesh_client::{
-        StateProofValidationStatus, FourProofSet, HyperMeshClientConfig, HyperMeshStateProofClient,
-        SpaceProofData, StakeProofData, TimeProofData, WorkProofData,
+        HyperMeshClientConfig, HyperMeshStateProofClient, StateProofValidationStatus,
     },
     StateProof, StateRequirements,
 };
+
+// Canonical four-proof set (single source of truth): authorization (WHO),
+// work hash (WHAT), location (WHERE), time (WHEN). No magnitude anywhere.
+use hypermesh_lib::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 
 // STOQ imports
 use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
@@ -352,31 +355,21 @@ async fn test_four_proof_validation() -> Result<()> {
     let client_config = HyperMeshClientConfig::default();
     let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
-    // Create valid four-proof set
-    let proof_set = FourProofSet {
-        space_proof: SpaceProofData {
-            storage_commitment: 1024 * 1024, // 1MB
-            network_position: "hypermesh://test-node".to_string(),
-            allocation_proof: vec![1, 2, 3, 4],
-        },
-        stake_proof: StakeProofData {
-            stake_amount: 10000,
-            authority_level: 100,
-            access_permissions: vec!["read".to_string(), "write".to_string()],
-        },
-        work_proof: WorkProofData {
-            computational_proof: vec![5, 6, 7, 8],
-            difficulty_target: 20,
-            operation_signature: "certificate-issuance".to_string(),
-        },
-        time_proof: TimeProofData {
-            block_timestamp: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)?
-                .as_secs(),
-            sequence_number: 1,
-            temporal_proof: vec![9, 10, 11, 12],
-        },
-    };
+    // Create a valid canonical four-proof set: bound identity (WHO), a work
+    // hash (WHAT), a storage location (WHERE), and a timestamp (WHEN).
+    let proof_set = StateProof::new(
+        StakeProof::new("test-owner".to_string(), "test-owner-identity".to_string()),
+        TimeProof::new(Duration::from_secs(0)),
+        SpaceProof::new(
+            "test-node".to_string(),
+            "hypermesh://test-node".to_string(),
+            1024 * 1024, // descriptive capacity, not a gate
+        ),
+        WorkProof::from_work(
+            "test-owner".to_string(),
+            "certificate-issuance".to_string(),
+            b"certificate issuance work",
+        ));
 
     // Validate four-proof set
     let result = hypermesh_client
@@ -414,29 +407,16 @@ async fn test_invalid_proof_rejection() -> Result<()> {
     let client_config = HyperMeshClientConfig::default();
     let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
-    // Create invalid proof set (missing required fields)
-    let proof_set = FourProofSet {
-        space_proof: SpaceProofData {
-            storage_commitment: 0,            // Invalid: zero commitment
-            network_position: "".to_string(), // Invalid: empty
-            allocation_proof: vec![],
-        },
-        stake_proof: StakeProofData {
-            stake_amount: 0, // Invalid: zero stake
-            authority_level: 0,
-            access_permissions: vec![],
-        },
-        work_proof: WorkProofData {
-            computational_proof: vec![],
-            difficulty_target: 0, // Invalid: zero difficulty
-            operation_signature: "".to_string(),
-        },
-        time_proof: TimeProofData {
-            block_timestamp: 0, // Invalid: zero timestamp
-            sequence_number: 0,
-            temporal_proof: vec![],
-        },
-    };
+    // Create a structurally invalid proof set: no bound identity (empty WHO)
+    // and a zero work hash (no WHAT). Authorization/hash absence — never a
+    // magnitude threshold — is what makes a proof invalid.
+    let proof_set = StateProof::new(
+        StakeProof::new(String::new(), String::new()), // zero hash → invalid WHAT
+        TimeProof::new(Duration::from_secs(0)),
+        SpaceProof::new(String::new(), String::new(), 1024), // no identity → invalid WHO
+        WorkProof::new(String::new(), String::new(), [0u8; 32]));
+    assert!(!proof_set.stake_proof.is_structurally_valid());
+    assert!(!proof_set.work_proof.is_structurally_valid());
 
     // In real implementation, this would return Invalid status
     // For now, our mock always returns Valid, so we just verify it doesn't crash
@@ -465,29 +445,25 @@ async fn test_byzantine_node_detection() -> Result<()> {
     let client_config = HyperMeshClientConfig::default();
     let hypermesh_client = HyperMeshStateProofClient::new(client_config).await?;
 
-    // Create request with Byzantine node ID
-    let proof_set = FourProofSet {
-        space_proof: SpaceProofData {
-            storage_commitment: 1024,
-            network_position: "hypermesh://byzantine-node".to_string(),
-            allocation_proof: vec![1, 2, 3],
-        },
-        stake_proof: StakeProofData {
-            stake_amount: 100,
-            authority_level: 10,
-            access_permissions: vec!["read".to_string()],
-        },
-        work_proof: WorkProofData {
-            computational_proof: vec![4, 5, 6],
-            difficulty_target: 10,
-            operation_signature: "byzantine-op".to_string(),
-        },
-        time_proof: TimeProofData {
-            block_timestamp: 1000,
-            sequence_number: 1,
-            temporal_proof: vec![7, 8, 9],
-        },
-    };
+    // Create request with a Byzantine node ID but a well-formed canonical
+    // proof set (identity + work hash + location + time). Byzantine detection
+    // keys on node identity/behavior, not on any proof magnitude.
+    let proof_set = StateProof::new(
+        StakeProof::new(
+            "byzantine-owner".to_string(),
+            "byzantine-identity".to_string(),
+        ),
+        TimeProof::new(Duration::from_secs(0)),
+        SpaceProof::new(
+            "byzantine-node".to_string(),
+            "hypermesh://byzantine-node".to_string(),
+            1024,
+        ),
+        WorkProof::from_work(
+            "byzantine-owner".to_string(),
+            "byzantine-op".to_string(),
+            b"byzantine op work",
+        ));
 
     let result = hypermesh_client
         .validate_four_proofs(&proof_set, "test_op", "test-asset", "byzantine_node_666")

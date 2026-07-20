@@ -182,13 +182,18 @@ impl AssetAdapter for ContainerAssetAdapter {
     }
 
     async fn validate_state_proof(&self, proof: &StateProof) -> AssetResult<bool> {
-        if proof.space_proof.total_size == 0 {
+        // PoSpace is WHERE (location), never how-much. Require the proof be
+        // bound to a location; capacity is descriptive and never gates.
+        if proof.space_proof.node_id.is_empty() || proof.space_proof.storage_path.is_empty() {
             return Ok(false);
         }
-        if proof.stake_proof.stake_amount < 50 {
+        // CANONICAL MODEL: PoStake is authorization (WHO) — require a bound
+        // identity, never a stake magnitude.
+        if proof.stake_proof.stake_holder_id.is_empty() {
             return Ok(false);
         }
-        if proof.work_proof.computational_power < 30 {
+        // PoWork is the HASH of work done (WHAT) — require work was hashed.
+        if proof.work_proof.work_hash == [0u8; 32] {
             return Ok(false);
         }
         if proof.time_proof.network_time_offset > Duration::from_secs(15) {

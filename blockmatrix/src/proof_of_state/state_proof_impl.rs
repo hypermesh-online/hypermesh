@@ -12,6 +12,7 @@ use crate::transport::PeerIdentity;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Arc;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Result type for state proof operations
 pub type StateProofOpResult<T> = Result<T, StateProofError>;

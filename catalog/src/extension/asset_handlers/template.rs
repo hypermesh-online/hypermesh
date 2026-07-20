@@ -200,12 +200,12 @@ impl AssetExtensionHandler for TemplateHandler {
         }
 
         // Template assets require valid stake and work proofs
-        if proof.stake_proof.stake_amount == 0 {
-            tracing::warn!("Template asset {}: stake amount is zero", id);
+        if proof.stake_proof.stake_holder_id.is_empty() {
+            tracing::warn!("Template asset {}: authorization has no bound identity", id);
             return Ok(false);
         }
-        if proof.work_proof.computational_power == 0 {
-            tracing::warn!("Template asset {}: computational power is zero", id);
+        if proof.work_proof.work_hash == [0u8; 32] {
+            tracing::warn!("Template asset {}: work hash is zero (no work performed)", id);
             return Ok(false);
         }
 

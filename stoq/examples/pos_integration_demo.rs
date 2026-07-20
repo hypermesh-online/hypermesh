@@ -11,8 +11,8 @@ use anyhow::Result;
 use hypermesh_lib::PrivacyMode;
 use std::time::{Duration, SystemTime};
 use stoq::protocol::{
-    MatrixPosition, MatrixPositionExt, PosToken, ProofOfSpace, ProofOfStake, ProofOfTime,
-    ProofOfWork,
+    MatrixPosition, MatrixPositionExt, PosToken, SpaceProof, StakeProof, StateProof, TimeProof,
+    WorkProof,
 };
 use stoq::transport::certificate_strategy::NetworkType;
 use stoq::transport::{StoqTransport, TransportConfig};
@@ -154,22 +154,23 @@ async fn demo_public_network(transport: &StoqTransport) -> Result<()> {
 
     info!("Created PoS token with 4 proofs:");
     info!(
-        "  Proof of Space (WHERE): Matrix position ({}, {}, {})",
-        pos_token.proof_of_space.matrix_position.0,
-        pos_token.proof_of_space.matrix_position.1,
-        pos_token.proof_of_space.matrix_position.2
+        "  Proof of Space (WHERE): Matrix position ({}, {}, {}) at {}",
+        pos_token.matrix_position.0,
+        pos_token.matrix_position.1,
+        pos_token.matrix_position.2,
+        pos_token.proof.space_proof.storage_path
     );
     info!(
-        "  Proof of Stake (WHO): {} tokens staked",
-        pos_token.proof_of_stake.stake_amount
+        "  Proof of Stake (WHO): authorized identity {} (authorization, not an amount)",
+        pos_token.proof.stake_proof.stake_holder_id
     );
     info!(
-        "  Proof of Work (WHAT): Difficulty {}",
-        pos_token.proof_of_work.difficulty
+        "  Proof of Work (WHAT): work hash {} (a hash, not a difficulty)",
+        hex_prefix(&pos_token.proof.work_proof.work_hash)
     );
     info!(
-        "  Proof of Time (WHEN): Sequence {}",
-        pos_token.proof_of_time.sequence
+        "  Proof of Time (WHEN): sequence {}",
+        pos_token.sequence
     );
 
     let result = transport
@@ -340,31 +341,43 @@ async fn demo_privacy_enforcement(transport: &StoqTransport) -> Result<()> {
     Ok(())
 }
 
+/// Build a canonical four-proof set for the demo.
+///
+/// CANONICAL MODEL: authorization (WHO) with NO amount, work HASH (WHAT),
+/// location (WHERE, capacity descriptive only), time (WHEN).
+/// First 8 bytes of a hash rendered as hex, for logging.
+fn hex_prefix(bytes: &[u8; 32]) -> String {
+    bytes[..8].iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn demo_proof() -> StateProof {
+    let mut space = SpaceProof::new(
+        "demo-node-001".to_string(),
+        "hypermesh://demo-node-001/store".to_string(),
+        1024 * 1024 * 1024,
+    );
+    space.file_hash = "d3m0c0nt3nth45h".to_string();
+
+    StateProof::new(
+        StakeProof::new("demo-owner".to_string(), "unbound".to_string()),
+        TimeProof::new(Duration::from_secs(1)),
+        space,
+        WorkProof::from_work(
+            "demo-owner".to_string(),
+            "demo-workload".to_string(),
+            b"the work the demo actually did",
+        ),
+    )
+}
+
 fn create_demo_pos_token() -> PosToken {
-    PosToken {
-        id: vec![1, 2, 3, 4, 5, 6, 7, 8],
-        proof_of_space: ProofOfSpace {
-            commitment_hash: vec![10, 20, 30, 40, 50, 60, 70, 80],
-            matrix_position: (100, 200, 300), // Matrix coordinates
-            capacity: 1024 * 1024 * 1024,     // 1 GB
-        },
-        proof_of_stake: ProofOfStake {
-            owner_pubkey: vec![11, 22, 33, 44, 55, 66, 77, 88],
-            stake_amount: 10_000, // Economic stake
-            staked_until: SystemTime::now() + Duration::from_secs(86400), // 1 day
-        },
-        proof_of_work: ProofOfWork {
-            difficulty: 20, // Computational difficulty
-            nonce: 123456789,
-            work_hash: vec![99, 88, 77, 66, 55, 44, 33, 22],
-        },
-        proof_of_time: ProofOfTime {
-            timestamp: SystemTime::now(),
-            sequence: 42, // Temporal ordering
-            prev_hash: vec![5, 10, 15, 20, 25, 30, 35, 40],
-        },
-        signature: vec![111, 222, 111, 222], // PoS token signature
-        expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour
-        issuer_pubkey: Some(vec![200, 201, 202, 203]),
-    }
+    PosToken::for_identity(
+        vec![1, 2, 3, 4, 5, 6, 7, 8],
+        vec![200, 201, 202, 203],
+        demo_proof(),
+        (100, 200, 300),
+        42,
+        vec![5, 10, 15, 20, 25, 30, 35, 40],
+        Duration::from_secs(3600),
+    )
 }

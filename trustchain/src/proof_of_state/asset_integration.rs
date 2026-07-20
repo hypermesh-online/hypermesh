@@ -53,19 +53,18 @@ impl AssetProofRequirements {
     }
 }
 
-/// Asset validation context
+/// Asset validation context.
+///
+/// CANONICAL MODEL: proofs answer WHO (authorization) / WHAT (work hash) /
+/// WHERE (location) / WHEN (time) — never a magnitude. There are no minimum
+/// stake / storage / compute thresholds; admission requires the proofs to be
+/// present and self-consistent, not to clear a numeric gate.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AssetValidationContext {
     /// Asset identifier (content hash)
     pub asset_id: String,
     /// Required proof types for this asset
     pub proof_requirements: AssetProofRequirements,
-    /// Minimum stake amount (if stake required)
-    pub min_stake: Option<u64>,
-    /// Minimum storage (if space required)
-    pub min_storage: Option<u64>,
-    /// Minimum compute power (if work required)
-    pub min_compute: Option<u64>,
 }
 
 impl AssetValidationContext {
@@ -74,61 +73,48 @@ impl AssetValidationContext {
         Self {
             asset_id,
             proof_requirements,
-            min_stake: None,
-            min_storage: None,
-            min_compute: None,
         }
-    }
-
-    /// Set minimum stake requirement
-    pub fn with_min_stake(mut self, min_stake: u64) -> Self {
-        self.min_stake = Some(min_stake);
-        self
-    }
-
-    /// Set minimum storage requirement
-    pub fn with_min_storage(mut self, min_storage: u64) -> Self {
-        self.min_storage = Some(min_storage);
-        self
-    }
-
-    /// Set minimum compute requirement
-    pub fn with_min_compute(mut self, min_compute: u64) -> Self {
-        self.min_compute = Some(min_compute);
-        self
     }
 }
 
-impl StateProof {
-    /// Validate state proof against asset requirements
-    /// This method integrates with BlockMatrix AssetId proof_scope validation
-    pub fn validate_for_asset(&self, context: &AssetValidationContext) -> Result<ProofValidation> {
+/// Validate `proof` against an asset's proof requirements.
+///
+/// Integrates with BlockMatrix `AssetId` proof_scope validation. Exposed to
+/// callers through the `StateProofOps::validate_for_asset` extension trait
+/// (the `StateProof` type itself is owned by `hypermesh_lib`).
+pub fn validate_proof_for_asset(
+    proof: &StateProof,
+    context: &AssetValidationContext,
+) -> Result<ProofValidation> {
+    {
+        let this = proof;
         // First, do standard validation
-        let mut validation = self.verify_all()?;
+        let mut validation = super::validation::verify_all_proofs(this)?;
 
         // Check required proofs based on asset requirements
         let reqs = &context.proof_requirements;
 
-        // Validate Space proof if required
+        // Validate Space proof if required.
+        //
+        // CANONICAL MODEL: PoSpace is WHERE (location). Storage capacity is a
+        // descriptive attribute, never a minimum-storage admission gate. When
+        // space is required, require a bound location commitment (present WHERE).
         if reqs.require_space {
             if !validation.space_valid {
                 return Ok(validation); // Already marked invalid
             }
 
-            // Check minimum storage if specified
-            if let Some(min_storage) = context.min_storage {
-                if self.space_proof.total_storage < min_storage {
-                    validation.space_valid = false;
-                    validation.all_valid = false;
-                    validation.add_error(
-                        super::validation::ProofType::Space,
-                        format!(
-                            "Asset {} requires minimum storage {} bytes",
-                            context.asset_id, min_storage
-                        ),
-                        super::validation::ErrorCode::StorageCommitmentInvalid,
-                    );
-                }
+            if this.space_proof.file_hash.is_empty() && this.space_proof.storage_path.is_empty() {
+                validation.space_valid = false;
+                validation.all_valid = false;
+                validation.add_error(
+                    super::validation::ProofType::Space,
+                    format!(
+                        "Asset {} requires a bound storage location (WHERE)",
+                        context.asset_id
+                    ),
+                    super::validation::ErrorCode::StorageCommitmentInvalid,
+                );
             }
         }
 
@@ -138,20 +124,20 @@ impl StateProof {
                 return Ok(validation); // Already marked invalid
             }
 
-            // Check minimum stake if specified
-            if let Some(min_stake) = context.min_stake {
-                if self.stake_proof.stake_amount < min_stake {
-                    validation.stake_valid = false;
-                    validation.all_valid = false;
-                    validation.add_error(
-                        super::validation::ProofType::Stake,
-                        format!(
-                            "Asset {} requires minimum stake {} tokens",
-                            context.asset_id, min_stake
-                        ),
-                        super::validation::ErrorCode::InsufficientStake,
-                    );
-                }
+            // CANONICAL MODEL: PoStake is authorization (WHO), not a magnitude.
+            // Instead of a minimum-stake gate, require the identity binding to
+            // be present when authorization is required.
+            if this.stake_proof.stake_holder_id.is_empty() {
+                validation.stake_valid = false;
+                validation.all_valid = false;
+                validation.add_error(
+                    super::validation::ProofType::Stake,
+                    format!(
+                        "Asset {} requires a bound authorization identity (WHO)",
+                        context.asset_id
+                    ),
+                    super::validation::ErrorCode::InsufficientStake,
+                );
             }
         }
 
@@ -161,20 +147,20 @@ impl StateProof {
                 return Ok(validation); // Already marked invalid
             }
 
-            // Check minimum compute if specified
-            if let Some(min_compute) = context.min_compute {
-                if self.work_proof.computational_power < min_compute {
-                    validation.work_valid = false;
-                    validation.all_valid = false;
-                    validation.add_error(
-                        super::validation::ProofType::Work,
-                        format!(
-                            "Asset {} requires minimum compute power {}",
-                            context.asset_id, min_compute
-                        ),
-                        super::validation::ErrorCode::InsufficientWork,
-                    );
-                }
+            // CANONICAL MODEL: PoWork is the HASH of work done, never a compute
+            // magnitude (capacity is a descriptive adapter attribute). When
+            // work is required, require a real (non-zero) work hash.
+            if this.work_proof.work_hash == [0u8; 32] {
+                validation.work_valid = false;
+                validation.all_valid = false;
+                validation.add_error(
+                    super::validation::ProofType::Work,
+                    format!(
+                        "Asset {} requires a real (non-zero) work hash",
+                        context.asset_id
+                    ),
+                    super::validation::ErrorCode::InsufficientWork,
+                );
             }
         }
 
@@ -211,6 +197,7 @@ impl StateProof {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proof_of_state::StateProofOps;
 
     #[test]
     fn test_asset_validation_all_proofs_required() {
@@ -240,28 +227,31 @@ mod tests {
     }
 
     #[test]
-    fn test_asset_validation_min_stake() {
+    fn test_asset_validation_authorized_identity_passes() {
+        // PoStake is authorization: a bound identity (WHO) passes, regardless
+        // of any magnitude (there is none).
         let proof = StateProof::new_for_testing();
 
         let context = AssetValidationContext::new(
             "test_asset_789".to_string(),
             AssetProofRequirements::all(),
-        )
-        .with_min_stake(5000); // Require 5000 tokens
+        );
 
         let validation = proof.validate_for_asset(&context).expect("test: validation");
-        assert!(validation.all_valid); // new_for_testing has 10000 stake
+        assert!(validation.all_valid);
+        assert!(validation.stake_valid);
     }
 
     #[test]
-    fn test_asset_validation_insufficient_stake() {
-        let proof = StateProof::new_for_testing();
+    fn test_asset_validation_unauthorized_identity_fails() {
+        // No bound identity => authorization is malformed => stake invalid.
+        let mut proof = StateProof::new_for_testing();
+        proof.stake_proof.stake_holder_id = String::new();
 
         let context = AssetValidationContext::new(
             "test_asset_999".to_string(),
             AssetProofRequirements::all(),
-        )
-        .with_min_stake(1_000_000); // Require 1M tokens (too high)
+        );
 
         let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(!validation.all_valid);
@@ -271,8 +261,8 @@ mod tests {
     #[test]
     fn test_asset_validation_minimal_requirements() {
         let mut proof = StateProof::new_for_testing();
-        // Intentionally break work and time proofs
-        proof.work_proof.computational_power = 0;
+        // Intentionally break work (zero hash) and time proofs.
+        proof.work_proof.work_hash = [0u8; 32];
         proof.time_proof.nonce = 0;
 
         // Only require space and stake (minimal)
@@ -287,18 +277,37 @@ mod tests {
     }
 
     #[test]
-    fn test_asset_validation_with_all_minimums() {
-        let proof = StateProof::new_for_testing();
+    fn test_asset_validation_requires_bound_location_not_capacity() {
+        // PoSpace answers WHERE via a bound location — never a storage-capacity
+        // minimum. A proof with a bound location passes.
+        let mut proof = StateProof::new_for_testing();
+        proof.space_proof.storage_path = "/hypermesh/storage/node".to_string();
+        proof.space_proof.file_hash = "location-commitment".to_string();
 
         let context = AssetValidationContext::new(
             "test_asset_full".to_string(),
             AssetProofRequirements::all(),
-        )
-        .with_min_stake(5000)
-        .with_min_storage(10 * 1024 * 1024) // 10MB
-        .with_min_compute(500);
+        );
 
         let validation = proof.validate_for_asset(&context).expect("test: validation");
         assert!(validation.all_valid);
+    }
+
+    #[test]
+    fn test_asset_validation_missing_location_fails() {
+        // A required PoSpace with no bound location (WHERE) is rejected — on
+        // location absence, never on a capacity threshold.
+        let mut proof = StateProof::new_for_testing();
+        proof.space_proof.storage_path = String::new();
+        proof.space_proof.file_hash = String::new();
+
+        let context = AssetValidationContext::new(
+            "test_asset_no_location".to_string(),
+            AssetProofRequirements::custom(true, false, false, false),
+        );
+
+        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        assert!(!validation.space_valid);
+        assert!(!validation.all_valid);
     }
 }

@@ -296,7 +296,7 @@ pub(crate) fn asset_hash_entry_to_bytes(
 /// ```c
 /// struct pos_validation {
 ///     __u8  algorithm;
-///     __u32 difficulty;
+///     __u32 reserved;         /* must be zero */
 ///     __u8  validated;
 ///     __u64 last_validated;   /* 8-byte aligned -> 24 bytes total */
 /// };
@@ -304,20 +304,23 @@ pub(crate) fn asset_hash_entry_to_bytes(
 /// Layout (24 bytes, little-endian, natural C alignment):
 ///   `[0]`      algorithm      (0x01 FALCON / 0x02 Ed25519 / 0x03 ECDSA)
 ///   `[1..4]`   padding
-///   `[4..8]`   difficulty     (u32 LE)
+///   `[4..8]`   reserved       (u32 LE, always zero)
 ///   `[8]`      validated      (1 = passed cryptographic verification)
 ///   `[9..16]`  padding
 ///   `[16..24]` last_validated (u64 LE, bpf_ktime_get_ns() at write time)
+///
+/// `reserved` formerly carried a PoW difficulty target. PoWork is a
+/// content-hash match, not a mining contest, so the word is now always zero
+/// and exists only to keep `last_validated` 8-byte aligned.
 #[cfg(any(feature = "kernel-attach", test))]
 pub(crate) fn pos_validation_to_bytes(
     algorithm: u8,
-    difficulty: u32,
     validated: bool,
     last_validated_ns: u64,
 ) -> [u8; 24] {
     let mut buf = [0u8; 24];
     buf[0] = algorithm;
-    buf[4..8].copy_from_slice(&difficulty.to_le_bytes());
+    // buf[4..8] `reserved` stays zero.
     buf[8] = validated as u8;
     buf[16..24].copy_from_slice(&last_validated_ns.to_le_bytes());
     buf
@@ -354,12 +357,13 @@ mod map_serializer_tests {
 
     #[test]
     fn pos_validation_layout_matches_c_struct() {
-        // C: __u8 algorithm; __u32 difficulty; __u8 validated;
+        // C: __u8 algorithm; __u32 reserved; __u8 validated;
         // __u64 last_validated; (natural alignment -> 24 bytes)
-        let bytes = pos_validation_to_bytes(0x01, 8, true, 0xDEAD_BEEF_u64);
+        let bytes = pos_validation_to_bytes(0x01, true, 0xDEAD_BEEF_u64);
         assert_eq!(bytes.len(), 24);
         assert_eq!(bytes[0], 0x01); // algorithm = FALCON
-        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 8);
+        // `reserved` @4..8 is always zero — no difficulty is carried.
+        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 0);
         assert_eq!(bytes[8], 1); // validated
         let ts = u64::from_le_bytes([
             bytes[16], bytes[17], bytes[18], bytes[19],
@@ -370,7 +374,7 @@ mod map_serializer_tests {
 
     #[test]
     fn pos_validation_not_validated() {
-        let bytes = pos_validation_to_bytes(0x01, 8, false, 0);
+        let bytes = pos_validation_to_bytes(0x01, false, 0);
         assert_eq!(bytes[8], 0);
     }
 

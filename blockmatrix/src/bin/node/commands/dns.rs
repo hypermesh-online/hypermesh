@@ -12,6 +12,7 @@ use blockmatrix::bootstrap::NodeBootstrap;
 use blockmatrix::StateProof;
 
 use crate::cli::DnsAction;
+use trustchain::proof_of_state::StateProofOps;
 
 /// Path to the persisted DNS records file for a given node data directory.
 fn dns_records_path(data_dir: &std::path::Path, node_id: &str) -> std::path::PathBuf {

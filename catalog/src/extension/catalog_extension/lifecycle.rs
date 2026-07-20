@@ -250,24 +250,22 @@ impl AssetLibraryExtension for CatalogExtension {
                 });
             }
 
-            // Verify minimum stake requirement for publishing
-            let min_stake = self.config.min_stake_for_publish();
-            if proof.stake_proof.stake_amount < min_stake {
+            // CANONICAL MODEL: PoStake is authorization (WHO), never a
+            // magnitude. Publishing requires a bound authorization identity,
+            // not a minimum stake amount.
+            if proof.stake_proof.stake_holder_id.is_empty() {
                 self.complete_operation().await;
                 return Err(ExtensionError::RuntimeError {
-                    message: format!(
-                        "Insufficient stake for publishing: {} < {} required",
-                        proof.stake_proof.stake_amount, min_stake
-                    ),
+                    message: "Publishing requires a bound authorization identity (WHO)"
+                        .to_string(),
                 });
             }
 
             tracing::info!(
-                "Proof of State validated for package '{}': stake={}, space={}, compute={}",
+                "Proof of State validated for package '{}': holder_id={}, space={}",
                 package.name,
-                proof.stake_proof.stake_amount,
+                proof.stake_proof.stake_holder_id,
                 proof.space_proof.total_storage,
-                proof.work_proof.computational_power,
             );
         }
 

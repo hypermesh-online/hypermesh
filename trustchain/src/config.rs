@@ -537,9 +537,11 @@ impl TrustChainConfig {
             return Err(anyhow!("TrustChain requires IPv6-only networking"));
         }
 
-        // Validate state proof requirements consistency
-        if self.ca.state_requirements.minimum_stake
-            != self.ct.state_requirements.minimum_stake
+        // Validate state proof requirements consistency. Proofs carry no
+        // magnitude, so consistency is checked on the WHEN-freshness bound
+        // (`max_time_offset`) shared across services.
+        if self.ca.state_requirements.max_time_offset
+            != self.ct.state_requirements.max_time_offset
         {
             return Err(anyhow!(
                 "State proof requirements must be consistent across services"

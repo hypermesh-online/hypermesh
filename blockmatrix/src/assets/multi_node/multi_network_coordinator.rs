@@ -270,7 +270,7 @@ impl CrossNetworkValidator {
         // Validate proof (simplified - production would verify all 4 proofs)
         let valid = !proof.space_proof.node_id.is_empty()
             && !proof.stake_proof.stake_holder_id.is_empty()
-            && proof.work_proof.computational_power > 0
+            && proof.work_proof.work_hash != [0u8; 32]
             && proof.time_proof.nonce > 0;
 
         // Cache result
@@ -740,7 +740,7 @@ mod tests {
         let dealer_network = NetworkId([2u8; 16]);
 
         use crate::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof, WorkState, WorkloadType,
+            SpaceProof, StakeProof, TimeProof, WorkProof,
         };
         use std::time::SystemTime;
 
@@ -756,18 +756,13 @@ mod tests {
             stake_proof: StakeProof {
                 stake_holder: "test".to_string(),
                 stake_holder_id: "test-id".to_string(),
-                stake_amount: 1000,
                 stake_timestamp: SystemTime::now(),
 
             },
             work_proof: WorkProof {
                 owner_id: "test-owner".to_string(),
+                work_hash: *blake3::hash(b"test-work").as_bytes(),
                 workload_id: "test-workload".to_string(),
-                pid: 12345,
-                computational_power: 100,
-                workload_type: WorkloadType::Compute,
-                work_state: WorkState::Running,
-                work_challenges: vec!["challenge1".to_string()],
                 proof_timestamp: SystemTime::now(),
             },
             time_proof: TimeProof {

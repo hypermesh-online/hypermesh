@@ -198,13 +198,18 @@ impl AssetExtensionHandler for DatasetHandler {
             return Ok(false);
         }
 
-        // Dataset assets require storage commitment (space proof)
-        if proof.stake_proof.stake_amount == 0 {
-            tracing::warn!("Dataset asset {}: stake amount is zero", id);
+        // PoStake is authorization (WHO), never a magnitude: require a bound
+        // identity, not a stake amount.
+        if proof.stake_proof.stake_holder_id.is_empty() {
+            tracing::warn!("Dataset asset {}: authorization has no bound identity", id);
             return Ok(false);
         }
-        if proof.space_proof.total_storage == 0 {
-            tracing::warn!("Dataset asset {}: space commitment is zero", id);
+        // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
+        // location; capacity is descriptive and never gates admission.
+        if proof.space_proof.node_id.is_empty()
+            && proof.space_proof.storage_path.is_empty()
+        {
+            tracing::warn!("dataset asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }
 

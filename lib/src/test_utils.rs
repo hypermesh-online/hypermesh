@@ -12,7 +12,7 @@ use crate::types::{
     AssetId, ContentHash, MatrixPosition, NetworkId, NodeId, PrivacyMode,
 };
 use crate::proof::{
-    ProofOfState, SpaceProof, StakeProof, TimeProof, WorkCategory, WorkProof,
+    SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
 };
 use std::time::Duration;
 
@@ -99,62 +99,40 @@ impl Default for TestFixtures {
 
 /// Create a valid test [`SpaceProof`].
 pub fn test_space_proof() -> SpaceProof {
-    SpaceProof {
-        node_id: test_node_id("test-node"),
-        matrix_position: test_matrix_position(1.0, 2.0, 3.0),
-        stored_bytes: 1024,
-        committed_bytes: 4096,
-        content_hash: test_content_hash(0xAB),
-        timestamp_ms: 1700000000000,
-    }
+    let mut p = SpaceProof::new("test-node".to_string(), "/hypermesh/test".to_string(), 4096);
+    p.total_size = 1024;
+    p.file_hash = "test-file-hash".to_string();
+    p
 }
 
-/// Create a valid test [`StakeProof`].
+/// Create a valid test [`StakeProof`] (authorization — no magnitude).
 pub fn test_stake_proof() -> StakeProof {
-    StakeProof {
-        node_id: test_node_id("test-node"),
-        asset_id: Some(test_asset_id("test-asset")),
-        stake_amount: 500,
-        signature: vec![0xDE, 0xAD],
-        timestamp_ms: 1700000000000,
-    }
+    StakeProof::new("test-holder".to_string(), "test-node".to_string())
 }
 
-/// Create a valid test [`WorkProof`].
+/// Create a valid test [`WorkProof`] (hash of work done).
 pub fn test_work_proof() -> WorkProof {
-    WorkProof {
-        node_id: test_node_id("test-node"),
-        compute_units: 42,
-        work_category: WorkCategory::Compute,
-        challenge_proof: vec![0xCA, 0xFE],
-        timestamp_ms: 1700000000000,
-    }
+    WorkProof::from_work("test-node".to_string(), "test-workload".to_string(), b"test-work")
 }
 
 /// Create a valid test [`TimeProof`].
 pub fn test_time_proof() -> TimeProof {
-    TimeProof {
-        time_offset: Duration::from_millis(150),
-        nonce: 99,
-        proof_hash: vec![0xBE, 0xEF],
-        timestamp_ms: 1700000000000,
-    }
+    TimeProof::new(Duration::from_millis(150))
 }
 
-/// Create a valid test [`ProofOfState`] from all four proofs.
-pub fn test_proof_of_state() -> ProofOfState {
-    ProofOfState::new(
-        test_space_proof(),
+/// Create a valid test [`StateProof`] from all four proofs.
+pub fn test_state_proof() -> StateProof {
+    StateProof::new(
         test_stake_proof(),
-        test_work_proof(),
         test_time_proof(),
+        test_space_proof(),
+        test_work_proof(),
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof::Validatable;
 
     #[test]
     fn test_factories_produce_valid_types() {
@@ -167,11 +145,11 @@ mod tests {
 
     #[test]
     fn test_proof_factories_pass_validation() {
-        assert!(test_space_proof().validate().is_ok());
-        assert!(test_stake_proof().validate().is_ok());
-        assert!(test_work_proof().validate().is_ok());
-        assert!(test_time_proof().validate().is_ok());
-        assert!(test_proof_of_state().validate().is_ok());
+        assert!(test_space_proof().is_structurally_valid());
+        assert!(test_stake_proof().is_structurally_valid());
+        assert!(test_work_proof().is_structurally_valid());
+        assert!(test_time_proof().is_structurally_valid());
+        assert!(test_state_proof().is_structurally_valid());
     }
 
     #[test]

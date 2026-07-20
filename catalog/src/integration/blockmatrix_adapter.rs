@@ -190,7 +190,6 @@ mod tests {
     fn relaxed_policy() -> TrustPolicy {
         TrustPolicy {
             require_state_proof: false,
-            minimum_stake: 0,
             allowed_publishers: Vec::new(),
             require_certificate: false,
         }

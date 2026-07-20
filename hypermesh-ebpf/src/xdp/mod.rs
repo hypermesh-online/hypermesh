@@ -180,7 +180,6 @@ mod tests {
     #[test]
     fn test_kernel_pos_config_default() {
         let cfg = KernelPosConfig::default();
-        assert_eq!(cfg.min_difficulty, 8);
         assert_eq!(cfg.max_timestamp_skew_ns, 5 * 60 * 1_000_000_000);
         assert_eq!(cfg.validation_ttl_ns, 60 * 60 * 1_000_000_000);
         assert!(cfg.enabled);
@@ -200,38 +199,33 @@ mod tests {
     #[test]
     fn test_kernel_pos_config_serialization() {
         let cfg = KernelPosConfig {
-            min_difficulty: 16,
             max_timestamp_skew_ns: 300_000_000_000, // 5 min in ns
             validation_ttl_ns: 3_600_000_000_000,   // 1 hour in ns
             enabled: true,
         };
 
         let bytes = cfg.to_bytes();
-        assert_eq!(bytes.len(), 32);
+        assert_eq!(bytes.len(), 24);
 
-        // Verify field layout — C `struct pos_config` NATURAL (non-packed) alignment:
-        // u64 fields are 8-byte aligned (4B pad after min_difficulty, 4B trailing pad).
-        let difficulty = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        assert_eq!(difficulty, 16);
-
+        // Verify field layout — C `struct pos_config` NATURAL (non-packed)
+        // alignment: u64 fields are 8-byte aligned, 4B trailing pad.
         let skew = u64::from_le_bytes([
-            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         ]);
         assert_eq!(skew, 300_000_000_000);
 
         let ttl = u64::from_le_bytes([
-            bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
         ]);
         assert_eq!(ttl, 3_600_000_000_000);
 
-        let enabled = u32::from_le_bytes([bytes[24], bytes[25], bytes[26], bytes[27]]);
+        let enabled = u32::from_le_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
         assert_eq!(enabled, 1);
     }
 
     #[test]
     fn test_kernel_pos_config_serialization_roundtrip() {
         let original = KernelPosConfig {
-            min_difficulty: 24,
             max_timestamp_skew_ns: 42_000_000,
             validation_ttl_ns: 99_000_000_000,
             enabled: false,
@@ -253,38 +247,43 @@ mod tests {
     #[test]
     fn test_kernel_pos_config_disabled_serialization() {
         let cfg = KernelPosConfig {
-            min_difficulty: 0,
             max_timestamp_skew_ns: 0,
             validation_ttl_ns: 0,
             enabled: false,
         };
         let bytes = cfg.to_bytes();
-        // All bytes zero. 32 bytes = C `struct pos_config` NATURAL (non-packed)
+        // All bytes zero. 24 bytes = C `struct pos_config` NATURAL (non-packed)
         // layout — u64 fields are 8-byte aligned (see hypermesh_xdp.c).
-        assert_eq!(bytes, [0u8; 32]);
+        assert_eq!(bytes, [0u8; 24]);
+    }
+
+    #[test]
+    fn test_kernel_pos_config_carries_no_difficulty_field() {
+        // Regression guard for the PoW mining-difficulty removal: the kernel
+        // PoS config is exactly 24 bytes of skew + TTL + enabled. If a
+        // difficulty word were ever re-added, the struct would grow to 32 and
+        // this assertion would fail.
+        assert_eq!(KernelPosConfig::SIZE, 24);
+        assert_eq!(KernelPosConfig::default().to_bytes().len(), 24);
     }
 
     #[test]
     fn test_kernel_pos_config_field_offsets_match_c_natural_layout() {
-        // Guards the byte layout against the C `struct pos_config` (32 bytes,
+        // Guards the byte layout against the C `struct pos_config` (24 bytes,
         // natural alignment). A field at the wrong offset here = kernel reads
         // garbage = silent PoS bypass, so pin the exact offsets.
         let cfg = KernelPosConfig {
-            min_difficulty: 0x1122_3344,
             max_timestamp_skew_ns: 0x0102_0304_0506_0708,
             validation_ttl_ns: 0x1112_1314_1516_1718,
             enabled: true,
         };
         let b = cfg.to_bytes();
-        assert_eq!(&b[0..4], &0x1122_3344u32.to_le_bytes()); // min_difficulty @0
-        assert_eq!(&b[4..8], &[0u8; 4]); // padding
-        assert_eq!(&b[8..16], &0x0102_0304_0506_0708u64.to_le_bytes()); // skew @8
-        assert_eq!(&b[16..24], &0x1112_1314_1516_1718u64.to_le_bytes()); // ttl @16
-        assert_eq!(&b[24..28], &1u32.to_le_bytes()); // enabled @24
-        assert_eq!(&b[28..32], &[0u8; 4]); // trailing padding
+        assert_eq!(&b[0..8], &0x0102_0304_0506_0708u64.to_le_bytes()); // skew @0
+        assert_eq!(&b[8..16], &0x1112_1314_1516_1718u64.to_le_bytes()); // ttl @8
+        assert_eq!(&b[16..20], &1u32.to_le_bytes()); // enabled @16
+        assert_eq!(&b[20..24], &[0u8; 4]); // trailing padding
         // round-trip
-        let rt = KernelPosConfig::from_bytes(&b).expect("test: from_bytes 32B");
-        assert_eq!(rt.min_difficulty, cfg.min_difficulty);
+        let rt = KernelPosConfig::from_bytes(&b).expect("test: from_bytes 24B");
         assert_eq!(rt.max_timestamp_skew_ns, cfg.max_timestamp_skew_ns);
         assert_eq!(rt.validation_ttl_ns, cfg.validation_ttl_ns);
         assert_eq!(rt.enabled, cfg.enabled);
