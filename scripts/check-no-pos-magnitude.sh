@@ -71,7 +71,9 @@ ALLOW_PATH_RE='(geospatial|tensor|/matrix/)'
 # orphaned/undeclared modules, tests, examples and other-crate directories.
 candidates() {
   find . \
-    \( -path ./target -o -path ./.git -o -path './*/target' \) -prune -o \
+    \( -path ./target -o -path ./.git -o -path './*/target' \
+       -o -path ./.claude/worktrees -o -path './.claude/worktrees/*' \
+       -o -name node_modules -o -name vendor \) -prune -o \
     \( -name '*.rs' -o -name '*.c' -o -name '*.h' \) -print
 }
 
