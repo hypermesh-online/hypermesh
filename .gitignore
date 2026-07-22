@@ -62,3 +62,8 @@ mobile/*.ipa
 mobile/*.apk
 mobile/*.aab
 mobile/assets/
+
+# Test-run artifact: the TrustChain revocation store is written by the
+# trustchain suite (default data dir `trustchain-data/`). It is runtime state,
+# not source — running tests must not dirty the worktree.
+trustchain/trustchain-data/

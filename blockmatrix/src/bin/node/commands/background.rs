@@ -4,7 +4,7 @@
 
 //! Background loops -- peer sync, block sync, gossip, reflector heartbeat.
 
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use blockmatrix::blockchain::propagation::BlockPropagator;
 use blockmatrix::blockchain::sync_manager::SyncManager;
@@ -115,7 +115,10 @@ pub(super) fn spawn_block_sync_loop(
             for block in &fetched_blocks {
                 match blockchain.insert_received_block(block.clone()).await {
                     Ok(()) => info!("Inserted synced block #{}", block.index),
-                    Err(e) => debug!("Synced block #{} insertion failed: {}", block.index, e),
+                    // S3.2 QA F2: raised from `debug!` — a synced block we
+                    // DROP (broken asset lineage, bad H3 envelope, structural
+                    // failure) must be visible at the default log level.
+                    Err(e) => warn!("Synced block #{} REJECTED: {}", block.index, e),
                 }
             }
             if !fetched_blocks.is_empty() {

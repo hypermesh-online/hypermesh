@@ -40,6 +40,78 @@ fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool
     entry.state_proof.stake_proof.stake_holder_id == derived
 }
 
+/// S3.2 accept-side check for ONE entry against the lineage state we already
+/// have for its asset (`expected` = `(lineage_id, asset_seq)` of the last entry
+/// we recorded, or `None` if the asset is unknown here).
+///
+/// Kept out of [`NodeBlockchain::verify_block_lineage`] so the walk stays short
+/// and the rejection rules read as one flat decision table.
+fn check_entry_lineage(
+    entry: &BlockAssetEntry,
+    expected: Option<(String, u64)>,
+    block_index: u64,
+    entry_ix: usize,
+) -> Result<(), String> {
+    let Some((head_id, head_seq)) = expected else {
+        // Asset unknown here: only a proper asset-genesis may enter. Anything
+        // else is a foreign asset-chain — S3.4's job, explicitly rejected until
+        // then rather than accepted with unverifiable provenance.
+        if entry.is_asset_genesis() {
+            return Ok(());
+        }
+        return Err(format!(
+            "Block {block_index} entry {entry_ix} carries a FOREIGN asset-chain: it claims \
+             predecessor {:?} at seq {} for an asset whose history this container has never \
+             seen. Verifying and grafting a foreign asset-chain is S3.4 — rejected until then \
+             (never silently accepted with unverifiable provenance)",
+            entry.prev_asset_entry(),
+            entry.asset_seq(),
+        ));
+    };
+
+    match entry.prev_asset_entry() {
+        Some(claimed) if claimed == head_id => {}
+        Some(claimed) => {
+            return Err(format!(
+                "Block {block_index} entry {entry_ix} asset lineage broken: claims predecessor \
+                 {} but our recorded head for this asset is {} — mirror rejected",
+                &claimed[..16.min(claimed.len())],
+                &head_id[..16.min(head_id.len())],
+            ));
+        }
+        None => {
+            // F1: `head_seq` here may come from the asset's surviving
+            // high-water TOMBSTONE rather than a held entry — an asset whose
+            // entries we pruned is still an asset we have seen, so re-rooting
+            // it is refused exactly as if we still held the bodies.
+            return Err(format!(
+                "Block {block_index} entry {entry_ix} asset lineage broken: claims to be an \
+                 asset-genesis for an asset this container has already seen (head seq \
+                 {head_seq}) — mirror rejected",
+            ));
+        }
+    }
+
+    // F5: fail closed on overflow. A head at `u64::MAX` has NO valid successor;
+    // `head_seq + 1` would wrap to 0 and let a re-rooted entry read as a
+    // continuation.
+    let Some(expected_seq) = head_seq.checked_add(1) else {
+        return Err(format!(
+            "Block {block_index} entry {entry_ix} asset lineage broken: our head seq is \
+             u64::MAX — no successor sequence exists, mirror rejected",
+        ));
+    };
+    if entry.asset_seq() != expected_seq {
+        return Err(format!(
+            "Block {block_index} entry {entry_ix} asset lineage broken: asset_seq {} is not \
+             our head seq {head_seq} + 1 — mirror rejected",
+            entry.asset_seq(),
+        ));
+    }
+
+    Ok(())
+}
+
 impl NodeBlockchain {
     /// Add a new block containing the given entries.
     ///
@@ -103,6 +175,16 @@ impl NodeBlockchain {
         // index-independent CPU work.
         let _append_reservation = self.append_lock.lock().await;
 
+        // 1a. S3.2 — ASSET LINEAGE stamping. This is the single write
+        //     chokepoint for locally-produced entries: every production
+        //     producer (`add_block_with_data`, `register_asset_record(s)`,
+        //     `register_dns_asset`, `add_key_rotation_block`, the IPC store /
+        //     shard / auth / dashboard handlers, the gateway bridges) reaches
+        //     the chain through `add_block`. Stamping here — under the head
+        //     reservation, so the asset head we read cannot move — and BEFORE
+        //     H3 signing means the FALCON envelope covers the lineage.
+        self.stamp_asset_lineage(&mut entries).await?;
+
         // 1b. H3 — single local-write signing chokepoint. When this chain has a
         //     node signer (live daemon), attach a FALCON-1024 `signed_proof`
         //     envelope to EVERY entry over its (already content-bound)
@@ -149,6 +231,136 @@ impl NodeBlockchain {
         );
 
         Ok(new_block)
+    }
+
+    /// S3.2 — stamp asset lineage onto every entry of a block being appended.
+    ///
+    /// For each entry: read the asset's current head from the S3.1
+    /// [`AssetChainIndex`](super::asset_index::AssetChainIndex) (O(1)), and set
+    /// `prev_asset_entry = head.lineage_id()`, `asset_seq = head.asset_seq + 1`.
+    /// An asset this container has never seen becomes an ASSET GENESIS
+    /// (`prev = None, seq = 0`).
+    ///
+    /// A single block may carry several entries for the SAME asset
+    /// (`register_asset_records` batches), so the in-block continuation is
+    /// tracked locally: the second entry for an asset succeeds the first
+    /// entry of the same block, not the on-chain head.
+    ///
+    /// Called under the head reservation (`append_lock`), so the head this
+    /// reads cannot move before the block is inserted.
+    async fn stamp_asset_lineage(
+        &self,
+        entries: &mut [BlockAssetEntry],
+    ) -> Result<(), String> {
+        use std::collections::HashMap;
+
+        // asset_hash -> (lineage_id, asset_seq) of the last entry stamped for
+        // that asset within THIS block.
+        let mut in_block: HashMap<[u8; 32], (String, u64)> = HashMap::new();
+
+        for entry in entries.iter_mut() {
+            let predecessor = match in_block.get(&entry.asset_hash) {
+                Some(previous) => Some(previous.clone()),
+                None => self.asset_lineage_head(&entry.asset_hash).await.map_err(
+                    |locator| {
+                        format!(
+                            "asset head at block {} entry {} is no longer held in full \
+                             — refusing to append without its lineage",
+                            locator.block_index, locator.entry_ix,
+                        )
+                    },
+                )?,
+            };
+
+            match predecessor {
+                Some((prev_id, prev_seq)) => {
+                    // F5: fail closed rather than wrapping to 0 — an asset
+                    // chain is never re-rooted by overflowing its counter.
+                    let next_seq = prev_seq.checked_add(1).ok_or_else(|| {
+                        "asset_seq is u64::MAX — no successor sequence exists, \
+                         refusing to append"
+                            .to_string()
+                    })?;
+                    entry.set_asset_lineage(Some(prev_id), next_seq);
+                }
+                None => entry.set_asset_lineage(None, 0),
+            }
+
+            in_block.insert(entry.asset_hash, (entry.lineage_id(), entry.asset_seq()));
+        }
+
+        Ok(())
+    }
+
+    /// S3.2 — accept-side asset-lineage verification for a RECEIVED block.
+    ///
+    /// Runs immediately before the block is inserted (never on the
+    /// orphan-buffering path: an orphan's asset predecessor may well live in
+    /// the predecessor block that has not arrived yet — it is re-checked when
+    /// the orphan is drained and actually linked).
+    ///
+    /// Two cases, both fail-closed:
+    ///
+    /// - **Asset known locally** — the entry must be a proper successor of OUR
+    ///   recorded head for that asset: `prev_asset_entry == head.lineage_id()`
+    ///   AND `asset_seq == head.asset_seq + 1`. A forged prev-pointer, a
+    ///   re-rooted "asset genesis" for an asset we already hold, or a skipped /
+    ///   replayed sequence number is REJECTED.
+    /// - **Asset unknown locally** — only a proper asset genesis
+    ///   (`prev = None, seq = 0`) is accepted. Anything else is a FOREIGN
+    ///   ASSET-CHAIN whose history we have never seen; verifying and grafting
+    ///   such a chain is **S3.4**, and until then it is rejected explicitly
+    ///   rather than silently accepted with unverifiable provenance.
+    ///
+    /// In-block continuation is handled exactly as on the write side: a second
+    /// entry for the same asset within one block succeeds the first.
+    async fn verify_block_lineage(&self, block: &Block) -> Result<(), String> {
+        use std::collections::HashMap;
+
+        // asset_hash -> (lineage_id, asset_seq) of the last entry SEEN for that
+        // asset: from earlier in this same block if present, otherwise our
+        // recorded on-chain head.
+        let mut seen: HashMap<[u8; 32], (String, u64)> = HashMap::new();
+
+        for (i, entry) in block.entries.iter().enumerate() {
+            let expected = match seen.get(&entry.asset_hash) {
+                Some(previous) => Some(previous.clone()),
+                None => self.recorded_asset_head(&entry.asset_hash, block.index, i).await?,
+            };
+
+            check_entry_lineage(entry, expected, block.index, i)?;
+
+            seen.insert(entry.asset_hash, (entry.lineage_id(), entry.asset_seq()));
+        }
+
+        Ok(())
+    }
+
+    /// The `(lineage_id, asset_seq)` of our recorded head for `asset_hash`, or
+    /// `None` when this container has never seen the asset.
+    ///
+    /// F1: "never seen" means never — [`asset_lineage_head`] falls back to the
+    /// asset's surviving high-water tombstone when pruning removed the entry
+    /// bodies, so a pruned asset is still recognised and a fresh `(None, 0)`
+    /// genesis for it is still rejected.
+    ///
+    /// Errors only when the head is indexed but its block is no longer held in
+    /// full — we then cannot judge lineage at all, and fail closed.
+    ///
+    /// [`asset_lineage_head`]: NodeBlockchain::asset_lineage_head
+    async fn recorded_asset_head(
+        &self,
+        asset_hash: &[u8; 32],
+        block_index: u64,
+        entry_ix: usize,
+    ) -> Result<Option<(String, u64)>, String> {
+        self.asset_lineage_head(asset_hash).await.map_err(|locator| {
+            format!(
+                "Block {block_index} entry {entry_ix}: our head for this asset (block {}) \
+                 is no longer held in full — cannot verify lineage, mirror rejected",
+                locator.block_index,
+            )
+        })
     }
 
     /// Create an asset from raw data and add it as a block.
@@ -311,10 +523,32 @@ impl NodeBlockchain {
                     );
                 }
             }
+
+            // S3.4: an entry carrying a `state_proof.mirror_seal` is accepted
+            // here WITHOUT checking WHO sealed it. Locally,
+            // `check_seal_authority` requires `sealed_by` to be an OWNER of the
+            // asset AND to be this node's own signing identity; a RECEIVED entry
+            // gets neither check, so a peer may hand us a block whose
+            // `MirrorSeal.sealed_by` is neither the entry's claimed author
+            // (`stake_proof.stake_holder_id`, already FALCON-bound above) nor an
+            // owner in the asset's `AuthorizationSet`. The seal then becomes
+            // on-chain, hash-committed mirror history attributed to an identity
+            // that never authorised it.
+            //
+            // The gate belongs here, next to the H3 signer binding it depends
+            // on: require `mirror_seal.sealed_by == stake_holder_id` and that
+            // the identity holds the distribution right on the asset's head
+            // entry. Deferred to S3.4 with the rest of the received-entry
+            // authority checks, and NOT implemented in S3.3 — see the S3.5 note
+            // on `check_seal_authority`: assets are ownerless at creation today,
+            // so an owner check on the receive path would reject every seal.
         }
 
-        // Genesis has no predecessor to verify — insert directly.
+        // Genesis has no predecessor to verify — insert directly (after S3.2
+        // asset-lineage verification, which applies to every entry regardless
+        // of the block's position in the container spine).
         if block.index == 0 {
+            self.verify_block_lineage(&block).await?;
             return self.insert_block(block).await;
         }
 
@@ -385,8 +619,14 @@ impl NodeBlockchain {
             return Ok(());
         }
 
-        // Linkage verified — insert, then attempt to drain any orphan chain
-        // that was waiting on this newly-inserted block.
+        // Container linkage verified. S3.2: the ASSET lineage of every entry
+        // must also be verified before the block enters — checked here, at the
+        // point of actual insertion, so an orphan that arrived early is judged
+        // against the head it will really extend.
+        self.verify_block_lineage(&block).await?;
+
+        // Insert, then attempt to drain any orphan chain that was waiting on
+        // this newly-inserted block.
         let inserted_hash = block.hash.clone();
         self.insert_block(block).await?;
         self.drain_orphans_from(inserted_hash).await;
@@ -417,6 +657,14 @@ impl NodeBlockchain {
                     "Dropping orphan block {} on drain (failed re-verification)",
                     orphan.index,
                 );
+                break;
+            }
+
+            // S3.2: the orphan's asset lineage is verified HERE, not when it
+            // was buffered — its asset predecessor may have arrived in the
+            // block that just linked it.
+            if let Err(e) = self.verify_block_lineage(&orphan).await {
+                warn!("Dropping orphan block {} on drain: {e}", orphan.index);
                 break;
             }
 

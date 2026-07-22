@@ -14,6 +14,8 @@ use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
+use super::asset_index::{AssetChainIndex, AssetEntryLocator};
+use super::attestations::MirrorAttestationPool;
 use super::block::{Block, BlockHeader};
 use super::genesis_auth::GenesisAuthManager;
 use super::validation::ChainValidator;
@@ -127,6 +129,42 @@ pub struct NodeBlockchain {
     /// held; `insert_block` acquires those itself, so the reservation holder
     /// must not (and does not) hold them across the call.
     pub(crate) append_lock: Arc<tokio::sync::Mutex<()>>,
+
+    /// S3.1: derived per-asset view of `blocks` — see
+    /// [`AssetChainIndex`](super::asset_index::AssetChainIndex).
+    ///
+    /// Holds no authority and no data that is not already in the blocks; it
+    /// exists so per-asset questions ("which asset authorizes this shard?",
+    /// "what is this asset's history?") stop being full-chain linear scans.
+    /// Rebuilt from the block set on load (`from_genesis`/`from_blocks`),
+    /// maintained incrementally at the single insert chokepoint
+    /// [`insert_block`](Self::insert_block), and undone on block removal
+    /// ([`prune_to_headers`](Self::prune_to_headers)) so it can never point at
+    /// a block the chain no longer holds.
+    ///
+    /// LOCK ORDER: this is acquired LAST, after every other chain lock —
+    /// `append_lock → blocks → headers → hash_index → head → stats →
+    /// asset_index`. It is never held while acquiring any of them, so it adds
+    /// no cycle to the S3.0 order.
+    pub(crate) asset_index: Arc<RwLock<AssetChainIndex>>,
+
+    /// S3.3: OFF-SPINE mirror attestations, keyed by matrix position — see
+    /// [`MirrorAttestationPool`](super::attestations::MirrorAttestationPool).
+    ///
+    /// Deliberately NOT part of the spine and NOT derived from the block set:
+    /// attestations are third-party statements by mirrors, accumulated here
+    /// until an OWNER seals them into a checkpoint entry
+    /// ([`seal_mirror_attestations`](Self::seal_mirror_attestations)).
+    /// Recording one consumes no `prev_asset_entry` / `asset_seq` slot, so N
+    /// mirrors can attest concurrently without forking or renumbering the
+    /// title.
+    ///
+    /// LOCK ORDER: acquired LAST, after `asset_index` —
+    /// `append_lock → blocks → headers → hash_index → head → stats →
+    /// asset_index → mirror_attestations`. It is never held while acquiring
+    /// any of them (the seal path snapshots it, drops the guard, and only then
+    /// calls `add_block`), so it adds no cycle to the S3.0 order.
+    pub(crate) mirror_attestations: Arc<RwLock<MirrorAttestationPool>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -189,6 +227,9 @@ impl NodeBlockchain {
             node_coordinate.x, node_coordinate.y, node_coordinate.z
         );
 
+        // S3.1: seed the derived per-asset index from the genesis block.
+        let asset_index = AssetChainIndex::rebuild([&genesis]);
+
         NodeBlockchain {
             node_coordinate,
             blocks: Arc::new(RwLock::new(blocks)),
@@ -203,6 +244,8 @@ impl NodeBlockchain {
             signer: None,
             block_sink: None,
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
+            asset_index: Arc::new(RwLock::new(asset_index)),
+            mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
         }
     }
 
@@ -307,6 +350,11 @@ impl NodeBlockchain {
             total_data_size += block.size();
         }
 
+        // S3.1: rebuild the derived per-asset index from the restored blocks.
+        // This is the restart path — an index built here must equal one that
+        // was maintained incrementally over the same blocks.
+        let asset_index = AssetChainIndex::rebuild(blocks.iter());
+
         let head = blocks.last().cloned();
         let chain_height = head.as_ref().map(|b| b.index).unwrap_or(0);
 
@@ -339,6 +387,8 @@ impl NodeBlockchain {
             signer: None,
             block_sink: None,
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
+            asset_index: Arc::new(RwLock::new(asset_index)),
+            mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
         })
     }
 
@@ -445,19 +495,13 @@ impl NodeBlockchain {
     ///
     /// This is the authorization anchor; the requester's PoS authentication
     /// is enforced separately (see `peer_auth::verify_shard_access`).
+    ///
+    /// S3.1: answered from the [`AssetChainIndex`] in O(1). Semantically
+    /// identical to the full-chain scan it replaces — the index records
+    /// exactly the `StoragePointer::Sharded` shard hashes of exactly the
+    /// blocks the chain holds.
     pub async fn authorizes_shard(&self, shard_id: &[u8; 32]) -> bool {
-        use super::block::StoragePointer;
-        let blocks = self.blocks.read().await;
-        for block in blocks.values() {
-            for entry in &block.entries {
-                if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
-                    if shard_hashes.iter().any(|h| h == shard_id) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        self.asset_index.read().await.authorizes_shard(shard_id)
     }
 
     /// Return the content-bound registration entry that authorizes `shard_id`.
@@ -465,31 +509,147 @@ impl NodeBlockchain {
     /// A6.6: when this node SERVES a shard, it also serves that ONE asset's
     /// registration so the fetcher can re-anchor it on its own chain (torrent
     /// model: nodes that touched the vector share-compute the registration —
-    /// no whole-chain replication). This scans the same `Sharded` entries as
-    /// [`authorizes_shard`] and returns a CLONE of the first entry whose
-    /// `shard_hashes` lists `shard_id`. The clone carries `asset_hash`, the
+    /// no whole-chain replication). It probes the same [`AssetChainIndex`] that
+    /// backs [`authorizes_shard`](Self::authorizes_shard) and returns a CLONE
+    /// of the EARLIEST entry in chain order whose `shard_hashes` lists
+    /// `shard_id`. The clone carries `asset_hash`, the
     /// content-bound `state_proof`, and the `StoragePointer::Sharded`
     /// (shard_hashes + placements) — everything the fetcher needs to
     /// independently re-validate and register the same asset.
     ///
     /// Returns `None` when no on-chain asset lists this shard (the serve path
     /// then omits the registration and falls back to bare shard bytes).
+    ///
+    /// S3.1: the shard→entry lookup is now an O(1) [`AssetChainIndex`] probe
+    /// instead of a full-chain scan. The candidate set is unchanged; when more
+    /// than one entry lists the same shard the index returns the EARLIEST in
+    /// chain order, where the scan returned an arbitrary one (it iterated a
+    /// `HashMap`) — same semantics, now deterministic.
     pub async fn registration_for_shard(
         &self,
         shard_id: &[u8; 32],
     ) -> Option<super::block::BlockAssetEntry> {
-        use super::block::StoragePointer;
+        let locator = self
+            .asset_index
+            .read()
+            .await
+            .locator_for_shard(shard_id)
+            .cloned()?;
+        self.entry_at(&locator).await
+    }
+
+    /// Resolve a locator produced by the [`AssetChainIndex`] to the entry it
+    /// names. Returns `None` if the block is no longer held in full.
+    pub async fn entry_at(
+        &self,
+        locator: &AssetEntryLocator,
+    ) -> Option<super::block::BlockAssetEntry> {
+        self.blocks
+            .read()
+            .await
+            .get(&locator.block_index)
+            .and_then(|block| block.entries.get(locator.entry_ix))
+            .cloned()
+    }
+
+    /// S3.1: every entry recorded for `asset_hash`, in chain order.
+    ///
+    /// This is the asset's history within this node's container — the per-asset
+    /// view S3.2 (lineage) and S3.5 (transfer with provenance) build on.
+    /// Locators only; use [`entry_at`](Self::entry_at) or
+    /// [`asset_history_entries`](Self::asset_history_entries) to materialize.
+    pub async fn asset_history(&self, asset_hash: &[u8; 32]) -> Vec<AssetEntryLocator> {
+        self.asset_index
+            .read()
+            .await
+            .asset_history(asset_hash)
+            .to_vec()
+    }
+
+    /// [`asset_history`](Self::asset_history), materialized to cloned entries.
+    ///
+    /// Entries whose block is no longer held in full (pruned to a header) are
+    /// skipped — the caller gets the history this node can still produce.
+    pub async fn asset_history_entries(
+        &self,
+        asset_hash: &[u8; 32],
+    ) -> Vec<super::block::BlockAssetEntry> {
+        let locators = self.asset_history(asset_hash).await;
         let blocks = self.blocks.read().await;
-        for block in blocks.values() {
-            for entry in &block.entries {
-                if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
-                    if shard_hashes.iter().any(|h| h == shard_id) {
-                        return Some(entry.clone());
-                    }
-                }
-            }
+        locators
+            .iter()
+            .filter_map(|loc| {
+                blocks
+                    .get(&loc.block_index)
+                    .and_then(|b| b.entries.get(loc.entry_ix))
+                    .cloned()
+            })
+            .collect()
+    }
+
+    /// S3.1: the most recent entry recorded for `asset_hash`, if any.
+    pub async fn asset_head(&self, asset_hash: &[u8; 32]) -> Option<AssetEntryLocator> {
+        self.asset_index.read().await.asset_head(asset_hash).cloned()
+    }
+
+    /// S3.2/F1 — the `(lineage_id, asset_seq)` this container recognises as
+    /// `asset_hash`'s head, for BOTH the local stamp path and the receive
+    /// path. This is the single definition of "what must this asset's next
+    /// entry succeed?", so the two paths cannot disagree.
+    ///
+    /// Resolution order:
+    /// 1. the indexed head entry, read out of the block that holds it;
+    /// 2. failing that, the F1 TOMBSTONE — the asset's high-water mark, which
+    ///    survives `prune_to_headers`. Without step 2 a pruned asset reads as
+    ///    UNKNOWN, and an unknown asset accepts a fresh `(None, 0)` genesis:
+    ///    prune-then-re-root.
+    /// 3. genuinely never seen → `Ok(None)`.
+    ///
+    /// `Err(locator)` means the head is indexed but its block is no longer
+    /// held in full — the caller cannot judge lineage and must fail closed.
+    ///
+    /// Lock discipline: the `asset_index` read guard is released BEFORE
+    /// [`entry_at`](Self::entry_at) takes `blocks`, per the documented order
+    /// (`blocks → … → asset_index`).
+    pub(crate) async fn asset_lineage_head(
+        &self,
+        asset_hash: &[u8; 32],
+    ) -> Result<Option<(String, u64)>, AssetEntryLocator> {
+        let (head_locator, high_water) = {
+            let index = self.asset_index.read().await;
+            (
+                index.asset_head(asset_hash).cloned(),
+                index.asset_high_water(asset_hash).cloned(),
+            )
+        };
+
+        if let Some(locator) = head_locator {
+            return match self.entry_at(&locator).await {
+                Some(head) => Ok(Some((head.lineage_id(), head.asset_seq()))),
+                None => Err(locator),
+            };
         }
-        None
+
+        Ok(high_water.map(|hw| (hw.lineage_id, hw.seq)))
+    }
+
+    /// F1 — has this container EVER recorded an entry for `asset_hash`, even
+    /// one since pruned away?
+    pub async fn has_ever_seen_asset(&self, asset_hash: &[u8; 32]) -> bool {
+        self.asset_index.read().await.has_ever_seen_asset(asset_hash)
+    }
+
+    /// Number of distinct assets the index knows about.
+    pub async fn indexed_asset_count(&self) -> usize {
+        self.asset_index.read().await.asset_count()
+    }
+
+    /// Snapshot of the derived per-asset index.
+    ///
+    /// Exposed so the S3.1 rebuild proof can compare an incrementally
+    /// maintained index against one rebuilt from the same blocks.
+    pub async fn asset_index_snapshot(&self) -> AssetChainIndex {
+        self.asset_index.read().await.clone()
     }
 
     /// Get the last N blocks.
@@ -538,12 +698,16 @@ impl NodeBlockchain {
         let mut hash_index = self.hash_index.write().await;
         let mut head = self.head.write().await;
         let mut stats = self.stats.write().await;
+        // S3.1: acquired last, per the documented lock order.
+        let mut asset_index = self.asset_index.write().await;
 
         blocks.clear();
         hash_index.clear();
+        asset_index.clear();
 
         blocks.insert(genesis.index, genesis.clone());
         hash_index.insert(genesis.hash.clone(), genesis.index);
+        asset_index.index_block(&genesis);
         *head = Some(genesis.clone());
 
         *stats = ChainStats {
@@ -636,6 +800,8 @@ impl NodeBlockchain {
         let mut headers = self.headers.write().await;
         let mut hash_index = self.hash_index.write().await;
         let mut stats = self.stats.write().await;
+        // S3.1: acquired last, per the documented lock order.
+        let mut asset_index = self.asset_index.write().await;
 
         for index in range {
             // Never prune genesis
@@ -646,6 +812,9 @@ impl NodeBlockchain {
                 // Store header for integrity verification
                 headers.insert(index, block.header());
                 hash_index.remove(&block.hash);
+                // S3.1: undo this block's contribution so the derived index
+                // can never name a block the chain no longer holds in full.
+                asset_index.remove_block(index);
                 stats.total_blocks = stats.total_blocks.saturating_sub(1);
                 stats.total_data_size = stats.total_data_size.saturating_sub(block.size());
             }
@@ -664,6 +833,10 @@ impl NodeBlockchain {
         let mut hash_index = self.hash_index.write().await;
         let mut head = self.head.write().await;
         let mut stats = self.stats.write().await;
+        // S3.1: acquired last, per the documented lock order, and held for the
+        // whole publish so no reader can observe a block that the derived
+        // per-asset index does not yet cover.
+        let mut asset_index = self.asset_index.write().await;
 
         if blocks.contains_key(&block.index) {
             return Err(format!("Block {} already exists", block.index));
@@ -685,6 +858,10 @@ impl NodeBlockchain {
 
         blocks.insert(block.index, block.clone());
         hash_index.insert(block.hash.clone(), block.index);
+        // S3.1: the single insert chokepoint is also the single index
+        // maintenance point — `add_block`, `insert_received_block` and the
+        // orphan drain all reach the index through here.
+        asset_index.index_block(&block);
 
         if head.as_ref().is_none_or(|h| block.index > h.index) {
             *head = Some(block.clone());

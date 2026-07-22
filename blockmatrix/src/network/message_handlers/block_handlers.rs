@@ -207,9 +207,15 @@ async fn insert_block(
             true
         }
         Err(e) => {
-            debug!(
-                "Block {} insertion failed: {} (from peer {})",
-                block.index, e, short_id,
+            // S3.2 QA F2: a DROPPED block from a peer must be visible at the
+            // default log level. This is the rejection path for a forged or
+            // broken asset lineage, an unsigned/mis-bound H3 envelope and a
+            // failed structural check — logging it at `debug!` made the exact
+            // silent drop the lineage gate exists to prevent. The orphan-drain
+            // path already warns; all three are now consistent.
+            warn!(
+                "Block {} REJECTED from peer {}: {}",
+                block.index, short_id, e,
             );
             false
         }

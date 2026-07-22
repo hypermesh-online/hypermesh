@@ -166,6 +166,75 @@ impl BlockAssetEntry {
         self.state_proof.space_proof.file_hash == hex::encode(self.asset_hash)
     }
 
+    /// S3.2 — stamp this entry's ASSET LINEAGE into the proof body and
+    /// re-derive `proof_hash`.
+    ///
+    /// The lineage pointer lives inside `state_proof` (see
+    /// [`StateProof::prev_asset_entry`]), so writing it necessarily changes
+    /// `proof_hash = BLAKE3(serialize(state_proof))`. This re-runs
+    /// [`bind_proof_to_asset`] so the signed-to-content binding
+    /// (`space_proof.file_hash == hex(asset_hash)`) is preserved and the entry
+    /// stays internally consistent by construction.
+    ///
+    /// Any previously attached `signed_proof` is DROPPED: an H3 envelope signs
+    /// the proof bytes, and those bytes just changed — keeping the old envelope
+    /// would leave an entry whose signature no longer wraps its proof. The
+    /// write chokepoint stamps lineage BEFORE signing, so nothing is lost.
+    ///
+    /// This is a method change only: no `BlockAssetEntry` field is added, and
+    /// `Block::calculate_hash` still commits to exactly
+    /// `(asset_hash || proof_hash)` — the lineage reaches the block hash
+    /// TRANSITIVELY, through `proof_hash`.
+    pub fn set_asset_lineage(&mut self, prev_asset_entry: Option<String>, asset_seq: u64) {
+        self.state_proof.prev_asset_entry = prev_asset_entry;
+        self.state_proof.asset_seq = asset_seq;
+        let (bound, proof_hash) = bind_proof_to_asset(&self.asset_hash, &self.state_proof);
+        self.state_proof = bound;
+        self.proof_hash = proof_hash;
+        self.signed_proof = None;
+    }
+
+    /// S3.2 — this entry's lineage identity: what a SUCCESSOR entry for the
+    /// same asset must carry in `prev_asset_entry`.
+    ///
+    /// Lowercase hex of `proof_hash`, which is the value
+    /// `Block::calculate_hash` already commits to for this entry.
+    pub fn lineage_id(&self) -> String {
+        hex::encode(self.proof_hash)
+    }
+
+    /// S3.2 — the predecessor this entry claims for its asset, if any.
+    pub fn prev_asset_entry(&self) -> Option<&str> {
+        self.state_proof.prev_asset_entry.as_deref()
+    }
+
+    /// S3.2 — this entry's position in its asset's chain (0 = asset genesis).
+    pub fn asset_seq(&self) -> u64 {
+        self.state_proof.asset_seq
+    }
+
+    /// S3.2 — does this entry claim to be its asset's FIRST entry?
+    pub fn is_asset_genesis(&self) -> bool {
+        self.state_proof.is_asset_genesis()
+    }
+
+    /// S3.2 — is this entry a well-formed successor of `predecessor`?
+    ///
+    /// Both halves are checked: the prev-pointer must name the predecessor's
+    /// `lineage_id`, and the sequence must advance by exactly one.
+    ///
+    /// The successor sequence is computed with `checked_add`: at `u64::MAX` the
+    /// answer is "no successor exists", not a wrap to 0 — an asset chain cannot
+    /// be re-rooted by overflowing its counter.
+    pub fn succeeds(&self, predecessor: &BlockAssetEntry) -> bool {
+        let Some(expected_seq) = predecessor.asset_seq().checked_add(1) else {
+            return false;
+        };
+        self.asset_hash == predecessor.asset_hash
+            && self.prev_asset_entry() == Some(predecessor.lineage_id().as_str())
+            && self.asset_seq() == expected_seq
+    }
+
     /// Attach a FALCON-1024 signed envelope over this entry's `state_proof`.
     ///
     /// H3: this is the single local-write signing step. It serializes the

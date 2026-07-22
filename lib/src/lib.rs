@@ -8,6 +8,7 @@
 //! Every crate should import shared types from here, not define their own.
 
 pub mod asset;
+pub mod attestation;
 pub mod authz;
 pub mod crypto;
 pub mod economic;
@@ -28,6 +29,9 @@ pub mod test_utils;
 
 // Re-export commonly used types at crate root
 pub use asset::*;
+pub use attestation::{
+    MatrixIndex, MembershipProof, MerkleStep, MirrorAttestation, MirrorSeal, SealBreak,
+};
 pub use authz::{
     AuthDecision, AuthorizationSet, CapacityDimension, CapacityProfile, Grant, GrantScope,
     GrantSig, Owner,

@@ -18,6 +18,8 @@
 //! This fundamentally differs from traditional blockchain architectures where
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
+pub mod asset_index;
+pub mod attestations;
 pub mod block;
 pub mod block_sink;
 pub mod chain;
@@ -26,6 +28,7 @@ pub mod genesis_assessor;
 pub mod genesis_auth;
 pub mod genesis_crypto;
 pub mod genesis_ops;
+pub mod lineage;
 pub mod mutations;
 pub mod node_chain;
 pub mod propagation;
@@ -35,6 +38,10 @@ pub mod sync_manager;
 pub mod sync_protocol;
 pub mod validation;
 
+pub use asset_index::{AssetChainIndex, AssetEntryLocator, AssetHighWater};
+pub use attestations::{
+    matrix_index_of, verify_attestation, MirrorAttestationPool, MirrorSealReceipt,
+};
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
@@ -42,6 +49,7 @@ pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,
 };
 pub use genesis_auth::{GenesisAuthManager, GenesisCredentials};
+pub use lineage::{AssetLineage, LineageBreak};
 pub use node_chain::{ChainStats, NodeBlockchain};
 pub use propagation::{
     BlockPropagator, BlockTransport, PropagationResult, PropagationStrategy, SimulatedTransport,
