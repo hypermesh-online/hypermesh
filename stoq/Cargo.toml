@@ -81,8 +81,8 @@ wasm-bindgen-futures = { version = "0.4", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 
 
-# Engauge metrics streaming (optional)
-engauge = { path = "../engauge", optional = true }
+# NGauge metrics streaming (optional)
+ngauge = { path = "../ngauge", optional = true }
 
 # Optional ML for routing optimization (placeholder)
 # candle = { version = "0.5", optional = true }
@@ -104,7 +104,7 @@ high-performance = [] # Zero-copy operations, connection multiplexing
 benchmark = []
 ebpf = [] # Enable eBPF integration tests and examples
 wasm = ["dep:wasm-bindgen", "dep:js-sys", "dep:web-sys"]
-engauge = ["dep:engauge"] # Enable STOQ METRICS frame type for Engauge streaming
+ngauge = ["dep:ngauge"] # Enable STOQ METRICS frame type for NGauge streaming
 
 [[bench]]
 name = "throughput"

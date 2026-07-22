@@ -38,7 +38,7 @@ items = [
     # Per-service FFI functions (route through IPC daemon)
     "Caesar API (hypermesh_caesar_wallet, balance, transactions, rewards, route_packet, governor_params)",
     "TrustChain API (hypermesh_trustchain_certificates, issue, validate, revoke, dns_zones)",
-    "Engauge API (hypermesh_engauge_capacity, traffic, marketplace, node_metrics, leases)",
+    "NGauge API (hypermesh_ngauge_capacity, traffic, marketplace, node_metrics, leases)",
     "Catalog API (hypermesh_catalog_browse, search, package_info, registry_stats)",
     # Language FFI loaders (wrapping the C FFI for each language)
     "TypeScript FFI loader (ffi-napi + ref-napi, optional dependency)",

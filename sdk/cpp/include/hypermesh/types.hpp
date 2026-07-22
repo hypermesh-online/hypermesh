@@ -699,9 +699,9 @@ inline void to_json(nlohmann::json& j, const TrustChainDnsZoneList& l) {
     j = nlohmann::json{{"count", l.count}, {"zones", l.zones}};
 }
 
-// ── Engauge ──
+// ── NGauge ──
 
-struct EngaugeCapacityMetrics {
+struct NGaugeCapacityMetrics {
     uint64_t bytes_served = 0;
     double compute_delivered = 0.0;
     uint64_t storage = 0;
@@ -709,7 +709,7 @@ struct EngaugeCapacityMetrics {
     double uptime = 0.0;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeCapacityMetrics& m) {
+inline void from_json(const nlohmann::json& j, NGaugeCapacityMetrics& m) {
     j.at("bytes_served").get_to(m.bytes_served);
     j.at("compute_delivered").get_to(m.compute_delivered);
     j.at("storage").get_to(m.storage);
@@ -717,7 +717,7 @@ inline void from_json(const nlohmann::json& j, EngaugeCapacityMetrics& m) {
     j.at("uptime").get_to(m.uptime);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeCapacityMetrics& m) {
+inline void to_json(nlohmann::json& j, const NGaugeCapacityMetrics& m) {
     j = nlohmann::json{
         {"bytes_served", m.bytes_served},
         {"compute_delivered", m.compute_delivered},
@@ -727,19 +727,19 @@ inline void to_json(nlohmann::json& j, const EngaugeCapacityMetrics& m) {
     };
 }
 
-struct EngaugeTrafficMetrics {
+struct NGaugeTrafficMetrics {
     double organic_ratio = 0.0;
     double speculative_ratio = 0.0;
     uint64_t total_requests = 0;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeTrafficMetrics& m) {
+inline void from_json(const nlohmann::json& j, NGaugeTrafficMetrics& m) {
     j.at("organic_ratio").get_to(m.organic_ratio);
     j.at("speculative_ratio").get_to(m.speculative_ratio);
     j.at("total_requests").get_to(m.total_requests);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeTrafficMetrics& m) {
+inline void to_json(nlohmann::json& j, const NGaugeTrafficMetrics& m) {
     j = nlohmann::json{
         {"organic_ratio", m.organic_ratio},
         {"speculative_ratio", m.speculative_ratio},
@@ -747,19 +747,19 @@ inline void to_json(nlohmann::json& j, const EngaugeTrafficMetrics& m) {
     };
 }
 
-struct EngaugeListing {
+struct NGaugeListing {
     std::string id;
     std::string resource_type;
     double price = 0.0;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeListing& l) {
+inline void from_json(const nlohmann::json& j, NGaugeListing& l) {
     j.at("id").get_to(l.id);
     j.at("resource_type").get_to(l.resource_type);
     j.at("price").get_to(l.price);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeListing& l) {
+inline void to_json(nlohmann::json& j, const NGaugeListing& l) {
     j = nlohmann::json{
         {"id", l.id},
         {"resource_type", l.resource_type},
@@ -767,33 +767,33 @@ inline void to_json(nlohmann::json& j, const EngaugeListing& l) {
     };
 }
 
-struct EngaugeListingList {
+struct NGaugeListingList {
     uint64_t count = 0;
-    std::vector<EngaugeListing> listings;
+    std::vector<NGaugeListing> listings;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeListingList& l) {
+inline void from_json(const nlohmann::json& j, NGaugeListingList& l) {
     j.at("count").get_to(l.count);
     j.at("listings").get_to(l.listings);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeListingList& l) {
+inline void to_json(nlohmann::json& j, const NGaugeListingList& l) {
     j = nlohmann::json{{"count", l.count}, {"listings", l.listings}};
 }
 
-struct EngaugeNodeMetrics {
+struct NGaugeNodeMetrics {
     double activity_score = 0.0;
     uint64_t receipts = 0;
     double bandwidth = 0.0;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeNodeMetrics& m) {
+inline void from_json(const nlohmann::json& j, NGaugeNodeMetrics& m) {
     j.at("activity_score").get_to(m.activity_score);
     j.at("receipts").get_to(m.receipts);
     j.at("bandwidth").get_to(m.bandwidth);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeNodeMetrics& m) {
+inline void to_json(nlohmann::json& j, const NGaugeNodeMetrics& m) {
     j = nlohmann::json{
         {"activity_score", m.activity_score},
         {"receipts", m.receipts},
@@ -801,19 +801,19 @@ inline void to_json(nlohmann::json& j, const EngaugeNodeMetrics& m) {
     };
 }
 
-struct EngaugeLease {
+struct NGaugeLease {
     std::string id;
     std::string resource_type;
     std::string status;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeLease& l) {
+inline void from_json(const nlohmann::json& j, NGaugeLease& l) {
     j.at("id").get_to(l.id);
     j.at("resource_type").get_to(l.resource_type);
     j.at("status").get_to(l.status);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeLease& l) {
+inline void to_json(nlohmann::json& j, const NGaugeLease& l) {
     j = nlohmann::json{
         {"id", l.id},
         {"resource_type", l.resource_type},
@@ -821,17 +821,17 @@ inline void to_json(nlohmann::json& j, const EngaugeLease& l) {
     };
 }
 
-struct EngaugeLeaseList {
+struct NGaugeLeaseList {
     uint64_t count = 0;
-    std::vector<EngaugeLease> leases;
+    std::vector<NGaugeLease> leases;
 };
 
-inline void from_json(const nlohmann::json& j, EngaugeLeaseList& l) {
+inline void from_json(const nlohmann::json& j, NGaugeLeaseList& l) {
     j.at("count").get_to(l.count);
     j.at("leases").get_to(l.leases);
 }
 
-inline void to_json(nlohmann::json& j, const EngaugeLeaseList& l) {
+inline void to_json(nlohmann::json& j, const NGaugeLeaseList& l) {
     j = nlohmann::json{{"count", l.count}, {"leases", l.leases}};
 }
 

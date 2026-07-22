@@ -46,12 +46,6 @@ export const crateStats: CrateStats[] = [
     "testCount": 0
   },
   {
-    "id": "engauge",
-    "files": 36,
-    "linesOfCode": 12190,
-    "testCount": 237
-  },
-  {
     "id": "gateway",
     "files": 28,
     "linesOfCode": 10697,
@@ -86,6 +80,12 @@ export const crateStats: CrateStats[] = [
     "files": 0,
     "linesOfCode": 0,
     "testCount": 0
+  },
+  {
+    "id": "ngauge",
+    "files": 36,
+    "linesOfCode": 12190,
+    "testCount": 237
   },
   {
     "id": "sdk",

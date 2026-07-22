@@ -134,12 +134,12 @@ export function buildFfiSpec(): Record<string, [string, string[]]> {
     hypermesh_trustchain_revoke: ["pointer", ["pointer", "string"]],
     hypermesh_trustchain_dns_zones: ["pointer", ["pointer"]],
 
-    // Engauge
-    hypermesh_engauge_capacity: ["pointer", ["pointer"]],
-    hypermesh_engauge_traffic: ["pointer", ["pointer"]],
-    hypermesh_engauge_marketplace: ["pointer", ["pointer"]],
-    hypermesh_engauge_node_metrics: ["pointer", ["pointer"]],
-    hypermesh_engauge_leases: ["pointer", ["pointer"]],
+    // NGauge
+    hypermesh_ngauge_capacity: ["pointer", ["pointer"]],
+    hypermesh_ngauge_traffic: ["pointer", ["pointer"]],
+    hypermesh_ngauge_marketplace: ["pointer", ["pointer"]],
+    hypermesh_ngauge_node_metrics: ["pointer", ["pointer"]],
+    hypermesh_ngauge_leases: ["pointer", ["pointer"]],
 
     // Catalog
     hypermesh_catalog_browse: ["pointer", ["pointer", "string", "uint32"]],

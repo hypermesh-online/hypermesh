@@ -327,7 +327,7 @@ async fn send_gossip_to_peer(
 /// [`NetworkManager::get_connected_nodes`] and calls
 /// [`trustchain::ca::FederationManager::add_peer`] for any peer not
 /// already in the federation.  PoS gating, byzantine override, and
-/// engauge trust-band capping are all enforced inside `add_peer`, so
+/// ngauge trust-band capping are all enforced inside `add_peer`, so
 /// the discovery loop only needs to surface candidates.
 ///
 /// This is a no-op when `federation` is `None`, which is the alpha

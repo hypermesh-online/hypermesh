@@ -15,7 +15,7 @@ pub mod catalog;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
-pub mod engauge;
+pub mod ngauge;
 pub mod gateway;
 pub mod intelligence;
 pub mod domain;
@@ -103,7 +103,7 @@ pub fn register_all(handler: &mut RequestHandler, state: Arc<DaemonState>) {
     message::register(handler, &state);
     intelligence::register(handler, &state);
     caesar::register(handler, &state);
-    engauge::register(handler, &state);
+    ngauge::register(handler, &state);
     trustchain::register(handler, &state);
     stoq::register(handler, &state);
     system::register(handler, &state);
@@ -171,7 +171,7 @@ pub(crate) mod tests {
             #[cfg(feature = "caesar")]
             caesar: None,
             #[cfg(feature = "intelligence")]
-            engauge_bridge: None,
+            ngauge_bridge: None,
             #[cfg(feature = "intelligence")]
             federation_manager: None,
             #[cfg(feature = "intelligence")]
@@ -265,10 +265,10 @@ pub(crate) mod tests {
             "caesar.transactions",
             "caesar.rewards",
             "caesar.staking",
-            "engauge.capacity",
-            "engauge.traffic",
-            "engauge.throttle",
-            "engauge.routing",
+            "ngauge.capacity",
+            "ngauge.traffic",
+            "ngauge.throttle",
+            "ngauge.routing",
             "trustchain.status",
             "trustchain.certs",
             "trustchain.identity",

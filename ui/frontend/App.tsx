@@ -14,7 +14,7 @@ import { HyperMeshModule } from './components/modules/HyperMeshModule';
 import { CatalogModule } from './components/modules/CatalogModule';
 import { TrustChainModule } from './components/modules/TrustChainModule';
 import CaesarModule from './components/modules/CaesarModule';
-import EngaugeModule from './components/modules/EngaugeModule';
+import NGaugeModule from './components/modules/NGaugeModule';
 import { StoqModule } from './components/modules/StoqModule';
 import { DashboardMonitor } from './components/api/DashboardMonitor';
 import { InboxPanel } from './components/sharing/InboxPanel';
@@ -77,7 +77,7 @@ export default function App() {
                 <Route path="/catalog/*" element={<ErrorBoundary module="Catalog"><CatalogModule /></ErrorBoundary>} />
                 <Route path="/trustchain/*" element={<ErrorBoundary module="TrustChain"><TrustChainModule /></ErrorBoundary>} />
                 <Route path="/caesar/*" element={<ErrorBoundary module="Caesar"><CaesarModule /></ErrorBoundary>} />
-                <Route path="/engauge/*" element={<ErrorBoundary module="Engauge"><EngaugeModule /></ErrorBoundary>} />
+                <Route path="/ngauge/*" element={<ErrorBoundary module="NGauge"><NGaugeModule /></ErrorBoundary>} />
                 <Route path="/stoq/*" element={<ErrorBoundary module="STOQ"><StoqModule /></ErrorBoundary>} />
                 <Route path="/inbox" element={<ErrorBoundary module="Inbox"><InboxPanel /></ErrorBoundary>} />
                 <Route path="/messages" element={<ErrorBoundary module="Messages"><MessengerPanel /></ErrorBoundary>} />

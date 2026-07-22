@@ -28,7 +28,7 @@ set(SDK_SOURCES
     src/api/domain.cpp
     src/api/caesar.cpp
     src/api/trustchain.cpp
-    src/api/engauge.cpp
+    src/api/ngauge.cpp
     src/api/catalog.cpp
 )
 

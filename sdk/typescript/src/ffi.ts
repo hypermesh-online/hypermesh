@@ -31,11 +31,11 @@ import type {
   DnsResolveResponse,
   DomainListResponse,
   DomainRegisterResponse,
-  EngaugeCapacityMetrics,
-  EngaugeLeaseList,
-  EngaugeListingList,
-  EngaugeNodeMetrics,
-  EngaugeTrafficMetrics,
+  NGaugeCapacityMetrics,
+  NGaugeLeaseList,
+  NGaugeListingList,
+  NGaugeNodeMetrics,
+  NGaugeTrafficMetrics,
   NodeStatus,
   PeersResponse,
   TopologyInfo,
@@ -364,35 +364,35 @@ export class HyperMeshFFI {
     );
   }
 
-  // ── Engauge ────────────────────────────────────────────────────────────
+  // ── NGauge ────────────────────────────────────────────────────────────
 
-  engaugeCapacity(): EngaugeCapacityMetrics {
+  ngaugeCapacity(): NGaugeCapacityMetrics {
     return this.parse(
-      this.lib["hypermesh_engauge_capacity"](this.requireConnected()),
+      this.lib["hypermesh_ngauge_capacity"](this.requireConnected()),
     );
   }
 
-  engaugeTraffic(): EngaugeTrafficMetrics {
+  ngaugeTraffic(): NGaugeTrafficMetrics {
     return this.parse(
-      this.lib["hypermesh_engauge_traffic"](this.requireConnected()),
+      this.lib["hypermesh_ngauge_traffic"](this.requireConnected()),
     );
   }
 
-  engaugeMarketplace(): EngaugeListingList {
+  ngaugeMarketplace(): NGaugeListingList {
     return this.parse(
-      this.lib["hypermesh_engauge_marketplace"](this.requireConnected()),
+      this.lib["hypermesh_ngauge_marketplace"](this.requireConnected()),
     );
   }
 
-  engaugeNodeMetrics(): EngaugeNodeMetrics {
+  ngaugeNodeMetrics(): NGaugeNodeMetrics {
     return this.parse(
-      this.lib["hypermesh_engauge_node_metrics"](this.requireConnected()),
+      this.lib["hypermesh_ngauge_node_metrics"](this.requireConnected()),
     );
   }
 
-  engaugeLeases(): EngaugeLeaseList {
+  ngaugeLeases(): NGaugeLeaseList {
     return this.parse(
-      this.lib["hypermesh_engauge_leases"](this.requireConnected()),
+      this.lib["hypermesh_ngauge_leases"](this.requireConnected()),
     );
   }
 

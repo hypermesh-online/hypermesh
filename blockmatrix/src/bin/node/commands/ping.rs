@@ -253,7 +253,7 @@ fn split_host_port(target: &str) -> (&str, Option<u16>) {
 /// Resolution layers (in order):
 /// 1. If daemon is running: query IPC `dns.resolve` for full blockchain DNS
 ///    (includes peer-synced records, user-registered names, network DNS)
-/// 2. Well-known local services (trust, caesar, catalog, engauge, blockmatrix)
+/// 2. Well-known local services (trust, caesar, catalog, ngauge, blockmatrix)
 /// 3. Returns None → caller falls through to system DNS
 async fn resolve_hypermesh_dns(name: &str, explicit_port: Option<u16>) -> Option<SocketAddr> {
     // Query running daemon for full DNS (blockchain + peer-synced + local services).

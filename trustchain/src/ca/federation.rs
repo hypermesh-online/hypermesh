@@ -116,13 +116,13 @@ pub struct FederationManager {
     /// Key shares held by this node from federated CA key splits.
     /// Keyed by CA fingerprint (SHA-256 of CA public key).
     held_key_shares: RwLock<HashMap<[u8; 32], KeyShare>>,
-    /// Optional engauge-driven trust-band provider (Phase F.1). When
+    /// Optional ngauge-driven trust-band provider (Phase F.1). When
     /// set, `add_peer` consults this after the PoS gate to cap the
-    /// peer's trust level at the engauge-derived band.
-    engauge_signals: RwLock<Option<Arc<dyn TrustSignalProvider>>>,
+    /// peer's trust level at the ngauge-derived band.
+    ngauge_signals: RwLock<Option<Arc<dyn TrustSignalProvider>>>,
     /// Optional byzantine detector (Phase F.1). When set and the peer
     /// has any byzantine confidence above the detector's threshold,
-    /// `add_peer` forces `Untrusted` regardless of PoS or engauge state.
+    /// `add_peer` forces `Untrusted` regardless of PoS or ngauge state.
     byzantine_detector: RwLock<Option<Arc<ByzantineDetector>>>,
     /// Whether threshold-mode signing is enabled (Phase F.1). Set by
     /// the caller after key shares have been distributed.
@@ -138,22 +138,22 @@ impl FederationManager {
             events: Arc::new(RwLock::new(Vec::new())),
             state_proof_validator: Arc::new(tokio::sync::Mutex::new(FourProofValidator::new())),
             held_key_shares: RwLock::new(HashMap::new()),
-            engauge_signals: RwLock::new(None),
+            ngauge_signals: RwLock::new(None),
             byzantine_detector: RwLock::new(None),
             threshold_mode: RwLock::new(false),
         }
     }
 
-    /// Attach (or replace) the engauge trust-signal provider used by
+    /// Attach (or replace) the ngauge trust-signal provider used by
     /// `add_peer` to cap the peer's trust level.  See
     /// [`crate::ca::trust_provider::TrustSignalProvider`].
     pub async fn set_trust_signal_provider(&self, provider: Arc<dyn TrustSignalProvider>) {
-        *self.engauge_signals.write().await = Some(provider);
+        *self.ngauge_signals.write().await = Some(provider);
     }
 
     /// Attach (or replace) the byzantine detector consulted by
     /// `add_peer`.  Peers flagged by the detector are forced to
-    /// `Untrusted` regardless of PoS or engauge state.
+    /// `Untrusted` regardless of PoS or ngauge state.
     pub async fn set_byzantine_detector(&self, detector: Arc<ByzantineDetector>) {
         *self.byzantine_detector.write().await = Some(detector);
     }
@@ -248,7 +248,7 @@ impl FederationManager {
         // --- Phase F.1: byzantine override ---
         // If the byzantine detector has any record of this peer with
         // confidence above its threshold, force Untrusted regardless of
-        // PoS or engauge signals.  Engauge gating only applies when the
+        // PoS or ngauge signals.  NGauge gating only applies when the
         // peer is *not* byzantine.
         let mut byzantine = false;
         if peer.trust_level != FederationTrustLevel::Untrusted {
@@ -264,12 +264,12 @@ impl FederationManager {
             }
         }
 
-        // --- Phase F.1: engauge trust-band gating ---
-        // Cap the peer's trust at the engauge-derived band.  The band
+        // --- Phase F.1: ngauge trust-band gating ---
+        // Cap the peer's trust at the ngauge-derived band.  The band
         // is `Full` or `Conditional`; `Untrusted` is already settled
         // above by PoS / byzantine checks.
         if !byzantine && peer.trust_level != FederationTrustLevel::Untrusted {
-            if let Some(provider) = self.engauge_signals.read().await.as_ref().cloned() {
+            if let Some(provider) = self.ngauge_signals.read().await.as_ref().cloned() {
                 if let Some(fp) = derive_peer_fingerprint(&peer.public_key) {
                     match provider.trust_band_for(&fp).await {
                         Some(PeerTrustBand::Full) => {
@@ -278,7 +278,7 @@ impl FederationManager {
                         Some(PeerTrustBand::Conditional) => {
                             if peer.trust_level == FederationTrustLevel::Full {
                                 debug!(
-                                    "Engauge signals cap peer '{}' at Conditional",
+                                    "NGauge signals cap peer '{}' at Conditional",
                                     peer.ca_id
                                 );
                                 peer.trust_level = FederationTrustLevel::Conditional;

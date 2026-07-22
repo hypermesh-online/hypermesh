@@ -22,7 +22,7 @@ export const moduleColors = {
     bg: 'bg-yellow-500/20',
     border: 'border-yellow-500/50',
   },
-  engauge: {
+  ngauge: {
     gradient: 'from-orange-400 to-red-600',
     text: 'text-orange-400',
     bg: 'bg-orange-500/20',
@@ -56,7 +56,7 @@ export type StatusName = keyof typeof statusColors;
 
 /** Polling intervals in milliseconds for React Query refetch cycles */
 export const polling = {
-  fast: 5_000,    // STOQ stats, engauge throttle
+  fast: 5_000,    // STOQ stats, ngauge throttle
   normal: 10_000, // node status, blockchain height
   slow: 15_000,   // peers, assets, domains
   rare: 30_000,   // caesar overview, trustchain status

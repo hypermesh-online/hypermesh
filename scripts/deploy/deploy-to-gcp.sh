@@ -40,7 +40,7 @@ fi
 echo "=== Deploying HyperMesh to $HOST (user: $REMOTE_USER) ==="
 
 # 1. Ensure binaries exist
-# engauge-server is intentionally excluded: disabled on the remote and it needs a
+# ngauge-server is intentionally excluded: disabled on the remote and it needs a
 # `server` cargo feature that is not part of the deploy build.
 for bin in gateway trustchain-http3-server trustchain-stoq-server hypermesh catalog-server caesar; do
     if [ ! -f "$RELEASE_DIR/$bin" ]; then
@@ -54,7 +54,7 @@ echo "Creating remote directories..."
 $SSH "$REMOTE_USER@$HOST" bash -s <<'REMOTE'
 set -euo pipefail
 sudo id -u hypermesh &>/dev/null || sudo useradd -r -s /usr/sbin/nologin -d /var/lib/hypermesh hypermesh
-sudo mkdir -p /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,engauge,caesar}
+sudo mkdir -p /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,ngauge,caesar}
 sudo mkdir -p /var/log/hypermesh
 sudo mkdir -p /etc/hypermesh/certs
 sudo chown -R hypermesh:hypermesh /var/lib/hypermesh /var/log/hypermesh /etc/hypermesh
@@ -115,7 +115,7 @@ rm -f /tmp/gateway.toml /tmp/trustchain-http3.toml /tmp/trustchain-stoq.toml
 REMOTE
 
 # 5. Upload systemd units
-# engauge.service is omitted: the engauge-server binary is not deployed and the
+# ngauge.service is omitted: the ngauge-server binary is not deployed and the
 # service stays disabled on the remote.
 echo "Uploading systemd units..."
 UNITS="gateway.service trustchain-http3.service trustchain-stoq.service blockmatrix.service catalog.service caesar.service"

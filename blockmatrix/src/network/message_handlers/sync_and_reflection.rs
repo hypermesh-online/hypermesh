@@ -43,7 +43,7 @@ pub(super) async fn handle_shard_dispatch(
     }
 }
 
-/// Record shard fetch demand for engauge swarm analytics.
+/// Record shard fetch demand for ngauge swarm analytics.
 ///
 /// Extracts the shard_id from a SHARD_FETCH message (tag 0x02 + 32-byte hash)
 /// and records it in the swarm demand tracker. If the message is too short

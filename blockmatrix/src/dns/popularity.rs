@@ -1,10 +1,10 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! DNS popularity tracking for engauge-driven replication.
+//! DNS popularity tracking for ngauge-driven replication.
 //!
 //! Popular DNS names are tracked by resolution frequency, analogous to
-//! how `SwarmDemandTracker` tracks shard fetch demand. The engauge
+//! how `SwarmDemandTracker` tracks shard fetch demand. The ngauge
 //! intelligence layer can use this data to decide which DNS records
 //! should be replicated to more nodes.
 
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Tracks DNS resolution frequency for engauge-driven replication.
+/// Tracks DNS resolution frequency for ngauge-driven replication.
 ///
 /// Popular names get replicated to more nodes (like popular shards).
 /// Uses the same pattern as [`crate::network::SwarmDemandTracker`].
@@ -60,14 +60,14 @@ impl DnsPopularityTracker {
         sorted
     }
 
-    /// Get a BLAKE3 content hash for a DNS name (for engauge demand tracking).
+    /// Get a BLAKE3 content hash for a DNS name (for ngauge demand tracking).
     ///
     /// Uses `dns:` prefix for domain separation from shard content hashes.
     pub fn name_hash(name: &str) -> [u8; 32] {
         *blake3::hash(format!("dns:{}", name).as_bytes()).as_bytes()
     }
 
-    /// Snapshot of all resolution counts for feeding into engauge.
+    /// Snapshot of all resolution counts for feeding into ngauge.
     pub async fn snapshot(&self) -> HashMap<String, u64> {
         self.resolution_counts.read().await.clone()
     }

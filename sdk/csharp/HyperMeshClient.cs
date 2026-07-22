@@ -11,13 +11,13 @@ public sealed class HyperMeshClient : IDisposable
     private const string DefaultCaesarUrl = "https://localhost:8443";
     private const string DefaultTrustChainUrl = "https://localhost:8443";
     private const string DefaultCatalogUrl = "https://localhost:8443";
-    private const string DefaultEngaugeUrl = "https://localhost:8443";
+    private const string DefaultNGaugeUrl = "https://localhost:8443";
 
     private readonly HttpApiClient _apiClient;
     private readonly HttpApiClient _caesarClient;
     private readonly HttpApiClient _trustChainClient;
     private readonly HttpApiClient _catalogClient;
-    private readonly HttpApiClient _engaugeClient;
+    private readonly HttpApiClient _ngaugeClient;
     private bool _disposed;
 
     /// <summary>Node status and health.</summary>
@@ -53,8 +53,8 @@ public sealed class HyperMeshClient : IDisposable
     /// <summary>TrustChain (certificates, validation, DNS zones).</summary>
     public TrustChainApi TrustChain { get; }
 
-    /// <summary>Engauge (capacity, traffic, marketplace, metrics).</summary>
-    public EngaugeApi Engauge { get; }
+    /// <summary>NGauge (capacity, traffic, marketplace, metrics).</summary>
+    public NGaugeApi NGauge { get; }
 
     /// <summary>Catalog (packages, search, registry).</summary>
     public CatalogApi Catalog { get; }
@@ -66,21 +66,21 @@ public sealed class HyperMeshClient : IDisposable
     /// <param name="caesarUrl">Caesar EVP API base URL (default: https://localhost:8443).</param>
     /// <param name="trustChainUrl">TrustChain API base URL (default: https://localhost:8443).</param>
     /// <param name="catalogUrl">Catalog API base URL (default: https://localhost:8443).</param>
-    /// <param name="engaugeUrl">Engauge API base URL (default: https://localhost:8443).</param>
+    /// <param name="ngaugeUrl">NGauge API base URL (default: https://localhost:8443).</param>
     /// <param name="httpClient">Optional HttpClient instance for custom configuration.</param>
     public HyperMeshClient(
         string baseUrl = DefaultBaseUrl,
         string caesarUrl = DefaultCaesarUrl,
         string trustChainUrl = DefaultTrustChainUrl,
         string catalogUrl = DefaultCatalogUrl,
-        string engaugeUrl = DefaultEngaugeUrl,
+        string ngaugeUrl = DefaultNGaugeUrl,
         HttpClient? httpClient = null)
     {
         _apiClient = new HttpApiClient(baseUrl, httpClient);
         _caesarClient = new HttpApiClient(caesarUrl);
         _trustChainClient = new HttpApiClient(trustChainUrl);
         _catalogClient = new HttpApiClient(catalogUrl);
-        _engaugeClient = new HttpApiClient(engaugeUrl);
+        _ngaugeClient = new HttpApiClient(ngaugeUrl);
 
         Node = new NodeApi(_apiClient);
         Blockchain = new BlockchainApi(_apiClient);
@@ -93,7 +93,7 @@ public sealed class HyperMeshClient : IDisposable
         Domain = new DomainApi(_apiClient);
         Caesar = new CaesarApi(_caesarClient);
         TrustChain = new TrustChainApi(_trustChainClient);
-        Engauge = new EngaugeApi(_engaugeClient);
+        NGauge = new NGaugeApi(_ngaugeClient);
         Catalog = new CatalogApi(_catalogClient);
     }
 
@@ -105,7 +105,7 @@ public sealed class HyperMeshClient : IDisposable
             _caesarClient.Dispose();
             _trustChainClient.Dispose();
             _catalogClient.Dispose();
-            _engaugeClient.Dispose();
+            _ngaugeClient.Dispose();
             _disposed = true;
         }
     }

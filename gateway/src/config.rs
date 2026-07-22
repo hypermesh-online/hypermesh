@@ -105,8 +105,8 @@ pub struct GatewayConfig {
     /// Catalog backend address
     pub catalog_addr: SocketAddr,
 
-    /// engauge analytics backend address
-    pub engauge_addr: SocketAddr,
+    /// ngauge analytics backend address
+    pub ngauge_addr: SocketAddr,
 
     /// TLS server name for TrustChain backend (SNI)
     pub trustchain_server_name: String,
@@ -120,8 +120,8 @@ pub struct GatewayConfig {
     /// TLS server name for Catalog backend (SNI)
     pub catalog_server_name: String,
 
-    /// TLS server name for engauge backend (SNI)
-    pub engauge_server_name: String,
+    /// TLS server name for ngauge backend (SNI)
+    pub ngauge_server_name: String,
 
     /// Certificate configuration
     pub cert_path: PathBuf,
@@ -223,14 +223,14 @@ impl Default for GatewayConfig {
             catalog_addr: "[::1]:9295"
                 .parse()
                 .expect("hardcoded default catalog addr is valid"),
-            engauge_addr: "[::1]:9296"
+            ngauge_addr: "[::1]:9296"
                 .parse()
-                .expect("hardcoded default engauge addr is valid"),
+                .expect("hardcoded default ngauge addr is valid"),
             trustchain_server_name: "trustchain".to_string(),
             blockmatrix_server_name: "blockmatrix".to_string(),
             caesar_server_name: "caesar".to_string(),
             catalog_server_name: "catalog".to_string(),
-            engauge_server_name: "engauge".to_string(),
+            ngauge_server_name: "ngauge".to_string(),
             cert_path: PathBuf::from("certs/server.crt"),
             key_path: PathBuf::from("certs/server.key"),
             pool: ConnectionPoolConfig::default(),
@@ -365,11 +365,11 @@ impl GatewayConfig {
         if let Ok(name) = std::env::var("CATALOG_SERVER_NAME") {
             self.catalog_server_name = name;
         }
-        if let Ok(addr) = std::env::var("ENGAUGE_ADDR") {
-            self.engauge_addr = addr.parse()?;
+        if let Ok(addr) = std::env::var("NGAUGE_ADDR") {
+            self.ngauge_addr = addr.parse()?;
         }
-        if let Ok(name) = std::env::var("ENGAUGE_SERVER_NAME") {
-            self.engauge_server_name = name;
+        if let Ok(name) = std::env::var("NGAUGE_SERVER_NAME") {
+            self.ngauge_server_name = name;
         }
         if let Ok(path) = std::env::var("CERT_PATH") {
             self.cert_path = PathBuf::from(path);
@@ -440,12 +440,12 @@ impl GatewayConfig {
             config.catalog_server_name = name;
         }
 
-        if let Ok(addr) = std::env::var("ENGAUGE_ADDR") {
-            config.engauge_addr = addr.parse()?;
+        if let Ok(addr) = std::env::var("NGAUGE_ADDR") {
+            config.ngauge_addr = addr.parse()?;
         }
 
-        if let Ok(name) = std::env::var("ENGAUGE_SERVER_NAME") {
-            config.engauge_server_name = name;
+        if let Ok(name) = std::env::var("NGAUGE_SERVER_NAME") {
+            config.ngauge_server_name = name;
         }
 
         if let Ok(path) = std::env::var("CERT_PATH") {
@@ -555,12 +555,12 @@ trustchain_addr = "[::1]:8444"
 blockmatrix_addr = "[::1]:9292"
 caesar_addr = "[::1]:9294"
 catalog_addr = "[::1]:9295"
-engauge_addr = "[::1]:9296"
+ngauge_addr = "[::1]:9296"
 trustchain_server_name = "tc"
 blockmatrix_server_name = "bm"
 caesar_server_name = "cs"
 catalog_server_name = "cat"
-engauge_server_name = "eng"
+ngauge_server_name = "eng"
 cert_path = "certs/server.crt"
 key_path = "certs/server.key"
 log_level = "info"
@@ -600,12 +600,12 @@ trustchain_addr = "[::1]:8444"
 blockmatrix_addr = "[::1]:9292"
 caesar_addr = "[::1]:9294"
 catalog_addr = "[::1]:9295"
-engauge_addr = "[::1]:9296"
+ngauge_addr = "[::1]:9296"
 trustchain_server_name = "tc"
 blockmatrix_server_name = "bm"
 caesar_server_name = "cs"
 catalog_server_name = "cat"
-engauge_server_name = "eng"
+ngauge_server_name = "eng"
 cert_path = "certs/server.crt"
 key_path = "certs/server.key"
 log_level = "info"
@@ -655,12 +655,12 @@ trustchain_addr = "[::1]:8444"
 blockmatrix_addr = "[::1]:9292"
 caesar_addr = "[::1]:9294"
 catalog_addr = "[::1]:9295"
-engauge_addr = "[::1]:9296"
+ngauge_addr = "[::1]:9296"
 trustchain_server_name = "tc"
 blockmatrix_server_name = "bm"
 caesar_server_name = "cs"
 catalog_server_name = "cat"
-engauge_server_name = "eng"
+ngauge_server_name = "eng"
 cert_path = "/tmp/cert.pem"
 key_path = "/tmp/key.pem"
 log_level = "debug"
@@ -727,12 +727,12 @@ trustchain_addr = "[::1]:8444"
 blockmatrix_addr = "[::1]:9292"
 caesar_addr = "[::1]:9294"
 catalog_addr = "[::1]:9295"
-engauge_addr = "[::1]:9296"
+ngauge_addr = "[::1]:9296"
 trustchain_server_name = "tc"
 blockmatrix_server_name = "bm"
 caesar_server_name = "cs"
 catalog_server_name = "cat"
-engauge_server_name = "eng"
+ngauge_server_name = "eng"
 cert_path = "certs/server.crt"
 key_path = "certs/server.key"
 log_level = "warn"

@@ -39,7 +39,7 @@ items = [
     # Caesar works in-memory on a single node, but has no real external integration
     "Multi-node packet routing — routing logic exists but packets don't actually traverse QUIC connections between nodes",
     "Blockchain-backed acceptance criteria — currently in-memory, should be on Network chain",
-    "Engauge capacity metrics integration — feature-gated code exists but no real data pipeline",
+    "NGauge capacity metrics integration — feature-gated code exists but no real data pipeline",
     "Banking interop bridge — velocity economics functional, 3 tests failing on external adapter paths",
 ]
 

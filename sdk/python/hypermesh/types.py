@@ -271,12 +271,12 @@ class TrustChainDnsZoneList:
     zones: list[dict[str, Any]]
 
 
-# ── Engauge ──
+# ── NGauge ──
 
 
 @dataclass
-class EngaugeCapacityMetrics:
-    """Response from GET /api/v1/engauge/capacity."""
+class NGaugeCapacityMetrics:
+    """Response from GET /api/v1/ngauge/capacity."""
 
     bytes_served: int
     compute_delivered: float
@@ -286,8 +286,8 @@ class EngaugeCapacityMetrics:
 
 
 @dataclass
-class EngaugeTrafficMetrics:
-    """Response from GET /api/v1/engauge/traffic."""
+class NGaugeTrafficMetrics:
+    """Response from GET /api/v1/ngauge/traffic."""
 
     organic_ratio: float
     speculative_ratio: float
@@ -295,16 +295,16 @@ class EngaugeTrafficMetrics:
 
 
 @dataclass
-class EngaugeListingList:
-    """Response from GET /api/v1/engauge/marketplace/listings."""
+class NGaugeListingList:
+    """Response from GET /api/v1/ngauge/marketplace/listings."""
 
     count: int
     listings: list[dict[str, Any]]
 
 
 @dataclass
-class EngaugeNodeMetrics:
-    """Response from GET /api/v1/engauge/node/metrics."""
+class NGaugeNodeMetrics:
+    """Response from GET /api/v1/ngauge/node/metrics."""
 
     activity_score: float
     receipts: int
@@ -312,8 +312,8 @@ class EngaugeNodeMetrics:
 
 
 @dataclass
-class EngaugeLeaseList:
-    """Response from GET /api/v1/engauge/leases."""
+class NGaugeLeaseList:
+    """Response from GET /api/v1/ngauge/leases."""
 
     count: int
     leases: list[dict[str, Any]]

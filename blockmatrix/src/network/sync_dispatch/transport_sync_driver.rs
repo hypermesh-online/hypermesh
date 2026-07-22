@@ -125,7 +125,7 @@ impl TransportSyncDriver {
                         fetched_blocks.extend(blocks);
                         synced = true;
 
-                        // Feed sync results into engauge intelligence (when enabled)
+                        // Feed sync results into ngauge intelligence (when enabled)
                         Self::feed_intelligence_after_sync(network_id, peer_height);
 
                         break;
@@ -160,7 +160,7 @@ impl TransportSyncDriver {
         fetched_blocks
     }
 
-    /// Feed post-sync intelligence data into the engauge bridge.
+    /// Feed post-sync intelligence data into the ngauge bridge.
     ///
     /// After a successful sync round, notifies the intelligence layer so that
     /// swarm analytics can be updated and replication triggers checked. Actual
@@ -174,13 +174,13 @@ impl TransportSyncDriver {
             "Intelligence feedback: sync round completed"
         );
 
-        // When the intelligence feature is enabled, the caller's EngaugeBridge
+        // When the intelligence feature is enabled, the caller's NGaugeBridge
         // periodic feeder picks up demand data automatically. Here we log that
         // the sync round is a good time for the caller to invoke
         // `check_replication_needs()` on the IntelligenceLayer.
         //
         // Actual replication trigger checking requires access to the shared
-        // SwarmAnalytics (owned by EngaugeBridge), which is wired at the node
+        // SwarmAnalytics (owned by NGaugeBridge), which is wired at the node
         // level, not inside TransportSyncDriver. The node's run loop should
         // call `intelligence_layer.check_replication_needs()` after each
         // `run_sync_round()` returns.

@@ -25,9 +25,9 @@ pub mod pos_fast_validator;
 pub mod pos_integration;
 pub mod pos_validator;
 
-#[cfg(feature = "engauge")]
+#[cfg(feature = "ngauge")]
 pub mod metrics_bridge;
-#[cfg(feature = "engauge")]
+#[cfg(feature = "ngauge")]
 pub mod metrics_frame;
 
 // Re-exports for backward compatibility
@@ -74,8 +74,8 @@ pub mod frame_types {
     /// FALCON public key exchange frame type
     pub const FALCON_KEY: VarInt = VarInt::from_u32(0xfe000006);
 
-    /// Engauge METRICS frame type for streaming metrics payloads
-    #[cfg(feature = "engauge")]
+    /// NGauge METRICS frame type for streaming metrics payloads
+    #[cfg(feature = "ngauge")]
     pub const STOQ_METRICS: VarInt = VarInt::from_u32(0xfe000007);
 }
 

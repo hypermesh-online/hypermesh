@@ -15,8 +15,8 @@ stoq = { path = "../stoq" }
 # stoq/lib, so no dependency cycle (trustchain does not depend on gateway).
 trustchain = { path = "../trustchain" }
 
-# Engauge for SSE metrics streaming (MetricsPublisher + SseFrameBridge)
-engauge = { path = "../engauge" }
+# NGauge for SSE metrics streaming (MetricsPublisher + SseFrameBridge)
+ngauge = { path = "../ngauge" }
 
 tokio = { workspace = true }
 h3 = "0.0.8"

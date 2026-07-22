@@ -264,7 +264,7 @@ impl CatalogPeerClient {
 
         // Pick up to `max_neighbors` connected peers. Stable order based
         // on whatever the network manager hands back — alpha policy.
-        // engauge-driven dispersion comes later.
+        // ngauge-driven dispersion comes later.
         let chosen: Vec<String> = nodes
             .into_iter()
             .filter(|n| n.connection.is_some())

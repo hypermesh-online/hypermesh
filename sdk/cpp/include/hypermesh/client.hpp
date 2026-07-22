@@ -18,7 +18,7 @@
 #include <hypermesh/api/domain.hpp>
 #include <hypermesh/api/caesar.hpp>
 #include <hypermesh/api/trustchain.hpp>
-#include <hypermesh/api/engauge.hpp>
+#include <hypermesh/api/ngauge.hpp>
 #include <hypermesh/api/catalog.hpp>
 
 namespace hypermesh {
@@ -38,7 +38,7 @@ public:
         const std::string& base_url = "https://localhost:8443",
         const std::string& caesar_url = "https://localhost:8443",
         const std::string& trustchain_url = "https://localhost:8443",
-        const std::string& engauge_url = "https://localhost:8443",
+        const std::string& ngauge_url = "https://localhost:8443",
         const std::string& catalog_url = "https://localhost:8443");
 
     /// Access the node status API.
@@ -74,8 +74,8 @@ public:
     /// Access the TrustChain API.
     TrustChainApi trustchain() const;
 
-    /// Access the Engauge API.
-    EngaugeApi engauge() const;
+    /// Access the NGauge API.
+    NGaugeApi ngauge() const;
 
     /// Access the Catalog API.
     CatalogApi catalog() const;
@@ -87,7 +87,7 @@ private:
     HttpClient http_;
     HttpClient caesar_http_;
     HttpClient trustchain_http_;
-    HttpClient engauge_http_;
+    HttpClient ngauge_http_;
     HttpClient catalog_http_;
 };
 

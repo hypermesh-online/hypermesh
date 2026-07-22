@@ -69,7 +69,7 @@ jobs:
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "result": "${{ steps.compile.outcome }}",
-            "components": ["hypermesh-lib", "stoq", "trustchain", "catalog", "caesar-sdk", "caesar", "blockmatrix", "hypermesh-ebpf", "gateway", "engauge"],
+            "components": ["hypermesh-lib", "stoq", "trustchain", "catalog", "caesar-sdk", "caesar", "blockmatrix", "hypermesh-ebpf", "gateway", "ngauge"],
             "rust_version": "$(rustc --version)",
             "commit": "${{ github.sha }}"
           }

@@ -491,35 +491,35 @@ char *hypermesh_domain_register(hypermesh_client_t *client, const char *name, co
 // # Safety
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_engauge_capacity(hypermesh_client_t *client);
+char *hypermesh_ngauge_capacity(hypermesh_client_t *client);
 
 // Fetch current traffic statistics. Returns JSON.
 //
 // # Safety
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_engauge_traffic(hypermesh_client_t *client);
+char *hypermesh_ngauge_traffic(hypermesh_client_t *client);
 
 // Fetch marketplace resource pool info. Returns JSON.
 //
 // # Safety
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_engauge_marketplace(hypermesh_client_t *client);
+char *hypermesh_ngauge_marketplace(hypermesh_client_t *client);
 
 // Fetch detailed node-level metrics. Returns JSON.
 //
 // # Safety
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_engauge_node_metrics(hypermesh_client_t *client);
+char *hypermesh_ngauge_node_metrics(hypermesh_client_t *client);
 
 // Fetch active resource leases. Returns JSON array.
 //
 // # Safety
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_engauge_leases(hypermesh_client_t *client);
+char *hypermesh_ngauge_leases(hypermesh_client_t *client);
 
 // Generate a fresh post-quantum identity (FALCON-1024 + Kyber-1024).
 //

@@ -3,10 +3,10 @@
 //! Shared sharding types (R5, R14).
 //!
 //! Canonical cross-crate definitions for erasure-coded shards. The Reed-Solomon
-//! sharding ENGINE lives in the `engauge` crate (NGauge is the sharding
+//! sharding ENGINE lives in the `ngauge` crate (NGauge is the sharding
 //! authority); these are the shared data structures it produces and that
 //! blockmatrix (and any other crate) consumes. Keeping them in `hypermesh-lib`
-//! — which every crate already depends on — lets the engine live in engauge
+//! — which every crate already depends on — lets the engine live in ngauge
 //! without forcing a dependency cycle.
 //!
 //! The shard is an atomic content-addressed unit: after creation it must NEVER
@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Errors from the sharding engine (config validation + Reed-Solomon codec).
 ///
-/// Defined here in `hypermesh-lib` so the engine (engauge) and its consumers
+/// Defined here in `hypermesh-lib` so the engine (ngauge) and its consumers
 /// (blockmatrix) share one error type without a dependency cycle. blockmatrix's
 /// pipeline `PipelineError` provides a `From<ShardingError>` conversion so
 /// existing call sites keep returning `PipelineError`.
@@ -61,7 +61,7 @@ pub struct Shard {
 impl Shard {
     /// Calculate the BLAKE3 hash of shard data (hex-encoded).
     ///
-    /// Public so the sharding engine (engauge) can stamp the integrity hash
+    /// Public so the sharding engine (ngauge) can stamp the integrity hash
     /// into [`ShardMetadata::hash`] when it produces shards.
     pub fn calculate_hash(data: &[u8]) -> String {
         hex::encode(blake3::hash(data).as_bytes())
@@ -95,7 +95,7 @@ pub struct ShardingStats {
 impl ShardingStats {
     /// Compute derived statistics for a completed sharding operation.
     ///
-    /// Public so the sharding engine (engauge) can build the stats it returns.
+    /// Public so the sharding engine (ngauge) can build the stats it returns.
     pub fn calculate(
         original_size: usize,
         total_shard_size: usize,

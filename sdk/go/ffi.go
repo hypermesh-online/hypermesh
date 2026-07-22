@@ -84,12 +84,12 @@ extern char *hypermesh_trustchain_revoke(hypermesh_client_t *client,
                                          const char *cert_id);
 extern char *hypermesh_trustchain_dns_zones(hypermesh_client_t *client);
 
-// Engauge.
-extern char *hypermesh_engauge_capacity(hypermesh_client_t *client);
-extern char *hypermesh_engauge_traffic(hypermesh_client_t *client);
-extern char *hypermesh_engauge_marketplace(hypermesh_client_t *client);
-extern char *hypermesh_engauge_node_metrics(hypermesh_client_t *client);
-extern char *hypermesh_engauge_leases(hypermesh_client_t *client);
+// NGauge.
+extern char *hypermesh_ngauge_capacity(hypermesh_client_t *client);
+extern char *hypermesh_ngauge_traffic(hypermesh_client_t *client);
+extern char *hypermesh_ngauge_marketplace(hypermesh_client_t *client);
+extern char *hypermesh_ngauge_node_metrics(hypermesh_client_t *client);
+extern char *hypermesh_ngauge_leases(hypermesh_client_t *client);
 
 // Catalog.
 extern char *hypermesh_catalog_browse(hypermesh_client_t *client,
@@ -371,31 +371,31 @@ func (c *FFIClient) TrustChainDnsZones() (*TrustChainDnsZoneList, error) {
 	return decodeFFI[TrustChainDnsZoneList](c, C.hypermesh_trustchain_dns_zones(c.handle))
 }
 
-// ── Engauge ─────────────────────────────────────────────────────────────
+// ── NGauge ─────────────────────────────────────────────────────────────
 
-// EngaugeCapacity returns current node capacity metrics.
-func (c *FFIClient) EngaugeCapacity() (*EngaugeCapacityMetrics, error) {
-	return decodeFFI[EngaugeCapacityMetrics](c, C.hypermesh_engauge_capacity(c.handle))
+// NGaugeCapacity returns current node capacity metrics.
+func (c *FFIClient) NGaugeCapacity() (*NGaugeCapacityMetrics, error) {
+	return decodeFFI[NGaugeCapacityMetrics](c, C.hypermesh_ngauge_capacity(c.handle))
 }
 
-// EngaugeTraffic returns current traffic statistics.
-func (c *FFIClient) EngaugeTraffic() (*EngaugeTrafficMetrics, error) {
-	return decodeFFI[EngaugeTrafficMetrics](c, C.hypermesh_engauge_traffic(c.handle))
+// NGaugeTraffic returns current traffic statistics.
+func (c *FFIClient) NGaugeTraffic() (*NGaugeTrafficMetrics, error) {
+	return decodeFFI[NGaugeTrafficMetrics](c, C.hypermesh_ngauge_traffic(c.handle))
 }
 
-// EngaugeMarketplace returns marketplace resource pool info.
-func (c *FFIClient) EngaugeMarketplace() (*EngaugeListingList, error) {
-	return decodeFFI[EngaugeListingList](c, C.hypermesh_engauge_marketplace(c.handle))
+// NGaugeMarketplace returns marketplace resource pool info.
+func (c *FFIClient) NGaugeMarketplace() (*NGaugeListingList, error) {
+	return decodeFFI[NGaugeListingList](c, C.hypermesh_ngauge_marketplace(c.handle))
 }
 
-// EngaugeNodeMetrics returns detailed node-level metrics.
-func (c *FFIClient) EngaugeNodeMetrics() (*EngaugeNodeMetrics, error) {
-	return decodeFFI[EngaugeNodeMetrics](c, C.hypermesh_engauge_node_metrics(c.handle))
+// NGaugeNodeMetrics returns detailed node-level metrics.
+func (c *FFIClient) NGaugeNodeMetrics() (*NGaugeNodeMetrics, error) {
+	return decodeFFI[NGaugeNodeMetrics](c, C.hypermesh_ngauge_node_metrics(c.handle))
 }
 
-// EngaugeLeases returns active resource leases.
-func (c *FFIClient) EngaugeLeases() (*EngaugeLeaseList, error) {
-	return decodeFFI[EngaugeLeaseList](c, C.hypermesh_engauge_leases(c.handle))
+// NGaugeLeases returns active resource leases.
+func (c *FFIClient) NGaugeLeases() (*NGaugeLeaseList, error) {
+	return decodeFFI[NGaugeLeaseList](c, C.hypermesh_ngauge_leases(c.handle))
 }
 
 // ── Catalog ─────────────────────────────────────────────────────────────

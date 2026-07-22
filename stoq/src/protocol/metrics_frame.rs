@@ -2,14 +2,14 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! STOQ METRICS frame type -- carries Engauge MetricsFrame payloads.
+//! STOQ METRICS frame type -- carries NGauge MetricsFrame payloads.
 //!
 //! Frame type ID: `0xfe000007` (custom extension range).
-//! Feature-gated behind the `engauge` feature flag.
+//! Feature-gated behind the `ngauge` feature flag.
 
-use engauge::streaming::{MetricsFrame, ProtocolError};
+use ngauge::streaming::{MetricsFrame, ProtocolError};
 
-/// Custom frame type identifier for Engauge metrics.
+/// Custom frame type identifier for NGauge metrics.
 pub const STOQ_METRICS_FRAME_TYPE: u32 = 0xfe00_0007;
 
 /// Handler for STOQ METRICS frames.
@@ -65,7 +65,7 @@ impl Default for MetricsFrameHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use engauge::streaming::{CapacitySnapshot, MetricsPayload};
+    use ngauge::streaming::{CapacitySnapshot, MetricsPayload};
     use hypermesh_lib::types::NodeId;
     use hypermesh_lib::PrivacyMode;
     use std::sync::atomic::{AtomicU64, Ordering};

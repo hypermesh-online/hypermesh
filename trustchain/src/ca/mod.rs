@@ -53,5 +53,5 @@ pub use federation::{
     FederatedCA, FederatedValidationResult, FederationManager, FederationPolicy, FederationStatus,
     FederationTrustLevel,
 };
-// Re-export the engauge-facing trust provider abstraction (Phase F.1).
+// Re-export the ngauge-facing trust provider abstraction (Phase F.1).
 pub use trust_provider::{PeerCertFingerprint, PeerTrustBand, TrustSignalProvider};

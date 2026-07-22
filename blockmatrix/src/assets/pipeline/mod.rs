@@ -126,7 +126,7 @@ pub enum PipelineError {
 }
 
 /// Bridge the sharding engine's error (now owned by `hypermesh-lib`, since the
-/// Reed-Solomon engine lives in `engauge`) back into `PipelineError` so the
+/// Reed-Solomon engine lives in `ngauge`) back into `PipelineError` so the
 /// pipeline call sites keep returning `PipelineError` via `?` unchanged.
 impl From<hypermesh_lib::ShardingError> for PipelineError {
     fn from(err: hypermesh_lib::ShardingError) -> Self {

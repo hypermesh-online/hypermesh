@@ -55,7 +55,7 @@ cargo test -p stoq
 - **PoS Tokenization**: BLAKE3 cryptographic validation with Proof of State token verification
 - **Matrix Sharding**: Fragmentation/reassembly with matrix coordinate addressing (x,y,z)
 - **Tensor Routing**: Multi-hop routing with matrix topology awareness
-- **Engauge METRICS Frame**: Custom frame type (0xfe000007) for streaming MetricsFrame payloads (feature-gated)
+- **NGauge METRICS Frame**: Custom frame type (0xfe000007) for streaming MetricsFrame payloads (feature-gated)
 
 ## Recent Changes
 - **Local FALCON-1024 PoS verification**: PoS validator verifies FALCON-1024 signatures locally (no TrustChain client needed)

@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Caesar EVP gold-gram protocol with conservation invariant and PID governor (220 tests)
 - Catalog asset package registry with DHT distribution and STOQ API (264 tests)
 - Gateway HTTP/3 + STOQ dual-listener with 4 roles: bootstrap, inbound proxy, outbound proxy, inter-network (155 tests)
-- engauge analytics with streaming metrics, differential privacy, and resource marketplace (130 tests)
+- ngauge analytics with streaming metrics, differential privacy, and resource marketplace (130 tests)
 - caesar-sdk with IngressAdapter and EgressAdapter traits for external integration
 - hypermesh-ebpf XDP packet processing with AF_XDP zero-copy I/O and policy sync
 - IPv6 asset addressing with AssetAddress and TransferEngine

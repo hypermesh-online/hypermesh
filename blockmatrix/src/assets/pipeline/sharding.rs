@@ -5,17 +5,17 @@
 //! Sharding Stage - Reed-Solomon erasure coding (re-export shim).
 //!
 //! The Reed-Solomon sharding ENGINE (`Sharder`, `ShardingConfig`) now lives in
-//! the `engauge` crate — NGauge is the sharding authority. The shared shard
+//! the `ngauge` crate — NGauge is the sharding authority. The shared shard
 //! data structures (`Shard`, `ShardMetadata`, `ShardingStats`) and the
 //! `ShardingError` live in `hypermesh-lib` so every consumer can use them
 //! without a dependency cycle.
 //!
 //! This module re-exports both so existing `crate::assets::pipeline::sharding::*`
 //! call sites keep resolving unchanged. blockmatrix now CALLS the engine
-//! (`engauge::Sharder`) rather than owning it; everything else in the pipeline
+//! (`ngauge::Sharder`) rather than owning it; everything else in the pipeline
 //! (compress, encrypt, hash, distribute) stays in blockmatrix.
 
-pub use engauge::sharding::{Sharder, ShardingConfig};
+pub use ngauge::sharding::{Sharder, ShardingConfig};
 pub use hypermesh_lib::{Shard, ShardMetadata, ShardingError, ShardingStats};
 
 #[cfg(test)]
@@ -23,13 +23,13 @@ mod tests {
     use super::*;
 
     /// Seam test: a store->shard->reconstruct round-trip through the re-exported
-    /// `engauge::Sharder` reached via the blockmatrix pipeline path must be
+    /// `ngauge::Sharder` reached via the blockmatrix pipeline path must be
     /// byte-identical. This proves the re-export shim wires the engine
     /// correctly end-to-end from blockmatrix.
     #[test]
-    fn test_pipeline_sharding_roundtrip_via_engauge() {
+    fn test_pipeline_sharding_roundtrip_via_ngauge() {
         let sharder = Sharder::new(ShardingConfig::default()).expect("test: create sharder");
-        let data = b"blockmatrix pipeline seam -> engauge sharding authority".repeat(200);
+        let data = b"blockmatrix pipeline seam -> ngauge sharding authority".repeat(200);
 
         let (shards, stats) = sharder.shard(&data).expect("test: shard");
         assert_eq!(shards.len(), 14); // RS(10,4)

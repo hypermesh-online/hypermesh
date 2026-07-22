@@ -79,7 +79,7 @@ export function Breadcrumbs({
         'hypermesh': 'HyperMesh',
         'caesar': 'Caesar',
         'catalog': 'Catalog',
-        'ngauge': 'Ngauge',
+        'ngauge': 'NGauge',
         'identity': 'Identity',
         'networks': 'Networks',
         'trust': 'Trust Web',

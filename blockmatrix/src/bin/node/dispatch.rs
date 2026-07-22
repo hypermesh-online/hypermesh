@@ -14,7 +14,7 @@ use blockmatrix::ipc;
 
 use crate::cli::{
     CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction,
-    EngaugeAction, GatewayAction, MessageAction, ShareAction, TrustchainAction,
+    NGaugeAction, GatewayAction, MessageAction, ShareAction, TrustchainAction,
 };
 use crate::commands::connect::service_ipc_call;
 use crate::commands::domain::{run_domain, run_join};
@@ -134,8 +134,8 @@ pub(crate) async fn dispatch_command(
         Some(Commands::Trustchain { action }) => {
             dispatch_trustchain(action, cli.json).await?;
         }
-        Some(Commands::Engauge { action }) => {
-            dispatch_engauge(action, cli.json).await?;
+        Some(Commands::NGauge { action }) => {
+            dispatch_ngauge(action, cli.json).await?;
         }
         Some(Commands::Catalog { action }) => {
             dispatch_catalog(action, cli.json).await?;
@@ -532,22 +532,22 @@ async fn dispatch_trustchain(action: TrustchainAction, json: bool) -> Result<()>
     Ok(())
 }
 
-async fn dispatch_engauge(action: EngaugeAction, json: bool) -> Result<()> {
+async fn dispatch_ngauge(action: NGaugeAction, json: bool) -> Result<()> {
     match action {
-        EngaugeAction::Capacity => {
-            service_ipc_call("engauge.capacity", serde_json::json!({}), json).await?;
+        NGaugeAction::Capacity => {
+            service_ipc_call("ngauge.capacity", serde_json::json!({}), json).await?;
         }
-        EngaugeAction::Traffic => {
-            service_ipc_call("engauge.traffic", serde_json::json!({}), json).await?;
+        NGaugeAction::Traffic => {
+            service_ipc_call("ngauge.traffic", serde_json::json!({}), json).await?;
         }
-        EngaugeAction::Marketplace => {
-            service_ipc_call("engauge.marketplace", serde_json::json!({}), json).await?;
+        NGaugeAction::Marketplace => {
+            service_ipc_call("ngauge.marketplace", serde_json::json!({}), json).await?;
         }
-        EngaugeAction::Metrics => {
-            service_ipc_call("engauge.node_metrics", serde_json::json!({}), json).await?;
+        NGaugeAction::Metrics => {
+            service_ipc_call("ngauge.node_metrics", serde_json::json!({}), json).await?;
         }
-        EngaugeAction::Leases => {
-            service_ipc_call("engauge.leases", serde_json::json!({}), json).await?;
+        NGaugeAction::Leases => {
+            service_ipc_call("ngauge.leases", serde_json::json!({}), json).await?;
         }
     }
     Ok(())

@@ -1,11 +1,11 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! IPC handlers for intelligence/engauge monitoring.
+//! IPC handlers for intelligence/ngauge monitoring.
 //!
 //! Exposes `intelligence.stats` which returns swarm demand tracking data,
 //! shard store metrics, and (when the `intelligence` feature is enabled)
-//! engauge analytics summaries.
+//! ngauge analytics summaries.
 
 use std::sync::Arc;
 
@@ -14,7 +14,7 @@ use crate::ipc::state::DaemonState;
 
 /// Register intelligence-related IPC methods.
 pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
-    // intelligence.stats — swarm demand and engauge analytics summary
+    // intelligence.stats — swarm demand and ngauge analytics summary
     {
         let s = state.clone();
         handler.register(
@@ -30,7 +30,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 /// Collect intelligence metrics from available subsystems.
 ///
 /// Returns shard store counts, swarm demand snapshot summary, and
-/// engauge analytics when the `intelligence` feature is active.
+/// ngauge analytics when the `intelligence` feature is active.
 async fn handle_stats(
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {

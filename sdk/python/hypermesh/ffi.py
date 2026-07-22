@@ -224,21 +224,21 @@ def _load_library(path: str) -> ctypes.CDLL:
     lib.hypermesh_trustchain_dns_zones.argtypes = [client_p]
     lib.hypermesh_trustchain_dns_zones.restype = ctypes.c_void_p
 
-    # -- Engauge --
-    lib.hypermesh_engauge_capacity.argtypes = [client_p]
-    lib.hypermesh_engauge_capacity.restype = ctypes.c_void_p
+    # -- NGauge --
+    lib.hypermesh_ngauge_capacity.argtypes = [client_p]
+    lib.hypermesh_ngauge_capacity.restype = ctypes.c_void_p
 
-    lib.hypermesh_engauge_traffic.argtypes = [client_p]
-    lib.hypermesh_engauge_traffic.restype = ctypes.c_void_p
+    lib.hypermesh_ngauge_traffic.argtypes = [client_p]
+    lib.hypermesh_ngauge_traffic.restype = ctypes.c_void_p
 
-    lib.hypermesh_engauge_marketplace.argtypes = [client_p]
-    lib.hypermesh_engauge_marketplace.restype = ctypes.c_void_p
+    lib.hypermesh_ngauge_marketplace.argtypes = [client_p]
+    lib.hypermesh_ngauge_marketplace.restype = ctypes.c_void_p
 
-    lib.hypermesh_engauge_node_metrics.argtypes = [client_p]
-    lib.hypermesh_engauge_node_metrics.restype = ctypes.c_void_p
+    lib.hypermesh_ngauge_node_metrics.argtypes = [client_p]
+    lib.hypermesh_ngauge_node_metrics.restype = ctypes.c_void_p
 
-    lib.hypermesh_engauge_leases.argtypes = [client_p]
-    lib.hypermesh_engauge_leases.restype = ctypes.c_void_p
+    lib.hypermesh_ngauge_leases.argtypes = [client_p]
+    lib.hypermesh_ngauge_leases.restype = ctypes.c_void_p
 
     # -- Catalog --
     lib.hypermesh_catalog_browse.argtypes = [
@@ -587,33 +587,33 @@ class HyperMeshFFI:
         return self._call_json(self._lib.hypermesh_trustchain_dns_zones)
 
     # -----------------------------------------------------------------
-    # Engauge API
+    # NGauge API
     # -----------------------------------------------------------------
 
-    def engauge_capacity(self) -> dict:
+    def ngauge_capacity(self) -> dict:
         """Fetch current node capacity metrics."""
         self._require_handle()
-        return self._call_json(self._lib.hypermesh_engauge_capacity)
+        return self._call_json(self._lib.hypermesh_ngauge_capacity)
 
-    def engauge_traffic(self) -> dict:
+    def ngauge_traffic(self) -> dict:
         """Fetch current traffic statistics."""
         self._require_handle()
-        return self._call_json(self._lib.hypermesh_engauge_traffic)
+        return self._call_json(self._lib.hypermesh_ngauge_traffic)
 
-    def engauge_marketplace(self) -> dict:
+    def ngauge_marketplace(self) -> dict:
         """Fetch marketplace resource pool info."""
         self._require_handle()
-        return self._call_json(self._lib.hypermesh_engauge_marketplace)
+        return self._call_json(self._lib.hypermesh_ngauge_marketplace)
 
-    def engauge_node_metrics(self) -> dict:
+    def ngauge_node_metrics(self) -> dict:
         """Fetch detailed node-level metrics."""
         self._require_handle()
-        return self._call_json(self._lib.hypermesh_engauge_node_metrics)
+        return self._call_json(self._lib.hypermesh_ngauge_node_metrics)
 
-    def engauge_leases(self) -> Any:
+    def ngauge_leases(self) -> Any:
         """Fetch active resource leases."""
         self._require_handle()
-        return self._call_json(self._lib.hypermesh_engauge_leases)
+        return self._call_json(self._lib.hypermesh_ngauge_leases)
 
     # -----------------------------------------------------------------
     # Catalog API

@@ -39,7 +39,7 @@ pub struct PathCandidate {
     pub bytes_sent: u64,
 }
 
-/// Callback type for polling latest engauge recommendations.
+/// Callback type for polling latest ngauge recommendations.
 ///
 /// Returns `Some((enable_redundant, strategy_name))` when a new
 /// recommendation is available, or `None` when nothing has changed.
@@ -49,7 +49,7 @@ pub type MetricSourceFn = Arc<dyn Fn() -> Option<(bool, String)> + Send + Sync>;
 pub struct PathSelector {
     strategy: PathScheduler,
     round_robin_index: AtomicU32,
-    /// Optional callback to poll for engauge routing recommendations.
+    /// Optional callback to poll for ngauge routing recommendations.
     metric_source: Option<MetricSourceFn>,
 }
 
@@ -64,7 +64,7 @@ impl PathSelector {
     }
 
     /// Register a callback that the selector can poll for the latest
-    /// engauge routing recommendation.
+    /// ngauge routing recommendation.
     ///
     /// The callback should return `Some((enable_redundant, strategy_name))`
     /// when a new recommendation is available, or `None` when nothing has
@@ -188,7 +188,7 @@ impl PathSelector {
         self.strategy = strategy;
     }
 
-    /// Apply an engauge routing recommendation by mapping lowercase
+    /// Apply an ngauge routing recommendation by mapping lowercase
     /// strategy names to `PathScheduler` variants.
     ///
     /// Accepted names: `"bandwidth"` → `BandwidthWeighted`,
@@ -196,7 +196,7 @@ impl PathSelector {
     /// anything else → `RoundRobin`.
     ///
     /// Returns `true` if the strategy actually changed.
-    pub fn apply_engauge_recommendation(&mut self, strategy_name: &str) -> bool {
+    pub fn apply_ngauge_recommendation(&mut self, strategy_name: &str) -> bool {
         let new_strategy = match strategy_name {
             "bandwidth" => PathScheduler::BandwidthWeighted,
             "latency" => PathScheduler::LowestLatency,
@@ -209,7 +209,7 @@ impl PathSelector {
         }
 
         tracing::info!(
-            "PathSelector engauge recommendation: {:?} -> {:?} (input={:?})",
+            "PathSelector ngauge recommendation: {:?} -> {:?} (input={:?})",
             self.strategy, new_strategy, strategy_name,
         );
         self.strategy = new_strategy;
@@ -235,12 +235,12 @@ impl PathSelector {
                 path_id,
                 bandwidth_mbps,
                 latency_ms,
-                "Recorded path metrics from engauge",
+                "Recorded path metrics from ngauge",
             );
         }
     }
 
-    /// Apply an external scheduling recommendation (e.g., from engauge
+    /// Apply an external scheduling recommendation (e.g., from ngauge
     /// routing intelligence). Maps the recommended strategy to the
     /// internal `PathScheduler` enum. The `enable_redundant` flag forces
     /// redundant mode regardless of the recommended strategy when `true`.
@@ -443,27 +443,27 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_engauge_recommendation() {
+    fn test_apply_ngauge_recommendation() {
         let mut selector = PathSelector::new(PathScheduler::RoundRobin);
 
-        let changed = selector.apply_engauge_recommendation("bandwidth");
+        let changed = selector.apply_ngauge_recommendation("bandwidth");
         assert!(changed);
         assert_eq!(*selector.strategy(), PathScheduler::BandwidthWeighted);
 
-        let changed = selector.apply_engauge_recommendation("latency");
+        let changed = selector.apply_ngauge_recommendation("latency");
         assert!(changed);
         assert_eq!(*selector.strategy(), PathScheduler::LowestLatency);
 
-        let changed = selector.apply_engauge_recommendation("redundant");
+        let changed = selector.apply_ngauge_recommendation("redundant");
         assert!(changed);
         assert_eq!(*selector.strategy(), PathScheduler::Redundant);
 
-        let changed = selector.apply_engauge_recommendation("unknown");
+        let changed = selector.apply_ngauge_recommendation("unknown");
         assert!(changed);
         assert_eq!(*selector.strategy(), PathScheduler::RoundRobin);
 
         // Same value should not change
-        let changed = selector.apply_engauge_recommendation("unknown");
+        let changed = selector.apply_ngauge_recommendation("unknown");
         assert!(!changed);
     }
 

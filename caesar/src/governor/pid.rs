@@ -8,7 +8,7 @@
 //! fees, demurrage overrides, and routing incentives across L0-L3 market tiers.
 
 use hypermesh_lib::{GoldGrams, MarketTier};
-#[cfg(feature = "engauge")]
+#[cfg(feature = "ngauge")]
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -222,15 +222,15 @@ impl GovernorPid {
         }
     }
 
-    /// Apply an engauge throttle signal to the current governance params.
+    /// Apply an ngauge throttle signal to the current governance params.
     ///
     /// Adjusts fee modifiers by the band_modifier and demurrage overrides
-    /// by the demurrage_modifier from the engauge throttle signal.
-    #[cfg(feature = "engauge")]
+    /// by the demurrage_modifier from the ngauge throttle signal.
+    #[cfg(feature = "ngauge")]
     pub fn apply_throttle_signal(
         &self,
         params: &mut GovernanceParams,
-        signal: &engauge::ThrottleSignal,
+        signal: &ngauge::ThrottleSignal,
     ) {
         let band = Decimal::from_f64(signal.band_modifier).unwrap_or(dec!(1));
         params.fee_modifiers.l0 *= band;
@@ -555,12 +555,12 @@ mod tests {
         assert_eq!(g.gold_deviation(&m), dec!(0));
     }
 
-    #[cfg(feature = "engauge")]
+    #[cfg(feature = "ngauge")]
     #[test]
     fn apply_throttle_signal_organic() {
         let g = GovernorPid::new();
         let mut params = GovernanceParams::default();
-        let signal = engauge::ThrottleSignal {
+        let signal = ngauge::ThrottleSignal {
             activity_score: 0.8,
             band_modifier: 0.5,      // organic: cheaper
             demurrage_modifier: 0.8, // organic: slower decay

@@ -124,21 +124,21 @@ public sealed class HyperMeshFfi : IDisposable
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr hypermesh_trustchain_dns_zones(IntPtr client);
 
-    // -- Engauge --------------------------------------------------------
+    // -- NGauge --------------------------------------------------------
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern IntPtr hypermesh_engauge_capacity(IntPtr client);
+    private static extern IntPtr hypermesh_ngauge_capacity(IntPtr client);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern IntPtr hypermesh_engauge_traffic(IntPtr client);
+    private static extern IntPtr hypermesh_ngauge_traffic(IntPtr client);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern IntPtr hypermesh_engauge_marketplace(IntPtr client);
+    private static extern IntPtr hypermesh_ngauge_marketplace(IntPtr client);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern IntPtr hypermesh_engauge_node_metrics(IntPtr client);
+    private static extern IntPtr hypermesh_ngauge_node_metrics(IntPtr client);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-    private static extern IntPtr hypermesh_engauge_leases(IntPtr client);
+    private static extern IntPtr hypermesh_ngauge_leases(IntPtr client);
 
     // -- Catalog --------------------------------------------------------
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
@@ -403,28 +403,28 @@ public sealed class HyperMeshFfi : IDisposable
         => InvokeJson(hypermesh_trustchain_dns_zones);
 
     // -------------------------------------------------------------------
-    // Engauge Analytics
+    // NGauge Analytics
     // -------------------------------------------------------------------
 
     /// <summary>Get current node capacity metrics.</summary>
-    public JsonDocument EngaugeCapacity()
-        => InvokeJson(hypermesh_engauge_capacity);
+    public JsonDocument NGaugeCapacity()
+        => InvokeJson(hypermesh_ngauge_capacity);
 
     /// <summary>Get current traffic statistics.</summary>
-    public JsonDocument EngaugeTraffic()
-        => InvokeJson(hypermesh_engauge_traffic);
+    public JsonDocument NGaugeTraffic()
+        => InvokeJson(hypermesh_ngauge_traffic);
 
     /// <summary>Get marketplace resource pool info.</summary>
-    public JsonDocument EngaugeMarketplace()
-        => InvokeJson(hypermesh_engauge_marketplace);
+    public JsonDocument NGaugeMarketplace()
+        => InvokeJson(hypermesh_ngauge_marketplace);
 
     /// <summary>Get detailed node-level metrics.</summary>
-    public JsonDocument EngaugeNodeMetrics()
-        => InvokeJson(hypermesh_engauge_node_metrics);
+    public JsonDocument NGaugeNodeMetrics()
+        => InvokeJson(hypermesh_ngauge_node_metrics);
 
     /// <summary>Get active resource leases.</summary>
-    public JsonDocument EngaugeLeases()
-        => InvokeJson(hypermesh_engauge_leases);
+    public JsonDocument NGaugeLeases()
+        => InvokeJson(hypermesh_ngauge_leases);
 
     // -------------------------------------------------------------------
     // Catalog Registry

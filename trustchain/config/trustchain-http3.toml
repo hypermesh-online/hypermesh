@@ -78,7 +78,7 @@ trustchain_domains = [
     "trust",
     "assets",
     "catalog",
-    "engauge",
+    "ngauge",
 ]
 
 [dns.cache_ttl]

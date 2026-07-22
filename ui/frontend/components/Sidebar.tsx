@@ -57,8 +57,8 @@ const navigation = [
     description: 'Token integration and economics'
   },
   {
-    name: 'Engauge',
-    href: '/engauge',
+    name: 'NGauge',
+    href: '/ngauge',
     icon: BarChart2,
     description: 'Analytics and resource marketplace'
   },

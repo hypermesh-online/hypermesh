@@ -27,7 +27,7 @@ Mint -> Route (Governor-adjusted fees) -> Transit -> Deliver -> Settle
 - **Gravity dissolution** -- 90-day timeout, 6-criteria qualification, weighted shard-holder distribution
 - **Universal Payment Interface** -- IngressAdapter + EgressAdapter traits (extracted to caesar-sdk)
 - **STOQ API** -- 5 handlers: route_packet, node_status, governor_params, effective_rate, health
-- **Engauge integration** -- feature-gated: fee distribution signals, Governor throttle, capacity-based routing
+- **NGauge integration** -- feature-gated: fee distribution signals, Governor throttle, capacity-based routing
 
 ## Modules
 

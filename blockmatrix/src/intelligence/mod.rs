@@ -32,9 +32,9 @@ use tracing::{debug, info, instrument, warn};
 // Sub-modules for integration layer
 #[cfg(feature = "intelligence")]
 pub mod ebpf_feedback;
-pub mod engauge_bridge;
+pub mod ngauge_bridge;
 #[cfg(feature = "intelligence")]
-pub mod engauge_trust_adapter;
+pub mod ngauge_trust_adapter;
 pub mod integration;
 pub mod metrics_bridge;
 pub mod performance;
@@ -45,7 +45,7 @@ pub mod workflows;
 #[cfg(feature = "intelligence")]
 pub use ebpf_feedback::EbpfFeedbackAdapter;
 #[cfg(feature = "intelligence")]
-pub use engauge_trust_adapter::EngaugeTrustAdapter;
+pub use ngauge_trust_adapter::NGaugeTrustAdapter;
 
 // Re-exports from types module
 use types::inline_trustchain_stub;
@@ -589,8 +589,8 @@ impl IntelligenceLayer {
 
     /// Check whether any tracked shards need additional replicas.
     ///
-    /// P6: evaluates a [`engauge::ReplicationTrigger`] against the LIVE
-    /// [`engauge::SwarmAnalytics`] that the feed loop populates — the SAME
+    /// P6: evaluates a [`ngauge::ReplicationTrigger`] against the LIVE
+    /// [`ngauge::SwarmAnalytics`] that the feed loop populates — the SAME
     /// `Arc<Mutex<SwarmAnalytics>>` created in `connect.rs` and fed with real
     /// demand every 10s. The former stub built a fresh empty instance here,
     /// which always returned `[]` (the analytics it checked was never the one
@@ -602,9 +602,9 @@ impl IntelligenceLayer {
     #[cfg(feature = "intelligence")]
     pub fn check_replication_needs(
         &self,
-        analytics: &std::sync::Mutex<engauge::SwarmAnalytics>,
-    ) -> Vec<engauge::ReplicationSignal> {
-        use engauge::{ReplicationConfig, ReplicationTrigger};
+        analytics: &std::sync::Mutex<ngauge::SwarmAnalytics>,
+    ) -> Vec<ngauge::ReplicationSignal> {
+        use ngauge::{ReplicationConfig, ReplicationTrigger};
 
         let trigger = ReplicationTrigger::new(ReplicationConfig::default());
         let signals = match analytics.lock() {

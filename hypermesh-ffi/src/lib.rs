@@ -248,12 +248,12 @@ mod tests {
             assert!(hypermesh_trustchain_validate(null, p).is_null());
             assert!(hypermesh_trustchain_revoke(null, p).is_null());
             assert!(hypermesh_trustchain_dns_zones(null).is_null());
-            // Engauge
-            assert!(hypermesh_engauge_capacity(null).is_null());
-            assert!(hypermesh_engauge_traffic(null).is_null());
-            assert!(hypermesh_engauge_marketplace(null).is_null());
-            assert!(hypermesh_engauge_node_metrics(null).is_null());
-            assert!(hypermesh_engauge_leases(null).is_null());
+            // NGauge
+            assert!(hypermesh_ngauge_capacity(null).is_null());
+            assert!(hypermesh_ngauge_traffic(null).is_null());
+            assert!(hypermesh_ngauge_marketplace(null).is_null());
+            assert!(hypermesh_ngauge_node_metrics(null).is_null());
+            assert!(hypermesh_ngauge_leases(null).is_null());
             // Catalog
             assert!(hypermesh_catalog_browse(null, p, 0).is_null());
             assert!(hypermesh_catalog_browse(null, std::ptr::null(), 0).is_null());

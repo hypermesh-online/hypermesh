@@ -2,19 +2,19 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! `TrustSignalProvider` — engauge-driven federation gating.
+//! `TrustSignalProvider` — ngauge-driven federation gating.
 //!
 //! Phase F.1 wires per-peer activity, capacity, and traffic-classification
-//! signals from engauge into TrustChain's `FederationManager`.  The trait
+//! signals from ngauge into TrustChain's `FederationManager`.  The trait
 //! lives in trustchain so the federation manager doesn't need to depend
-//! on engauge directly; the concrete adapter lives in blockmatrix
-//! (`intelligence::engauge_trust_adapter`) and converts engauge data into
+//! on ngauge directly; the concrete adapter lives in blockmatrix
+//! (`intelligence::ngauge_trust_adapter`) and converts ngauge data into
 //! the small descriptor below.
 //!
 //! TrustChain only needs to know the resulting [`PeerTrustBand`] — a
 //! coarse Full/Conditional band that maps directly onto
 //! [`crate::ca::federation::FederationTrustLevel`].  The fine-grained
-//! engauge signal types stay on the engauge side.
+//! ngauge signal types stay on the ngauge side.
 
 use async_trait::async_trait;
 
@@ -27,8 +27,8 @@ pub type PeerCertFingerprint = [u8; 32];
 
 /// Coarse trust band returned by the signal provider.
 ///
-/// `Full` and `Conditional` mirror engauge's `TrustBand`.  Trustchain
-/// keeps its own enum so this module compiles without an engauge
+/// `Full` and `Conditional` mirror ngauge's `TrustBand`.  Trustchain
+/// keeps its own enum so this module compiles without an ngauge
 /// dependency.  `Untrusted` is reserved for the byzantine override path
 /// inside `FederationManager::add_peer` — providers must not return it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,11 +39,11 @@ pub enum PeerTrustBand {
     Conditional,
 }
 
-/// Provider of engauge-derived trust signals for a single peer.
+/// Provider of ngauge-derived trust signals for a single peer.
 ///
 /// The federation manager queries this asynchronously each time a peer
 /// is added, so the provider may consult shared state (e.g. an
-/// `EngaugeBridge`) under a lock.  Returning `None` means "no signals
+/// `NGaugeBridge`) under a lock.  Returning `None` means "no signals
 /// available" — the federation manager falls back to its existing
 /// PoS-only gating in that case.
 #[async_trait]

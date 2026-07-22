@@ -73,7 +73,7 @@ async fn build_state(
         #[cfg(feature = "caesar")]
         caesar: None,
         #[cfg(feature = "intelligence")]
-        engauge_bridge: None,
+        ngauge_bridge: None,
         #[cfg(feature = "intelligence")]
         federation_manager: None,
         #[cfg(feature = "intelligence")]
@@ -114,7 +114,7 @@ fn test_method_to_capability_registry() {
         ("blockchain.block", Capability::ViewOnly),
         ("caesar.balance", Capability::ViewOnly),
         ("caesar.transactions", Capability::ViewOnly),
-        ("engauge.capacity", Capability::ViewOnly),
+        ("ngauge.capacity", Capability::ViewOnly),
         ("trustchain.identity", Capability::ViewOnly),
         ("stoq.stats", Capability::ViewOnly),
         ("dns.resolve", Capability::ViewOnly),

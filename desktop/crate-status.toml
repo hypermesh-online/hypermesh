@@ -38,5 +38,5 @@ items = [
     "Auto-update flow inside the desktop bundle (current path: re-install via package manager)",
     "macOS code-signing + notarization in release.yml (manual today; see docs/RELEASING.md C.2 section)",
     "Tauri permissions hardening — capabilities/default.json grants broad webview access",
-    "Multi-window support (separate Caesar wallet window, Engauge dashboard window)",
+    "Multi-window support (separate Caesar wallet window, NGauge dashboard window)",
 ]

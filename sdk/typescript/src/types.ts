@@ -250,9 +250,9 @@ export interface TrustChainDnsZoneList {
   zones: TrustChainDnsZone[];
 }
 
-// ── Engauge ──
+// ── NGauge ──
 
-export interface EngaugeCapacityMetrics {
+export interface NGaugeCapacityMetrics {
   bytes_served: number;
   compute_delivered: number;
   storage: number;
@@ -260,40 +260,40 @@ export interface EngaugeCapacityMetrics {
   uptime: number;
 }
 
-export interface EngaugeTrafficMetrics {
+export interface NGaugeTrafficMetrics {
   organic_ratio: number;
   speculative_ratio: number;
   total_requests: number;
 }
 
-export interface EngaugeListing {
+export interface NGaugeListing {
   id: string;
   resource_type: string;
   price: number;
   [key: string]: unknown;
 }
 
-export interface EngaugeListingList {
+export interface NGaugeListingList {
   count: number;
-  listings: EngaugeListing[];
+  listings: NGaugeListing[];
 }
 
-export interface EngaugeNodeMetrics {
+export interface NGaugeNodeMetrics {
   activity_score: number;
   receipts: number;
   bandwidth: number;
 }
 
-export interface EngaugeLease {
+export interface NGaugeLease {
   id: string;
   resource_type: string;
   status: string;
   [key: string]: unknown;
 }
 
-export interface EngaugeLeaseList {
+export interface NGaugeLeaseList {
   count: number;
-  leases: EngaugeLease[];
+  leases: NGaugeLease[];
 }
 
 // ── Catalog ──

@@ -142,7 +142,7 @@ impl Default for DnsConfig {
                 "trust".to_string(),
                 "assets".to_string(),
                 "catalog".to_string(),
-                "engauge".to_string(),
+                "ngauge".to_string(),
             ],
             state_requirements: StateRequirements::localhost_testing(),
         }
@@ -170,7 +170,7 @@ impl DnsConfig {
                 "trust".to_string(),
                 "assets".to_string(),
                 "catalog".to_string(),
-                "engauge".to_string(),
+                "ngauge".to_string(),
             ],
             state_requirements: StateRequirements::localhost_testing(),
         }
@@ -196,7 +196,7 @@ impl DnsConfig {
                 "trust".to_string(),
                 "assets".to_string(),
                 "catalog".to_string(),
-                "engauge".to_string(),
+                "ngauge".to_string(),
             ],
             state_requirements: StateRequirements::production(),
         }

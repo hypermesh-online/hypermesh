@@ -70,8 +70,8 @@ hypermesh-lib = { workspace = true }
 # Caesar SDK (UPI adapter traits)
 caesar-sdk = { path = "../caesar-sdk" }
 
-# Engauge integration (optional)
-engauge = { path = "../engauge", optional = true }
+# NGauge integration (optional)
+ngauge = { path = "../ngauge", optional = true }
 
 # Performance monitoring
 
@@ -85,5 +85,5 @@ production = ["redis-cache"]
 development = []
 redis-cache = []
 hypermesh = []
-engauge = ["dep:engauge"]
+ngauge = ["dep:ngauge"]
 ethereum = ["dep:ethers", "dep:primitive-types"]

@@ -1,21 +1,21 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
-//! Bridge between STOQ transport metrics and engauge MetricsFrame streaming.
+//! Bridge between STOQ transport metrics and ngauge MetricsFrame streaming.
 //!
-//! [`MetricsFrameBridge`] accepts an engauge [`MetricsPublisher`] and converts
+//! [`MetricsFrameBridge`] accepts an ngauge [`MetricsPublisher`] and converts
 //! STOQ transport events (latency, throughput, connection health) into
 //! Capacity and Congestion [`MetricsFrame`]s for streaming to the mesh.
 
-use engauge::streaming::protocol::{CongestionSnapshot, RoutingSnapshot};
-use engauge::streaming::{MetricsFrame, MetricsPublisher};
-use engauge::CapacityMetrics;
+use ngauge::streaming::protocol::{CongestionSnapshot, RoutingSnapshot};
+use ngauge::streaming::{MetricsFrame, MetricsPublisher};
+use ngauge::CapacityMetrics;
 use hypermesh_ebpf::metrics::HyperMeshMetrics;
 
-/// Bridge that converts STOQ transport metrics into engauge MetricsFrames.
+/// Bridge that converts STOQ transport metrics into ngauge MetricsFrames.
 ///
 /// STOQ creates this bridge and calls [`publish_transport_metrics`] periodically
-/// to emit Capacity and Congestion frames via the engauge publisher.
+/// to emit Capacity and Congestion frames via the ngauge publisher.
 pub struct MetricsFrameBridge {
     publisher: MetricsPublisher,
     /// Accumulated frames for external consumption.
@@ -54,7 +54,7 @@ pub struct TransportSnapshot {
 }
 
 impl MetricsFrameBridge {
-    /// Create a new bridge with the given engauge publisher.
+    /// Create a new bridge with the given ngauge publisher.
     pub fn new(publisher: MetricsPublisher) -> Self {
         Self {
             publisher,
@@ -201,7 +201,7 @@ fn routing_from_ebpf(ebpf: &HyperMeshMetrics) -> RoutingSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use engauge::streaming::MetricsPayload;
+    use ngauge::streaming::MetricsPayload;
     use hypermesh_lib::types::NodeId;
     use hypermesh_lib::PrivacyMode;
 

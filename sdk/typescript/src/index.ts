@@ -8,7 +8,7 @@ import { ConfigApi } from "./api/config.js";
 import { DashboardApi } from "./api/dashboard.js";
 import { DnsApi } from "./api/dns.js";
 import { DomainApi } from "./api/domain.js";
-import { EngaugeApi } from "./api/engauge.js";
+import { NGaugeApi } from "./api/ngauge.js";
 import { NetworkApi } from "./api/network.js";
 import { NodeApi } from "./api/node.js";
 import { TopologyApi } from "./api/topology.js";
@@ -18,14 +18,14 @@ const DEFAULT_BASE_URL = "https://localhost:8443";
 const DEFAULT_CAESAR_URL = "https://localhost:8443";
 const DEFAULT_TRUSTCHAIN_URL = "https://localhost:8443";
 const DEFAULT_CATALOG_URL = "https://localhost:8443";
-const DEFAULT_ENGAUGE_URL = "https://localhost:8443";
+const DEFAULT_NGAUGE_URL = "https://localhost:8443";
 
 export interface HyperMeshClientOptions {
   baseUrl?: string;
   caesarUrl?: string;
   trustchainUrl?: string;
   catalogUrl?: string;
-  engaugeUrl?: string;
+  ngaugeUrl?: string;
   /**
    * Phase K.2 — base64-encoded `CapabilityToken` issued by the daemon's
    * `auth.create_session` IPC. Required when connecting to a daemon
@@ -61,7 +61,7 @@ export class HyperMeshClient {
   public readonly dashboard: DashboardApi;
   public readonly dns: DnsApi;
   public readonly domain: DomainApi;
-  public readonly engauge: EngaugeApi;
+  public readonly ngauge: NGaugeApi;
   public readonly network: NetworkApi;
   public readonly node: NodeApi;
   public readonly topology: TopologyApi;
@@ -79,7 +79,7 @@ export class HyperMeshClient {
     let caesarUrl = DEFAULT_CAESAR_URL;
     let trustchainUrl = DEFAULT_TRUSTCHAIN_URL;
     let catalogUrl = DEFAULT_CATALOG_URL;
-    let engaugeUrl = DEFAULT_ENGAUGE_URL;
+    let ngaugeUrl = DEFAULT_NGAUGE_URL;
     let sessionToken: CapabilityToken | null = null;
 
     if (typeof options === "string") {
@@ -89,7 +89,7 @@ export class HyperMeshClient {
       caesarUrl = options.caesarUrl ?? DEFAULT_CAESAR_URL;
       trustchainUrl = options.trustchainUrl ?? DEFAULT_TRUSTCHAIN_URL;
       catalogUrl = options.catalogUrl ?? DEFAULT_CATALOG_URL;
-      engaugeUrl = options.engaugeUrl ?? DEFAULT_ENGAUGE_URL;
+      ngaugeUrl = options.ngaugeUrl ?? DEFAULT_NGAUGE_URL;
       sessionToken = options.sessionToken ?? null;
     }
 
@@ -97,8 +97,8 @@ export class HyperMeshClient {
     const caesarHttp = new HttpClient(caesarUrl, sessionToken);
     const trustchainHttp = new HttpClient(trustchainUrl, sessionToken);
     const catalogHttp = new HttpClient(catalogUrl, sessionToken);
-    const engaugeHttp = new HttpClient(engaugeUrl, sessionToken);
-    this.httpClients = [http, caesarHttp, trustchainHttp, catalogHttp, engaugeHttp];
+    const ngaugeHttp = new HttpClient(ngaugeUrl, sessionToken);
+    this.httpClients = [http, caesarHttp, trustchainHttp, catalogHttp, ngaugeHttp];
 
     this.asset = new AssetApi(http);
     this.blockchain = new BlockchainApi(http);
@@ -113,13 +113,13 @@ export class HyperMeshClient {
     this.caesar = new CaesarApi(caesarHttp);
     this.trustchain = new TrustChainApi(trustchainHttp);
     this.catalog = new CatalogApi(catalogHttp);
-    this.engauge = new EngaugeApi(engaugeHttp);
+    this.ngauge = new NGaugeApi(ngaugeHttp);
   }
 
   /**
    * Phase K.2 — install/rotate the capability token across all
    * underlying transports (gateway, caesar, trustchain, catalog,
-   * engauge).
+   * ngauge).
    *
    * Pass `null` to clear the token (e.g. after `auth.revoke_session`).
    */
@@ -221,13 +221,13 @@ export type {
   DomainJoinResponse,
   DomainListResponse,
   DomainRegisterResponse,
-  EngaugeCapacityMetrics,
-  EngaugeLease,
-  EngaugeLeaseList,
-  EngaugeListing,
-  EngaugeListingList,
-  EngaugeNodeMetrics,
-  EngaugeTrafficMetrics,
+  NGaugeCapacityMetrics,
+  NGaugeLease,
+  NGaugeLeaseList,
+  NGaugeListing,
+  NGaugeListingList,
+  NGaugeNodeMetrics,
+  NGaugeTrafficMetrics,
   Neighbor,
   NodeStatus,
   Peer,

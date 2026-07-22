@@ -53,7 +53,7 @@ pub const LOCAL_SERVICES: &[ServiceEntry] = &[
     ServiceEntry { name: "caesar", port: 9294 },
     ServiceEntry { name: "catalog", port: 9295 },
     ServiceEntry { name: "trust", port: 8444 },
-    ServiceEntry { name: "engauge", port: 9296 },
+    ServiceEntry { name: "ngauge", port: 9296 },
 ];
 
 // ---------------------------------------------------------------------------

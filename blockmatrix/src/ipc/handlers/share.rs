@@ -568,7 +568,7 @@ mod tests {
             #[cfg(feature = "caesar")]
             caesar: None,
             #[cfg(feature = "intelligence")]
-            engauge_bridge: None,
+            ngauge_bridge: None,
             #[cfg(feature = "intelligence")]
             federation_manager: None,
             #[cfg(feature = "intelligence")]

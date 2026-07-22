@@ -12,7 +12,7 @@
  *   /api/v1/blockmatrix/*  → blockmatrix daemon ([::1]:9292)
  *   /api/v1/caesar/*       → caesar daemon ([::1]:9294)
  *   /api/v1/catalog/*      → catalog daemon ([::1]:9295)
- *   /api/v1/engauge/*      → engauge daemon ([::1]:9296)
+ *   /api/v1/ngauge/*      → ngauge daemon ([::1]:9296)
  *   /api/v1/trustchain/*   → trustchain daemon ([::1]:8444)
  *
  * Scope-aware visibility is determined by the request's capability token +
@@ -221,7 +221,7 @@ export interface StakingInfo {
   [key: string]: unknown;
 }
 
-// --- Engauge response types ---
+// --- NGauge response types ---
 
 export interface CapacityMetrics {
   cpu_usage: number;
@@ -753,22 +753,22 @@ class BlockMatrixClient {
     return this.fetchJson('/api/v1/caesar/staking');
   }
 
-  // --- Engauge ---
+  // --- NGauge ---
 
-  async engaugeCapacity(): Promise<CapacityMetrics> {
-    return this.fetchJson('/api/v1/engauge/capacity');
+  async ngaugeCapacity(): Promise<CapacityMetrics> {
+    return this.fetchJson('/api/v1/ngauge/capacity');
   }
 
-  async engaugeTraffic(): Promise<TrafficAnalysis> {
-    return this.fetchJson('/api/v1/engauge/traffic');
+  async ngaugeTraffic(): Promise<TrafficAnalysis> {
+    return this.fetchJson('/api/v1/ngauge/traffic');
   }
 
-  async engaugeThrottle(): Promise<ThrottleStatus> {
-    return this.fetchJson('/api/v1/engauge/throttle');
+  async ngaugeThrottle(): Promise<ThrottleStatus> {
+    return this.fetchJson('/api/v1/ngauge/throttle');
   }
 
-  async engaugeRouting(): Promise<RoutingAdvisory> {
-    return this.fetchJson('/api/v1/engauge/routing');
+  async ngaugeRouting(): Promise<RoutingAdvisory> {
+    return this.fetchJson('/api/v1/ngauge/routing');
   }
 
   // --- TrustChain ---
