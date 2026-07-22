@@ -24,8 +24,8 @@ items = [
     "BlockMatrix backend routing (gateway -> [::1]:9292)",
     "Caesar backend routing (gateway -> [::1]:9294)",
     "Catalog backend routing (gateway -> [::1]:9295)",
-    "Engauge backend routing (gateway -> [::1]:9296)",
-    "Engauge API routing (/api/v1/engauge)",
+    "NGauge backend routing (gateway -> [::1]:9296)",
+    "NGauge API routing (/api/v1/ngauge)",
     # Dashboard serving
     "Scope-aware dashboard server (DashboardServer with scope determination, content-type detection, caching)",
     "Dashboard load_from_directory and load_defaults methods for populating scope-aware cache",

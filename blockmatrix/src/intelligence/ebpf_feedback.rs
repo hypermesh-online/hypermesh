@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Phase E.1: Bridge from engauge routing intelligence to kernel-level eBPF policy.
+//! Phase E.1: Bridge from ngauge routing intelligence to kernel-level eBPF policy.
 //!
-//! Engauge produces [`EbpfRoutingRule`] and [`EbpfPrivacyAction`] signals based
+//! NGauge produces [`EbpfRoutingRule`] and [`EbpfPrivacyAction`] signals based
 //! on observed congestion + traffic classification. This adapter consumes them
 //! and applies the resulting policy to the live [`HyperMeshEbpf`] BPF maps via
 //! the existing `set_routing_rule` and `set_privacy_tier` APIs.
@@ -15,11 +15,11 @@
 
 use std::sync::Arc;
 
-use engauge::routing_intel::{EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule};
+use ngauge::routing_intel::{EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule};
 use hypermesh_ebpf::HyperMeshEbpf;
 use hypermesh_lib::{NetworkId, PrivacyMode};
 
-/// Adapter that pushes engauge routing intelligence decisions into the
+/// Adapter that pushes ngauge routing intelligence decisions into the
 /// kernel-level eBPF policy maps managed by [`HyperMeshEbpf`].
 ///
 /// The adapter holds a shared [`Arc<HyperMeshEbpf>`] so that multiple feeds

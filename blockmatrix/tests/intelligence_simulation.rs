@@ -5,7 +5,7 @@
 //! Multi-node intelligence loop simulation harness (H7).
 //!
 //! Tests the full intelligence loop: asset creation -> shard distribution ->
-//! retrieval -> engauge feedback -> replication triggers -> security validation.
+//! retrieval -> ngauge feedback -> replication triggers -> security validation.
 //! Exercises 10-50 node topologies with real pipeline, shard stores, swarm
 //! analytics, and PoS transfer validation.
 
@@ -27,7 +27,7 @@ use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::swarm_provider::ShardLocationIndex;
 use blockmatrix::network::SwarmDemandTracker;
 
-use engauge::swarm_analytics::{
+use ngauge::swarm_analytics::{
     ReplicationConfig, ReplicationRecommendation, ReplicationTrigger, SwarmAnalytics,
 };
 
@@ -189,11 +189,11 @@ async fn test_10_node_asset_lifecycle() {
 }
 
 // ===========================================================================
-// Test 2: engauge feedback loop — popularity detection via windowed fetch rate
+// Test 2: ngauge feedback loop — popularity detection via windowed fetch rate
 // ===========================================================================
 
 #[tokio::test]
-async fn test_10_node_engauge_feedback_loop() {
+async fn test_10_node_ngauge_feedback_loop() {
     // Create analytics with 60s window and threshold of 5 fetches
     let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);
     let popular_hash = [0xAA; 32];

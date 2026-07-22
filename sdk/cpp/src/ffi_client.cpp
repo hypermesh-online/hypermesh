@@ -282,32 +282,32 @@ std::string FfiClient::trustchain_dns_zones() {
 }
 
 // ---------------------------------------------------------------------------
-// Engauge Analytics
+// NGauge Analytics
 // ---------------------------------------------------------------------------
 
-std::string FfiClient::engauge_capacity() {
+std::string FfiClient::ngauge_capacity() {
     require_connected();
-    return take_result(hypermesh_engauge_capacity(client_));
+    return take_result(hypermesh_ngauge_capacity(client_));
 }
 
-std::string FfiClient::engauge_traffic() {
+std::string FfiClient::ngauge_traffic() {
     require_connected();
-    return take_result(hypermesh_engauge_traffic(client_));
+    return take_result(hypermesh_ngauge_traffic(client_));
 }
 
-std::string FfiClient::engauge_marketplace() {
+std::string FfiClient::ngauge_marketplace() {
     require_connected();
-    return take_result(hypermesh_engauge_marketplace(client_));
+    return take_result(hypermesh_ngauge_marketplace(client_));
 }
 
-std::string FfiClient::engauge_node_metrics() {
+std::string FfiClient::ngauge_node_metrics() {
     require_connected();
-    return take_result(hypermesh_engauge_node_metrics(client_));
+    return take_result(hypermesh_ngauge_node_metrics(client_));
 }
 
-std::string FfiClient::engauge_leases() {
+std::string FfiClient::ngauge_leases() {
     require_connected();
-    return take_result(hypermesh_engauge_leases(client_));
+    return take_result(hypermesh_ngauge_leases(client_));
 }
 
 // ---------------------------------------------------------------------------

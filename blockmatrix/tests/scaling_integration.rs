@@ -281,7 +281,7 @@ async fn test_consumer_becomes_provider() {
 
 #[tokio::test]
 async fn test_swarm_analytics_popularity_detection() {
-    use engauge::swarm_analytics::{ReplicationRecommendation, SwarmAnalytics};
+    use ngauge::swarm_analytics::{ReplicationRecommendation, SwarmAnalytics};
 
     // Step 1: Create SwarmAnalytics with 60s window, threshold 5
     let mut analytics = SwarmAnalytics::with_window(Duration::from_secs(60), 5);

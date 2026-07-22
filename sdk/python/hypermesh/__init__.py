@@ -58,11 +58,11 @@ from .types import (
     DnsRecord,
     Domain,
     DomainList,
-    EngaugeCapacityMetrics,
-    EngaugeLeaseList,
-    EngaugeListingList,
-    EngaugeNodeMetrics,
-    EngaugeTrafficMetrics,
+    NGaugeCapacityMetrics,
+    NGaugeLeaseList,
+    NGaugeListingList,
+    NGaugeNodeMetrics,
+    NGaugeTrafficMetrics,
     Neighbor,
     Neighbors,
     NodeStatus,
@@ -81,7 +81,7 @@ _DEFAULT_BASE_URL = "https://localhost:8443"
 _DEFAULT_CAESAR_URL = "https://localhost:8443"
 _DEFAULT_TRUSTCHAIN_URL = "https://localhost:8443"
 _DEFAULT_CATALOG_URL = "https://localhost:8443"
-_DEFAULT_ENGAUGE_URL = "https://localhost:8443"
+_DEFAULT_NGAUGE_URL = "https://localhost:8443"
 
 
 class HyperMeshClient:
@@ -97,8 +97,8 @@ class HyperMeshClient:
         TrustChain service address. Default ``https://localhost:8443``.
     catalog_url:
         Catalog service address. Default ``https://localhost:8443``.
-    engauge_url:
-        Engauge service address. Default ``https://localhost:8443``.
+    ngauge_url:
+        NGauge service address. Default ``https://localhost:8443``.
     async_mode:
         When ``True``, use httpx-based async transport. All API
         methods become coroutines.
@@ -119,7 +119,7 @@ class HyperMeshClient:
         caesar_url: str = _DEFAULT_CAESAR_URL,
         trustchain_url: str = _DEFAULT_TRUSTCHAIN_URL,
         catalog_url: str = _DEFAULT_CATALOG_URL,
-        engauge_url: str = _DEFAULT_ENGAUGE_URL,
+        ngauge_url: str = _DEFAULT_NGAUGE_URL,
         async_mode: bool = False,
         timeout: float = 30.0,
         session_token: str | None = None,
@@ -141,15 +141,15 @@ class HyperMeshClient:
             catalog_transport = AsyncTransport(
                 catalog_url, timeout=timeout, capability_token=session_token
             )
-            engauge_transport = AsyncTransport(
-                engauge_url, timeout=timeout, capability_token=session_token
+            ngauge_transport = AsyncTransport(
+                ngauge_url, timeout=timeout, capability_token=session_token
             )
             self._async_transport = transport
             self._async_service_transports = [
                 caesar_transport,
                 trustchain_transport,
                 catalog_transport,
-                engauge_transport,
+                ngauge_transport,
             ]
 
             from .api.node import AsyncNodeApi
@@ -163,7 +163,7 @@ class HyperMeshClient:
             from .api.domain import AsyncDomainApi
             from .api.caesar import AsyncCaesarApi
             from .api.trustchain import AsyncTrustChainApi
-            from .api.engauge import AsyncEngaugeApi
+            from .api.ngauge import AsyncNGaugeApi
             from .api.catalog import AsyncCatalogApi
 
             self.node = AsyncNodeApi(transport)
@@ -177,7 +177,7 @@ class HyperMeshClient:
             self.domain = AsyncDomainApi(transport)
             self.caesar = AsyncCaesarApi(caesar_transport)
             self.trustchain = AsyncTrustChainApi(trustchain_transport)
-            self.engauge = AsyncEngaugeApi(engauge_transport)
+            self.ngauge = AsyncNGaugeApi(ngauge_transport)
             self.catalog = AsyncCatalogApi(catalog_transport)
         else:
             transport = SyncTransport(  # type: ignore[assignment]
@@ -197,7 +197,7 @@ class HyperMeshClient:
             from .api.domain import DomainApi
             from .api.caesar import CaesarApi
             from .api.trustchain import TrustChainApi
-            from .api.engauge import EngaugeApi
+            from .api.ngauge import NGaugeApi
             from .api.catalog import CatalogApi
 
             self.node = NodeApi(transport)
@@ -219,9 +219,9 @@ class HyperMeshClient:
                     trustchain_url, timeout=timeout, capability_token=session_token
                 )
             )
-            self.engauge = EngaugeApi(
+            self.ngauge = NGaugeApi(
                 SyncTransport(
-                    engauge_url, timeout=timeout, capability_token=session_token
+                    ngauge_url, timeout=timeout, capability_token=session_token
                 )
             )
             self.catalog = CatalogApi(
@@ -245,7 +245,7 @@ class HyperMeshClient:
             "domain",
             "caesar",
             "trustchain",
-            "engauge",
+            "ngauge",
             "catalog",
         ):
             api = getattr(self, service_attr, None)
@@ -365,11 +365,11 @@ __all__ = [
     "TrustChainValidationResult",
     "TrustChainRevokeResult",
     "TrustChainDnsZoneList",
-    "EngaugeCapacityMetrics",
-    "EngaugeTrafficMetrics",
-    "EngaugeListingList",
-    "EngaugeNodeMetrics",
-    "EngaugeLeaseList",
+    "NGaugeCapacityMetrics",
+    "NGaugeTrafficMetrics",
+    "NGaugeListingList",
+    "NGaugeNodeMetrics",
+    "NGaugeLeaseList",
     "CatalogPackageInfo",
     "CatalogPackageList",
     "CatalogSearchResults",

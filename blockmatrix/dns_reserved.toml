@@ -17,7 +17,7 @@ domains = [
     "hypermesh",
     "trust",
     "caesar",
-    "engauge",
+    "ngauge",
     "catalog",
     "dashboard",
     "blockmatrix",

@@ -54,10 +54,10 @@ impl InboundProxy {
                 backend_name: "blockmatrix".into(),
             },
             DashboardRoute {
-                path_prefix: "/engauge".into(),
-                display_name: "engauge Panel".into(),
+                path_prefix: "/ngauge".into(),
+                display_name: "ngauge Panel".into(),
                 description: "Engagement metrics and analytics".into(),
-                backend_name: "engauge".into(),
+                backend_name: "ngauge".into(),
             },
             DashboardRoute {
                 path_prefix: "/caesar".into(),
@@ -134,7 +134,7 @@ mod tests {
             .map(|r| r.display_name.as_str())
             .collect();
         assert!(names.contains(&"Resource Dashboard"));
-        assert!(names.contains(&"engauge Panel"));
+        assert!(names.contains(&"ngauge Panel"));
         assert!(names.contains(&"Caesar Wallet"));
         assert!(names.contains(&"Catalog Browser"));
     }
@@ -150,13 +150,13 @@ mod tests {
     }
 
     #[test]
-    fn match_route_engauge() {
+    fn match_route_ngauge() {
         let proxy = InboundProxy::with_defaults();
-        let route = proxy.match_route("/engauge/metrics");
+        let route = proxy.match_route("/ngauge/metrics");
         assert!(route.is_some());
         assert_eq!(
             route.expect("test: checked above").display_name,
-            "engauge Panel"
+            "ngauge Panel"
         );
     }
 

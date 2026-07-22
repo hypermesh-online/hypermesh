@@ -10,14 +10,14 @@ members = [
     "blockmatrix",
     "hypermesh-ebpf",
     "gateway",
-    "engauge",
+    "ngauge",
     "hypermesh-sdk",
     "hypermesh-ffi",
 ]
 resolver = "2"
 
 # Coherent workspace-wide package metadata. Members inherit these with
-# `version.workspace = true` etc., eliminating the version skew (engauge/caesar
+# `version.workspace = true` etc., eliminating the version skew (ngauge/caesar
 # were 1.0.0 while every other crate was 0.1.0). The IPC protocol version
 # (`IPC_PROTOCOL_VERSION = env!("CARGO_PKG_VERSION")`) now resolves coherently to
 # this single value across the whole daemon.

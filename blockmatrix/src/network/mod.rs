@@ -84,7 +84,7 @@ impl std::fmt::Debug for NetworkNode {
 /// Tracks shard fetch demand from network peers.
 ///
 /// Records which shards are being requested and by whom, providing
-/// the data needed for engauge's `SwarmAnalytics` to make replication
+/// the data needed for ngauge's `SwarmAnalytics` to make replication
 /// and dispersion decisions.
 pub struct SwarmDemandTracker {
     /// Per-shard request counts and last-access timestamps.
@@ -128,7 +128,7 @@ impl SwarmDemandTracker {
         entry.requester_ids.insert(requester_node_id.to_string());
     }
 
-    /// Get a snapshot of all demand entries for feeding into engauge.
+    /// Get a snapshot of all demand entries for feeding into ngauge.
     pub async fn snapshot(&self) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
         self.entries.lock().await.clone()
     }
@@ -180,9 +180,9 @@ pub struct PeerContext {
     /// Gossip protocol instance for mesh coordination.
     pub gossip_protocol: Option<Arc<GossipProtocol>>,
     /// Swarm demand tracker for recording shard fetch requests.
-    /// Fed into engauge SwarmAnalytics when the `intelligence` feature is enabled.
+    /// Fed into ngauge SwarmAnalytics when the `intelligence` feature is enabled.
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
-    /// DNS popularity tracker for engauge-driven replication of popular names.
+    /// DNS popularity tracker for ngauge-driven replication of popular names.
     /// When `Some`, DNS resolution requests are recorded for analytics.
     pub dns_popularity_tracker: Option<Arc<crate::dns::DnsPopularityTracker>>,
     /// Shard location index for consumer-becomes-provider (R12).
@@ -195,16 +195,16 @@ pub struct PeerContext {
     /// Key rotation chains per node (node_id -> list of rotation entries).
     /// Used for key continuity verification and split-brain detection.
     pub rotation_chains: Option<Arc<RwLock<HashMap<String, Vec<serde_json::Value>>>>>,
-    /// engauge SwarmAnalytics for processing received metrics and demand data.
+    /// ngauge SwarmAnalytics for processing received metrics and demand data.
     /// When `Some`, `handle_metrics_connection` feeds frames into this pipeline
-    /// and the EngaugeBridge reads analytics for propagation weight computation.
+    /// and the NGaugeBridge reads analytics for propagation weight computation.
     #[cfg(feature = "intelligence")]
-    pub engauge_analytics: Option<Arc<std::sync::Mutex<engauge::SwarmAnalytics>>>,
-    /// engauge MetricsIngestionPipeline for processing received MetricsFrame payloads.
+    pub ngauge_analytics: Option<Arc<std::sync::Mutex<ngauge::SwarmAnalytics>>>,
+    /// ngauge MetricsIngestionPipeline for processing received MetricsFrame payloads.
     /// When `Some`, incoming metrics frames are routed through differential privacy
     /// filtering and stored for trending analysis.
     #[cfg(feature = "intelligence")]
-    pub engauge_ingestion: Option<Arc<std::sync::Mutex<engauge::MetricsIngestionPipeline>>>,
+    pub ngauge_ingestion: Option<Arc<std::sync::Mutex<ngauge::MetricsIngestionPipeline>>>,
     /// Phase G.2 — cross-network transfer coordinator.
     ///
     /// When `Some`, incoming `TAG_TRANSFER_REGISTER_REQ` messages are

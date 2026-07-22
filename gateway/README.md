@@ -9,7 +9,7 @@ HTTP/3 + STOQ gateway for `*.hypermesh.online`, serving as the clearnet entry po
 | Role | Protocol | Purpose |
 |------|----------|---------|
 | **Bootstrap** | HTTP/3 -> STOQ | Initial STOQ connection info + bootstrap tokens at `trust.hypermesh.online` |
-| **Inbound Proxy** | HTTP/3 -> HyperMesh | Clearnet access to HyperMesh dashboards (resource, engauge, caesar, catalog) |
+| **Inbound Proxy** | HTTP/3 -> HyperMesh | Clearnet access to HyperMesh dashboards (resource, ngauge, caesar, catalog) |
 | **Outbound Proxy** | HyperMesh -> HTTP/3 | Bridge HyperMesh resources to non-HyperMesh clearnet endpoints |
 | **Inter-Network** | STOQ <-> STOQ | Bridge between federated/private/public HyperMesh networks |
 

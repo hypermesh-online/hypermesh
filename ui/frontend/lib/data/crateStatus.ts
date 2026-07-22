@@ -24,7 +24,7 @@ const crateToModule: Record<string, string> = {
   'trustchain': 'trustchain',
   'hypermesh-ebpf': 'ebpf',
   'hypermesh-lib': 'lib',
-  'engauge': 'engauge',
+  'ngauge': 'ngauge',
   'gateway': 'gateway',
   'ui': 'ui',
 };

@@ -4,11 +4,11 @@
 
 //! Integration test for Phase E.1: eBPF feedback adapter.
 //!
-//! Confirms the engauge -> blockmatrix -> eBPF feedback loop. When a
+//! Confirms the ngauge -> blockmatrix -> eBPF feedback loop. When a
 //! [`RoutingIntelFeed`] has an [`EbpfFeedbackAdapter`] attached, calling
 //! `publish_update` propagates the congestion-derived privacy action to
 //! [`HyperMeshEbpf`]. Routing rule propagation is exercised via the direct
-//! adapter API (engauge does not yet emit `EbpfRoutingRule` from
+//! adapter API (ngauge does not yet emit `EbpfRoutingRule` from
 //! `publish_update`; see Phase E.2).
 
 #![cfg(feature = "intelligence")]
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use blockmatrix::intelligence::EbpfFeedbackAdapter;
-use engauge::routing_intel::{
+use ngauge::routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, RoutingIntelFeed,
 };
 use hypermesh_ebpf::{EbpfConfig, HyperMeshEbpf};
@@ -39,7 +39,7 @@ fn adapter_attaches_to_routing_intel_feed() {
     let candidates: Vec<NodeId> = vec![];
     let _update = feed.publish_update(&pos, &pos, &candidates);
 
-    // No rules pushed yet (engauge does not emit EbpfRoutingRule in
+    // No rules pushed yet (ngauge does not emit EbpfRoutingRule in
     // publish_update at this phase), so the count is zero — but the call
     // graph executed end-to-end without panicking.
     assert_eq!(ebpf.routing_rule_count(), 0);

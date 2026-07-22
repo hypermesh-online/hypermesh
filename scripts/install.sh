@@ -246,7 +246,7 @@ case "$TARGET" in
             id -u hypermesh >/dev/null 2>&1 || \
                 useradd -r -s /usr/sbin/nologin -d /var/lib/hypermesh hypermesh
             install -d -o hypermesh -g hypermesh \
-                /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,engauge,caesar}
+                /var/lib/hypermesh/{blockmatrix,trustchain,gateway,catalog,ngauge,caesar}
             install -d -o hypermesh -g hypermesh /var/log/hypermesh
             install -d -o hypermesh -g hypermesh /etc/hypermesh/certs
         else
@@ -257,7 +257,7 @@ case "$TARGET" in
         if $INSTALL_SYSTEMD && [ "$(id -u)" -eq 0 ] && command -v systemctl >/dev/null 2>&1; then
             echo "Installing systemd units..."
             SYSTEMD_DIR="/etc/systemd/system"
-            for unit in gateway.service trustchain.service blockmatrix.service catalog.service engauge.service caesar.service; do
+            for unit in gateway.service trustchain.service blockmatrix.service catalog.service ngauge.service caesar.service; do
                 if [ -f "$STAGE_DIR/systemd/$unit" ]; then
                     install -m 644 "$STAGE_DIR/systemd/$unit" "$SYSTEMD_DIR/$unit"
                     echo "  Installed $unit"
@@ -269,7 +269,7 @@ case "$TARGET" in
             systemctl daemon-reload
             echo
             echo "Start services with:"
-            echo "  systemctl enable --now trustchain blockmatrix caesar catalog engauge gateway"
+            echo "  systemctl enable --now trustchain blockmatrix caesar catalog ngauge gateway"
         elif ! $INSTALL_SYSTEMD; then
             echo "Skipping systemd installation (--no-systemd)."
         fi

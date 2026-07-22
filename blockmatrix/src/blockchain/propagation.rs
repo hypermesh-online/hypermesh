@@ -116,7 +116,7 @@ pub struct PropagationResult {
 
 /// A per-node weight modifier for prioritizing block propagation targets.
 ///
-/// Supplied externally by engauge's `RoutingAdvisor` (when the `intelligence`
+/// Supplied externally by ngauge's `RoutingAdvisor` (when the `intelligence`
 /// feature is enabled). Positive factors increase propagation priority;
 /// values below 1.0 reduce it; zero means skip the node entirely.
 #[derive(Debug, Clone)]
@@ -137,7 +137,7 @@ pub struct BlockPropagator {
     seen_blocks: Arc<RwLock<HashMap<String, HashSet<MatrixCoordinate>>>>,
     /// Network transport for sending blocks to peers
     transport: Arc<dyn BlockTransport>,
-    /// Optional per-node weight modifiers from engauge routing intelligence.
+    /// Optional per-node weight modifiers from ngauge routing intelligence.
     /// When set, `propagate_block` sorts targets by weight (highest first)
     /// and skips nodes with weight <= 0.
     propagation_weights: Arc<RwLock<Vec<PropagationWeight>>>,
@@ -180,7 +180,7 @@ impl BlockPropagator {
         self.interest_context = Some(ctx);
     }
 
-    /// Update the propagation weight modifiers (typically called by engauge
+    /// Update the propagation weight modifiers (typically called by ngauge
     /// routing intelligence when new metrics arrive).
     pub async fn set_propagation_weights(&self, weights: Vec<PropagationWeight>) {
         *self.propagation_weights.write().await = weights;
@@ -210,7 +210,7 @@ impl BlockPropagator {
             _ => self.select_propagation_targets(network_nodes).await,
         };
 
-        // Apply engauge routing weights: filter out zero-weight nodes, sort by weight descending.
+        // Apply ngauge routing weights: filter out zero-weight nodes, sort by weight descending.
         targets = self.apply_weights(targets).await;
 
         info!(
@@ -412,7 +412,7 @@ impl BlockPropagator {
             .insert(*node);
     }
 
-    /// Apply engauge routing weights to propagation targets.
+    /// Apply ngauge routing weights to propagation targets.
     ///
     /// Filters out targets with weight <= 0 and sorts remaining targets
     /// by weight descending (highest priority first). Targets without

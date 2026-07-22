@@ -20,7 +20,7 @@ items = [
     "ErrorBoundary: class component, module-aware error display + retry button",
     "ModuleLoading: skeleton-based loading placeholder",
     # Single data path: useBlockMatrix → blockmatrix-api.ts → Gateway → IPC
-    "blockmatrix-api.ts: 43 typed methods covering ALL IPC handlers (core, blockchain, dns, network, topology, asset, domain, dashboard, config, share, message, caesar, engauge, trustchain, stoq, gateway, intelligence)",
+    "blockmatrix-api.ts: 43 typed methods covering ALL IPC handlers (core, blockchain, dns, network, topology, asset, domain, dashboard, config, share, message, caesar, ngauge, trustchain, stoq, gateway, intelligence)",
     "useBlockMatrix.ts: 43 React Query hooks with per-hook polling intervals",
     "Zero mock data — errors shown as errors, not fake data",
     # HyperMesh module (12 sub-routes, all connected)
@@ -39,11 +39,11 @@ items = [
     # Caesar module (real hooks)
     "CaesarOverview: balance cards, staking, rewards, recent transactions (useCaesar* hooks)",
     "CaesarModule: Overview/Wallet/Rewards tabs",
-    # Engauge module (real hooks, routed + sidebar)
-    "EngaugeOverview: capacity metrics, traffic analysis, throttle status",
-    "EngaugeAnalytics: capacity breakdown, traffic details, privacy sharing matrix",
-    "EngaugeMarketplace: tier pricing with real capacity stats",
-    "EngaugeRouting: routing advisory, congestion level, governor throttle",
+    # NGauge module (real hooks, routed + sidebar)
+    "NGaugeOverview: capacity metrics, traffic analysis, throttle status",
+    "NGaugeAnalytics: capacity breakdown, traffic details, privacy sharing matrix",
+    "NGaugeMarketplace: tier pricing with real capacity stats",
+    "NGaugeRouting: routing advisory, congestion level, governor throttle",
     "IntelligenceStats: H1-H7 loop status, utilization, network flow",
     # TrustChain module (real hooks)
     "SecurityMonitoringDashboard: CA status, cert health, federation peers, identity",

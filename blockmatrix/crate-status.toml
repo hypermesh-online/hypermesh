@@ -17,14 +17,14 @@ items = [
     "Node resume path (load persisted genesis/blocks/cert from disk)",
     "BLAKE3 content hashing for blocks",
     # Asset pipeline (real crypto, real erasure coding — LOCAL ONLY)
-    "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(engauge/NGauge Sharder, RS 10+4)->store locally",
-    "Sharding authority is NGauge (A1) — blockmatrix pipeline CONSUMES engauge::Sharder/ShardingConfig; Shard/ShardMetadata/ShardingStats live in hypermesh-lib (no dependency cycle)",
+    "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(ngauge/NGauge Sharder, RS 10+4)->store locally",
+    "Sharding authority is NGauge (A1) — blockmatrix pipeline CONSUMES ngauge::Sharder/ShardingConfig; Shard/ShardMetadata/ShardingStats live in hypermesh-lib (no dependency cycle)",
     "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
     "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
     "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
     "Random-access byte range reconstruction — reconstruct only segments covering requested range",
     "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
-    "Adaptive erasure coding (R14 — RS parameters scale with asset size), engine now provided by engauge::Sharder",
+    "Adaptive erasure coding (R14 — RS parameters scale with asset size), engine now provided by ngauge::Sharder",
     "Store command: file -> pipeline -> local shard files + shard map",
     "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
     # Asset adapters (data structures and trait impls, no network validation)
@@ -101,11 +101,11 @@ items = [
     "C# SDK (HyperMesh.Sdk) — .NET 8.0 async client wrapping Gateway API",
     "C++ SDK (hypermesh_sdk) — C++17 POSIX socket client wrapping Gateway API",
     "Go SDK (sdk-go) — zero-dep client with context.Context wrapping Gateway API",
-    # Per-service SDK modules (Caesar, TrustChain, Engauge, Catalog) in all 5 languages
-    "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, Engauge:9296, Catalog:9295)",
+    # Per-service SDK modules (Caesar, TrustChain, NGauge, Catalog) in all 5 languages
+    "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, NGauge:9296, Catalog:9295)",
     "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
     # CLI service subcommands (route through IPC daemon)
-    "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
+    "CLI service subcommands (hypermesh caesar/trustchain/ngauge/catalog) with IPC relay",
     "CLI --mode flag (auto/ffi/ipc/http) and per-service URL flags",
     # Config services section
     "Config [services] section (ConnectionMode, per-service URLs in config.toml)",
@@ -118,7 +118,7 @@ items = [
     "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
     "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
     "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
-    "Metrics emission to engauge — MetricsReporter pushes Capacity + Congestion + Routing frames (eBPF-sourced) via STOQ streams (CONN_TYPE_METRICS=0x02) to peers every 30s with backoff",
+    "Metrics emission to ngauge — MetricsReporter pushes Capacity + Congestion + Routing frames (eBPF-sourced) via STOQ streams (CONN_TYPE_METRICS=0x02) to peers every 30s with backoff",
     "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
     "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
     "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
@@ -131,12 +131,12 @@ items = [
     "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
     "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
     "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
-    "Engauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
-    "BlockPropagator routing weights — PropagationWeight integration, peers sorted by engauge-computed weight, zero-weight filtered",
+    "NGauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
+    "BlockPropagator routing weights — PropagationWeight integration, peers sorted by ngauge-computed weight, zero-weight filtered",
     "Bilateral PoS verification on peer auth",
     "Reflector health scoring and pruning",
     "Cross-node metrics pipeline (MetricsReporter)",
-    "EngaugeBridge periodic feed + transmit",
+    "NGaugeBridge periodic feed + transmit",
     "ReplicationTrigger wired to IntelligenceLayer",
     "RoutingAdvisor weights in TransactionRouter",
     "Privacy tier mapping fix",
@@ -156,13 +156,13 @@ items = [
     "Block propagation torrent model — ContentInterested strategy: Device=none, Private=full replication, Public=reflectors+spatial+consumers, Anonymous=consumers only",
     "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers",
     # Intelligence loop (H1-H7)
-    "Intelligence feature enabled by default — engauge bridge compiles and runs in production",
-    "Metrics ingestion wired — handle_metrics_connection feeds frames into engauge MetricsIngestionPipeline (no longer discarded)",
-    "EngaugeBridge periodic feed — SwarmDemandTracker → SwarmAnalytics every 10s via tokio task",
+    "Intelligence feature enabled by default — ngauge bridge compiles and runs in production",
+    "Metrics ingestion wired — handle_metrics_connection feeds frames into ngauge MetricsIngestionPipeline (no longer discarded)",
+    "NGaugeBridge periodic feed — SwarmDemandTracker → SwarmAnalytics every 10s via tokio task",
     "Propagation weight feed — RoutingIntelligence → TensorWeightModifier → PropagationWeight every 15s",
     "Replication trigger — ReplicationTrigger.check() against live SwarmAnalytics, signals logged with urgency > 0.5",
     "intelligence.stats IPC endpoint — queryable metrics (shard_count, peer_count, uptime)",
-    "10-50 node simulation harness — 9 integration tests (asset lifecycle, engauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)",
+    "10-50 node simulation harness — 9 integration tests (asset lifecycle, ngauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)",
     # P2P File Sharing (J1-J7)
     "ShareInvite protocol — signed envelope with shard map + Kyber-wrapped DecryptionKey, FALCON-1024 signature, TAG_SHARE_INVITE wire protocol",
     "Key wrapping — encrypt/decrypt DecryptionKey with recipient's Kyber-1024 public key (KEM + BLAKE3-derived AES-256-GCM)",
@@ -183,13 +183,13 @@ items = [
     "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
     # Core Protocol Completion (L1-L5)
     "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
-    "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds engauge SwarmAnalytics",
+    "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds ngauge SwarmAnalytics",
     "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
-    "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, engauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
-    "EbpfFeedbackAdapter wires engauge routing intelligence into kernel-level BPF maps",
+    "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, ngauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
+    "EbpfFeedbackAdapter wires ngauge routing intelligence into kernel-level BPF maps",
     "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
-    "EngaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on engauge popularity signals",
-    "EngaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer engauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
+    "NGaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on ngauge popularity signals",
+    "NGaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer ngauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
     "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
     # Phase G.1 — cross-network transfer choreography
     "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
@@ -231,14 +231,14 @@ items = [
     "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); handshake-only peers with no stake are refused",
     # P6 — NGauge reconciler convergence + TTL cache + version negotiation
     "Replication convergence actuator — post-fetch set_replica_count(shard, provider_count) so ReplicationTrigger sees needed<=replicas next cycle and STOPS (swarm-emergent convergence), closing the R12 replication loop",
-    "DispersionAdvisor anti-affinity placement — extra-replica fetch consults engauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
+    "DispersionAdvisor anti-affinity placement — extra-replica fetch consults ngauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
     "TTL shard-location cache — provider records age like dns::cache (DEFAULT_PROVIDER_TTL 300s, is_expired sweep); expired providers are not handed out as fetch sources",
     "STOQ protocol-version negotiation — handshake carries protocol_version, major mismatch rejected BEFORE trust is granted, old peers without the field still accepted (serde default)",
     "Orphan-buffer bound — MAX_ORPHANS + 120s TTL sweep on the buffer-then-link path prevents distinct-prev-hash orphan floods from exhausting memory",
     # P7 — substrate extraction
     "Matrix coordinate derivation delegates to base substrate — coordinate.rs calls base derive_cell/derive_address (fd48:4d00::/32), one canonical BLAKE3 construction shared across the workspace",
-    # A1 — sharding authority moved into NGauge (engauge)
-    "A1 sharding-engine move — Reed-Solomon engine (Sharder/ShardingConfig) now lives in engauge/NGauge; blockmatrix pipeline calls it via a re-export shim (assets/pipeline/sharding.rs), byte-identical round-trip seam-tested",
+    # A1 — sharding authority moved into NGauge (ngauge)
+    "A1 sharding-engine move — Reed-Solomon engine (Sharder/ShardingConfig) now lives in ngauge/NGauge; blockmatrix pipeline calls it via a re-export shim (assets/pipeline/sharding.rs), byte-identical round-trip seam-tested",
     # A2 — two-layer mirror retrieval
     "Two-layer mirror retrieval — client-assembly fetch resolves live mirrors FIRST then the plan's canonical matrix placements (location_resolver), with a TAG_SHARD_LOCATE upstream-tracker fallback when connected peers miss",
     "Unified seed-on-fetch — client-assembly and IPC fetch paths share ONE become-provider seeder; a fetched shard is re-announced only AFTER the BLAKE3 content-validity gate passes (mirror invariant #1)",

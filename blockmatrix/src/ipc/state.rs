@@ -43,7 +43,7 @@ pub struct DaemonState {
     pub shutdown_tx: tokio::sync::watch::Sender<bool>,
     /// Bootstrap DNS resolver for name resolution.
     pub dns_resolver: DnsResolver,
-    /// DNS popularity tracker for engauge-driven replication.
+    /// DNS popularity tracker for ngauge-driven replication.
     /// Records resolution frequency so popular names get replicated to more nodes.
     pub dns_popularity_tracker: Option<Arc<DnsPopularityTracker>>,
     /// Shard location index — same instance shared with PeerContext so
@@ -57,9 +57,9 @@ pub struct DaemonState {
     /// Caesar EVP protocol instance (None if feature disabled or init failed).
     #[cfg(feature = "caesar")]
     pub caesar: Option<Arc<tokio::sync::RwLock<caesar::CaesarProtocol>>>,
-    /// Engauge swarm analytics bridge (None if feature disabled or not wired).
+    /// NGauge swarm analytics bridge (None if feature disabled or not wired).
     #[cfg(feature = "intelligence")]
-    pub engauge_bridge: Option<Arc<crate::intelligence::engauge_bridge::EngaugeBridge>>,
+    pub ngauge_bridge: Option<Arc<crate::intelligence::ngauge_bridge::NGaugeBridge>>,
     /// Phase F.1: federation manager (CA-side trust + key shares).
     #[cfg(feature = "intelligence")]
     pub federation_manager: Option<Arc<trustchain::ca::FederationManager>>,
@@ -132,7 +132,7 @@ pub struct DaemonState {
     /// daemon was started with `--mode light` this is `Some` and the
     /// startup path skips full block hosting and shard pipeline. K.1
     /// alpha ships the type/wiring; the production minimization
-    /// (skipping `ShardStore`/`PipelineEngine`/Caesar/engauge etc.)
+    /// (skipping `ShardStore`/`PipelineEngine`/Caesar/ngauge etc.)
     /// is staged as K.1.5.
     pub light_sync_manager: Option<Arc<crate::light_client::HeaderSyncManager>>,
 

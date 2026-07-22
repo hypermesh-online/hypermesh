@@ -96,7 +96,7 @@ Do not introduce SHA-256, RSA, Ed25519, or other non-quantum-resistant primitive
 | `caesar-sdk` | UPI adapter traits for Caesar integration |
 | `catalog` | Asset package registry and DHT distribution |
 | `gateway` | HTTP/3 + STOQ dual-listener gateway |
-| `engauge` | Analytics, streaming metrics, marketplace |
+| `ngauge` | Analytics, streaming metrics, marketplace |
 | `hypermesh-ebpf` | XDP packet processing with AF_XDP |
 | `ui` | TypeScript/React frontend |
 

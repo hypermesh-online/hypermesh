@@ -85,7 +85,7 @@ pub struct Cli {
     ///
     /// K.1 ships the flag and the `HeaderSyncManager` scaffolding. Full
     /// startup-path minimization (skipping `ShardStore`, `PipelineEngine`,
-    /// Caesar, engauge, etc.) is staged as K.1.5.
+    /// Caesar, ngauge, etc.) is staged as K.1.5.
     #[clap(long, default_value = "full")]
     pub mode: LightModeArg,
 
@@ -239,10 +239,10 @@ pub enum Commands {
         action: TrustchainAction,
     },
 
-    /// Engauge analytics operations
-    Engauge {
+    /// NGauge analytics operations
+    NGauge {
         #[clap(subcommand)]
-        action: EngaugeAction,
+        action: NGaugeAction,
     },
 
     /// Catalog registry operations
@@ -443,7 +443,7 @@ pub enum TrustchainAction {
 }
 
 #[derive(Subcommand, Debug)]
-pub enum EngaugeAction {
+pub enum NGaugeAction {
     /// Show capacity metrics
     Capacity,
     /// Show traffic analysis

@@ -20,7 +20,7 @@ Dashboard for monitoring and managing the HyperMesh ecosystem. Built with React,
 
 ### Working
 - Dashboard home with ecosystem overview
-- Module pages: STOQ, TrustChain, Catalog, Caesar, Engauge, HyperMesh
+- Module pages: STOQ, TrustChain, Catalog, Caesar, NGauge, HyperMesh
 - TrustChain management (certificates, security, Proof of State, node config)
 - Asset management views (creation wizard, advanced management)
 - Proxy and NAT address management
@@ -40,7 +40,7 @@ Dashboard for monitoring and managing the HyperMesh ecosystem. Built with React,
 - Real-time metrics streaming
 - Multi-node cluster topology visualization
 - Caesar wallet and transaction management UI
-- Engauge analytics and reward distribution dashboard
+- NGauge analytics and reward distribution dashboard
 - Native desktop dashboard (Tauri: Linux/macOS/Windows)
 - First-run onboarding flow (sovereign node setup, network join)
 

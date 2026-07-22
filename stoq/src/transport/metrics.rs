@@ -236,7 +236,7 @@ impl TransportMetrics {
 
     /// Get a rich transport snapshot including jitter and loss metrics.
     ///
-    /// This is the primary method for feeding transport data to engauge.
+    /// This is the primary method for feeding transport data to ngauge.
     pub fn get_transport_snapshot(&self, active_connections: usize) -> TransportSnapshot {
         let bytes_sent = self.bytes_sent.load(Ordering::Relaxed);
         let bytes_received = self.bytes_received.load(Ordering::Relaxed);
@@ -377,7 +377,7 @@ pub struct IntervalMetrics {
     pub connections_per_sec: f64,
 }
 
-/// Rich transport metrics snapshot for feeding to engauge.
+/// Rich transport metrics snapshot for feeding to ngauge.
 ///
 /// Contains measured values from actual QUIC connections including
 /// latency percentiles, jitter, and loss ratios.

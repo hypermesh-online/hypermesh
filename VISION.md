@@ -47,7 +47,7 @@ plus the proof it is that thing — never the bulk of the thing itself.
 | **`stoq`** | The transport — run **at the port by eBPF**. STOQ = Secure Tokenization Over QUIC; PoS *is* the transport. |
 | **`hypermesh-ebpf`** | The gate. Runs STOQ at the port; transfers instructions/addresses + block validation. |
 | **`trustchain`** | A **decentralized DNS server, via eBPF** — in parallel with, and partially via, NGauge. Also the certificate authority that secures device-to-device sessions. |
-| **NGauge** (`engauge`) | **Resource dispatching — and that is all it has to do.** Two faces: an **interface for Catalog**, and a **scheduler for BlockMatrix**. Shard-distributes blocks. |
+| **NGauge** (`ngauge`) | **Resource dispatching — and that is all it has to do.** Two faces: an **interface for Catalog**, and a **scheduler for BlockMatrix**. Shard-distributes blocks. |
 | **`catalog`** | The **package manager for the shared Asset library** on a network. Holds the definitions. |
 | **`blockmatrix`** | The **distributed storage substrate** — where Blocks are distributed across the network. **Secured by TrustChain, shard-distributed by NGauge.** |
 

@@ -24,8 +24,8 @@ const (
 	// DefaultCatalogURL is the default Catalog service address (via Gateway).
 	DefaultCatalogURL = "https://localhost:8443"
 
-	// DefaultEngaugeURL is the default Engauge service address (via Gateway).
-	DefaultEngaugeURL = "https://localhost:8443"
+	// DefaultNGaugeURL is the default NGauge service address (via Gateway).
+	DefaultNGaugeURL = "https://localhost:8443"
 
 	// DefaultTimeout is the default HTTP client timeout.
 	DefaultTimeout = 30 * time.Second
@@ -45,7 +45,7 @@ type Client struct {
 	Domain     *DomainApi
 	Caesar     *CaesarApi
 	TrustChain *TrustChainApi
-	Engauge    *EngaugeApi
+	NGauge    *NGaugeApi
 	Catalog    *CatalogApi
 
 	// httpClients tracks every transport so SetCapabilityToken can
@@ -69,7 +69,7 @@ type clientConfig struct {
 	caesarURL     string
 	trustChainURL string
 	catalogURL    string
-	engaugeURL    string
+	ngaugeURL    string
 	httpClient    *http.Client
 	// sessionToken — Phase K.2 capability token (base64 of serialized
 	// CapabilityToken). When set, every request carries the
@@ -123,10 +123,10 @@ func WithCatalogURL(url string) Option {
 	}
 }
 
-// WithEngaugeURL sets a custom Engauge service URL.
-func WithEngaugeURL(url string) Option {
+// WithNGaugeURL sets a custom NGauge service URL.
+func WithNGaugeURL(url string) Option {
 	return func(cfg *clientConfig) {
-		cfg.engaugeURL = strings.TrimRight(url, "/")
+		cfg.ngaugeURL = strings.TrimRight(url, "/")
 	}
 }
 
@@ -145,7 +145,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 		caesarURL:     DefaultCaesarURL,
 		trustChainURL: DefaultTrustChainURL,
 		catalogURL:    DefaultCatalogURL,
-		engaugeURL:    DefaultEngaugeURL,
+		ngaugeURL:    DefaultNGaugeURL,
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -159,9 +159,9 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	caesarH := newHTTPClient(cfg.caesarURL, cfg.httpClient)
 	trustChainH := newHTTPClient(cfg.trustChainURL, cfg.httpClient)
 	catalogH := newHTTPClient(cfg.catalogURL, cfg.httpClient)
-	engaugeH := newHTTPClient(cfg.engaugeURL, cfg.httpClient)
+	ngaugeH := newHTTPClient(cfg.ngaugeURL, cfg.httpClient)
 
-	allTransports := []*httpClient{h, caesarH, trustChainH, catalogH, engaugeH}
+	allTransports := []*httpClient{h, caesarH, trustChainH, catalogH, ngaugeH}
 	// Phase K.2 — install the session token on every transport.
 	if cfg.sessionToken != "" {
 		for _, hc := range allTransports {
@@ -181,7 +181,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 		Domain:      &DomainApi{http: h},
 		Caesar:      &CaesarApi{http: caesarH},
 		TrustChain:  &TrustChainApi{http: trustChainH},
-		Engauge:     &EngaugeApi{http: engaugeH},
+		NGauge:     &NGaugeApi{http: ngaugeH},
 		Catalog:     &CatalogApi{http: catalogH},
 		httpClients: allTransports,
 	}

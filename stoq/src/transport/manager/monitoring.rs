@@ -91,7 +91,7 @@ impl StoqTransport {
 
     /// Get a rich transport snapshot including jitter, loss, and latency percentiles.
     ///
-    /// This is the primary method for feeding transport data to engauge.
+    /// This is the primary method for feeding transport data to ngauge.
     pub fn get_transport_snapshot(&self) -> crate::transport::metrics::TransportSnapshot {
         self.metrics.get_transport_snapshot(self.connections.len())
     }

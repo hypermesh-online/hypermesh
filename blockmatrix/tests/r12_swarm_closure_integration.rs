@@ -10,7 +10,7 @@
 //!  2. The `broadcast_announcement` helper sends the payload to peer
 //!     connections, which a peer's `handle_shard_announce` updates into
 //!     their `ShardLocationIndex` so the new provider is discoverable.
-//!  3. `EngaugeBridge::check_replication_signals` returns non-empty signals
+//!  3. `NGaugeBridge::check_replication_signals` returns non-empty signals
 //!     when synthetic demand exceeds the per-replica threshold.
 //!
 //! These tests exercise the wires directly without spinning the full
@@ -28,8 +28,8 @@ use blockmatrix::network::consumer_provider::{
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::swarm_provider::ShardLocationIndex;
 use blockmatrix::network::SwarmDemandTracker;
-use blockmatrix::intelligence::engauge_bridge::EngaugeBridge;
-use engauge::SwarmAnalytics;
+use blockmatrix::intelligence::ngauge_bridge::NGaugeBridge;
+use ngauge::SwarmAnalytics;
 use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
 
 fn test_hash(seed: u8) -> ContentHash {
@@ -166,7 +166,7 @@ async fn broadcast_with_no_peers_returns_zero() {
 async fn replication_signals_fire_under_synthetic_demand() {
     let tracker = Arc::new(SwarmDemandTracker::new());
     let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
-    let bridge = EngaugeBridge::new(
+    let bridge = NGaugeBridge::new(
         tracker.clone(),
         analytics.clone(),
         MatrixPosition { x: 0.0, y: 0.0, z: 0.0 },
@@ -220,7 +220,7 @@ async fn replication_signals_fire_under_synthetic_demand() {
 }
 
 /// Two-side R12 closure simulation: A fetches from B, A's announce updates
-/// B's index, and engauge picks up popularity from concurrent demand,
+/// B's index, and ngauge picks up popularity from concurrent demand,
 /// producing a replication signal that connect.rs would act on by
 /// requesting extra copies via TAG_SHARD_FETCH.
 #[tokio::test]
@@ -253,10 +253,10 @@ async fn end_to_end_swarm_closure_signal_flow() {
         "B's index must show A as provider after announce",
     );
 
-    // --- engauge demand: synthetic load on B drives replication signal ---
+    // --- ngauge demand: synthetic load on B drives replication signal ---
     let tracker = Arc::new(SwarmDemandTracker::new());
     let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
-    let bridge = EngaugeBridge::new(
+    let bridge = NGaugeBridge::new(
         tracker.clone(),
         analytics.clone(),
         MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },

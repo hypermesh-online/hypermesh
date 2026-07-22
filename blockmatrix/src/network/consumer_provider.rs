@@ -168,7 +168,7 @@ impl ConsumerProviderManager {
 /// Each peer is sent the payload over a fresh unidirectional STOQ stream.
 /// Failures are logged at warn level but do not abort the broadcast — best-
 /// effort delivery is the goal (other consumers will pick up the slack via
-/// engauge popularity tracking).
+/// ngauge popularity tracking).
 ///
 /// Returns the number of peers successfully reached.
 ///

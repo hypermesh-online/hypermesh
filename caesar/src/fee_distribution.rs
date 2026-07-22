@@ -138,16 +138,16 @@ impl FeeDistributor {
         })
     }
 
-    /// Distribute fees weighted by engauge capacity scores instead of raw bytes.
+    /// Distribute fees weighted by ngauge capacity scores instead of raw bytes.
     ///
     /// Transit nodes with higher capacity scores receive proportionally more of
     /// the transit fee pool. Falls back to equal split if all scores are zero.
-    #[cfg(feature = "engauge")]
+    #[cfg(feature = "ngauge")]
     pub fn distribute_with_capacity_weights(
         &self,
         total_fee: GoldGrams,
         egress_node: NodeId,
-        transit_nodes: &[(NodeId, engauge::CapacityMetrics)],
+        transit_nodes: &[(NodeId, ngauge::CapacityMetrics)],
     ) -> Result<FeeDistribution, FeeError> {
         if total_fee.is_zero() {
             return Err(FeeError::ZeroFee);
@@ -169,7 +169,7 @@ impl FeeDistributor {
 
         let scores: Vec<f64> = transit_nodes
             .iter()
-            .map(|(_, m)| engauge::CapacityScore::calculate(m).value())
+            .map(|(_, m)| ngauge::CapacityScore::calculate(m).value())
             .collect();
         let total_score: f64 = scores.iter().sum();
 
@@ -315,18 +315,18 @@ mod tests {
         assert_eq!(result.transit_payments[0].amount, GoldGrams(dec!(30)));
     }
 
-    #[cfg(feature = "engauge")]
+    #[cfg(feature = "ngauge")]
     #[test]
     fn distribute_with_capacity_weights_proportional() {
         let dist = distributor();
-        let high_cap = engauge::CapacityMetrics::new(
+        let high_cap = ngauge::CapacityMetrics::new(
             1_073_741_824,
             1_000_000,
             10_737_418_240,
             1_000_000_000,
             1.0,
         );
-        let low_cap = engauge::CapacityMetrics::new(100_000, 10_000, 100_000, 100_000, 0.5);
+        let low_cap = ngauge::CapacityMetrics::new(100_000, 10_000, 100_000, 100_000, 0.5);
         let result = dist
             .distribute_with_capacity_weights(
                 GoldGrams(dec!(100)),

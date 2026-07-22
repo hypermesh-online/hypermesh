@@ -17,9 +17,9 @@ items = [
     "Certificate lifecycle per scope (Anonymous=ephemeral minutes, Private=bounded days, Public=full months — trustchain + stoq)",
     "5 language SDKs (TypeScript, Python, C#, C++, Go) — HTTP REST + FFI dual-path, per-service modules, examples, guides",
     "C FFI bindings (hypermesh-ffi) — 38 functions covering all APIs, 5 language FFI loaders",
-    "CLI service subcommands (hypermesh caesar/trustchain/engauge/catalog) with IPC relay",
+    "CLI service subcommands (hypermesh caesar/trustchain/ngauge/catalog) with IPC relay",
     "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control; kernel+userspace policy unified and shard fetch is PoS-authenticated (eBPF kernel gate)",
-    "Workspace version unification — [workspace.package] version = 1.0.0, all 13 members inherit version.workspace (P7 fixed the prior engauge/caesar 1.0.0-vs-0.1.0 skew)",
+    "Workspace version unification — [workspace.package] version = 1.0.0, all 13 members inherit version.workspace (P7 fixed the prior ngauge/caesar 1.0.0-vs-0.1.0 skew)",
     "One-click installer — scripts/install/hypermesh-install.sh (P7)",
 ]
 

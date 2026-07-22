@@ -27,7 +27,7 @@ Lower layers know nothing about higher ones. Higher layers depend only on the pu
 +-----------------------------------------------------------+
 |  7. Catalog        Asset Package Registry                  |
 +-----------------------------------------------------------+
-|  6. engauge        Analytics, Metrics & Marketplace        |
+|  6. ngauge        Analytics, Metrics & Marketplace        |
 +-----------------------------------------------------------+
 |  5. Caesar         EVP Gold-Gram Protocol + SDK            |
 +-----------------------------------------------------------+
@@ -41,7 +41,7 @@ Lower layers know nothing about higher ones. Higher layers depend only on the pu
 +-----------------------------------------------------------+
 ```
 
-A minimal node runs layers 1-4. Caesar, engauge, Catalog, and Gateway are optional.
+A minimal node runs layers 1-4. Caesar, ngauge, Catalog, and Gateway are optional.
 
 ---
 
@@ -191,9 +191,9 @@ Extracted SDK traits with zero Caesar-internal dependencies:
 
 ---
 
-## Layer 6 -- engauge (Analytics)
+## Layer 6 -- ngauge (Analytics)
 
-**Crate**: `engauge/` | **5,758 lines** | **135 tests** | **Status**: complete
+**Crate**: `ngauge/` | **5,758 lines** | **135 tests** | **Status**: complete
 
 Engagement analytics and resource marketplace. 10 modules:
 
@@ -234,7 +234,7 @@ Asset package registry. Defines asset specifications and provides discovery. Cat
 HTTP/3 + STOQ dual-listener for `trust.hypermesh.online`. 4 operational roles:
 
 1. **Clearnet Bootstrap**: HTTP/3 at port 8443 for initial STOQ connection info + bootstrap tokens
-2. **Inbound Proxy**: HTTP/3 access to HyperMesh dashboards (resource dashboard, engauge panel)
+2. **Inbound Proxy**: HTTP/3 access to HyperMesh dashboards (resource dashboard, ngauge panel)
 3. **Outbound Proxy**: Bridge HyperMesh resources to non-HyperMesh clearnet endpoints
 4. **Inter-Network**: STOQ-to-STOQ bridge between federated/private/public networks
 
@@ -317,7 +317,7 @@ hypermesh-lib (canonical types, 9 dependents)
     +-- stoq (transport)
     |     |
     |     +-- hypermesh-ebpf
-    |     +-- engauge (optional, feature-gated)
+    |     +-- ngauge (optional, feature-gated)
     |
     +-- trustchain (identity)
     |     |
@@ -339,11 +339,11 @@ hypermesh-lib (canonical types, 9 dependents)
     |     |
     |     +-- stoq
     |     +-- caesar-sdk
-    |     +-- engauge (optional, feature-gated)
+    |     +-- ngauge (optional, feature-gated)
     |
     +-- caesar-sdk (SDK traits)
     |
-    +-- engauge (analytics)
+    +-- ngauge (analytics)
     |
     +-- gateway (HTTP/3 + STOQ entry)
           |

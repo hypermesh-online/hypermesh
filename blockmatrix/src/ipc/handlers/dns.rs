@@ -31,7 +31,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                             data: None,
                         })?;
 
-                    // Record resolution for popularity tracking (engauge).
+                    // Record resolution for popularity tracking (ngauge).
                     if let Some(ref tracker) = s.dns_popularity_tracker {
                         tracker.record_resolution(name).await;
                     }
@@ -268,7 +268,7 @@ mod tests {
             #[cfg(feature = "caesar")]
             caesar: None,
             #[cfg(feature = "intelligence")]
-            engauge_bridge: None,
+            ngauge_bridge: None,
             #[cfg(feature = "intelligence")]
             federation_manager: None,
             #[cfg(feature = "intelligence")]

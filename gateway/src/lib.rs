@@ -22,7 +22,7 @@ pub mod remote_proxy;
 pub mod router;
 pub mod scope_bridge_proxy;
 pub mod scope_router;
-pub mod sse_engauge;
+pub mod sse_ngauge;
 pub mod stoq_bridge;
 pub mod stoq_listener;
 pub mod tls;

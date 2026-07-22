@@ -58,7 +58,7 @@ jobs:
           - blockmatrix
           - hypermesh-ebpf
           - gateway
-          - engauge
+          - ngauge
     steps:
       - uses: actions/checkout@v4
 
@@ -114,7 +114,7 @@ jobs:
           - blockmatrix
           - hypermesh-ebpf
           - gateway
-          - engauge
+          - ngauge
         target: [x86_64-unknown-linux-gnu]
     steps:
       - uses: actions/checkout@v4
@@ -158,7 +158,7 @@ jobs:
 
       - name: Run benchmarks
         run: |
-          for dir in stoq trustchain blockmatrix catalog engauge; do
+          for dir in stoq trustchain blockmatrix catalog ngauge; do
             if [ -d "$dir/benches" ]; then
               echo "Running benchmarks for $dir"
               cargo bench -p "$(grep '^name' "$dir/Cargo.toml" | head -1 | sed 's/.*= *"\(.*\)"/\1/')" --no-fail-fast || true

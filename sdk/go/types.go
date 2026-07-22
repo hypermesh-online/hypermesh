@@ -295,10 +295,10 @@ type TrustChainDnsZoneList struct {
 	Zones []TrustChainDnsZone `json:"zones"`
 }
 
-// ── Engauge ──
+// ── NGauge ──
 
-// EngaugeCapacityMetrics represents the response from GET /api/v1/engauge/capacity.
-type EngaugeCapacityMetrics struct {
+// NGaugeCapacityMetrics represents the response from GET /api/v1/ngauge/capacity.
+type NGaugeCapacityMetrics struct {
 	BytesServed      uint64  `json:"bytes_served"`
 	ComputeDelivered float64 `json:"compute_delivered"`
 	Storage          uint64  `json:"storage"`
@@ -306,44 +306,44 @@ type EngaugeCapacityMetrics struct {
 	Uptime           float64 `json:"uptime"`
 }
 
-// EngaugeTrafficMetrics represents the response from GET /api/v1/engauge/traffic.
-type EngaugeTrafficMetrics struct {
+// NGaugeTrafficMetrics represents the response from GET /api/v1/ngauge/traffic.
+type NGaugeTrafficMetrics struct {
 	OrganicRatio     float64 `json:"organic_ratio"`
 	SpeculativeRatio float64 `json:"speculative_ratio"`
 	TotalRequests    uint64  `json:"total_requests"`
 }
 
-// EngaugeListing represents a marketplace listing.
-type EngaugeListing struct {
+// NGaugeListing represents a marketplace listing.
+type NGaugeListing struct {
 	ID           string  `json:"id"`
 	ResourceType string  `json:"resource_type"`
 	Price        float64 `json:"price"`
 }
 
-// EngaugeListingList represents the response from GET /api/v1/engauge/marketplace/listings.
-type EngaugeListingList struct {
+// NGaugeListingList represents the response from GET /api/v1/ngauge/marketplace/listings.
+type NGaugeListingList struct {
 	Count    int              `json:"count"`
-	Listings []EngaugeListing `json:"listings"`
+	Listings []NGaugeListing `json:"listings"`
 }
 
-// EngaugeNodeMetrics represents the response from GET /api/v1/engauge/node/metrics.
-type EngaugeNodeMetrics struct {
+// NGaugeNodeMetrics represents the response from GET /api/v1/ngauge/node/metrics.
+type NGaugeNodeMetrics struct {
 	ActivityScore float64 `json:"activity_score"`
 	Receipts      uint64  `json:"receipts"`
 	Bandwidth     float64 `json:"bandwidth"`
 }
 
-// EngaugeLease represents a resource lease.
-type EngaugeLease struct {
+// NGaugeLease represents a resource lease.
+type NGaugeLease struct {
 	ID           string `json:"id"`
 	ResourceType string `json:"resource_type"`
 	Status       string `json:"status"`
 }
 
-// EngaugeLeaseList represents the response from GET /api/v1/engauge/leases.
-type EngaugeLeaseList struct {
+// NGaugeLeaseList represents the response from GET /api/v1/ngauge/leases.
+type NGaugeLeaseList struct {
 	Count  int            `json:"count"`
-	Leases []EngaugeLease `json:"leases"`
+	Leases []NGaugeLease `json:"leases"`
 }
 
 // ── Catalog ──

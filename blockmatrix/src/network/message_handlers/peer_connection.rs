@@ -144,7 +144,7 @@ pub(crate) async fn dispatch_message(
 
     match tag {
         TAG_SHARD_SEND | TAG_SHARD_FETCH => {
-            // Record shard fetch demand for engauge swarm intelligence.
+            // Record shard fetch demand for ngauge swarm intelligence.
             if tag == TAG_SHARD_FETCH {
                 record_shard_demand(&data, peer_node_id, ctx).await;
 

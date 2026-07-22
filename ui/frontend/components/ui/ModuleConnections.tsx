@@ -109,11 +109,11 @@ export function ModuleConnections({
         provides: ['Asset registry', 'Resource creation', 'Service deployment']
       },
       {
-        name: 'Engauge',
+        name: 'NGauge',
         icon: Gauge,
         status: 'enabled',
         description: 'Analytics and resource marketplace',
-        href: '/engauge',
+        href: '/ngauge',
         dependencies: ['STOQ transport', 'BlockMatrix metrics'],
         provides: ['Capacity metrics', 'Routing intelligence', 'Marketplace']
       }

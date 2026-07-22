@@ -9,12 +9,12 @@ HyperMeshClient::HyperMeshClient(
     const std::string& base_url,
     const std::string& caesar_url,
     const std::string& trustchain_url,
-    const std::string& engauge_url,
+    const std::string& ngauge_url,
     const std::string& catalog_url)
     : http_(base_url),
       caesar_http_(caesar_url),
       trustchain_http_(trustchain_url),
-      engauge_http_(engauge_url),
+      ngauge_http_(ngauge_url),
       catalog_http_(catalog_url) {}
 
 NodeApi HyperMeshClient::node() const {
@@ -61,8 +61,8 @@ TrustChainApi HyperMeshClient::trustchain() const {
     return TrustChainApi(trustchain_http_);
 }
 
-EngaugeApi HyperMeshClient::engauge() const {
-    return EngaugeApi(engauge_http_);
+NGaugeApi HyperMeshClient::ngauge() const {
+    return NGaugeApi(ngauge_http_);
 }
 
 CatalogApi HyperMeshClient::catalog() const {

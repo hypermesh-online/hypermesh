@@ -215,7 +215,7 @@ pub(super) async fn send_sync_reply(stream: &mut stoq::Stream, reply_msg: &Matri
 /// Handle an incoming metrics stream (discriminator 0x02).
 ///
 /// Reads the frame payload, logs it, and when the `intelligence` feature is
-/// enabled feeds it into the engauge `MetricsIngestionPipeline` attached to
+/// enabled feeds it into the ngauge `MetricsIngestionPipeline` attached to
 /// the `PeerContext`.
 pub(super) async fn handle_metrics_connection(
     stream: &mut stoq::Stream,
@@ -246,19 +246,19 @@ pub(super) async fn handle_metrics_connection(
         }
     };
 
-    // Feed into engauge ingestion pipeline when available (H2).
+    // Feed into ngauge ingestion pipeline when available (H2).
     #[cfg(feature = "intelligence")]
     if let (Some(ctx), Some(_json)) = (&peer_ctx, &frame_json) {
-        if let Some(ref ingestion) = ctx.engauge_ingestion {
-            // Try to deserialize the JSON into an engauge MetricsFrame.
+        if let Some(ref ingestion) = ctx.ngauge_ingestion {
+            // Try to deserialize the JSON into an ngauge MetricsFrame.
             // MetricsReporter builds JSON manually, so this may fail for
             // older formats — log and continue rather than crashing.
-            match serde_json::from_value::<engauge::MetricsFrame>(_json.clone()) {
+            match serde_json::from_value::<ngauge::MetricsFrame>(_json.clone()) {
                 Ok(metrics_frame) => {
                     match ingestion.lock() {
                         Ok(mut pipeline) => {
                             pipeline.ingest(metrics_frame);
-                            debug!("Ingested metrics frame into engauge pipeline");
+                            debug!("Ingested metrics frame into ngauge pipeline");
                         }
                         Err(e) => {
                             debug!("Failed to lock ingestion pipeline: {e}");
@@ -266,7 +266,7 @@ pub(super) async fn handle_metrics_connection(
                     }
                 }
                 Err(e) => {
-                    debug!("Metrics frame not engauge-compatible (ok for alpha): {e}");
+                    debug!("Metrics frame not ngauge-compatible (ok for alpha): {e}");
                 }
             }
         }

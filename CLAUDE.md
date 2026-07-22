@@ -44,7 +44,7 @@
 | **Caesar** | `/caesar` | ⚡ **77% (24/31)** | Single-node only, no multi-node packet routing |
 | **Caesar-SDK** | `/caesar-sdk` | ⚡ **71% (5/7)** | Trait definitions complete, no external adapters |
 | **Catalog** | `/catalog` | ✅ **100% (16/16)** | DHT, STOQ transport, TrustChain security, P2P sharing, PoS validation, STOQ API |
-| **Engauge** | `/engauge` | ⚡ **~80%** | Streaming, routing intel, marketplace complete; eBPF-to-engauge pipeline wired |
+| **NGauge** | `/ngauge` | ⚡ **~80%** | Streaming, routing intel, marketplace complete; eBPF-to-ngauge pipeline wired |
 | **Gateway** | `/gateway` | ✅ **100% (20/20)** | Complete: dual-listener, PoS auth, federation, rate limiting, 194 tests |
 | **Hypermesh-eBPF** | `/hypermesh-ebpf` | ✅ **100%** | Complete: XDP, AF_XDP zero-copy, policy sync, FALCON-1024 verification |
 | **Lib** | `/lib` | ✅ **92% (25/27)** | Types correct, but state proof types exercised with fake data |
@@ -255,7 +255,7 @@ pub struct ContainerAssetAdapter; // IMPLEMENTED
 
 **trust.hypermesh.online as Network Gateway** (4 roles):
 1. **Clearnet Bootstrap**: HTTP/3 at trust.hypermesh.online for initial STOQ connection info + bootstrap tokens
-2. **Clearnet Inbound Proxy**: HTTP/3 access to HyperMesh dashboards (resource dashboard, engauge panel)
+2. **Clearnet Inbound Proxy**: HTTP/3 access to HyperMesh dashboards (resource dashboard, ngauge panel)
 3. **Outbound Proxy**: Bridge HyperMesh resources to non-HyperMesh clearnet endpoints
 4. **Inter-Network Gateway**: Bridge between federated/private/public HyperMesh networks (STOQ-to-STOQ)
 

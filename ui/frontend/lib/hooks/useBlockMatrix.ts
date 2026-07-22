@@ -406,43 +406,43 @@ export function useCaesarStaking(pollInterval = 60_000) {
   });
 }
 
-// ---------- Engauge ----------
+// ---------- NGauge ----------
 
-/** Engauge capacity metrics */
-export function useEngaugeCapacity(pollInterval = 5_000) {
+/** NGauge capacity metrics */
+export function useNGaugeCapacity(pollInterval = 5_000) {
   return useQuery<CapacityMetrics>({
-    queryKey: ['engauge', 'capacity'],
-    queryFn: () => blockMatrixClient.engaugeCapacity(),
+    queryKey: ['ngauge', 'capacity'],
+    queryFn: () => blockMatrixClient.ngaugeCapacity(),
     refetchInterval: pollInterval,
     staleTime: 3_000,
   });
 }
 
-/** Engauge traffic analysis */
-export function useEngaugeTraffic(pollInterval = 10_000) {
+/** NGauge traffic analysis */
+export function useNGaugeTraffic(pollInterval = 10_000) {
   return useQuery<TrafficAnalysis>({
-    queryKey: ['engauge', 'traffic'],
-    queryFn: () => blockMatrixClient.engaugeTraffic(),
+    queryKey: ['ngauge', 'traffic'],
+    queryFn: () => blockMatrixClient.ngaugeTraffic(),
     refetchInterval: pollInterval,
     staleTime: 5_000,
   });
 }
 
-/** Engauge throttle status */
-export function useEngaugeThrottle(pollInterval = 5_000) {
+/** NGauge throttle status */
+export function useNGaugeThrottle(pollInterval = 5_000) {
   return useQuery<ThrottleStatus>({
-    queryKey: ['engauge', 'throttle'],
-    queryFn: () => blockMatrixClient.engaugeThrottle(),
+    queryKey: ['ngauge', 'throttle'],
+    queryFn: () => blockMatrixClient.ngaugeThrottle(),
     refetchInterval: pollInterval,
     staleTime: 3_000,
   });
 }
 
-/** Engauge routing advisory */
-export function useEngaugeRouting(pollInterval = 15_000) {
+/** NGauge routing advisory */
+export function useNGaugeRouting(pollInterval = 15_000) {
   return useQuery<RoutingAdvisory>({
-    queryKey: ['engauge', 'routing'],
-    queryFn: () => blockMatrixClient.engaugeRouting(),
+    queryKey: ['ngauge', 'routing'],
+    queryFn: () => blockMatrixClient.ngaugeRouting(),
     refetchInterval: pollInterval,
     staleTime: 10_000,
   });

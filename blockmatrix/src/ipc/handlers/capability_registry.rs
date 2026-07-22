@@ -54,11 +54,11 @@ pub fn required_capability(method: &str) -> Capability {
         | "caesar.balance"
         | "caesar.transactions"
         | "caesar.overview"
-        // Engauge reads
-        | "engauge.capacity"
-        | "engauge.traffic"
-        | "engauge.routing"
-        | "engauge.throttle"
+        // NGauge reads
+        | "ngauge.capacity"
+        | "ngauge.traffic"
+        | "ngauge.routing"
+        | "ngauge.throttle"
         // TrustChain reads
         | "trustchain.identity"
         | "trustchain.status"
@@ -169,7 +169,7 @@ mod tests {
             "blockchain.block",
             "caesar.balance",
             "caesar.transactions",
-            "engauge.capacity",
+            "ngauge.capacity",
             "trustchain.identity",
             "stoq.stats",
             "dns.resolve",

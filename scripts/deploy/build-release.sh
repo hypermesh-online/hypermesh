@@ -11,15 +11,15 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-CRATES="-p gateway -p trustchain -p blockmatrix -p catalog -p engauge -p caesar"
+CRATES="-p gateway -p trustchain -p blockmatrix -p catalog -p ngauge -p caesar"
 MODE="${1:---portable}"
 
 case "$MODE" in
     --native)
         echo "Building release binaries (native — using .cargo/config.toml)..."
         cargo build --release $CRATES
-        # engauge-server binary requires 'server' feature
-        cargo build --release -p engauge --features engauge/server
+        # ngauge-server binary requires 'server' feature
+        cargo build --release -p ngauge --features ngauge/server
         BINDIR="target/release"
         ;;
     --portable)
@@ -29,8 +29,8 @@ case "$MODE" in
         export RUSTFLAGS="-C target-cpu=x86-64 -C force-frame-pointers=yes"
         export C_INCLUDE_PATH=/usr/include
         cargo build --release --target x86_64-unknown-linux-musl $CRATES
-        # engauge-server binary requires 'server' feature
-        cargo build --release --target x86_64-unknown-linux-musl -p engauge --features engauge/server
+        # ngauge-server binary requires 'server' feature
+        cargo build --release --target x86_64-unknown-linux-musl -p ngauge --features ngauge/server
         BINDIR="target/x86_64-unknown-linux-musl/release"
         ;;
     --target)
@@ -39,8 +39,8 @@ case "$MODE" in
         export RUSTFLAGS="-C target-cpu=x86-64 -C force-frame-pointers=yes"
         export C_INCLUDE_PATH=/usr/include
         cargo build --release --target "$TARGET" $CRATES
-        # engauge-server binary requires 'server' feature
-        cargo build --release --target "$TARGET" -p engauge --features engauge/server
+        # ngauge-server binary requires 'server' feature
+        cargo build --release --target "$TARGET" -p ngauge --features ngauge/server
         BINDIR="target/$TARGET/release"
         ;;
     *)
@@ -52,7 +52,7 @@ esac
 # List built binaries
 echo ""
 echo "=== Built binaries ==="
-for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
+for bin in gateway trustchain_ca hypermesh catalog-server ngauge-server caesar; do
     path="$BINDIR/$bin"
     if [ -f "$path" ]; then
         size=$(du -h "$path" | cut -f1)
@@ -66,7 +66,7 @@ done
 if [ "$MODE" != "--native" ]; then
     echo ""
     echo "=== Portability check ==="
-    for bin in gateway trustchain_ca hypermesh catalog-server engauge-server caesar; do
+    for bin in gateway trustchain_ca hypermesh catalog-server ngauge-server caesar; do
         path="$BINDIR/$bin"
         if [ -f "$path" ]; then
             if file "$path" | grep -q "static"; then

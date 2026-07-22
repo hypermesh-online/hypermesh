@@ -10,10 +10,10 @@
 //!
 //! Privacy-aware: respects the 2-axis PrivacyMode (Scope gates access, Traceability filters disclosure).
 //!
-//! # Engauge Integration
+//! # NGauge Integration
 //!
-//! PoSPing results are reported to Engauge via [`engauge::streaming::VerificationSnapshot`].
-//! The conversion is intentionally not a direct type dependency -- Engauge defines its own
+//! PoSPing results are reported to NGauge via [`ngauge::streaming::VerificationSnapshot`].
+//! The conversion is intentionally not a direct type dependency -- NGauge defines its own
 //! wire format for streaming metrics. A node aggregates PoSPing results per epoch and
 //! constructs a `VerificationSnapshot` with:
 //! - `probes_sent`: number of probes generated this epoch
@@ -86,10 +86,10 @@ impl PoSPingService {
     }
 }
 
-/// Aggregated epoch metrics suitable for Engauge reporting.
+/// Aggregated epoch metrics suitable for NGauge reporting.
 ///
 /// Produced by [`aggregate_epoch_results`]. The caller constructs an
-/// `engauge::streaming::VerificationSnapshot` from these fields.
+/// `ngauge::streaming::VerificationSnapshot` from these fields.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EpochAggregation {
     /// Number of PoSPing probes sent (results.len()).
@@ -104,12 +104,12 @@ pub struct EpochAggregation {
     pub epoch: u64,
 }
 
-/// Aggregate PoSPing results for an epoch into metrics suitable for Engauge reporting.
+/// Aggregate PoSPing results for an epoch into metrics suitable for NGauge reporting.
 ///
 /// The returned [`EpochAggregation`] maps 1:1 to the fields of
-/// `engauge::streaming::VerificationSnapshot`. This function lives in blockmatrix
-/// (not engauge) so the dependency arrow stays unidirectional: blockmatrix never
-/// imports engauge, and engauge never imports blockmatrix internals.
+/// `ngauge::streaming::VerificationSnapshot`. This function lives in blockmatrix
+/// (not ngauge) so the dependency arrow stays unidirectional: blockmatrix never
+/// imports ngauge, and ngauge never imports blockmatrix internals.
 ///
 /// Returns an [`EpochAggregation`] with all-zero fields when `results` is empty.
 pub fn aggregate_epoch_results(results: &[PoSPingResult]) -> EpochAggregation {

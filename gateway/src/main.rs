@@ -11,7 +11,7 @@ mod onboarding;
 mod pool;
 mod proxy;
 mod router;
-mod sse_engauge;
+mod sse_ngauge;
 mod stoq_bridge;
 mod stoq_listener;
 
@@ -298,9 +298,9 @@ where
     let path = req.uri().path().to_string();
     let start = std::time::Instant::now();
 
-    // Intercept engauge SSE streaming requests before reading any body. SSE
+    // Intercept ngauge SSE streaming requests before reading any body. SSE
     // is GET-only and must NOT be passed through the buffering proxy path.
-    if let Some(handshake) = router.try_engauge_sse(&req) {
+    if let Some(handshake) = router.try_ngauge_sse(&req) {
         return handle_sse_request(handshake, stream, router, method, path, start).await;
     }
 
@@ -348,11 +348,11 @@ where
     Ok(())
 }
 
-/// Drive an engauge SSE streaming response. Sends response headers immediately,
+/// Drive an ngauge SSE streaming response. Sends response headers immediately,
 /// then pumps each `Bytes` chunk received from the bridge into the HTTP/3
 /// response body until the producer closes or the client disconnects.
 async fn handle_sse_request<T>(
-    handshake: crate::sse_engauge::SseHandshake,
+    handshake: crate::sse_ngauge::SseHandshake,
     mut stream: h3::server::RequestStream<T, Bytes>,
     router: Arc<GatewayRouter>,
     method: http::Method,
@@ -362,7 +362,7 @@ async fn handle_sse_request<T>(
 where
     T: quic::BidiStream<Bytes>,
 {
-    use crate::sse_engauge::SseHandshake;
+    use crate::sse_ngauge::SseHandshake;
 
     match handshake {
         SseHandshake::Error(resp) => {

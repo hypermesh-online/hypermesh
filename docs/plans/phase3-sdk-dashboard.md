@@ -77,7 +77,7 @@ Phase 3 builds the developer-facing SDK layer and dashboard asset system for Hyp
 ### Step 1.1: Create crate skeleton
 
 Create `/home/persist/hypermesh/core/hypermesh-sdk/Cargo.toml`:
-- Add `"hypermesh-sdk"` to workspace members in `/home/persist/hypermesh/core/Cargo.toml` (line 12, after `"engauge"`)
+- Add `"hypermesh-sdk"` to workspace members in `/home/persist/hypermesh/core/Cargo.toml` (line 12, after `"ngauge"`)
 - Dependencies: `hypermesh-lib` (workspace), `tokio` (workspace), `serde` (workspace), `serde_json` (workspace), `thiserror` (workspace), `tracing` (workspace), `anyhow` (workspace)
 - Optional dependency on `stoq` (feature-gated `remote` feature) for STOQ transport mode
 
@@ -559,7 +559,7 @@ The three HTML files (~80 lines each) are stored at `/home/persist/hypermesh/cor
 - `/api/v1/blockmatrix/dns/list` -- displays registered domains
 - `/api/v1/blockmatrix/assets` -- displays stored assets with sizes
 - `/api/v1/caesar/status` -- displays Caesar balance summary
-- `/api/v1/engauge/metrics` -- displays engagement metrics
+- `/api/v1/ngauge/metrics` -- displays engagement metrics
 
 Uses vanilla JavaScript (no framework dependency) for maximum portability. Refreshes data every 30 seconds.
 
@@ -569,7 +569,7 @@ Uses vanilla JavaScript (no framework dependency) for maximum portability. Refre
 - Dashboard management (list/remove registered dashboards)
 - DNS registration form
 - Asset upload form
-- Log viewer (streams from `/api/v1/engauge/logs`)
+- Log viewer (streams from `/api/v1/ngauge/logs`)
 
 **Estimated lines**: ~240 (3 HTML files)
 

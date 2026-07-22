@@ -110,7 +110,7 @@ For musl static builds (deployment): `rustup target add x86_64-unknown-linux-mus
 
 > Banking provider integrations (Stripe/Plaid/Square) are not yet live; the caesar-sdk UPI adapter trait is the integration point.
 | [gateway](gateway/) | HTTP/3 + STOQ gateway, DNS-over-HTTPS, domain routing |
-| [engauge](engauge/) | Analytics, capacity metrics, routing intelligence, marketplace |
+| [ngauge](ngauge/) | Analytics, capacity metrics, routing intelligence, marketplace |
 | [hypermesh-sdk](hypermesh-sdk/) | Typed Rust SDK for daemon IPC API |
 | [hypermesh-ffi](hypermesh-ffi/) | C FFI bindings for cross-language integration |
 | [ui](ui/) | React 19 dashboard — 55 connected components, zero mock data |
@@ -164,8 +164,8 @@ TrustChain CA with Shamir Secret Sharing (3-of-5 threshold) for FALCON-1024 key 
 
 ### Intelligence Loop
 
-engauge monitors network health and feeds back into routing:
-- MetricsReporter → engauge ingestion (every 30s)
+ngauge monitors network health and feeds back into routing:
+- MetricsReporter → ngauge ingestion (every 30s)
 - SwarmDemandTracker → SwarmAnalytics (every 10s)
 - RoutingIntelligence → PropagationWeights (every 15s)
 - ReplicationTrigger checks against live analytics
@@ -207,7 +207,7 @@ The public bootstrap node at `35.208.78.211:9292` (GCP, Debian 12). Runs as a re
 - **Private messaging** (Kyber encrypted, FALCON signed, threaded)
 - **Streaming asset pipeline** (segment-oriented, torrent/streaming/random-access)
 - **Torrent-model block propagation** (content-interested peers only)
-- **Intelligence loop** (engauge → routing weights → replication triggers)
+- **Intelligence loop** (ngauge → routing weights → replication triggers)
 - **Cross-network asset transfers** (blockchain lock/register/release entries)
 - **Threshold CA** (Shamir SSS for FALCON-1024 key splitting)
 - **Distributed CA** (federation key shares, CRL/OCSP propagation)

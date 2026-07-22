@@ -15,7 +15,7 @@ body:
         - caesar
         - caesar-sdk
         - gateway
-        - engauge
+        - ngauge
         - hypermesh-ebpf
         - hypermesh-lib
         - ui

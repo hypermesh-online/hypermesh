@@ -2,9 +2,9 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Lightweight metrics reporter for the engauge streaming pipeline.
+//! Lightweight metrics reporter for the ngauge streaming pipeline.
 //!
-//! Collects real node data and produces engauge-compatible `MetricsFrame`
+//! Collects real node data and produces ngauge-compatible `MetricsFrame`
 //! JSON. Pushes frames to connected peers over STOQ streams using the
 //! `CONN_TYPE_METRICS` (0x02) discriminator byte.
 
@@ -25,7 +25,7 @@ fn timestamp_us() -> u64 {
 /// Number of cycles to skip after a send failure before retrying.
 const BACKOFF_CYCLES: u64 = 10;
 
-/// Metrics reporter that builds engauge-compatible capacity frames
+/// Metrics reporter that builds ngauge-compatible capacity frames
 /// and pushes them to peers over STOQ streams.
 pub struct MetricsReporter {
     node_id: String,
@@ -46,7 +46,7 @@ impl MetricsReporter {
 
     /// Build a capacity metrics frame from current node state.
     ///
-    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
+    /// Returns JSON bytes compatible with `ngauge::streaming::MetricsFrame`.
     pub fn build_capacity_frame(
         &mut self,
         chain_height: u64,
@@ -75,7 +75,7 @@ impl MetricsReporter {
         });
 
         info!(
-            target: "engauge::metrics",
+            target: "ngauge::metrics",
             chain_height,
             peer_count,
             shard_count,
@@ -89,7 +89,7 @@ impl MetricsReporter {
 
     /// Build a congestion metrics frame from eBPF transport data.
     ///
-    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
+    /// Returns JSON bytes compatible with `ngauge::streaming::MetricsFrame`.
     pub fn build_congestion_frame(&mut self, ebpf: &HyperMeshMetrics) -> Vec<u8> {
         self.sequence += 1;
         let now_us = timestamp_us();
@@ -113,7 +113,7 @@ impl MetricsReporter {
         });
 
         debug!(
-            target: "engauge::metrics",
+            target: "ngauge::metrics",
             drops = t.kernel_drops,
             latency_us = t.latency_avg_us,
             drop_ratio = format!("{:.4}", drop_ratio),
@@ -125,7 +125,7 @@ impl MetricsReporter {
 
     /// Build a routing metrics frame from eBPF transport and routing data.
     ///
-    /// Returns JSON bytes compatible with `engauge::streaming::MetricsFrame`.
+    /// Returns JSON bytes compatible with `ngauge::streaming::MetricsFrame`.
     pub fn build_routing_frame(&mut self, ebpf: &HyperMeshMetrics) -> Vec<u8> {
         self.sequence += 1;
         let now_us = timestamp_us();
@@ -148,7 +148,7 @@ impl MetricsReporter {
         });
 
         debug!(
-            target: "engauge::metrics",
+            target: "ngauge::metrics",
             latency_us = t.latency_avg_us,
             throughput_gbps = format!("{:.2}", t.throughput_gbps()),
             routing_success = r.successful,
@@ -159,7 +159,7 @@ impl MetricsReporter {
     }
 
     /// Build capacity, congestion, and routing frames and serialize each
-    /// via the engauge-compatible JSON wire format.
+    /// via the ngauge-compatible JSON wire format.
     ///
     /// Returns a `Vec` of byte vectors (one per frame type). The caller
     /// can transmit each individually over STOQ streams.

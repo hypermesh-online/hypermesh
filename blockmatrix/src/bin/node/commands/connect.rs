@@ -108,7 +108,7 @@ pub async fn run_connect(
         std::sync::Arc<blockmatrix::network::consumer_provider::ConsumerProviderManager>,
     > = None;
     #[cfg(feature = "intelligence")]
-    let mut engauge_bits: Option<EngaugeBits> = None;
+    let mut ngauge_bits: Option<NGaugeBits> = None;
 
     let privacy_mode = bootstrap.privacy_mode().await;
     let has_bootstrap_peers = !cli.bootstrap.is_empty();
@@ -140,9 +140,9 @@ pub async fn run_connect(
         consumer_provider_manager_ref = Some(result.consumer_provider_manager);
         #[cfg(feature = "intelligence")]
         {
-            engauge_bits = Some(EngaugeBits {
+            ngauge_bits = Some(NGaugeBits {
                 demand_tracker: result.swarm_demand_tracker,
-                analytics: result.engauge_analytics,
+                analytics: result.ngauge_analytics,
             });
         }
     }
@@ -191,8 +191,8 @@ pub async fn run_connect(
         #[cfg(feature = "caesar")]
         caesar: caesar_instance,
         #[cfg(feature = "intelligence")]
-        engauge_bridge: engauge_bits.map(|eb| {
-            std::sync::Arc::new(blockmatrix::intelligence::engauge_bridge::EngaugeBridge::new(
+        ngauge_bridge: ngauge_bits.map(|eb| {
+            std::sync::Arc::new(blockmatrix::intelligence::ngauge_bridge::NGaugeBridge::new(
                 eb.demand_tracker,
                 eb.analytics,
                 hypermesh_lib::MatrixPosition {
@@ -364,12 +364,12 @@ pub async fn run_connect(
     Ok(())
 }
 
-/// Engauge handles carried back from `start_network` when the `intelligence`
+/// NGauge handles carried back from `start_network` when the `intelligence`
 /// feature is enabled.
 #[cfg(feature = "intelligence")]
-struct EngaugeBits {
+struct NGaugeBits {
     demand_tracker: std::sync::Arc<blockmatrix::network::SwarmDemandTracker>,
-    analytics: std::sync::Arc<std::sync::Mutex<engauge::SwarmAnalytics>>,
+    analytics: std::sync::Arc<std::sync::Mutex<ngauge::SwarmAnalytics>>,
 }
 
 /// Result bundle returned from `start_network`.
@@ -393,7 +393,7 @@ struct NetworkStartResult {
     #[cfg(feature = "intelligence")]
     swarm_demand_tracker: std::sync::Arc<blockmatrix::network::SwarmDemandTracker>,
     #[cfg(feature = "intelligence")]
-    engauge_analytics: std::sync::Arc<std::sync::Mutex<engauge::SwarmAnalytics>>,
+    ngauge_analytics: std::sync::Arc<std::sync::Mutex<ngauge::SwarmAnalytics>>,
 }
 
 /// Initialize STOQ transport, network manager, and all background loops.
@@ -578,19 +578,19 @@ async fn start_network(
         ),
     );
 
-    // --- engauge intelligence wiring (H2-H5) ---
+    // --- ngauge intelligence wiring (H2-H5) ---
     #[cfg(feature = "intelligence")]
-    let engauge_analytics = std::sync::Arc::new(
-        std::sync::Mutex::new(engauge::SwarmAnalytics::new()),
+    let ngauge_analytics = std::sync::Arc::new(
+        std::sync::Mutex::new(ngauge::SwarmAnalytics::new()),
     );
     #[cfg(feature = "intelligence")]
-    let engauge_ingestion = std::sync::Arc::new(
-        std::sync::Mutex::new(engauge::MetricsIngestionPipeline::with_defaults()),
+    let ngauge_ingestion = std::sync::Arc::new(
+        std::sync::Mutex::new(ngauge::MetricsIngestionPipeline::with_defaults()),
     );
 
     // P5: construct the shared eBPF orchestrator once. It is used both by
     // the PeerContext (to mirror peer authentication into the kernel
-    // fast-path maps) AND by the engauge routing-intelligence feedback loop
+    // fast-path maps) AND by the ngauge routing-intelligence feedback loop
     // below. When the orchestrator cannot be created the node runs in the
     // userspace-only tier (graceful degradation) — every kernel-map write
     // downstream is a no-op unless an XDP program is actually attached.
@@ -637,9 +637,9 @@ async fn start_network(
             tokio::sync::RwLock::new(std::collections::HashMap::new()),
         )),
         #[cfg(feature = "intelligence")]
-        engauge_analytics: Some(engauge_analytics.clone()),
+        ngauge_analytics: Some(ngauge_analytics.clone()),
         #[cfg(feature = "intelligence")]
-        engauge_ingestion: Some(engauge_ingestion.clone()),
+        ngauge_ingestion: Some(ngauge_ingestion.clone()),
         // Phase G.2 — alpha-default inert. Daemon opt-in plumbs a real
         // TransferCoordinator here once a STOQ-backed TransferTransport
         // is configured (Phase G.2 deliverable on the daemon side).
@@ -721,7 +721,7 @@ async fn start_network(
     )
     .await;
 
-    // --- H3: Spawn EngaugeBridge periodic feed loop ---
+    // --- H3: Spawn NGaugeBridge periodic feed loop ---
     #[cfg(feature = "intelligence")]
     {
         let bridge_position = hypermesh_lib::MatrixPosition {
@@ -733,7 +733,7 @@ async fn start_network(
         // We implement the loop here instead of calling run_periodic_feed() because
         // the std::sync::MutexGuard held by that method is not Send-safe across await.
         let feed_tracker = swarm_demand_tracker.clone();
-        let feed_analytics = engauge_analytics.clone();
+        let feed_analytics = ngauge_analytics.clone();
         let feed_position = bridge_position;
         tokio::spawn(async move {
             let interval = std::time::Duration::from_secs(10);
@@ -770,7 +770,7 @@ async fn start_network(
                 }
             }
         });
-        info!("engauge intelligence bridge started (periodic_feed=10s)");
+        info!("ngauge intelligence bridge started (periodic_feed=10s)");
 
         // --- Phase E.1: eBPF feedback adapter for the routing intelligence
         // feed. Reuses the SAME orchestrator shared with the PeerContext
@@ -778,11 +778,11 @@ async fn start_network(
         // mirror and the congestion-derived routing feed.
         let ebpf_for_feedback = ebpf_orchestrator.clone();
         if ebpf_for_feedback.is_some() {
-            info!("eBPF feedback adapter ready for engauge routing intelligence");
+            info!("eBPF feedback adapter ready for ngauge routing intelligence");
         }
 
         // --- H4: Spawn propagation weight feed loop ---
-        let h4_analytics = engauge_analytics.clone();
+        let h4_analytics = ngauge_analytics.clone();
         let h4_propagator = block_propagator.clone();
         let h4_network = network_clone.clone();
         let h4_coord = coord;
@@ -790,9 +790,9 @@ async fn start_network(
         tokio::spawn(async move {
             // Construct a RoutingIntelFeed once and reuse it across iterations
             // so the eBPF feedback adapter remains attached.
-            let mut feed = engauge::routing_intel::RoutingIntelFeed::new(30);
+            let mut feed = ngauge::routing_intel::RoutingIntelFeed::new(30);
             if let Some(ebpf) = h4_ebpf.clone() {
-                let adapter: Box<dyn engauge::routing_intel::EbpfPolicyFeedback> =
+                let adapter: Box<dyn ngauge::routing_intel::EbpfPolicyFeedback> =
                     Box::new(blockmatrix::intelligence::EbpfFeedbackAdapter::new(ebpf));
                 feed.set_ebpf_feedback(adapter);
             }
@@ -820,7 +820,7 @@ async fn start_network(
                 // accumulated yet, so weights will be neutral=1.0). When the
                 // MetricsIngestionPipeline starts feeding RoutingIntelligence
                 // in a later sprint, these weights become meaningful.
-                let ri = engauge::RoutingIntelligence::new(30);
+                let ri = ngauge::RoutingIntelligence::new(30);
                 let source_pos = hypermesh_lib::MatrixPosition {
                     x: h4_coord.x as f64,
                     y: h4_coord.y as f64,
@@ -831,24 +831,24 @@ async fn start_network(
                 // derived privacy actions to HyperMeshEbpf.
                 let _ = feed.publish_update(&source_pos, &source_pos, &candidate_ids);
 
-                let modifiers = engauge::RoutingAdvisor::compute_weight_adjustments(
+                let modifiers = ngauge::RoutingAdvisor::compute_weight_adjustments(
                     &ri, &source_pos, &source_pos, &candidate_ids,
                 );
                 if !modifiers.is_empty() {
-                    let weights = blockmatrix::intelligence::engauge_bridge::compute_propagation_weights(
+                    let weights = blockmatrix::intelligence::ngauge_bridge::compute_propagation_weights(
                         &modifiers, &node_coords,
                     );
                     if !weights.is_empty() {
                         h4_propagator.lock().await.set_propagation_weights(weights).await;
-                        debug!("Updated propagation weights from engauge ({} modifiers)", modifiers.len());
+                        debug!("Updated propagation weights from ngauge ({} modifiers)", modifiers.len());
                     }
                 }
 
                 // --- H5: Check replication triggers ---
                 match h4_analytics.lock() {
                     Ok(analytics) => {
-                        let trigger = engauge::ReplicationTrigger::new(
-                            engauge::ReplicationConfig::default(),
+                        let trigger = ngauge::ReplicationTrigger::new(
+                            ngauge::ReplicationConfig::default(),
                         );
                         let signals = trigger.check(&analytics);
                         for signal in &signals {
@@ -869,16 +869,16 @@ async fn start_network(
                 }
             }
         });
-        info!("engauge propagation weight + replication loop started (interval=15s)");
+        info!("ngauge propagation weight + replication loop started (interval=15s)");
 
-        // --- Phase E.2: Replication-poll task. Every 30s, ask engauge which
+        // --- Phase E.2: Replication-poll task. Every 30s, ask ngauge which
         // shards need more replicas and proactively fetch additional copies
         // from known providers via TAG_SHARD_FETCH. Closes the consumer-
         // becomes-provider loop: hot shards get pulled by additional nodes,
         // and each successful fetch announces the new node as a provider,
         // so future requests fan out across the swarm.
         {
-            let rp_analytics = engauge_analytics.clone();
+            let rp_analytics = ngauge_analytics.clone();
             let rp_index = shard_location_index.clone();
             let rp_transport = shard_transport.clone();
             let rp_network = network_clone.clone();
@@ -903,8 +903,8 @@ async fn start_network(
                     }
 
                     let signals = match rp_analytics.lock() {
-                        Ok(guard) => engauge::ReplicationTrigger::new(
-                            engauge::ReplicationConfig::default(),
+                        Ok(guard) => ngauge::ReplicationTrigger::new(
+                            ngauge::ReplicationConfig::default(),
                         )
                         .check(&guard),
                         Err(e) => {
@@ -1059,12 +1059,12 @@ async fn start_network(
         #[cfg(feature = "intelligence")]
         swarm_demand_tracker,
         #[cfg(feature = "intelligence")]
-        engauge_analytics,
+        ngauge_analytics,
     })
 }
 
 /// P6 (step 3): pick which provider to fetch a replica from using the
-/// engauge [`DispersionAdvisor`] instead of always taking `candidates[0]`.
+/// ngauge [`DispersionAdvisor`] instead of always taking `candidates[0]`.
 ///
 /// The advisor runs k-means over the shard's consumer demand map (with
 /// anti-affinity to positions already holding replicas) and returns the
@@ -1076,7 +1076,7 @@ async fn start_network(
 /// is reproducible rather than arbitrary hash ordering.
 #[cfg(feature = "intelligence")]
 fn select_dispersion_source(
-    analytics: &std::sync::Mutex<engauge::SwarmAnalytics>,
+    analytics: &std::sync::Mutex<ngauge::SwarmAnalytics>,
     shard_id: &hypermesh_lib::ContentHash,
     candidates: &[String],
     peer_coords: &std::collections::HashMap<String, hypermesh_lib::MatrixPosition>,
@@ -1086,7 +1086,7 @@ fn select_dispersion_source(
     // Recommend placements from live analytics (k-means over demand).
     let recommendations = match analytics.lock() {
         Ok(guard) => {
-            let advisor = engauge::DispersionAdvisor::new();
+            let advisor = ngauge::DispersionAdvisor::new();
             advisor.recommend_placement(shard_id, &guard, candidates.len().max(1))
         }
         Err(_) => Vec::new(),

@@ -61,7 +61,7 @@ jobs:
           - blockmatrix
           - hypermesh-ebpf
           - gateway
-          - engauge
+          - ngauge
     steps:
       - uses: actions/checkout@v4
 

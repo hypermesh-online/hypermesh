@@ -20,9 +20,9 @@ The gateway serves four roles:
 The gateway uses TLS Server Name Indication (SNI) to route incoming connections. When a client connects, the gateway inspects the hostname in the TLS handshake and forwards the connection to the appropriate internal service.
 
 ```
-Client connects to engauge.hypermesh.online:8443
-  -> Gateway reads SNI: "engauge.hypermesh.online"
-  -> Routes to engauge-server at [::1]:9296 via STOQ
+Client connects to ngauge.hypermesh.online:8443
+  -> Gateway reads SNI: "ngauge.hypermesh.online"
+  -> Routes to ngauge-server at [::1]:9296 via STOQ
   -> Returns response to client over HTTP/3
 ```
 
@@ -33,7 +33,7 @@ All subdomains of `*.hypermesh.online` resolve to the gateway. The gateway handl
 | Endpoint | Port | Service | Status |
 |----------|------|---------|--------|
 | `trust.hypermesh.online` | 8443 | Main gateway — health checks, dashboard, node bootstrap | Active |
-| `engauge.hypermesh.online` | 8443 | Engagement analytics and metrics | Active |
+| `ngauge.hypermesh.online` | 8443 | Engagement analytics and metrics | Active |
 | `caesar.hypermesh.online` | 8443 | Caesar EVP network access | Future |
 | `catalog.hypermesh.online` | 8443 | Public asset catalog | Future |
 

@@ -31,7 +31,7 @@ items = [
     "Canonical ProofType from hypermesh-lib",
     "Production binary hardening (config file loading from TRUSTCHAIN_CONFIG env / ~/.hypermesh/trustchain.toml, graceful shutdown on SIGTERM/SIGINT, health endpoint, signal handling)",
     # DNS zones (config entries, not propagated)
-    "Production DNS zone config for catalog.hypermesh.online and engauge.hypermesh.online",
+    "Production DNS zone config for catalog.hypermesh.online and ngauge.hypermesh.online",
     # Metrics
     "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)",
     "Real PoS bilateral verification on peer connections",
@@ -45,8 +45,8 @@ items = [
     "OCSP federated check — federated_check() queries local store first; with FederationOcspTransport attached, polls Full/Conditional peers and returns Revoked on first hit, Unknown when all peers Unknown",
     # Phase F.1 — CA Federation Activation (2026-05-07)
     "ThresholdSignCoordinator — broadcasts share-request via FederationTransport, awaits t-of-n responses with deadline, calls reconstruct_and_sign for FALCON-1024 signature",
-    "TrustSignalProvider trait — pluggable engauge-driven trust gating in FederationManager.add_peer_with_proof",
-    "engauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
+    "TrustSignalProvider trait — pluggable ngauge-driven trust gating in FederationManager.add_peer_with_proof",
+    "ngauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
     "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback",
     # Phase F.2 — OCSP + CRL Federation (2026-05-07)
     "OCSP HTTP/3 endpoint with federation fallback — POST /api/v1/trustchain/ocsp serves real OcspResponder; on local Unknown, falls back to FederationOcspTransport peer queries when attached",

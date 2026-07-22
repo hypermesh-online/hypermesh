@@ -155,7 +155,7 @@ pub struct TransactionRouter {
     config: TransactionRoutingConfig,
     nodes: HashMap<String, NodeEntry>,
     stats: RoutingStatistics,
-    /// Optional per-node weight adjustments from engauge routing intelligence.
+    /// Optional per-node weight adjustments from ngauge routing intelligence.
     /// Maps node_id to a multiplicative weight factor (e.g., 0.5 penalizes,
     /// 1.5 boosts). Applied in relay scoring so congested routes are penalized.
     weight_adjustments: Option<HashMap<String, f64>>,
@@ -172,7 +172,7 @@ impl TransactionRouter {
         }
     }
 
-    /// Set per-node weight adjustments from engauge routing intelligence.
+    /// Set per-node weight adjustments from ngauge routing intelligence.
     ///
     /// Each entry maps a `node_id` to a multiplicative weight factor that is
     /// applied during relay scoring. Values below 1.0 penalize congested nodes;
@@ -280,7 +280,7 @@ impl TransactionRouter {
                 let mut score = routing_similarity(&ideal_dir, &dir_to_candidate)
                     + routing_similarity(&ideal_dir, &dir_from_candidate);
 
-                // Apply engauge weight adjustment if available for this node
+                // Apply ngauge weight adjustment if available for this node
                 if let Some(ref adjustments) = self.weight_adjustments {
                     if let Some(&factor) = adjustments.get(id) {
                         score *= factor;

@@ -15,7 +15,7 @@ use crate::config::{GatewayConfig, RetryConfig};
 use crate::middleware::{CircuitBreaker, CorsMiddleware, LoggingMiddleware, RequestIdMiddleware};
 use crate::pool::ConnectionPool;
 use crate::proxy::{transform_backend_path, Http3Proxy};
-use crate::sse_engauge::{is_sse_path, EngaugeStream, SseHandshake};
+use crate::sse_ngauge::{is_sse_path, NGaugeStream, SseHandshake};
 
 use crate::dashboard_server::{DashboardScope, DashboardServer};
 use crate::onboarding::{GATEWAY_ADMIN_HTML, GATEWAY_PRIVATE_HTML, GATEWAY_PUBLIC_HTML};
@@ -27,12 +27,12 @@ pub struct GatewayRouter {
     blockmatrix_pool: ConnectionPool,
     caesar_pool: ConnectionPool,
     catalog_pool: ConnectionPool,
-    engauge_pool: ConnectionPool,
+    ngauge_pool: ConnectionPool,
     trustchain_proxy: Http3Proxy,
     blockmatrix_proxy: Http3Proxy,
     caesar_proxy: Http3Proxy,
     catalog_proxy: Http3Proxy,
-    engauge_proxy: Http3Proxy,
+    ngauge_proxy: Http3Proxy,
     /// TrustChain service address (retained for health check routing)
     _trustchain_addr: SocketAddr,
     /// BlockMatrix service address (retained for health check routing)
@@ -41,8 +41,8 @@ pub struct GatewayRouter {
     _caesar_addr: SocketAddr,
     /// Catalog service address (retained for health check routing)
     _catalog_addr: SocketAddr,
-    /// engauge service address (retained for health check routing)
-    _engauge_addr: SocketAddr,
+    /// ngauge service address (retained for health check routing)
+    _ngauge_addr: SocketAddr,
     dashboard: DashboardServer,
     cors: CorsMiddleware,
     retry_config: RetryConfig,
@@ -50,11 +50,11 @@ pub struct GatewayRouter {
     blockmatrix_breaker: Arc<CircuitBreaker>,
     caesar_breaker: Arc<CircuitBreaker>,
     catalog_breaker: Arc<CircuitBreaker>,
-    engauge_breaker: Arc<CircuitBreaker>,
-    /// Engauge SSE streaming endpoint state (M.6b).
-    engauge_stream: EngaugeStream,
+    ngauge_breaker: Arc<CircuitBreaker>,
+    /// NGauge SSE streaming endpoint state (M.6b).
+    ngauge_stream: NGaugeStream,
     /// Background stub frame producer task handle.
-    _engauge_stream_task: Arc<tokio::task::JoinHandle<()>>,
+    _ngauge_stream_task: Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl GatewayRouter {
@@ -92,9 +92,9 @@ impl GatewayRouter {
         )
         .await?;
 
-        let engauge_pool = ConnectionPool::new(
-            config.engauge_addr,
-            &config.engauge_server_name,
+        let ngauge_pool = ConnectionPool::new(
+            config.ngauge_addr,
+            &config.ngauge_server_name,
             config.pool.max_connections,
             config.pool.idle_timeout,
         )
@@ -111,7 +111,7 @@ impl GatewayRouter {
 
         let catalog_proxy = Http3Proxy::new(catalog_pool.clone(), config.pool.connect_timeout);
 
-        let engauge_proxy = Http3Proxy::new(engauge_pool.clone(), config.pool.connect_timeout);
+        let ngauge_proxy = Http3Proxy::new(ngauge_pool.clone(), config.pool.connect_timeout);
 
         // Create circuit breakers
         let trustchain_breaker = Arc::new(CircuitBreaker::new(
@@ -125,14 +125,14 @@ impl GatewayRouter {
 
         let catalog_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
-        let engauge_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
+        let ngauge_breaker = Arc::new(CircuitBreaker::new(5, Duration::from_secs(30)));
 
-        // Initialize the engauge SSE streaming endpoint and spawn its frame
+        // Initialize the ngauge SSE streaming endpoint and spawn its frame
         // producer. In alpha the gateway publishes stub frames; later this can
-        // be wired to a real engauge daemon feed.
-        let engauge_node = NodeId::from_public_key(b"gateway-engauge-sse");
-        let engauge_stream = EngaugeStream::new(engauge_node, PrivacyMode::PUBLIC);
-        let engauge_stream_task = Arc::new(engauge_stream.spawn_stub_producer());
+        // be wired to a real ngauge daemon feed.
+        let ngauge_node = NodeId::from_public_key(b"gateway-ngauge-sse");
+        let ngauge_stream = NGaugeStream::new(ngauge_node, PrivacyMode::PUBLIC);
+        let ngauge_stream_task = Arc::new(ngauge_stream.spawn_stub_producer());
 
         // Initialize dashboard server with onboarding HTML
         let dashboard = DashboardServer::new(Duration::from_secs(3600));
@@ -151,17 +151,17 @@ impl GatewayRouter {
             blockmatrix_pool,
             caesar_pool,
             catalog_pool,
-            engauge_pool,
+            ngauge_pool,
             trustchain_proxy,
             blockmatrix_proxy,
             caesar_proxy,
             catalog_proxy,
-            engauge_proxy,
+            ngauge_proxy,
             _trustchain_addr: config.trustchain_addr,
             _blockmatrix_addr: config.blockmatrix_addr,
             _caesar_addr: config.caesar_addr,
             _catalog_addr: config.catalog_addr,
-            _engauge_addr: config.engauge_addr,
+            _ngauge_addr: config.ngauge_addr,
             dashboard,
             cors: CorsMiddleware::new(config.cors.clone()),
             retry_config: config.retry.clone(),
@@ -169,26 +169,26 @@ impl GatewayRouter {
             blockmatrix_breaker,
             caesar_breaker,
             catalog_breaker,
-            engauge_breaker,
-            engauge_stream,
-            _engauge_stream_task: engauge_stream_task,
+            ngauge_breaker,
+            ngauge_stream,
+            _ngauge_stream_task: ngauge_stream_task,
         })
     }
 
-    /// Attempt to handle a request as an engauge SSE stream.
+    /// Attempt to handle a request as an ngauge SSE stream.
     ///
     /// Returns `Some(handshake)` when the path matches the SSE endpoint and
     /// the method is `GET`. Returns `None` to let the regular request flow
     /// proceed (including for non-GET methods on the SSE path, which will get
     /// a 405 via the standard backend route).
-    pub fn try_engauge_sse(&self, req: &Request<()>) -> Option<SseHandshake> {
+    pub fn try_ngauge_sse(&self, req: &Request<()>) -> Option<SseHandshake> {
         if req.method() != Method::GET {
             return None;
         }
         if !is_sse_path(req.uri().path()) {
             return None;
         }
-        Some(self.engauge_stream.handle(req.headers()))
+        Some(self.ngauge_stream.handle(req.headers()))
     }
 
     /// Apply CORS headers to a streaming response head before transmission.
@@ -342,11 +342,11 @@ impl GatewayRouter {
                 &self.catalog_breaker,
                 "/api/v1/catalog",
             ))
-        } else if path.starts_with("/api/v1/engauge") {
+        } else if path.starts_with("/api/v1/ngauge") {
             Ok((
-                &self.engauge_proxy,
-                &self.engauge_breaker,
-                "/api/v1/engauge",
+                &self.ngauge_proxy,
+                &self.ngauge_breaker,
+                "/api/v1/ngauge",
             ))
         } else {
             Err(anyhow!("No backend found for path: {path}"))
@@ -425,8 +425,8 @@ impl GatewayRouter {
         };
         backends.insert("catalog".to_string(), catalog_status);
 
-        // Check engauge health
-        let engauge_status = match self.engauge_pool.health_check().await {
+        // Check ngauge health
+        let ngauge_status = match self.ngauge_pool.health_check().await {
             Ok(latency) => {
                 json!({
                     "status": "up",
@@ -440,14 +440,14 @@ impl GatewayRouter {
                 })
             }
         };
-        backends.insert("engauge".to_string(), engauge_status);
+        backends.insert("ngauge".to_string(), ngauge_status);
 
         // Get pool statistics
         let trustchain_stats = self.trustchain_pool.stats();
         let blockmatrix_stats = self.blockmatrix_pool.stats();
         let caesar_stats = self.caesar_pool.stats();
         let catalog_stats = self.catalog_pool.stats();
-        let engauge_stats = self.engauge_pool.stats();
+        let ngauge_stats = self.ngauge_pool.stats();
 
         let response_body = json!({
             "status": "healthy",
@@ -475,10 +475,10 @@ impl GatewayRouter {
                     "active_connections": catalog_stats.active_connections,
                     "requests_served": catalog_stats.requests_served,
                 },
-                "engauge": {
-                    "total_connections": engauge_stats.total_connections,
-                    "active_connections": engauge_stats.active_connections,
-                    "requests_served": engauge_stats.requests_served,
+                "ngauge": {
+                    "total_connections": ngauge_stats.total_connections,
+                    "active_connections": ngauge_stats.active_connections,
+                    "requests_served": ngauge_stats.requests_served,
                 }
             }
         });

@@ -14,7 +14,7 @@ This guide covers installing and running a HyperMesh node on Linux.
   - `9292` — BlockMatrix STOQ
   - `9294` — Caesar STOQ
   - `9295` — Catalog STOQ
-  - `9296` — Engauge STOQ
+  - `9296` — NGauge STOQ
 
 Verify your kernel version:
 
@@ -59,7 +59,7 @@ The tarball contains five binaries:
 | `trustchain_ca` | Certificate authority — issues FALCON-1024 certificates |
 | `hypermesh` | BlockMatrix node — runs the blockchain, manages assets |
 | `catalog-server` | Asset registry — package distribution over STOQ |
-| `engauge-server` | Analytics — engagement metrics and routing intelligence |
+| `ngauge-server` | Analytics — engagement metrics and routing intelligence |
 
 ### 3. Install systemd units
 
@@ -85,7 +85,7 @@ Configuration files live in `/etc/hypermesh/`:
 | `trustchain.toml` | CA settings, certificate rotation, OCSP/CRL endpoints |
 | `hypermesh.toml` | BlockMatrix node identity, matrix position, privacy mode |
 | `catalog.toml` | Catalog bind address, cache size, storage backend |
-| `engauge.toml` | Metrics collection, privacy filters, streaming config |
+| `ngauge.toml` | Metrics collection, privacy filters, streaming config |
 
 At minimum, review `gateway.toml` to confirm port bindings and `trustchain.toml` to set your certificate storage path.
 
@@ -97,14 +97,14 @@ Start services in dependency order. TrustChain must come first (other services n
 sudo systemctl enable --now trustchain
 sudo systemctl enable --now hypermesh
 sudo systemctl enable --now catalog
-sudo systemctl enable --now engauge
+sudo systemctl enable --now ngauge
 sudo systemctl enable --now gateway
 ```
 
 Or as a single command:
 
 ```bash
-sudo systemctl enable --now trustchain hypermesh catalog engauge gateway
+sudo systemctl enable --now trustchain hypermesh catalog ngauge gateway
 ```
 
 Systemd respects the ordering constraints defined in the unit files, but enabling them in this order ensures correct startup sequencing on first boot.
@@ -114,7 +114,7 @@ Systemd respects the ordering constraints defined in the unit files, but enablin
 ### Check service status
 
 ```bash
-sudo systemctl status trustchain hypermesh catalog engauge gateway
+sudo systemctl status trustchain hypermesh catalog ngauge gateway
 ```
 
 All five services should show `active (running)`.
@@ -143,7 +143,7 @@ journalctl -u trustchain --no-pager -n 20
 | 9292 | STOQ | BlockMatrix | Internal — blockchain and asset operations |
 | 9294 | STOQ | Caesar | Internal — EVP packet routing |
 | 9295 | STOQ | Catalog | Internal — package registry |
-| 9296 | STOQ | Engauge | Internal — analytics and metrics |
+| 9296 | STOQ | NGauge | Internal — analytics and metrics |
 
 All internal ports use STOQ (QUIC-based transport with eBPF acceleration). Only port 8443 should be exposed to the public internet. Internal ports communicate over IPv6.
 

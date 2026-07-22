@@ -1,0 +1,55 @@
+[crate]
+name = "NGauge"
+id = "ngauge"
+description = "Work tracking, content receipts, capacity metrics, and network analytics for HyperMesh"
+phase = "alpha"
+
+[features.working]
+items = [
+    # Sharding authority (A1 — NGauge now OWNS the erasure-coding engine)
+    "Reed-Solomon sharding engine (ngauge::Sharder — encode/decode k-of-n via reed-solomon-erasure, last-shard length trailer, per-shard BLAKE3 integrity hash; byte-identical to the old blockmatrix impl; blockmatrix consumes it at its shard seam via pub use ngauge::sharding::Sharder)",
+    "Adaptive ShardingConfig (adaptive_for_size delegates to lib ErasureCodingParams::for_asset_size — R14 RS param scaling; ngauge is now a MANDATORY blockmatrix dependency, intelligence feature gates only the analytics surface)",
+    # Data structures and local computation (real logic, tested)
+    "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
+    "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
+    "KYC compliance checker (self-sovereign attestation structure, tier-based levels)",
+    "Organic vs speculative traffic detection (pattern-based aggregate flow analysis)",
+    "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio)",
+    "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime)",
+    "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend)",
+    "Metrics streaming protocol (MetricsFrame, 4 payload types, encode/decode, privacy-mode-aware)",
+    "Differential privacy filter (Laplace noise injection, epsilon-calibrated)",
+    "Routing intelligence traits (TensorWeightModifier, PathPolicyRecommendation)",
+    "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases)",
+    "Lease manager (supply/demand matching, validation, lifecycle management)",
+    "Pricing engine (Governor-adjusted, tier-aware multipliers)",
+    "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
+    "STOQ METRICS frame type integration (0xfe000007 custom frame)",
+    "Swarm analytics data structures (ShardPopularity, demand maps, cascade tracker)",
+    "Min-spec performance profiling (budget validation against R13 limits)",
+    "Caesar in-transit/holding amount tracking (per-node economic state struct)",
+    "STOQ-compatible API server (NGaugeStoqApi: 6 handlers, bind [::1]:9296)",
+    "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
+    "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()",
+    "MetricsPublisher transport callbacks",
+    "MetricsSubscriber byte ingestion",
+    "RegionalAggregator periodic change detection",
+    "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
+    "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
+    "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
+    "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
+    "ReplicationTrigger consumed by blockmatrix swarm coordinator — ngauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
+    "Reconciler convergence closed (P6) — set_replica_count feedback hook (was the never-called gap) drives actual→desired replica convergence: after each fetch the actuator reports provider count back, ReplicationTrigger sees needed<=replicas and STOPS firing (swarm-emergent stable fixed point, verified by convergence tests)",
+    "DispersionAdvisor (P6) — anti-affinity placement recommends where new replicas go instead of naive candidates[0]",
+    "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full",
+]
+
+[features.in_development]
+items = [
+    "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
+]
+
+[features.planned]
+items = [
+    "Cross-node metrics federation via reflector pool",
+]

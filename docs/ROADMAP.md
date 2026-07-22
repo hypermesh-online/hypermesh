@@ -374,7 +374,7 @@ and are running ${node_count} node(s)!
 You have registered ${catalog_count} catalog package(s) and
 ${caesar_enabled ? "have" : "have not"} set up Caesar network support!
 
-${engauge_metrics_summary}
+${ngauge_metrics_summary}
 
 [Configure Your Node]  [Browse Catalog]  [View Network]
 ```

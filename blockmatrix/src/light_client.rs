@@ -30,7 +30,7 @@
 //! `LightMode::Full` is the default. The `--mode light` flag is opt-in.
 //! When the daemon is started in `LightMode::Light` only the
 //! `HeaderSyncManager` runs; full block hosting, shard transport, asset
-//! pipeline writes, Caesar EVP, and the engauge bridge are skipped. The
+//! pipeline writes, Caesar EVP, and the ngauge bridge are skipped. The
 //! reduced startup path is a follow-up sub-step (K.1.5) — for K.1 we
 //! ship the types, the flag, the verifier, and the tests.
 
@@ -94,7 +94,7 @@ pub enum LightClientError {
 /// Runtime selector for the node startup path.
 ///
 /// - `Full` — default behaviour: full block hosting, shard storage,
-///   asset pipeline, Caesar EVP, engauge bridge.
+///   asset pipeline, Caesar EVP, ngauge bridge.
 /// - `Light` — header-only sync, no full block hosting, no shard hosting,
 ///   no asset pipeline writes. Memory ~256 MB target, storage ~1 GB cap.
 /// - `ThinClient` — reserved for K.2: zero local chain state, all

@@ -125,14 +125,14 @@ impl PacketRouter {
         })
     }
 
-    /// Select next hop using engauge capacity reports for scoring.
+    /// Select next hop using ngauge capacity reports for scoring.
     ///
-    /// Uses engauge's normalized capacity score (bytes served, compute,
+    /// Uses ngauge's normalized capacity score (bytes served, compute,
     /// storage, bandwidth, uptime) instead of raw network metrics.
-    #[cfg(feature = "engauge")]
+    #[cfg(feature = "ngauge")]
     pub fn route_with_capacity(
         &self,
-        reports: &[engauge::CapacityReport],
+        reports: &[ngauge::CapacityReport],
         _packet_tier: MarketTier,
     ) -> Result<RouteSelection, RoutingError> {
         if reports.is_empty() {
@@ -486,13 +486,13 @@ mod tests {
         assert_eq!(result.next_hop, NodeId::from_public_key(b"b"));
     }
 
-    #[cfg(feature = "engauge")]
+    #[cfg(feature = "ngauge")]
     #[test]
     fn route_with_capacity_selects_highest() {
         let router = PacketRouter::default();
-        let high = engauge::CapacityReport::new(
+        let high = ngauge::CapacityReport::new(
             NodeId::from_public_key(b"high-cap"),
-            engauge::CapacityMetrics::new(
+            ngauge::CapacityMetrics::new(
                 1_073_741_824,
                 1_000_000,
                 10_737_418_240,
@@ -501,9 +501,9 @@ mod tests {
             ),
             1,
         );
-        let low = engauge::CapacityReport::new(
+        let low = ngauge::CapacityReport::new(
             NodeId::from_public_key(b"low-cap"),
-            engauge::CapacityMetrics::new(100, 100, 100, 100, 0.1),
+            ngauge::CapacityMetrics::new(100, 100, 100, 100, 0.1),
             1,
         );
 

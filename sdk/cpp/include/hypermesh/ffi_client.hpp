@@ -174,22 +174,22 @@ public:
     /// List TrustChain DNS zones. Returns JSON array.
     std::string trustchain_dns_zones();
 
-    // -- Engauge Analytics ---------------------------------------------------
+    // -- NGauge Analytics ---------------------------------------------------
 
     /// Fetch node capacity metrics. Returns JSON.
-    std::string engauge_capacity();
+    std::string ngauge_capacity();
 
     /// Fetch traffic statistics. Returns JSON.
-    std::string engauge_traffic();
+    std::string ngauge_traffic();
 
     /// Fetch marketplace resource pool info. Returns JSON.
-    std::string engauge_marketplace();
+    std::string ngauge_marketplace();
 
     /// Fetch detailed node-level metrics. Returns JSON.
-    std::string engauge_node_metrics();
+    std::string ngauge_node_metrics();
 
     /// Fetch active resource leases. Returns JSON array.
-    std::string engauge_leases();
+    std::string ngauge_leases();
 
     // -- Catalog Registry ----------------------------------------------------
 
