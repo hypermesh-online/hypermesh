@@ -16,7 +16,10 @@ items = [
     "CryptoAlgorithm enum (Falcon/Kyber/AES)",
     "HypermeshError unified error type",
     "Three-pillar asset system (AssetKind + BaseState/AssetStatusTrait + AssetAdapter)",
-    "Canonical state proof types (SpaceProof/StakeProof/WorkProof/TimeProof/ProofOfState + Validatable trait)",
+    "Canonical state proof types (SpaceProof/StakeProof/WorkProof/TimeProof/StateProof/WireSignedProof + Validatable trait) — S1 made lib the ONE definition site; 7 duplicate PoS type sets removed from trustchain/stoq/blockmatrix/caesar/catalog",
+    "Authorization model (S1) — StakeProof is WHO/authorization with NO amount, WorkProof carries work_hash (no difficulty/nonce/compute), SpaceProof is WHERE/location (capacity is descriptive and never gates), TimeProof is WHEN",
+    "Authorization types (lib/src/authz.rs) — Owner, GrantScope (Read|Use|Transfer), AuthorizationSet, AuthDecision, CapacityProfile",
+    "Determinism seam — *_at() constructors take an explicit timestamp so the genesis path is a pure function of its inputs (S3.0); live paths keep SystemTime::now()",
     "EVP economic types (PacketId, GoldGrams, MarketTier, PacketState, DemurrageRate)",
     "AssetAddress IPv6 type (fd48:4d00 prefix, matrix coords, content fingerprint, shard sub-addressing)",
     "Transmission asset type in SystemAssetKind (R10)",
@@ -39,7 +42,7 @@ items = [
 [features.in_development]
 items = [
     # Lib types are defined but some are not yet exercised by real implementations
-    "State proof types — defined and have Validatable trait, but consuming crates generate fake proofs",
+    "State proof depth — lib defines the canonical types and structural validity; generation/crypto lives in trustchain via the StateProofOps extension trait, and per-proof validity is still structural (identity binding present, timestamp bounds), not threshold-verifying",
     "BlockchainScope::Network — blockmatrix implements Network scope sync MVP (block propagation, gossip, cross-genesis insertion, E2E two-node over QUIC)",
 ]
 

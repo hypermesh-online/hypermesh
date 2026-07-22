@@ -25,6 +25,8 @@ items = [
     "Key rotation entries — KeyRotationEntry with FALCON-signed transition proof, old key signs new key authorization, rotation chain verification (genesis → current)",
     "Recovery passphrase commitment — HKDF-SHA512 + BLAKE3 deterministic commitment stored in genesis Identity asset, passphrase never persisted",
     "TrustChainProofProvider — implements StateProofProvider with FALCON-1024 signed WireSignedProof envelope (BLAKE3+FALCON signing/verification, replay-prevention nonce)",
+    "PoS types consolidated into lib (S1) — trustchain no longer defines its own proof structs; proof_of_state re-exports hypermesh_lib's canonical set and attaches generation/crypto via the StateProofOps extension trait",
+    "Stake-magnitude removed (S1) — no stake_amount, no minimum_stake/threshold, no PoW difficulty or nonce; PoStake is an identity binding (WHO) and PoWork is a work_hash (WHAT)",
     "FALCON-1024 identity signing — bilateral handshake proofs are FALCON-signed end-to-end (generate→sign→wire→verify), StakeProof covered by WireSignedProof envelope",
     "FALCON IS authentication — QUIC/TLS provides transport encryption only (AcceptAllVerifier bypasses cert verification), PoS bilateral handshake with FALCON-signed proofs is the sole authentication mechanism",
     "BLAKE3 content hashing",
@@ -82,7 +84,7 @@ items = [
     "Byzantine detection — ByzantineDetector monitors local node only",
     "Let's Encrypt / ACME cert bootstrap for trust.hypermesh.online gateway TLS",
     # PROOF DEPTH: authenticity is at the envelope, inner proofs are structural
-    "Inner four-proof depth — StakeProof/SpaceProof/WorkProof/TimeProof ::validate() is STRUCTURAL (non-empty holder id, positive stake, age/epoch bounds), NOT signature/threshold-verifying; cryptographic authenticity is only the FALCON-1024 WireSignedProof envelope over the serialized StateProof. Deep per-proof threshold checks (real stake/storage/compute attestation) not yet enforced on hot paths",
+    "Inner four-proof depth — StakeProof/SpaceProof/WorkProof/TimeProof structural validity is identity/field presence + time bounds (S1 deleted every magnitude gate), NOT signature-verifying per proof; cryptographic authenticity is only the FALCON-1024 WireSignedProof envelope over the serialized StateProof. Per-proof attestation depth (real location/work-hash attestation) not yet enforced on hot paths",
     "Device-continuity enforcement is opt-in — verify_device_continuity rejects a copied identity on a different machine only under --require-hardware-auth (defaults off)",
 ]
 

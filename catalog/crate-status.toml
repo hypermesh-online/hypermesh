@@ -25,6 +25,7 @@ items = [
     "DHT store/query over STOQ transport",
     "STOQ API handlers wired to CatalogRegistry",
     "Real FALCON-1024 signature verification",
+    "Canonical PoS types consumed from lib (S1) — catalog's duplicate PoS type set was deleted; it now uses hypermesh_lib's proof types",
     "X.509 certificate parsing for publisher info",
     "TrustChain certificate validation (real expiry/revocation)",
     "Policy rule evaluation (CertificateIssuer)",

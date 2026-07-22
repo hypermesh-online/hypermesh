@@ -21,6 +21,11 @@ items = [
     "Shard architecture — disk persistence, auth TTL, peer cleanup on disconnect, PoS-gated access control; kernel+userspace policy unified and shard fetch is PoS-authenticated (eBPF kernel gate)",
     "Workspace version unification — [workspace.package] version = 1.0.0, all 13 members inherit version.workspace (P7 fixed the prior engauge/caesar 1.0.0-vs-0.1.0 skew)",
     "One-click installer — scripts/install/hypermesh-install.sh (P7)",
+    "S1 Proof of State consolidation — ONE canonical PoS type set in lib (StakeProof/WorkProof/SpaceProof/TimeProof/StateProof/WireSignedProof + Owner/GrantScope/AuthorizationSet/AuthDecision/CapacityProfile); trustchain re-exports and keeps generation/crypto via a StateProofOps extension trait; stoq + catalog consume lib's set; 7 duplicate PoS type sets removed across trustchain/stoq/blockmatrix/caesar/catalog",
+    "S1 stake-magnitude → authorization — every magnitude gate deleted workspace-wide (stake_amount, minimum_stake, MAX_REASONABLE_STORAGE, PoW leading-zero difficulty + nonce including hypermesh_xdp.c, capacity admission gates); PoStake is WHO, PoWork is a work_hash, PoSpace capacity is descriptive and never gates",
+    "S1 fixed the `--features multi-node` build (was E0072 recursive-type on main)",
+    "PoS magnitude guard — scripts/check-no-pos-magnitude.sh scans the whole worktree by behaviour/shape (not identifier, not limited to src/) and blocks on pre-push",
+    "VISION.md — architecture of record, including a Security Model section (genesis is self-signing; secrecy is singular, proof is plural)",
 ]
 
 [features.in_development]
@@ -28,6 +33,7 @@ items = [
     "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector); dual-CA split (http3:8444 / stoq:8445) deployed and verified live (F9)",
     "Network MVP — bilateral handshake + block sync verified E2E local-to-GCP (trust.hypermesh.online), network_id metadata exchange, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution, stale cert auto-recovery.",
     "Mirror/sharding architecture correction (A-series) — Reed-Solomon sharding moved into NGauge, two-layer mirror retrieval + upstream tracker, per-shard mirror invariant on live paths, on-chain shard registration at publish + interest-scoped registration on fetch, 3-node mirror flow proven E2E",
+    "Per-asset chain (S3.x, branch s3-asset-chain, NOT merged) — S3.1 AssetChainIndex, S3.2 authenticated per-asset lineage in the StateProof body, S3.3 matrix-indexed mirror attestations (in QA). S3.2 is a FORMAT CHANGE: proof_hash changes for every proof, so old peers fail with a proof_hash mismatch and bincode chains will not deserialize — coordinated upgrade plus `rm -rf /var/lib/hypermesh/blockmatrix/node_*` required at cutover",
     "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)",
 ]
 

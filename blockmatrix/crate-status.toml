@@ -12,7 +12,12 @@ items = [
     "Geospatial module (GPS conversion, clustering)",
     # Single-node blockchain (real persistence, real BLAKE3 hashing)
     "Every-node blockchain (independent Device chain, genesis on boot)",
-    "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager, versioned block format v1 with BLAKE3 integrity verification on every read)",
+    "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager, versioned block format v1 with BLAKE3 integrity verification on every read) — until S3.0 the machinery existed but RUNTIME blocks never reached it (save_block had no call site in mutations.rs), so every stored asset was lost on restart",
+    "S3.0 durable block write-through — BlockSink at the insert_block chokepoint persists every block (genesis and runtime), fail-closed: persist before in-memory publish, so a failed write cannot be silently accepted",
+    "S3.0 blocking I/O off the async path — fsync/WAL/metadata/index writes moved to spawn_blocking (previously ran on a tokio worker inside four held chain write locks, once per block)",
+    "S3.0 add_block head→insert race fixed via head reservation — concurrent writers went 2/8 → 8/8 with no silent loss",
+    "S3.0 deterministic genesis — four clock reads removed from the genesis path so peers can reproduce and adopt it; live runtime proofs keep real clocks + freshness nonces",
+    "S3.0 genesis adoption transport — genesis request/response carries a real verified Block instead of a hash string, recorded non-destructively per network (destructive adopt_genesis deliberately not wired — S3.4)",
     "NodeBlockchain::from_blocks() chain reconstruction with integrity validation",
     "Node resume path (load persisted genesis/blocks/cert from disk)",
     "BLAKE3 content hashing for blocks",
@@ -115,7 +120,7 @@ items = [
     "DNS propagation via blockchain — DnsBlockEntry serialized into BlockAssetEntry with BaseSystemType::Dns, extracted on receive, re-populated on restart",
     "CA certificate enrollment — after bilateral PoS handshake, TrustChain CA issues cert to replace self-signed bootstrap cert (§5.7 Phase 2)",
     "Stream type discrimination — CONN_TYPE_HANDSHAKE (0x00) and CONN_TYPE_PEER_MESSAGE (0x01) on every STOQ connection",
-    "Genesis Proof of State from real hardware — stake formula (cores*mhz)+memory_mb ensures R13-compliant devices pass minimum_stake",
+    "Genesis Proof of State from real hardware — OsAbstraction-assessed capabilities bind the four proofs (S1 removed the (cores*mhz)+memory_mb stake formula and the minimum_stake gate; capacity is descriptive, PoStake is an identity binding)",
     "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
     "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
     "Metrics emission to engauge — MetricsReporter pushes Capacity + Congestion + Routing frames (eBPF-sourced) via STOQ streams (CONN_TYPE_METRICS=0x02) to peers every 30s with backoff",
@@ -228,7 +233,7 @@ items = [
     "RpcRequest.capability_token optional field — backward-compat with pre-K.2 clients (None bypasses enforcement when issuer not configured); RpcRequest::new_with_token() helper for SDKs",
     "CapabilityContext — base64 token decode + FALCON verify + expiry + revocation + scope check, returns CAPABILITY_DENIED RpcError on any failure",
     # P5/F6 — eBPF kernel gate + PoS-authenticated shard fetch
-    "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); handshake-only peers with no stake are refused",
+    "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); a peer whose proof does not authorize that asset is refused",
     # P6 — NGauge reconciler convergence + TTL cache + version negotiation
     "Replication convergence actuator — post-fetch set_replica_count(shard, provider_count) so ReplicationTrigger sees needed<=replicas next cycle and STOPS (swarm-emergent convergence), closing the R12 replication loop",
     "DispersionAdvisor anti-affinity placement — extra-replica fetch consults engauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
@@ -261,6 +266,10 @@ items = [
 items = [
     # Cross-network asset transfer lifecycle — G.1+G.2+I.1 landed (full choreography, chain-scan recovery, ack-routing, e2e + crash-recovery tests, daemon STOQ TransferTransport wrapper). Lock→Transfer→Unlock e2e integration with cross-chain receipt validation in Phase J.
     "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
+    # Per-asset chain (S3.x) — ON BRANCH s3-asset-chain, NOT merged to main
+    "S3.1 AssetChainIndex (branch s3-asset-chain, unmerged) — per-asset lookup as a real O(1) structure replacing full-chain linear scans, many-to-many, rebuilt on load; zero block/serde format change",
+    "S3.2 authenticated per-asset lineage (branch s3-asset-chain, unmerged) — prev_asset_entry + asset_seq carried INSIDE the StateProof body so lineage inherits FALCON signing and hash-commitment via proof_hash with no Block field change; tamper-evident (a forgery passing every signature check is still rejected); per-asset high-water tombstones stop a prune from re-opening an asset to a fresh root. FORMAT CHANGE: proof_hash changes for every proof, so old peers fail with a proof_hash mismatch and bincode chains will not deserialize — needs a coordinated upgrade plus `rm -rf /var/lib/hypermesh/blockmatrix/node_*` at cutover",
+    "S3.3 matrix-indexed mirror attestations (in QA, unmerged) — third-party mirror attestations verified via the verify_grant template (signer_binds_to_author forbids third-party signers, so signed_proof cannot carry them), accumulated off-spine in a BTreeMap<(MatrixIndex, mirror), _> so matrix position IS the canonical order (no trusted clock), sealed into the spine by the owner via StateProof.mirror_seal; rides the same S3.2 format change",
     # Security review pending
     "Block persistence integrity — tamper detection works (BLAKE3 canonical hash verified on every read, WAL replay, legacy compat), formal security audit pending",
     # Scope-aware sync (partially working)
