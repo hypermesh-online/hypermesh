@@ -93,6 +93,40 @@ pub struct NodeBlockchain {
     /// (`insert_received_block`) verifies whatever envelope the producer
     /// attached; it does not use this signer.
     pub(crate) signer: Option<Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>>,
+
+    /// S3.0/B1: durable write-through sink for accepted blocks.
+    ///
+    /// When present (live daemon), EVERY block that reaches
+    /// [`insert_block`](Self::insert_block) — from `add_block`,
+    /// `insert_received_block`, or an orphan drain — is written to the WAL and
+    /// block storage BEFORE it becomes visible in memory. Fail-closed: a
+    /// persistence error aborts the insert, so the in-memory chain can never
+    /// hold a block that a restart would lose.
+    ///
+    /// `None` for library/test chains: behaviour is exactly as it was before
+    /// S3.0 (memory only).
+    pub(crate) block_sink: Option<Arc<dyn super::block_sink::BlockSink>>,
+
+    /// S3.0 QA follow-up (FIX 2): head reservation for local appends.
+    ///
+    /// [`add_block`](super::mutations) reads the head to derive the next index,
+    /// then builds, signs and inserts the block. Without a reservation, every
+    /// concurrent caller reads the SAME head, computes the SAME index, and all
+    /// but one loses at the duplicate-index check inside
+    /// [`insert_block`](Self::insert_block) — its already-built, already-signed
+    /// block is thrown away. S3.0's durable write-through widened that window
+    /// by exactly the fsync duration (measured: 2 of 8 concurrent writers
+    /// survived).
+    ///
+    /// Holding this mutex across read-head → build → sign → insert serialises
+    /// local appends, which is what an append to a single linear chain is
+    /// anyway: index N+1 cannot be computed until N exists.
+    ///
+    /// LOCK ORDER: this is acquired BEFORE any of `blocks`/`headers`/
+    /// `hash_index`/`head`/`stats` and is never taken while one of them is
+    /// held; `insert_block` acquires those itself, so the reservation holder
+    /// must not (and does not) hold them across the call.
+    pub(crate) append_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -113,12 +147,15 @@ impl NodeBlockchain {
 
     /// Create a new blockchain seeded with an externally-constructed genesis.
     ///
-    /// `Block::genesis` is non-deterministic (TimeProof embeds SystemTime + a
-    /// random nonce), so two independent calls produce different hashes. When
-    /// a caller persists the genesis to disk AND uses a blockchain in memory,
-    /// both must reference the *same* block — otherwise block 1's
-    /// `previous_hash` (taken from the in-memory head) won't match the on-disk
-    /// genesis on restart.
+    /// The genesis PATH is deterministic since S3.0/B2 — it is a pure function
+    /// of (device assessment, coordinate, genesis epoch). But
+    /// [`Block::genesis`] reads a fresh `GenesisEpoch::now()` on every call, so
+    /// two calls a nanosecond apart still yield different blocks. When a caller
+    /// persists the genesis to disk AND holds a blockchain in memory, both must
+    /// reference the *same* block — otherwise block 1's `previous_hash` (taken
+    /// from the in-memory head) won't match the on-disk genesis on restart.
+    /// Use [`Block::genesis_with_identity_at`] / [`Block::genesis_from_assessment`]
+    /// when the epoch must be pinned (network genesis, reproducibility tests).
     pub fn from_genesis(node_coordinate: MatrixCoordinate, genesis: Block) -> Self {
         Self::from_genesis_with_service(node_coordinate, genesis, ValidationService::new())
     }
@@ -164,6 +201,8 @@ impl NodeBlockchain {
             headers: Arc::new(RwLock::new(HashMap::new())),
             orphans: Arc::new(RwLock::new(HashMap::new())),
             signer: None,
+            block_sink: None,
+            append_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -178,6 +217,23 @@ impl NodeBlockchain {
         signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>,
     ) -> Self {
         self.signer = Some(signer);
+        self
+    }
+
+    /// S3.0/B1: attach a durable [`BlockSink`](super::block_sink::BlockSink) so
+    /// every accepted block is written through to the WAL + block storage
+    /// before it becomes visible in memory.
+    ///
+    /// Builder form, mirroring [`with_signer`](Self::with_signer) — the live
+    /// daemon calls this right after constructing the chain
+    /// (`from_genesis`/`from_blocks`) with its `PersistenceManager`. Chains
+    /// without a sink keep the pre-S3.0 memory-only behaviour, which is
+    /// correct for library and test chains that have no storage directory.
+    pub fn with_persistence(
+        mut self,
+        sink: Arc<dyn super::block_sink::BlockSink>,
+    ) -> Self {
+        self.block_sink = Some(sink);
         self
     }
 
@@ -281,6 +337,8 @@ impl NodeBlockchain {
             headers: Arc::new(RwLock::new(HashMap::new())),
             orphans: Arc::new(RwLock::new(HashMap::new())),
             signer: None,
+            block_sink: None,
+            append_lock: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -451,6 +509,20 @@ impl NodeBlockchain {
     /// chain and starts from the network's genesis.
     ///
     /// Returns error if the genesis block's index is not 0 or hash verification fails.
+    ///
+    /// # NOT WIRED — it would desynchronise memory from disk (S3.0 QA note)
+    ///
+    /// This clears `blocks`, `hash_index` and `head` and reseeds them WITHOUT
+    /// notifying [`block_sink`](Self::block_sink). On a chain with a durable
+    /// sink attached, the on-disk chain would keep the old genesis and every
+    /// old block while memory holds the new root — the exact
+    /// memory-ahead-of-disk divergence the S3.0 write-through exists to
+    /// prevent, only inverted. Nothing in production calls this today
+    /// (`SyncManager::record_network_genesis` deliberately records a network's
+    /// root NON-destructively instead). Adopting a network chain for real needs
+    /// a container that holds the device chain and adopted network chains side
+    /// by side, with its own durable roots — that is S3.4's job. Do not wire
+    /// this into a sink-bearing chain before then.
     pub async fn adopt_genesis(&self, genesis: Block) -> Result<(), String> {
         if genesis.index != 0 {
             return Err(format!(
@@ -581,6 +653,12 @@ impl NodeBlockchain {
     }
 
     /// Insert a block into the chain (internal helper).
+    ///
+    /// S3.0/B1: this is the single insert chokepoint for `add_block`,
+    /// `insert_received_block` and the orphan drain, so it is also where the
+    /// durable write-through happens. The block is persisted BEFORE it is
+    /// published to the in-memory maps, and a persistence failure aborts the
+    /// insert (fail-closed) — memory never gets ahead of disk.
     pub(crate) async fn insert_block(&self, block: Block) -> Result<(), String> {
         let mut blocks = self.blocks.write().await;
         let mut hash_index = self.hash_index.write().await;
@@ -589,6 +667,20 @@ impl NodeBlockchain {
 
         if blocks.contains_key(&block.index) {
             return Err(format!("Block {} already exists", block.index));
+        }
+
+        // Durable write-through (fail-closed). The write locks are held across
+        // this await deliberately: no reader may observe a block that is not
+        // yet on disk, and no concurrent insert may claim the same index while
+        // this one is being written.
+        if let Some(sink) = self.block_sink.as_ref() {
+            sink.persist_block(&block).await.map_err(|e| {
+                error!(
+                    "Refusing block {} — durable persistence failed: {e}",
+                    block.index,
+                );
+                format!("Block {} persistence failed: {e}", block.index)
+            })?;
         }
 
         blocks.insert(block.index, block.clone());

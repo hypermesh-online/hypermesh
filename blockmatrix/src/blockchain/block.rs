@@ -35,7 +35,9 @@ use std::fmt;
 
 use crate::assets::core::AssetRegistration;
 use crate::matrix::coordinate::MatrixCoordinate;
-use crate::proof_of_state::genesis_proof::{generate_genesis_proof, HardwareAssessment};
+use crate::proof_of_state::genesis_proof::{
+    generate_genesis_proof, GenesisEpoch, HardwareAssessment,
+};
 use trustchain::proof_of_state::{StateProof, WireSignedProof};
 
 /// Where the actual asset data lives (the block only stores a pointer).
@@ -333,7 +335,7 @@ impl Block {
     /// Per R1: hardware assessed, not self-reported.
     /// Per section 8.2: "Usage IS verification."
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
-        Self::build_genesis_block(node_coordinate, None)
+        Self::build_genesis_block(node_coordinate, None, GenesisEpoch::now())
     }
 
     /// Create the genesis block bound to a canonical device identity.
@@ -348,20 +350,61 @@ impl Block {
         node_coordinate: MatrixCoordinate,
         device_node_id: &str,
     ) -> Self {
-        Self::build_genesis_block(node_coordinate, Some(device_node_id))
+        Self::genesis_with_identity_at(node_coordinate, device_node_id, GenesisEpoch::now())
+    }
+
+    /// [`genesis_with_identity`](Self::genesis_with_identity) with an EXPLICIT
+    /// genesis epoch (S3.0/B2).
+    ///
+    /// This is the reproducible form: given the same device, coordinate,
+    /// identity and epoch it yields the same block, byte for byte. The live
+    /// daemon calls it with `GenesisEpoch::now()` at first boot — one explicit
+    /// clock read, recorded on-chain — instead of scattering `SystemTime::now()`
+    /// through the four proofs.
+    pub fn genesis_with_identity_at(
+        node_coordinate: MatrixCoordinate,
+        device_node_id: &str,
+        epoch: GenesisEpoch,
+    ) -> Self {
+        Self::build_genesis_block(node_coordinate, Some(device_node_id), epoch)
+    }
+
+    /// Build a genesis block from an EXPLICIT hardware assessment and epoch —
+    /// no OS probe, no clock read (S3.0/B2).
+    ///
+    /// This is the purely functional core: everything the block depends on is
+    /// an argument, which is what makes "two nodes, identical inputs, identical
+    /// genesis" a checkable property rather than an aspiration.
+    pub fn genesis_from_assessment(hw: &HardwareAssessment, epoch: GenesisEpoch) -> Self {
+        Self::assemble_genesis(hw.coordinate, generate_genesis_proof(hw, epoch), epoch)
     }
 
     fn build_genesis_block(
         node_coordinate: MatrixCoordinate,
         device_node_id: Option<&str>,
+        epoch: GenesisEpoch,
     ) -> Self {
-        let genesis_reg = AssetRegistration::genesis(node_coordinate);
+        let state_proof = Self::build_genesis_proof(node_coordinate, device_node_id, epoch);
+        Self::assemble_genesis(node_coordinate, state_proof, epoch)
+    }
+
+    /// Assemble the genesis block from a coordinate and its (already built)
+    /// state proof. Shared by every genesis constructor so the entry shape and
+    /// content binding are defined exactly once.
+    fn assemble_genesis(
+        node_coordinate: MatrixCoordinate,
+        state_proof: StateProof,
+        epoch: GenesisEpoch,
+    ) -> Self {
+        // B2: the registration is stamped with the genesis epoch, not the live
+        // clock — its metadata feeds `content_hash` and its `creation_timestamp`
+        // feeds `to_string()`, so both reach the block hash.
+        let genesis_reg =
+            AssetRegistration::genesis_at(node_coordinate, epoch.as_system_time());
         let content_hash = {
             let serialized = genesis_reg.to_string();
             *blake3::hash(serialized.as_bytes()).as_bytes()
         };
-
-        let state_proof = Self::build_genesis_proof(node_coordinate, device_node_id);
 
         // Bind the genesis proof to the genesis asset's content hash so the
         // signed-to-content invariant holds from block 0 (P1). `new_bound`
@@ -391,6 +434,7 @@ impl Block {
     fn build_genesis_proof(
         coordinate: MatrixCoordinate,
         device_node_id: Option<&str>,
+        epoch: GenesisEpoch,
     ) -> StateProof {
         match crate::create_os_abstraction() {
             Ok(os) => {
@@ -399,7 +443,7 @@ impl Block {
                     format!("genesis_{}", &fp.hex()[..16.min(fp.hex().len())])
                 });
                 let hw = HardwareAssessment::from_os(os.as_ref(), &node_id, coordinate);
-                generate_genesis_proof(&hw)
+                generate_genesis_proof(&hw, epoch)
             }
             Err(_) => {
                 // Fallback: no OS access — synthesize an empty (zero-source)
@@ -424,7 +468,7 @@ impl Block {
                     device_fingerprint,
                     disk_serial: None,
                 };
-                generate_genesis_proof(&hw)
+                generate_genesis_proof(&hw, epoch)
             }
         }
     }

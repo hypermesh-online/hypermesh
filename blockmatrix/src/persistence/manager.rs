@@ -324,7 +324,7 @@ impl PersistenceManager {
         Ok(Some(state))
     }
 
-    /// Save block to blockchain storage
+    /// Save block to blockchain storage (WAL first, then block files).
     pub async fn save_block(&self, block: &Block) -> PersistenceResult<()> {
         if let Some(storage) = self.blockchain_storage.read().await.as_ref() {
             storage.write_block(block).await?;
@@ -616,6 +616,22 @@ impl PersistenceManager {
             recent_blocks,
             timestamp: chrono::Utc::now(),
         })
+    }
+}
+
+/// S3.0/B1: the `PersistenceManager` IS the chain's durable block sink.
+///
+/// [`save_block`](PersistenceManager::save_block) already writes the WAL entry
+/// before the block file and truncates the WAL on commit, so implementing the
+/// trait over it gives `NodeBlockchain` crash-safe write-through for free —
+/// exactly the guarantee the two hand-written `save_block` call sites in the
+/// node binary provided for genesis and the hardware block only.
+#[async_trait::async_trait]
+impl crate::blockchain::block_sink::BlockSink for PersistenceManager {
+    async fn persist_block(&self, block: &Block) -> Result<(), String> {
+        self.save_block(block)
+            .await
+            .map_err(|e| format!("persistence manager: {e}"))
     }
 }
 

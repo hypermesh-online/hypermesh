@@ -12,7 +12,9 @@ use blockmatrix::assets::core::{
 };
 use blockmatrix::create_os_abstraction;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::proof_of_state::genesis_proof::{generate_genesis_proof, HardwareAssessment};
+use blockmatrix::proof_of_state::genesis_proof::{
+    generate_genesis_proof, GenesisEpoch, HardwareAssessment,
+};
 use blockmatrix::StateProof;
 
 /// Assess node hardware and build `AssetRegistration` entries for each
@@ -49,11 +51,17 @@ pub fn assess_hardware_assets() -> Result<Vec<AssetRegistration>> {
 /// so the collapsed identity flows into all four proofs. The device
 /// fingerprint is captured from the OS and folded into every proof
 /// (device-auth invariant).
+/// S3.0/B2 note: this is the block-1 hardware-REGISTRATION proof, not the
+/// genesis proof, so it takes a LIVE epoch (`GenesisEpoch::now()`) — one
+/// explicit clock read at the call site, replacing the reads that used to be
+/// hidden inside the four proof constructors. It is stamped when the
+/// registration happens, which is what a runtime claim should assert.
 pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -> StateProof {
+    let epoch = GenesisEpoch::now();
     match create_os_abstraction() {
         Ok(os) => {
             let hw = HardwareAssessment::from_os(os.as_ref(), node_id, coordinate);
-            generate_genesis_proof(&hw)
+            generate_genesis_proof(&hw, epoch)
         }
         Err(e) => {
             warn!(
@@ -73,7 +81,7 @@ pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -
                 device_fingerprint,
                 disk_serial: None,
             };
-            generate_genesis_proof(&hw)
+            generate_genesis_proof(&hw, epoch)
         }
     }
 }

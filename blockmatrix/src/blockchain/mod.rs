@@ -19,6 +19,7 @@
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
 pub mod block;
+pub mod block_sink;
 pub mod chain;
 pub mod errors;
 pub mod genesis_assessor;
@@ -35,6 +36,7 @@ pub mod sync_protocol;
 pub mod validation;
 
 pub use block::{Block, BlockHeader};
+pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,

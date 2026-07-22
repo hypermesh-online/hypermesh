@@ -438,6 +438,19 @@ impl AssetRegistration {
 
     /// Create a genesis asset for a node's blockchain
     pub fn genesis(node_coordinate: MatrixCoordinate) -> Self {
+        Self::genesis_at(node_coordinate, SystemTime::now())
+    }
+
+    /// [`genesis`](Self::genesis) with an EXPLICIT creation instant.
+    ///
+    /// S3.0/B2: the genesis registration used to stamp `SystemTime::now()`
+    /// into BOTH its metadata (which feeds `content_hash`) and its
+    /// `creation_timestamp` (which feeds `to_string()`, and hence the genesis
+    /// entry's `asset_hash`). That made the genesis BLOCK unreproducible even
+    /// once the four proofs were made deterministic — the registration is the
+    /// fourth hidden clock read on the genesis path. Passing the genesis epoch
+    /// in removes it.
+    pub fn genesis_at(node_coordinate: MatrixCoordinate, created_at: SystemTime) -> Self {
         let genesis_data = AssetData {
             config: format!(
                 "Genesis asset for node at ({}, {}, {})",
@@ -445,14 +458,16 @@ impl AssetRegistration {
             )
             .into_bytes(),
             definition: b"GENESIS_BLOCK".to_vec(),
-            metadata: format!("Created at {:?}", SystemTime::now()).into_bytes(),
+            metadata: format!("Created at {created_at:?}").into_bytes(),
         };
 
-        Self::from_asset_data(
+        let mut registration = Self::from_asset_data(
             &genesis_data,
             NetworkScope::Global,
             AssetCategory::BaseSystem(BaseSystemType::Blockchain),
-        )
+        );
+        registration.creation_timestamp = created_at;
+        registration
     }
 
     /// Generate content-based hash

@@ -46,6 +46,29 @@ impl NodeBlockchain {
     /// Each `BlockAssetEntry` carries its own `StateProof` which is
     /// validated independently.  The block is built, structurally
     /// validated, and inserted.
+    ///
+    /// CONCURRENCY (S3.0 QA follow-up, FIX 2): the sequence
+    /// read-head → derive index → sign → validate → insert runs under the
+    /// chain's `append_lock` head reservation. Without it every concurrent
+    /// caller reads the same head, derives the same index, and all but one
+    /// fails the duplicate-index check inside `insert_block` — silently
+    /// discarding an already-built, already-FALCON-signed block. S3.0's
+    /// durable write-through widened that window by the fsync duration
+    /// (2 of 8 concurrent writers survived; now 8 of 8).
+    ///
+    /// Serialising is the right shape rather than retry-on-collision: appends
+    /// to a single linear chain are inherently serial (index N+1 is not
+    /// derivable until N exists), a retry loop would have to re-sign on every
+    /// attempt (FALCON-1024 is the expensive step) and offers no liveness
+    /// guarantee under sustained contention, and — critically — with the
+    /// reservation the H3 signature is produced exactly once, on the index the
+    /// block is actually inserted at.
+    ///
+    /// The reservation does NOT cover `insert_received_block`: a received
+    /// block arrives with its index already fixed by its producer, so it
+    /// cannot be re-indexed. A local append that collides with a concurrently
+    /// received block still returns a real error to its caller — never a
+    /// silent drop.
     pub async fn add_block(
         &self,
         mut entries: Vec<BlockAssetEntry>,
@@ -69,6 +92,16 @@ impl NodeBlockchain {
                     format!("State proof validation failed for entry {i}: {e}")
                 })?;
         }
+
+        // FIX 2 — head reservation. Everything from here to the insert must be
+        // serialised: the derived index, the H3 signature produced for it, and
+        // the insert that claims it. Held across `insert_block`, which takes
+        // the chain write locks itself — we hold NONE of them here, so the
+        // documented order (append_lock → blocks → headers → hash_index → head
+        // → stats) is respected and no cycle exists. Entry proof validation
+        // above deliberately stays OUTSIDE the reservation: it is pure,
+        // index-independent CPU work.
+        let _append_reservation = self.append_lock.lock().await;
 
         // 1b. H3 — single local-write signing chokepoint. When this chain has a
         //     node signer (live daemon), attach a FALCON-1024 `signed_proof`

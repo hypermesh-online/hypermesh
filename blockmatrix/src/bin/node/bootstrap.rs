@@ -126,7 +126,7 @@ pub(crate) async fn resume_node(
     nid: &str,
     coord: MatrixCoordinate,
     require_hardware_auth: bool,
-) -> Result<(NodeBootstrap, PersistenceManager)> {
+) -> Result<(NodeBootstrap, std::sync::Arc<PersistenceManager>)> {
     info!(
         "Found persisted state at {}, resuming node",
         data_dir.display()
@@ -139,9 +139,11 @@ pub(crate) async fn resume_node(
         enable_background: true,
         ..PersistenceConfig::default()
     };
-    let persistence = PersistenceManager::new(persistence_config, nid.to_string())
-        .await
-        .context("failed to initialize persistence manager")?;
+    let persistence = std::sync::Arc::new(
+        PersistenceManager::new(persistence_config, nid.to_string())
+            .await
+            .context("failed to initialize persistence manager")?,
+    );
 
     let report = persistence.recover().await.context("recovery failed")?;
     info!(
@@ -194,10 +196,16 @@ pub(crate) async fn resume_node(
     // AUTHORIZATION (to whom an asset belongs), not a numeric magnitude, so the
     // hardening is the FALCON signature + signer↔owner binding, not a raised
     // stake floor.
+    // S3.0/B1: attach the durable block sink so EVERY runtime block
+    // (`add_block` / `insert_received_block` / orphan drain) is written
+    // through to the WAL + block storage. Before S3.0 only genesis and the
+    // hardware block were ever persisted, so everything a running node
+    // recorded was lost on the next restart.
     let blockchain = std::sync::Arc::new(
         NodeBlockchain::from_blocks(coord, blocks)
             .map_err(|e| anyhow::anyhow!("failed to reconstruct blockchain: {}", e))?
-            .with_signer(falcon_identity),
+            .with_signer(falcon_identity)
+            .with_persistence(persistence.clone()),
     );
 
     let cert_path = data_dir.join(nid).join("certificate.json");
@@ -222,7 +230,7 @@ pub(crate) async fn fresh_boot(
     coord: MatrixCoordinate,
     device_node_id: &str,
     require_hardware_auth: bool,
-) -> Result<(NodeBootstrap, PersistenceManager)> {
+) -> Result<(NodeBootstrap, std::sync::Arc<PersistenceManager>)> {
     info!(
         "No persisted state found, initializing fresh node at ({}, {}, {})",
         coord.x, coord.y, coord.z
@@ -242,14 +250,31 @@ pub(crate) async fn fresh_boot(
             &signing_identity_dir,
         )?);
 
+    // S3.0/B1: the persistence manager is created BEFORE the chain so it can be
+    // attached as the chain's durable block sink. Every runtime block then
+    // write-throughs to the WAL + block storage instead of living only in
+    // memory until the process exits.
+    let persistence_config = PersistenceConfig {
+        storage_dir: data_dir.to_path_buf(),
+        enable_background: true,
+        ..PersistenceConfig::default()
+    };
+    let persistence = std::sync::Arc::new(
+        PersistenceManager::new(persistence_config, nid.to_string())
+            .await
+            .context("failed to initialize persistence manager")?,
+    );
+
     // Genesis bound to the canonical device identity (collapses the three
     // historical node IDs into `device_node_id`). The device fingerprint is
     // captured inside the genesis proofs unconditionally. H3: attach the signer
-    // so `add_block` signs produced proofs.
+    // so `add_block` signs produced proofs. B1: attach the block sink so every
+    // subsequent block is durable.
     let bootstrap = NodeBootstrap::initialize_with_identity_and_signer(
         coord,
         device_node_id,
         signer,
+        Some(persistence.clone()),
     )
     .await?;
 
@@ -261,15 +286,8 @@ pub(crate) async fn fresh_boot(
         );
     }
 
-    let persistence_config = PersistenceConfig {
-        storage_dir: data_dir.to_path_buf(),
-        enable_background: true,
-        ..PersistenceConfig::default()
-    };
-    let persistence = PersistenceManager::new(persistence_config, nid.to_string())
-        .await
-        .context("failed to initialize persistence manager")?;
-
+    // Genesis is seeded directly into the chain by `from_genesis` and never
+    // passes through `insert_block`, so it is still persisted explicitly here.
     persistence
         .save_block(bootstrap.genesis_block())
         .await
@@ -309,6 +327,10 @@ pub(crate) async fn fresh_boot(
                 .await
             {
                 Ok(block) => {
+                    // B1: no explicit `save_block` here any more — the chain's
+                    // block sink already wrote this block through (fail-closed)
+                    // before `register_asset_records` returned. Saving again
+                    // would append a duplicate record to the block file.
                     info!(
                         "Registered hardware + identity assets in block #{} (hash: {})",
                         block.index,
@@ -318,9 +340,6 @@ pub(crate) async fn fresh_boot(
                         "Identity registered as blockchain asset (node_id: {})",
                         &falcon_identity.node_id[..16],
                     );
-                    if let Err(e) = persistence.save_block(&block).await {
-                        warn!("Failed to persist hardware asset block: {e}");
-                    }
                 }
                 Err(e) => warn!("Failed to register hardware assets: {e}"),
             }

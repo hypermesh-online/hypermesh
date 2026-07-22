@@ -32,6 +32,56 @@ use crate::assets::core::authz::{
 /// prefix to recover the genesis-recorded fingerprint hex.
 pub const DEVICE_BINDING_PREFIX: &str = "device_fp:";
 
+/// The single temporal INPUT to the genesis path (S3.0/B2).
+///
+/// A genesis block that peers must ADOPT has to be reproducible: two parties
+/// holding the same inputs must derive a byte-identical block. Before S3.0 the
+/// genesis proofs read `SystemTime::now()` in three places and derived the
+/// PoTime nonce from the wall clock, so genesis was unreproducible by
+/// construction and adoption could never be verified.
+///
+/// Every clock read on the genesis path is now lifted into this ONE explicit
+/// value. For a device genesis it is the moment of first boot, captured once by
+/// the daemon (`GenesisEpoch::now`) and thereafter recorded on-chain. For a
+/// network genesis (S3.6) it is part of the network definition, so every joiner
+/// re-derives the identical block.
+///
+/// LIVE handshake / runtime proofs are untouched: they keep `SystemTime::now()`
+/// and their freshness nonces. Determinism applies to genesis ONLY.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GenesisEpoch(SystemTime);
+
+impl GenesisEpoch {
+    /// Read the wall clock ONCE, at the moment a genesis is first created.
+    ///
+    /// This is the only sanctioned clock read on the genesis path, and it is
+    /// deliberately explicit at the call site: after this the epoch is an
+    /// input like any other, recorded in the block and replayable.
+    pub fn now() -> Self {
+        Self(SystemTime::now())
+    }
+
+    /// Build a genesis epoch from a fixed Unix-seconds value — the form a
+    /// network definition carries.
+    pub fn from_unix_secs(secs: u64) -> Self {
+        Self(UNIX_EPOCH + Duration::from_secs(secs))
+    }
+
+    /// The epoch as a `SystemTime` (what the proofs stamp).
+    pub fn as_system_time(self) -> SystemTime {
+        self.0
+    }
+
+    /// Nanoseconds since the Unix epoch — the canonical byte form folded into
+    /// derived values (e.g. the deterministic PoTime nonce).
+    pub fn unix_nanos(self) -> u128 {
+        self.0
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    }
+}
+
 /// Number of BLAKE3 iterations the PoWork challenge answer folds over. Small
 /// enough to be sub-millisecond on an R13 device, large enough that the
 /// answer is a real (non-trivial) function of the fingerprint + nonce.
@@ -132,11 +182,16 @@ impl HardwareAssessment {
 /// threshold; genesis admission requires a bound identity (WHO), not a number.
 /// Hardware capacity figures are descriptive asset attributes (the resource
 /// adapter's `CapacityProfile`), never a proof gate.
-pub fn generate_genesis_proof(hw: &HardwareAssessment) -> StateProof {
-    let stake = build_stake_proof(hw);
-    let time = build_time_proof();
-    let space = build_space_proof(hw);
-    let work = build_work_proof(hw);
+///
+/// DETERMINISM (S3.0/B2): this function is a PURE function of `hw` (device
+/// fingerprint, coordinate, node identity, capacity) and `epoch`. It reads no
+/// clock and draws no randomness, so two nodes holding identical inputs produce
+/// a byte-identical proof — and therefore a byte-identical genesis block.
+pub fn generate_genesis_proof(hw: &HardwareAssessment, epoch: GenesisEpoch) -> StateProof {
+    let stake = build_stake_proof(hw, epoch);
+    let time = build_time_proof(hw, epoch);
+    let space = build_space_proof(hw, epoch);
+    let work = build_work_proof(hw, epoch);
 
     StateProof::new(stake, time, space, work)
 }
@@ -154,10 +209,11 @@ pub fn generate_genesis_proof(hw: &HardwareAssessment) -> StateProof {
 /// - `stake_holder` carries the RECOVERABLE device-fingerprint binding
 ///   (`device_fp:<hex>`) so the continuity gate can read it back and reject a
 ///   copied identity on a different machine.
-fn build_stake_proof(hw: &HardwareAssessment) -> StakeProof {
-    StakeProof::new(
+fn build_stake_proof(hw: &HardwareAssessment, epoch: GenesisEpoch) -> StakeProof {
+    StakeProof::new_at(
         format!("{}{}", DEVICE_BINDING_PREFIX, hw.device_fingerprint.hex()),
         hw.node_id.clone(),
+        epoch.as_system_time(),
     )
 }
 
@@ -168,7 +224,7 @@ fn build_stake_proof(hw: &HardwareAssessment) -> StakeProof {
 /// disk serial + storage path, so tampering with the recorded device binding
 /// is detectable. `node_id` is the device node ID (not the coord string) —
 /// the coordinate is a DERIVED attribute recorded in `storage_path`.
-fn build_space_proof(hw: &HardwareAssessment) -> SpaceProof {
+fn build_space_proof(hw: &HardwareAssessment, epoch: GenesisEpoch) -> SpaceProof {
     let storage_path = format!(
         "/hypermesh/storage/{}#cell=({},{},{})",
         hw.node_id, hw.coordinate.x, hw.coordinate.y, hw.coordinate.z
@@ -191,23 +247,41 @@ fn build_space_proof(hw: &HardwareAssessment) -> SpaceProof {
         total_size: used,
         total_storage: hw.storage_bytes,
         file_hash,
-        proof_timestamp: SystemTime::now(),
+        // Determinism (B2): the genesis epoch, never the live clock.
+        proof_timestamp: epoch.as_system_time(),
     }
 }
 
-/// PoTime (WHEN): real monotonic + wall-clock witness with a freshness nonce.
+/// PoTime (WHEN): the genesis epoch, with a DERIVED (not clock-drawn) nonce.
 ///
-/// Replaces the historic `Duration::from_millis(0)`. The offset is a real,
-/// bounded reading: the sub-second remainder of the wall clock. The nonce
-/// (random, inside `TimeProof::new`) provides replay freshness. This keeps
-/// the offset within `StateRequirements` bounds while being a genuine clock
-/// reading rather than a hardcoded zero.
-fn build_time_proof() -> TimeProof {
-    let offset = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| Duration::from_nanos(d.subsec_nanos() as u64))
-        .unwrap_or_else(|_| Duration::from_millis(0));
-    TimeProof::new(offset)
+/// The offset stays a real, bounded reading — the sub-second remainder of the
+/// genesis epoch — rather than a hardcoded zero, so it remains inside
+/// `StateRequirements` bounds. Both the timestamp and the nonce are functions
+/// of the genesis inputs only.
+///
+/// WHY NO FRESHNESS NONCE HERE (B2): a nonce exists to make a proof
+/// unrepeatable, which is precisely what a genesis block must NOT be — an
+/// adopting peer has to re-derive it. Genesis is never presented as a live
+/// liveness claim, so it needs no replay window. The nonce still varies per
+/// device and per epoch (it is BLAKE3 over the fingerprint, node id and epoch),
+/// so distinct genesis blocks stay distinct. LIVE handshake and runtime proofs
+/// continue to use `TimeProof::new`, which draws its nonce from the wall clock
+/// — replay protection is untouched everywhere except genesis.
+fn build_time_proof(hw: &HardwareAssessment, epoch: GenesisEpoch) -> TimeProof {
+    let nanos = epoch.unix_nanos();
+    let offset = Duration::from_nanos((nanos % 1_000_000_000) as u64);
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"hypermesh-genesis-potime-nonce-v1");
+    hasher.update(&hw.device_fingerprint.digest);
+    hasher.update(hw.node_id.as_bytes());
+    hasher.update(&nanos.to_le_bytes());
+    let digest = hasher.finalize();
+    let mut nonce_bytes = [0u8; 8];
+    nonce_bytes.copy_from_slice(&digest.as_bytes()[..8]);
+    let nonce = u64::from_le_bytes(nonce_bytes).max(1);
+
+    TimeProof::new_at(offset, epoch.as_system_time(), nonce)
 }
 
 /// PoWork (WHAT): the HASH of work done — a device-bound, CPU-timed BLAKE3
@@ -218,11 +292,12 @@ fn build_time_proof() -> TimeProof {
 /// fingerprint || node_id, N)` — real CPU work bound to THIS physical device
 /// (via the fingerprint), not a generic capacity number. `owner_id` is the
 /// device node ID.
-fn build_work_proof(hw: &HardwareAssessment) -> WorkProof {
-    WorkProof::new(
+fn build_work_proof(hw: &HardwareAssessment, epoch: GenesisEpoch) -> WorkProof {
+    WorkProof::new_at(
         hw.node_id.clone(),
         format!("genesis_{}", hw.node_id),
         device_work_hash(hw),
+        epoch.as_system_time(),
     )
 }
 
@@ -358,6 +433,17 @@ mod tests {
         })
     }
 
+    /// A FIXED epoch — used wherever the assertion is about determinism.
+    fn fixed_epoch() -> GenesisEpoch {
+        GenesisEpoch::from_unix_secs(1_780_000_000)
+    }
+
+    /// A live epoch — used wherever the assertion is about `validate()`, which
+    /// rejects an authorization older than 30 days.
+    fn live_epoch() -> GenesisEpoch {
+        GenesisEpoch::now()
+    }
+
     fn test_hw(cores: u32, mhz: u32, mem_gb: u64, storage_gb: u64) -> HardwareAssessment {
         HardwareAssessment {
             cpu_cores: cores,
@@ -376,7 +462,7 @@ mod tests {
     fn r13_minimum_device_passes_default_requirements() {
         // R13: 2-core 1GHz, 4GB RAM, 50GB storage
         let hw = test_hw(2, 1000, 4, 50);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         let reqs = StateRequirements::default();
 
         assert!(
@@ -392,7 +478,7 @@ mod tests {
     #[test]
     fn high_end_device_passes_default_requirements() {
         let hw = test_hw(16, 3500, 64, 2000);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         let reqs = StateRequirements::default();
         assert!(proof.validate_with_requirements(&reqs));
     }
@@ -402,7 +488,7 @@ mod tests {
         // The coordinate is now a DERIVED attribute recorded inside the
         // storage_path (node_id is the device node ID, not the coord string).
         let hw = test_hw(4, 2000, 8, 100);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         assert_eq!(proof.space_proof.node_id, "test-genesis-node");
         assert!(
             proof.space_proof.storage_path.contains("cell=(1,2,3)"),
@@ -414,7 +500,7 @@ mod tests {
     #[test]
     fn stake_holder_carries_recoverable_fingerprint() {
         let hw = test_hw(4, 2000, 8, 100);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         let recovered =
             recorded_fingerprint_hex(&proof).expect("genesis proof must record fingerprint");
         assert_eq!(recovered, hw.device_fingerprint.hex());
@@ -429,8 +515,8 @@ mod tests {
         let mut hw_b = test_hw(4, 2000, 8, 100);
         hw_b.device_fingerprint = test_fingerprint("B");
 
-        let proof_a = generate_genesis_proof(&hw_a);
-        let proof_b = generate_genesis_proof(&hw_b);
+        let proof_a = generate_genesis_proof(&hw_a, live_epoch());
+        let proof_b = generate_genesis_proof(&hw_b, live_epoch());
 
         // Same node label, DIFFERENT device -> different recorded fingerprint
         // and different PoSpace commitment. This is what lets the continuity
@@ -448,7 +534,7 @@ mod tests {
         // BLAKE3 iteration answer bound to the device fingerprint — non-zero,
         // and DIFFERENT for a different device.
         let hw_a = test_hw(4, 2000, 8, 100);
-        let proof_a = generate_genesis_proof(&hw_a);
+        let proof_a = generate_genesis_proof(&hw_a, live_epoch());
         assert_ne!(
             proof_a.work_proof.work_hash, [0u8; 32],
             "work hash must be populated (real work performed)"
@@ -456,7 +542,7 @@ mod tests {
 
         let mut hw_b = test_hw(4, 2000, 8, 100);
         hw_b.device_fingerprint = test_fingerprint("B");
-        let proof_b = generate_genesis_proof(&hw_b);
+        let proof_b = generate_genesis_proof(&hw_b, live_epoch());
         assert_ne!(
             proof_a.work_proof.work_hash, proof_b.work_proof.work_hash,
             "work hash must be device-bound (differs by fingerprint)"
@@ -478,13 +564,69 @@ mod tests {
     }
 
     #[test]
-    fn time_proof_offset_is_real_not_hardcoded_zero() {
+    fn time_proof_offset_is_real_and_bounded() {
         use trustchain::proof_of_state::proof::Proof;
-        // Offset is the sub-second wall-clock remainder — a real reading.
-        // It is virtually never exactly zero, and is always in-bounds.
-        let proof = generate_genesis_proof(&test_hw(2, 1000, 4, 50));
+        // B2: the offset is the sub-second remainder of the GENESIS EPOCH — a
+        // real, bounded reading derived from an input rather than a hidden
+        // clock read, and never a hardcoded zero-by-construction.
+        let proof = generate_genesis_proof(&test_hw(2, 1000, 4, 50), live_epoch());
         assert!(proof.time_proof.validate());
         assert!(proof.time_proof.network_time_offset < std::time::Duration::from_secs(1));
+    }
+
+    #[test]
+    fn genesis_proof_is_deterministic_for_identical_inputs() {
+        // B2: the whole point — no clock read, no drawn nonce, so the same
+        // inputs give the same bytes. Before S3.0 this was impossible:
+        // `SystemTime::now()` appeared in three proofs and the PoTime nonce was
+        // derived from the wall clock, so two calls one nanosecond apart
+        // differed.
+        let hw = test_hw(2, 1000, 4, 50);
+        let a = generate_genesis_proof(&hw, fixed_epoch());
+        let b = generate_genesis_proof(&hw, fixed_epoch());
+
+        assert_eq!(a.stake_proof.stake_timestamp, b.stake_proof.stake_timestamp);
+        assert_eq!(a.space_proof.proof_timestamp, b.space_proof.proof_timestamp);
+        assert_eq!(a.work_proof.proof_timestamp, b.work_proof.proof_timestamp);
+        assert_eq!(a.time_proof.nonce, b.time_proof.nonce);
+        assert_eq!(a.time_proof.proof_hash, b.time_proof.proof_hash);
+        assert_eq!(
+            serde_json::to_vec(&a).expect("test: serialize"),
+            serde_json::to_vec(&b).expect("test: serialize"),
+            "genesis proof must be byte-identical for identical inputs",
+        );
+    }
+
+    #[test]
+    fn genesis_proof_differs_by_epoch_and_by_device() {
+        let hw_a = test_hw(2, 1000, 4, 50);
+        let mut hw_b = test_hw(2, 1000, 4, 50);
+        hw_b.device_fingerprint = test_fingerprint("B");
+
+        let base = generate_genesis_proof(&hw_a, fixed_epoch());
+        let later = generate_genesis_proof(
+            &hw_a,
+            GenesisEpoch::from_unix_secs(1_780_000_001),
+        );
+        let other_device = generate_genesis_proof(&hw_b, fixed_epoch());
+
+        assert_ne!(base.time_proof.nonce, later.time_proof.nonce);
+        assert_ne!(base.time_proof.nonce, other_device.time_proof.nonce);
+        assert_ne!(
+            base.stake_proof.stake_timestamp,
+            later.stake_proof.stake_timestamp,
+        );
+    }
+
+    #[test]
+    fn live_time_proof_still_draws_a_fresh_nonce() {
+        // Guard: B2 must NOT have weakened live replay protection. Two live
+        // `TimeProof::new` calls still differ.
+        use trustchain::proof_of_state::proof::TimeProof;
+        let a = TimeProof::new(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        let b = TimeProof::new(std::time::Duration::from_millis(5));
+        assert_ne!(a.nonce, b.nonce, "live proofs must stay unrepeatable");
     }
 
     #[test]
@@ -492,7 +634,7 @@ mod tests {
         use trustchain::proof_of_state::proof::Proof;
 
         let hw = test_hw(4, 2000, 8, 100);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
 
         assert!(proof.stake_proof.validate(), "PoStake must pass");
         assert!(proof.time_proof.validate(), "PoTime must pass");
@@ -506,7 +648,7 @@ mod tests {
         // amount. The R13 device is authorized because its identity is bound,
         // not because a magnitude clears a threshold.
         let hw = test_hw(2, 1000, 4, 50);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         assert!(
             !proof.stake_proof.stake_holder_id.is_empty(),
             "PoStake must carry a bound identity (authorization)"
@@ -519,7 +661,7 @@ mod tests {
         // Genesis on device A; live boot on device A → Match, startup permitted
         // under both enforcement modes.
         let hw = test_hw(4, 2000, 8, 100);
-        let proof = generate_genesis_proof(&hw);
+        let proof = generate_genesis_proof(&hw, live_epoch());
         let recorded = recorded_fingerprint_hex(&proof);
         let live_hex = hw.device_fingerprint.hex();
 
@@ -534,7 +676,7 @@ mod tests {
         // Genesis recorded on device A.
         let mut hw_a = test_hw(4, 2000, 8, 100);
         hw_a.device_fingerprint = test_fingerprint("A");
-        let genesis_a = generate_genesis_proof(&hw_a);
+        let genesis_a = generate_genesis_proof(&hw_a, live_epoch());
         let recorded = recorded_fingerprint_hex(&genesis_a);
 
         // The SAME genesis directory is copied to machine B, whose LIVE

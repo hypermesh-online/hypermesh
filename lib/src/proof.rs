@@ -138,6 +138,23 @@ impl StakeProof {
         }
     }
 
+    /// Construct an authorization proof with an EXPLICIT timestamp.
+    ///
+    /// Determinism seam (S3.0/B2): the genesis path must be a pure function of
+    /// its inputs, so it cannot read the wall clock. Live/runtime paths keep
+    /// using [`new`](Self::new), which stamps `SystemTime::now()`.
+    pub fn new_at(
+        stake_holder: String,
+        stake_holder_id: String,
+        stake_timestamp: SystemTime,
+    ) -> Self {
+        Self {
+            stake_holder,
+            stake_holder_id,
+            stake_timestamp,
+        }
+    }
+
     /// Structural validity: authorization requires a bound identity (WHO), not
     /// a magnitude. A non-empty `stake_holder_id` is the identity binding.
     pub fn is_structurally_valid(&self) -> bool {
@@ -201,6 +218,24 @@ impl WorkProof {
             workload_id,
             work_hash,
             proof_timestamp: SystemTime::now(),
+        }
+    }
+
+    /// Construct a work proof with an EXPLICIT timestamp.
+    ///
+    /// Determinism seam (S3.0/B2): used by the genesis path, which must not
+    /// read the wall clock. Live/runtime paths keep [`new`](Self::new).
+    pub fn new_at(
+        owner_id: String,
+        workload_id: String,
+        work_hash: [u8; 32],
+        proof_timestamp: SystemTime,
+    ) -> Self {
+        Self {
+            owner_id,
+            workload_id,
+            work_hash,
+            proof_timestamp,
         }
     }
 
@@ -280,6 +315,43 @@ impl TimeProof {
             .unwrap_or(1)
             .max(1);
 
+        let proof_hash = {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&network_time_offset.as_micros().to_le_bytes());
+            let timestamp_micros = time_verification_timestamp
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_micros())
+                .unwrap_or(0);
+            hasher.update(&timestamp_micros.to_le_bytes());
+            hasher.update(&nonce.to_le_bytes());
+            hasher.finalize().as_bytes().to_vec()
+        };
+
+        Self {
+            network_time_offset,
+            time_verification_timestamp,
+            nonce,
+            proof_hash,
+        }
+    }
+
+    /// Construct a time proof with an EXPLICIT timestamp and nonce.
+    ///
+    /// Determinism seam (S3.0/B2). [`new`](Self::new) derives BOTH the
+    /// timestamp and the nonce from the wall clock, which is exactly what a
+    /// LIVE proof needs (replay freshness) and exactly what a GENESIS proof
+    /// cannot have (it must be reproducible by anyone holding the same
+    /// inputs). Genesis supplies its epoch and a nonce derived from the
+    /// genesis inputs; nothing on the handshake / runtime path may use this.
+    ///
+    /// The `proof_hash` is computed over (offset, timestamp, nonce) with the
+    /// same construction as [`new`](Self::new), so
+    /// [`is_structurally_valid`](Self::is_structurally_valid) holds.
+    pub fn new_at(
+        network_time_offset: Duration,
+        time_verification_timestamp: SystemTime,
+        nonce: u64,
+    ) -> Self {
         let proof_hash = {
             let mut hasher = blake3::Hasher::new();
             hasher.update(&network_time_offset.as_micros().to_le_bytes());

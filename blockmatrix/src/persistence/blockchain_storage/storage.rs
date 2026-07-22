@@ -23,6 +23,34 @@ use super::wal::{WalEntry, WalOperation, WalReader, WalWriter};
 /// Block file size threshold (1000 blocks per file)
 const BLOCKS_PER_FILE: u64 = 1000;
 
+/// Run a BLOCKING filesystem operation on the blocking thread pool.
+///
+/// S3.0 QA follow-up (FIX 1). Every write path in this module uses blocking
+/// `std::fs` calls — including `sync_all()`, which parks the calling thread for
+/// the duration of a disk flush. Before S3.0 that ran twice per boot; since the
+/// durable write-through it runs for EVERY block, and the chain holds its four
+/// write locks (`blocks`/`hash_index`/`head`/`stats`) across the call. Running
+/// an fsync directly on a tokio worker therefore stalls that worker AND every
+/// chain reader behind it (`get_height`, `get_block`, IPC queries, propagation,
+/// shard lookups) for the flush duration.
+///
+/// The durability SEMANTICS are unchanged: the caller still awaits completion,
+/// so the data is fsync'd before the function returns `Ok` and
+/// `insert_block`'s fail-closed contract (durability BEFORE visibility) still
+/// holds. This is not fire-and-forget — only the thread the blocking work
+/// happens on has changed.
+async fn blocking_io<T, F>(f: F) -> PersistenceResult<T>
+where
+    F: FnOnce() -> PersistenceResult<T> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(f).await.map_err(|e| {
+        PersistenceError::Io(std::io::Error::other(format!(
+            "blocking storage task failed to complete: {e}"
+        )))
+    })?
+}
+
 /// Manages blockchain storage for a single node
 pub struct BlockchainStorage {
     /// Storage directory
@@ -86,14 +114,18 @@ impl BlockchainStorage {
 
     /// Write a block to storage (WAL + storage files)
     pub async fn write_block(&self, block: &Block) -> PersistenceResult<()> {
-        // Write to WAL first for crash recovery
-        if let Some(wal) = self.wal.write().await.as_mut() {
-            wal.write_entry(WalEntry {
-                op_type: WalOperation::AddBlock,
-                block: block.clone(),
-                timestamp: chrono::Utc::now(),
-            })?;
-        }
+        // Write to WAL first for crash recovery.
+        //
+        // FIX 1: the WAL append is blocking too (`write_all` + `flush` on a
+        // `BufWriter<File>`), so the writer is moved onto the blocking pool and
+        // moved back. `spawn_blocking` needs owned data — hence take/restore
+        // rather than a borrow of the guard across the await.
+        self.append_to_wal(WalEntry {
+            op_type: WalOperation::AddBlock,
+            block: block.clone(),
+            timestamp: chrono::Utc::now(),
+        })
+        .await?;
 
         // Write to storage files
         self.write_block_to_storage(block).await?;
@@ -102,6 +134,43 @@ impl BlockchainStorage {
         self.truncate_wal().await?;
 
         Ok(())
+    }
+
+    /// Append one entry to the write-ahead log, off the async worker.
+    ///
+    /// FIX 1: takes the `WalWriter` out of its slot, does the blocking
+    /// serialize+write+flush on the blocking pool, then puts it back. The
+    /// `wal` write lock is held for the whole round-trip, so no other caller
+    /// can observe (or race on) the empty slot.
+    ///
+    /// An empty slot on entry means a previous blocking task was cancelled or
+    /// panicked and the writer was lost. That is reported as an error rather
+    /// than skipped: silently dropping WAL entries would degrade crash
+    /// recovery invisibly, which is the opposite of the fail-closed contract.
+    async fn append_to_wal(&self, entry: WalEntry) -> PersistenceResult<()> {
+        let mut slot = self.wal.write().await;
+        let Some(writer) = slot.take() else {
+            return Err(PersistenceError::RecoveryFailed(
+                "WAL writer unavailable — refusing to write a block without a \
+                 write-ahead log entry"
+                    .to_string(),
+            ));
+        };
+
+        let (writer, result) = tokio::task::spawn_blocking(move || {
+            let mut writer = writer;
+            let result = writer.write_entry(entry);
+            (writer, result)
+        })
+        .await
+        .map_err(|e| {
+            PersistenceError::Io(std::io::Error::other(format!(
+                "WAL append task failed to complete: {e}"
+            )))
+        })?;
+
+        *slot = Some(writer);
+        result
     }
 
     /// Write block to storage files without WAL logging.
@@ -118,26 +187,31 @@ impl BlockchainStorage {
             .join("blocks")
             .join(format!("{file_id:08}.blk"));
 
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&file_path)?;
-
-        let offset = file.seek(SeekFrom::End(0))?;
         let serialized = serialize_block_v1(block)?;
+        let serialized_len = serialized.len() as u32;
 
-        file.write_all(&serialized)?;
-        file.sync_all()?;
+        // FIX 1: open + seek + write + FSYNC on the blocking pool. Awaited, so
+        // the bytes are durable before this returns — `insert_block` still gets
+        // durability-before-visibility — but the fsync no longer parks a tokio
+        // worker while the chain's write locks are held.
+        let offset = blocking_io(move || {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&file_path)?;
+            let offset = file.seek(SeekFrom::End(0))?;
+            file.write_all(&serialized)?;
+            file.sync_all()?;
+            Ok(offset)
+        })
+        .await?;
 
         // Update indices
         {
             let mut block_index = self.block_index.write().await;
             let mut index_map = self.index_map.write().await;
 
-            block_index.insert(
-                block.hash.clone(),
-                (file_id, offset, serialized.len() as u32),
-            );
+            block_index.insert(block.hash.clone(), (file_id, offset, serialized_len));
             index_map.insert(block.index, block.hash.clone());
         }
 
@@ -169,18 +243,29 @@ impl BlockchainStorage {
     ///
     /// Drops the current WAL writer, truncates the file to zero bytes,
     /// then re-opens a fresh WAL writer.
+    ///
+    /// FIX 1: dropping the old writer flushes it, and the truncate + re-open
+    /// are blocking file operations, so the whole swap runs on the blocking
+    /// pool. The `wal` write lock is held across it, so the transiently empty
+    /// slot is never observable.
     async fn truncate_wal(&self) -> PersistenceResult<()> {
         let wal_path = self.storage_dir.join("wal.log");
         let mut wal = self.wal.write().await;
-        // Drop existing writer so the file handle is released
-        *wal = None;
-        // Truncate file to zero bytes
-        OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(&wal_path)?;
-        // Re-open fresh WAL writer
-        *wal = Some(WalWriter::new(wal_path)?);
+        // Move the existing writer into the blocking task so its flush-on-drop
+        // does not run on an async worker either.
+        let previous = wal.take();
+
+        let writer = blocking_io(move || {
+            drop(previous); // releases the file handle (flushing BufWriter)
+            OpenOptions::new()
+                .write(true)
+                .truncate(true)
+                .open(&wal_path)?;
+            WalWriter::new(wal_path)
+        })
+        .await?;
+
+        *wal = Some(writer);
         Ok(())
     }
 
@@ -295,15 +380,23 @@ impl BlockchainStorage {
     }
 
     /// Save metadata to disk
+    ///
+    /// FIX 1: the serialize happens under the read lock (cheap, in-memory);
+    /// the blocking `fs::write` runs on the blocking pool with owned data, so
+    /// the lock is not held across it.
     async fn save_metadata(&self) -> PersistenceResult<()> {
         let metadata_path = self.storage_dir.join("metadata.json");
-        let metadata = self.metadata.read().await;
+        let json = {
+            let metadata = self.metadata.read().await;
+            serde_json::to_string_pretty(&*metadata)
+                .map_err(|e| PersistenceError::Serialization(e.to_string()))?
+        };
 
-        let json = serde_json::to_string_pretty(&*metadata)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-
-        std::fs::write(metadata_path, json)?;
-        Ok(())
+        blocking_io(move || {
+            std::fs::write(metadata_path, json)?;
+            Ok(())
+        })
+        .await
     }
 
     /// Load metadata from disk
@@ -313,17 +406,24 @@ impl BlockchainStorage {
     }
 
     /// Save block index to disk
+    ///
+    /// FIX 1: snapshot + serialize under the read locks, then release them and
+    /// do the blocking `fs::write` on the blocking pool.
     async fn save_index(&self) -> PersistenceResult<()> {
         let index_path = self.storage_dir.join("index.db");
-        let block_index = self.block_index.read().await;
-        let index_map = self.index_map.read().await;
+        let serialized = {
+            let block_index = self.block_index.read().await;
+            let index_map = self.index_map.read().await;
+            let index_data = (block_index.clone(), index_map.clone());
+            bincode::serialize(&index_data)
+                .map_err(|e| PersistenceError::Serialization(e.to_string()))?
+        };
 
-        let index_data = (block_index.clone(), index_map.clone());
-        let serialized = bincode::serialize(&index_data)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-
-        std::fs::write(index_path, serialized)?;
-        Ok(())
+        blocking_io(move || {
+            std::fs::write(index_path, serialized)?;
+            Ok(())
+        })
+        .await
     }
 
     /// Load block index from disk
@@ -410,10 +510,29 @@ impl BlockchainStorage {
     }
 
     /// Flush WAL to storage
+    ///
+    /// FIX 1: the flush is a blocking write; same take/restore round-trip as
+    /// [`append_to_wal`](Self::append_to_wal). An absent writer here is not an
+    /// error (nothing buffered to flush).
     pub async fn flush_wal(&self) -> PersistenceResult<()> {
-        if let Some(wal) = self.wal.write().await.as_mut() {
-            wal.flush()?;
-        }
-        Ok(())
+        let mut slot = self.wal.write().await;
+        let Some(writer) = slot.take() else {
+            return Ok(());
+        };
+
+        let (writer, result) = tokio::task::spawn_blocking(move || {
+            let mut writer = writer;
+            let result = writer.flush();
+            (writer, result)
+        })
+        .await
+        .map_err(|e| {
+            PersistenceError::Io(std::io::Error::other(format!(
+                "WAL flush task failed to complete: {e}"
+            )))
+        })?;
+
+        *slot = Some(writer);
+        result
     }
 }

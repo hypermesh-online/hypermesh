@@ -196,6 +196,9 @@ windows = { version = "0.58", features = [
 [dev-dependencies]
 tokio-test = { workspace = true }
 tempfile = { workspace = true }
+# Integration tests implement `blockchain::BlockSink` (e.g. the slow-sink probe
+# in tests/s3_0_durability_and_genesis.rs), which is an `#[async_trait]` trait.
+async-trait = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 ctor = "0.2"  # Test initialization functions

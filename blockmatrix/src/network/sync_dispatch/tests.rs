@@ -306,8 +306,11 @@ fn test_dispatch_reflector_heartbeat_updates_existing() {
     assert!((best[0].health_score - 0.9).abs() < f64::EPSILON);
 }
 
+/// S3.0/B3: a hash-only provider can no longer answer a GenesisRequest at all.
+/// It used to reply with `hash_0` in a field called `genesis_block_json` — a
+/// response no peer could verify or adopt. Declining is the correct answer.
 #[test]
-fn test_dispatch_genesis_request_with_provider() {
+fn test_dispatch_genesis_request_hash_only_provider_declines() {
     let mut sm = make_sync_manager();
     sm.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
         .expect("test: join");
@@ -325,18 +328,116 @@ fn test_dispatch_genesis_request_with_provider() {
         network_id: "net-1".to_string(),
     };
 
-    let resp = dispatcher.dispatch(msg, "peer-1", zero_position());
-    match resp {
+    assert!(matches!(
+        dispatcher.dispatch(msg, "peer-1", zero_position()),
+        DispatchResponse::None
+    ));
+}
+
+/// S3.0/B3: the full round trip. Node A serves its REAL genesis block; node B
+/// dispatches the response, deserializes it, verifies the hash and records it
+/// as the network's root — without touching its own chain.
+#[test]
+fn test_genesis_request_response_round_trips_a_real_block() {
+    let coord_a = MatrixCoordinate::new(3, 1, 4).expect("test: valid coord");
+    let genesis_a = Block::genesis(coord_a);
+    let provider = crate::blockchain::sync_manager::NodeBlockchainBlockProvider::from_blocks(
+        std::slice::from_ref(&genesis_a),
+    );
+
+    // --- Node A: serve the genesis ---
+    let mut sm_a = make_sync_manager();
+    sm_a.join_network("net-1".to_string(), PrivacyMode::PUBLIC, 100)
+        .expect("test: join");
+    let mut rp_a = make_reflector_pool();
+    let mut dispatcher_a = SyncDispatcher {
+        sync_manager: &mut sm_a,
+        reflector_pool: &mut rp_a,
+        block_provider: Some(&provider),
+    };
+
+    let reply = dispatcher_a.dispatch(
+        MatrixMessage::GenesisRequest {
+            network_id: "net-1".to_string(),
+        },
+        "peer-b",
+        zero_position(),
+    );
+
+    let (network_id, genesis_block_json) = match reply {
         DispatchResponse::Reply(MatrixMessage::GenesisResponse {
             network_id,
             genesis_block_json,
-        }) => {
-            assert_eq!(network_id, "net-1");
-            // FakeBlockProvider returns "hash_0" for height 0
-            assert_eq!(genesis_block_json, "hash_0");
-        }
+        }) => (network_id, genesis_block_json),
         other => unreachable!("test: expected GenesisResponse, got {:?}", other),
-    }
+    };
+
+    // The payload is a real Block, not a hash.
+    let wire: Block =
+        serde_json::from_str(&genesis_block_json).expect("test: response carries a Block");
+    assert_eq!(wire.hash, genesis_a.hash);
+    assert!(wire.verify_hash());
+    assert!(wire.is_genesis());
+
+    // --- Node B: receive it ---
+    let coord_b = MatrixCoordinate::new(-2, 7, 0).expect("test: valid coord");
+    let own_genesis = Block::genesis(coord_b);
+    assert_ne!(own_genesis.hash, genesis_a.hash);
+
+    let mut sm_b = make_sync_manager();
+    let mut rp_b = make_reflector_pool();
+    let mut dispatcher_b = SyncDispatcher {
+        sync_manager: &mut sm_b,
+        reflector_pool: &mut rp_b,
+        block_provider: None,
+    };
+
+    assert!(matches!(
+        dispatcher_b.dispatch(
+            MatrixMessage::GenesisResponse {
+                network_id: network_id.clone(),
+                genesis_block_json,
+            },
+            "peer-a",
+            zero_position(),
+        ),
+        DispatchResponse::None
+    ));
+
+    let recorded = sm_b
+        .network_genesis(&network_id)
+        .expect("test: B recorded the network genesis");
+    assert_eq!(recorded.hash, genesis_a.hash);
+}
+
+/// S3.0/B3: a tampered genesis is rejected on receipt, not recorded.
+#[test]
+fn test_genesis_response_with_tampered_block_is_rejected() {
+    let coord = MatrixCoordinate::new(3, 1, 4).expect("test: valid coord");
+    let mut tampered = Block::genesis(coord);
+    tampered.hash = "0".repeat(64);
+
+    let mut sm = make_sync_manager();
+    let mut rp = make_reflector_pool();
+    let mut dispatcher = SyncDispatcher {
+        sync_manager: &mut sm,
+        reflector_pool: &mut rp,
+        block_provider: None,
+    };
+
+    dispatcher.dispatch(
+        MatrixMessage::GenesisResponse {
+            network_id: "net-1".to_string(),
+            genesis_block_json: serde_json::to_string(&tampered).expect("test: serialize"),
+        },
+        "peer-a",
+        zero_position(),
+    );
+
+    assert!(
+        sm.network_genesis("net-1").is_none(),
+        "a block whose hash does not verify must never be recorded as a root",
+    );
 }
 
 #[test]

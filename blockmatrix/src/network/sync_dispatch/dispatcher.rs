@@ -94,9 +94,17 @@ impl<'a> SyncDispatcher<'a> {
                 block_hashes,
             } => self.handle_sync_block_request(network_id, block_hashes),
 
-            // Response variants are handled by the caller, not dispatched
-            MatrixMessage::GenesisResponse { .. }
-            | MatrixMessage::HeaderResponse { .. }
+            // S3.0/B3: a GenesisResponse is no longer discarded. It carries a
+            // real serialized Block, which the handler verifies and records as
+            // the network's root (non-destructively — see
+            // `handle_genesis_response`).
+            MatrixMessage::GenesisResponse {
+                network_id,
+                genesis_block_json,
+            } => self.handle_genesis_response(network_id, genesis_block_json),
+
+            // Remaining response variants are handled by the caller
+            MatrixMessage::HeaderResponse { .. }
             | MatrixMessage::SyncBlockResponse { .. } => {
                 debug!("SyncDispatcher: response message handled by caller");
                 DispatchResponse::None

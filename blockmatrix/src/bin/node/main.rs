@@ -118,8 +118,6 @@ async fn main() -> Result<()> {
             .await?
     };
 
-    let persistence = std::sync::Arc::new(persistence);
-
     load_persisted_dns(boot.dns(), &data_dir, &nid).await;
     extract_dns_from_blockchain(boot.dns(), &boot).await;
     boot.verify_self_sufficient().await?;

@@ -257,7 +257,7 @@ impl NodeBootstrap {
     /// 3. DNS with localhost → ::1
     /// 4. Default to Private mode (no network)
     pub async fn initialize(node_coordinate: MatrixCoordinate) -> Result<Self> {
-        Self::initialize_inner(node_coordinate, None, None).await
+        Self::initialize_inner(node_coordinate, None, None, None).await
     }
 
     /// Initialize a new node whose genesis is bound to a canonical device
@@ -270,24 +270,36 @@ impl NodeBootstrap {
         node_coordinate: MatrixCoordinate,
         device_node_id: &str,
     ) -> Result<Self> {
-        Self::initialize_inner(node_coordinate, Some(device_node_id), None).await
+        Self::initialize_inner(node_coordinate, Some(device_node_id), None, None).await
     }
 
     /// H3 variant of [`initialize_with_identity`](Self::initialize_with_identity)
     /// that also attaches a node signer so the fresh chain FALCON-signs the
     /// proof envelope of every locally-produced block.
+    ///
+    /// S3.0/B1: `block_sink` attaches the chain's durable write-through sink.
+    /// The live daemon always supplies one; `None` keeps the memory-only
+    /// behaviour used by library callers and tests.
     pub async fn initialize_with_identity_and_signer(
         node_coordinate: MatrixCoordinate,
         device_node_id: &str,
         signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>,
+        block_sink: Option<Arc<dyn crate::blockchain::BlockSink>>,
     ) -> Result<Self> {
-        Self::initialize_inner(node_coordinate, Some(device_node_id), Some(signer)).await
+        Self::initialize_inner(
+            node_coordinate,
+            Some(device_node_id),
+            Some(signer),
+            block_sink,
+        )
+        .await
     }
 
     async fn initialize_inner(
         node_coordinate: MatrixCoordinate,
         device_node_id: Option<&str>,
         signer: Option<Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>>,
+        block_sink: Option<Arc<dyn crate::blockchain::BlockSink>>,
     ) -> Result<Self> {
         info!(
             "Initializing node at ({}, {}, {}) with self-sufficient bootstrap",
@@ -303,11 +315,13 @@ impl NodeBootstrap {
         info!("Created genesis block: {}", genesis_block.hash);
 
         // 2. Initialize blockchain with the SAME genesis we just built.
-        //    NodeBlockchain::new would call Block::genesis again — and
-        //    Block::genesis is non-deterministic (TimeProof embeds
-        //    SystemTime + nonce), so the two genesis blocks would have
-        //    different hashes. Block 1 would chain off the in-memory genesis
-        //    while disk holds the persisted one, breaking restart replay.
+        //    NodeBlockchain::new would call Block::genesis again — and each
+        //    call takes a fresh `GenesisEpoch::now()` (S3.0/B2: the epoch is
+        //    now the ONE explicit temporal input, rather than three hidden
+        //    `SystemTime::now()` reads plus a clock-derived nonce), so the two
+        //    genesis blocks would still have different hashes. Block 1 would
+        //    chain off the in-memory genesis while disk holds the persisted
+        //    one, breaking restart replay.
         //
         //    Block-accept validation uses `default()` StateRequirements.
         //    PoStake is AUTHORIZATION (to whom an asset belongs), not a numeric
@@ -318,6 +332,11 @@ impl NodeBootstrap {
         // proof envelope of every locally-produced block.
         if let Some(s) = signer {
             chain = chain.with_signer(s);
+        }
+        // S3.0/B1: attach the durable block sink so every block added after
+        // genesis survives a restart.
+        if let Some(sink) = block_sink {
+            chain = chain.with_persistence(sink);
         }
         let blockchain = Arc::new(chain);
 

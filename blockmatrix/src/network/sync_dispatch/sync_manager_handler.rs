@@ -78,7 +78,18 @@ impl<'a> SyncDispatcher<'a> {
         DispatchResponse::None
     }
 
-    /// Return the genesis block (index 0) from the local chain.
+    /// Serve the FULL genesis block (index 0) from the local chain.
+    ///
+    /// S3.0/B3: this used to return `hashes[0]` — a 64-char hash string — in a
+    /// field named `genesis_block_json`, with an in-code note that the caller
+    /// should "follow up". Nothing followed up, and a hash is not adoptable:
+    /// the receiver cannot verify a chain root it has never seen. The response
+    /// now carries the serialized [`Block`], which the requester deserializes,
+    /// hash-verifies and records.
+    ///
+    /// If the provider cannot supply a full genesis we answer NOTHING rather
+    /// than something genesis-shaped — a peer must never treat an unverifiable
+    /// placeholder as a chain root.
     pub(super) fn handle_genesis_request(&self, network_id: String) -> DispatchResponse {
         let provider = match self.block_provider {
             Some(p) => p,
@@ -91,27 +102,86 @@ impl<'a> SyncDispatcher<'a> {
             }
         };
 
-        let (hashes, _height) = provider.get_block_hashes(0, 1);
-        if hashes.is_empty() {
-            warn!(
-                network = %network_id,
-                "GenesisRequest: no genesis block found",
-            );
-            return DispatchResponse::None;
-        }
+        let genesis = match provider.get_genesis_block() {
+            Some(block) => block,
+            None => {
+                warn!(
+                    network = %network_id,
+                    "GenesisRequest: provider has no full genesis block to serve",
+                );
+                return DispatchResponse::None;
+            }
+        };
 
-        // The provider only gives hashes; we need the full block.
-        // For GenesisRequest we return the hash so the caller can fetch
-        // the full block via BlockFetchRequest. We encode the hash as a
-        // GenesisResponse with the genesis hash in the JSON field.
-        //
-        // NOTE: The full-block provider pattern requires the caller to
-        // supply a FullBlockProvider (see NodeBlockchainFullBlockProvider).
-        // For now, return the hash so the caller can follow up.
+        let genesis_block_json = match serde_json::to_string(&genesis) {
+            Ok(json) => json,
+            Err(e) => {
+                warn!(
+                    network = %network_id,
+                    "GenesisRequest: failed to serialize genesis block: {e}",
+                );
+                return DispatchResponse::None;
+            }
+        };
+
+        info!(
+            network = %network_id,
+            genesis = %&genesis.hash[..16.min(genesis.hash.len())],
+            "Serving full genesis block",
+        );
+
         DispatchResponse::Reply(MatrixMessage::GenesisResponse {
             network_id,
-            genesis_block_json: hashes[0].clone(),
+            genesis_block_json,
         })
+    }
+
+    /// Receive a peer's genesis block and record it for `network_id`.
+    ///
+    /// S3.0/B3: the dispatcher used to log-and-drop every `GenesisResponse`, so
+    /// adoption never happened at all. It now deserializes the block,
+    /// re-derives and checks its hash, and hands it to the `SyncManager` as
+    /// that network's verified root.
+    ///
+    /// WHAT THIS DOES NOT DO (deferred to S3.4): it does NOT call
+    /// `NodeBlockchain::adopt_genesis`, which CLEARS the local chain. Wiping a
+    /// sovereign device chain in order to join a network is the wrong
+    /// primitive; the device chain and the adopted network chain have to
+    /// coexist in a multi-chain container. Until that container exists, S3.0
+    /// lands the transport half — a real block is requested, received,
+    /// verified and retained — and nothing destructive.
+    pub(super) fn handle_genesis_response(
+        &mut self,
+        network_id: String,
+        genesis_block_json: String,
+    ) -> DispatchResponse {
+        let genesis: crate::blockchain::Block =
+            match serde_json::from_str(&genesis_block_json) {
+                Ok(block) => block,
+                Err(e) => {
+                    warn!(
+                        network = %network_id,
+                        "GenesisResponse rejected — not a deserializable Block: {e}",
+                    );
+                    return DispatchResponse::None;
+                }
+            };
+
+        match self
+            .sync_manager
+            .record_network_genesis(&network_id, genesis)
+        {
+            Ok(()) => debug!(
+                network = %network_id,
+                "GenesisResponse accepted and recorded",
+            ),
+            Err(e) => warn!(
+                network = %network_id,
+                "GenesisResponse rejected: {e}",
+            ),
+        }
+
+        DispatchResponse::None
     }
 
     /// Return block headers from `from_height` up to `max_count`.

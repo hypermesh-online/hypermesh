@@ -37,6 +37,18 @@ pub trait BlockProvider: Send + Sync {
     ///
     /// The second element of the tuple is the provider's current chain height.
     fn get_block_hashes(&self, from_height: u64, max_blocks: u32) -> (Vec<String>, u64);
+
+    /// Return the FULL genesis block (index 0), when this provider has it.
+    ///
+    /// S3.0/B3: `handle_genesis_request` used to answer a `GenesisRequest` with
+    /// a hash string stuffed into a field named `genesis_block_json`, because
+    /// the provider exposed hashes only. A peer cannot adopt a hash. Providers
+    /// that hold real blocks override this; hash-only providers keep the
+    /// default `None` and the handler declines to answer rather than replying
+    /// with something that merely looks like a genesis block.
+    fn get_genesis_block(&self) -> Option<super::block::Block> {
+        None
+    }
 }
 
 /// Receives notifications when the SyncManager transitions a network to
@@ -63,6 +75,9 @@ pub struct SyncManager {
     config: SyncConfig,
     /// Optional observer notified on sync completion
     observer: Option<Box<dyn SyncObserver>>,
+    /// S3.0/B3: verified genesis block per network, recorded on receipt of a
+    /// `GenesisResponse`. Non-destructive: the device chain is untouched.
+    network_genesis: HashMap<String, super::block::Block>,
     /// Phase I.1: when `true`, [`Self::generate_sync_request`] emits
     /// [`SyncMessage::HeaderRequest`] instead of [`SyncMessage::Request`].
     ///
@@ -165,6 +180,7 @@ impl SyncManager {
             sync_states: HashMap::new(),
             config,
             observer: None,
+            network_genesis: HashMap::new(),
             prefer_headers_mode: false,
             headers_only_sync_count: 0,
         }
@@ -249,6 +265,63 @@ impl SyncManager {
         self.sync_states.insert(network_id, SyncState::Discovering);
 
         Ok(())
+    }
+
+    /// S3.0/B3: record a VERIFIED foreign genesis block for `network_id`.
+    ///
+    /// NON-DESTRUCTIVE by construction. This does not touch the device chain —
+    /// it records "this is the genesis the network `network_id` is rooted at"
+    /// alongside the membership, which is what a joiner needs in order to
+    /// recognise that network's chain later. The destructive
+    /// `NodeBlockchain::adopt_genesis` (which clears the local chain) is
+    /// deliberately NOT called from here; a container that holds the device
+    /// chain and adopted network chains side by side is S3.4's job.
+    ///
+    /// The caller is responsible for having verified the block first (index 0,
+    /// `is_genesis`, `verify_hash`); this method re-checks those invariants
+    /// because a recorded root that fails them is worse than none.
+    pub fn record_network_genesis(
+        &mut self,
+        network_id: &str,
+        genesis: super::block::Block,
+    ) -> Result<(), String> {
+        if !genesis.is_genesis() {
+            return Err(format!(
+                "Refusing genesis for {network_id}: index {} / previous_hash {} is not a genesis",
+                genesis.index,
+                &genesis.previous_hash[..16.min(genesis.previous_hash.len())],
+            ));
+        }
+        if !genesis.verify_hash() {
+            return Err(format!(
+                "Refusing genesis for {network_id}: hash verification failed",
+            ));
+        }
+
+        if let Some(existing) = self.network_genesis.get(network_id) {
+            if existing.hash != genesis.hash {
+                return Err(format!(
+                    "Refusing genesis for {network_id}: conflicts with the already-recorded \
+                     root {} (a network has exactly one genesis)",
+                    &existing.hash[..16.min(existing.hash.len())],
+                ));
+            }
+            return Ok(());
+        }
+
+        info!(
+            network = %network_id,
+            genesis = %&genesis.hash[..16.min(genesis.hash.len())],
+            "Recorded verified network genesis (non-destructive)",
+        );
+        self.network_genesis
+            .insert(network_id.to_string(), genesis);
+        Ok(())
+    }
+
+    /// The verified genesis block recorded for `network_id`, if any.
+    pub fn network_genesis(&self, network_id: &str) -> Option<&super::block::Block> {
+        self.network_genesis.get(network_id)
     }
 
     /// Leave a Network scope chain
@@ -572,6 +645,91 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(mgr.active_network_count(), 0);
         assert!(!mgr.is_member("net-alpha"));
+    }
+
+    // ------------------------------------------------------------------
+    // S3.0/B3 — record_network_genesis (QA follow-up: the refusal branches
+    // were correct but untested).
+    // ------------------------------------------------------------------
+
+    fn genesis_block(x: i64) -> super::super::block::Block {
+        let coord = crate::matrix::coordinate::MatrixCoordinate::new(x, 0, 0)
+            .expect("test: valid coordinate");
+        super::super::block::Block::genesis(coord)
+    }
+
+    #[test]
+    fn test_record_network_genesis_accepts_then_is_idempotent() {
+        let mut mgr = SyncManager::new("dev-chain".to_string(), default_config());
+        let genesis = genesis_block(1);
+
+        mgr.record_network_genesis("net-1", genesis.clone())
+            .expect("test: first verified root is recorded");
+        assert_eq!(
+            mgr.network_genesis("net-1").map(|b| b.hash.clone()),
+            Some(genesis.hash.clone()),
+        );
+
+        // Re-recording the SAME root is a no-op, not an error (a peer may
+        // announce the network's genesis more than once).
+        mgr.record_network_genesis("net-1", genesis.clone())
+            .expect("test: re-recording the identical root is idempotent");
+        assert_eq!(
+            mgr.network_genesis("net-1").map(|b| b.hash.clone()),
+            Some(genesis.hash),
+        );
+    }
+
+    #[test]
+    fn test_record_network_genesis_refuses_conflicting_second_root() {
+        let mut mgr = SyncManager::new("dev-chain".to_string(), default_config());
+        let first = genesis_block(1);
+        let second = genesis_block(2);
+        assert_ne!(first.hash, second.hash, "test setup: distinct roots");
+
+        mgr.record_network_genesis("net-1", first.clone())
+            .expect("test: first root recorded");
+
+        // A network has exactly one genesis: a second, DIFFERENT root must be
+        // refused — and must not overwrite the one already recorded.
+        let err = mgr
+            .record_network_genesis("net-1", second)
+            .expect_err("test: conflicting second root must be refused");
+        assert!(
+            err.contains("conflicts with the already-recorded"),
+            "error should cite the conflicting root, got: {err}",
+        );
+        assert_eq!(
+            mgr.network_genesis("net-1").map(|b| b.hash.clone()),
+            Some(first.hash),
+            "the originally recorded root must be untouched",
+        );
+    }
+
+    #[test]
+    fn test_record_network_genesis_refuses_non_genesis_and_bad_hash() {
+        let mut mgr = SyncManager::new("dev-chain".to_string(), default_config());
+
+        // (a) Not a genesis block (index != 0).
+        let mut not_genesis = genesis_block(3);
+        not_genesis.index = 7;
+        let err = mgr
+            .record_network_genesis("net-1", not_genesis)
+            .expect_err("test: non-genesis must be refused");
+        assert!(err.contains("is not a genesis"), "got: {err}");
+
+        // (b) Genesis-shaped but the hash does not recompute.
+        let mut tampered = genesis_block(4);
+        tampered.hash = "0".repeat(64);
+        let err = mgr
+            .record_network_genesis("net-1", tampered)
+            .expect_err("test: unverifiable hash must be refused");
+        assert!(err.contains("hash verification failed"), "got: {err}");
+
+        assert!(
+            mgr.network_genesis("net-1").is_none(),
+            "no refused block may be recorded",
+        );
     }
 
     #[test]

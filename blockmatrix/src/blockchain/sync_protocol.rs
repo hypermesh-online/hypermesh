@@ -111,6 +111,9 @@ pub enum SyncMessage {
 pub struct NodeBlockchainBlockProvider {
     block_hashes: Vec<String>,
     chain_height: u64,
+    /// S3.0/B3: the FULL genesis block, so a `GenesisRequest` can be answered
+    /// with something a peer can actually verify and adopt.
+    genesis: Option<super::block::Block>,
 }
 
 impl NodeBlockchainBlockProvider {
@@ -119,6 +122,7 @@ impl NodeBlockchainBlockProvider {
         Self {
             block_hashes: blocks.iter().map(|b| b.hash.clone()).collect(),
             chain_height: blocks.len() as u64,
+            genesis: blocks.iter().find(|b| b.is_genesis()).cloned(),
         }
     }
 }
@@ -131,6 +135,10 @@ impl BlockProvider for NodeBlockchainBlockProvider {
         }
         let end = (start + max_blocks as usize).min(self.block_hashes.len());
         (self.block_hashes[start..end].to_vec(), self.chain_height)
+    }
+
+    fn get_genesis_block(&self) -> Option<super::block::Block> {
+        self.genesis.clone()
     }
 }
 
