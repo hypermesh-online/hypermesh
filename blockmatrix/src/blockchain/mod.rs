@@ -18,6 +18,7 @@
 //! This fundamentally differs from traditional blockchain architectures where
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
+pub mod asset_index;
 pub mod block;
 pub mod block_sink;
 pub mod chain;
@@ -35,6 +36,7 @@ pub mod sync_manager;
 pub mod sync_protocol;
 pub mod validation;
 
+pub use asset_index::{AssetChainIndex, AssetEntryLocator};
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
