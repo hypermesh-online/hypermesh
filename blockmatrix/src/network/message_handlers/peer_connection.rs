@@ -20,13 +20,15 @@ use super::super::{
 };
 use super::super::peer_auth::{self, AuthenticatedPeers};
 
+use super::attestation_handlers::handle_mirror_attestation;
 use super::block_handlers::handle_block_announce;
 use super::distributed_ca::{handle_ca_key_share, handle_ca_sign_request, handle_ca_sign_response};
 use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_GOSSIP,
-    TAG_KEY_ROTATION, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_LOCATE, TAG_SHARD_SEND,
+    TAG_KEY_ROTATION, TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_LOCATE,
+    TAG_SHARD_SEND,
     TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
     TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE,
     TAG_TRANSFER_ROLLBACK,
@@ -130,6 +132,12 @@ pub(crate) async fn dispatch_message(
             | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
             | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
             | TAG_TRANSFER_RELEASE | TAG_TRANSFER_ROLLBACK
+            // S3.4: an attestation is a third party's statement about an asset
+            // we hold, cached in a BOUNDED pool and eventually sealed on-chain
+            // by the owner. Same standing as a block announcement: each one is
+            // independently FALCON-verified, AND the submitting peer must have
+            // passed the bilateral PoS handshake for this network.
+            | TAG_MIRROR_ATTEST
     );
     if needs_auth
         && !peer_auth::verify_peer_access(
@@ -172,6 +180,11 @@ pub(crate) async fn dispatch_message(
         }
         TAG_SHARD_ANNOUNCE => {
             handle_shard_announce(data, peer_node_id, ctx).await;
+        }
+        TAG_MIRROR_ATTEST => {
+            // S3.4: a mirror's signed "I hold and validated this" statement.
+            // Fire-and-forget; the handler owns every rejection path.
+            handle_mirror_attestation(data, peer_node_id, ctx).await;
         }
         TAG_SHARD_LOCATE => {
             // A2 upstream tracker fallback: answer "who has content_hash X?"

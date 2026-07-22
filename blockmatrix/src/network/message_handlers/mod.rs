@@ -8,10 +8,12 @@
 //! - `protocol`: wire-protocol tag bytes
 //! - `peer_connection`: incoming connection routing, handshake, message loop, dispatch
 //! - `block_handlers`: block announcement, propagation, DNS extraction
+//! - `attestation_handlers`: S3.4 mirror-attestation submission (send + receive)
 //! - `sync_and_reflection`: sync messages, reflector registration, shard/transfer/DNS/invite/etc.
 //! - `distributed_ca`: distributed CA key share + threshold signing
 //! - `message_utils`: sync reply, DNS peer resolution, metrics, gossip
 
+mod attestation_handlers;
 mod block_handlers;
 mod distributed_ca;
 mod dns_protocol;
@@ -26,7 +28,7 @@ pub(crate) use protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE,
     TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE, TAG_GOSSIP, TAG_KEY_ROTATION,
-    TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
+    TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
     TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ,
     TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
 };
@@ -38,6 +40,10 @@ pub use dns_protocol::{select_canonical, DistributedDnsQuery, DistributedDnsResp
 pub(crate) use peer_connection::{
     dispatch_message, handle_incoming_connection, run_peer_message_loop,
 };
+
+// S3.4 mirror-attestation send path — used by a mirror to submit its
+// attestation to the peer it fetched from.
+pub use attestation_handlers::send_mirror_attestation;
 
 // DNS network fallback used by the DNS resolver.
 pub use message_utils::{distributed_dns_resolve, resolve_from_network};

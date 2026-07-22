@@ -35,7 +35,12 @@ fn accept_unsigned_blocks() -> bool {
 /// we bind `hex(BLAKE3(signer_pubkey))` to that claimed WHO. A valid signature
 /// from key K over a proof claiming a DIFFERENT author is rejected — otherwise
 /// any node could sign a proof asserting someone else's stake.
-fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
+///
+/// `pub(crate)` because S3.4's foreign asset-chain accept
+/// ([`super::foreign`]) asks the identical question of every entry in an
+/// imported history. Sharing the function — rather than restating the rule —
+/// is what keeps "who may author an entry" a single definition in this crate.
+pub(crate) fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
     let derived = blake3::hash(signer_pubkey).to_hex().to_string();
     entry.state_proof.stake_proof.stake_holder_id == derived
 }

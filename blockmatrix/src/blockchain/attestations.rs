@@ -115,6 +115,58 @@ pub fn verify_attestation(attestation: &MirrorAttestation) -> bool {
     .unwrap_or(false)
 }
 
+/// S3.4 — maximum live attestations held for ONE asset.
+///
+/// One mirror at one cell has exactly one live attestation, so this is a cap on
+/// distinct `(matrix cell, mirror)` attestors per asset. FALCON keypairs are
+/// free to mint, so identity count is not a scarce resource and this bound is
+/// what stops one asset's mirror set from growing without limit.
+pub const MAX_ATTESTATIONS_PER_ASSET: usize = 256;
+
+/// S3.4 — maximum live attestations held across all assets.
+///
+/// The backstop for the per-asset cap: without it, an attacker holding N assets
+/// could still reach `N × MAX_ATTESTATIONS_PER_ASSET`. The wire surface
+/// additionally refuses attestations for assets this container does not hold,
+/// which is what keeps N itself bounded by real local state rather than by
+/// attacker-chosen hashes.
+pub const MAX_TOTAL_ATTESTATIONS: usize = 8192;
+
+/// Why a verified attestation could not be recorded.
+///
+/// Distinct from a verification failure on purpose: the attestation is sound,
+/// there is simply no room. Callers log it differently, and a mirror can retry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PoolFull {
+    /// This asset already holds [`MAX_ATTESTATIONS_PER_ASSET`] attestors.
+    Asset {
+        /// The per-asset cap.
+        limit: usize,
+    },
+    /// The pool holds [`MAX_TOTAL_ATTESTATIONS`] attestations across all assets.
+    Global {
+        /// The global cap.
+        limit: usize,
+    },
+}
+
+impl std::fmt::Display for PoolFull {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Asset { limit } => write!(
+                f,
+                "this asset already holds {limit} mirror attestations — refusing a new \
+                 attestor (nothing already recorded is evicted)"
+            ),
+            Self::Global { limit } => write!(
+                f,
+                "the mirror attestation pool holds {limit} attestations — refusing a new \
+                 attestor (nothing already recorded is evicted)"
+            ),
+        }
+    }
+}
+
 /// Off-spine accumulation of mirror attestations, organized by matrix position.
 ///
 /// `asset_hash → BTreeMap<(matrix cell, mirror), attestation>`.
@@ -125,9 +177,34 @@ pub fn verify_attestation(attestation: &MirrorAttestation) -> bool {
 /// arrival. Dedupe falls out of the same key — one mirror at one cell has
 /// exactly one live attestation, and re-attesting at a newer spine point
 /// replaces it rather than inflating the set.
+///
+/// # Bounded, and why nothing is evicted (S3.4)
+///
+/// Once attestations arrive over the wire this map is fed by strangers, and an
+/// unbounded map fed by strangers is a memory-exhaustion primitive. It is
+/// therefore capped per asset ([`MAX_ATTESTATIONS_PER_ASSET`]) and globally
+/// ([`MAX_TOTAL_ATTESTATIONS`]), and at capacity a NEW attestor is REFUSED.
+///
+/// Eviction was rejected deliberately. An attestation is a mirror's evidence
+/// that it held and validated an asset, and the owner's seal is what makes that
+/// evidence durable. Any eviction policy — oldest-first, random, anything — is
+/// a lever an attacker pulls by flooding: mint attestors until the honest
+/// mirror's record is pushed out, then wait for the owner to seal a set that no
+/// longer contains it. Refusing admission at capacity cannot delete evidence
+/// that is already recorded; it can only delay a newcomer, and a REPLACEMENT
+/// (same cell, same mirror, newer spine point) is never refused because it does
+/// not grow the set.
+///
+/// The residual, stated rather than hidden: an attacker who wins the race can
+/// occupy an asset's 256 slots and keep later honest mirrors out until an
+/// operator releases them. That is a delay, not a deletion, and it is strictly
+/// preferable to handing out a deletion primitive.
 #[derive(Clone, Debug, Default)]
 pub struct MirrorAttestationPool {
     by_asset: HashMap<[u8; 32], BTreeMap<(MatrixIndex, String), MirrorAttestation>>,
+    /// Live attestation count across every asset, maintained on insert/removal
+    /// so the global bound is O(1) rather than a walk of every asset.
+    total: usize,
 }
 
 impl MirrorAttestationPool {
@@ -139,15 +216,48 @@ impl MirrorAttestationPool {
     /// Record a VERIFIED attestation, replacing any prior attestation from the
     /// same mirror at the same matrix cell.
     ///
-    /// Returns the attestation it displaced, if any. The caller must have run
-    /// [`verify_attestation`] first — [`NodeBlockchain::record_mirror_attestation`]
-    /// is the gate that guarantees it.
-    pub fn insert(&mut self, attestation: MirrorAttestation) -> Option<MirrorAttestation> {
+    /// Returns `Ok(displaced)` — the attestation this one replaced, if any — or
+    /// [`PoolFull`] when admitting a NEW attestor would exceed a bound. A
+    /// replacement is always admitted: it does not grow the set.
+    ///
+    /// The caller must have run [`verify_attestation`] first —
+    /// [`NodeBlockchain::record_mirror_attestation`] is the gate that
+    /// guarantees it.
+    pub fn try_insert(
+        &mut self,
+        attestation: MirrorAttestation,
+    ) -> Result<Option<MirrorAttestation>, PoolFull> {
         let key = (attestation.matrix_index, attestation.mirror.clone());
-        self.by_asset
+
+        // Judge capacity WITHOUT creating the asset's slot: a refused
+        // attestation must not leave an empty set behind (which would itself be
+        // an unbounded-key primitive keyed by an attacker-chosen asset hash).
+        let existing = self.by_asset.get(&attestation.asset_hash);
+        let is_replacement = existing.is_some_and(|set| set.contains_key(&key));
+        if !is_replacement {
+            if existing.map_or(0, BTreeMap::len) >= MAX_ATTESTATIONS_PER_ASSET {
+                return Err(PoolFull::Asset {
+                    limit: MAX_ATTESTATIONS_PER_ASSET,
+                });
+            }
+            if self.total >= MAX_TOTAL_ATTESTATIONS {
+                return Err(PoolFull::Global {
+                    limit: MAX_TOTAL_ATTESTATIONS,
+                });
+            }
+            self.total += 1;
+        }
+
+        Ok(self
+            .by_asset
             .entry(attestation.asset_hash)
             .or_default()
-            .insert(key, attestation)
+            .insert(key, attestation))
+    }
+
+    /// Live attestations held across every asset.
+    pub fn total(&self) -> usize {
+        self.total
     }
 
     /// Every attestation held for `asset_hash`, in canonical matrix order.
@@ -183,7 +293,9 @@ impl MirrorAttestationPool {
     /// Drop every attestation for `asset_hash` (e.g. the asset left this
     /// container). Returns how many were dropped.
     pub fn clear_asset(&mut self, asset_hash: &[u8; 32]) -> usize {
-        self.by_asset.remove(asset_hash).map_or(0, |set| set.len())
+        let dropped = self.by_asset.remove(asset_hash).map_or(0, |set| set.len());
+        self.total = self.total.saturating_sub(dropped);
+        dropped
     }
 }
 
@@ -256,11 +368,22 @@ impl NodeBlockchain {
             );
         }
 
+        // S3.4: the pool is bounded. A verified attestation can still be
+        // refused for want of room — see [`MirrorAttestationPool`] for why the
+        // answer is refuse-the-newcomer rather than evict-an-incumbent.
         let displaced = self
             .mirror_attestations
             .write()
             .await
-            .insert(attestation.clone());
+            .try_insert(attestation.clone())
+            .map_err(|full| {
+                warn!(
+                    mirror = %attestation.mirror,
+                    cell = %attestation.matrix_index,
+                    "S3.4: mirror attestation verified but not recorded — {full}"
+                );
+                format!("mirror attestation not recorded: {full}")
+            })?;
 
         info!(
             mirror = %attestation.mirror,
@@ -269,6 +392,42 @@ impl NodeBlockchain {
             "S3.3: recorded mirror attestation off-spine"
         );
         Ok(())
+    }
+
+    /// S3.4 — the accept path for an attestation that arrived OVER THE WIRE.
+    ///
+    /// One admission rule on top of
+    /// [`record_mirror_attestation`](Self::record_mirror_attestation), and NOT a
+    /// second list of verification checks: **we only cache statements about
+    /// assets this container holds** — on its own spine, or as a foreign
+    /// asset-chain adopted by
+    /// [`accept_foreign_asset_chain`](Self::accept_foreign_asset_chain).
+    ///
+    /// The pool is keyed by a 32-byte asset hash that a remote sender chooses
+    /// freely. Without this rule the key space belongs to the sender, and the
+    /// global pool bound becomes a lever rather than a protection: fill it with
+    /// statements about assets nobody has, and honest attestations for real
+    /// assets get refused. Tying the key space to assets we actually hold makes
+    /// the bound a function of local state.
+    ///
+    /// It is also the cheap gate: an unknown asset is refused by a map probe,
+    /// before any FALCON-1024 verification is attempted.
+    ///
+    /// Everything else — envelope structure, identity binding, the signature
+    /// itself, the pool bound — is [`verify_attestation`] and the pool, reached
+    /// by delegation. Nothing is restated here.
+    pub async fn accept_wire_attestation(
+        &self,
+        attestation: MirrorAttestation,
+    ) -> Result<(), String> {
+        if !self.holds_asset(&attestation.asset_hash).await {
+            return Err(format!(
+                "mirror attestation not cached: this container holds no asset {} \
+                 (neither on its spine nor as an adopted foreign chain)",
+                &hex::encode(attestation.asset_hash)[..16],
+            ));
+        }
+        self.record_mirror_attestation(attestation).await
     }
 
     /// Every attestation accumulated for `asset_hash`, in canonical matrix
@@ -284,6 +443,12 @@ impl NodeBlockchain {
     /// How many mirrors have attested to `asset_hash`.
     pub async fn mirror_attestation_count(&self, asset_hash: &[u8; 32]) -> usize {
         self.mirror_attestations.read().await.count_for(asset_hash)
+    }
+
+    /// S3.4 — live attestations held across every asset. This is the quantity
+    /// [`MAX_TOTAL_ATTESTATIONS`] bounds.
+    pub async fn mirror_attestation_total(&self) -> usize {
+        self.mirror_attestations.read().await.total()
     }
 
     /// Seal the accumulated mirror attestations for `asset_hash` into the

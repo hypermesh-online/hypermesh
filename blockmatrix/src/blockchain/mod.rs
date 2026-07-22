@@ -24,6 +24,7 @@ pub mod block;
 pub mod block_sink;
 pub mod chain;
 pub mod errors;
+pub mod foreign;
 pub mod genesis_assessor;
 pub mod genesis_auth;
 pub mod genesis_crypto;
@@ -40,11 +41,16 @@ pub mod validation;
 
 pub use asset_index::{AssetChainIndex, AssetEntryLocator, AssetHighWater};
 pub use attestations::{
-    matrix_index_of, verify_attestation, MirrorAttestationPool, MirrorSealReceipt,
+    matrix_index_of, verify_attestation, MirrorAttestationPool, MirrorSealReceipt, PoolFull,
+    MAX_ATTESTATIONS_PER_ASSET, MAX_TOTAL_ATTESTATIONS,
 };
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
+pub use foreign::{
+    ForeignAssetChain, ForeignChainReceipt, ForeignChainReject, ForeignChainStore,
+    MAX_FOREIGN_CHAINS, MAX_FOREIGN_CHAIN_ENTRIES,
+};
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,
 };
