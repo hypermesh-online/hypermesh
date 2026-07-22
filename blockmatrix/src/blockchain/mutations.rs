@@ -523,6 +523,25 @@ impl NodeBlockchain {
                     );
                 }
             }
+
+            // S3.4: an entry carrying a `state_proof.mirror_seal` is accepted
+            // here WITHOUT checking WHO sealed it. Locally,
+            // `check_seal_authority` requires `sealed_by` to be an OWNER of the
+            // asset AND to be this node's own signing identity; a RECEIVED entry
+            // gets neither check, so a peer may hand us a block whose
+            // `MirrorSeal.sealed_by` is neither the entry's claimed author
+            // (`stake_proof.stake_holder_id`, already FALCON-bound above) nor an
+            // owner in the asset's `AuthorizationSet`. The seal then becomes
+            // on-chain, hash-committed mirror history attributed to an identity
+            // that never authorised it.
+            //
+            // The gate belongs here, next to the H3 signer binding it depends
+            // on: require `mirror_seal.sealed_by == stake_holder_id` and that
+            // the identity holds the distribution right on the asset's head
+            // entry. Deferred to S3.4 with the rest of the received-entry
+            // authority checks, and NOT implemented in S3.3 — see the S3.5 note
+            // on `check_seal_authority`: assets are ownerless at creation today,
+            // so an owner check on the receive path would reject every seal.
         }
 
         // Genesis has no predecessor to verify — insert directly (after S3.2

@@ -95,6 +95,9 @@ impl StateProofOps for StateProof {
             // chain; the blockchain write chokepoint stamps the real lineage.
             prev_asset_entry: None,
             asset_seq: 0,
+            // S3.3: mirror attestations are sealed by the asset's OWNER onto a
+            // dedicated checkpoint entry, never by proof generation.
+            mirror_seal: None,
         })
     }
 

@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::asset_index::{AssetChainIndex, AssetEntryLocator};
+use super::attestations::MirrorAttestationPool;
 use super::block::{Block, BlockHeader};
 use super::genesis_auth::GenesisAuthManager;
 use super::validation::ChainValidator;
@@ -146,6 +147,24 @@ pub struct NodeBlockchain {
     /// asset_index`. It is never held while acquiring any of them, so it adds
     /// no cycle to the S3.0 order.
     pub(crate) asset_index: Arc<RwLock<AssetChainIndex>>,
+
+    /// S3.3: OFF-SPINE mirror attestations, keyed by matrix position — see
+    /// [`MirrorAttestationPool`](super::attestations::MirrorAttestationPool).
+    ///
+    /// Deliberately NOT part of the spine and NOT derived from the block set:
+    /// attestations are third-party statements by mirrors, accumulated here
+    /// until an OWNER seals them into a checkpoint entry
+    /// ([`seal_mirror_attestations`](Self::seal_mirror_attestations)).
+    /// Recording one consumes no `prev_asset_entry` / `asset_seq` slot, so N
+    /// mirrors can attest concurrently without forking or renumbering the
+    /// title.
+    ///
+    /// LOCK ORDER: acquired LAST, after `asset_index` —
+    /// `append_lock → blocks → headers → hash_index → head → stats →
+    /// asset_index → mirror_attestations`. It is never held while acquiring
+    /// any of them (the seal path snapshots it, drops the guard, and only then
+    /// calls `add_block`), so it adds no cycle to the S3.0 order.
+    pub(crate) mirror_attestations: Arc<RwLock<MirrorAttestationPool>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -226,6 +245,7 @@ impl NodeBlockchain {
             block_sink: None,
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
+            mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
         }
     }
 
@@ -368,6 +388,7 @@ impl NodeBlockchain {
             block_sink: None,
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
+            mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
         })
     }
 

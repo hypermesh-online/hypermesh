@@ -19,6 +19,7 @@
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
 pub mod asset_index;
+pub mod attestations;
 pub mod block;
 pub mod block_sink;
 pub mod chain;
@@ -38,6 +39,9 @@ pub mod sync_protocol;
 pub mod validation;
 
 pub use asset_index::{AssetChainIndex, AssetEntryLocator, AssetHighWater};
+pub use attestations::{
+    matrix_index_of, verify_attestation, MirrorAttestationPool, MirrorSealReceipt,
+};
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};

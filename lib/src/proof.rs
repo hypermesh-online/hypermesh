@@ -534,6 +534,27 @@ pub struct StateProof {
     /// walking the whole history.
     #[serde(default)]
     pub asset_seq: u64,
+
+    /// S3.3 — MIRROR SEAL: the owner's checkpoint over the mirror attestations
+    /// accumulated OFF-spine for this asset, or `None` on an ordinary entry.
+    ///
+    /// Mirror "share" attestations ([`MirrorAttestation`](crate::attestation::MirrorAttestation))
+    /// are matrix-indexed and accumulate off the spine, so N mirrors cannot
+    /// fork or renumber the single-parent title. Periodically the OWNER (holder
+    /// of the distribution right) seals the accumulated set into the spine by
+    /// writing a [`MirrorSeal`] here — a BLAKE3 root over the set in canonical
+    /// matrix order, plus its cardinality and the sealing identity.
+    ///
+    /// Carried inside the proof body for exactly the reason S3.2's lineage is:
+    /// `proof_hash = BLAKE3(serialize(state_proof))` and
+    /// `Block::calculate_hash` folds `(asset_hash || proof_hash)`, so the seal
+    /// is hash-committed transitively AND covered by H3's FALCON envelope —
+    /// with zero `Block` / `BlockAssetEntry` field change and no multi-parent
+    /// merge. An attestation stripped from or added to the set after sealing
+    /// changes the recomputed root and is detectable
+    /// ([`verify_sealed_set`](crate::attestation::verify_sealed_set)).
+    #[serde(default)]
+    pub mirror_seal: Option<crate::attestation::MirrorSeal>,
 }
 
 impl StateProof {
@@ -556,6 +577,9 @@ impl StateProof {
             work_proof,
             prev_asset_entry: None,
             asset_seq: 0,
+            // S3.3: a fresh proof carries no mirror seal; the owner's seal path
+            // writes one onto a dedicated checkpoint entry.
+            mirror_seal: None,
         }
     }
 
@@ -659,6 +683,7 @@ impl StateProof {
             ),
             prev_asset_entry: None,
             asset_seq: 0,
+            mirror_seal: None,
         }
     }
 
