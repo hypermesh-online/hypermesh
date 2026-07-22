@@ -118,7 +118,94 @@ These govern everything above and are not negotiable:
 
 ---
 
-## 7. Where the Current Code Diverges
+## 7. Security Model
+
+### 7.1 Genesis is self-signing — the root of trust
+
+**There is no authority above genesis.** A node's genesis block is not signed by a CA, a foundation
+key, or a peer. It signs itself, and that is the entire root of trust:
+
+- The **identity that signs genesis is declared inside genesis** (the Identity SystemAsset carries
+  the FALCON-1024 public key).
+- The **genesis hash is derived from that content**, including the identity — so the signer and the
+  signed are bound in one object.
+- The **chain identity IS the genesis hash**. Alter anything and you have a different chain, not a
+  tampered one.
+
+This is only meaningful because genesis is **deterministic** — a pure function of
+(device assessment, matrix coordinate, genesis epoch). A peer re-derives it from inputs the block
+itself carries and checks the hash. Non-deterministic genesis cannot be adopted, only asserted.
+
+**Self-signing is not self-*certifying*.** Anyone can mint a genesis. What they cannot do is mint
+one for *someone else's device fingerprint* without that device's private key, or alter one without
+changing the identity of the chain it roots. Trust does not come from genesis being blessed; it
+comes from genesis being **unforgeable, reproducible, and self-consistent**, and from every
+subsequent claim chaining back to it.
+
+### 7.2 Keyed hashing — proving possession without disclosure
+
+A hash **salted with a private key** (BLAKE3 keyed mode) yields a value only the key-holder can
+produce. Paired with a FALCON signature over that value, it gives possession-proof without
+disclosure — the verifier confirms *the holder computed this* without ever seeing the key.
+
+This is already the pattern behind DNS invitation tokens (BLAKE3-HMAC keyed by owner proof). The
+generalization: **device continuity, epoch binding, and identity assertions can all be keyed rather
+than revealed.** The private key never crosses a boundary — consistent with the FFI rule that
+secret keys never cross the C ABI.
+
+### 7.3 The store is never trusted; the content proves itself
+
+Every asset is **content-addressed** (BLAKE3 = identity), **encrypted**, and **PoS-validated**.
+Therefore the medium holding it is outside the trust boundary *by construction*.
+
+The consequence is liberating: **any dumb carrier is safe.** A kernel eBPF map, a shared cache — or
+an external store like etcd — can hold HyperMesh data without joining the TCB, because it cannot
+read the content, cannot forge it, and cannot alter it undetected. Such a store is not a database we
+trust; it is a **carrier we don't have to**. This is what makes distributed kernel-visible state
+possible without weakening zero-trust, and it is why "no foreign databases" is about *trusted*
+state, not about bytes at rest.
+
+### 7.4 Verification is mandatory — black-holing is correct
+
+STOQ **requires** eBPF. There is no degraded userspace fallback. A node that cannot verify does not
+participate, and unverifiable traffic is **dropped**. In a zero-trust system an unverified path *is*
+the vulnerability, so the absence of a fallback is a feature.
+
+(The Gateway is the deliberate exception — it exists for IPv4/HTTP backwards-compatibility, and its
+non-HyperMesh traffic must pass through. HyperMesh's own IPv6/QUIC plane is verified-or-dropped.)
+
+### 7.5 Provenance is tamper-evident, not merely recorded
+
+Each asset entry's identity **cryptographically depends on its predecessor's**: the lineage pointer
+lives inside the `StateProof`, so `proof_hash = BLAKE3(state_proof)` chains entries, and
+`Block::calculate_hash` folds that per entry. Rewriting an asset's history changes every downstream
+hash.
+
+The property this buys, stated precisely: **a forgery that passes every signature check is still
+rejected.** An attacker can produce an entry that is validly FALCON-signed by a real identity, with
+a correctly re-derived `proof_hash` and intact content binding — and the lineage gate rejects it
+anyway, because the predecessor it names is not the head we recorded. Signatures prove *who*;
+lineage proves *what came before*. Both are required.
+
+### 7.6 Authorization is identity, never magnitude
+
+**PoStake is authorization** — who owns, and to whom access is granted — verified cryptographically.
+It is never a quantity, never a threshold, never a balance. There is no amount that buys authority.
+Mirrors are grantees; grantees are identities; identities are `BLAKE3(FALCON pubkey)`.
+
+Enforced mechanically: `scripts/check-no-pos-magnitude.sh` scans the **whole worktree** — including
+orphaned and undeclared files, which is where three consecutive cleanup passes hid regressions — and
+blocks on push.
+
+### 7.7 Consensus is a result, not a factor
+
+Each mirror validates independently. Agreement is the *emergent output* of independent validation,
+never an input to it. There is no vote, no quorum, no leader election, and therefore no quorum to
+capture or leader to compromise.
+
+---
+
+## 8. Where the Current Code Diverges
 
 Recorded so the gap is explicit. Verify before acting on any of it.
 
