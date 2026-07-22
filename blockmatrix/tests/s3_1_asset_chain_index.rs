@@ -492,3 +492,75 @@ async fn s3_1_prune_to_headers_removes_pruned_blocks_from_the_index() {
         "index after prune differs from a rebuild over the surviving blocks",
     );
 }
+
+/// S3.1 QA follow-up: a shard listed by BOTH a pruned block and a surviving one
+/// must STILL authorize after `prune_to_headers`, and must resolve to the
+/// SURVIVING block's asset.
+///
+/// This is the case where a naive "drop the key when a contributing block goes"
+/// implementation silently de-authorizes a shard this node still serves — or,
+/// worse, keeps a locator pointing at a block that is no longer held in full.
+#[tokio::test]
+async fn s3_1_shard_shared_by_pruned_and_surviving_block_still_authorizes() {
+    let chain = NodeBlockchain::new(coord());
+
+    // The SAME shard is listed by two DIFFERENT assets in two different blocks.
+    let shared_shard = [0x5Au8; 32];
+    let pruned_asset = [0x01u8; 32];
+    let surviving_asset = [0x02u8; 32];
+
+    chain
+        .add_block(vec![sharded(pruned_asset, vec![shared_shard])])
+        .await
+        .expect("test: add_block 1");
+    chain
+        .add_block(vec![sharded(surviving_asset, vec![shared_shard])])
+        .await
+        .expect("test: add_block 2");
+
+    // Before pruning, the earliest (block 1, the soon-to-be-pruned one) wins.
+    assert!(chain.authorizes_shard(&shared_shard).await);
+    assert_eq!(
+        chain
+            .registration_for_shard(&shared_shard)
+            .await
+            .expect("test: registration before prune")
+            .asset_hash,
+        pruned_asset,
+    );
+
+    // Prune block 1 only.
+    chain.prune_to_headers(1..2).await;
+    let remaining = chain.get_chain().await;
+    assert_eq!(remaining.len(), 2, "genesis + block 2 remain in full");
+
+    // The shard is STILL authorized — block 2 still lists it.
+    assert!(
+        chain.authorizes_shard(&shared_shard).await,
+        "a shard still listed by a surviving block must stay authorized",
+    );
+    assert_eq!(
+        chain.authorizes_shard(&shared_shard).await,
+        scan_authorizes_shard(&remaining, &shared_shard),
+    );
+
+    // And it now resolves to the SURVIVING block's asset, not the pruned one.
+    let registration = chain
+        .registration_for_shard(&shared_shard)
+        .await
+        .expect("test: registration must still resolve after prune");
+    assert_eq!(
+        registration.asset_hash, surviving_asset,
+        "must resolve to the surviving block's asset",
+    );
+
+    // The pruned asset is gone from the index; the surviving one is intact.
+    assert!(chain.asset_history(&pruned_asset).await.is_empty());
+    assert_eq!(chain.asset_history(&surviving_asset).await.len(), 1);
+
+    // The pruned index still equals a rebuild over the surviving blocks.
+    assert_eq!(
+        chain.asset_index_snapshot().await,
+        AssetChainIndex::rebuild(remaining.iter()),
+    );
+}

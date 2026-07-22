@@ -67,6 +67,25 @@ pub struct AssetEntryLocator {
     pub block_hash: String,
 }
 
+/// The furthest an asset's chain has ever advanced in THIS container.
+///
+/// S3.2 QA F1 — the tombstone. Pruning drops an asset's entries from the index
+/// (correctly: the index may never name a block the chain no longer holds in
+/// full), but the asset's *identity* must outlive its entry bodies. Without
+/// this record a pruned asset becomes UNKNOWN, and an unknown asset accepts a
+/// fresh `(prev = None, seq = 0)` asset-genesis — a lineage-RESET primitive:
+/// prune, then re-root the asset under someone else's history. The high-water
+/// mark survives [`AssetChainIndex::remove_block`], so a pruned asset stays
+/// KNOWN and a fresh root for it stays REJECTED.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AssetHighWater {
+    /// `lineage_id` of the furthest entry ever indexed for this asset — what a
+    /// legitimate continuation must name in `prev_asset_entry`.
+    pub lineage_id: String,
+    /// `asset_seq` of that entry. A continuation must carry `seq + 1`.
+    pub seq: u64,
+}
+
 /// What one block contributed to the index — used to undo it on removal.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct BlockContribution {
@@ -81,12 +100,48 @@ struct BlockContribution {
 ///
 /// Derived state only: [`rebuild`](Self::rebuild) from the same block set
 /// always yields an equal value, which is what the S3.1 rebuild proof asserts.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq)]
 pub struct AssetChainIndex {
     by_asset: HashMap<[u8; 32], Vec<AssetEntryLocator>>,
     heads: HashMap<[u8; 32], AssetEntryLocator>,
     by_shard: HashMap<[u8; 32], Vec<AssetEntryLocator>>,
     by_block: HashMap<u64, BlockContribution>,
+    /// F1 tombstones — monotonic per-asset high-water marks. Deliberately NOT
+    /// part of [`PartialEq`]; see the impl below.
+    high_water: HashMap<[u8; 32], AssetHighWater>,
+}
+
+/// Equality is over the DERIVED VIEW of the block set — `by_asset`, `heads`,
+/// `by_shard`, `by_block` — and deliberately EXCLUDES `high_water`.
+///
+/// # Why the tombstone is out of the equality set
+///
+/// The S3.1 property under test is *"an index maintained incrementally equals
+/// one rebuilt from the same blocks"*. `high_water` is not a function of the
+/// current block set: it is a monotonic MEMORY of blocks this container once
+/// held, and a rebuild from surviving blocks alone cannot reconstruct what
+/// pruning erased. Including it would make the property false-by-construction
+/// after any prune — the equality assertion would break without anything being
+/// wrong, and the only way to restore it would be to drop the tombstone on
+/// rebuild, which is exactly the lineage-reset F1 closes.
+///
+/// So the semantics are stated rather than papered over:
+/// **tombstones are runtime-only, and a rebuild SEEDS them from surviving
+/// blocks** (the highest seq still present per asset). That seed is a lower
+/// bound, never an over-claim — it can only ever be `<=` the true high water,
+/// so a rebuild never rejects a legitimate continuation it should accept. The
+/// in-process guarantee (prune cannot re-root an asset) holds exactly where
+/// the attack exists: `prune_to_headers` is an in-memory operation on a live
+/// chain, and the tombstone lives for that chain's lifetime. A process
+/// RESTART reloads full blocks from the durable sink, so the rebuilt index
+/// recovers its history from the blocks themselves.
+impl PartialEq for AssetChainIndex {
+    fn eq(&self, other: &Self) -> bool {
+        self.by_asset == other.by_asset
+            && self.heads == other.heads
+            && self.by_shard == other.by_shard
+            && self.by_block == other.by_block
+    }
 }
 
 impl AssetChainIndex {
@@ -134,6 +189,7 @@ impl AssetChainIndex {
             );
             contribution.assets.push(entry.asset_hash);
             self.refresh_head(&entry.asset_hash);
+            self.raise_high_water(entry);
 
             if let StoragePointer::Sharded { shard_hashes, .. } = &entry.storage_pointer {
                 for shard_hash in shard_hashes {
@@ -153,6 +209,11 @@ impl AssetChainIndex {
     ///
     /// Called when a full block leaves the chain (`prune_to_headers`), so the
     /// index can never point at a block the chain no longer holds.
+    ///
+    /// F1: the per-asset `high_water` tombstones are deliberately NOT removed.
+    /// The entry BODIES go (they are no longer held), but the asset's identity
+    /// survives, so a pruned asset stays known and cannot be re-rooted with a
+    /// fresh `(None, 0)` genesis.
     pub fn remove_block(&mut self, block_index: u64) {
         let Some(contribution) = self.by_block.remove(&block_index) else {
             return;
@@ -173,6 +234,25 @@ impl AssetChainIndex {
         self.heads.clear();
         self.by_shard.clear();
         self.by_block.clear();
+        // The chain itself is being reseeded from a different root — this
+        // container's memory of the OLD chain's assets is not evidence about
+        // the new one, so the tombstones go too.
+        self.high_water.clear();
+    }
+
+    /// F1 — the furthest this container has ever seen `asset_hash`'s chain
+    /// advance, INCLUDING through entries that have since been pruned.
+    ///
+    /// This is what makes a pruned asset still KNOWN: lineage checks fall back
+    /// to it when [`asset_head`](Self::asset_head) has nothing.
+    pub fn asset_high_water(&self, asset_hash: &[u8; 32]) -> Option<&AssetHighWater> {
+        self.high_water.get(asset_hash)
+    }
+
+    /// Whether this container has ever recorded an entry for `asset_hash`,
+    /// even if every one of them has since been pruned.
+    pub fn has_ever_seen_asset(&self, asset_hash: &[u8; 32]) -> bool {
+        self.high_water.contains_key(asset_hash)
     }
 
     /// Every entry recorded for `asset_hash`, in chain order.
@@ -227,6 +307,27 @@ impl AssetChainIndex {
             .get(shard_id)
             .map(Vec::as_slice)
             .unwrap_or(&[])
+    }
+
+    /// F1 — advance an asset's tombstone to cover `entry`, monotonically.
+    ///
+    /// Takes the MAX by `asset_seq`, so it is insensitive to block arrival
+    /// order (received blocks and orphan drains do not arrive in index order)
+    /// and idempotent under re-indexing the same block.
+    fn raise_high_water(&mut self, entry: &super::block::BlockAssetEntry) {
+        let seq = entry.asset_seq();
+        match self.high_water.get(&entry.asset_hash) {
+            Some(existing) if existing.seq >= seq => {}
+            _ => {
+                self.high_water.insert(
+                    entry.asset_hash,
+                    AssetHighWater {
+                        lineage_id: entry.lineage_id(),
+                        seq,
+                    },
+                );
+            }
+        }
     }
 
     /// Recompute the head for one asset from its (sorted) history.
@@ -361,6 +462,66 @@ mod tests {
         assert!(!index.authorizes_shard(&shard));
         assert!(index.asset_head(&[0xC1; 32]).is_none());
         assert_eq!(index.asset_count(), 0);
+    }
+
+    /// F1 — the tombstone survives what the locators do not.
+    #[test]
+    fn remove_block_keeps_the_asset_high_water_tombstone() {
+        let asset = [0xE1u8; 32];
+        let mut e0 = entry(0xE1, StoragePointer::Genesis);
+        e0.set_asset_lineage(None, 0);
+        let mut e1 = entry(0xE1, StoragePointer::Genesis);
+        e1.set_asset_lineage(Some(e0.lineage_id()), 1);
+        let expected_id = e1.lineage_id();
+
+        let b1 = Block::new(1, vec![e0], "p".into());
+        let b2 = Block::new(2, vec![e1], b1.hash.clone());
+        let mut index = AssetChainIndex::rebuild([&b1, &b2]);
+
+        index.remove_block(1);
+        index.remove_block(2);
+
+        // Locators are gone — the index must never name a block the chain no
+        // longer holds in full.
+        assert!(index.asset_head(&asset).is_none());
+        assert!(index.asset_history(&asset).is_empty());
+        assert_eq!(index.asset_count(), 0);
+
+        // The asset's IDENTITY is not gone: it stays known at its high water,
+        // so a fresh `(None, 0)` root for it can still be refused.
+        assert!(index.has_ever_seen_asset(&asset));
+        let hw = index.asset_high_water(&asset).expect("test: tombstone");
+        assert_eq!(hw.seq, 1, "high water is the furthest seq ever indexed");
+        assert_eq!(hw.lineage_id, expected_id);
+
+        // `clear` (chain reseeded from a different root) does drop it.
+        index.clear();
+        assert!(!index.has_ever_seen_asset(&asset));
+    }
+
+    /// F1 — the tombstone is monotonic and order-insensitive.
+    #[test]
+    fn high_water_takes_the_max_regardless_of_arrival_order() {
+        let asset = [0xE2u8; 32];
+        let mut e0 = entry(0xE2, StoragePointer::Genesis);
+        e0.set_asset_lineage(None, 0);
+        let mut e1 = entry(0xE2, StoragePointer::Genesis);
+        e1.set_asset_lineage(Some(e0.lineage_id()), 1);
+
+        let b1 = Block::new(1, vec![e0], "p".into());
+        let b2 = Block::new(2, vec![e1], b1.hash.clone());
+
+        // Out-of-order arrival (received blocks / orphan drains) must not
+        // lower the high water.
+        let reverse = AssetChainIndex::rebuild([&b2, &b1]);
+        assert_eq!(
+            reverse.asset_high_water(&asset).map(|hw| hw.seq),
+            Some(1),
+        );
+        // ...and re-indexing is idempotent for the tombstone too.
+        let mut again = reverse.clone();
+        again.index_block(&b1);
+        assert_eq!(again.asset_high_water(&asset).map(|hw| hw.seq), Some(1));
     }
 
     #[test]

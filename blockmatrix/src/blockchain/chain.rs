@@ -488,9 +488,10 @@ impl NodeBlockchain {
     /// A6.6: when this node SERVES a shard, it also serves that ONE asset's
     /// registration so the fetcher can re-anchor it on its own chain (torrent
     /// model: nodes that touched the vector share-compute the registration —
-    /// no whole-chain replication). This scans the same `Sharded` entries as
-    /// [`authorizes_shard`] and returns a CLONE of the first entry whose
-    /// `shard_hashes` lists `shard_id`. The clone carries `asset_hash`, the
+    /// no whole-chain replication). It probes the same [`AssetChainIndex`] that
+    /// backs [`authorizes_shard`](Self::authorizes_shard) and returns a CLONE
+    /// of the EARLIEST entry in chain order whose `shard_hashes` lists
+    /// `shard_id`. The clone carries `asset_hash`, the
     /// content-bound `state_proof`, and the `StoragePointer::Sharded`
     /// (shard_hashes + placements) — everything the fetcher needs to
     /// independently re-validate and register the same asset.
@@ -568,6 +569,53 @@ impl NodeBlockchain {
     /// S3.1: the most recent entry recorded for `asset_hash`, if any.
     pub async fn asset_head(&self, asset_hash: &[u8; 32]) -> Option<AssetEntryLocator> {
         self.asset_index.read().await.asset_head(asset_hash).cloned()
+    }
+
+    /// S3.2/F1 — the `(lineage_id, asset_seq)` this container recognises as
+    /// `asset_hash`'s head, for BOTH the local stamp path and the receive
+    /// path. This is the single definition of "what must this asset's next
+    /// entry succeed?", so the two paths cannot disagree.
+    ///
+    /// Resolution order:
+    /// 1. the indexed head entry, read out of the block that holds it;
+    /// 2. failing that, the F1 TOMBSTONE — the asset's high-water mark, which
+    ///    survives `prune_to_headers`. Without step 2 a pruned asset reads as
+    ///    UNKNOWN, and an unknown asset accepts a fresh `(None, 0)` genesis:
+    ///    prune-then-re-root.
+    /// 3. genuinely never seen → `Ok(None)`.
+    ///
+    /// `Err(locator)` means the head is indexed but its block is no longer
+    /// held in full — the caller cannot judge lineage and must fail closed.
+    ///
+    /// Lock discipline: the `asset_index` read guard is released BEFORE
+    /// [`entry_at`](Self::entry_at) takes `blocks`, per the documented order
+    /// (`blocks → … → asset_index`).
+    pub(crate) async fn asset_lineage_head(
+        &self,
+        asset_hash: &[u8; 32],
+    ) -> Result<Option<(String, u64)>, AssetEntryLocator> {
+        let (head_locator, high_water) = {
+            let index = self.asset_index.read().await;
+            (
+                index.asset_head(asset_hash).cloned(),
+                index.asset_high_water(asset_hash).cloned(),
+            )
+        };
+
+        if let Some(locator) = head_locator {
+            return match self.entry_at(&locator).await {
+                Some(head) => Ok(Some((head.lineage_id(), head.asset_seq()))),
+                None => Err(locator),
+            };
+        }
+
+        Ok(high_water.map(|hw| (hw.lineage_id, hw.seq)))
+    }
+
+    /// F1 — has this container EVER recorded an entry for `asset_hash`, even
+    /// one since pruned away?
+    pub async fn has_ever_seen_asset(&self, asset_hash: &[u8; 32]) -> bool {
+        self.asset_index.read().await.has_ever_seen_asset(asset_hash)
     }
 
     /// Number of distinct assets the index knows about.

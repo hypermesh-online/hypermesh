@@ -771,6 +771,7 @@ mod tests {
                 nonce: 42,
                 proof_hash: vec![1, 2, 3, 4],
             },
+            ..Default::default()
         };
 
         let valid = coordinator

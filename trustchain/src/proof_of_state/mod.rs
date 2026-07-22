@@ -91,6 +91,10 @@ impl StateProofOps for StateProof {
             time_proof: generate_time_with_ntp_sync().await?,
             space_proof: generate_space_from_system(node_id).await?,
             work_proof: generate_work_from_computation(node_id).await?,
+            // S3.2: a freshly generated proof is not yet attached to an asset's
+            // chain; the blockchain write chokepoint stamps the real lineage.
+            prev_asset_entry: None,
+            asset_seq: 0,
         })
     }
 

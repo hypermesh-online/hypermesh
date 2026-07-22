@@ -493,17 +493,75 @@ pub struct StateProof {
     pub space_proof: SpaceProof,
     /// WHAT/HOW — hash of work done.
     pub work_proof: WorkProof,
+
+    /// S3.2 — ASSET LINEAGE: identity of the prior entry for the SAME asset,
+    /// or `None` when this is the asset's own genesis (the first time the asset
+    /// appears on this chain).
+    ///
+    /// The value is the lowercase hex of the predecessor entry's `proof_hash`
+    /// (`BLAKE3(serialize(predecessor state_proof))`). Two properties make that
+    /// the right identity:
+    ///
+    /// 1. **It is already hash-committed.** `Block::calculate_hash` folds
+    ///    `(asset_hash || proof_hash)` for every entry, so naming a predecessor
+    ///    by its `proof_hash` names something the predecessor's block hash
+    ///    already covers — a lineage pointer cannot reference a phantom entry
+    ///    without breaking that block's hash.
+    /// 2. **It addresses an ENTRY, not a block.** One block legitimately
+    ///    carries entries for many assets (`register_asset_records` batches the
+    ///    whole hardware assessment into one block) and may carry more than one
+    ///    entry for the same asset. A block hash would be ambiguous at exactly
+    ///    the granularity the asset chain needs.
+    ///
+    /// Because this field lives INSIDE the proof, it is covered by
+    /// `proof_hash = BLAKE3(serialize(state_proof))` — which makes each entry's
+    /// identity depend on its predecessor's, i.e. a genuine per-asset hash
+    /// chain — and it is FALCON-signed by H3's `signed_proof` envelope. It
+    /// therefore inherits authentication and hash-commitment without adding a
+    /// single field to `Block` or `BlockAssetEntry`.
+    ///
+    /// `#[serde(default)]` keeps the JSON wire path tolerant; the persisted
+    /// on-disk format is bincode (positional), so this IS a format change for
+    /// already-persisted chains — see the S3.2 notes.
+    #[serde(default)]
+    pub prev_asset_entry: Option<String>,
+
+    /// S3.2 — per-asset sequence number. `0` for the asset's genesis entry,
+    /// incremented by exactly one for every subsequent entry of that asset.
+    ///
+    /// Redundant with the prev-pointer walk by design: it makes a truncated or
+    /// re-rooted lineage detectable in O(1) at accept time rather than only by
+    /// walking the whole history.
+    #[serde(default)]
+    pub asset_seq: u64,
 }
 
 impl StateProof {
     /// Create a new composite proof from its four components.
+    ///
+    /// Asset lineage starts at the asset's genesis (`prev = None, seq = 0`);
+    /// the chain's write chokepoint stamps the real lineage when the entry is
+    /// appended. This keeps genesis construction a pure, deterministic function
+    /// of its inputs (S3.0/B2).
     pub fn new(
         stake_proof: StakeProof,
         time_proof: TimeProof,
         space_proof: SpaceProof,
         work_proof: WorkProof,
     ) -> Self {
-        Self { stake_proof, time_proof, space_proof, work_proof }
+        Self {
+            stake_proof,
+            time_proof,
+            space_proof,
+            work_proof,
+            prev_asset_entry: None,
+            asset_seq: 0,
+        }
+    }
+
+    /// S3.2: does this proof claim to be the asset's FIRST entry?
+    pub fn is_asset_genesis(&self) -> bool {
+        self.prev_asset_entry.is_none() && self.asset_seq == 0
     }
 
     /// All four proof types present in this system.
@@ -599,6 +657,8 @@ impl StateProof {
                 "test_workload_001".to_string(),
                 b"test-work-material",
             ),
+            prev_asset_entry: None,
+            asset_seq: 0,
         }
     }
 

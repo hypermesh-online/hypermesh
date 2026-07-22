@@ -199,6 +199,7 @@ fn create_test_proof() -> StateProof {
             work_hash: [7u8; 32],
             proof_timestamp: SystemTime::now(),
         },
+        ..Default::default()
     }
 }
 
