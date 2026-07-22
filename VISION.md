@@ -120,6 +120,33 @@ These govern everything above and are not negotiable:
 
 ## 7. Security Model
 
+> **You cannot keep something secret unless you are the only one who knows it.**
+
+Everything else follows from taking that literally.
+
+A secret shared is not a secret — it is a liability with a countdown. So HyperMesh holds exactly one
+class of secret: **your private key, which never leaves you.** It does not cross a process boundary,
+a C ABI, a wire, or a disk in cleartext. Nothing else in the system is treated as confidential-
+because-hidden, because nothing else can be.
+
+The inversion that makes this work: **secrecy is singular, but proof is plural.** You are the only
+one who knows your key — and *everyone* mirrors the evidence produced with it. Trust is not
+established by sharing secrets; it is established by publishing artifacts that are unforgeable
+without a secret nobody else holds.
+
+So verification arrives along two independent axes, and they corroborate each other:
+
+- **Vertically — through the individual's own chain.** Your genesis signs itself, every subsequent
+  entry chains to its predecessor, and the whole lineage is re-derivable from artifacts you
+  published. One identity, one unbroken history.
+- **Horizontally — through the mesh, because everyone is mirroring it.** A grantee *is* a mirror.
+  Every mirror independently validates what it holds, and the distribution graph is itself the
+  audit trail. To rewrite history you would have to rewrite it everywhere it is reflected,
+  simultaneously, without any mirror noticing — while lacking the key that made it valid in the
+  first place.
+
+Neither axis requires you to reveal anything. The key stays singular; the proof goes everywhere.
+
 ### 7.1 Genesis is self-signing — the root of trust
 
 **There is no authority above genesis.** A node's genesis block is not signed by a CA, a foundation
