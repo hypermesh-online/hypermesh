@@ -22,9 +22,16 @@ use crate::assets::core::{AssetError, AssetRegistration, AssetResult};
 /// Canonical NetworkId from hypermesh-lib (newtype over [u8; 16]).
 pub use hypermesh_lib::NetworkId;
 
-/// Network membership information
+/// Credentialed participation-membership record for the multi-network
+/// participation subsystem.
+///
+/// NOT the same concern as `blockchain::sync_manager::NetworkMembership`
+/// (which tracks a node's membership in a *synced Network chain*: scope +
+/// sync state). This record tracks TrustChain-credentialed participation in
+/// a network — role, status, credentials, and which assets are visible in
+/// it. The two collide on a name only; they are kept distinct on purpose.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NetworkMembership {
+pub struct ParticipationMembership {
     /// Network identifier
     pub network_id: NetworkId,
     /// Network name (e.g., "Bank Customer Portal", "Employee VPN")
@@ -186,7 +193,7 @@ pub struct MultiNetworkMembership {
     /// Node ID
     _local_node: PeerIdentity,
     /// Current memberships
-    memberships: Arc<RwLock<HashMap<NetworkId, NetworkMembership>>>,
+    memberships: Arc<RwLock<HashMap<NetworkId, ParticipationMembership>>>,
     /// Discovered networks
     discovered_networks: Arc<RwLock<HashMap<NetworkId, NetworkDiscovery>>>,
     /// TrustChain client for credentials (interface to TrustChain)
@@ -268,7 +275,7 @@ impl MultiNetworkMembership {
             .await?;
 
         // Create membership
-        let membership = NetworkMembership {
+        let membership = ParticipationMembership {
             network_id,
             network_name: network_info.name,
             status: MembershipStatus::Active, // Active immediately after joining
@@ -316,7 +323,7 @@ impl MultiNetworkMembership {
     }
 
     /// Get active memberships
-    pub async fn active_memberships(&self) -> Vec<NetworkMembership> {
+    pub async fn active_memberships(&self) -> Vec<ParticipationMembership> {
         let memberships = self.memberships.read().await;
         memberships
             .values()

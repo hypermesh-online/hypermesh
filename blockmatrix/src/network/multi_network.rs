@@ -154,8 +154,20 @@ pub enum VisibilityPolicy {
     Explicit,    // Must be explicitly configured
 }
 
-/// Central coordinator for multi-network participation
-pub struct MultiNetworkCoordinator {
+/// Handler-based coordinator for isolated network *connections*.
+///
+/// Distinct concern from `assets::multi_node::MultiNetworkCoordinator`
+/// (the live participation coordinator: membership + asset routing +
+/// cross-network validation + engagement). This type bootstraps
+/// `NetworkConnection`s through per-type `NetworkHandler`s and enforces
+/// packet isolation. The two previously collided on the name
+/// `MultiNetworkCoordinator`; this one is renamed to reflect its actual
+/// responsibility.
+///
+/// NOTE: currently unreferenced outside this module's own tests — a
+/// candidate for removal in a dead-code pass (deferred here to preserve
+/// the exact `blockmatrix --lib` test baseline).
+pub struct NetworkConnectionCoordinator {
     /// Network handlers by type
     handlers: HashMap<NetworkType, Arc<dyn NetworkHandler>>,
 
@@ -169,7 +181,7 @@ pub struct MultiNetworkCoordinator {
     asset_visibility: Arc<RwLock<AssetVisibilityControl>>,
 }
 
-impl MultiNetworkCoordinator {
+impl NetworkConnectionCoordinator {
     pub fn new(isolation: Arc<dyn IsolationManager>) -> Self {
         let mut handlers = HashMap::new();
 
@@ -451,7 +463,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_join_multiple_networks() {
-        let mut coordinator = MultiNetworkCoordinator::new_default();
+        let mut coordinator = NetworkConnectionCoordinator::new_default();
 
         // Join Anonymous network
         let anon_id = coordinator
@@ -490,7 +502,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_asset_visibility() {
-        let mut coordinator = MultiNetworkCoordinator::new_default();
+        let mut coordinator = NetworkConnectionCoordinator::new_default();
 
         // Join two networks
         let network1 = coordinator
@@ -535,7 +547,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_leave_network() {
-        let mut coordinator = MultiNetworkCoordinator::new_default();
+        let mut coordinator = NetworkConnectionCoordinator::new_default();
 
         // Join network
         let network_id = coordinator
@@ -555,7 +567,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_network_stats() {
-        let mut coordinator = MultiNetworkCoordinator::new_default();
+        let mut coordinator = NetworkConnectionCoordinator::new_default();
 
         // Join various networks
         coordinator

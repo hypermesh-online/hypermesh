@@ -25,7 +25,7 @@ use tokio::sync::RwLock;
 // Import network membership from our implementation
 pub use super::network_membership::{
     ApprovalProcess, JoinRequirements, MembershipStatus, MultiNetworkMembership,
-    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkMembership, PrivacyMode,
+    NetworkCredentials, NetworkDiscovery, NetworkId, ParticipationMembership, PrivacyMode,
     TrustChainClient,
 };
 
@@ -548,7 +548,7 @@ impl MultiNetworkCoordinator {
     }
 
     /// Get active networks
-    pub async fn active_networks(&self) -> Vec<NetworkMembership> {
+    pub async fn active_networks(&self) -> Vec<ParticipationMembership> {
         self.membership.active_memberships().await
     }
 
