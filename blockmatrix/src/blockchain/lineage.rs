@@ -23,6 +23,22 @@
 //! That verification is deliberately self-contained: it takes only the entries,
 //! not the chain, because S3.5's transfer hands exactly this list to a
 //! recipient who has never seen our container.
+//!
+//! # D1 — this is the authoritative per-asset object
+//!
+//! Under the unification inversion, [`AssetLineage`] is THE authority for every
+//! per-asset question — "what is this asset's head / predecessor / history?".
+//! It answers from the entries themselves, addressed by their `lineage_id`
+//! (`= hex(proof_hash)`, spine-offset-free): a predecessor is named by its
+//! `lineage_id`, never by a block index. The linear spine
+//! (`NodeBlockchain.blocks`, keyed by block index) is DEMOTED to a
+//! batching/durability log — it stores the entries and preserves on-disk
+//! back-compat and spine-sync, but it holds no per-asset authority and no
+//! asset-authority question may consult a block index as identity. Block index
+//! survives only as a storage-fetch detail (which block to read an entry out
+//! of), routed through the derived [`AssetChainIndex`] cache.
+//!
+//! [`AssetChainIndex`]: super::asset_index::AssetChainIndex
 
 use super::block::BlockAssetEntry;
 use super::chain::NodeBlockchain;
