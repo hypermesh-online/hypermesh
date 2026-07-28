@@ -296,8 +296,27 @@ strip = "symbols"
 
 [profile.dev]
 opt-level = 1
-debug = true
+# `debug = true` emitted full DWARF into every one of the workspace's ~97
+# integration-test binaries. Each tests/*.rs file links the WHOLE dependency
+# tree (quinn, rustls, FALCON, Kyber, reed-solomon) into a standalone binary,
+# so full debug info is paid ~97 times over. That is what produced a 354 GB
+# target tree on a 1.8 TB disk and starved the machine of I/O.
+#
+# line-tables-only keeps file:line in every backtrace and panic — which is how
+# this project actually debugs (test output, not a stepping debugger). What is
+# given up is variable inspection under gdb/lldb.
+debug = "line-tables-only"
+# Keep debug info in separate object files rather than copying it into every
+# linked binary. Linux-only; the 97 binaries stop each carrying their own copy.
+split-debuginfo = "unpacked"
 panic = "unwind"
+
+# Dependencies do not need debug info at all — we never step into quinn or
+# rustls. They are also built once and reused, so optimising them costs nothing
+# per-rebuild and makes the test suite meaningfully faster.
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
 
 [profile.bench]
 inherits = "release"

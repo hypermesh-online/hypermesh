@@ -100,6 +100,68 @@ Three consequences, each of which resolves a previously-floating question:
 
 ---
 
+## 5.5 The Unified Model — Node ≡ Asset ≡ Index *(load-bearing)*
+
+> A node **is** an asset. Every asset **is** a node — an index (a cell) in a hash-matrix.
+
+This identity is the spine of the whole architecture, and it collapses a confusion the
+current code still carries:
+
+- **One chain per node = one chain per asset.** They are the same statement, because the
+  node and the asset are the same object. Each asset is its own chain, located at its
+  matrix index. There is no separate "node chain" that assets live inside, and no
+  privileged linear sequence with everything else hanging off it. A node simply holds many
+  asset-chains, addressed by matrix position.
+- **"Foreign" cannot exist.** Receiving an asset another node held is *receiving an asset* —
+  its chain is a chain at an index, indistinguishable in kind from any you authored. Any code
+  that must special-case a chain as "foreign" is proof the single-linear-chain model is still
+  present and must be refactored out.
+
+### The substrate is Chunks of Matrices
+
+The HashMatrix and the HyperMesh substrate are built from **chunks** — sub-matrices of
+asset-indexed cells — **globally distributed**. A node is responsible for a *locality*: the
+chunk(s) it holds and mirrors (this is the same locality NGauge dispatches over, §4).
+
+### Worlds — partitions that emerge and resize
+
+The matrix partitions into **worlds**: sub-meshes that form where nodes cluster and
+**activate**. Worlds are *emergent, not drawn.* The boundary is activation and node
+distribution — **not geography.** A datacenter region may happen to coincide with a world,
+the way global datacenters divide by region on a map, but the analogy is a game server's
+**worlds**, not a political map: instances that shard by where the population and load
+actually are.
+
+- **One primitive, every scale.** A private network is a tiny, near-trivially-partitioned
+  world; "the entire US" is a huge emergent one. There is exactly one partitioning primitive
+  spanning both — which is the **nestable network** model already in this architecture: a
+  world *is* a network, a world inside a world is a nested network, and Scope/Tracking
+  (§5, Bounded|Unbounded × Tracked|Untracked) inherits down the nesting.
+- **Boundaries move.** What is new is that worlds **extend and partition themselves** as
+  activation shifts, driven by **NGauge** — networks are not statically declared once and
+  fixed. NGauge's dispatch mandate therefore includes *where the world-boundaries are*, not
+  only shard/replica placement within a world.
+- **Both intentional and emergent worlds must coexist.** Some worlds are declared by an
+  operator (I stand up my private network); some emerge from load at scale (a continent
+  partitions itself). The same primitive must serve both.
+
+### Chunks are elastic — a chunk is the slice of matrix a world occupies
+
+A **chunk** is therefore **not** a fixed cube of coordinates nor a fixed hash-bucket range —
+it is *whatever slice of the matrix a world currently spans, and worlds resize.* The tensor
+layer must operate over **elastic partitions**, not static blocks.
+
+### Tensor arithmetic over chunks *(the scaling mechanism)*
+
+At scale, operations are expressed as **tensor arithmetic over chunks, universally** — never
+per-cell loops. Routing, placement, allocation, dispersion, and world extend/partition are
+tensor operations over the (elastic) chunk a world occupies. This is how network effects
+scale, and it is a **first-class concern of the unification refactor**, not an optimization
+deferred to later. Chunks are the unit; tensor ops are the verb; worlds are the elastic
+boundary they run within and across.
+
+---
+
 ## 6. Standing Invariants
 
 These govern everything above and are not negotiable:
