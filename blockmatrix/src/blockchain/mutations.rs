@@ -166,8 +166,12 @@ impl NodeBlockchain {
                     "Entry {i} proof not bound to its asset_hash (signed-to-content violation)"
                 ));
             }
+            // D4: validate against the rules of the NETWORK that owns the asset
+            // (selected by scope), not one global bar. With no published network
+            // rulesets today the scope resolves to the anchor requirements, so
+            // this is byte-identical to the pre-D4 single-bar call.
             self.state_proof_validator
-                .validate(&entry.state_proof)
+                .validate(&entry.state_proof, &entry.registration.network_scope)
                 .map_err(|e| {
                     format!("State proof validation failed for entry {i}: {e}")
                 })?;
@@ -481,12 +485,25 @@ impl NodeBlockchain {
             }
 
             // (c) State proof validity: the four-proof StateProof must pass
-            // its own structural/temporal validation.
-            if !entry.state_proof.validate() {
-                return Err(format!(
-                    "Block {} entry {i} state proof validation failed — mirror rejected",
-                    block.index,
-                ));
+            // its own structural validation. D4: routed through the
+            // ValidationService so the received path shares the SAME
+            // scope→rules seam as the local `add_block` path (unifying the
+            // former intrinsic `entry.state_proof.validate()` bypass onto the
+            // service). The effective bar is UNCHANGED — `validate_received`
+            // applies exactly `proof.validate()` (structural only), NOT the
+            // freshness gate, so a historical block replayed from a sync pool
+            // with a stale WHEN offset is not newly rejected.
+            match self.state_proof_validator.validate_received(
+                &entry.state_proof,
+                &entry.registration.network_scope,
+            ) {
+                Ok(true) => {}
+                _ => {
+                    return Err(format!(
+                        "Block {} entry {i} state proof validation failed — mirror rejected",
+                        block.index,
+                    ));
+                }
             }
 
             // (d) H3 — FALCON-in-block PoS verification (the untrusted-remote

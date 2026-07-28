@@ -13,6 +13,8 @@ pub mod genesis_proof;
 pub mod state_proof_impl;
 pub mod proof;
 pub mod validation;
+pub mod network_rules;
+pub mod validation_service;
 
 // Re-export all types from TrustChain
 pub use trustchain::proof_of_state::*;
@@ -136,85 +138,9 @@ impl Default for StateProofConfig {
     }
 }
 
-// Real validation service implementation using TrustChain's Proof of State
-pub mod validation_service {
-    use super::*;
-    use crate::proof_of_state::validation::{DefaultStateAuthenticator, StateAuthenticator};
-    use std::sync::Arc;
-
-    pub struct ValidationService {
-        validator: Arc<dyn StateAuthenticator>,
-        requirements: StateRequirements,
-    }
-
-    impl Default for ValidationService {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
-
-    impl ValidationService {
-        pub fn new() -> Self {
-            Self {
-                validator: Arc::new(DefaultStateAuthenticator::new()),
-                requirements: StateRequirements::default(),
-            }
-        }
-
-        pub fn with_requirements(requirements: StateRequirements) -> Self {
-            Self {
-                validator: Arc::new(DefaultStateAuthenticator::with_requirements(
-                    requirements.clone(),
-                )),
-                requirements,
-            }
-        }
-
-        pub fn for_production() -> Self {
-            Self {
-                validator: Arc::new(DefaultStateAuthenticator::with_requirements(
-                    StateRequirements::production(),
-                )),
-                requirements: StateRequirements::production(),
-            }
-        }
-    }
-
-    // Trait for state proof validation service
-    pub trait StateProofValidationService: Send + Sync {
-        fn validate(&self, proof: &StateProof) -> Result<bool, StateProofError>;
-    }
-
-    impl StateProofValidationService for ValidationService {
-        fn validate(&self, proof: &StateProof) -> Result<bool, StateProofError> {
-            if proof.validate_with_requirements(&self.requirements) {
-                Ok(true)
-            } else {
-                Err(StateProofError::ValidationFailed(
-                    "State proof failed validation requirements".to_string(),
-                ))
-            }
-        }
-    }
-
-    impl ValidationService {
-        pub async fn validate_async(&self, proof: &StateProof) -> Result<bool, StateProofError> {
-            let proof_bytes = proof
-                .to_bytes()
-                .map_err(|e| StateProofError::Other(format!("Failed to serialize proof: {e}")))?;
-
-            match self.validator.validate(&proof_bytes).await {
-                Ok(true) => Ok(true),
-                Ok(false) => Err(StateProofError::ValidationFailed(
-                    "State proof validation failed".to_string(),
-                )),
-                Err(e) => Err(StateProofError::ValidationFailed(format!(
-                    "Validation error: {e}"
-                ))),
-            }
-        }
-    }
-}
+// Real validation service implementation using TrustChain's Proof of State.
+// Lives in its own file (`validation_service.rs`) — one purpose per file.
+pub use validation_service::{StateProofValidationService, ValidationService};
 
 pub mod stoq_handlers {
     use super::validation_service::{StateProofValidationService, ValidationService};
