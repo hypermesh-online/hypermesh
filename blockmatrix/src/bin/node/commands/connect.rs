@@ -750,7 +750,10 @@ async fn start_network(
                                 let consumer_id = hypermesh_lib::NodeId::from_public_key(
                                     requester_id.as_bytes(),
                                 );
-                                analytics.record_request(
+                                // P2: worlds seam — the single implicit world
+                                // (GLOBAL_WORLD) until worlds form (VISION §5.5).
+                                analytics.record_request_in_world(
+                                    hypermesh_lib::GLOBAL_WORLD,
                                     *shard_id,
                                     consumer_id,
                                     feed_position,
@@ -851,7 +854,9 @@ async fn start_network(
                         let trigger = ngauge::ReplicationTrigger::new(
                             ngauge::ReplicationConfig::default(),
                         );
-                        let signals = trigger.check(&analytics);
+                        // P2: worlds seam — check the single implicit world.
+                        let signals =
+                            trigger.check_in_world(&analytics, hypermesh_lib::GLOBAL_WORLD);
                         for signal in &signals {
                             if signal.urgency > 0.5 {
                                 info!(
@@ -907,7 +912,8 @@ async fn start_network(
                         Ok(guard) => ngauge::ReplicationTrigger::new(
                             ngauge::ReplicationConfig::default(),
                         )
-                        .check(&guard),
+                        // P2: worlds seam — check the single implicit world.
+                        .check_in_world(&guard, hypermesh_lib::GLOBAL_WORLD),
                         Err(e) => {
                             debug!(
                                 "replication-poll: analytics lock poisoned: {e}"
@@ -942,8 +948,14 @@ async fn start_network(
                         .collect();
 
                     for signal in signals.iter().filter(|s| s.urgency > 0.5) {
-                        // Find peers known to provide this shard.
-                        let providers = rp_index.get_providers(&signal.shard_id).await;
+                        // Find peers known to provide this shard (P2: single
+                        // implicit world until worlds form).
+                        let providers = rp_index
+                            .get_providers_in_world(
+                                hypermesh_lib::GLOBAL_WORLD,
+                                &signal.shard_id,
+                            )
+                            .await;
                         // Skip if we are the only known provider (cannot
                         // self-replicate) or no providers at all.
                         let candidates: Vec<String> = providers
@@ -992,18 +1004,23 @@ async fn start_network(
                                 // Without this hook the replica count stayed 0
                                 // forever and the loop never converged.
                                 rp_index
-                                    .register_provider(
+                                    .register_provider_in_world(
+                                        hypermesh_lib::GLOBAL_WORLD,
                                         &rp_local_node_id,
                                         &[signal.shard_id],
                                     )
                                     .await;
                                 let replica_count = rp_index
-                                    .get_providers(&signal.shard_id)
+                                    .get_providers_in_world(
+                                        hypermesh_lib::GLOBAL_WORLD,
+                                        &signal.shard_id,
+                                    )
                                     .await
                                     .len()
                                     as u32;
                                 if let Ok(mut guard) = rp_analytics.lock() {
-                                    guard.set_replica_count(
+                                    guard.set_replica_count_in_world(
+                                        hypermesh_lib::GLOBAL_WORLD,
                                         signal.shard_id,
                                         replica_count,
                                     );
@@ -1088,7 +1105,13 @@ fn select_dispersion_source(
     let recommendations = match analytics.lock() {
         Ok(guard) => {
             let advisor = ngauge::DispersionAdvisor::new();
-            advisor.recommend_placement(shard_id, &guard, candidates.len().max(1))
+            // P2: worlds seam — recommend within the single implicit world.
+            advisor.recommend_placement_in_world(
+                hypermesh_lib::GLOBAL_WORLD,
+                shard_id,
+                &guard,
+                candidates.len().max(1),
+            )
         }
         Err(_) => Vec::new(),
     };

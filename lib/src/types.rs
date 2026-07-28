@@ -79,6 +79,22 @@ impl From<&str> for AssetId {
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NetworkId(pub [u8; 16]);
 
+/// The single implicit world — the flat, global partition that is the *only*
+/// world until worlds actually form (VISION.md §5.5: NGauge decides placement
+/// per-world; worlds are emergent, nestable networks).
+///
+/// This lives next to [`NetworkId`] because it is a `NetworkId` sentinel and
+/// `lib` is the universal dependency every world-keyed structure shares
+/// (ngauge, blockmatrix, feature-gated or not) — one definition, zero
+/// dependency/feature coupling. NGauge owns the *policy* of worlds; `lib` owns
+/// the *type* and this default value.
+///
+/// Keying a map by `(GLOBAL_WORLD, k)` while only ever inserting this value is
+/// byte-for-byte identical to the pre-world flat `k`-keyed map: one implicit
+/// world = today's flat set. It is the seam P5 later uses to mount per-world
+/// isolation without changing behavior here.
+pub const GLOBAL_WORLD: NetworkId = NetworkId([0u8; 16]);
+
 impl fmt::Display for NetworkId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in &self.0 {

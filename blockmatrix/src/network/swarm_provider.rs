@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{ContentHash, NetworkId, GLOBAL_WORLD};
 
 /// Default provider-record lifetime (P6). Mirrors the DNS TTL cache
 /// (`dns/cache.rs`): a provider learned via `TAG_SHARD_ANNOUNCE` is trusted
@@ -76,7 +76,10 @@ impl ProviderEntry {
 /// clean `remove_provider` still ages out of the index (bounded staleness,
 /// mirrors `dns/cache.rs`).
 pub struct ShardLocationIndex {
-    locations: Arc<RwLock<HashMap<ContentHash, HashMap<String, ProviderEntry>>>>,
+    /// `(world, shard)` -> provider node id -> TTL record. Until worlds form
+    /// (VISION.md §5.5), every key's world is [`GLOBAL_WORLD`] and lookup /
+    /// iteration is identical to the pre-world flat `ContentHash`-keyed map.
+    locations: Arc<RwLock<HashMap<(NetworkId, ContentHash), HashMap<String, ProviderEntry>>>>,
     /// TTL applied to newly-registered / refreshed provider records.
     ttl: Duration,
 }
@@ -95,24 +98,48 @@ impl ShardLocationIndex {
         }
     }
 
-    /// Register a node as a provider of the given shards, stamping (or
-    /// refreshing) a TTL on each record. Re-registration from a fresh
-    /// `TAG_SHARD_ANNOUNCE` extends the record's lifetime rather than
+    /// Register a node as a provider of the given shards in [`GLOBAL_WORLD`],
+    /// stamping (or refreshing) a TTL on each record. Re-registration from a
+    /// fresh `TAG_SHARD_ANNOUNCE` extends the record's lifetime rather than
     /// resetting `registered_at`.
     pub async fn register_provider(&self, node_id: &str, shard_ids: &[ContentHash]) {
         self.register_provider_with_ttl(node_id, shard_ids, self.ttl).await;
     }
 
-    /// Register with an explicit TTL (used by tests to force fast expiry).
+    /// Register a node as a provider within a specific world (P2 world seam).
+    pub async fn register_provider_in_world(
+        &self,
+        world_id: NetworkId,
+        node_id: &str,
+        shard_ids: &[ContentHash],
+    ) {
+        self.register_provider_in_world_with_ttl(world_id, node_id, shard_ids, self.ttl)
+            .await;
+    }
+
+    /// Register with an explicit TTL in [`GLOBAL_WORLD`] (used by tests to force
+    /// fast expiry).
     pub async fn register_provider_with_ttl(
         &self,
         node_id: &str,
         shard_ids: &[ContentHash],
         ttl: Duration,
     ) {
+        self.register_provider_in_world_with_ttl(GLOBAL_WORLD, node_id, shard_ids, ttl)
+            .await;
+    }
+
+    /// Register with an explicit TTL within a specific world (P2 world seam).
+    pub async fn register_provider_in_world_with_ttl(
+        &self,
+        world_id: NetworkId,
+        node_id: &str,
+        shard_ids: &[ContentHash],
+        ttl: Duration,
+    ) {
         let mut locs = self.locations.write().await;
         for shard_id in shard_ids {
-            let providers = locs.entry(*shard_id).or_default();
+            let providers = locs.entry((world_id, *shard_id)).or_default();
             providers
                 .entry(node_id.to_string())
                 .and_modify(|e| e.refresh(ttl))
@@ -120,7 +147,8 @@ impl ShardLocationIndex {
         }
     }
 
-    /// Remove a node from all shard provider sets (e.g., on disconnect).
+    /// Remove a node from all shard provider sets across all worlds (e.g., on
+    /// disconnect).
     pub async fn remove_provider(&self, node_id: &str) {
         let mut locs = self.locations.write().await;
         for providers in locs.values_mut() {
@@ -136,8 +164,18 @@ impl ShardLocationIndex {
     /// age (most-recently registered/refreshed first) so callers that take the
     /// head of the list prefer the freshest announcement.
     pub async fn get_providers(&self, shard_id: &ContentHash) -> Vec<String> {
+        self.get_providers_in_world(GLOBAL_WORLD, shard_id).await
+    }
+
+    /// Get all known, non-expired providers for a shard within a specific world
+    /// (P2 world seam), freshest-first.
+    pub async fn get_providers_in_world(
+        &self,
+        world_id: NetworkId,
+        shard_id: &ContentHash,
+    ) -> Vec<String> {
         let locs = self.locations.read().await;
-        locs.get(shard_id)
+        locs.get(&(world_id, *shard_id))
             .map(|providers| {
                 let mut live: Vec<(&String, Duration)> = providers
                     .iter()

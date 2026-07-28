@@ -89,8 +89,11 @@ impl std::fmt::Debug for NetworkNode {
 /// the data needed for ngauge's `SwarmAnalytics` to make replication
 /// and dispersion decisions.
 pub struct SwarmDemandTracker {
-    /// Per-shard request counts and last-access timestamps.
-    entries: tokio::sync::Mutex<HashMap<hypermesh_lib::ContentHash, DemandEntry>>,
+    /// Per-shard request counts and last-access timestamps, keyed by
+    /// `(world, shard)`. Until worlds form (VISION.md §5.5), every key's world
+    /// is [`hypermesh_lib::GLOBAL_WORLD`] and behavior is identical to the
+    /// pre-world flat map.
+    entries: tokio::sync::Mutex<HashMap<(hypermesh_lib::NetworkId, hypermesh_lib::ContentHash), DemandEntry>>,
 }
 
 /// A single shard's demand record.
@@ -112,15 +115,27 @@ impl SwarmDemandTracker {
         }
     }
 
-    /// Record a fetch request for a shard from a specific peer.
+    /// Record a fetch request for a shard from a specific peer in
+    /// [`hypermesh_lib::GLOBAL_WORLD`] (the default world).
     pub async fn record_fetch(
         &self,
         shard_id: hypermesh_lib::ContentHash,
         requester_node_id: &str,
     ) {
+        self.record_fetch_in_world(hypermesh_lib::GLOBAL_WORLD, shard_id, requester_node_id)
+            .await;
+    }
+
+    /// Record a fetch request for a shard within a specific world (P2 world seam).
+    pub async fn record_fetch_in_world(
+        &self,
+        world_id: hypermesh_lib::NetworkId,
+        shard_id: hypermesh_lib::ContentHash,
+        requester_node_id: &str,
+    ) {
         let now_us = chrono::Utc::now().timestamp_micros() as u64;
         let mut entries = self.entries.lock().await;
-        let entry = entries.entry(shard_id).or_insert_with(|| DemandEntry {
+        let entry = entries.entry((world_id, shard_id)).or_insert_with(|| DemandEntry {
             request_count: 0,
             last_request_us: 0,
             requester_ids: std::collections::HashSet::new(),
@@ -130,14 +145,31 @@ impl SwarmDemandTracker {
         entry.requester_ids.insert(requester_node_id.to_string());
     }
 
-    /// Get a snapshot of all demand entries for feeding into ngauge.
+    /// Get a snapshot of all demand entries for feeding into ngauge, flattened
+    /// to `shard -> entry`. Until worlds form, only
+    /// [`hypermesh_lib::GLOBAL_WORLD`] is present, so this equals the pre-world
+    /// snapshot exactly.
     pub async fn snapshot(&self) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
-        self.entries.lock().await.clone()
+        self.entries
+            .lock()
+            .await
+            .iter()
+            .map(|((_world, shard), entry)| (*shard, entry.clone()))
+            .collect()
     }
 
-    /// Get demand entry for a specific shard.
+    /// Get demand entry for a specific shard in [`hypermesh_lib::GLOBAL_WORLD`].
     pub async fn get(&self, shard_id: &hypermesh_lib::ContentHash) -> Option<DemandEntry> {
-        self.entries.lock().await.get(shard_id).cloned()
+        self.get_in_world(hypermesh_lib::GLOBAL_WORLD, shard_id).await
+    }
+
+    /// Get demand entry for a specific shard within a world (P2 world seam).
+    pub async fn get_in_world(
+        &self,
+        world_id: hypermesh_lib::NetworkId,
+        shard_id: &hypermesh_lib::ContentHash,
+    ) -> Option<DemandEntry> {
+        self.entries.lock().await.get(&(world_id, *shard_id)).cloned()
     }
 }
 
