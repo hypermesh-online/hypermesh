@@ -23,8 +23,10 @@
 
 use anyhow::Result;
 use hypermesh_lib::{ContentHash, NetworkId};
+use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::warn;
+use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 use super::{DefaultIsolationManager, IsolationManager, IsolationStats, IsolationViolation};
 use crate::network::trust::NetworkType;
@@ -33,8 +35,15 @@ use crate::network::trust::NetworkType;
 pub struct WorldIsolationGate {
     /// The dormant enforcer, now mounted and configured for `local_world`.
     manager: Arc<DefaultIsolationManager>,
-    /// This node's home world — the only world it serves shards for.
+    /// This node's home world — the root world it always belongs to.
     local_world: NetworkId,
+    /// The full set of worlds this node participates in — its home world plus
+    /// any emergent child world it has been folded into as those form (P6,
+    /// VISION.md §5.5). A fetch for a shard in ANY admitted world is legitimate
+    /// same-world traffic; only a world absent from this set is foreign and
+    /// rejected. Seeded with `local_world` at mount, so a single-world node
+    /// admits exactly its home world (identical to P5 behaviour).
+    admitted: Arc<RwLock<HashSet<NetworkId>>>,
 }
 
 impl WorldIsolationGate {
@@ -48,9 +57,12 @@ impl WorldIsolationGate {
         manager
             .configure_network(local_world, network_type)
             .await?;
+        let mut admitted = HashSet::new();
+        admitted.insert(local_world);
         Ok(Self {
             manager,
             local_world,
+            admitted: Arc::new(RwLock::new(admitted)),
         })
     }
 
@@ -59,18 +71,71 @@ impl WorldIsolationGate {
         self.local_world
     }
 
+    /// Fold an emergent child world into this node's membership (P6).
+    ///
+    /// Called when a [`WorldManager`](../../../../ngauge) forms/joins a child
+    /// world whose hot chunk this node holds: the node is now a legitimate
+    /// mirror inside `world`, so a fetch for a shard belonging to `world` is
+    /// same-world traffic and must be accepted. Idempotent. Registers the world
+    /// with the underlying enforcer for audit symmetry.
+    pub async fn admit_world(&self, world: NetworkId, network_type: NetworkType) -> Result<()> {
+        {
+            let mut admitted = self.admitted.write().await;
+            if !admitted.insert(world) {
+                return Ok(());
+            }
+        }
+        // Best-effort enforcer registration; a duplicate config is not fatal.
+        let _ = self.manager.configure_network(world, network_type).await;
+        info!(
+            "world-isolation: admitted world {} into node membership (home {})",
+            world, self.local_world,
+        );
+        Ok(())
+    }
+
+    /// Drop an emergent child world from this node's membership — the inverse of
+    /// [`admit_world`], used when a child world is merged back into its parent
+    /// (P6 merge). The home world can never be dropped.
+    pub async fn revoke_world(&self, world: NetworkId) {
+        if world == self.local_world {
+            return;
+        }
+        let mut admitted = self.admitted.write().await;
+        if admitted.remove(&world) {
+            info!(
+                "world-isolation: revoked world {} from node membership (home {})",
+                world, self.local_world,
+            );
+        }
+    }
+
+    /// Whether this node currently participates in `world`.
+    pub async fn admits(&self, world: NetworkId) -> bool {
+        self.admitted.read().await.contains(&world)
+    }
+
     /// Consult the boundary enforcer before fetching/replicating a shard that
     /// belongs to `shard_world`.
     ///
-    /// - **Same world** (`shard_world == local_world`) → `Ok(())`. Until worlds
-    ///   form this is the only reachable case, so the live path is a no-op.
-    /// - **Cross world** → `Err(..)`, logged at `warn!` (INFO-visible), with
+    /// - **Home world** (`shard_world == local_world`) → runs the full enforcer
+    ///   path (`validate_boundary`), exactly as P5 did — the single-world no-op.
+    /// - **Admitted child world** → `Ok(())`. The node is a member of this
+    ///   emergent world (it holds the migrated hot chunk), so the fetch is
+    ///   legitimate same-world traffic, not a boundary crossing.
+    /// - **Foreign world** (not admitted) → `Err(..)`, logged at `warn!`, with
     ///   the violation recorded in the enforcer's audit log.
     pub async fn check_fetch(
         &self,
         shard_world: NetworkId,
         shard_id: &ContentHash,
     ) -> Result<()> {
+        // A world the node participates in (other than home) is same-world
+        // traffic: accept without a boundary probe so a legitimate holder of a
+        // migrated shard is never stranded.
+        if shard_world != self.local_world && self.admits(shard_world).await {
+            return Ok(());
+        }
         match self
             .manager
             .validate_boundary(self.local_world, shard_world)
