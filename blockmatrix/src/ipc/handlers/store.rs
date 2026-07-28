@@ -106,14 +106,30 @@ async fn handle_store(
         .await
         .map_err(|e| rpc_err(-32003, format!("pipeline processing failed: {e}")))?;
 
-    // 4. Store shards locally + persist to disk
+    // 4. Compute placement: WHERE each shard lives, on real PoS-eligible peers.
+    //
+    // P4: the live store path places through the single placement authority
+    // (`network::placement::place_shards` → `distribute_shards_pos_aware`):
+    // PoS decides WHO is eligible, proximity (P3) decides WHERE. The pipeline no
+    // longer fabricates golden-ratio positions. Snapshot the connected peers
+    // once so placement and distribution agree on the same peer set. Cold start
+    // (no network / no peers) yields empty placements → every shard kept local.
+    let peers = match &state.network {
+        Some(net) => net.get_connected_nodes().await,
+        None => Vec::new(),
+    };
+    let placements =
+        crate::network::placement::place_shards(&peers, &processed.shards, &asset_id, privacy_mode)
+            .await;
+
+    // 5. Store shards locally + persist to disk
     let stored_shards = store_shards_locally(state, &processed).await;
     let shard_bytes: Vec<[u8; 32]> = stored_shards.iter().map(|(b, _)| *b).collect();
     let shard_hashes: Vec<String> = stored_shards.iter().map(|(_, h)| h.clone()).collect();
     persist_shard_map(state, &processed, &shard_hashes, privacy_mode)
         .map_err(|e| rpc_err(-32004, format!("persist failed: {e}")))?;
 
-    // 5. Register the sharded asset on-chain BEFORE distributing.
+    // 6. Register the sharded asset on-chain BEFORE distributing.
     //
     // A6.1: this is the fix. Without an on-chain `StoragePointer::Sharded`
     // entry listing these shard hashes, `NodeBlockchain::authorizes_shard`
@@ -123,10 +139,11 @@ async fn handle_store(
     // unregistered publish is exactly the bug being fixed. Distribution runs
     // only after registration succeeds (order: persist → register → distribute).
     let registered_block =
-        register_sharded_asset_onchain(state, &processed, &shard_bytes, privacy_mode).await?;
+        register_sharded_asset_onchain(state, &processed, &shard_bytes, &placements, privacy_mode)
+            .await?;
 
-    // 6. Distribute to network peers if transport available
-    let distribution = distribute_if_possible(state, &processed).await;
+    // 7. Distribute to network peers if transport available
+    let distribution = distribute_if_possible(state, &processed, &placements, &peers).await;
 
     Ok(serde_json::json!({
         "asset_id": asset_id,
@@ -153,6 +170,7 @@ async fn register_sharded_asset_onchain(
     state: &DaemonState,
     processed: &ProcessedAsset,
     shard_bytes: &[[u8; 32]],
+    placements: &[crate::distribution::ShardPlacement],
     privacy_mode: PrivacyMode,
 ) -> Result<u64, RpcError> {
     // asset_hash: the file's BLAKE3 content address (asset_id is its hex form).
@@ -166,14 +184,10 @@ async fn register_sharded_asset_onchain(
             )
         })?;
 
-    // placements: the matrix coordinate of each shard's placement (empty is
-    // fine — `authorizes_shard` scans only `shard_hashes`).
-    let placements: Vec<MatrixCoordinate> = processed
-        .distributed
-        .placements
-        .iter()
-        .map(|p| p.position)
-        .collect();
+    // placements: the matrix coordinate of each shard's placement, from the
+    // real PoS-eligible-node placement authority (empty on cold start is fine —
+    // `authorizes_shard` scans only `shard_hashes`).
+    let placements: Vec<MatrixCoordinate> = placements.iter().map(|p| p.position).collect();
 
     // Node's current four-proof StateProof (same daemon-path convention the
     // dashboard/domain handlers use before calling `add_block`).
@@ -319,13 +333,18 @@ fn persist_shard_map(
 }
 
 /// Distribute shards to network peers if shard transport is available.
+///
+/// `placements` come from the placement authority (`place_shards`) and
+/// `peers` is the same snapshot placement was computed over.
 async fn distribute_if_possible(
     state: &DaemonState,
     processed: &ProcessedAsset,
+    placements: &[crate::distribution::ShardPlacement],
+    peers: &[crate::network::NetworkNode],
 ) -> serde_json::Value {
-    let (network, transport) = match (&state.network, &state.shard_transport) {
-        (Some(net), Some(tr)) => (net, tr),
-        _ => {
+    let transport = match &state.shard_transport {
+        Some(tr) => tr,
+        None => {
             return serde_json::json!({
                 "sent": 0,
                 "kept_local": processed.shards.len(),
@@ -343,14 +362,7 @@ async fn distribute_if_possible(
         })
         .collect();
 
-    let peers = network.get_connected_nodes().await;
-    let result = distribute_to_peers(
-        &shard_pairs,
-        &processed.distributed.placements,
-        &peers,
-        transport.as_ref(),
-    )
-    .await;
+    let result = distribute_to_peers(&shard_pairs, placements, peers, transport.as_ref()).await;
 
     serde_json::json!({
         "sent": result.sent,

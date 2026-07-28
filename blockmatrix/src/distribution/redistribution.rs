@@ -223,7 +223,7 @@ fn redistribute_minimal(
         .collect();
 
     // Redistribute only affected shards
-    let distribution = distribute_across_octants(affected_shard_data, eligible_nodes)?;
+    let distribution = distribute_across_octants(&affected_shard_data, eligible_nodes)?;
 
     // Replace affected placements
     for affected in affected_shards {
@@ -259,7 +259,7 @@ fn redistribute_full_rebalance(
     shards: Vec<Shard>,
     eligible_nodes: &[NodeInfo],
 ) -> AssetResult<(Vec<ShardPlacement>, Vec<(String, String, usize)>)> {
-    let distribution = distribute_across_octants(shards, eligible_nodes)?;
+    let distribution = distribute_across_octants(&shards, eligible_nodes)?;
 
     // All shards are potentially moved
     let moved = Vec::new(); // Would compare with previous placements

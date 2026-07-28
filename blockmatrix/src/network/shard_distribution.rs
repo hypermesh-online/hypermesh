@@ -3,14 +3,16 @@
 
 //! Placement-aware shard distribution to network peers.
 //!
-//! After the asset pipeline produces shards and the `MatrixDistributor`
-//! calculates optimal matrix positions for each shard, this module sends
-//! shards to the connected peers closest to those target positions.
+//! After the asset pipeline produces shards and the placement authority
+//! ([`crate::network::placement::place_shards`] →
+//! [`crate::distribution::distribute_shards_pos_aware`]) computes each shard's
+//! target matrix position on a real PoS-eligible peer, this module sends shards
+//! to the connected peers closest to those target positions.
 //!
 //! Graceful degradation: shards whose target position has no nearby peer
 //! remain stored locally.
 
-use crate::assets::pipeline::distribution::ShardPlacement;
+use crate::distribution::ShardPlacement;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::shard_transport::ShardTransport;
 use crate::network::NetworkNode;
@@ -36,7 +38,8 @@ pub struct NetworkDistributionResult {
 /// # Arguments
 ///
 /// * `shards` - Pairs of (content_hash, shard_data) from the pipeline
-/// * `placements` - Target matrix positions from `MatrixDistributor`
+/// * `placements` - Target matrix positions from the placement authority
+///   ([`crate::network::placement::place_shards`])
 /// * `peers` - Currently connected and authenticated peers
 /// * `transport` - STOQ shard transport for sending
 pub async fn distribute_to_peers(
@@ -164,7 +167,6 @@ fn peer_to_node_id(peer: &NetworkNode) -> NodeId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::pipeline::distribution::ShardPlacement;
     use crate::network::shard_transport::MockShardTransport;
 
     fn make_placement(
@@ -173,14 +175,13 @@ mod tests {
         y: i64,
         z: i64,
     ) -> ShardPlacement {
+        let position = MatrixCoordinate::new(x, y, z).expect("test: valid coord");
         ShardPlacement {
             shard_index: index,
-            position: MatrixCoordinate::new(x, y, z)
-                .expect("test: valid coord"),
-            network_id: "default".to_string(),
-            node_id: None,
-            distance_from_origin: 0.0,
-            routing_path: vec![],
+            position,
+            node_id: format!("node-{index}"),
+            octant: 0,
+            distance_from_origin: position.euclidean_distance(&MatrixCoordinate::origin()),
         }
     }
 

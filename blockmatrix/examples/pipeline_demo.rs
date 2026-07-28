@@ -187,25 +187,13 @@ async fn main() -> anyhow::Result<()> {
     println!("      Final size: {} bytes", processed.stats.final_size);
     println!();
 
-    // Show shard placements
-    println!("📍 Shard Placements:");
-    for (i, placement) in processed.distributed.placements.iter().take(5).enumerate() {
-        println!(
-            "   Shard {}: ({}, {}, {}) on {} (distance: {:.2})",
-            placement.shard_index,
-            placement.position.x,
-            placement.position.y,
-            placement.position.z,
-            placement.network_id,
-            placement.distance_from_origin
-        );
-    }
-    if processed.distributed.placements.len() > 5 {
-        println!(
-            "   ... and {} more shards",
-            processed.distributed.placements.len() - 5
-        );
-    }
+    // Shard placement is no longer computed by the pipeline (P4). WHERE shards
+    // live is decided on the live store path over the real PoS-eligible peer
+    // set (see `network::placement::place_shards` →
+    // `distribution::distribute_shards_pos_aware`), which this offline demo has
+    // no peers for — so placements are empty here by design.
+    println!("📍 Shard Placements: computed on the store path (real peers), not in the pipeline");
+    println!("   placements in this offline demo: {}", processed.distributed.placements.len());
     println!();
 
     // Reconstruct asset
