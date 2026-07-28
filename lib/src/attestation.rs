@@ -79,6 +79,44 @@ pub const ATTESTATION_DOMAIN: &[u8] = b"HYPERMESH/S3.3/MIRROR-ATTESTATION/v1";
 /// into a [`MirrorSeal`] root).
 pub const ATTESTATION_COMMITMENT_DOMAIN: &[u8] = b"HYPERMESH/S3.3/ATTESTATION-COMMITMENT/v1";
 
+/// S3.4/F1 — largest accepted [`MirrorAttestation::spine_point`], in bytes.
+///
+/// # Why this field needs a cap at all
+///
+/// `spine_point` is the ONLY unbounded attacker-chosen field an attestation
+/// carries. Everything else is already pinned:
+///
+/// * `asset_hash`, `matrix_index`, `spine_seq` — fixed width;
+/// * `mirror` — [`binds_to_signer`](MirrorAttestation::binds_to_signer) forces
+///   it to equal `hex(BLAKE3(pubkey))`, i.e. exactly 64 bytes;
+/// * `signature.signer_pubkey` / `signature.signature` — a FALCON-1024 key and
+///   detached signature, or the signature does not verify;
+/// * `signature.proof_bytes` — must equal
+///   [`my_canonical_bytes`](MirrorAttestation::my_canonical_bytes), so it is a
+///   function of the fields above **plus `spine_point`**.
+///
+/// So `spine_point` sets the size of the whole object, and it appears in it
+/// TWICE (the field, and again inside `proof_bytes`). Uncapped, an attestor
+/// signs a 13 KiB `spine_point` itself — signing imposes no size limit — and
+/// each pool slot costs ~30 KiB instead of ~4 KiB.
+///
+/// # The number, and why nothing honest is near it
+///
+/// A `spine_point` is a `lineage_id`: `hex(proof_hash)` of the entry the mirror
+/// validated (BlockMatrix `BlockAssetEntry::lineage_id`). `proof_hash` is a
+/// BLAKE3 digest, so the ONLY value any producer emits is **64 bytes** of
+/// lowercase hex. 256 is four times that — enough hex for a 128-byte digest,
+/// which is twice the width BLAKE3 or any successor in this codebase produces.
+/// Honest material cannot approach it; the 13,400-byte attack cannot come near
+/// passing.
+///
+/// # This is a bound on network input, NOT a proof term
+///
+/// It gates admission of a third party's statement into local memory. It is not
+/// consulted by any [`StateProof`](crate::proof::StateProof), carries no
+/// magnitude, and no authorization decision reads it.
+pub const MAX_SPINE_POINT_BYTES: usize = 256;
+
 /// Domain separator for the seal root over an ordered attestation set.
 pub const SEAL_ROOT_DOMAIN: &[u8] = b"HYPERMESH/S3.3/MIRROR-SEAL-ROOT/v1";
 
@@ -274,15 +312,28 @@ impl MirrorAttestation {
         self.mirror == derived
     }
 
-    /// Structural validity: non-empty identities, envelope covers these fields,
-    /// and the signer binds to the claimed mirror.
+    /// Structural validity: non-empty identities, a `spine_point` within
+    /// [`MAX_SPINE_POINT_BYTES`], the envelope covering these fields, and the
+    /// signer binding to the claimed mirror.
     ///
     /// This is the whole check MINUS the FALCON verification, which lives in
     /// BlockMatrix (step (2) of `verify_attestation`). Never treat this alone
     /// as acceptance.
+    ///
+    /// # Why the size cap is HERE and nowhere else (S3.4/F1)
+    ///
+    /// This function is the ONE audit gate. BlockMatrix's `verify_attestation`
+    /// calls it, and `record_mirror_attestation` calls that, so a requirement
+    /// added here reaches the accept path automatically — which is exactly the
+    /// property S3.3's B1 finding forced (a second list at the accept gate is
+    /// what diverged before). Putting the cap at the accept gate only would
+    /// recreate that divergence in the opposite direction: memory bounded on
+    /// the way in, but [`verify_sealed_set`] and [`verify_membership`] still
+    /// willing to open a seal over material the pool would never hold.
     pub fn is_structurally_valid(&self) -> bool {
         !self.mirror.is_empty()
             && !self.spine_point.is_empty()
+            && self.spine_point.len() <= MAX_SPINE_POINT_BYTES
             && !self.signature.signer_pubkey.is_empty()
             && !self.signature.signature.is_empty()
             && self.proof_bytes_match()
@@ -832,6 +883,48 @@ mod tests {
         assert!(falcon_ok(&a), "FALCON still verifies");
         assert!(!a.binds_to_signer(), "identity binding must fail");
         assert!(!a.is_structurally_valid());
+    }
+
+    /// S3.4/F1 — the `spine_point` cap, at the ONE gate.
+    ///
+    /// The attack is a 13,400-byte `spine_point` (the largest that fits the
+    /// 64 KiB wire cap), signed by the attacker itself so the envelope is
+    /// perfectly valid. What refuses it is the SIZE, not the crypto.
+    #[test]
+    fn spine_point_is_length_capped_at_the_audit_gate() {
+        let asset = [0x5Au8; 32];
+        let cell = MatrixIndex::new(1, 2, 3);
+
+        // The only length any producer emits: hex of a BLAKE3 digest.
+        let honest = attest(asset, cell, &"ab".repeat(32), 4, 1);
+        assert_eq!(honest.spine_point.len(), 64);
+        assert!(honest.is_structurally_valid(), "an honest lineage_id must pass");
+
+        // Exactly at the cap: accepted. One byte over: refused.
+        let at_cap = attest(asset, cell, &"c".repeat(MAX_SPINE_POINT_BYTES), 4, 2);
+        assert!(at_cap.is_structurally_valid(), "the cap is inclusive");
+        let over = attest(asset, cell, &"c".repeat(MAX_SPINE_POINT_BYTES + 1), 4, 3);
+        assert!(!over.is_structurally_valid(), "one byte over must be refused");
+        assert!(over.proof_bytes_match() && over.binds_to_signer() && falcon_ok(&over),
+            "the refusal is by SIZE — the envelope and identity binding are sound");
+
+        // The measured attack.
+        let attack = attest(asset, cell, &"S".repeat(13_400), 4, 4);
+        assert!(!attack.is_structurally_valid());
+
+        // And because the gate is one gate, the seal paths refuse it too — an
+        // oversized attestation cannot be laundered through a membership proof.
+        let seal = build_seal("owner-1", std::slice::from_ref(&attack));
+        assert!(matches!(
+            verify_sealed_set(&asset, std::slice::from_ref(&attack), &seal),
+            Err(SealBreak::NotStructurallyValid { .. })
+        ));
+        let proof = membership_proof(std::slice::from_ref(&attack), &attack)
+            .expect("test: leaf exists regardless of size");
+        assert!(matches!(
+            verify_membership(&asset, &attack, &proof, &seal),
+            Err(SealBreak::NotStructurallyValid { .. })
+        ));
     }
 
     #[test]

@@ -41,15 +41,17 @@ pub mod validation;
 
 pub use asset_index::{AssetChainIndex, AssetEntryLocator, AssetHighWater};
 pub use attestations::{
-    matrix_index_of, verify_attestation, MirrorAttestationPool, MirrorSealReceipt, PoolFull,
-    MAX_ATTESTATIONS_PER_ASSET, MAX_TOTAL_ATTESTATIONS,
+    attestation_footprint_bytes, matrix_index_of, verify_attestation, MirrorAttestationPool,
+    MirrorSealReceipt, PoolFull, MAX_ATTESTATIONS_PER_ASSET, MAX_ATTESTATION_POOL_BYTES,
+    MAX_TOTAL_ATTESTATIONS,
 };
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
 pub use foreign::{
-    ForeignAssetChain, ForeignChainReceipt, ForeignChainReject, ForeignChainStore,
-    MAX_FOREIGN_CHAINS, MAX_FOREIGN_CHAIN_ENTRIES,
+    chain_footprint_bytes, entry_footprint_bytes, ForeignAssetChain, ForeignChainReceipt,
+    ForeignChainReject, ForeignChainStore, StoreBound, MAX_FOREIGN_CHAINS,
+    MAX_FOREIGN_CHAIN_ENTRIES, MAX_FOREIGN_STORE_BYTES,
 };
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,
