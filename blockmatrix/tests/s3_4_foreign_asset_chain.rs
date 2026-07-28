@@ -22,9 +22,9 @@
 
 use blockmatrix::blockchain::block::{Block, BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{
-    chain_footprint_bytes, entry_footprint_bytes, ForeignAssetChain, ForeignChainReject,
-    ForeignChainStore, LineageBreak, NodeBlockchain, StoreBound, MAX_FOREIGN_CHAINS,
-    MAX_FOREIGN_CHAIN_ENTRIES, MAX_FOREIGN_STORE_BYTES,
+    chain_footprint_bytes, entry_footprint_bytes, PresentedAssetChain, AcceptReject,
+    ReceivedAssetStore, LineageBreak, NodeBlockchain, StoreBound, MAX_RECEIVED_CHAINS,
+    MAX_RECEIVED_CHAIN_ENTRIES, MAX_RECEIVED_STORE_BYTES,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use hypermesh_lib::NodeSigner;
@@ -57,13 +57,13 @@ fn foreign_entry(
 }
 
 /// A well-formed foreign chain of `len` entries for `asset`, authored by `by`.
-fn foreign_chain(by: &FalconIdentity, asset: [u8; 32], len: usize) -> ForeignAssetChain {
+fn foreign_chain(by: &FalconIdentity, asset: [u8; 32], len: usize) -> PresentedAssetChain {
     let mut entries: Vec<BlockAssetEntry> = Vec::new();
     for seq in 0..len as u64 {
         let prev = entries.last().map(BlockAssetEntry::lineage_id);
         entries.push(foreign_entry(by, asset, prev, seq));
     }
-    ForeignAssetChain::new(asset, entries)
+    PresentedAssetChain::new(asset, entries)
 }
 
 /// A locally-appendable (unsigned) entry — the shape S3.2's tests use for a
@@ -109,7 +109,7 @@ async fn s3_4_valid_foreign_chain_is_accepted_and_the_spine_does_not_move() {
     assert!(!chain.holds_asset(&asset).await);
 
     let receipt = chain
-        .accept_foreign_asset_chain(foreign_chain(&stranger, asset, 3))
+        .accept_asset_chain(foreign_chain(&stranger, asset, 3))
         .await
         .expect("test: a valid foreign asset-chain must be accepted");
 
@@ -126,14 +126,14 @@ async fn s3_4_valid_foreign_chain_is_accepted_and_the_spine_does_not_move() {
 
     // ...and the imported title is queryable and self-verifying.
     let lineage = chain
-        .foreign_asset_lineage(&asset)
+        .received_asset_lineage(&asset)
         .await
         .expect("test: adopted chain is queryable");
     assert_eq!(lineage.sequence(), vec![0, 1, 2]);
     assert_eq!(lineage.verify(), Ok(()));
     assert_eq!(chain.asset_lineage_any(&asset).await, lineage);
     assert!(chain.holds_asset(&asset).await);
-    assert_eq!(chain.foreign_chain_count().await, 1);
+    assert_eq!(chain.received_chain_count().await, 1);
 
     // The SPINE's own per-asset view still knows nothing about it — imported
     // history is not local title.
@@ -148,23 +148,23 @@ async fn s3_4_empty_and_oversized_presentations_are_refused() {
 
     assert_eq!(
         chain
-            .accept_foreign_asset_chain(ForeignAssetChain::new([0x42u8; 32], vec![]))
+            .accept_asset_chain(PresentedAssetChain::new([0x42u8; 32], vec![]))
             .await,
-        Err(ForeignChainReject::Empty)
+        Err(AcceptReject::Empty)
     );
 
     // Over-length is judged BEFORE any signature work: one cheap entry cloned
     // past the cap is enough to prove the ordering.
     let one = foreign_chain(&stranger, [0x43u8; 32], 1);
-    let flooded = ForeignAssetChain::new(
+    let flooded = PresentedAssetChain::new(
         [0x43u8; 32],
-        vec![one.entries[0].clone(); MAX_FOREIGN_CHAIN_ENTRIES + 1],
+        vec![one.entries[0].clone(); MAX_RECEIVED_CHAIN_ENTRIES + 1],
     );
     assert_eq!(
-        chain.accept_foreign_asset_chain(flooded).await,
-        Err(ForeignChainReject::TooLong {
-            presented: MAX_FOREIGN_CHAIN_ENTRIES + 1,
-            limit: MAX_FOREIGN_CHAIN_ENTRIES,
+        chain.accept_asset_chain(flooded).await,
+        Err(AcceptReject::TooLong {
+            presented: MAX_RECEIVED_CHAIN_ENTRIES + 1,
+            limit: MAX_RECEIVED_CHAIN_ENTRIES,
         })
     );
 }
@@ -181,12 +181,12 @@ async fn s3_4_forged_lineage_is_rejected() {
     let mut forged = foreign_chain(&stranger, asset, 3);
     forged.entries[2] = foreign_entry(&stranger, asset, Some("de".repeat(32)), 2);
     assert!(matches!(
-        chain.accept_foreign_asset_chain(forged).await,
-        Err(ForeignChainReject::LineageBroken(
+        chain.accept_asset_chain(forged).await,
+        Err(AcceptReject::LineageBroken(
             LineageBreak::PrevPointerMismatch { position: 2, .. }
         ))
     ));
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (b) SEQUENCE GAP — correct prev-pointer, skipped sequence number.
     let chain = NodeBlockchain::new(coord());
@@ -199,28 +199,28 @@ async fn s3_4_forged_lineage_is_rejected() {
         9,
     ));
     assert!(matches!(
-        chain.accept_foreign_asset_chain(gapped).await,
-        Err(ForeignChainReject::LineageBroken(LineageBreak::SequenceGap {
+        chain.accept_asset_chain(gapped).await,
+        Err(AcceptReject::LineageBroken(LineageBreak::SequenceGap {
             position: 2,
             claimed: 9,
             expected: 2,
         }))
     ));
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (c) ROOT IS NOT AN ASSET-GENESIS — a chain presented mid-history, which
     //     is exactly the "unverifiable provenance" S3.2 refused to guess at.
     let chain = NodeBlockchain::new(coord());
     let asset = [0x46u8; 32];
     let full = foreign_chain(&stranger, asset, 3);
-    let truncated = ForeignAssetChain::new(asset, full.entries[1..].to_vec());
+    let truncated = PresentedAssetChain::new(asset, full.entries[1..].to_vec());
     assert!(matches!(
-        chain.accept_foreign_asset_chain(truncated).await,
-        Err(ForeignChainReject::LineageBroken(
+        chain.accept_asset_chain(truncated).await,
+        Err(AcceptReject::LineageBroken(
             LineageBreak::RootIsNotAssetGenesis { .. }
         ))
     ));
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (d) WRONG ASSET — an entry for a different asset smuggled into the run.
     let chain = NodeBlockchain::new(coord());
@@ -233,8 +233,8 @@ async fn s3_4_forged_lineage_is_rejected() {
         1,
     );
     assert!(matches!(
-        chain.accept_foreign_asset_chain(mixed).await,
-        Err(ForeignChainReject::LineageBroken(LineageBreak::WrongAsset {
+        chain.accept_asset_chain(mixed).await,
+        Err(AcceptReject::LineageBroken(LineageBreak::WrongAsset {
             position: 1
         }))
     ));
@@ -256,12 +256,12 @@ async fn s3_4_bad_signers_are_rejected() {
     let mut unsigned = foreign_chain(&stranger, asset, 2);
     unsigned.entries[1].signed_proof = None;
     assert_eq!(
-        chain.accept_foreign_asset_chain(unsigned).await,
-        Err(ForeignChainReject::Unsigned { position: 1 }),
+        chain.accept_asset_chain(unsigned).await,
+        Err(AcceptReject::Unsigned { position: 1 }),
         "the spine's one-release legacy flag must not admit an unsigned foreign import"
     );
     std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (b) SIGNER IS NOT THE CLAIMED AUTHOR — a real, valid FALCON signature over
     //     a proof that names somebody ELSE as its author.
@@ -282,10 +282,10 @@ async fn s3_4_bad_signers_are_rejected() {
     assert!(entry.verify_signed_proof().is_ok(), "the signature itself is valid");
     wrong_author.entries[1] = entry;
     assert_eq!(
-        chain.accept_foreign_asset_chain(wrong_author).await,
-        Err(ForeignChainReject::SignerNotAuthor { position: 1 })
+        chain.accept_asset_chain(wrong_author).await,
+        Err(AcceptReject::SignerNotAuthor { position: 1 })
     );
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (c) PROOF ALTERED AFTER SIGNING — the envelope no longer wraps the proof
     //     the entry carries.
@@ -296,10 +296,10 @@ async fn s3_4_bad_signers_are_rejected() {
         wire.nonce[0] ^= 0xFF;
     }
     assert!(matches!(
-        chain.accept_foreign_asset_chain(tampered).await,
-        Err(ForeignChainReject::BadSignature { position: 0, .. })
+        chain.accept_asset_chain(tampered).await,
+        Err(AcceptReject::BadSignature { position: 0, .. })
     ));
-    assert!(!chain.has_foreign_asset_chain(&asset).await);
+    assert!(!chain.has_received_asset_chain(&asset).await);
 }
 
 // ── DOMAINS: the container spine keeps its own rejection rule ───────────────
@@ -312,7 +312,7 @@ async fn s3_4_accepting_a_foreign_chain_opens_no_path_onto_the_node_spine() {
 
     let foreign = foreign_chain(&stranger, asset, 2);
     chain
-        .accept_foreign_asset_chain(foreign.clone())
+        .accept_asset_chain(foreign.clone())
         .await
         .expect("test: accepted off-spine");
     let after_accept = snapshot(&chain).await;
@@ -360,9 +360,9 @@ async fn s3_4_a_foreign_chain_cannot_shadow_a_spine_asset() {
 
     assert_eq!(
         chain
-            .accept_foreign_asset_chain(foreign_chain(&stranger, asset, 3))
+            .accept_asset_chain(foreign_chain(&stranger, asset, 3))
             .await,
-        Err(ForeignChainReject::AlreadyOnSpine),
+        Err(AcceptReject::AlreadyOnSpine),
         "an import must not offer a second opinion about an asset the spine holds"
     );
 
@@ -372,9 +372,9 @@ async fn s3_4_a_foreign_chain_cannot_shadow_a_spine_asset() {
     assert!(chain.asset_lineage(&asset).await.is_empty());
     assert_eq!(
         chain
-            .accept_foreign_asset_chain(foreign_chain(&stranger, asset, 3))
+            .accept_asset_chain(foreign_chain(&stranger, asset, 3))
             .await,
-        Err(ForeignChainReject::AlreadyOnSpine)
+        Err(AcceptReject::AlreadyOnSpine)
     );
 }
 
@@ -395,7 +395,7 @@ async fn s3_4_adoption_is_non_destructive() {
 
     for tag in 0x60u8..0x66 {
         chain
-            .accept_foreign_asset_chain(foreign_chain(&stranger, [tag; 32], 2))
+            .accept_asset_chain(foreign_chain(&stranger, [tag; 32], 2))
             .await
             .expect("test: accepted");
     }
@@ -409,9 +409,9 @@ async fn s3_4_adoption_is_non_destructive() {
     assert_eq!(chain.asset_lineage(&local_asset).await.verify(), Ok(()));
     assert_eq!(snapshot(&chain).await, before);
     // Every adopted chain coexists — an accept adds, it never clears.
-    assert_eq!(chain.foreign_chain_count().await, 6);
+    assert_eq!(chain.received_chain_count().await, 6);
     for tag in 0x60u8..0x66 {
-        assert!(chain.has_foreign_asset_chain(&[tag; 32]).await);
+        assert!(chain.has_received_asset_chain(&[tag; 32]).await);
     }
 }
 
@@ -425,16 +425,16 @@ async fn s3_4_an_adopted_chain_may_only_be_extended() {
     // freshness nonce, so two independently built runs are genuinely two
     // different histories — which the conflict case below relies on.)
     let full = foreign_chain(&stranger, asset, 5);
-    let three = ForeignAssetChain::new(asset, full.entries[..3].to_vec());
+    let three = PresentedAssetChain::new(asset, full.entries[..3].to_vec());
 
     chain
-        .accept_foreign_asset_chain(three.clone())
+        .accept_asset_chain(three.clone())
         .await
         .expect("test: accepted");
 
     // Re-presenting the same prefix is idempotent: nothing added.
     let receipt = chain
-        .accept_foreign_asset_chain(three.clone())
+        .accept_asset_chain(three.clone())
         .await
         .expect("test: re-presentation accepted");
     assert_eq!(receipt.added, 0);
@@ -442,7 +442,7 @@ async fn s3_4_an_adopted_chain_may_only_be_extended() {
 
     // Genuine extension: same history, two more entries.
     let receipt = chain
-        .accept_foreign_asset_chain(full)
+        .accept_asset_chain(full)
         .await
         .expect("test: extension accepted");
     assert_eq!(receipt.added, 2);
@@ -450,8 +450,8 @@ async fn s3_4_an_adopted_chain_may_only_be_extended() {
 
     // Truncation is not an update.
     assert_eq!(
-        chain.accept_foreign_asset_chain(three).await,
-        Err(ForeignChainReject::NotAnExtension {
+        chain.accept_asset_chain(three).await,
+        Err(AcceptReject::NotAnExtension {
             held: 5,
             presented: 3,
         })
@@ -462,13 +462,13 @@ async fn s3_4_an_adopted_chain_may_only_be_extended() {
     let rival = FalconIdentity::generate();
     assert_eq!(
         chain
-            .accept_foreign_asset_chain(foreign_chain(&rival, asset, 5))
+            .accept_asset_chain(foreign_chain(&rival, asset, 5))
             .await,
-        Err(ForeignChainReject::Conflict { position: 0 })
+        Err(AcceptReject::Conflict { position: 0 })
     );
     assert_eq!(
         chain
-            .foreign_asset_lineage(&asset)
+            .received_asset_lineage(&asset)
             .await
             .expect("test: still held")
             .len(),
@@ -486,8 +486,8 @@ async fn s3_4_foreign_store_bound_holds_and_evicts_nothing() {
     // keypair is enough to fill it — which is exactly why it must be bounded.
     let stranger = FalconIdentity::generate();
 
-    let mut first: Option<ForeignAssetChain> = None;
-    for n in 0..MAX_FOREIGN_CHAINS {
+    let mut first: Option<PresentedAssetChain> = None;
+    for n in 0..MAX_RECEIVED_CHAINS {
         let mut asset = [0u8; 32];
         asset[..8].copy_from_slice(&(n as u64).to_le_bytes());
         let presented = foreign_chain(&stranger, asset, 2);
@@ -495,7 +495,7 @@ async fn s3_4_foreign_store_bound_holds_and_evicts_nothing() {
             // Adopt only the FIRST entry of this one, so the same history is
             // available later as a genuine extension.
             chain
-                .accept_foreign_asset_chain(ForeignAssetChain::new(
+                .accept_asset_chain(PresentedAssetChain::new(
                     asset,
                     presented.entries[..1].to_vec(),
                 ))
@@ -505,42 +505,42 @@ async fn s3_4_foreign_store_bound_holds_and_evicts_nothing() {
             continue;
         }
         chain
-            .accept_foreign_asset_chain(presented)
+            .accept_asset_chain(presented)
             .await
             .expect("test: accepted below capacity");
     }
-    assert_eq!(chain.foreign_chain_count().await, MAX_FOREIGN_CHAINS);
+    assert_eq!(chain.received_chain_count().await, MAX_RECEIVED_CHAINS);
 
     // At capacity a NEW chain is refused...
     let overflow = [0xFFu8; 32];
     assert_eq!(
         chain
-            .accept_foreign_asset_chain(foreign_chain(&stranger, overflow, 1))
+            .accept_asset_chain(foreign_chain(&stranger, overflow, 1))
             .await,
-        Err(ForeignChainReject::StoreFull(StoreBound::Chains {
-            held: MAX_FOREIGN_CHAINS,
-            limit: MAX_FOREIGN_CHAINS,
+        Err(AcceptReject::StoreFull(StoreBound::Chains {
+            held: MAX_RECEIVED_CHAINS,
+            limit: MAX_RECEIVED_CHAINS,
         }))
     );
-    assert!(!chain.has_foreign_asset_chain(&overflow).await);
+    assert!(!chain.has_received_asset_chain(&overflow).await);
 
     // ...and NOTHING already adopted was evicted to make room.
-    assert_eq!(chain.foreign_chain_count().await, MAX_FOREIGN_CHAINS);
+    assert_eq!(chain.received_chain_count().await, MAX_RECEIVED_CHAINS);
     let first = first.expect("test: at least one chain");
-    assert!(chain.has_foreign_asset_chain(&first.asset_hash).await);
+    assert!(chain.has_received_asset_chain(&first.asset_hash).await);
 
     // Extending an ALREADY-held chain is still admitted at capacity: it takes
     // no new slot.
     let first_asset = first.asset_hash;
     chain
-        .accept_foreign_asset_chain(first)
+        .accept_asset_chain(first)
         .await
         .expect("test: extension of a held chain is admitted at capacity");
 
     // Space is reclaimed only by a LOCAL decision, never by traffic.
-    assert_eq!(chain.forget_foreign_asset_chain(&first_asset).await, 2);
+    assert_eq!(chain.forget_received_asset_chain(&first_asset).await, 2);
     chain
-        .accept_foreign_asset_chain(foreign_chain(&stranger, overflow, 1))
+        .accept_asset_chain(foreign_chain(&stranger, overflow, 1))
         .await
         .expect("test: room was made explicitly");
 }
@@ -567,15 +567,15 @@ async fn s3_4_the_store_bound_is_a_byte_budget_that_fits_r13() {
     );
 
     // THE DEFECT, quantified: the count caps alone do not bound this store.
-    let counts_only = MAX_FOREIGN_CHAINS * MAX_FOREIGN_CHAIN_ENTRIES * footprint;
+    let counts_only = MAX_RECEIVED_CHAINS * MAX_RECEIVED_CHAIN_ENTRIES * footprint;
     println!(
         "count-caps-only worst case: {counts_only} bytes ({} MiB)",
         counts_only / (1024 * 1024)
     );
     assert!(
         counts_only > R13_MIN_RAM_BYTES / 2,
-        "this assertion documents WHY the byte budget exists: {MAX_FOREIGN_CHAINS} x \
-         {MAX_FOREIGN_CHAIN_ENTRIES} x {footprint} = {counts_only} bytes — more than HALF \
+        "this assertion documents WHY the byte budget exists: {MAX_RECEIVED_CHAINS} x \
+         {MAX_RECEIVED_CHAIN_ENTRIES} x {footprint} = {counts_only} bytes — more than HALF \
          a minimum-spec node's entire RAM, for an off-spine cache. That is the figure \
          that must NOT be the store's effective bound"
     );
@@ -583,25 +583,25 @@ async fn s3_4_the_store_bound_is_a_byte_budget_that_fits_r13() {
     // THE FIX: the byte budget is the binding bound, and it fits R13 with the
     // rest of the node's working set still in play.
     assert!(
-        MAX_FOREIGN_STORE_BYTES < counts_only,
+        MAX_RECEIVED_STORE_BYTES < counts_only,
         "the byte budget must bind before the count caps ever could"
     );
     assert!(
-        MAX_FOREIGN_STORE_BYTES <= R13_MIN_RAM_BYTES / 32,
+        MAX_RECEIVED_STORE_BYTES <= R13_MIN_RAM_BYTES / 32,
         "the off-spine store must not claim more than ~3% of a minimum-spec node's RAM; \
-         {MAX_FOREIGN_STORE_BYTES} vs {R13_MIN_RAM_BYTES}"
+         {MAX_RECEIVED_STORE_BYTES} vs {R13_MIN_RAM_BYTES}"
     );
 
     // And it is ENFORCED at the byte boundary, not merely declared.
-    let store = ForeignChainStore::new();
+    let store = ReceivedAssetStore::new();
     assert_eq!(store.bytes_held(), 0);
-    assert_eq!(store.admission_check(true, MAX_FOREIGN_STORE_BYTES), Ok(()));
+    assert_eq!(store.admission_check(true, MAX_RECEIVED_STORE_BYTES), Ok(()));
     assert_eq!(
-        store.admission_check(true, MAX_FOREIGN_STORE_BYTES + 1),
-        Err(ForeignChainReject::StoreFull(StoreBound::Bytes {
+        store.admission_check(true, MAX_RECEIVED_STORE_BYTES + 1),
+        Err(AcceptReject::StoreFull(StoreBound::Bytes {
             held: 0,
-            incoming: MAX_FOREIGN_STORE_BYTES + 1,
-            budget: MAX_FOREIGN_STORE_BYTES,
+            incoming: MAX_RECEIVED_STORE_BYTES + 1,
+            budget: MAX_RECEIVED_STORE_BYTES,
         })),
         "the byte budget must refuse, and must name itself as the bound that refused"
     );
@@ -609,9 +609,9 @@ async fn s3_4_the_store_bound_is_a_byte_budget_that_fits_r13() {
     // A single message can never blow the budget on its own — the per-message
     // entry cap keeps one presentation far below it. The budget is cumulative,
     // which is precisely why it must be accounted rather than assumed.
-    let biggest_single_message = MAX_FOREIGN_CHAIN_ENTRIES * footprint;
+    let biggest_single_message = MAX_RECEIVED_CHAIN_ENTRIES * footprint;
     assert!(
-        biggest_single_message < MAX_FOREIGN_STORE_BYTES,
+        biggest_single_message < MAX_RECEIVED_STORE_BYTES,
         "one message ({biggest_single_message} B) must not be able to exhaust the budget"
     );
 }
@@ -621,25 +621,25 @@ async fn s3_4_byte_accounting_tracks_what_is_actually_held() {
     let chain = NodeBlockchain::new(coord());
     let stranger = FalconIdentity::generate();
 
-    assert_eq!(chain.foreign_chain_bytes().await, 0);
+    assert_eq!(chain.received_chain_bytes().await, 0);
 
     // One 5-entry history per asset, signed ONCE. A re-signed chain is not
     // byte-identical (nonce and timestamp differ, so `lineage_id` differs), so
     // an extension must be presented from the same entries it extends.
-    let histories: Vec<ForeignAssetChain> = (0x70u8..0x76)
+    let histories: Vec<PresentedAssetChain> = (0x70u8..0x76)
         .map(|tag| foreign_chain(&stranger, [tag; 32], 5))
         .collect();
 
     let mut expected = 0usize;
     for history in &histories {
-        let prefix = ForeignAssetChain::new(history.asset_hash, history.entries[..3].to_vec());
+        let prefix = PresentedAssetChain::new(history.asset_hash, history.entries[..3].to_vec());
         expected += chain_footprint_bytes(&prefix.entries);
         chain
-            .accept_foreign_asset_chain(prefix)
+            .accept_asset_chain(prefix)
             .await
             .expect("test: accepted");
         assert_eq!(
-            chain.foreign_chain_bytes().await,
+            chain.received_chain_bytes().await,
             expected,
             "every adopted entry must be charged exactly once"
         );
@@ -649,40 +649,40 @@ async fn s3_4_byte_accounting_tracks_what_is_actually_held() {
     let long = histories[0].clone();
     let tail_bytes = chain_footprint_bytes(&long.entries[3..]);
     chain
-        .accept_foreign_asset_chain(long)
+        .accept_asset_chain(long)
         .await
         .expect("test: extension accepted");
     expected += tail_bytes;
-    assert_eq!(chain.foreign_chain_bytes().await, expected);
+    assert_eq!(chain.received_chain_bytes().await, expected);
 
     // A re-presentation of a chain already held in full charges nothing.
     // (Re-present the entries actually held: a FALCON-1024 signature is
     // variable-length, so a freshly-signed re-run is not byte-identical.)
     let held_71 = chain
-        .foreign_asset_lineage(&[0x71u8; 32])
+        .received_asset_lineage(&[0x71u8; 32])
         .await
         .expect("test: 0x71 is held");
     chain
-        .accept_foreign_asset_chain(ForeignAssetChain::new(
+        .accept_asset_chain(PresentedAssetChain::new(
             [0x71u8; 32],
             held_71.entries.clone(),
         ))
         .await
         .expect("test: re-presentation accepted");
-    assert_eq!(chain.foreign_chain_bytes().await, expected);
+    assert_eq!(chain.received_chain_bytes().await, expected);
 
     // Forgetting releases exactly what it charged.
-    chain.forget_foreign_asset_chain(&[0x71u8; 32]).await;
+    chain.forget_received_asset_chain(&[0x71u8; 32]).await;
     expected -= chain_footprint_bytes(&held_71.entries);
-    assert_eq!(chain.foreign_chain_bytes().await, expected);
+    assert_eq!(chain.received_chain_bytes().await, expected);
 
     // A refused admission charges nothing at all.
-    let before = chain.foreign_chain_bytes().await;
+    let before = chain.received_chain_bytes().await;
     assert!(chain
-        .accept_foreign_asset_chain(ForeignAssetChain::new([0x77u8; 32], Vec::new()))
+        .accept_asset_chain(PresentedAssetChain::new([0x77u8; 32], Vec::new()))
         .await
         .is_err());
-    assert_eq!(chain.foreign_chain_bytes().await, before);
+    assert_eq!(chain.received_chain_bytes().await, before);
 }
 
 // ── A3: CAPACITY IS JUDGED BEFORE THE SIGNATURE WORK ───────────────────────
@@ -698,20 +698,20 @@ async fn s3_4_capacity_is_refused_before_any_falcon_verification() {
     extendable[..8].copy_from_slice(&0u64.to_le_bytes());
     let extendable_history = foreign_chain(&stranger, extendable, 3);
 
-    for n in 0..MAX_FOREIGN_CHAINS {
+    for n in 0..MAX_RECEIVED_CHAINS {
         let mut asset = [0u8; 32];
         asset[..8].copy_from_slice(&(n as u64).to_le_bytes());
         let presented = if n == 0 {
-            ForeignAssetChain::new(extendable, extendable_history.entries[..1].to_vec())
+            PresentedAssetChain::new(extendable, extendable_history.entries[..1].to_vec())
         } else {
             foreign_chain(&stranger, asset, 1)
         };
         chain
-            .accept_foreign_asset_chain(presented)
+            .accept_asset_chain(presented)
             .await
             .expect("test: accepted below capacity");
     }
-    assert_eq!(chain.foreign_chain_count().await, MAX_FOREIGN_CHAINS);
+    assert_eq!(chain.received_chain_count().await, MAX_RECEIVED_CHAINS);
 
     // A NEW chain, at capacity, whose LAST entry carries a corrupted signature.
     // The two possible verdicts are an ordering oracle:
@@ -719,7 +719,7 @@ async fn s3_4_capacity_is_refused_before_any_falcon_verification() {
     //   BadSignature  => every entry was FALCON-verified before the refusal,
     //                    i.e. the CPU-exhaustion primitive is live.
     let overflow = [0xFEu8; 32];
-    let mut poisoned = foreign_chain(&stranger, overflow, MAX_FOREIGN_CHAIN_ENTRIES);
+    let mut poisoned = foreign_chain(&stranger, overflow, MAX_RECEIVED_CHAIN_ENTRIES);
     if let Some(last) = poisoned.entries.last_mut() {
         if let Some(envelope) = last.signed_proof.as_mut() {
             envelope.signature[0] ^= 0xFF;
@@ -727,35 +727,35 @@ async fn s3_4_capacity_is_refused_before_any_falcon_verification() {
     }
 
     assert_eq!(
-        chain.accept_foreign_asset_chain(poisoned).await,
-        Err(ForeignChainReject::StoreFull(StoreBound::Chains {
-            held: MAX_FOREIGN_CHAINS,
-            limit: MAX_FOREIGN_CHAINS,
+        chain.accept_asset_chain(poisoned).await,
+        Err(AcceptReject::StoreFull(StoreBound::Chains {
+            held: MAX_RECEIVED_CHAINS,
+            limit: MAX_RECEIVED_CHAINS,
         })),
-        "at capacity the refusal must cost O(1), not {MAX_FOREIGN_CHAIN_ENTRIES} FALCON \
+        "at capacity the refusal must cost O(1), not {MAX_RECEIVED_CHAIN_ENTRIES} FALCON \
          verifications"
     );
 
     // The early probe and the authoritative check are the SAME function asked
     // the same question, so they cannot name different bounds.
-    let store_view = ForeignChainStore::new();
+    let store_view = ReceivedAssetStore::new();
     assert_eq!(
-        store_view.admission_check(true, MAX_FOREIGN_STORE_BYTES + 1),
-        Err(ForeignChainReject::StoreFull(StoreBound::Bytes {
+        store_view.admission_check(true, MAX_RECEIVED_STORE_BYTES + 1),
+        Err(AcceptReject::StoreFull(StoreBound::Bytes {
             held: 0,
-            incoming: MAX_FOREIGN_STORE_BYTES + 1,
-            budget: MAX_FOREIGN_STORE_BYTES,
+            incoming: MAX_RECEIVED_STORE_BYTES + 1,
+            budget: MAX_RECEIVED_STORE_BYTES,
         }))
     );
 
     // An EXTENSION of a held chain is not growth and is still admitted at
     // capacity — the early probe must not have turned into a blanket refusal.
     let receipt = chain
-        .accept_foreign_asset_chain(extendable_history)
+        .accept_asset_chain(extendable_history)
         .await
         .expect("test: extending a held chain is admitted at capacity");
     assert_eq!(receipt.added, 2);
-    assert_eq!(chain.foreign_chain_count().await, MAX_FOREIGN_CHAINS);
+    assert_eq!(chain.received_chain_count().await, MAX_RECEIVED_CHAINS);
 }
 
 // ── A4: THE INVERSE ORDERING (adopt foreign X, then spine X) ───────────────
@@ -769,12 +769,12 @@ async fn s3_4_a_spine_block_supersedes_an_already_adopted_foreign_chain() {
     let foreign = foreign_chain(&stranger, asset, 3);
     let foreign_head_id = foreign.entries[2].lineage_id();
     chain
-        .accept_foreign_asset_chain(foreign)
+        .accept_asset_chain(foreign)
         .await
         .expect("test: adopted off-spine");
 
-    assert!(chain.foreign_asset_lineage(&asset).await.is_some());
-    assert!(!chain.foreign_chain_is_shadowed(&asset).await);
+    assert!(chain.received_asset_lineage(&asset).await.is_some());
+    assert!(!chain.received_chain_is_shadowed(&asset).await);
 
     // THE INVERSE ORDERING: the spine now acquires the same asset. Nothing in
     // the spine accept path consults `foreign_chains`, and it must not — a
@@ -796,30 +796,30 @@ async fn s3_4_a_spine_block_supersedes_an_already_adopted_foreign_chain() {
 
     // A4 CLOSED: the superseded import stops answering as a live title, and
     // says so explicitly instead of silently coexisting.
-    assert!(chain.foreign_chain_is_shadowed(&asset).await);
+    assert!(chain.received_chain_is_shadowed(&asset).await);
     assert_eq!(
-        chain.foreign_asset_lineage(&asset).await,
+        chain.received_asset_lineage(&asset).await,
         None,
         "a shadowed import must not keep serving a competing history"
     );
-    assert_eq!(chain.foreign_asset_head(&asset).await, None);
+    assert_eq!(chain.received_asset_head(&asset).await, None);
 
     // The bytes are still held and still accounted — shadowing is not a free
     // deletion — and are released by an explicit local decision.
-    assert!(chain.has_foreign_asset_chain(&asset).await);
-    assert!(chain.foreign_chain_bytes().await > 0);
-    assert_eq!(chain.forget_foreign_asset_chain(&asset).await, 3);
-    assert_eq!(chain.foreign_chain_bytes().await, 0);
-    assert!(!chain.foreign_chain_is_shadowed(&asset).await);
+    assert!(chain.has_received_asset_chain(&asset).await);
+    assert!(chain.received_chain_bytes().await > 0);
+    assert_eq!(chain.forget_received_asset_chain(&asset).await, 3);
+    assert_eq!(chain.received_chain_bytes().await, 0);
+    assert!(!chain.received_chain_is_shadowed(&asset).await);
 }
 
 /// F4 — a store full of SHADOWED chains has a reachable reclaim path.
 ///
-/// `ForeignChainStore::asset_hashes` is `pub`, but the store is `pub(crate)` and
+/// `ReceivedAssetStore::asset_hashes` is `pub`, but the store is `pub(crate)` and
 /// nothing on `NodeBlockchain` returned the adopted set — so
-/// `forget_foreign_asset_chain` only worked for a hash the caller already
+/// `forget_received_asset_chain` only worked for a hash the caller already
 /// remembered. A store whose chains have all been superseded by the spine
-/// answers no query (`foreign_asset_lineage` returns `None`), still charges the
+/// answers no query (`received_asset_lineage` returns `None`), still charges the
 /// byte budget, and refused every new admission with no enumerable way out.
 ///
 /// The reclaim stays a LOCAL decision: it acts only on chains the spine has
@@ -833,21 +833,21 @@ async fn s3_4_shadowed_foreign_chains_are_enumerable_and_reclaimable() {
     let assets: Vec<[u8; 32]> = (0..3u8).map(|i| [0x60 + i; 32]).collect();
     for asset in &assets {
         chain
-            .accept_foreign_asset_chain(foreign_chain(&stranger, *asset, 2))
+            .accept_asset_chain(foreign_chain(&stranger, *asset, 2))
             .await
             .expect("test: adopted off-spine");
     }
-    let charged = chain.foreign_chain_bytes().await;
-    assert_eq!(chain.foreign_chain_count().await, 3);
+    let charged = chain.received_chain_bytes().await;
+    assert_eq!(chain.received_chain_count().await, 3);
 
     // ENUMERATION: the adopted set is reachable without remembering the hashes.
-    let mut enumerated = chain.foreign_asset_hashes().await;
+    let mut enumerated = chain.received_asset_hashes().await;
     enumerated.sort_unstable();
     let mut expected = assets.clone();
     expected.sort_unstable();
     assert_eq!(enumerated, expected, "every adopted chain must be enumerable");
     assert!(
-        chain.shadowed_foreign_asset_chains().await.is_empty(),
+        chain.shadowed_received_asset_chains().await.is_empty(),
         "nothing is shadowed yet"
     );
 
@@ -858,27 +858,27 @@ async fn s3_4_shadowed_foreign_chains_are_enumerable_and_reclaimable() {
             .expect("test: the spine takes the asset");
     }
 
-    let mut shadowed = chain.shadowed_foreign_asset_chains().await;
+    let mut shadowed = chain.shadowed_received_asset_chains().await;
     shadowed.sort_unstable();
     let mut expected_shadowed = assets[..2].to_vec();
     expected_shadowed.sort_unstable();
     assert_eq!(shadowed, expected_shadowed);
 
     // RECLAIM: only the shadowed entries go, and the live one is untouched.
-    assert_eq!(chain.forget_shadowed_foreign_asset_chains().await, 2);
-    assert_eq!(chain.foreign_chain_count().await, 1);
-    assert!(chain.has_foreign_asset_chain(&assets[2]).await);
-    assert!(chain.foreign_asset_lineage(&assets[2]).await.is_some());
+    assert_eq!(chain.forget_shadowed_received_asset_chains().await, 2);
+    assert_eq!(chain.received_chain_count().await, 1);
+    assert!(chain.has_received_asset_chain(&assets[2]).await);
+    assert!(chain.received_asset_lineage(&assets[2]).await.is_some());
     assert!(
-        chain.foreign_chain_bytes().await < charged,
+        chain.received_chain_bytes().await < charged,
         "the byte budget must actually come back"
     );
-    assert!(chain.shadowed_foreign_asset_chains().await.is_empty());
+    assert!(chain.shadowed_received_asset_chains().await.is_empty());
 
     // Reclaiming again is a no-op — it can only ever act on what the spine has
     // already superseded, so it can never delete a live answer.
-    assert_eq!(chain.forget_shadowed_foreign_asset_chains().await, 0);
-    assert!(chain.foreign_asset_lineage(&assets[2]).await.is_some());
+    assert_eq!(chain.forget_shadowed_received_asset_chains().await, 0);
+    assert!(chain.received_asset_lineage(&assets[2]).await.is_some());
 }
 
 // ── CONCURRENCY ────────────────────────────────────────────────────────────
@@ -895,7 +895,7 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
     let stranger = std::sync::Arc::new(FalconIdentity::generate());
 
     // Sign OUTSIDE the race so the window under test is the accept, not keygen.
-    let presented: Vec<ForeignAssetChain> = (0..WRITERS)
+    let presented: Vec<PresentedAssetChain> = (0..WRITERS)
         .map(|n| {
             let mut asset = [0xA0u8; 32];
             asset[..8].copy_from_slice(&(n as u64).to_le_bytes());
@@ -911,7 +911,7 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
     for one in presented {
         let chain = chain.clone();
         tasks.push(tokio::spawn(
-            async move { chain.accept_foreign_asset_chain(one).await },
+            async move { chain.accept_asset_chain(one).await },
         ));
     }
 
@@ -935,8 +935,8 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
     assert_eq!(added_total, WRITERS * ENTRIES);
 
     // The store's accounting matches EXACTLY what was admitted.
-    assert_eq!(chain.foreign_chain_count().await, WRITERS);
-    assert_eq!(chain.foreign_chain_bytes().await, expected_bytes);
+    assert_eq!(chain.received_chain_count().await, WRITERS);
+    assert_eq!(chain.received_chain_bytes().await, expected_bytes);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
@@ -951,15 +951,15 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
     // legitimate: a longer presentation extends, a shorter one is refused as
     // NotAnExtension. Neither may be dropped, and the union must be exact.
     let full = foreign_chain(&stranger, asset, WRITERS);
-    let presented: Vec<ForeignAssetChain> = (1..=WRITERS)
-        .map(|len| ForeignAssetChain::new(asset, full.entries[..len].to_vec()))
+    let presented: Vec<PresentedAssetChain> = (1..=WRITERS)
+        .map(|len| PresentedAssetChain::new(asset, full.entries[..len].to_vec()))
         .collect();
 
     let mut tasks = Vec::new();
     for one in presented {
         let chain = chain.clone();
         tasks.push(tokio::spawn(
-            async move { chain.accept_foreign_asset_chain(one).await },
+            async move { chain.accept_asset_chain(one).await },
         ));
     }
 
@@ -976,7 +976,7 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
                 // The ONLY legitimate refusal here: a shorter prefix arriving
                 // after a longer one. Anything else is a real defect.
                 assert!(
-                    matches!(reject, ForeignChainReject::NotAnExtension { .. }),
+                    matches!(reject, AcceptReject::NotAnExtension { .. }),
                     "unexpected refusal under same-asset contention: {reject}"
                 );
             }
@@ -987,9 +987,9 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
 
     // Exactly one chain, holding the longest history presented, with each entry
     // counted exactly once across all the accepts that added anything.
-    assert_eq!(chain.foreign_chain_count().await, 1);
+    assert_eq!(chain.received_chain_count().await, 1);
     let held = chain
-        .foreign_asset_lineage(&asset)
+        .received_asset_lineage(&asset)
         .await
         .expect("test: the chain is held");
     assert_eq!(held.entries.len(), WRITERS);
@@ -999,7 +999,7 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
         "each entry must be charged as added exactly once — no double count, no gap"
     );
     assert_eq!(
-        chain.foreign_chain_bytes().await,
+        chain.received_chain_bytes().await,
         chain_footprint_bytes(&held.entries),
         "byte accounting must equal the entries actually held"
     );
@@ -1019,7 +1019,7 @@ async fn s3_4_accepts_and_spine_appends_interleave_without_deadlock() {
     let chain = std::sync::Arc::new(NodeBlockchain::new(coord()));
     let stranger = std::sync::Arc::new(FalconIdentity::generate());
 
-    let foreigns: Vec<ForeignAssetChain> = (0..ROUNDS)
+    let foreigns: Vec<PresentedAssetChain> = (0..ROUNDS)
         .map(|n| {
             let mut asset = [0xC2u8; 32];
             asset[..8].copy_from_slice(&(n as u64).to_le_bytes());
@@ -1031,7 +1031,7 @@ async fn s3_4_accepts_and_spine_appends_interleave_without_deadlock() {
         let chain = chain.clone();
         tokio::spawn(async move {
             for one in foreigns {
-                let _ = chain.accept_foreign_asset_chain(one).await;
+                let _ = chain.accept_asset_chain(one).await;
             }
         })
     };
@@ -1054,7 +1054,7 @@ async fn s3_4_accepts_and_spine_appends_interleave_without_deadlock() {
         .await
         .expect("test: lock-order inversion would hang here");
 
-    assert_eq!(chain.foreign_chain_count().await, ROUNDS);
+    assert_eq!(chain.received_chain_count().await, ROUNDS);
     assert_eq!(chain.get_height().await, ROUNDS as u64);
     assert_eq!(chain.asset_lineage_any(&[0xD3u8; 32]).await.verify(), Ok(()));
 }
@@ -1076,7 +1076,7 @@ async fn s3_4_a_spine_append_racing_an_accept_leaves_exactly_one_live_title() {
 
         let accepting = {
             let chain = chain.clone();
-            tokio::spawn(async move { chain.accept_foreign_asset_chain(foreign).await })
+            tokio::spawn(async move { chain.accept_asset_chain(foreign).await })
         };
         let appending = {
             let chain = chain.clone();
@@ -1093,7 +1093,7 @@ async fn s3_4_a_spine_append_racing_an_accept_leaves_exactly_one_live_title() {
         let spine = chain.asset_lineage(&asset).await;
         assert!(!spine.is_empty(), "the spine append always lands");
         assert_eq!(
-            chain.foreign_asset_lineage(&asset).await,
+            chain.received_asset_lineage(&asset).await,
             None,
             "round {round}: the import must not be readable alongside a spine title \
              (accept returned Ok = {accepted})"

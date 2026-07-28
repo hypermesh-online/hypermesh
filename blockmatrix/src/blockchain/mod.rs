@@ -18,6 +18,7 @@
 //! This fundamentally differs from traditional blockchain architectures where
 //! all nodes share a single chain and use Proof of States like PoW or PoS.
 
+pub mod accept;
 pub mod asset_index;
 pub mod attestations;
 pub mod block;
@@ -48,10 +49,10 @@ pub use attestations::{
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
-pub use foreign::{
-    chain_footprint_bytes, entry_footprint_bytes, ForeignAssetChain, ForeignChainReceipt,
-    ForeignChainReject, ForeignChainStore, StoreBound, MAX_FOREIGN_CHAINS,
-    MAX_FOREIGN_CHAIN_ENTRIES, MAX_FOREIGN_STORE_BYTES,
+pub use accept::{
+    chain_footprint_bytes, entry_footprint_bytes, AcceptReceipt, AcceptReject, PresentedAssetChain,
+    ReceivedAssetStore, StoreBound, MAX_RECEIVED_CHAINS, MAX_RECEIVED_CHAIN_ENTRIES,
+    MAX_RECEIVED_STORE_BYTES,
 };
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,

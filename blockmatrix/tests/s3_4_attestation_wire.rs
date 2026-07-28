@@ -23,7 +23,7 @@
 
 use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{
-    attestation_footprint_bytes, ForeignAssetChain, MirrorAttestationPool, NodeBlockchain,
+    attestation_footprint_bytes, PresentedAssetChain, MirrorAttestationPool, NodeBlockchain,
     PoolFull, MAX_ATTESTATIONS_PER_ASSET, MAX_ATTESTATION_POOL_BYTES, MAX_TOTAL_ATTESTATIONS,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -420,7 +420,7 @@ async fn s3_4_wire_attestations_are_only_cached_for_assets_we_hold() {
     entry.set_asset_lineage(None, 0);
     entry.sign_proof(&author).expect("test: FALCON sign");
     chain
-        .accept_foreign_asset_chain(ForeignAssetChain::new(unknown, vec![entry]))
+        .accept_asset_chain(PresentedAssetChain::new(unknown, vec![entry]))
         .await
         .expect("test: foreign chain adopted");
 
@@ -949,7 +949,7 @@ async fn s3_4_forgetting_a_foreign_chain_releases_its_pooled_attestations() {
     entry.set_asset_lineage(None, 0);
     entry.sign_proof(&author).expect("test: FALCON sign");
     chain
-        .accept_foreign_asset_chain(ForeignAssetChain::new(foreign_asset, vec![entry]))
+        .accept_asset_chain(PresentedAssetChain::new(foreign_asset, vec![entry]))
         .await
         .expect("test: foreign chain adopted");
 
@@ -964,7 +964,7 @@ async fn s3_4_forgetting_a_foreign_chain_releases_its_pooled_attestations() {
 
     // Forgetting the foreign chain — a LOCAL decision — releases the pool slot
     // for an asset this container no longer holds, and touches nothing else.
-    assert_eq!(chain.forget_foreign_asset_chain(&foreign_asset).await, 1);
+    assert_eq!(chain.forget_received_asset_chain(&foreign_asset).await, 1);
     assert_eq!(chain.mirror_attestation_count(&foreign_asset).await, 0);
     assert_eq!(chain.mirror_attestation_count(&spine_asset).await, 1);
     assert_eq!(chain.mirror_attestation_total().await, 1);
