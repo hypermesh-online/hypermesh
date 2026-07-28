@@ -36,9 +36,9 @@ fn accept_unsigned_blocks() -> bool {
 /// from key K over a proof claiming a DIFFERENT author is rejected — otherwise
 /// any node could sign a proof asserting someone else's stake.
 ///
-/// `pub(crate)` because S3.4's foreign asset-chain accept
-/// ([`super::foreign`]) asks the identical question of every entry in an
-/// imported history. Sharing the function — rather than restating the rule —
+/// `pub(crate)` because the received asset-chain accept
+/// ([`super::accept`]) asks the identical question of every entry in a
+/// presented history. Sharing the function — rather than restating the rule —
 /// is what keeps "who may author an entry" a single definition in this crate.
 pub(crate) fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
     let derived = blake3::hash(signer_pubkey).to_hex().to_string();
@@ -58,17 +58,20 @@ fn check_entry_lineage(
     entry_ix: usize,
 ) -> Result<(), String> {
     let Some((head_id, head_seq)) = expected else {
-        // Asset unknown here: only a proper asset-genesis may enter. Anything
-        // else is a foreign asset-chain — S3.4's job, explicitly rejected until
-        // then rather than accepted with unverifiable provenance.
+        // Asset unknown here: only a proper asset-genesis may enter via a
+        // block. Anything else is an asset history this container has not
+        // verified — it belongs on the asset-chain accept path
+        // (`accept_asset_chain`), which verifies its lineage and every signer
+        // before adopting it. A block may not graft it in.
         if entry.is_asset_genesis() {
             return Ok(());
         }
         return Err(format!(
-            "Block {block_index} entry {entry_ix} carries a FOREIGN asset-chain: it claims \
-             predecessor {:?} at seq {} for an asset whose history this container has never \
-             seen. Verifying and grafting a foreign asset-chain is S3.4 — rejected until then \
-             (never silently accepted with unverifiable provenance)",
+            "Block {block_index} entry {entry_ix} carries an asset history to route to the \
+             asset-chain accept path (accept_asset_chain): it claims predecessor {:?} at seq \
+             {} for an asset whose history this container has never seen. A block may not graft \
+             an unverified asset history — present it to accept_asset_chain, which verifies its \
+             lineage and every signer before adopting it",
             entry.prev_asset_entry(),
             entry.asset_seq(),
         ));

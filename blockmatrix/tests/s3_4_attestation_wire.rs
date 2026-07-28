@@ -11,7 +11,7 @@
 //                  — not the sender — names the attestor.
 //   ADMISSION    — an attestation about an asset this container does not hold is
 //                  refused before any signature work; adopting the asset as an
-//                  S3.4 foreign chain makes the same attestation acceptable.
+//                  S3.4 received chain makes the same attestation acceptable.
 //   BOUND        — the pool is capped per asset and globally, refuses NEWCOMERS
 //                  at capacity, EVICTS NOTHING, and still admits a replacement
 //                  from an incumbent attestor.
@@ -422,7 +422,7 @@ async fn s3_4_wire_attestations_are_only_cached_for_assets_we_hold() {
     chain
         .accept_asset_chain(PresentedAssetChain::new(unknown, vec![entry]))
         .await
-        .expect("test: foreign chain adopted");
+        .expect("test: received chain adopted");
 
     chain
         .accept_wire_attestation(over_the_wire(&orphaned))
@@ -919,11 +919,11 @@ async fn s3_4_capacity_is_judged_before_the_signature() {
     );
 }
 
-/// F1 — the reclaim path exists and is reachable: forgetting a foreign chain
+/// F1 — the reclaim path exists and is reachable: forgetting a received chain
 /// releases the attestations pooled for it, because the asset is then no longer
 /// held and a NEW attestation about it would be refused.
 #[tokio::test]
-async fn s3_4_forgetting_a_foreign_chain_releases_its_pooled_attestations() {
+async fn s3_4_forgetting_a_received_chain_releases_its_pooled_attestations() {
     let spine_asset = [0x7Au8; 32];
     let (chain, spine, seq) = chain_holding(spine_asset).await;
     let mirror = FalconIdentity::generate();
@@ -935,13 +935,13 @@ async fn s3_4_forgetting_a_foreign_chain_releases_its_pooled_attestations() {
         .await
         .expect("test: spine asset attestation");
 
-    // Adopt a foreign chain and attest to THAT asset.
-    let foreign_asset = [0x7Bu8; 32];
+    // Adopt a received chain and attest to THAT asset.
+    let received_asset = [0x7Bu8; 32];
     let author = FalconIdentity::generate();
     let mut proof = StateProof::new_for_testing();
     proof.stake_proof.stake_holder_id = author.node_id().to_string();
     let mut entry = BlockAssetEntry::new_bound(
-        foreign_asset,
+        received_asset,
         &proof,
         StoragePointer::Genesis,
         blockmatrix::assets::core::AssetRegistration::genesis(coord()),
@@ -949,30 +949,30 @@ async fn s3_4_forgetting_a_foreign_chain_releases_its_pooled_attestations() {
     entry.set_asset_lineage(None, 0);
     entry.sign_proof(&author).expect("test: FALCON sign");
     chain
-        .accept_asset_chain(PresentedAssetChain::new(foreign_asset, vec![entry]))
+        .accept_asset_chain(PresentedAssetChain::new(received_asset, vec![entry]))
         .await
-        .expect("test: foreign chain adopted");
+        .expect("test: received chain adopted");
 
-    let on_foreign = attest(&mirror, foreign_asset, MatrixIndex::new(2, 2, 2), &spine, seq);
+    let on_received = attest(&mirror, received_asset, MatrixIndex::new(2, 2, 2), &spine, seq);
     chain
-        .accept_wire_attestation(over_the_wire(&on_foreign))
+        .accept_wire_attestation(over_the_wire(&on_received))
         .await
-        .expect("test: foreign asset attestation");
+        .expect("test: received asset attestation");
     assert_eq!(chain.mirror_attestation_total().await, 2);
     let charged = chain.mirror_attestation_bytes().await;
     assert!(charged > 0);
 
-    // Forgetting the foreign chain — a LOCAL decision — releases the pool slot
+    // Forgetting the received chain — a LOCAL decision — releases the pool slot
     // for an asset this container no longer holds, and touches nothing else.
-    assert_eq!(chain.forget_received_asset_chain(&foreign_asset).await, 1);
-    assert_eq!(chain.mirror_attestation_count(&foreign_asset).await, 0);
+    assert_eq!(chain.forget_received_asset_chain(&received_asset).await, 1);
+    assert_eq!(chain.mirror_attestation_count(&received_asset).await, 0);
     assert_eq!(chain.mirror_attestation_count(&spine_asset).await, 1);
     assert_eq!(chain.mirror_attestation_total().await, 1);
     assert!(chain.mirror_attestation_bytes().await < charged);
 
     // The same attestation is now refused: we do not hold the asset.
     chain
-        .accept_wire_attestation(over_the_wire(&on_foreign))
+        .accept_wire_attestation(over_the_wire(&on_received))
         .await
         .expect_err("test: the asset is no longer held");
 

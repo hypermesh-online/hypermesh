@@ -232,20 +232,42 @@ impl AssetLineage {
 }
 
 impl NodeBlockchain {
-    /// S3.2 — an asset's provenance chain from this container, in chain order.
+    /// S3.2 — an asset's provenance chain from this container, in chain order,
+    /// from whichever side of the container holds it.
     ///
-    /// Backed by the S3.1 index, so this is O(entries for the asset), not a
-    /// chain scan. Entries whose block has been pruned to a header are absent
-    /// (they are also absent from the index) — a lineage with a hole fails
-    /// [`AssetLineage::verify`] rather than silently pretending to be whole.
+    /// The block chain is consulted FIRST — it is authoritative for the assets
+    /// it holds — and its answer, when non-empty, is returned as-is. Only when
+    /// the block chain has no history for the asset does this fall through to a
+    /// RECEIVED chain adopted by
+    /// [`accept_asset_chain`](Self::accept_asset_chain). That fall-through is
+    /// safe precisely because the accept path refuses any asset the block chain
+    /// has ever held, and [`received_asset_lineage`](Self::received_asset_lineage)
+    /// returns `None` the moment the block chain takes an asset over — so a
+    /// received chain can only ever surface here for an asset the block chain
+    /// genuinely does not hold, never as a second opinion about a local title.
+    ///
+    /// Backed by the S3.1 index for the block-chain side, so that half is
+    /// O(entries for the asset), not a chain scan. Entries whose block has been
+    /// pruned to a header are absent (they are also absent from the index) — a
+    /// lineage with a hole fails [`AssetLineage::verify`] rather than silently
+    /// pretending to be whole.
     ///
     /// This is the object S3.5's transfer hands to a recipient: the asset's
     /// full, self-verifying history.
     pub async fn asset_lineage(&self, asset_hash: &[u8; 32]) -> AssetLineage {
-        AssetLineage {
-            asset_hash: *asset_hash,
-            entries: self.asset_history_entries(asset_hash).await,
+        let spine = self.asset_history_entries(asset_hash).await;
+        if !spine.is_empty() {
+            return AssetLineage {
+                asset_hash: *asset_hash,
+                entries: spine,
+            };
         }
+        self.received_asset_lineage(asset_hash)
+            .await
+            .unwrap_or(AssetLineage {
+                asset_hash: *asset_hash,
+                entries: Vec::new(),
+            })
     }
 
     /// [`asset_lineage`](Self::asset_lineage) plus its verification verdict.

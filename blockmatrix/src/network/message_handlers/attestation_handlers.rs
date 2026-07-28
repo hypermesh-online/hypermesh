@@ -40,7 +40,7 @@
 //!    and the global pool bound becomes a lever: fill it with statements about
 //!    assets nobody has, and honest attestations for real assets are refused.
 //!    Requiring the asset to exist here — on the spine, or as an S3.4-adopted
-//!    foreign chain — ties the key space to real local state.
+//!    received chain — ties the key space to real local state.
 //! 2. **The pool is bounded**, per asset and globally, and refuses newcomers at
 //!    capacity rather than evicting incumbents. See
 //!    [`MirrorAttestationPool`](crate::blockchain::MirrorAttestationPool).

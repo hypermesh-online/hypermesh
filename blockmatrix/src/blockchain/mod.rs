@@ -25,7 +25,6 @@ pub mod block;
 pub mod block_sink;
 pub mod chain;
 pub mod errors;
-pub mod foreign;
 pub mod genesis_assessor;
 pub mod genesis_auth;
 pub mod genesis_crypto;

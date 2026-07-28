@@ -166,22 +166,22 @@ pub struct NodeBlockchain {
     /// calls `add_block`), so it adds no cycle to the S3.0 order.
     pub(crate) mirror_attestations: Arc<RwLock<MirrorAttestationPool>>,
 
-    /// S3.4: adopted FOREIGN asset-chains, held OFF the node spine — see
-    /// [`ForeignChainStore`](super::foreign::ForeignChainStore).
+    /// S3.4: adopted RECEIVED asset-chains, held aside from the node's own
+    /// block chain — see [`ReceivedAssetStore`](super::accept::ReceivedAssetStore).
     ///
-    /// A foreign asset's history is a run of entries from somebody else's
+    /// A received asset's history is a run of entries from somebody else's
     /// container. It cannot join `blocks` (its blocks have their indices, their
-    /// predecessors and their genesis, none of which are ours), and the spine
-    /// accept mode correctly refuses it. It lives here instead, verified
+    /// predecessors and their genesis, none of which are ours), and the
+    /// block-accept path correctly refuses it. It lives here instead, verified
     /// against its own internal lineage and every signer, and queryable without
     /// any of it being able to move `head`, `blocks`, `stats` or `asset_index`.
     ///
     /// LOCK ORDER: acquired LAST, after `mirror_attestations` —
     /// `append_lock → blocks → headers → hash_index → head → stats →
-    /// asset_index → mirror_attestations → foreign_chains`. The accept path
+    /// asset_index → mirror_attestations → received_chains`. The accept path
     /// releases every other lock before taking it (it reads
     /// `has_ever_seen_asset` first, then writes here), so it adds no cycle.
-    pub(crate) foreign_chains: Arc<RwLock<super::foreign::ForeignChainStore>>,
+    pub(crate) received_chains: Arc<RwLock<super::accept::ReceivedAssetStore>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -263,7 +263,7 @@ impl NodeBlockchain {
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
             mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
-            foreign_chains: Arc::new(RwLock::new(super::foreign::ForeignChainStore::new())),
+            received_chains: Arc::new(RwLock::new(super::accept::ReceivedAssetStore::new())),
         }
     }
 
@@ -407,7 +407,7 @@ impl NodeBlockchain {
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
             mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
-            foreign_chains: Arc::new(RwLock::new(super::foreign::ForeignChainStore::new())),
+            received_chains: Arc::new(RwLock::new(super::accept::ReceivedAssetStore::new())),
         })
     }
 

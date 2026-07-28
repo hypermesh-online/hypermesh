@@ -2,27 +2,27 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! S3.4 — the presented/wire surface: a foreign asset's chain as offered for
+//! S3.4 — the presented/wire surface: a presented asset's chain as offered for
 //! adoption, plus the refusal vocabulary and the accept receipt. The accept
 //! mode that consumes these lives in the parent [`super`] module.
 
 use crate::blockchain::block::BlockAssetEntry;
 use crate::blockchain::lineage::{AssetLineage, LineageBreak};
 
-/// A foreign asset's provenance chain as presented for adoption: the asset it
+/// A presented asset's provenance chain as presented for adoption: the asset it
 /// claims to be, and its entries in chain order (oldest first).
 ///
 /// Deliberately NOT a `Block` and deliberately not convertible into one. This
-/// is the whole structural separation from the node-spine accept mode.
+/// is the whole structural separation from the node's block-accept path — there is no `Block` here, so nothing here can reach `insert_block`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ForeignAssetChain {
+pub struct PresentedAssetChain {
     /// `hA` — the asset this chain claims to be the history of.
     pub asset_hash: [u8; 32],
     /// The asset's entries, oldest first, starting at its asset-genesis.
     pub entries: Vec<BlockAssetEntry>,
 }
 
-impl ForeignAssetChain {
+impl PresentedAssetChain {
     /// Present `entries` as `asset_hash`'s chain.
     pub fn new(asset_hash: [u8; 32], entries: Vec<BlockAssetEntry>) -> Self {
         Self { asset_hash, entries }
@@ -53,15 +53,15 @@ impl ForeignAssetChain {
     }
 }
 
-/// Why a foreign asset-chain was refused.
+/// Why a received asset-chain was refused.
 ///
 /// Every variant is a REFUSAL of the import only. None of them can affect the
-/// node spine, because nothing in this module writes to it.
+/// node's own block chain, because nothing in this module writes to it.
 #[derive(Clone, Debug, PartialEq)]
-pub enum ForeignChainReject {
+pub enum AcceptReject {
     /// No entries were presented — there is no history to verify.
     Empty,
-    /// More entries than [`MAX_FOREIGN_CHAIN_ENTRIES`].
+    /// More entries than [`MAX_RECEIVED_CHAIN_ENTRIES`].
     TooLong {
         /// Entries presented.
         presented: usize,
@@ -70,8 +70,8 @@ pub enum ForeignChainReject {
     },
     /// The chain's internal lineage is broken (S3.2's verdict, verbatim).
     LineageBroken(LineageBreak),
-    /// An entry carries no FALCON `signed_proof` envelope. Unlike the spine
-    /// accept mode there is NO legacy-migration tolerance here: a foreign
+    /// An entry carries no FALCON `signed_proof` envelope. Unlike the block-accept path
+    /// there is NO legacy-migration tolerance here: a received
     /// import has no pre-H3 corpus to rescue, so an unsigned entry is an
     /// unattributable claim.
     Unsigned {
@@ -91,11 +91,12 @@ pub enum ForeignChainReject {
         /// Position in the chain.
         position: usize,
     },
-    /// This container's own spine already holds (or has held) this asset. The
-    /// spine is authoritative for its own assets; an import may not shadow one.
+    /// This container's own block chain already holds (or has held) this asset.
+    /// The block chain is authoritative for its own assets; an import may not
+    /// shadow one.
     AlreadyOnSpine,
-    /// A different history for this asset is already held off-spine. An
-    /// accepted foreign chain may only ever be EXTENDED, never replaced.
+    /// A different history for this asset is already held. An
+    /// accepted received chain may only ever be EXTENDED, never replaced.
     Conflict {
         /// Position at which the presented chain diverges from the held one.
         position: usize,
@@ -108,19 +109,19 @@ pub enum ForeignChainReject {
         /// Entries presented.
         presented: usize,
     },
-    /// The off-spine store cannot fit this chain. Carries WHICH bound was hit,
+    /// The received-chain store cannot fit this chain. Carries WHICH bound was hit,
     /// so a caller and an operator read the same diagnosis.
     ///
-    /// Produced in exactly one place — [`ForeignChainStore::admission_check`](super::store::ForeignChainStore::admission_check) —
+    /// Produced in exactly one place — [`ReceivedAssetStore::admission_check`](super::store::ReceivedAssetStore::admission_check) —
     /// which both the early capacity probe and the authoritative adopt-time
     /// check call. There is no second capacity rule to drift from this one.
     StoreFull(StoreBound),
 }
 
-/// Which of the off-spine store's bounds refused an admission.
+/// Which of the received-chain store's bounds refused an admission.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StoreBound {
-    /// The byte budget [`MAX_FOREIGN_STORE_BYTES`] — the memory bound.
+    /// The byte budget [`MAX_RECEIVED_STORE_BYTES`] — the memory bound.
     Bytes {
         /// Bytes already held.
         held: usize,
@@ -129,7 +130,7 @@ pub enum StoreBound {
         /// The budget.
         budget: usize,
     },
-    /// The distinct-chain count [`MAX_FOREIGN_CHAINS`] — the key-space guard.
+    /// The distinct-chain count [`MAX_RECEIVED_CHAINS`] — the key-space guard.
     Chains {
         /// Chains already held.
         held: usize,
@@ -156,58 +157,58 @@ impl std::fmt::Display for StoreBound {
     }
 }
 
-impl std::fmt::Display for ForeignChainReject {
+impl std::fmt::Display for AcceptReject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Empty => write!(f, "foreign asset-chain carries no entries"),
+            Self::Empty => write!(f, "received asset-chain carries no entries"),
             Self::TooLong { presented, limit } => write!(
                 f,
-                "foreign asset-chain has {presented} entries, limit is {limit}"
+                "received asset-chain has {presented} entries, limit is {limit}"
             ),
             Self::LineageBroken(break_) => {
-                write!(f, "foreign asset-chain lineage is broken: {break_}")
+                write!(f, "received asset-chain lineage is broken: {break_}")
             }
             Self::Unsigned { position } => write!(
                 f,
-                "foreign asset-chain entry {position} has no FALCON signed_proof envelope \
+                "received asset-chain entry {position} has no FALCON signed_proof envelope \
                  — an imported history must be attributable at every step"
             ),
             Self::BadSignature { position, detail } => write!(
                 f,
-                "foreign asset-chain entry {position} signature invalid: {detail}"
+                "received asset-chain entry {position} signature invalid: {detail}"
             ),
             Self::SignerNotAuthor { position } => write!(
                 f,
-                "foreign asset-chain entry {position} was signed by a key that does not \
+                "received asset-chain entry {position} was signed by a key that does not \
                  derive its claimed author (BLAKE3(pubkey) != stake_holder_id)"
             ),
             Self::AlreadyOnSpine => write!(
                 f,
-                "this container's own spine already holds this asset — a foreign import \
-                 may not shadow a local title"
+                "this container's own block chain already holds this asset — a received \
+                 import may not shadow a local title"
             ),
             Self::Conflict { position } => write!(
                 f,
-                "foreign asset-chain diverges at entry {position} from the history already \
+                "received asset-chain diverges at entry {position} from the history already \
                  adopted for this asset — an adopted chain may only be extended"
             ),
             Self::NotAnExtension { held, presented } => write!(
                 f,
-                "foreign asset-chain presents {presented} entries but {held} are already \
+                "received asset-chain presents {presented} entries but {held} are already \
                  held — truncation is not an extension"
             ),
             Self::StoreFull(bound) => write!(
                 f,
-                "foreign asset-chain store is at capacity ({bound}) — refusing to admit a \
+                "received asset-chain store is at capacity ({bound}) — refusing to admit a \
                  new chain (nothing already adopted is evicted)"
             ),
         }
     }
 }
 
-/// What an accepted foreign asset-chain produced.
+/// What an accepted received asset-chain produced.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForeignChainReceipt {
+pub struct AcceptReceipt {
     /// The asset adopted.
     pub asset_hash: [u8; 32],
     /// Entries now held for it.

@@ -2,17 +2,17 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! S3.4 — the bounded off-spine store: byte accounting, the capacity bounds,
-//! and extension-only adoption of already-verified foreign asset-chains.
+//! S3.4 — the bounded received-chain store: byte accounting, the capacity bounds,
+//! and extension-only adoption of already-verified received asset-chains.
 
 use std::collections::HashMap;
 
 use crate::blockchain::block::BlockAssetEntry;
 
-use super::presented::{ForeignChainReject, StoreBound};
+use super::presented::{AcceptReject, StoreBound};
 
-/// Total bytes of foreign asset-chain material this container will hold
-/// off-spine. **This is the bound that binds.**
+/// Total bytes of received asset-chain material this container will hold
+/// aside from its own block chain. **This is the bound that binds.**
 ///
 /// # Why a byte budget and not a count
 ///
@@ -21,7 +21,7 @@ use super::presented::{ForeignChainReject, StoreBound};
 /// prints it): the entry carries its `StateProof` TWICE — once parsed, once as
 /// the `proof_bytes` the envelope signs — plus a 1793-byte public key and a
 /// ~1280-byte signature. 1024 × 512 × 7,038 B = **3.44 GiB**, i.e. **86 % of
-/// R13's entire 4 GB minimum-spec RAM**, claimed by an off-spine cache of other
+/// R13's entire 4 GB minimum-spec RAM**, claimed by a cache of other
 /// containers' titles. (It does not quite *exceed* 4 GB, as the QA advisory
 /// estimated — it is 3.44 GiB, not 2.6 GiB, and it is under the line rather
 /// than over it. The conclusion is unchanged: a cache permitted 86 % of a
@@ -47,30 +47,30 @@ use super::presented::{ForeignChainReject, StoreBound};
 ///
 /// At the measured 7,038-byte entry footprint, 64 MiB is ~9,500 adopted
 /// entries — e.g. 1024 chains averaging 9 entries, or a few hundred long
-/// histories. That is a working set, not an archive; the off-spine store is a
+/// histories. That is a working set, not an archive; the received-chain store is a
 /// cache of other containers' titles, and an operator reclaims space
 /// explicitly with
-/// [`forget_foreign_asset_chain`](crate::blockchain::chain::NodeBlockchain::forget_foreign_asset_chain).
-pub const MAX_FOREIGN_STORE_BYTES: usize = 64 * 1024 * 1024;
+/// [`forget_received_asset_chain`](crate::blockchain::chain::NodeBlockchain::forget_received_asset_chain).
+pub const MAX_RECEIVED_STORE_BYTES: usize = 64 * 1024 * 1024;
 
-/// Maximum number of distinct foreign asset-chains held off-spine.
+/// Maximum number of distinct received asset-chains held.
 ///
-/// SECONDARY guard. [`MAX_FOREIGN_STORE_BYTES`] is the memory bound; this one
+/// SECONDARY guard. [`MAX_RECEIVED_STORE_BYTES`] is the memory bound; this one
 /// bounds the *key* space, so a flood of one-entry chains cannot cost
 /// unbounded `HashMap` bookkeeping under the byte budget.
-pub const MAX_FOREIGN_CHAINS: usize = 1024;
+pub const MAX_RECEIVED_CHAINS: usize = 1024;
 
-/// Maximum number of entries in one foreign asset-chain.
+/// Maximum number of entries in one received asset-chain.
 ///
 /// SECONDARY guard, and a CPU one: verification cost is O(entries) FALCON-1024
 /// verifications, so an unbounded chain is a compute-exhaustion primitive as
 /// much as a memory one. The cap is applied BEFORE any signature work.
-pub const MAX_FOREIGN_CHAIN_ENTRIES: usize = 512;
+pub const MAX_RECEIVED_CHAIN_ENTRIES: usize = 512;
 
 /// Bytes charged for an entry whose footprint cannot be measured.
 ///
 /// Only reachable for an entry with no `signed_proof` envelope, which the
-/// accept path refuses before adoption ([`ForeignChainReject::Unsigned`]), or
+/// accept path refuses before adoption ([`AcceptReject::Unsigned`]), or
 /// for one whose pointer/registration will not serialize. Charging a large
 /// constant fails in the safe direction: an unmeasurable entry consumes budget
 /// as if it were the largest thing the wire could carry.
@@ -81,7 +81,7 @@ const UNMEASURED_ENTRY_BYTES: usize = 64 * 1024;
 /// rounding on each of the entry's several small allocations.
 const ENTRY_BOOKKEEPING_BYTES: usize = 512;
 
-/// Bytes an entry is charged against [`MAX_FOREIGN_STORE_BYTES`].
+/// Bytes an entry is charged against [`MAX_RECEIVED_STORE_BYTES`].
 ///
 /// Computed STRUCTURALLY, not by serializing the entry: every variable-length
 /// part is reachable directly, so the measurement costs no round-trip on a
@@ -129,37 +129,37 @@ pub fn chain_footprint_bytes(entries: &[BlockAssetEntry]) -> usize {
         .fold(0usize, usize::saturating_add)
 }
 
-/// Off-spine storage for verified foreign asset-chains.
+/// Storage for verified received asset-chains, held aside from the node's own block chain.
 ///
 /// # Bound: a byte budget, with the counts as secondary guards
 ///
 /// The store is fed from outside this container, so it is bounded — and the
-/// bound that binds is **[`MAX_FOREIGN_STORE_BYTES`] (64 MiB)**, measured per
+/// bound that binds is **[`MAX_RECEIVED_STORE_BYTES`] (64 MiB)**, measured per
 /// entry by [`entry_footprint_bytes`] and maintained incrementally in
-/// `bytes_held`. [`MAX_FOREIGN_CHAINS`] and [`MAX_FOREIGN_CHAIN_ENTRIES`]
+/// `bytes_held`. [`MAX_RECEIVED_CHAINS`] and [`MAX_RECEIVED_CHAIN_ENTRIES`]
 /// remain, as a key-space guard and a per-message compute guard respectively,
 /// but neither is load-bearing for memory: their product at the measured
 /// 7,038-byte entry footprint is 3.44 GiB — 86 % of R13's 4 GB minimum-spec
 /// RAM.
 ///
 /// Worst-case footprint of this store, stated plainly: **64 MiB of entry
-/// material**, plus `MAX_FOREIGN_CHAINS` × (32-byte key + `Vec` header) ≈
+/// material**, plus `MAX_RECEIVED_CHAINS` × (32-byte key + `Vec` header) ≈
 /// 56 KiB of map overhead — call it 64.1 MiB. Against R13 (1 Mb/s, 50 GB,
 /// 4 GB RAM, 2-core 1 GHz) that is 1.6 % of RAM, leaving the rest of the node
-/// its working set. See [`MAX_FOREIGN_STORE_BYTES`] for the derivation.
+/// its working set. See [`MAX_RECEIVED_STORE_BYTES`] for the derivation.
 ///
 /// # Why eviction is refused
 ///
 /// The alternative — evict-oldest, as the orphan buffer does — is
 /// attacker-steerable here in a way it is not there. An orphan is unverified
-/// and provisional; an adopted foreign chain is verified history that a caller
+/// and provisional; an adopted received chain is verified history that a caller
 /// may already have acted on. Making admission of attacker-supplied chains able
 /// to *displace* it would hand an attacker a deletion primitive. Refusing new
 /// admissions loses nothing that was already established, and an operator can
 /// always release space explicitly with
-/// [`forget_foreign_asset_chain`](crate::blockchain::chain::NodeBlockchain::forget_foreign_asset_chain).
+/// [`forget_received_asset_chain`](crate::blockchain::chain::NodeBlockchain::forget_received_asset_chain).
 #[derive(Clone, Debug, Default)]
-pub struct ForeignChainStore {
+pub struct ReceivedAssetStore {
     chains: HashMap<[u8; 32], Vec<BlockAssetEntry>>,
     /// Charged bytes across every held chain, maintained incrementally so the
     /// byte budget is O(1) to test rather than a walk of every entry.
@@ -173,13 +173,13 @@ pub struct ForeignChainStore {
     bytes_held: usize,
 }
 
-impl ForeignChainStore {
+impl ReceivedAssetStore {
     /// An empty store.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Number of distinct foreign asset-chains held.
+    /// Number of distinct received asset-chains held.
     pub fn len(&self) -> usize {
         self.chains.len()
     }
@@ -212,7 +212,7 @@ impl ForeignChainStore {
         debug_assert_eq!(
             self.bytes_held,
             self.recomputed_bytes(),
-            "ForeignChainStore.bytes_held desynced from the entries held — a mutation \
+            "ReceivedAssetStore.bytes_held desynced from the entries held — a mutation \
              bypassed adopt()/forget()"
         );
     }
@@ -254,7 +254,7 @@ impl ForeignChainStore {
     ///
     /// 1. as an EARLY probe, under a read lock, before any FALCON-1024 work —
     ///    so a refusal at steady-state capacity costs O(1) instead of up to
-    ///    [`MAX_FOREIGN_CHAIN_ENTRIES`] signature verifications;
+    ///    [`MAX_RECEIVED_CHAIN_ENTRIES`] signature verifications;
     /// 2. as the AUTHORITATIVE check inside [`Self::adopt`], under the write
     ///    lock that actually admits the entries.
     ///
@@ -274,18 +274,18 @@ impl ForeignChainStore {
         &self,
         is_new_chain: bool,
         incoming_bytes: usize,
-    ) -> Result<(), ForeignChainReject> {
-        if is_new_chain && self.chains.len() >= MAX_FOREIGN_CHAINS {
-            return Err(ForeignChainReject::StoreFull(StoreBound::Chains {
+    ) -> Result<(), AcceptReject> {
+        if is_new_chain && self.chains.len() >= MAX_RECEIVED_CHAINS {
+            return Err(AcceptReject::StoreFull(StoreBound::Chains {
                 held: self.chains.len(),
-                limit: MAX_FOREIGN_CHAINS,
+                limit: MAX_RECEIVED_CHAINS,
             }));
         }
-        if self.bytes_held.saturating_add(incoming_bytes) > MAX_FOREIGN_STORE_BYTES {
-            return Err(ForeignChainReject::StoreFull(StoreBound::Bytes {
+        if self.bytes_held.saturating_add(incoming_bytes) > MAX_RECEIVED_STORE_BYTES {
+            return Err(AcceptReject::StoreFull(StoreBound::Bytes {
                 held: self.bytes_held,
                 incoming: incoming_bytes,
-                budget: MAX_FOREIGN_STORE_BYTES,
+                budget: MAX_RECEIVED_STORE_BYTES,
             }));
         }
         Ok(())
@@ -317,13 +317,13 @@ impl ForeignChainStore {
         &mut self,
         asset_hash: [u8; 32],
         entries: Vec<BlockAssetEntry>,
-    ) -> Result<usize, ForeignChainReject> {
+    ) -> Result<usize, AcceptReject> {
         // Read-only judgement first, so a refusal leaves the store untouched
         // and its accounting trivially intact.
         let (is_new_chain, split_at) = match self.chains.get(&asset_hash) {
             Some(held) => {
                 if entries.len() < held.len() {
-                    return Err(ForeignChainReject::NotAnExtension {
+                    return Err(AcceptReject::NotAnExtension {
                         held: held.len(),
                         presented: entries.len(),
                     });
@@ -334,7 +334,7 @@ impl ForeignChainStore {
                             && presented.asset_seq() == held_entry.asset_seq()
                     });
                     if !same {
-                        return Err(ForeignChainReject::Conflict { position });
+                        return Err(AcceptReject::Conflict { position });
                     }
                 }
                 (false, held.len())

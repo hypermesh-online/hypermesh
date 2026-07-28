@@ -174,7 +174,7 @@ pub const MAX_TOTAL_ATTESTATIONS: usize = 8192;
 /// the operative bound rather than decoration.
 ///
 /// Against R13 (1 Mb/s, 50 GB, 4 GB RAM, 2-core 1 GHz), 32 MiB is **0.8 %** of
-/// RAM — half the off-spine foreign-chain store's 64 MiB, which is the right
+/// RAM — half the received-chain store's 64 MiB, which is the right
 /// ratio: that store caches other containers' titles, this pool holds live
 /// third-party statements about assets we already hold. A minimum-spec node
 /// keeps ~3.9 GB for the block store, the matrix, STOQ buffers and the asset
@@ -542,8 +542,8 @@ impl MirrorAttestationPool {
     /// traffic. It is reached from
     /// [`NodeBlockchain::clear_mirror_attestations`] (an operator/host
     /// decision) and from
-    /// [`NodeBlockchain::forget_foreign_asset_chain`], which is the one place
-    /// where an asset genuinely stops being held: once the foreign chain is
+    /// [`NodeBlockchain::forget_received_asset_chain`], which is the one place
+    /// where an asset genuinely stops being held: once the received chain is
     /// gone, `holds_asset` is false, so
     /// [`accept_wire_attestation`](NodeBlockchain::accept_wire_attestation)
     /// would refuse a NEW attestation for it — keeping the old ones would charge
@@ -701,9 +701,9 @@ impl NodeBlockchain {
     /// One admission rule on top of
     /// [`record_mirror_attestation`](Self::record_mirror_attestation), and NOT a
     /// second list of verification checks: **we only cache statements about
-    /// assets this container holds** — on its own spine, or as a foreign
+    /// assets this container holds** — on its own spine, or as a received
     /// asset-chain adopted by
-    /// [`accept_foreign_asset_chain`](Self::accept_foreign_asset_chain).
+    /// [`accept_asset_chain`](Self::accept_asset_chain).
     ///
     /// The pool is keyed by a 32-byte asset hash that a remote sender chooses
     /// freely. Without this rule the key space belongs to the sender, and the
@@ -722,19 +722,19 @@ impl NodeBlockchain {
         &self,
         attestation: MirrorAttestation,
     ) -> Result<(), String> {
-        // S3.5: `holds_asset` spans the spine AND adopted foreign chains, so an
-        // attestation about a FOREIGN-only asset is admitted here and consumes
-        // the same global budget from which spine assets' attestations are
-        // sealed. Foreign-accepted material can therefore influence which
-        // evidence reaches the spine — a coupling NOT covered by the "foreign
-        // chains are not in AssetChainIndex / authorizes_shard" exclusion,
-        // which is about lineage authority rather than about a shared bound.
+        // S3.5: `holds_asset` spans the block chain AND adopted received chains, so an
+        // attestation about a RECEIVED-only asset is admitted here and consumes
+        // the same global budget from which block-chain assets' attestations are
+        // sealed. Received-accepted material can therefore influence which
+        // evidence reaches the block chain — a coupling NOT covered by the
+        // "received chains are not in AssetChainIndex / authorizes_shard"
+        // exclusion, which is about lineage authority rather than a shared bound.
         //
-        // The gate S3.5 will need: the pool must budget spine-held and
-        // foreign-held assets SEPARATELY, so foreign material cannot crowd out
+        // The gate S3.5 will need: the pool must budget block-chain-held and
+        // received-held assets SEPARATELY, so received material cannot crowd out
         // attestations for assets this container actually owns. It is deferred
-        // rather than added now because Part A (accept_foreign_asset_chain) has
-        // no wire caller — no remote input can reach the foreign side of
+        // rather than added now because Part A (accept_asset_chain) has
+        // no wire caller — no remote input can reach the received side of
         // `holds_asset` in the shipped binary — so the coupling is real but
         // unreachable, and splitting the budget is a policy change that must be
         // designed with the cross-scope transfer path rather than bolted on
@@ -742,7 +742,7 @@ impl NodeBlockchain {
         if !self.holds_asset(&attestation.asset_hash).await {
             return Err(format!(
                 "mirror attestation not cached: this container holds no asset {} \
-                 (neither on its spine nor as an adopted foreign chain)",
+                 (neither on its block chain nor as an adopted received chain)",
                 &hex::encode(attestation.asset_hash)[..16],
             ));
         }
