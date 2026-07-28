@@ -777,36 +777,66 @@ impl NodeBlockchain {
         self.add_block(vec![entry]).await
     }
 
-    /// Write a key rotation entry to the blockchain.
+    /// Write a key rotation entry to the blockchain as a SUCCESSOR of the
+    /// node's identity asset (D5 Part 2 — "node identity is a first-class asset
+    /// chain").
     ///
-    /// Records old->new key transition with FALCON-signed proof (§6.2.2).
-    /// The rotation entry is stored as a `StoragePointer::Local` payload
-    /// so peers receiving the block can extract and verify the chain.
+    /// A key rotation is not a new asset; it is the next event in the node's
+    /// identity lineage. So the entry carries the SAME `asset_hash` as the
+    /// identity asset it extends (`identity_asset_hash` — the content hash of
+    /// the genesis `BaseSystem(Identity)` registration, stable across
+    /// rotations). The single-write chokepoint's lineage stamping
+    /// ([`stamp_asset_lineage`](Self::stamp_asset_lineage)) then chains this
+    /// entry onto the identity head (`prev = head.lineage_id`, `asset_seq + 1`),
+    /// so the node's identity + every rotation walk as ONE [`AssetLineage`].
     ///
-    /// The caller supplies a real `&StateProof` for the owning node
-    /// (mirroring [`register_asset_records`]); this method never fabricates
-    /// a proof.
+    /// The entry is scoped `Private(NodeFingerprint)` (`network_scope`) — a
+    /// node's identity chain belongs to that node — and categorised
+    /// `BaseSystem(KeyRotation)`. The serialized `KeyRotationEntry` rides in the
+    /// `StoragePointer::Local` payload as auxiliary data (the asset is
+    /// content-addressed by `identity_asset_hash`, not by the rotation bytes —
+    /// the same pattern as [`register_dns_asset`](Self::register_dns_asset)).
+    ///
+    /// The caller supplies a real `&StateProof` for the owning node; this method
+    /// never fabricates a proof, and `new_bound` re-binds it to
+    /// `identity_asset_hash` so the signed-to-content invariant (P1) holds.
     pub async fn add_key_rotation_block(
         &self,
         entry: &trustchain::identity::KeyRotationEntry,
         state_proof: &StateProof,
+        identity_asset_hash: [u8; 32],
+        network_scope: crate::assets::core::NetworkScope,
     ) -> Result<Block, String> {
+        use crate::assets::core::{AssetCategory, AssetData, BaseSystemType};
+
         let entry_bytes = serde_json::to_vec(entry).map_err(|e| {
             format!("Failed to serialize key rotation entry: {e}")
         })?;
-        let asset_hash = *blake3::hash(&entry_bytes).as_bytes();
 
-        // Bind the proof to the content hash (signed-to-content invariant, P1).
-        // Here the Local payload IS the content (`entry_bytes`) and
-        // `asset_hash == BLAKE3(entry_bytes)`, so content-validity of the
-        // payload is also directly checkable by receivers.
+        // The rotation registration is metadata (category + scope) for a NEW
+        // entry in an EXISTING asset's chain; its own content hash is unused as
+        // an asset id, because the entry is addressed by `identity_asset_hash`.
+        let registration = AssetRegistration::from_asset_data(
+            &AssetData {
+                config: Vec::new(),
+                definition: entry_bytes.clone(),
+                metadata: Vec::new(),
+            },
+            network_scope,
+            AssetCategory::BaseSystem(BaseSystemType::KeyRotation),
+        );
+
+        // asset_hash = the identity asset being extended, so lineage stamping
+        // links this rotation onto the identity head rather than re-rooting a
+        // fresh single-entry asset. `new_bound` binds the proof to that hash
+        // (signed-to-content, P1); the rotation bytes ride as auxiliary payload.
         let block_entry = BlockAssetEntry::new_bound(
-            asset_hash,
+            identity_asset_hash,
             state_proof,
             StoragePointer::Local {
                 path: String::from_utf8_lossy(&entry_bytes).to_string(),
             },
-            AssetRegistration::genesis(self.node_coordinate),
+            registration,
         );
 
         self.add_block(vec![block_entry]).await

@@ -20,13 +20,16 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
     let addr = parse_target(target).await?;
     let coord = (cli.coord_x, cli.coord_y, cli.coord_z);
 
-    // Resolve identity directory for loading/creating FALCON keypair
+    // Resolve identity directory for loading/creating FALCON keypair.
+    // D5: identity lives at the coordinate-independent `data_dir/identity`;
+    // adopt a legacy coord-keyed copy so an un-migrated install still signs
+    // with its own keypair rather than an ephemeral one.
     let data_dir = resolve_data_dir(&cli.data_dir)?;
-    let nid = blockmatrix::bootstrap::node_id(
+    let legacy_key = blockmatrix::bootstrap::node_id(
         &blockmatrix::matrix::coordinate::MatrixCoordinate::new(coord.0, coord.1, coord.2)?,
     );
-
-    let identity_dir = data_dir.join(&nid).join("identity");
+    let identity_dir = blockmatrix::bootstrap::adopt_legacy_identity(&data_dir, &legacy_key)
+        .unwrap_or_else(|_| blockmatrix::bootstrap::identity_dir(&data_dir));
     let falcon_identity =
         blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)
             .unwrap_or_else(|_| blockmatrix::identity::FalconIdentity::generate());

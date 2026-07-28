@@ -124,12 +124,25 @@ pub(crate) fn handle_destroy(chaotic: bool, cli: &Cli) -> Result<()> {
         return Ok(());
     }
 
+    // D5: node state may live under a legacy coordinate key (`node_{x}_{y}_{z}`)
+    // OR the identity key (device-id hex, a dir carrying a `blockchain/`
+    // sub-dir), and the FALCON keypair lives at the coordinate-independent
+    // `data_dir/identity`. Destroy recognises all three so it works across the
+    // migration window.
     let mut node_dirs: Vec<std::path::PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&data_dir) {
         for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
             let name = entry.file_name();
-            if name.to_string_lossy().starts_with("node_") && entry.path().is_dir() {
-                node_dirs.push(entry.path());
+            let name = name.to_string_lossy();
+            let is_legacy = name.starts_with("node_");
+            let is_identity = name == "identity";
+            let is_state_dir = path.join("blockchain").is_dir();
+            if is_legacy || is_identity || is_state_dir {
+                node_dirs.push(path);
             }
         }
     }

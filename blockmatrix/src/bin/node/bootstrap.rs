@@ -124,6 +124,7 @@ fn enforce_min_sources(require_hardware_auth: bool) -> Result<()> {
 pub(crate) async fn resume_node(
     data_dir: &std::path::Path,
     nid: &str,
+    identity_dir: &std::path::Path,
     coord: MatrixCoordinate,
     require_hardware_auth: bool,
 ) -> Result<(NodeBootstrap, std::sync::Arc<PersistenceManager>)> {
@@ -184,10 +185,11 @@ pub(crate) async fn resume_node(
 
     // H3: load this node's FALCON identity so the reconstructed chain can sign
     // locally-produced blocks' proof envelopes (single local-write chokepoint).
-    let identity_dir = data_dir.join(nid).join("identity");
+    // D5: identity lives at the coordinate-independent `identity_dir`, not under
+    // the data-dir key.
     let falcon_identity: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> =
         std::sync::Arc::new(
-            blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)
+            blockmatrix::identity::FalconIdentity::load_or_create(identity_dir)
                 .context("failed to load FALCON identity for block signing")?,
         );
 
@@ -227,6 +229,7 @@ pub(crate) async fn resume_node(
 pub(crate) async fn fresh_boot(
     data_dir: &std::path::Path,
     nid: &str,
+    identity_dir: &std::path::Path,
     coord: MatrixCoordinate,
     device_node_id: &str,
     require_hardware_auth: bool,
@@ -243,11 +246,11 @@ pub(crate) async fn fresh_boot(
     // FALCON-sign locally-produced block proof envelopes (single local-write
     // signing chokepoint). `FalconIdentity` is not `Clone`, so the downstream
     // hardware-asset registration re-loads it (idempotent `load_or_create`
-    // reads the same persisted keys).
-    let signing_identity_dir = data_dir.join(nid).join("identity");
+    // reads the same persisted keys). D5: identity lives at the
+    // coordinate-independent `identity_dir`, not under the data-dir key.
     let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> =
         std::sync::Arc::new(blockmatrix::identity::FalconIdentity::load_or_create(
-            &signing_identity_dir,
+            identity_dir,
         )?);
 
     // S3.0/B1: the persistence manager is created BEFORE the chain so it can be
@@ -305,9 +308,9 @@ pub(crate) async fn fresh_boot(
     );
 
     // === R1/R10: Load identity and assess hardware for genesis asset registration ===
-    let identity_dir = data_dir.join(nid).join("identity");
+    // D5: identity lives at the coordinate-independent `identity_dir`.
     let falcon_identity =
-        blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
+        blockmatrix::identity::FalconIdentity::load_or_create(identity_dir)?;
     info!(
         "Genesis identity: {}... (FALCON-1024 + Kyber-1024)",
         &falcon_identity.node_id[..16]
